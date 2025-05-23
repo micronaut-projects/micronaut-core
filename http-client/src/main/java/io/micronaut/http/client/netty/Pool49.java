@@ -22,6 +22,7 @@ import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.exceptions.HttpClientException;
+import io.micronaut.http.netty.channel.loom.EventLoopVirtualThreadScheduler;
 import io.micronaut.http.netty.channel.loom.PrivateLoomSupport;
 import io.micronaut.scheduling.LoomSupport;
 import io.netty.channel.EventLoop;
@@ -186,30 +187,28 @@ final class Pool49 implements Pool {
         var configLocality = connectionPoolConfiguration.getConnectionLocality();
         if (configLocality != HttpClientConfiguration.ConnectionPoolConfiguration.ConnectionLocality.IGNORE) {
 
-            if (!PrivateLoomSupport.isSupported() || !LoomSupport.isVirtual(Thread.currentThread())) {
-                EventExecutor currentExecutor = ThreadExecutorMap.currentExecutor();
-                if (currentExecutor == null) {
-                    for (LocalPoolPair pool : localPools) {
-                        if (pool.loop.inEventLoop()) {
-                            poolPair = pool;
-                            break;
-                        }
-                    }
-                } else {
-                    poolPair = localPoolsByLoop.get(currentExecutor);
-                }
-            } else {
-                Thread carrier = PrivateLoomSupport.getCarrierThread(Thread.currentThread());
-                if (carrier != null) {
-                    for (LocalPoolPair pool : localPools) {
-                        if (pool.carrier == carrier) {
-                            poolPair = pool;
-                            break;
-                        }
-                    }
-                }
+            EventExecutor currentExecutor = null;
+
+            if (PrivateLoomSupport.isSupported() &&
+                LoomSupport.isVirtual(Thread.currentThread()) &&
+                PrivateLoomSupport.getScheduler(Thread.currentThread()) instanceof EventLoopVirtualThreadScheduler el) {
+                currentExecutor = el.eventLoop();
             }
 
+            if (currentExecutor == null) {
+                currentExecutor = ThreadExecutorMap.currentExecutor();
+            }
+
+            if (currentExecutor == null) {
+                for (LocalPoolPair pool : localPools) {
+                    if (pool.loop.inEventLoop()) {
+                        poolPair = pool;
+                        break;
+                    }
+                }
+            } else {
+                poolPair = localPoolsByLoop.get(currentExecutor);
+            }
             if (poolPair == null && configLocality == HttpClientConfiguration.ConnectionPoolConfiguration.ConnectionLocality.ENFORCED_ALWAYS) {
                 throw new HttpClientException("Attempted to open a HTTP connection from thread " +
                     Thread.currentThread() + " which is not part of the client event loop group, but configured the pool in locality mode ENFORCED_ALWAYS, which disallows " +
@@ -363,7 +362,6 @@ final class Pool49 implements Pool {
      */
     final class LocalPoolPair {
         final EventExecutor loop;
-        Thread carrier;
         final LocalPool<Http1PoolEntry> http1;
         final LocalPool<Http2PoolEntry> http2;
         /**
@@ -388,13 +386,6 @@ final class Pool49 implements Pool {
             this.loop = loop;
             http1 = new LocalPool<>();
             http2 = new LocalPool<>();
-            loop.execute(() -> {
-                if (PrivateLoomSupport.isSupported() && LoomSupport.isVirtual(Thread.currentThread())) {
-                    carrier = PrivateLoomSupport.getCarrierThread(Thread.currentThread());
-                } else {
-                    carrier = Thread.currentThread();
-                }
-            });
         }
 
         /**

@@ -18,6 +18,7 @@ package io.micronaut.http.netty.channel.loom;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.scheduling.LoomSupport;
 import io.netty.channel.EventLoopGroup;
@@ -26,6 +27,9 @@ import io.netty.channel.IoHandler;
 import io.netty.channel.IoHandlerFactory;
 import io.netty.channel.ManualIoEventLoop;
 import io.netty.channel.MultiThreadIoEventLoopGroup;
+import io.netty.util.AttributeMap;
+import io.netty.util.DefaultAttributeMap;
+import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.internal.ThreadExecutorMap;
 import io.netty.util.internal.shaded.org.jctools.queues.MpscUnboundedArrayQueue;
 import jakarta.inject.Singleton;
@@ -40,6 +44,7 @@ import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.LockSupport;
 
@@ -77,6 +82,10 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
      * Maximum number of queued tasks before entering throughput mode.
      */
     private static final int THROUGHPUT_MODE_THRESHOLD = 10;
+    /**
+     * Maximum number of threads per event loop before work spilling should kick in.
+     */
+    private static final int WORK_SPILL_THREAD_THRESHOLD = 2;
 
     private List<Runner> runners;
 
@@ -116,7 +125,10 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
     @Requires(condition = LoomSupport.LoomCondition.class)
     @Requires(condition = PrivateLoomSupport.PrivateLoomCondition.class)
     public static final class Factory {
-        Factory() {
+        final EventLoopLoomFactory holder;
+
+        Factory(EventLoopLoomFactory holder) {
+            this.holder = holder;
         }
 
         public EventLoopGroup create(int nThreads, Executor executor, IoHandlerFactory ioHandlerFactory) {
@@ -124,10 +136,11 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
         }
     }
 
-    private final class Runner implements Runnable, Executor, ThreadFactory {
+    final class Runner implements Runnable, EventLoopVirtualThreadScheduler, ThreadFactory {
         final int id;
         final Factory factory;
         final ManualIoEventLoop delegate;
+        final AttributeMap attributeMap = new DefaultAttributeMap();
         IoHandler backingHandler;
         Thread carrier;
 
@@ -162,10 +175,6 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
          * Whether we should block for the next {@link ManualIoEventLoop#run(long, long)} call.
          */
         volatile boolean block;
-        /**
-         * Thread counter for the thread name.
-         */
-        int threadId = 0;
         /**
          * If {@code true}, continuations from {@link #localLoomQueue} are executed in FIFO mode,
          * otherwise FILO mode is used.
@@ -217,7 +226,7 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
 
                         // we don't need to wake up if we're running on a vthread carried by this event loop.
                         Thread thread = Thread.currentThread();
-                        if (LoomSupport.isVirtual(thread) && PrivateLoomSupport.getCarrierThread(thread) == carrier) {
+                        if (isOnRunner(thread)) {
                             if (!throughputMode) {
                                 expediteWrite = true;
                                 Thread.yield();
@@ -227,6 +236,20 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
                 };
             };
             this.delegate = new ManualIoEventLoop(null, proxied);
+        }
+
+        @Override
+        public @NonNull AttributeMap attributeMap() {
+            return attributeMap;
+        }
+
+        @Override
+        public EventExecutor eventLoop() {
+            return delegate;
+        }
+
+        private boolean isOnRunner(Thread thread) {
+            return LoomSupport.isVirtual(thread) && PrivateLoomSupport.getScheduler(thread) == Runner.this;
         }
 
         /**
@@ -240,10 +263,10 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
 
         @Override
         public Thread newThread(Runnable r) {
-            return LoomSupport.unstarted("loom-on-netty-" + id + "-" + threadId++, b -> {
+            return LoomSupport.unstarted("loom-on-netty-" + id + "-" + ThreadLocalRandom.current().nextLong(), b -> {
                 Runner dst = Runner.this;
                 int active = activeThreads();
-                if (active > 1) {
+                if (active >= WORK_SPILL_THREAD_THRESHOLD) {
                     // spill to a less busy event loop
                     for (Runner runner : runners) {
                         int a = runner.activeThreads();
@@ -292,6 +315,7 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
         private void runIo() {
             delegate.setOwningThread(Thread.currentThread());
             ThreadExecutorMap.setCurrentExecutor(delegate);
+            factory.holder.targetScheduler.set(this);
 
             while (!delegate.isShuttingDown()) {
                 // Phase 1/2: run IO (blocking/non-blocking) and event loop tasks
@@ -405,7 +429,7 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
             if (ioContinuation == command) {
                 Thread t = Thread.currentThread();
                 ioContinuationScheduled = true;
-                if (t != carrier && (!LoomSupport.isVirtual(t) || PrivateLoomSupport.getCarrierThread(t) != carrier)) {
+                if (t != carrier && !isOnRunner(t)) {
                     LockSupport.unpark(carrier);
                 }
                 return;
@@ -462,7 +486,7 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
                 }
                 globalLoomQueue.add(command);
 
-                if (LoomSupport.isVirtual(Thread.currentThread()) && PrivateLoomSupport.getCarrierThread(Thread.currentThread()) == carrier) {
+                if (isOnRunner(Thread.currentThread())) {
                     if (!throughputMode && !expediteWrite) {
                         Thread.yield();
                     }

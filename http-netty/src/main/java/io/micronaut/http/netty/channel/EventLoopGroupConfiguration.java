@@ -103,6 +103,10 @@ public interface EventLoopGroupConfiguration extends Named {
         return Duration.ofSeconds(DEFAULT_SHUTDOWN_TIMEOUT);
     }
 
+    /**
+     * @return When set to {@code true}, use a special <i>experimental</i> event loop that can also
+     * execute virtual threads, in order to improve virtual thread performance.
+     */
     @Experimental
     default boolean isLoomCarrier() {
         return false;

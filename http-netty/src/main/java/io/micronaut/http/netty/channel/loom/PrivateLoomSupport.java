@@ -40,14 +40,16 @@ import java.util.concurrent.ForkJoinPool;
 @Experimental
 public final class PrivateLoomSupport {
     private static final MethodHandle DEFAULT_SCHEDULER;
-    private static final MethodHandle SCHEDULER;
+    private static final MethodHandle BUILDER_SCHEDULER;
     private static final MethodHandle CARRIER_THREAD;
+    private static final MethodHandle THREAD_SCHEDULER;
 
     private static final Throwable FAILURE;
 
     static {
         MethodHandle defaultScheduler;
-        MethodHandle scheduler;
+        MethodHandle builderScheduler;
+        MethodHandle threadScheduler;
         MethodHandle carrierThread;
         Throwable failure;
         try {
@@ -61,22 +63,32 @@ public final class PrivateLoomSupport {
             Field schedulerField = Class.forName("java.lang.ThreadBuilders$VirtualThreadBuilder")
                 .getDeclaredField("scheduler");
             schedulerField.setAccessible(true);
-            scheduler = lookup.unreflectSetter(schedulerField);
+            builderScheduler = lookup.unreflectSetter(schedulerField)
+                    .asType(MethodType.methodType(void.class, Object.class, Executor.class));
+
+            Field threadSchedulerField = Class.forName("java.lang.VirtualThread")
+                .getDeclaredField("scheduler");
+            threadSchedulerField.setAccessible(true);
+            threadScheduler = lookup.unreflectGetter(threadSchedulerField)
+                    .asType(MethodType.methodType(Executor.class, Thread.class));
 
             Field carrierThreadField = Class.forName("java.lang.VirtualThread")
                 .getDeclaredField("carrierThread");
             carrierThreadField.setAccessible(true);
-            carrierThread = lookup.unreflectGetter(carrierThreadField).asType(MethodType.methodType(Thread.class, Thread.class));
+            carrierThread = lookup.unreflectGetter(carrierThreadField)
+                    .asType(MethodType.methodType(Thread.class, Thread.class));
 
             failure = null;
         } catch (ReflectiveOperationException | InaccessibleObjectException roe) {
             defaultScheduler = null;
-            scheduler = null;
+            builderScheduler = null;
+            threadScheduler = null;
             carrierThread = null;
             failure = roe;
         }
         DEFAULT_SCHEDULER = defaultScheduler;
-        SCHEDULER = scheduler;
+        BUILDER_SCHEDULER = builderScheduler;
+        THREAD_SCHEDULER = threadScheduler;
         CARRIER_THREAD = carrierThread;
         FAILURE = failure;
     }
@@ -91,9 +103,9 @@ public final class PrivateLoomSupport {
         }
     }
 
-    static void setScheduler(Object builder, Executor executor) {
+    public static void setScheduler(Object builder, Executor executor) {
         try {
-            SCHEDULER.invoke(builder, executor);
+            BUILDER_SCHEDULER.invokeExact(builder, executor);
         } catch (Throwable e) {
             PlatformDependent.throwException(e);
         }
@@ -108,6 +120,15 @@ public final class PrivateLoomSupport {
         }
     }
 
+    public static Executor getScheduler(Thread t) {
+        try {
+            return (Executor) THREAD_SCHEDULER.invokeExact(t);
+        } catch (Throwable e) {
+            PlatformDependent.throwException(e);
+            throw new AssertionError();
+        }
+    }
+
     public static boolean isSupported() {
         return CARRIER_THREAD != null;
     }
@@ -115,7 +136,7 @@ public final class PrivateLoomSupport {
     static final class PrivateLoomCondition implements Condition {
         @Override
         public boolean matches(ConditionContext context) {
-            if (SCHEDULER == null) {
+            if (BUILDER_SCHEDULER == null) {
                 context.fail("Failed to access loom internals. Please make sure to add the `--add-opens=java.base/java.lang=ALL-UNNAMED` JVM argument. (" + FAILURE + ")");
                 return false;
             } else {

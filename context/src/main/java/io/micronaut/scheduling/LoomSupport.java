@@ -110,15 +110,6 @@ public final class LoomSupport {
         }
     }
 
-    public static ExecutorService newThreadPerTaskExecutor(ThreadFactory threadFactory) {
-        checkSupported();
-        try {
-            return (ExecutorService) MH_NEW_THREAD_PER_TASK_EXECUTOR.invokeExact(threadFactory);
-        } catch (Throwable e) {
-            throw new RuntimeException(e);
-        }
-    }
-
     @Experimental
     public static ThreadFactory newVirtualThreadFactory(String namePrefix, Consumer<Object> builderModifier) {
         checkSupported();
