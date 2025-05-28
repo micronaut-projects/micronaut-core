@@ -71,7 +71,7 @@ jfrunit = "1.0.0.Alpha2"
 # Versions which start with managed- are managed by Micronaut in the sense
 # that they will appear in the Micronaut BOM as <properties>
 #
-managed-groovy = "4.0.26"
+managed-groovy = "4.0.27"
 managed-jakarta-annotation-api = "2.1.1"
 managed-jackson = "2.18.3"
 #@NextMajorVersion @Deprecated Delete in Micronaut Framework 5.
