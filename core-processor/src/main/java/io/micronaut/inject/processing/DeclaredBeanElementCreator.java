@@ -101,7 +101,9 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
         MethodElement constructorElement = classElement.getPrimaryConstructor().orElse(null);
         if (constructorElement != null) {
             applyConfigurationInjectionIfNecessary(beanDefinitionWriter, constructorElement);
-            beanDefinitionWriter.visitBeanDefinitionConstructor(constructorElement, constructorElement.isPrivate(), visitorContext);
+            ClassElement beanDef = ClassElement.of(beanDefinitionWriter.getBeanTypeName());
+            boolean requiresReflection = !constructorElement.isAccessible(beanDef);
+            beanDefinitionWriter.visitBeanDefinitionConstructor(constructorElement, requiresReflection, visitorContext);
         } else {
             beanDefinitionWriter.visitDefaultConstructor(AnnotationMetadata.EMPTY_METADATA, visitorContext);
         }

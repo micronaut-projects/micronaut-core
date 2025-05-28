@@ -30,6 +30,7 @@ import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.ElementQuery;
+import io.micronaut.inject.ast.ImportedClass;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.PropertyElementQuery;
@@ -118,7 +119,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                     introspectionIndex,
                     element,
                     ce,
-                    metadata ? ce.getAnnotationMetadata() : null,
+                    metadata ? ce.getAnnotationMetadata() : AnnotationMetadata.EMPTY_METADATA,
                     context
                 );
 
@@ -149,7 +150,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                             introspectionIndex,
                             element,
                             classElement,
-                            metadata ? classElement.getAnnotationMetadata() : null,
+                            metadata ? classElement.getAnnotationMetadata() : AnnotationMetadata.EMPTY_METADATA,
                             context
                         );
 
@@ -164,12 +165,27 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             }
         } else {
             processBuilderDefinition(element, context, introspected, 0, targetPackage);
-            final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
-                targetPackage,
-                element,
-                metadata ? element.getAnnotationMetadata() : null,
-                context
-            );
+            final BeanIntrospectionWriter writer;
+            if (element.hasAnnotation(ImportedClass.class)) {
+                ClassElement originatingElement = context.getClassElement(element.stringValue(ImportedClass.class, "originatingElement").orElseThrow()).orElseThrow();
+                writer = new BeanIntrospectionWriter(
+                element.stringValue(ImportedClass.class, "targetPackage")
+                    .orElse(element.getPackageName()),
+                    element.getName(),
+                    0,
+                    originatingElement,
+                    element,
+                    metadata ? element.getAnnotationMetadata() : AnnotationMetadata.EMPTY_METADATA,
+                    context
+                );
+            } else {
+                writer = new BeanIntrospectionWriter(
+                    targetPackage,
+                    element,
+                    metadata ? element.getAnnotationMetadata() : AnnotationMetadata.EMPTY_METADATA,
+                    context
+                );
+            }
             processElement(metadata, indexedAnnotations, element, writer, ignoreSettersWithDifferingType);
         }
     }

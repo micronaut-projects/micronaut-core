@@ -17,7 +17,9 @@ package io.micronaut.annotation.processing;
 
 import io.micronaut.annotation.processing.visitor.JavaClassElement;
 import io.micronaut.annotation.processing.visitor.JavaNativeElement;
+import io.micronaut.context.annotation.ClassImport;
 import io.micronaut.context.annotation.ConfigurationReader;
+import io.micronaut.context.visitor.VisitorUtils;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
@@ -52,6 +54,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static javax.lang.model.element.ElementKind.ENUM;
 
@@ -85,6 +88,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         "io.micronaut.context.annotation.Value",
         "io.micronaut.context.annotation.Property",
         "io.micronaut.context.annotation.Executable",
+        ClassImport.class.getName(),
         AnnotationUtil.ANN_AROUND,
         AnnotationUtil.ANN_INTERCEPTOR_BINDINGS,
         AnnotationUtil.ANN_INTERCEPTOR_BINDING,
@@ -134,6 +138,16 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 annotations.forEach(annotation -> modelUtils.resolveTypeElements(
                         roundEnv.getElementsAnnotatedWith(annotation)
                     )
+                    .flatMap(typeElement -> {
+                        if (annotation.getQualifiedName().toString().equals(ClassImport.class.getName())) {
+                            ElementAnnotationMetadataFactory annotationMetadataFactory = javaVisitorContext.getElementAnnotationMetadataFactory().readOnly();
+                            JavaClassElement classElement = javaVisitorContext.getElementFactory()
+                                .newClassElement(typeElement, annotationMetadataFactory);
+                            return VisitorUtils.collectImportedElements(classElement, javaVisitorContext)
+                                .stream().map(e -> ((JavaClassElement) e).getNativeType().element());
+                        }
+                        return Stream.of(typeElement);
+                    })
                     .forEach(typeElement -> {
                         if (typeElement.getKind() == ENUM) {
                             final AnnotationMetadata am = annotationMetadataBuilder.lookupOrBuildForType(typeElement);
