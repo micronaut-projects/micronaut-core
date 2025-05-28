@@ -26,4 +26,5 @@ io.micronaut.visitors.IntroductionTestVisitor
 io.micronaut.visitors.CollectingVisitor
 io.micronaut.visitors.GeneratorVisitor
 io.micronaut.visitors.BuilderVisitor
+io.micronaut.visitors.ImportTypeElementSpec$DefaultTypeElementVisitor
 io.micronaut.visitors.query.TypeElementQuerySpec$TypeElementQueryVisitor

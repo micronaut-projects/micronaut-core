@@ -19,6 +19,7 @@ import io.micronaut.annotation.processing.visitor.JavaClassElement;
 import io.micronaut.annotation.processing.visitor.JavaElementFactory;
 import io.micronaut.annotation.processing.visitor.JavaNativeElement;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.visitor.VisitorUtils;
 import io.micronaut.core.annotation.Generated;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -28,6 +29,7 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.version.VersionUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
+import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.EnumConstantElement;
@@ -268,7 +270,13 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
                 List<JavaClassElement> javaClassElements = elements.stream()
                     .map(typeElement -> elementFactory.newSourceClassElement(typeElement, elementAnnotationMetadataFactory))
-                    .toList();
+                    .collect(Collectors.toCollection(() -> new ArrayList<>(elements.size())));
+
+                List<ClassElement> extraClasses = new ArrayList<>();
+                for (JavaClassElement javaClassElement : javaClassElements) {
+                    extraClasses.addAll(VisitorUtils.collectImportedElements(javaClassElement, javaVisitorContext));
+                }
+                javaClassElements.addAll((Collection) extraClasses);
 
                 for (LoadedVisitor loadedVisitor : loadedVisitors) {
                     for (JavaClassElement javaClassElement : javaClassElements) {
