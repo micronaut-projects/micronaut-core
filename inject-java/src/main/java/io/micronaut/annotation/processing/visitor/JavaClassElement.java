@@ -414,26 +414,24 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     private List<MethodElement> getRecordMethods() {
         var recordComponents = new HashSet<String>();
         var methodElements = new ArrayList<MethodElement>();
-        if (JavaModelUtils.isRecord(classElement)) {
-            for (Element enclosedElement : classElement.getEnclosedElements()) {
-                if (JavaModelUtils.isRecordComponent(enclosedElement) || enclosedElement instanceof ExecutableElement) {
-                    if (enclosedElement.getKind() == ElementKind.CONSTRUCTOR) {
-                        continue;
+        for (Element enclosedElement : classElement.getEnclosedElements()) {
+            if (JavaModelUtils.isRecordComponent(enclosedElement) || enclosedElement instanceof ExecutableElement) {
+                if (enclosedElement.getKind() == ElementKind.CONSTRUCTOR) {
+                    continue;
+                }
+                String name = enclosedElement.getSimpleName().toString();
+                if (enclosedElement instanceof ExecutableElement executableElement) {
+                    if (recordComponents.contains(name)) {
+                        methodElements.add(
+                            new JavaMethodElement(
+                                JavaClassElement.this,
+                                new JavaNativeElement.Method(executableElement),
+                                elementAnnotationMetadataFactory,
+                                visitorContext)
+                        );
                     }
-                    String name = enclosedElement.getSimpleName().toString();
-                    if (enclosedElement instanceof ExecutableElement executableElement) {
-                        if (recordComponents.contains(name)) {
-                            methodElements.add(
-                                new JavaMethodElement(
-                                    JavaClassElement.this,
-                                    new JavaNativeElement.Method(executableElement),
-                                    elementAnnotationMetadataFactory,
-                                    visitorContext)
-                            );
-                        }
-                    } else if (enclosedElement instanceof VariableElement) {
-                        recordComponents.add(name);
-                    }
+                } else if (enclosedElement instanceof VariableElement) {
+                    recordComponents.add(name);
                 }
             }
         }
@@ -442,17 +440,15 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
 
     private List<FieldElement> getRecordFields() {
         var fieldElements = new ArrayList<FieldElement>();
-        if (JavaModelUtils.isRecord(classElement)) {
-            for (Element enclosedElement : classElement.getEnclosedElements()) {
-                if (!JavaModelUtils.isRecordComponent(enclosedElement) && enclosedElement instanceof VariableElement variableElement) {
-                    fieldElements.add(
-                        new JavaFieldElement(
-                            JavaClassElement.this,
-                            new JavaNativeElement.Variable(variableElement),
-                            elementAnnotationMetadataFactory,
-                            visitorContext)
-                    );
-                }
+        for (Element enclosedElement : classElement.getEnclosedElements()) {
+            if (!JavaModelUtils.isRecordComponent(enclosedElement) && enclosedElement instanceof VariableElement variableElement) {
+                fieldElements.add(
+                    new JavaFieldElement(
+                        JavaClassElement.this,
+                        new JavaNativeElement.Variable(variableElement),
+                        elementAnnotationMetadataFactory,
+                        visitorContext)
+                );
             }
         }
         return fieldElements;
