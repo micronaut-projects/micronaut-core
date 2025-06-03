@@ -286,7 +286,7 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
 
             LoomSupport.unstarted(
                 "loom-on-netty-" + id + "-io",
-                b -> PrivateLoomSupport.setScheduler(b, this),
+                b -> PrivateLoomSupport.setScheduler(b, this::executeIo),
                 this::runIo
             ).start();
             assert ioContinuationScheduled;
@@ -413,13 +413,7 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
             return ranAny;
         }
 
-        @Override
-        public void execute(Runnable command) {
-            if (delegate.isShuttingDown()) {
-                PrivateLoomSupport.getDefaultScheduler().execute(command);
-                return;
-            }
-
+        private void executeIo(Runnable command) {
             // special handling for the continuation of the IO thread.
             Runnable ioContinuation = this.ioContinuation;
             if (ioContinuation == null) {
@@ -432,6 +426,16 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
                 if (t != carrier && !isOnRunner(t)) {
                     LockSupport.unpark(carrier);
                 }
+                return;
+            }
+
+            PrivateLoomSupport.getDefaultScheduler().execute(command);
+        }
+
+        @Override
+        public void execute(Runnable command) {
+            if (delegate.isShuttingDown()) {
+                PrivateLoomSupport.getDefaultScheduler().execute(command);
                 return;
             }
 
