@@ -95,8 +95,11 @@ public class ExecutorFactory {
             case WORK_STEALING:
                 return Executors.newWorkStealingPool(executorConfiguration.getParallelism());
             case THREAD_PER_TASK:
-                return new FastThreadPerTaskExecutor(getThreadFactory(executorConfiguration));
-
+                if ("false".equals(System.getProperty("jdk.trackAllThreads"))) {
+                    return new FastThreadPerTaskExecutor(getThreadFactory(executorConfiguration));
+                } else {
+                    return LoomSupport.newThreadPerTaskExecutor(getThreadFactory(executorConfiguration));
+                }
             default:
                 throw new IllegalStateException("Could not create Executor service for enum value: " + executorType);
         }
