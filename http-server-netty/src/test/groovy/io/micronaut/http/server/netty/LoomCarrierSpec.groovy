@@ -8,6 +8,7 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.netty.channel.loom.PrivateLoomSupport
+import io.micronaut.json.JsonMapper
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.scheduling.LoomSupport
 import io.micronaut.scheduling.TaskExecutors
@@ -20,39 +21,71 @@ import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.util.concurrent.ThreadFactory
 
-@spock.lang.Requires({ jvm.isJava21() })
+@spock.lang.Requires({ jvm.isJava21Compatible() })
 class LoomCarrierSpec extends Specification {
+    static {
+        try {
+            Class.forName("sun.nio.ch.Poller") // initialize poller
+        } catch (Throwable ignored) {
+        }
+    }
+
     def test() {
         given:
         def ctx = ApplicationContext.run([
                 'spec.name': 'LoomCarrierSpec',
                 'micronaut.netty.event-loops.default.loom-carrier': true,
                 'micronaut.netty.event-loops.default.num-threads': 1,
+                'micronaut.netty.loom-carrier.normal-warmup-tasks': 0
         ])
         def server = ctx.getBean(EmbeddedServer)
         server.start()
         def client = ctx.createBean(HttpClient, server.URI).toBlocking()
 
         when:
-        def s = client.retrieve("/loom-carrier", MyRecord)
+        def s = client.retrieve("/loom-carrier", ThreadInfo)
         then:
         s.current.startsWith("loom-on-netty-")
         s.carrier == "default-nioEventLoopGroup-3-1"
         when:
-        s = client.retrieve("/loom-carrier", MyRecord)
+        s = client.retrieve("/loom-carrier", ThreadInfo)
         then:
         s.current.startsWith("loom-on-netty-")
         s.carrier == "default-nioEventLoopGroup-3-1"
         when:
-        s = client.retrieve("/loom-carrier/loop-jdk", MyRecord)
+        s = client.retrieve("/loom-carrier/loop-jdk", ThreadInfo)
         then:
         s.current.startsWith("loom-on-netty-")
         s.carrier == "default-nioEventLoopGroup-3-1"
         when:
-        s = client.retrieve("/loom-carrier/loop-mn", MyRecord)
+        s = client.retrieve("/loom-carrier/loop-mn", ThreadInfo)
         then:
         s.current.startsWith("loom-on-netty-")
         s.carrier == "default-nioEventLoopGroup-3-1"
+
+        cleanup:
+        ctx.close()
+    }
+
+    @spock.lang.Requires({ jvm.isJava23Compatible() && !jvm.isJava23() }) // jdk 24 introduced sub pollers on the FJP
+    def 'sticky on poller thread'() {
+        given:
+        def ctx = ApplicationContext.run([
+                'spec.name': 'LoomCarrierSpec',
+                'micronaut.netty.event-loops.default.loom-carrier': true,
+                'micronaut.netty.event-loops.default.num-threads': 1,
+                'micronaut.netty.loom-carrier.normal-warmup-tasks': 0
+        ])
+        def server = ctx.getBean(EmbeddedServer)
+        server.start()
+        def client = ctx.createBean(HttpClient, server.URI).toBlocking()
+
+        when:
+        def s = client.retrieve("/loom-carrier/loop-read", LoopRead)
+        then:
+        s.before.carrier == 'default-nioEventLoopGroup-3-1'
+        s.nested.carrier == 'default-nioEventLoopGroup-3-1'
+        s.after.carrier.startsWith("ForkJoinPool-")
 
         cleanup:
         ctx.close()
@@ -68,10 +101,13 @@ class LoomCarrierSpec extends Specification {
         @Client("/")
         HttpClient client
 
+        @Inject
+        JsonMapper jsonMapper
+
         @ExecuteOn(TaskExecutors.BLOCKING)
         @Get
-        MyRecord foo() {
-            return new MyRecord(
+        ThreadInfo threadInfo() {
+            return new ThreadInfo(
                     Thread.currentThread().getName(),
                     PrivateLoomSupport.getCarrierThread(Thread.currentThread()).getName()
             )
@@ -98,11 +134,30 @@ class LoomCarrierSpec extends Specification {
         String loopMn() {
             return client.toBlocking().retrieve("/loom-carrier")
         }
+
+        @ExecuteOn(TaskExecutors.BLOCKING)
+        @Get("/loop-read")
+        LoopRead loopRead() {
+            def before = threadInfo()
+            def nested
+            try (InputStream is = new URL(embeddedServer.URI.toString() + "/loom-carrier").openStream()) {
+                nested = jsonMapper.readValue(is, ThreadInfo.class)
+            }
+            def after = threadInfo()
+            return new LoopRead(before, nested, after)
+        }
     }
 
-    record MyRecord(
+    record ThreadInfo(
             String current,
             String carrier
+    ) {
+    }
+
+    record LoopRead(
+            ThreadInfo before,
+            ThreadInfo nested,
+            ThreadInfo after
     ) {
     }
 }

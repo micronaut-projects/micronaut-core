@@ -30,7 +30,7 @@ import java.util.concurrent.Executor;
  */
 @Internal
 public sealed interface EventLoopVirtualThreadScheduler extends Executor
-    permits LoomCarrierGroup.Runner {
+    permits LoomCarrierGroup.Runner, LoomCarrierGroup.StickyScheduler {
 
     @NonNull
     AttributeMap attributeMap();
