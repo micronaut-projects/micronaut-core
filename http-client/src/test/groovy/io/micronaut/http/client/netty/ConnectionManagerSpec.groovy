@@ -536,17 +536,15 @@ class ConnectionManagerSpec extends Specification {
 
         // do one request
         conn.testExchangeResponse(conn.testExchangeRequest(client))
-        conn.clientChannel.unfreezeTime()
         // connection is in reserve, should not time out
-        TimeUnit.SECONDS.sleep(10)
+        conn.clientChannel.advanceTimeBy(10, TimeUnit.SECONDS)
         conn.advance()
 
         // second request
         def future = Mono.from(client.exchange('http://example.com/foo', String)).toFuture()
         conn.advance()
 
-        // todo: move to advanceTime once IdleStateHandler supports it
-        TimeUnit.SECONDS.sleep(5)
+        conn.clientChannel.advanceTimeBy(5, TimeUnit.SECONDS)
         conn.advance()
 
         assert future.isDone()
@@ -579,18 +577,16 @@ class ConnectionManagerSpec extends Specification {
         def r1 = conn.testExchangeRequest(client)
         conn.exchangeSettings()
         conn.testExchangeResponse(r1)
-        conn.clientChannel.unfreezeTime()
 
         // connection is in reserve, should not time out
-        TimeUnit.SECONDS.sleep(10)
+        conn.clientChannel.advanceTimeBy(10, TimeUnit.SECONDS)
         conn.advance()
 
         // second request
         def future = Mono.from(client.exchange('https://example.com/foo', String)).toFuture()
         conn.advance()
 
-        // todo: move to advanceTime once IdleStateHandler supports it
-        TimeUnit.SECONDS.sleep(5)
+        conn.clientChannel.advanceTimeBy(5, TimeUnit.SECONDS)
         conn.advance()
 
         assert future.isDone()
@@ -620,18 +616,16 @@ class ConnectionManagerSpec extends Specification {
 
         // do one request
         conn.testExchangeResponse(conn.testExchangeRequest(client))
-        conn.clientChannel.unfreezeTime()
         // wait for one part of the interval
-        TimeUnit.SECONDS.sleep(2)
+        conn.clientChannel.advanceTimeBy(2, TimeUnit.SECONDS)
         conn.advance()
 
         // second request
         def future = Mono.from(client.exchange('http://example.com/foo', String)).toFuture()
         conn.advance()
 
-        // todo: move to advanceTime once IdleStateHandler supports it
         // wait for the second part of the interval: below read-timeout, but together with the first sleep, above it
-        TimeUnit.SECONDS.sleep(3)
+        conn.clientChannel.advanceTimeBy(3, TimeUnit.SECONDS)
         conn.advance()
 
         assert !future.isDone()
@@ -716,9 +710,7 @@ class ConnectionManagerSpec extends Specification {
         patch(client, conn1, conn2)
 
         conn1.testExchangeResponse(conn1.testExchangeRequest(client))
-        conn1.clientChannel.unfreezeTime()
-        // todo: move to advanceTime once IdleStateHandler supports it
-        TimeUnit.SECONDS.sleep(5)
+        conn1.clientChannel.advanceTimeBy(5, TimeUnit.SECONDS)
         conn1.advance()
         // conn1 should expire now, conn2 will be the next connection
         conn2.testExchangeResponse(conn2.testExchangeRequest(client))
@@ -1099,9 +1091,8 @@ class ConnectionManagerSpec extends Specification {
             conn.exchangeSettings()
         }
         conn.testExchangeResponse(r1)
-        conn.clientChannel.unfreezeTime()
         // trigger timeout
-        TimeUnit.SECONDS.sleep(2)
+        conn.clientChannel.advanceTimeBy(2, TimeUnit.SECONDS)
 
         // second request
         // this triggers the dispatch0 logic to be delayed with execute
@@ -1140,10 +1131,9 @@ class ConnectionManagerSpec extends Specification {
         conn.exchangeSettings()
         conn.testExchangeResponse(r1)
 
-        conn.clientChannel.unfreezeTime()
         for (int i = 0; i < 8; i++) {
             conn.testExchangeRequest(client)
-            TimeUnit.MILLISECONDS.sleep(250)
+            conn.clientChannel.advanceTimeBy(250, TimeUnit.MILLISECONDS)
         }
         conn.advance()
 
@@ -1183,8 +1173,7 @@ class ConnectionManagerSpec extends Specification {
         conn.exchangeSettings()
         conn.testExchangeResponse(r1)
 
-        conn.clientChannel.unfreezeTime()
-        TimeUnit.SECONDS.sleep(2)
+        conn.clientChannel.advanceTimeBy(2, TimeUnit.SECONDS)
         conn.advance()
 
         expect:
