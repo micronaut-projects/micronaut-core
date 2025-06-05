@@ -18,17 +18,26 @@ package io.micronaut.http.netty;
 import com.oracle.svm.core.annotate.Delete;
 import com.oracle.svm.core.annotate.TargetClass;
 
+import java.util.function.BooleanSupplier;
+
 // Netty CleanerJava24 references these two classes, and they reference ScopedMemoryAccess, which
 // is not implemented in native image. That leads to a link error even on JVMs where MemorySegment
 // is still in preview. We need to delete these APIs entirely to make the build work, and suppress
 // the build time error with --report-unsupported-elements-at-runtime
 
-@TargetClass(className = "java.lang.foreign.MemorySegment")
+@TargetClass(className = "java.lang.foreign.MemorySegment", onlyWith = Jdk19OrLater.class)
 @Delete
 final class MemorySegmentDeletion {
 }
 
-@TargetClass(className = "java.lang.foreign.Arena")
+@TargetClass(className = "java.lang.foreign.Arena", onlyWith = Jdk19OrLater.class)
 @Delete
 final class ArenaDeletion {
+}
+
+final class Jdk19OrLater implements BooleanSupplier {
+    @Override
+    public boolean getAsBoolean() {
+        return Integer.getInteger("java.specification.version", 17) >= 19;
+    }
 }
