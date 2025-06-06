@@ -17,6 +17,8 @@ import io.micronaut.http.annotation.Get;
 @Introspected
 public interface Parent {
 
+    String BASE_PATH = "/hello";
+
     @Get("/get")
     String hello();
 

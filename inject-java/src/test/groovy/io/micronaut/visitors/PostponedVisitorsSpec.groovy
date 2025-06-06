@@ -128,12 +128,14 @@ class MyBean implements GeneratedInterface  {
 package example;
 
 import jakarta.inject.Singleton;
+import io.micronaut.http.annotation.Controller;
 
 @io.micronaut.visitors.GeneratorTrigger
 class Trigger {}
 
 // Parent is generated, we want to retrieve inherited annotations correctly
 @Singleton
+@Controller(Parent.BASE_PATH)
 class Child implements Parent {
 
     @Override
@@ -148,6 +150,38 @@ class Child implements Parent {
         CollectingVisitor.numMethodVisited == 1
         CollectingVisitor.getPath == "/get"
         CollectingVisitor.hasIntrospected
+        CollectingVisitor.controllerPath == "/hello"
+    }
+
+    void "test information collecting visitor not through parent"() {
+        when:
+        buildClassLoader('example.Trigger', '''
+package example;
+
+import jakarta.inject.Singleton;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Get;
+
+@io.micronaut.visitors.GeneratorTrigger
+class Trigger {}
+
+// Parent is generated, we want to retrieve the value correctly
+@Singleton
+@Controller(Parent.BASE_PATH)
+class Child {
+
+    @Get("/get")
+    public String hello() {
+        return "Hola!";
+    }
+
+}
+''')
+        then:
+        CollectingVisitor.numVisited == 1
+        CollectingVisitor.numMethodVisited == 1
+        CollectingVisitor.getPath == "/get"
+        CollectingVisitor.controllerPath == "/hello"
     }
 
 }
