@@ -139,8 +139,8 @@ class Trigger {}
 class Child implements Parent {
 
     @Override
-    public String hello() {
-        return "Hola!";
+    public TestModel hello() {
+        return new TestModel("Hola!");
     }
 
 }
