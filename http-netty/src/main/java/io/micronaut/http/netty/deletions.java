@@ -49,6 +49,7 @@ final class ScopedMemoryAccess {
 final class Jdk19OrLater implements BooleanSupplier {
     @Override
     public boolean getAsBoolean() {
-        return Integer.getInteger("java.specification.version", 17) >= 19;
+        int v = Integer.getInteger("java.specification.version", 17);
+        return v >= 19 && v < 25; // fixed in 25 according to graal team
     }
 }
