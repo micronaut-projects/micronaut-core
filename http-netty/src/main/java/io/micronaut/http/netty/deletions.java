@@ -24,7 +24,7 @@ import java.util.function.BooleanSupplier;
 // Netty CleanerJava24 references the memory segment API, and when that's reachable, there's a
 // build error with native image. These substitutions fix the build and disable the cleaner.
 
-@TargetClass(className = "io.netty.util.internal.CleanerJava24")
+@TargetClass(className = "io.netty.util.internal.CleanerJava24", onlyWith = Jdk19OrLater.class)
 final class CleanerJava24 {
     @Substitute
     @TargetElement(name = "isSupported")
