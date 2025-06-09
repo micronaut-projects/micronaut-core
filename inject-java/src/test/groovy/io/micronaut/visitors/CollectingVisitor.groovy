@@ -19,6 +19,12 @@ class CollectingVisitor implements TypeElementVisitor<Object, Object> {
     static String controllerPath
 
     @Override
+    void start(VisitorContext visitorContext) {
+        numVisited = 0
+        numMethodVisited = 0
+    }
+
+    @Override
     void visitClass(ClassElement element, VisitorContext context) {
         if (element.getName() != "example.Child") {
             return
@@ -29,6 +35,9 @@ class CollectingVisitor implements TypeElementVisitor<Object, Object> {
         }
 
         controllerPath = element.stringValue(Controller.class).orElse(null)
+        if ("<error>".equalsIgnoreCase(controllerPath)) {
+            throw new ElementPostponedToNextRoundException(element)
+        }
         ++numVisited
         hasIntrospected = element.hasStereotype(Introspected)
     }
@@ -40,6 +49,8 @@ class CollectingVisitor implements TypeElementVisitor<Object, Object> {
         }
 
         ++numMethodVisited
-        getPath = element.stringValue(Get).orElse(null)
+
+        def path = element.stringValue(Get).orElse(null)
+        getPath = path
     }
 }
