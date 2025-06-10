@@ -310,8 +310,10 @@ public class RequestLifecycle {
                 if (routeExecutor.serverConfiguration.isLogHandledExceptions()) {
                     routeExecutor.logException(cause);
                 }
-                Object result = handler.handle(request, cause);
-                return routeExecutor.createResponseForBody(propagatedContext, request, result, routeInfo, null);
+                try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
+                    Object result = handler.handle(request, cause);
+                    return routeExecutor.createResponseForBody(propagatedContext, request, result, routeInfo, null);
+                }
             } catch (Throwable e) {
                 return createDefaultErrorResponseFlow(request, e);
             }
