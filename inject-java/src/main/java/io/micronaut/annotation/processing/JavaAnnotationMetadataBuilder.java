@@ -459,7 +459,13 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     private boolean isValidDefaultValue(ExecutableElement executableElement) {
         AnnotationValue defaultValue = executableElement.getDefaultValue();
         if (defaultValue != null) {
-            Object v = defaultValue.getValue();
+            Object v;
+            try {
+                v = defaultValue.getValue();
+            } catch (UnsupportedOperationException e) {
+                // if this is Attribute it can throw UnsupportedOperationException
+                return false;
+            }
             if (v != null) {
                 if (v instanceof String string) {
                     return StringUtils.isNotEmpty(string);

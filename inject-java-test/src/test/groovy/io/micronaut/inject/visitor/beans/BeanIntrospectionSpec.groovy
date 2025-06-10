@@ -14,6 +14,7 @@ import io.micronaut.context.visitor.ConfigurationReaderVisitor
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.annotation.NextMajorVersion
 import io.micronaut.core.annotation.NonNull
+import io.micronaut.core.annotation.Nullable
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.BeanIntrospectionReference
 import io.micronaut.core.beans.BeanIntrospector
@@ -2594,6 +2595,52 @@ public class ValidatedConfig {
         introspection != null
         !introspection.getIndexedProperties(Constraint.class).isEmpty()
         introspection.getIndexedProperties(Constraint.class).size() == 2
+    }
+
+    void "not found indexed properties"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.ValidatedConfig','''\
+package test;
+
+import io.micronaut.context.annotation.ConfigurationProperties;
+
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
+import java.net.URL;
+
+@ConfigurationProperties("foo.bar")
+public class ValidatedConfig {
+
+    @NotNull
+    URL url;
+
+    @NotBlank
+    protected String name;
+
+    public URL getUrl() {
+        return url;
+    }
+
+    public void setUrl(URL url) {
+        this.url = url;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+
+
+''')
+        expect:
+        introspection != null
+        !introspection.getIndexedProperties(Constraint.class).isEmpty()
+        introspection.getIndexedProperties(Constraint.class).size() == 2
+        introspection.getIndexedProperty(Nullable.class).isEmpty()
+        introspection.getIndexedProperties(Nullable.class).isEmpty()
     }
 
     void "test generate bean introspection for @ConfigurationProperties with validation rules on fields and custom getter"() {
