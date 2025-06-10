@@ -239,7 +239,7 @@ result.each { println "$it.key => $it.value"}
         result.size() == 1
     }
 
-    void "shows packages and propertySources when endpoints.env.activeKeys=packages,propertySources"() {
+    void "shows packages and propertySources when endpoints.env.active-keys=packages,propertySources"() {
         given:
         this.client = buildClient(['endpoints.env.active-keys': "${EnvironmentEndpoint.PACKAGES_KEY},${EnvironmentEndpoint.PROPERTY_SOURCES_KEY}"])
 
