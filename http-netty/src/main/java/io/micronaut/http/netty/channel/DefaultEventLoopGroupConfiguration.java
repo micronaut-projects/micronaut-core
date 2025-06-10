@@ -61,6 +61,9 @@ public class DefaultEventLoopGroupConfiguration implements EventLoopGroupConfigu
      *                              Don't use unless you really know what this does.
      * @param shutdownQuietPeriod   The shutdown quiet period
      * @param shutdownTimeout       The shutdown timeout (must be &gt;= shutdownQuietPeriod)
+     * @param loomCarrier When set to {@code true}, use a special <i>experimental</i> event
+     *                    loop that can also execute virtual threads, in order to improve
+     *                    virtual thread performance.
      */
     @ConfigurationInject
     public DefaultEventLoopGroupConfiguration(

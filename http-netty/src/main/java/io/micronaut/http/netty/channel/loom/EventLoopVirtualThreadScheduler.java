@@ -23,7 +23,9 @@ import io.netty.util.concurrent.EventExecutor;
 import java.util.concurrent.Executor;
 
 /**
- * Scheduler for a virtual thread, with metadata.
+ * Scheduler for a virtual thread, with metadata. Does not change throughout a virtual thread's
+ * lifetime. This class allows for creating local shared resources, e.g. HTTP connections that
+ * run on the same event loop.
  *
  * @since 4.9.0
  * @author Jonas Konrad
@@ -32,9 +34,19 @@ import java.util.concurrent.Executor;
 public sealed interface EventLoopVirtualThreadScheduler extends Executor
     permits LoomCarrierGroup.Runner, LoomCarrierGroup.StickyScheduler {
 
+    /**
+     * Get a shared {@link AttributeMap} for this scheduler.
+     *
+     * @return The attribute map
+     */
     @NonNull
     AttributeMap attributeMap();
 
+    /**
+     * Get the event loop that runs on this scheduler.
+     *
+     * @return The event loop
+     */
     @NonNull
     EventExecutor eventLoop();
 }

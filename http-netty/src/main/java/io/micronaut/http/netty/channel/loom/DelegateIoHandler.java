@@ -15,11 +15,19 @@
  */
 package io.micronaut.http.netty.channel.loom;
 
+import io.micronaut.core.annotation.Internal;
 import io.netty.channel.IoHandle;
 import io.netty.channel.IoHandler;
 import io.netty.channel.IoHandlerContext;
 import io.netty.channel.IoRegistration;
 
+/**
+ * {@link IoHandler} that delegates.
+ *
+ * @author Jonas Konrad
+ * @since 4.9.0
+ */
+@Internal
 abstract class DelegateIoHandler implements IoHandler {
     private final IoHandler delegate;
 

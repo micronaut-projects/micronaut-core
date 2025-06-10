@@ -30,12 +30,19 @@ import jakarta.inject.Singleton;
 
 import java.util.concurrent.ThreadFactory;
 
+/**
+ * Factory that replaces the virtual {@link ThreadFactory} to pick the current event loop when
+ * possible.
+ *
+ * @since 4.9.0
+ * @author Jonas Konrad
+ */
 @Internal
 @Experimental
 @Factory
 @Requires(condition = LoomSupport.LoomCondition.class)
 @Requires(condition = PrivateLoomSupport.PrivateLoomCondition.class)
-public final class EventLoopLoomFactory {
+final class EventLoopLoomFactory {
     final FastThreadLocal<ThreadFactory> targetScheduler = new FastThreadLocal<>();
 
     @Named(TaskExecutors.VIRTUAL)

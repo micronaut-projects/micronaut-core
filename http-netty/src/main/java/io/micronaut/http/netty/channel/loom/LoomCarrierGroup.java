@@ -30,6 +30,7 @@ import io.netty.channel.MultiThreadIoEventLoopGroup;
 import io.netty.util.AttributeMap;
 import io.netty.util.DefaultAttributeMap;
 import io.netty.util.concurrent.EventExecutor;
+import io.netty.util.concurrent.FastThreadLocalThread;
 import io.netty.util.internal.ThreadExecutorMap;
 import io.netty.util.internal.shaded.org.jctools.queues.MpscUnboundedArrayQueue;
 import jakarta.inject.Singleton;
@@ -253,7 +254,7 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
             LoomSupport.unstarted(
                 "loom-on-netty-" + id + "-io",
                 b -> PrivateLoomSupport.setScheduler(b, this::executeIo),
-                this::runIo
+                () -> FastThreadLocalThread.runWithFastThreadLocal(this::runIo)
             ).start();
             assert ioContinuationScheduled;
 

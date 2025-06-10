@@ -1452,6 +1452,11 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
             return loomCarrier;
         }
 
+        /**
+         * @param loomCarrier When set to {@code true}, use a special <i>experimental</i> event
+         *                    loop that can also execute virtual threads, in order to improve
+         *                    virtual thread performance.
+         */
         public void setLoomCarrier(boolean loomCarrier) {
             this.loomCarrier = loomCarrier;
         }
