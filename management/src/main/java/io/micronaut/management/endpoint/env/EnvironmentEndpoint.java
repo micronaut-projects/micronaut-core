@@ -45,14 +45,14 @@ public class EnvironmentEndpoint {
     /**
      * Endpoint name.
      */
-    public static final String ACTIVE_ENVIRONMENTS_KEY = "activeEnvironments";
-    public static final String PACKAGES_KEY = "packages";
-    public static final String PROPERTY_SOURCES_KEY = "propertySources";
     public static final String NAME = "env";
+    private static final String ACTIVE_ENVIRONMENTS_KEY = "activeEnvironments";
+    private static final String PACKAGES_KEY = "packages";
+    private static final String PROPERTY_SOURCES_KEY = "propertySources";
     /**
      * Default keys to be displayed.
      */
-    public static final List<String> DEFAULT_ACTIVE_SECTIONS = List.of(EnvironmentEndpoint.ACTIVE_ENVIRONMENTS_KEY,
+    private static final List<String> DEFAULT_ACTIVE_SECTIONS = List.of(EnvironmentEndpoint.ACTIVE_ENVIRONMENTS_KEY,
         EnvironmentEndpoint.PACKAGES_KEY, EnvironmentEndpoint.PROPERTY_SOURCES_KEY);
     private static final String MASK_VALUE = "*****";
     private final Environment environment;
