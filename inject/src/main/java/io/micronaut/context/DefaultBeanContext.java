@@ -4367,7 +4367,14 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
                                                      @Nullable Predicate<BeanDefinition<T>> predicate) {
             Object defObject = this.definition;
             if (defObject != DEFINITION_DISABLED_SENTINEL && defObject != null) {
-                return (BeanDefinition<T>) defObject;
+                BeanDefinition<T> def = (BeanDefinition<T>) defObject;
+                if (beanType != null && !def.isCandidateBean(beanType)) {
+                    return null;
+                }
+                if (predicate != null && !predicate.test(def)) {
+                    return null;
+                }
+                return def;
             }
             BeanDefinitionReference<T> ref = getReferenceIfEnabled(context, resolutionContext);
             if (ref == null) {

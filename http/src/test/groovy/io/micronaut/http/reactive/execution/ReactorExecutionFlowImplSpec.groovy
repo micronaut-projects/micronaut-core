@@ -8,6 +8,7 @@ import org.reactivestreams.Publisher
 import reactor.core.publisher.Hooks
 import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
+import spock.lang.Issue
 import spock.lang.Specification
 
 import java.time.Duration
@@ -148,5 +149,24 @@ class ReactorExecutionFlowImplSpec extends Specification {
         then:
         flow instanceof ImperativeExecutionFlow
         flow.tryCompleteValue() == "foobar"
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/11744")
+    def 'double cancel'() {
+        given:
+        Hooks.resetOnOperatorDebug()
+        def cancelled = false
+        def flow = ReactiveExecutionFlow.fromPublisher(Mono.just("foo").doOnCancel { cancelled = true })
+        flow.onComplete {}
+
+        when:
+        flow.cancel()
+        then:
+        cancelled
+
+        when:
+        flow.cancel()
+        then:
+        noExceptionThrown()
     }
 }

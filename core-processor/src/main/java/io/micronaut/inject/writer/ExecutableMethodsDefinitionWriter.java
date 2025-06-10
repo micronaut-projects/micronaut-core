@@ -87,7 +87,6 @@ public class ExecutableMethodsDefinitionWriter implements ClassOutputWriter {
 
     private static final Method AT_INDEX_MATCHED_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractExecutableMethodsDefinition.class, "methodAtIndexMatches", int.class, String.class, Class[].class);
 
-    private static final String FIELD_METHODS_REFERENCES = "$METHODS_REFERENCES";
     private static final String FIELD_INTERCEPTABLE = "$interceptable";
 
     private static final int MIN_METHODS_TO_GENERATE_GET_METHOD = 5;
@@ -272,16 +271,12 @@ public class ExecutableMethodsDefinitionWriter implements ClassOutputWriter {
 
         metadataMethods.forEach(classDefBuilder::addMethod);
 
-        FieldDef methodReferencesField = FieldDef.builder(FIELD_METHODS_REFERENCES, methodsFieldType)
-            .addModifiers(Modifier.STATIC, Modifier.FINAL, Modifier.PRIVATE)
-            .initializer(
-                methodsFieldType.instantiate(
-                    metadataMethods.stream().map(thisType::invokeStatic).toList()
-                )
-            )
-            .build();
+        // We don't store methods into a static array, the $Exec class is always stored into a static field
+        // Otherwise we have a circular initialization problem $Exec -> $Definition.cinit -> new $Exec
 
-        classDefBuilder.addField(methodReferencesField);
+        ExpressionDef createMethodsArrayExp = methodsFieldType.instantiate(
+            metadataMethods.stream().map(thisType::invokeStatic).toList()
+        );
 
         if (methodDispatchWriter.isHasInterceptedMethod()) {
             FieldDef interceptable = FieldDef.builder(FIELD_INTERCEPTABLE, TypeDef.Primitive.BOOLEAN)
@@ -294,7 +289,7 @@ public class ExecutableMethodsDefinitionWriter implements ClassOutputWriter {
                 .addModifiers(Modifier.PUBLIC)
                 .addParameters(boolean.class)
                 .addStatement((aThis, methodParameters) -> aThis.superRef()
-                    .invokeConstructor(SUPER_CONSTRUCTOR, thisType.getStaticField(methodReferencesField)))
+                    .invokeConstructor(SUPER_CONSTRUCTOR, createMethodsArrayExp))
                 .addStatement((aThis, methodParameters) -> aThis.field(interceptable).put(methodParameters.get(0)))
                 .build();
 
@@ -314,7 +309,7 @@ public class ExecutableMethodsDefinitionWriter implements ClassOutputWriter {
                 MethodDef.constructor()
                     .addModifiers(Modifier.PUBLIC)
                     .build((aThis, methodParameters) -> aThis.superRef()
-                        .invokeConstructor(SUPER_CONSTRUCTOR, thisType.getStaticField(methodReferencesField))
+                        .invokeConstructor(SUPER_CONSTRUCTOR, createMethodsArrayExp)
                     )
             );
         }

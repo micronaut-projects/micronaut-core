@@ -2,11 +2,21 @@ package io.micronaut.visitors
 
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.core.annotation.Introspected
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
+import io.micronaut.inject.BeanDefinition
+import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.ast.MethodElement
+import io.micronaut.inject.ast.UnresolvedTypeKind
+import io.micronaut.inject.visitor.ElementPostponedToNextRoundException
+import io.micronaut.inject.visitor.TypeElementVisitor
+import io.micronaut.inject.visitor.VisitorContext
 import io.micronaut.inject.writer.BeanDefinitionVisitor
+import org.intellij.lang.annotations.Language
 import spock.lang.PendingFeature
 
 class PostponedVisitorsSpec extends AbstractTypeElementSpec {
-
     void 'test postpone introspection generation implementing generated interface'() {
         when:
             def definition = buildBeanIntrospection('test.Walrus', '''
@@ -73,9 +83,11 @@ class IntroductionTestInterceptor
 }
 ''')
         def introduction = getBean(context, 'test.MyIntroduction')
+        def definition = getBeanDefinition(context, 'test.MyIntroduction')
 
         then:
         introduction.getParentMethod() == 'good'
+        definition.getRequiredMethod("getParentMethod").hasAnnotation("SomeAnnotation")
     }
 
     void 'test postpone bean definition generation implementing generated interface'() {
@@ -109,4 +121,67 @@ class MyBean implements GeneratedInterface  {
         then:
         definition.executableMethods.size() == 1
     }
+
+    void "test information collecting visitor"() {
+        when:
+        buildClassLoader('example.Trigger', '''
+package example;
+
+import jakarta.inject.Singleton;
+import io.micronaut.http.annotation.Controller;
+
+@io.micronaut.visitors.GeneratorTrigger
+class Trigger {}
+
+// Parent is generated, we want to retrieve inherited annotations correctly
+@Singleton
+@Controller(Parent.BASE_PATH)
+class Child implements Parent {
+
+    @Override
+    public TestModel hello() {
+        return new TestModel("Hola!");
+    }
+
+}
+''')
+        then:
+        CollectingVisitor.numVisited == 1
+        CollectingVisitor.numMethodVisited == 1
+        CollectingVisitor.getPath == "/get"
+        CollectingVisitor.hasIntrospected
+        CollectingVisitor.controllerPath == "/hello"
+    }
+
+    void "test information collecting visitor not through parent"() {
+        when:
+        buildClassLoader('example.Trigger', '''
+package example;
+
+import jakarta.inject.Singleton;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Get;
+
+@io.micronaut.visitors.GeneratorTrigger
+class Trigger {}
+
+// Parent is generated, we want to retrieve the value correctly
+@Singleton
+@Controller(Parent.BASE_PATH)
+class Child {
+
+    @Get("/get")
+    public String hello() {
+        return "Hola!";
+    }
+
+}
+''')
+        then:
+        CollectingVisitor.numVisited == 1
+        CollectingVisitor.numMethodVisited == 1
+        CollectingVisitor.getPath == "/get"
+        CollectingVisitor.controllerPath == "/hello"
+    }
+
 }

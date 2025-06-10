@@ -17,6 +17,59 @@ import java.time.Duration
 
 class ConfigPropertiesParseSpec extends AbstractTypeElementSpec {
 
+    void "test builder with @EachProperty(list = true)"() {
+        when:
+        def context = buildContext('test.MeteringBucketConfigProperties', '''
+package test;
+
+import io.micronaut.context.annotation.ConfigurationBuilder;
+import io.micronaut.context.annotation.EachProperty;
+
+@EachProperty(value = "buckets", list = true)
+class MeteringBucketConfigProperties {
+    @ConfigurationBuilder(
+            prefixes = {""}
+    )
+    public MeteringBucketConfigBuilder bucketConfig = new MeteringBucketConfigBuilder();
+}
+
+class MeteringBucketConfigBuilder {
+
+    private String name;
+
+    public MeteringBucketConfigBuilder() {
+    }
+
+    public MeteringBucketConfigBuilder name(String name) {
+        this.name = name;
+        return this;
+    }
+
+    public MeteringBucket build() {
+        return new MeteringBucket(name);
+    }
+
+}
+
+class MeteringBucket {
+    private final String name;
+
+    MeteringBucket(String name) {
+        this.name = name;
+    }
+
+    public String getName() {
+        return name;
+    }
+}
+''', false, ["buckets":[["name": "xyz"], ["name": "bar"]]])
+        def beans = context.getBeansOfType(context.classLoader.loadClass('test.MeteringBucketConfigProperties'))
+
+        then:
+        beans.size() == 2
+        beans.collect { it -> it.bucketConfig.build().name }.sort() == ["bar", "xyz"]
+    }
+
     void "test configuration properties implementing interface"() {
         when:
         def context = buildContext('''

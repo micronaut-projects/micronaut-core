@@ -16,9 +16,11 @@
 package io.micronaut.management.health.indicator.discovery;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.discovery.DiscoveryClient;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.health.HealthStatus;
+import io.micronaut.management.endpoint.health.HealthEndpoint;
 import io.micronaut.management.health.indicator.HealthIndicator;
 import io.micronaut.management.health.indicator.HealthResult;
 import jakarta.inject.Singleton;
@@ -41,6 +43,7 @@ import java.util.stream.Stream;
  */
 @Requires(beans = {DiscoveryClient.class, DiscoveryClientHealthIndicatorConfiguration.class})
 @Singleton
+@Requires(property = HealthEndpoint.PREFIX + ".discovery-client-health.enabled", defaultValue = StringUtils.TRUE, notEquals = StringUtils.FALSE)
 public class DiscoveryClientHealthIndicator implements HealthIndicator {
 
     private final DiscoveryClient discoveryClient;

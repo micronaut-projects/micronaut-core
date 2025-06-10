@@ -32,7 +32,7 @@ import java.util.function.Function;
  * @since 4.2.0
  */
 @Internal
-sealed interface InternalHttpFilter extends GenericHttpFilter, Ordered permits AroundLegacyFilter, AsyncFilter, FilterRunner.RouteMatchResolverHttpFilter, MethodFilter {
+sealed interface InternalHttpFilter extends GenericHttpFilter, Ordered permits AroundLegacyFilter, FilterRunner.RouteMatchResolverHttpFilter, MethodFilter {
 
     /**
      * Checks the filter is implementing {@link ConditionalFilter} and is enabled.

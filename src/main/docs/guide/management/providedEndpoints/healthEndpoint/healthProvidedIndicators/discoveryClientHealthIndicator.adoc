@@ -1,0 +1,1 @@
+If your application uses service discovery, a health indicator is included to monitor the health of the discovery client. The data returned can include a list of the services available.

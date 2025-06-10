@@ -67,4 +67,26 @@ class DefaultBeanContextSpec extends Specification {
             beanContext.close()
     }
 
+    def "cached predicate"() {
+        given:
+        DefaultBeanContext beanContext = new DefaultBeanContext()
+        beanContext.registerSingleton(new MyBean())
+
+        when:
+        def b = beanContext.findBeanCandidates(null, Argument.of(MyBean), null)
+        then:
+        b.size() == 1
+
+        when:
+        b = beanContext.findBeanCandidates(null, Argument.of(MyBean), b[0])
+        then:
+        b.size() == 0
+
+
+        cleanup:
+        beanContext.close()
+    }
+
+    static class MyBean {
+    }
 }

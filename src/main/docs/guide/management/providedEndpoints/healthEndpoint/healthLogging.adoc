@@ -1,0 +1,8 @@
+The api:management.health.aggregator.DefaultHealthAggregator[] also emits log statements for health indicator status and details. To log this information use `Level.DEBUG` for just health indicator status or use Level.TRACE for both status and details. For example:
+
+[source,xml]
+----
+<logger name="io.micronaut.management.health.aggregator.DefaultHealthAggregator" level="trace" /> // <1>
+----
+<1> Use `level="debug"` for health indicator status, use `level="trace"` to add health indicator details
+

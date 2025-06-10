@@ -50,12 +50,14 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
 /**
  * Internal implementation of {@link io.micronaut.http.annotation.ServerFilter}.
  *
+ * @param <T>                 The bean type
  * @param order               The order
  * @param bean                The bean instance
  * @param method              The method
@@ -68,7 +70,7 @@ import java.util.function.Predicate;
  * @param filtersException    The filter exception
  * @param returnHandler       The return handler
  * @param isConditional       Is conditional filter
- * @param <T>                 The bean type
+ * @param executor            The executor to run this filter on
  * @author Jonas Konrad
  * @author Denis Stepanov
  * @since 4.2.0
@@ -89,8 +91,8 @@ record MethodFilter<T>(FilterOrder order,
                        ContinuationCreator continuationCreator,
                        boolean filtersException,
                        FilterReturnHandler returnHandler,
-                       boolean isConditional
-) implements InternalHttpFilter {
+                       boolean isConditional,
+                       Executor executor) implements InternalHttpFilter {
 
     private static final Predicate<FilterMethodContext> FILTER_CONDITION_ALWAYS_TRUE = runner -> true;
 
@@ -99,8 +101,9 @@ record MethodFilter<T>(FilterOrder order,
                                                    ExecutableMethod<T, ?> method,
                                                    boolean isResponseFilter,
                                                    FilterOrder order,
-                                                   RequestBinderRegistry argumentBinderRegistry) throws IllegalArgumentException {
-        return prepareFilterMethod(conversionService, bean, method, method.getArguments(), method.getReturnType().asArgument(), isResponseFilter, order, argumentBinderRegistry);
+                                                   RequestBinderRegistry argumentBinderRegistry,
+                                                   @Nullable Executor executor) throws IllegalArgumentException {
+        return prepareFilterMethod(conversionService, bean, method, method.getArguments(), method.getReturnType().asArgument(), isResponseFilter, order, argumentBinderRegistry, executor);
     }
 
     static <T> MethodFilter<T> prepareFilterMethod(ConversionService conversionService,
@@ -110,7 +113,8 @@ record MethodFilter<T>(FilterOrder order,
                                                    Argument<?> returnType,
                                                    boolean isResponseFilter,
                                                    FilterOrder order,
-                                                   RequestBinderRegistry argumentBinderRegistry) throws IllegalArgumentException {
+                                                   RequestBinderRegistry argumentBinderRegistry,
+                                                   @Nullable Executor executor) throws IllegalArgumentException {
 
         FilterArgBinder[] fulfilled = new FilterArgBinder[arguments.length];
         AsyncFilterArgBinder[] asyncArgBinders = null;
@@ -228,7 +232,8 @@ record MethodFilter<T>(FilterOrder order,
             continuationCreator,
             filtersException,
             returnHandler,
-            bean instanceof ConditionalFilter
+            bean instanceof ConditionalFilter,
+            executor
         );
     }
 
@@ -284,7 +289,7 @@ record MethodFilter<T>(FilterOrder order,
             context.response(),
             null,
             null);
-        return filter(context, filterMethodContext);
+        return filter(context, filterMethodContext, null, false);
     }
 
     @Override
@@ -300,7 +305,7 @@ record MethodFilter<T>(FilterOrder order,
             context.response(),
             null,
             createContinuation(downstream, context, mutablePropagatedContext));
-        return filter(context, filterMethodContext);
+        return filter(context, filterMethodContext, null, false);
     }
 
     @Override
@@ -317,7 +322,7 @@ record MethodFilter<T>(FilterOrder order,
             context.response(),
             exceptionToFilter,
             null);
-        return filter(context, filterMethodContext);
+        return filter(context, filterMethodContext, null, false);
     }
 
     @Override
@@ -331,30 +336,35 @@ record MethodFilter<T>(FilterOrder order,
         return continuationCreator.create(downstream, filterContext, mutablePropagatedContext);
     }
 
-    private ExecutionFlow<FilterContext> filter(FilterContext filterContext,
-                                                FilterMethodContext methodContext) {
-        try (PropagatedContext.Scope ignore = filterContext.propagatedContext().propagate()) {
-            if (filterCondition != null && !filterCondition.test(methodContext)) {
-                return ExecutionFlow.just(filterContext);
-            }
-            if (asyncArgBinders != null) {
-                return bindArgsAsync(methodContext).flatMap(args -> filter0(filterContext, methodContext, args));
-            } else {
-                Object[] args;
-                try {
-                    args = bindArgsSync(methodContext);
-                } catch (Throwable e) {
-                    return ExecutionFlow.error(e);
-                }
-                return filter0(filterContext, methodContext, args);
-            }
-        } catch (Throwable e) {
-            return ExecutionFlow.error(e);
-        }
-    }
+    private ExecutionFlow<FilterContext> filter(
+        FilterContext filterContext,
+        FilterMethodContext methodContext,
+        Object[] args,
+        boolean onExecutor
+    ) {
+        // this is intentionally one method instead of three nested ones to reduce stacktrace depth
+        // and avoid unnecessary propagate calls
 
-    private ExecutionFlow<FilterContext> filter0(FilterContext filterContext, FilterMethodContext methodContext, Object[] args) {
-        try {
+        try (PropagatedContext.Scope ignore = filterContext.propagatedContext().propagate()) {
+            if (args == null) {
+                if (filterCondition != null && !filterCondition.test(methodContext)) {
+                    return ExecutionFlow.just(filterContext);
+                }
+                if (asyncArgBinders != null) {
+                    return bindArgsAsync(methodContext).flatMap(a -> filter(filterContext, methodContext, a, onExecutor));
+                } else {
+                    try {
+                        args = bindArgsSync(methodContext);
+                    } catch (Throwable e) {
+                        return ExecutionFlow.error(e);
+                    }
+                }
+            }
+            if (!onExecutor && executor != null) {
+                Object[] finalArgs = args;
+                return ExecutionFlow.async(executor, () -> filter(filterContext, methodContext, finalArgs, true));
+            }
+
             Object returnValue;
             if (unsafeExecutable != null) {
                 returnValue = unsafeExecutable.invokeUnsafe(bean, args);
