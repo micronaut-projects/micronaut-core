@@ -15,7 +15,7 @@ endpoints:
 ----
 
 - defaults are false for `enabled` and true for `sensitive`
-- `activeKeys` defaults to ["activeEnvironments", "packages", "propertySources"]
+- `active-keys` defaults to ["activeEnvironments", "packages", "propertySources"]
 
 The `activeKeys` property allows you to customize which sections of the environment information are displayed.
 You can specify one or more of the following values:
