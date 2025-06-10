@@ -389,21 +389,26 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
             null -> false
             else -> !visitedTypes.add(typeArgument.type!!)
         }
-        var upperBounds =
-            resolveUpperBounds(
+        val upperBound =
+            resolveUpperBound(
                 owner,
                 typeArgument,
                 parentTypeArguments,
                 visitedTypes,
                 stripTypeArguments
             )
-        var lowerBounds = resolveLowerBounds(
+        val lowerBound = resolveLowerBound(
             owner,
             typeArgument,
             parentTypeArguments,
             visitedTypes,
             stripTypeArguments
         )
+        if (lowerBound is PrimitiveElement) {
+            return upperBound
+        }
+        var upperBounds = listOf(upperBound as KotlinClassElement)
+        var lowerBounds = if (lowerBound == null) listOf() else  listOf(lowerBound as KotlinClassElement)
         var upper = WildcardElement.findUpperType(upperBounds, lowerBounds)!!
         if (upper.name == Object::class.java.name) {
             upper = typeParameter
@@ -421,7 +426,7 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
         )
     }
 
-    private fun resolveLowerBounds(
+    private fun resolveLowerBound(
         owner: KotlinNativeElement,
         typeArgument: KSTypeArgument,
         parentTypeArguments: Map<String, ClassElement>,
