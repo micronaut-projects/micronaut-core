@@ -48,20 +48,22 @@ public class EnvironmentEndpoint {
     public static final String ACTIVE_ENVIRONMENTS_KEY = "activeEnvironments";
     public static final String PACKAGES_KEY = "packages";
     public static final String PROPERTY_SOURCES_KEY = "propertySources";
-
     public static final String NAME = "env";
-
+    /**
+     * Default keys to be displayed.
+     */
+    public static final List<String> DEFAULT_ACTIVE_SECTIONS = List.of(EnvironmentEndpoint.ACTIVE_ENVIRONMENTS_KEY,
+        EnvironmentEndpoint.PACKAGES_KEY, EnvironmentEndpoint.PROPERTY_SOURCES_KEY);
     private static final String MASK_VALUE = "*****";
-
     private final Environment environment;
     private final EnvironmentEndpointFilter environmentFilter;
-    private final EnvironmentEndpointConfiguration configuration;
+    private List<String> activeKeys = DEFAULT_ACTIVE_SECTIONS;
 
     /**
      * @param environment The {@link Environment}
      */
     public EnvironmentEndpoint(Environment environment) {
-        this(environment, null, new EnvironmentEndpointConfiguration());
+        this(environment, null);
     }
 
     /**
@@ -69,10 +71,31 @@ public class EnvironmentEndpoint {
      * @param environmentFilter The registered {@link EnvironmentEndpointFilter} bean if one is registered
      */
     @Inject
-    public EnvironmentEndpoint(Environment environment, @Nullable EnvironmentEndpointFilter environmentFilter, EnvironmentEndpointConfiguration configuration) {
+    public EnvironmentEndpoint(Environment environment,
+                               @Nullable EnvironmentEndpointFilter environmentFilter) {
         this.environment = environment;
         this.environmentFilter = environmentFilter;
-        this.configuration = configuration;
+    }
+
+    /**
+     * Gets the keys to be displayed by the environment endpoint.
+     * Defaults to ["activeEnvironments", "packages", "propertySources"] if not configured.
+     * Configurable via {@code endpoints.env.activeKeys}.
+     *
+     * @return The list of active sections.
+     */
+    public List<String> getActiveKeys() {
+        return activeKeys;
+    }
+
+    /**
+     * Sets the sections to be displayed by the environment endpoint.
+     * Example: {@code endpoints.env.activeKeys=activeEnvironments,packages}
+     *
+     * @param activeKeys The list of sections. If an empty list is provided, no sections will be displayed.
+     */
+    public void setActiveKeys(List<String> activeKeys) {
+        this.activeKeys = activeKeys;
     }
 
     /**
@@ -83,7 +106,7 @@ public class EnvironmentEndpoint {
     public Map<String, Object> getEnvironmentInfo() {
         EnvironmentFilterSpecification filter = createFilterSpecification();
         Map<String, Object> result = new LinkedHashMap<>();
-        List<String> activeKeys = configuration.getActiveKeys();
+        List<String> activeKeys = getActiveKeys();
 
         if (activeKeys.contains(ACTIVE_ENVIRONMENTS_KEY)) {
             result.put(ACTIVE_ENVIRONMENTS_KEY, environment.getActiveNames());
