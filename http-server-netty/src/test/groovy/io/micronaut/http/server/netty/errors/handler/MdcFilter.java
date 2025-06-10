@@ -22,7 +22,6 @@ public class MdcFilter {
         MDC.put("trace", traceId);
 
         mutablePropagatedContext.add(new MdcPropagationContext());
-        System.out.println("MDC TRACE ID: " + traceId);
     }
 
     @ResponseFilter
