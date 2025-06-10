@@ -11,7 +11,7 @@ endpoints:
   env:
     enabled: Boolean
     sensitive: Boolean
-    activeKeys: List<String>
+    active-keys: List<String>
 ----
 
 - defaults are false for `enabled` and true for `sensitive`
