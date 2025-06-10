@@ -494,7 +494,8 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
                 last = PrivateLoomSupport.getDefaultScheduler();
             } else if (LoomSupport.isVirtual(currentThread) && PrivateLoomSupport.getScheduler(currentThread) == PrivateLoomSupport.getDefaultScheduler()) {
                 last = PrivateLoomSupport.getDefaultScheduler();
-            } else if (io.carrier == currentThread) {
+            } else {
+                // move back to event loop whenever possible (e.g. after sleep)
                 last = io;
             }
             last.execute(command);
