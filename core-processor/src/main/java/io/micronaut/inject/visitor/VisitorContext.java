@@ -32,7 +32,6 @@ import io.micronaut.inject.writer.GeneratedFile;
 import java.net.URI;
 import java.net.URL;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
@@ -89,7 +88,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      *
      * @return The annotation metadata builder
      *
-     * @since  4.0.0
+     * @since 4.0.0
      */
     @Internal
     @NonNull
@@ -176,13 +175,13 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
             return projectDir;
         }
         // let's find the projectDir
-        Optional<GeneratedFile> dummyFile = visitGeneratedFile("dummy" + System.nanoTime());
+        Optional<GeneratedFile> dummyFile = visitGeneratedFile("dummy");
         if (dummyFile.isPresent()) {
             URI uri = dummyFile.get().toURI();
             // happens in tests 'mem:///CLASS_OUTPUT/dummy'
             if (uri.getScheme() != null && !uri.getScheme().equals("mem")) {
                 // assume files are generated in 'build' or 'target' directories
-                Path dummy = Paths.get(uri).normalize();
+                Path dummy = Path.of(uri).normalize();
                 while (dummy != null) {
                     Path dummyFileName = dummy.getFileName();
                     if (dummyFileName != null && ("build".equals(dummyFileName.toString()) || "target".equals(dummyFileName.toString()))) {
@@ -216,7 +215,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
         Optional<GeneratedFile> dummy = visitMetaInfFile("dummy", Element.EMPTY_ELEMENT_ARRAY);
         if (dummy.isPresent()) {
             // we want the parent directory of META-INF/dummy
-            Path classesOutputDir = Paths.get(dummy.get().toURI()).getParent().getParent();
+            Path classesOutputDir = Path.of(dummy.get().toURI()).getParent().getParent();
             return Optional.of(classesOutputDir);
         }
         return Optional.empty();

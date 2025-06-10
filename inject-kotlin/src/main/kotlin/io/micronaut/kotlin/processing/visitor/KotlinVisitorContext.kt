@@ -45,7 +45,6 @@ import java.net.URI
 import java.nio.file.Files
 import java.util.*
 import java.util.function.BiConsumer
-import kotlin.collections.ArrayList
 
 @OptIn(KspExperimental::class)
 internal class KotlinVisitorContext(
