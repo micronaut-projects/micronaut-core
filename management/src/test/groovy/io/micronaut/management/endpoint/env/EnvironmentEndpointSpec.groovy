@@ -227,7 +227,7 @@ result.each { println "$it.key => $it.value"}
 
     void "shows only activeEnvironments when endpoints.env.active-keys=activeEnvironments"() {
         given:
-        this.client = buildClient(['endpoints.env.activeKeys': EnvironmentEndpoint.ACTIVE_ENVIRONMENTS_KEY])
+        this.client = buildClient(['endpoints.env.active-keys': EnvironmentEndpoint.ACTIVE_ENVIRONMENTS_KEY])
 
         when:
         Map result = call("/${EnvironmentEndpoint.NAME}")
@@ -266,7 +266,7 @@ result.each { println "$it.key => $it.value"}
 
     void "uses default sections when endpoints.env.active-keys is not defined"() {
         given:
-        // No 'endpoints.env.activeKeys' property is set, so it should use the default.
+        // No 'endpoints.env.active-keys' property is set, so it should use the default.
         this.client = buildClient()
 
         when:
@@ -279,7 +279,7 @@ result.each { println "$it.key => $it.value"}
         result.size() == 3
     }
 
-    void "ignores invalid section names and shows valid ones when endpoints.env.activeKeys contains invalid section names"() {
+    void "ignores invalid section names and shows valid ones when endpoints.env.active-keys contains invalid section names"() {
         given:
         this.client = buildClient(['endpoints.env.active-keys': "invalidSection,${EnvironmentEndpoint.PACKAGES_KEY}"])
 
