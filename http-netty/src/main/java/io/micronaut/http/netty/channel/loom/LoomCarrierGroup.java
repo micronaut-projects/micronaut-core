@@ -243,7 +243,7 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
                         }
                     }
                 }
-                PrivateLoomSupport.setScheduler(b, new StickyScheduler(dst, dst));
+                PrivateLoomSupport.setScheduler(b, new StickyScheduler(dst));
             }, r);
         }
 
@@ -478,27 +478,20 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
         }
     }
 
-    static final class StickyScheduler implements Executor, EventLoopVirtualThreadScheduler {
-        final Runner io;
-        Executor last;
-
-        StickyScheduler(Runner io, Executor last) {
-            this.io = io;
-            this.last = last;
-        }
-
+    record StickyScheduler(Runner io) implements Executor, EventLoopVirtualThreadScheduler {
         @Override
         public void execute(Runnable command) {
             Thread currentThread = Thread.currentThread();
+            Executor dst;
             if (currentThread instanceof ForkJoinWorkerThread fjwt && fjwt.getPool() == PrivateLoomSupport.getDefaultScheduler()) {
-                last = PrivateLoomSupport.getDefaultScheduler();
+                dst = PrivateLoomSupport.getDefaultScheduler();
             } else if (LoomSupport.isVirtual(currentThread) && PrivateLoomSupport.getScheduler(currentThread) == PrivateLoomSupport.getDefaultScheduler()) {
-                last = PrivateLoomSupport.getDefaultScheduler();
+                dst = PrivateLoomSupport.getDefaultScheduler();
             } else {
                 // move back to event loop whenever possible (e.g. after sleep)
-                last = io;
+                dst = io;
             }
-            last.execute(command);
+            dst.execute(command);
         }
 
         @Override
