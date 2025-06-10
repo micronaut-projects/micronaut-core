@@ -30,7 +30,7 @@ For example, to only show active environments and packages:
 ----
 endpoints:
   env:
-    activeKeys: activeEnvironments,packages
+    active-keys: activeEnvironments,packages
 ----
 
 If you provide an empty list, no sections will be displayed.
