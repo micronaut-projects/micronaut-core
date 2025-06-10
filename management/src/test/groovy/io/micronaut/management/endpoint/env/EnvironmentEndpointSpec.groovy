@@ -225,7 +225,7 @@ result.each { println "$it.key => $it.value"}
         ]
     }
 
-    void "shows only activeEnvironments when endpoints.env.activeKeys=activeEnvironments"() {
+    void "shows only activeEnvironments when endpoints.env.active-keys=activeEnvironments"() {
         given:
         this.client = buildClient(['endpoints.env.activeKeys': EnvironmentEndpoint.ACTIVE_ENVIRONMENTS_KEY])
 
