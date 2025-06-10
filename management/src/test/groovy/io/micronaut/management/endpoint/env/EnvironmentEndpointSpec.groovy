@@ -241,7 +241,7 @@ result.each { println "$it.key => $it.value"}
 
     void "shows packages and propertySources when endpoints.env.activeKeys=packages,propertySources"() {
         given:
-        this.client = buildClient(['endpoints.env.activeKeys': "${EnvironmentEndpoint.PACKAGES_KEY},${EnvironmentEndpoint.PROPERTY_SOURCES_KEY}"])
+        this.client = buildClient(['endpoints.env.active-keys': "${EnvironmentEndpoint.PACKAGES_KEY},${EnvironmentEndpoint.PROPERTY_SOURCES_KEY}"])
 
         when:
         Map result = call("/${EnvironmentEndpoint.NAME}")
