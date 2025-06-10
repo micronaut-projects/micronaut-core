@@ -51,9 +51,6 @@ dependencies {
     testImplementation(libs.javax.persistence)
     testImplementation(projects.micronautRuntime)
     testImplementation(libs.neo4j.bolt)
-//    testImplementation(libs.managed.kotlinx.coroutines.core)
-//    testImplementation(libs.managed.kotlinx.coroutines.jdk8)
-//    testImplementation(libs.managed.kotlinx.coroutines.rx2)
     testImplementation(libs.micronaut.test.junit5) {
         exclude(group = "io.micronaut")
     }
