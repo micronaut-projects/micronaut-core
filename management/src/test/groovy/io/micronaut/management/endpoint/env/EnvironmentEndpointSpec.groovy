@@ -255,7 +255,7 @@ result.each { println "$it.key => $it.value"}
 
     void "shows no sections when endpoints.env.activeKeys is an empty string"() {
         given:
-        this.client = buildClient(['endpoints.env.activeKeys': '']) // Empty string
+        this.client = buildClient(['endpoints.env.active-keys': '']) // Empty string
 
         when:
         Map result = call("/${EnvironmentEndpoint.NAME}")
