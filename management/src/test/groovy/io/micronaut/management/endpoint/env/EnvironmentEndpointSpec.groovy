@@ -281,7 +281,7 @@ result.each { println "$it.key => $it.value"}
 
     void "ignores invalid section names and shows valid ones when endpoints.env.activeKeys contains invalid section names"() {
         given:
-        this.client = buildClient(['endpoints.env.activeKeys': "invalidSection,${EnvironmentEndpoint.PACKAGES_KEY}"])
+        this.client = buildClient(['endpoints.env.active-keys': "invalidSection,${EnvironmentEndpoint.PACKAGES_KEY}"])
 
         when:
         Map result = call("/${EnvironmentEndpoint.NAME}")
