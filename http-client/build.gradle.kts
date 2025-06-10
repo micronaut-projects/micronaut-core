@@ -1,4 +1,4 @@
-metaimport org.apache.tools.ant.taskdefs.condition.Os
+import org.apache.tools.ant.taskdefs.condition.Os
 
 plugins {
     id("io.micronaut.build.internal.convention-library")

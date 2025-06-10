@@ -154,7 +154,7 @@ managed-netty-codec-http = { module = "io.netty:netty-codec-http", version.ref =
 managed-netty-codec-http2 = { module = "io.netty:netty-codec-http2", version.ref = "managed-netty" }
 managed-netty-codec-http3 = { module = "io.netty:netty-codec-http3", version.ref = "managed-netty" }
 managed-netty-codec-classes-quic = { module = "io.netty:netty-codec-classes-quic", version.ref = "managed-netty" }
-managed-netty-codec-native-quic = { module = "io.netty:netty-codec-classes-quic", version.ref = "managed-netty" }
+managed-netty-codec-native-quic = { module = "io.netty:netty-codec-native-quic", version.ref = "managed-netty" }
 managed-netty-common = { module = "io.netty:netty-common", version.ref = "managed-netty" }
 managed-netty-handler = { module = "io.netty:netty-handler", version.ref = "managed-netty" }
 managed-netty-handler-proxy = { module = "io.netty:netty-handler-proxy", version.ref = "managed-netty" }
