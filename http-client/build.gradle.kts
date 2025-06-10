@@ -1,4 +1,4 @@
-import org.apache.tools.ant.taskdefs.condition.Os
+metaimport org.apache.tools.ant.taskdefs.condition.Os
 
 plugins {
     id("io.micronaut.build.internal.convention-library")
@@ -19,8 +19,8 @@ dependencies {
     api(projects.micronautHttpNetty)
     api(libs.managed.netty.handler.proxy)
 
-    compileOnly(libs.managed.netty.codec.http3)
-    testImplementation(libs.managed.netty.codec.http3)
+    compileOnly(projects.micronautHttpNettyHttp3)
+    testImplementation(projects.micronautHttpNettyHttp3)
 
     testAnnotationProcessor(platform(libs.test.boms.micronaut.validation))
     testAnnotationProcessor(libs.micronaut.validation.processor) {

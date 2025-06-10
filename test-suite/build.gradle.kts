@@ -90,7 +90,7 @@ dependencies {
             }
         }
     }
-    testImplementation(libs.managed.netty.codec.http3)
+    testImplementation(projects.micronautHttpNettyHttp3)
     testImplementation(libs.logbook.netty)
     testImplementation(libs.logback.classic)
     testImplementation(libs.bcpkix)

@@ -40,13 +40,13 @@ import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOutboundHandler;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.SimpleChannelInboundHandler;
-import io.netty.codec.http3.Http3;
-import io.netty.codec.http3.Http3FrameToHttpObjectCodec;
-import io.netty.codec.http3.Http3ServerConnectionHandler;
-import io.netty.codec.quic.QuicChannel;
-import io.netty.codec.quic.QuicSslContext;
-import io.netty.codec.quic.QuicSslEngine;
-import io.netty.codec.quic.QuicStreamChannel;
+import io.netty.handler.codec.http3.Http3;
+import io.netty.handler.codec.http3.Http3FrameToHttpObjectCodec;
+import io.netty.handler.codec.http3.Http3ServerConnectionHandler;
+import io.netty.handler.codec.quic.QuicChannel;
+import io.netty.handler.codec.quic.QuicSslContext;
+import io.netty.handler.codec.quic.QuicSslEngine;
+import io.netty.handler.codec.quic.QuicStreamChannel;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpMessage;
 import io.netty.handler.codec.http.HttpObjectAggregator;
@@ -214,7 +214,7 @@ final class HttpPipelineBuilder implements Closeable {
      */
     private static final class QuicFactory {
         /**
-         * Create a QUIC SSL engine provider ({@link io.netty.codec.quic.QuicCodecBuilder#sslEngineProvider(Function)}).
+         * Create a QUIC SSL engine provider ({@link io.netty.handler.codec.quic.QuicCodecBuilder#sslEngineProvider(Function)}).
          *
          * @return The engine provider
          */

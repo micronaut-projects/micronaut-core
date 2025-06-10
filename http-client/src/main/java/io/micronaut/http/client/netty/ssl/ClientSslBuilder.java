@@ -19,7 +19,7 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.ssl.SslConfiguration;
-import io.netty.codec.quic.QuicSslContext;
+import io.netty.handler.codec.quic.QuicSslContext;
 import io.netty.handler.ssl.SslContext;
 
 /**
