@@ -264,7 +264,7 @@ result.each { println "$it.key => $it.value"}
         result.isEmpty()
     }
 
-    void "uses default sections when endpoints.env.activeKeys is not defined"() {
+    void "uses default sections when endpoints.env.active-keys is not defined"() {
         given:
         // No 'endpoints.env.activeKeys' property is set, so it should use the default.
         this.client = buildClient()
