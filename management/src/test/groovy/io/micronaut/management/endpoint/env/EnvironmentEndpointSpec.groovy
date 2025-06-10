@@ -253,7 +253,7 @@ result.each { println "$it.key => $it.value"}
         result.size() == 2
     }
 
-    void "shows no sections when endpoints.env.activeKeys is an empty string"() {
+    void "shows no sections when endpoints.env.active-keys is an empty string"() {
         given:
         this.client = buildClient(['endpoints.env.active-keys': '']) // Empty string
 
