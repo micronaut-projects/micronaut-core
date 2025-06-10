@@ -52,3 +52,7 @@ tasks {
         }
     }
 }
+
+sonar {
+    skipProject = true
+}

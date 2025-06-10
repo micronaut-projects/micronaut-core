@@ -27,7 +27,8 @@ if (System.getenv("SONAR_TOKEN") != null) {
         "**/GroovyClassWriterOutputVisitor.java",
         "**/MutableHttpRequestWrapper.java",
         "**/tck/**",
-        "**/test/support/**"
+        "**/test/support/**",
+        "**/micronaut/annotation/processing/test/**"
     ]
     sonarqube {
         properties {
