@@ -80,7 +80,7 @@ public class EnvironmentEndpoint {
     /**
      * Gets the keys to be displayed by the environment endpoint.
      * Defaults to ["activeEnvironments", "packages", "propertySources"] if not configured.
-     * Configurable via {@code endpoints.env.activeKeys}.
+     * Configurable via {@code endpoints.env.active-keys}.
      *
      * @return The list of active sections.
      */
@@ -90,7 +90,7 @@ public class EnvironmentEndpoint {
 
     /**
      * Sets the sections to be displayed by the environment endpoint.
-     * Example: {@code endpoints.env.activeKeys=activeEnvironments,packages}
+     * Example: {@code endpoints.env.active-keys=activeEnvironments,packages}
      *
      * @param activeKeys The list of sections. If an empty list is provided, no sections will be displayed.
      */
