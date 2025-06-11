@@ -48,12 +48,12 @@ import java.util.Set;
  */
 @Internal
 public final class EvaluatedExpressionProcessor {
+    private static final Set<String> WRITTEN_CLASSES = new HashSet<>();
+
     private final Collection<ExpressionWithContext> evaluatedExpressions = new ArrayList<>(2);
     private final DefaultExpressionCompilationContextFactory expressionCompilationContextFactory;
     private final VisitorContext visitorContext;
     private final Element originatingElement;
-
-    private static final Set<String> WRITTEN_CLASSES = new HashSet<>();
 
     private List<EvaluatedExpressionWriter> writers;
 
