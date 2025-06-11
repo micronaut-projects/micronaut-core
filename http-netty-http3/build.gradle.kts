@@ -13,3 +13,10 @@ dependencies {
     runtimeOnly(variantOf(libs.managed.netty.codec.native.quic) { classifier("osx-aarch_64") })
     runtimeOnly(variantOf(libs.managed.netty.codec.native.quic) { classifier("windows-x86_64") })
 }
+
+micronautBuild {
+    binaryCompatibility {
+        // remove after 4.9.0
+        enabled = false
+    }
+}
