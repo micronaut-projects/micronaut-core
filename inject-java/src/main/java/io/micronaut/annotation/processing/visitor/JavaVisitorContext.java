@@ -103,7 +103,7 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
     private final JavaNativeElementsHelper nativeElementsHelper;
     private final Filer filer;
     private final Set<String> postponedTypes;
-    private boolean skipUnresolvedInterfaces;
+    private boolean visitUnresolvedInterfaces;
 
     /**
      * The default constructor.
@@ -221,19 +221,19 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
     }
 
     /**
-     * @return True if the unresolved interfaces should be skipped
+     * @return True if the unresolved interfaces should be visited
      * @since 4.9
      */
-    public boolean isSkipUnresolvedInterfaces() {
-        return skipUnresolvedInterfaces;
+    public boolean isVisitUnresolvedInterfaces() {
+        return visitUnresolvedInterfaces;
     }
 
     /**
-     * @param skipUnresolvedInterfaces True to skip unresolved interfaces
+     * @param visitUnresolvedInterfaces True to visit unresolved interfaces
      * @since 4.9
      */
-    public void setSkipUnresolvedInterfaces(boolean skipUnresolvedInterfaces) {
-        this.skipUnresolvedInterfaces = skipUnresolvedInterfaces;
+    public void setVisitUnresolvedInterfaces(boolean visitUnresolvedInterfaces) {
+        this.visitUnresolvedInterfaces = visitUnresolvedInterfaces;
     }
 
     @NonNull

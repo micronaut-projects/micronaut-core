@@ -1,7 +1,6 @@
 package io.micronaut.visitors
 
 import io.micronaut.inject.ast.ClassElement
-import io.micronaut.inject.visitor.TypeElementQuery
 import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.visitor.VisitorContext
 import org.intellij.lang.annotations.Language
@@ -38,12 +37,6 @@ public record TestModel(
 
 }
 """
-
-
-    @Override
-    TypeElementQuery query() {
-        return super.query().skipUnresolvedInterfaces()
-    }
 
     @Override
     void visitClass(ClassElement element, VisitorContext context) {

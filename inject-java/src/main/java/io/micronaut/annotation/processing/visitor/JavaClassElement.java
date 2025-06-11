@@ -299,7 +299,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     @Override
     public Collection<ClassElement> getInterfaces() {
         if (resolvedInterfaces == null) {
-            if (visitorContext.isSkipUnresolvedInterfaces()) {
+            if (!visitorContext.isVisitUnresolvedInterfaces()) {
                 resolvedInterfaces = classElement.getInterfaces().stream()
                     .filter(this::onlyAvailable)
                     .map(mirror -> newClassElement(mirror, getTypeArguments())).toList();
@@ -309,7 +309,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                     .map(mirror -> newClassElement(mirror, getTypeArguments())).toList();
                 hasErrorousInterface = false;
             }
-        } else if (hasErrorousInterface && !visitorContext.isSkipUnresolvedInterfaces()) {
+        } else if (hasErrorousInterface && visitorContext.isVisitUnresolvedInterfaces()) {
             resolvedInterfaces = classElement.getInterfaces().stream()
                 .map(mirror -> newClassElement(mirror, getTypeArguments())).toList();
             hasErrorousInterface = false;

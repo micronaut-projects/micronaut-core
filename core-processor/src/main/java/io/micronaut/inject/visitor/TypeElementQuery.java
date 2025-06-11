@@ -89,11 +89,11 @@ public interface TypeElementQuery {
     TypeElementQuery excludeFields();
 
     /**
-     * Skip unresolved interfaces.
+     * If the unresolved interfaces should be visited.
      *
      * @return this query
      */
-    TypeElementQuery skipUnresolvedInterfaces();
+    TypeElementQuery visitUnresolvedInterfaces();
 
     /**
      * Include the enum constants.
@@ -144,7 +144,7 @@ public interface TypeElementQuery {
     boolean includesEnumConstants();
 
     /**
-     * @return Skips unresolved interfaces
+     * @return Visits unresolved interfaces
      */
-    boolean skipsUnresolvedInterfaces();
+    boolean visitsUnresolvedInterfaces();
 }
