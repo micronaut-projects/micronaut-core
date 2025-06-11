@@ -53,6 +53,3 @@ tasks {
     }
 }
 
-sonar {
-    skipProject = true
-}
