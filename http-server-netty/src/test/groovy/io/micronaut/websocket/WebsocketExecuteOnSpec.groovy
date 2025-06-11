@@ -286,7 +286,7 @@ class WebsocketExecuteOnSpec extends Specification {
             replies.stream()
                     .filter(str -> str.contains(type))
                     .map(str -> str.replaceAll(type, ""))
-                    .map(str -> str.replaceAll("-?\\d", "").replace("-thread-", ""))
+                    .map(str -> str.replaceAll("-?\\d", "").replace("-thread", ""))
                     .collect(Collectors.toList())
         }
     }
