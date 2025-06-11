@@ -35,7 +35,7 @@ record DefaultTypeElementQuery(boolean includesConstructors,
                                boolean includesEnumConstants,
                                boolean visitsUnresolvedInterfaces) implements TypeElementQuery {
 
-    static DefaultTypeElementQuery DEFAULT = new DefaultTypeElementQuery(true, true, true, true, false);
+    static final DefaultTypeElementQuery DEFAULT = new DefaultTypeElementQuery(true, true, true, true, false);
 
     @Override
     public TypeElementQuery includeMethods() {

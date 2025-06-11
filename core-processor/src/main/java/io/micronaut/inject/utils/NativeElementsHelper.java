@@ -49,7 +49,7 @@ public abstract class NativeElementsHelper<C, M> {
      */
     public void cleanupForClass(Object nativeClassType) {
         processedClasses.remove(nativeClassType);
-        overridesCache.entrySet().removeIf(e -> e.getKey().classKey.equals(nativeClassType) );
+        overridesCache.entrySet().removeIf(e -> e.getKey().classKey.equals(nativeClassType));
     }
 
     /**
