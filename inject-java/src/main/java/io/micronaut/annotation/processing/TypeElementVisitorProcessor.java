@@ -246,6 +246,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
             for (Object nativeType : postponedTypes.values()) {
                 AbstractAnnotationMetadataBuilder.clearMutated(nativeType);
+                javaVisitorContext.getNativeElementsHelper().cleanupForClass(nativeType);
                 if (nativeType instanceof Element element) {
                     AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata cachedAnnotationMetadata = javaVisitorContext.getAnnotationMetadataBuilder().lookupOrBuildForType(element);
                     cachedAnnotationMetadata.markCleared();
