@@ -15,7 +15,7 @@ tasks.named("updateVersionCatalogs") {
     ignoredModules.add("com.github.ben-manes.caffeine:caffeine")
 }
 
-if (System.getenv("SONAR_TOKEN") != null) {
+if (System.getenv("SONAR_TOKEN") != null && !project.name.contains("test")) {
     // deprecated and compile time only classes excluded from coverage
     def coverageExcludes = [
         "**/StreamSoftServiceLoader.java",
