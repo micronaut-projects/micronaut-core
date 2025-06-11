@@ -3282,9 +3282,13 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
         if (candidates.size() == 1) {
             return candidates.iterator().next();
         }
+        Collection<BeanDefinition<T>> originalCandidates = candidates;
         candidates = candidates.stream().filter(candidate -> !candidate.hasDeclaredStereotype(Secondary.class)).toList();
         if (candidates.size() == 1) {
             return candidates.iterator().next();
+        }
+        if (candidates.isEmpty()) {
+            throw new NonUniqueBeanException(beanType.getType(), originalCandidates.iterator());
         }
         // pick the bean with the highest priority
         ArrayList<BeanDefinition<T>> listCandidates = new ArrayList<>(candidates);

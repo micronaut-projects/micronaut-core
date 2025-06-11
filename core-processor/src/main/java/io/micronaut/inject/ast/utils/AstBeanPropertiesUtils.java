@@ -81,8 +81,9 @@ public final class AstBeanPropertiesUtils {
         Set<String> excludes = configuration.getExcludes();
         String[] readPrefixes = configuration.getReadPrefixes();
         String[] writePrefixes = configuration.getWritePrefixes();
+        var isRecord = classElement.isRecord();
 
-        Map<String, BeanPropertyData> props = new LinkedHashMap<>();
+        var props = new LinkedHashMap<String, BeanPropertyData>();
         for (MethodElement methodElement : methodsSupplier.get()) {
             // Records include everything
             if (methodElement.isStatic() && !configuration.isAllowStaticProperties() || !excludeElementsInRole && isMethodInRole(methodElement)) {
@@ -93,7 +94,7 @@ public final class AstBeanPropertiesUtils {
                 continue;
             }
             boolean isAccessor = canMethodBeUsedForAccess(methodElement, accessKinds, visibility);
-            if (classElement.isRecord()) {
+            if (isRecord) {
                 if (!isAccessor) {
                     continue;
                 }
@@ -126,57 +127,58 @@ public final class AstBeanPropertiesUtils {
             resolveWriteAccessForField(fieldElement, isAccessor, beanPropertyData);
         }
 
-        if (!props.isEmpty()) {
-            List<PropertyElement> beanProperties = new ArrayList<>(props.size());
-            for (Map.Entry<String, BeanPropertyData> entry : props.entrySet()) {
-                String propertyName = entry.getKey();
-                BeanPropertyData value = entry.getValue();
-                if (configuration.isIgnoreSettersWithDifferingType() && value.setter != null && value.getter != null) {
-                    // ensure types match
-                    ClassElement getterType = value.getter.getGenericReturnType();
-                    ClassElement setterType = value.setter.getParameters()[0].getGenericType();
-                    if (isIncompatibleSetterType(setterType, getterType)) {
-                        // getter and setter don't match, remove setter
-                        value.setter = null;
-                        value.type = getterType;
-                    }
-                }
-                // Define the property type based on its writer element
-                if (value.writeAccessKind == BeanProperties.AccessKind.FIELD && !value.field.getType().equals(value.type)) {
-                    value.type = value.field.getGenericType();
-                } else if (value.writeAccessKind == BeanProperties.AccessKind.METHOD
-                    && value.setter != null
-                    && value.setter.getParameters().length > 0) {
-                    value.type = value.setter.getParameters()[0].getGenericType();
-                }
-                // In a case when the field's type is the same as the selected property type,
-                // and it has more type arguments annotations - use it as the property type
-                if (value.field != null
-                    && value.field.getType().equals(value.type)
-                    && hasMoreAnnotations(value.field.getType(), value.type)) {
-                    value.type = value.field.getGenericType();
-                }
-                // In a case when the getter's type is the same as the selected property type,
-                // and it has more type arguments annotations - use it as the property type
-                if (value.getter != null
-                    && value.getter.getGenericReturnType().equals(value.type)
-                    && hasMoreAnnotations(value.getter.getGenericReturnType(), value.type)) {
-                    value.type = value.getter.getGenericReturnType();
-                }
-                if (value.readAccessKind != null || value.writeAccessKind != null) {
-                    value.isExcluded = shouldExclude(includes, excludes, propertyName)
-                        || isExcludedByAnnotations(configuration, value)
-                        || isExcludedBecauseOfMissingAccess(value);
+        if (props.isEmpty()) {
+            return Collections.emptyList();
+        }
 
-                    PropertyElement propertyElement = propertyCreator.apply(value);
-                    if (propertyElement != null) {
-                        beanProperties.add(propertyElement);
-                    }
+        var beanProperties = new ArrayList<PropertyElement>(props.size());
+        for (Map.Entry<String, BeanPropertyData> entry : props.entrySet()) {
+            String propertyName = entry.getKey();
+            BeanPropertyData value = entry.getValue();
+            if (configuration.isIgnoreSettersWithDifferingType() && value.setter != null && value.getter != null) {
+                // ensure types match
+                ClassElement getterType = value.getter.getGenericReturnType();
+                ClassElement setterType = value.setter.getParameters()[0].getGenericType();
+                if (isIncompatibleSetterType(setterType, getterType)) {
+                    // getter and setter don't match, remove setter
+                    value.setter = null;
+                    value.type = getterType;
                 }
             }
-            return beanProperties;
+            // Define the property type based on its writer element
+            if (value.writeAccessKind == BeanProperties.AccessKind.FIELD && !value.field.getType().equals(value.type)) {
+                value.type = value.field.getGenericType();
+            } else if (value.writeAccessKind == BeanProperties.AccessKind.METHOD
+                && value.setter != null
+                && value.setter.getParameters().length > 0) {
+                value.type = value.setter.getParameters()[0].getGenericType();
+            }
+            // In a case when the field's type is the same as the selected property type,
+            // and it has more type arguments annotations - use it as the property type
+            if (value.field != null
+                && value.field.getType().equals(value.type)
+                && hasMoreAnnotations(value.field.getType(), value.type)) {
+                value.type = value.field.getGenericType();
+            }
+            // In a case when the getter's type is the same as the selected property type,
+            // and it has more type arguments annotations - use it as the property type
+            if (value.getter != null
+                && value.getter.getGenericReturnType().equals(value.type)
+                && hasMoreAnnotations(value.getter.getGenericReturnType(), value.type)) {
+                value.type = value.getter.getGenericReturnType();
+            }
+            if (value.readAccessKind != null || value.writeAccessKind != null) {
+                value.isExcluded = shouldExclude(includes, excludes, propertyName)
+                    || isExcludedByAnnotations(configuration, value)
+                    || isExcludedBecauseOfMissingAccess(value);
+
+                PropertyElement propertyElement = propertyCreator.apply(value);
+                if (propertyElement != null) {
+                    beanProperties.add(propertyElement);
+                }
+            }
         }
-        return Collections.emptyList();
+        return beanProperties;
     }
 
     private static boolean hasMoreAnnotations(ClassElement c1, ClassElement c2) {

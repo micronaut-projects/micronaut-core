@@ -35,6 +35,7 @@ import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.PropertyElementQuery;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.ElementPostponedToNextRoundException;
+import io.micronaut.inject.visitor.TypeElementQuery;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.ClassGenerationException;
@@ -76,6 +77,11 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     public int getOrder() {
         // lower precedence, all others to mutate metadata as necessary
         return POSITION;
+    }
+
+    @Override
+    public TypeElementQuery query() {
+        return TypeElementQuery.onlyClass();
     }
 
     @Override

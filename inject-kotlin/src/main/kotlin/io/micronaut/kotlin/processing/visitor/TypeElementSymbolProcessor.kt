@@ -39,9 +39,11 @@ import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.ElementModifier
 import io.micronaut.inject.ast.ElementQuery
 import io.micronaut.inject.ast.FieldElement
+import io.micronaut.inject.ast.MemberElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.PropertyElement
 import io.micronaut.inject.processing.ProcessingException
+import io.micronaut.inject.visitor.TypeElementQuery
 import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.visitor.VisitorContext
 import io.micronaut.kotlin.processing.beans.BeanDefinitionProcessor
@@ -261,20 +263,7 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
                             classDeclaration
                         )
                     }
-
-                    try {
-                        loadedVisitor.visitor.visitClass(classElement, visitorContext)
-                    } catch (e: Exception) {
-                        throw ProcessingException(classElement, e.message, e)
-                    }
-
-                    classDeclaration.getAllFunctions()
-                        .filter { it.isConstructor() && !it.isInternal() }
-                        .forEach {
-                            visitConstructor(classElement, it)
-                        }
-
-                    visitMembers(classElement)
+                    visitClass(classElement as KotlinClassElement, loadedVisitor.visitor.query())
                     visitInnerClasses(classElement)
                 }
             }
@@ -289,33 +278,60 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
                 val declaration = kspClassElement.declaration
                 if (processed.add(it.name) && acceptClass(declaration)) {
                     if (loadedVisitor.matches(declaration)) {
-                        visitor.visitClass(it, loadedVisitor.visitorContext)
-                        visitMembers(it)
+                        visitClass(it, visitor.query())
                     }
                     visitInnerClasses(it, processed)
                 }
             }
         }
 
-        private fun visitMembers(classElement: ClassElement) {
-            val properties = classElement.syntheticBeanProperties
-            for (property in properties) {
-                try {
-                    visitNativeProperty(property)
-                } catch (e: Exception) {
-                    throw ProcessingException(property, e.message, e)
+        private fun visitClass(classElement: KotlinClassElement, query: TypeElementQuery) {
+            try {
+                loadedVisitor.visitor.visitClass(classElement, visitorContext)
+            } catch (e: Exception) {
+                throw ProcessingException(classElement, e.message, e)
+            }
+            if (query.includesConstructors()) {
+                classElement.declaration.getAllFunctions()
+                    .filter { it.isConstructor() && !it.isInternal() }
+                    .forEach {
+                        visitConstructor(classElement, it)
+                    }
+            }
+            val visitedFields = HashSet<String>()
+            if (query.includesFields() || query.includesMethods()) {
+                val properties = classElement.syntheticBeanProperties
+                for (property in properties) {
+                    try {
+                        visitNativeProperty(property, visitedFields)
+                    } catch (e: Exception) {
+                        throw ProcessingException(property, e.message, e)
+                    }
                 }
             }
-            val memberElements =
+            val includesFields = query.includesFields() || query.includesEnumConstants()
+            val includesMethods: Boolean = query.includesMethods()
+            val elements = if (includesMethods && includesFields) {
                 classElement.getEnclosedElements(ElementQuery.ALL_FIELD_AND_METHODS)
-            for (memberElement in memberElements) {
+            } else if (includesMethods) {
+                classElement.getEnclosedElements(ElementQuery.ALL_METHODS)
+            } else if (includesFields) {
+                classElement.getEnclosedElements(ElementQuery.ALL_FIELDS)
+            } else {
+                listOf()
+            }
+            for (memberElement in elements) {
                 when (memberElement) {
                     is FieldElement -> {
-                        visitField(memberElement)
+                        if (query.includesFields() && !visitedFields.contains(memberElement.name)) {
+                            visitField(memberElement)
+                        }
                     }
 
                     is MethodElement -> {
-                        visitMethod(memberElement)
+                        if (query.includesMethods()) {
+                            visitMethod(memberElement)
+                        }
                     }
                 }
             }
@@ -362,14 +378,21 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
             }
         }
 
-        fun visitNativeProperty(propertyNode: PropertyElement) {
+        fun visitNativeProperty(propertyNode: PropertyElement, visitedFields: MutableSet<String>) {
             val visitor = loadedVisitor.visitor
             val visitorContext = loadedVisitor.visitorContext
             if (loadedVisitor.matches(propertyNode)) {
-                propertyNode.field.ifPresent { visitor.visitField(it, visitorContext) }
+                propertyNode.field.ifPresent {
+                    visitor.visitField(it, visitorContext)
+                    visitedFields.add(it.name)
+                }
                 // visit synthetic getter/setter methods
-                propertyNode.writeMethod.ifPresent { visitor.visitMethod(it, visitorContext) }
-                propertyNode.readMethod.ifPresent { visitor.visitMethod(it, visitorContext) }
+                propertyNode.writeMethod.ifPresent {
+                    visitor.visitMethod(it, visitorContext)
+                }
+                propertyNode.readMethod.ifPresent {
+                    visitor.visitMethod(it, visitorContext)
+                }
             }
         }
 

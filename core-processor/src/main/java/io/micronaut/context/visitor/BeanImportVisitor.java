@@ -25,6 +25,7 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
+import io.micronaut.inject.visitor.TypeElementQuery;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 
@@ -57,6 +58,11 @@ public class BeanImportVisitor implements TypeElementVisitor<Import, Object> {
         }
         OrderUtil.sort(beanImportHandlers);
         BEAN_IMPORT_HANDLERS = Collections.unmodifiableList(beanImportHandlers);
+    }
+
+    @Override
+    public TypeElementQuery query() {
+        return TypeElementQuery.onlyClass();
     }
 
     @Override

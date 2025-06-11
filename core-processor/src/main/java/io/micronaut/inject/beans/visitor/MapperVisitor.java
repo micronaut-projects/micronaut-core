@@ -24,6 +24,7 @@ import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElementQuery;
 import io.micronaut.inject.processing.ProcessingException;
+import io.micronaut.inject.visitor.TypeElementQuery;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 
@@ -43,6 +44,11 @@ public final class MapperVisitor implements TypeElementVisitor<Object, Mapper> {
     @Override
     public Set<String> getSupportedAnnotationNames() {
         return Set.of(Mapper.class.getName());
+    }
+
+    @Override
+    public TypeElementQuery query() {
+        return TypeElementQuery.onlyMethods();
     }
 
     @Override
