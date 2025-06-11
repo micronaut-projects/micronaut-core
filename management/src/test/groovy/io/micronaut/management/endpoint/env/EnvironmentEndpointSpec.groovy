@@ -225,6 +225,75 @@ result.each { println "$it.key => $it.value"}
         ]
     }
 
+    void "shows only activeEnvironments when endpoints.env.active-keys=activeEnvironments"() {
+        given:
+        this.client = buildClient(['endpoints.env.active-keys': EnvironmentEndpoint.ACTIVE_ENVIRONMENTS_KEY])
+
+        when:
+        Map result = call("/${EnvironmentEndpoint.NAME}")
+
+        then:
+        result.containsKey(EnvironmentEndpoint.ACTIVE_ENVIRONMENTS_KEY)
+        !result.containsKey(EnvironmentEndpoint.PACKAGES_KEY)
+        !result.containsKey(EnvironmentEndpoint.PROPERTY_SOURCES_KEY)
+        result.size() == 1
+    }
+
+    void "shows packages and propertySources when endpoints.env.active-keys=packages,propertySources"() {
+        given:
+        this.client = buildClient(['endpoints.env.active-keys': "${EnvironmentEndpoint.PACKAGES_KEY},${EnvironmentEndpoint.PROPERTY_SOURCES_KEY}"])
+
+        when:
+        Map result = call("/${EnvironmentEndpoint.NAME}")
+
+        then:
+        !result.containsKey(EnvironmentEndpoint.ACTIVE_ENVIRONMENTS_KEY)
+        result.containsKey(EnvironmentEndpoint.PACKAGES_KEY)
+        result.containsKey(EnvironmentEndpoint.PROPERTY_SOURCES_KEY)
+        result.size() == 2
+    }
+
+    void "shows no sections when endpoints.env.active-keys is an empty string"() {
+        given:
+        this.client = buildClient(['endpoints.env.active-keys': '']) // Empty string
+
+        when:
+        Map result = call("/${EnvironmentEndpoint.NAME}")
+
+        then:
+        result.isEmpty()
+    }
+
+    void "uses default sections when endpoints.env.active-keys is not defined"() {
+        given:
+        // No 'endpoints.env.active-keys' property is set, so it should use the default.
+        this.client = buildClient()
+
+        when:
+        Map result = call("/${EnvironmentEndpoint.NAME}")
+
+        then:
+        result.containsKey(EnvironmentEndpoint.ACTIVE_ENVIRONMENTS_KEY)
+        result.containsKey(EnvironmentEndpoint.PACKAGES_KEY)
+        result.containsKey(EnvironmentEndpoint.PROPERTY_SOURCES_KEY)
+        result.size() == 3
+    }
+
+    void "ignores invalid section names and shows valid ones when endpoints.env.active-keys contains invalid section names"() {
+        given:
+        this.client = buildClient(['endpoints.env.active-keys': "invalidSection,${EnvironmentEndpoint.PACKAGES_KEY}"])
+
+        when:
+        Map result = call("/${EnvironmentEndpoint.NAME}")
+
+        then:
+        !result.containsKey(EnvironmentEndpoint.ACTIVE_ENVIRONMENTS_KEY)
+        result.containsKey(EnvironmentEndpoint.PACKAGES_KEY)
+        !result.containsKey(EnvironmentEndpoint.PROPERTY_SOURCES_KEY)
+        !result.containsKey("invalidSection")
+        result.size() == 1
+    }
+
     @Singleton
     @Requires(property = "test.filter", value = "mask-all-except")
     static class HiddenAndMaskedEnvironmentEndpointFilter implements EnvironmentEndpointFilter {

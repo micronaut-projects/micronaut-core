@@ -246,6 +246,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
             for (Object nativeType : postponedTypes.values()) {
                 AbstractAnnotationMetadataBuilder.clearMutated(nativeType);
+                javaVisitorContext.getNativeElementsHelper().cleanupForClass(nativeType);
                 if (nativeType instanceof Element element) {
                     AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata cachedAnnotationMetadata = javaVisitorContext.getAnnotationMetadataBuilder().lookupOrBuildForType(element);
                     cachedAnnotationMetadata.markCleared();
@@ -282,16 +283,9 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                             }
                             error(originatingElement.element(), e.getMessage());
                         } catch (PostponeToNextRoundException e) {
-                            postponedTypes.put(javaClassElement.getCanonicalName(), e.getErrorElement());
+                            postponeElement(javaClassElement, e.getErrorElement(), e);
                         } catch (ElementPostponedToNextRoundException e) {
-                            Object nativeType = e.getOriginatingElement().getNativeType();
-                            if (nativeType instanceof JavaNativeElement jne) {
-                                Element element = jne.element();
-                                postponedTypes.put(javaClassElement.getCanonicalName(), element);
-                            } else {
-                                // should never happen.
-                                throw e;
-                            }
+                            postponeElement(javaClassElement, e.getOriginatingElement(), e);
                         }
                     }
                 }
@@ -328,11 +322,30 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         return false;
     }
 
+    private <T extends Throwable> void postponeElement(JavaClassElement javaClassElement, Object originalElement, T e) throws T {
+        Element postponedElement;
+        if (originalElement instanceof Element element) {
+            postponedElement = element;
+        } else if (originalElement instanceof io.micronaut.inject.ast.Element element) {
+            Object nativeType = element.getNativeType();
+            if (nativeType instanceof JavaNativeElement jne) {
+                postponedElement = jne.element();
+            } else {
+                // should never happen.
+                throw e;
+            }
+        } else {
+            // should never happen.
+            throw e;
+        }
+        postponedTypes.put(javaClassElement.getCanonicalName(), postponedElement);
+    }
+
     private void visitClass(LoadedVisitor visitor, JavaClassElement classElement) {
         TypeElementQuery query = visitor.getVisitor().query();
 
         try {
-            javaVisitorContext.setSkipUnresolvedInterfaces(query.skipsUnresolvedInterfaces());
+            javaVisitorContext.setVisitUnresolvedInterfaces(query.visitsUnresolvedInterfaces());
 
             visitor.getVisitor().visitClass(classElement, javaVisitorContext);
 
@@ -371,7 +384,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                 }
             }
         } finally {
-            javaVisitorContext.setSkipUnresolvedInterfaces(false);
+            javaVisitorContext.setVisitUnresolvedInterfaces(false);
         }
     }
 

@@ -24,7 +24,7 @@ import io.micronaut.core.annotation.Internal;
  * @param includesMethods           Include methods
  * @param includesFields            Include fields
  * @param includesEnumConstants     Include enum constants
- * @param skipsUnresolvedInterfaces Skips unresolved interfaces
+ * @param visitsUnresolvedInterfaces Visits unresolved interfaces
  * @author Denis Stepanov
  * @since 1.9
  */
@@ -33,62 +33,62 @@ record DefaultTypeElementQuery(boolean includesConstructors,
                                boolean includesMethods,
                                boolean includesFields,
                                boolean includesEnumConstants,
-                               boolean skipsUnresolvedInterfaces) implements TypeElementQuery {
+                               boolean visitsUnresolvedInterfaces) implements TypeElementQuery {
 
-    static DefaultTypeElementQuery DEFAULT = new DefaultTypeElementQuery(true, true, true, true, false);
+    static final DefaultTypeElementQuery DEFAULT = new DefaultTypeElementQuery(true, true, true, true, false);
 
     @Override
     public TypeElementQuery includeMethods() {
-        return new DefaultTypeElementQuery(includesConstructors, true, includesFields, includesEnumConstants, skipsUnresolvedInterfaces);
+        return new DefaultTypeElementQuery(includesConstructors, true, includesFields, includesEnumConstants, visitsUnresolvedInterfaces);
     }
 
     @Override
     public TypeElementQuery excludeMethods() {
-        return new DefaultTypeElementQuery(includesConstructors, false, includesFields, includesEnumConstants, skipsUnresolvedInterfaces);
+        return new DefaultTypeElementQuery(includesConstructors, false, includesFields, includesEnumConstants, visitsUnresolvedInterfaces);
     }
 
     @Override
     public TypeElementQuery includeConstructors() {
-        return new DefaultTypeElementQuery(true, includesMethods, includesFields, includesEnumConstants, skipsUnresolvedInterfaces);
+        return new DefaultTypeElementQuery(true, includesMethods, includesFields, includesEnumConstants, visitsUnresolvedInterfaces);
     }
 
     @Override
     public TypeElementQuery excludeConstructors() {
-        return new DefaultTypeElementQuery(false, includesMethods, includesFields, includesEnumConstants, skipsUnresolvedInterfaces);
+        return new DefaultTypeElementQuery(false, includesMethods, includesFields, includesEnumConstants, visitsUnresolvedInterfaces);
     }
 
     @Override
     public TypeElementQuery includeFields() {
-        return new DefaultTypeElementQuery(includesConstructors, includesMethods, true, includesEnumConstants, skipsUnresolvedInterfaces);
+        return new DefaultTypeElementQuery(includesConstructors, includesMethods, true, includesEnumConstants, visitsUnresolvedInterfaces);
     }
 
     @Override
     public TypeElementQuery excludeFields() {
-        return new DefaultTypeElementQuery(includesConstructors, includesMethods, false, includesEnumConstants, skipsUnresolvedInterfaces);
+        return new DefaultTypeElementQuery(includesConstructors, includesMethods, false, includesEnumConstants, visitsUnresolvedInterfaces);
     }
 
     @Override
     public TypeElementQuery includeEnumConstants() {
-        return new DefaultTypeElementQuery(includesConstructors, includesMethods, includesFields, true, skipsUnresolvedInterfaces);
+        return new DefaultTypeElementQuery(includesConstructors, includesMethods, includesFields, true, visitsUnresolvedInterfaces);
     }
 
     @Override
     public TypeElementQuery excludeEnumConstants() {
-        return new DefaultTypeElementQuery(includesConstructors, includesMethods, includesFields, false, skipsUnresolvedInterfaces);
+        return new DefaultTypeElementQuery(includesConstructors, includesMethods, includesFields, false, visitsUnresolvedInterfaces);
     }
 
     @Override
     public TypeElementQuery includeAll() {
-        return new DefaultTypeElementQuery(true, true, true, true, skipsUnresolvedInterfaces);
+        return new DefaultTypeElementQuery(true, true, true, true, visitsUnresolvedInterfaces);
     }
 
     @Override
     public TypeElementQuery excludeAll() {
-        return new DefaultTypeElementQuery(false, false, false, false, skipsUnresolvedInterfaces);
+        return new DefaultTypeElementQuery(false, false, false, false, visitsUnresolvedInterfaces);
     }
 
     @Override
-    public TypeElementQuery skipUnresolvedInterfaces() {
+    public TypeElementQuery visitUnresolvedInterfaces() {
         return new DefaultTypeElementQuery(includesConstructors, includesMethods, includesFields, includesEnumConstants, true);
     }
 }

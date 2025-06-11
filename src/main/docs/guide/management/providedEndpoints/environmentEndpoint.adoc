@@ -11,9 +11,33 @@ endpoints:
   env:
     enabled: Boolean
     sensitive: Boolean
+    active-keys: List<String>
 ----
 
 - defaults are false for `enabled` and true for `sensitive`
+- `active-keys` defaults to ["activeEnvironments", "packages", "propertySources"]
+
+The `active-keys` property allows you to customize which sections of the environment information are displayed.
+You can specify one or more of the following values:
+
+- `activeEnvironments`
+- `packages`
+- `propertySources`
+
+For example, to only show active environments and packages:
+
+[configuration]
+----
+endpoints:
+  env:
+    active-keys:
+      - activeEnvironments
+      - packages
+----
+
+If you provide an empty list, no sections will be displayed.
+
+== Masking sensitive information
 
 By default, the endpoint will mask all values.
 To customize this masking you need to supply a Bean that implements api:management.endpoint.env.EnvironmentEndpointFilter[].
