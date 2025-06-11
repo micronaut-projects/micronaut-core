@@ -67,6 +67,8 @@ ioc:
   beanValidation: Bean Validation
   annotationMetadata: Bean Annotation Metadata
   beanImport: Importing Beans from Libraries
+  classImport: Importing Classes from Libraries
+  mixin: Modifying Class Annotations With A Mixin
   nullabilityAnnotations: Nullability Annotations
   springBeans: Micronaut Beans And Spring
   android: Android Support
