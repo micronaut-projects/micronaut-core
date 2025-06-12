@@ -45,6 +45,8 @@ import io.netty.handler.codec.http2.Http2FrameLogger;
 import io.netty.handler.codec.http2.Http2Headers;
 import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.codec.http2.HttpConversionUtil;
+import io.netty.handler.timeout.IdleState;
+import io.netty.handler.timeout.IdleStateEvent;
 
 import java.nio.channels.ClosedChannelException;
 import java.util.EnumMap;
@@ -251,6 +253,10 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
                 }
                 io.netty.handler.codec.http2.Http2Stream cs = connection().stream(1);
                 handleFakeRequest(cs, fhr);
+            } else if (evt instanceof IdleStateEvent idle) {
+                if (idle.state() == IdleState.ALL_IDLE) {
+                    ctx.close();
+                }
             }
             super.userEventTriggered(ctx, evt);
         }

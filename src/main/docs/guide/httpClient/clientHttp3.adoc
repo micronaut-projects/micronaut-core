@@ -13,4 +13,4 @@ micronaut:
 
 Additionally, the netty HTTP/3 codec needs to be present on the classpath:
 
-dependency:netty-incubator-codec-http3[groupId="io.netty.incubator",artifactId="netty-incubator-codec-http3"]
+dependency:micronaut-http-netty-http3[]

@@ -278,13 +278,21 @@ Once a class is registered within evaluation context the methods and properties 
 
 Consider the following example:
 
-snippet::io.micronaut.docs.expressions.CustomEvaluationContext[title="User-defined evaluated expression context"]
+[source, java]
+.User-defined evaluated expression context
+----
+include::test-suite/src/main/java/io/micronaut/docs/expressions/CustomEvaluationContext.java[tag=clazz]
+----
 
 NOTE: The class should be resolvable as a bean can use `jakarta.inject` annotations to inject other types if necessary. In addition, for performance reasons all evaluation context classes are effectively singleton regardless of the defined scope.
 
 Registering this class can be achieved with a custom implementation of api:expressions.context.ExpressionEvaluationContextRegistrar[] that is registered via service loader as a api:inject.visitor.TypeElementVisitor[] (create a new `META-INF/services/io.micronaut.inject.visitor.TypeElementVisitor` file referencing the new class) and placed on the annotation processor classpath:
 
-snippet::io.micronaut.docs.expressions.ContextRegistrar[title="Defining a ExpressionEvaluationContextRegistrar"]
+[source, java]
+.Defining a ExpressionEvaluationContextRegistrar
+----
+include::test-suite/src/main/java/io/micronaut/docs/expressions/ContextRegistrar.java[tag=clazz]
+----
 
 Method `generateRandom(int, int)` can now be used within Evaluated Expression in the following way:
 

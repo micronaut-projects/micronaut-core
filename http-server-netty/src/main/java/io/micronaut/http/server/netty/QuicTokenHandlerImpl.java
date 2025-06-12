@@ -18,7 +18,7 @@ package io.micronaut.http.server.netty;
 import io.micronaut.core.annotation.Internal;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
-import io.netty.incubator.codec.quic.QuicTokenHandler;
+import io.netty.handler.codec.quic.QuicTokenHandler;
 import io.netty.util.concurrent.FastThreadLocal;
 
 import javax.crypto.KeyGenerator;

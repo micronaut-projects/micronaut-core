@@ -80,7 +80,6 @@ managed-kotlin = "1.9.25"
 managed-kotlin-coroutines = "1.8.1"
 managed-methvin-directory-watcher = "0.19.0"
 managed-netty = "4.2.2.Final"
-managed-netty-http3 = "0.0.29.Final"
 managed-netty-tcnative = "2.0.72.Final"
 managed-reactive-streams = "1.0.4"
 # This should be kept aligned with https://github.com/micronaut-projects/micronaut-reactor/blob/master/gradle.properties from the BOM
@@ -153,8 +152,10 @@ managed-methvin-directoryWatcher = { module = "io.methvin:directory-watcher", ve
 managed-netty-buffer = { module = "io.netty:netty-buffer", version.ref = "managed-netty" }
 managed-netty-codec-http = { module = "io.netty:netty-codec-http", version.ref = "managed-netty" }
 managed-netty-codec-http2 = { module = "io.netty:netty-codec-http2", version.ref = "managed-netty" }
+managed-netty-codec-http3 = { module = "io.netty:netty-codec-http3", version.ref = "managed-netty" }
+managed-netty-codec-classes-quic = { module = "io.netty:netty-codec-classes-quic", version.ref = "managed-netty" }
+managed-netty-codec-native-quic = { module = "io.netty:netty-codec-native-quic", version.ref = "managed-netty" }
 managed-netty-common = { module = "io.netty:netty-common", version.ref = "managed-netty" }
-managed-netty-incubator-codec-http3 = { module = "io.netty.incubator:netty-incubator-codec-http3", version.ref = "managed-netty-http3" }
 managed-netty-handler = { module = "io.netty:netty-handler", version.ref = "managed-netty" }
 managed-netty-handler-proxy = { module = "io.netty:netty-handler-proxy", version.ref = "managed-netty" }
 managed-netty-transport-native-epoll = { module = "io.netty:netty-transport-native-epoll", version.ref = "managed-netty" }

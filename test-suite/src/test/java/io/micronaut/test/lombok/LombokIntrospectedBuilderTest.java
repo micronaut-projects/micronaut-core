@@ -1,8 +1,10 @@
 package io.micronaut.test.lombok;
 
+import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanProperty;
+import io.micronaut.test.lombok.importtest.VersionManifest;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -13,7 +15,17 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@Introspected(classes = VersionManifest.VersionManifestEntry.class)
 public class LombokIntrospectedBuilderTest {
+
+    @Test
+    void testImportedIntrospection() {
+        BeanIntrospection<VersionManifest.VersionManifestEntry> introspection = BeanIntrospection.getIntrospection(VersionManifest.VersionManifestEntry.class);
+        VersionManifest.VersionManifestEntry entry = introspection.instantiate("test", 1, 2);
+        assertNotNull(entry);
+        assertEquals("test", entry.getName());
+        assertEquals(1, entry.getMajorVersion());
+    }
 
     @Test
     void testLombokInheritance() {

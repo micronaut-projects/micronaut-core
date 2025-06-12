@@ -355,6 +355,8 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
                                 final String seq = g2 + matcher.group(3);
                                 if (seq.equals("ns")) {
                                     return Optional.of(Duration.ofNanos(Integer.parseInt(amount)));
+                                } else if (seq.equals("us")) {
+                                    return Optional.of(Duration.ofNanos(Integer.parseInt(amount) * 1000L));
                                 }
                                 context.reject(
                                     value,

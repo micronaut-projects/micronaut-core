@@ -1305,6 +1305,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         private Duration shutdownQuietPeriod = Duration.ofSeconds(DEFAULT_SHUTDOWN_QUIET_PERIOD);
         private Duration shutdownTimeout = Duration.ofSeconds(DEFAULT_SHUTDOWN_TIMEOUT);
         private String name;
+        private boolean loomCarrier = false;
 
         /**
          * @param name The name;
@@ -1445,6 +1446,20 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         @Override
         public Duration getShutdownTimeout() {
             return shutdownTimeout;
+        }
+
+        @Override
+        public boolean isLoomCarrier() {
+            return loomCarrier;
+        }
+
+        /**
+         * @param loomCarrier When set to {@code true}, use a special <i>experimental</i> event
+         *                    loop that can also execute virtual threads, in order to improve
+         *                    virtual thread performance.
+         */
+        public void setLoomCarrier(boolean loomCarrier) {
+            this.loomCarrier = loomCarrier;
         }
     }
 

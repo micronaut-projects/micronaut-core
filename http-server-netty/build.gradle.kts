@@ -16,6 +16,7 @@ tasks {
         systemProperty("io.netty.leakDetection.level", "paranoid")
         systemProperty("io.netty.customResourceLeakDetector", "io.micronaut.http.server.netty.fuzzing.BufferLeakDetection")
         systemProperty("io.netty.leakDetection.targetRecords", "100")
+        jvmArgs("--add-opens=java.base/java.lang=ALL-UNNAMED")
         maxHeapSize = "1G"
     }
 }
@@ -33,7 +34,7 @@ dependencies {
     compileOnly(projects.micronautWebsocket)
     compileOnly(libs.managed.kotlin.stdlib)
     compileOnly(libs.managed.netty.transport.native.unix.common)
-    compileOnly(libs.managed.netty.incubator.codec.http3)
+    compileOnly(projects.micronautHttpNettyHttp3)
     compileOnly(libs.brotli4j)
 
     testImplementation(libs.jmh.core)
@@ -60,7 +61,7 @@ dependencies {
     testImplementation(projects.micronautInjectJavaTest)
     testImplementation(projects.micronautHttpClient)
     testImplementation(libs.spotbugs)
-    testImplementation(libs.managed.netty.incubator.codec.http3)
+    testImplementation(projects.micronautHttpNettyHttp3)
     testImplementation(libs.bcpkix)
     testImplementation(projects.micronautJacksonDatabind)
 // Add Micronaut Jackson XML after v4 Migration

@@ -154,6 +154,31 @@ class FuzzyInputSpec extends Specification {
         where:
         input << [
                 Base64.decoder.decode("RSArIEhUVFAvMS4xCkNvbnRlbnQtTGVuZ3RoOjIKdDr/ClVwZ3JhZGU6Cgo="),
+                Base64.decoder.decode("UEFUQ0gLDQ0jLzovL9s6Ly8NAEhUVFAvMi4wCm8uVjpEIcAvJwpBY2NlcHQ6LHRleHQvaHRtbAoK" +
+                        "RU1UDUD///8JSFRUUC8wLjEKQWNjZXB0Oglpby7///////9lcHQ6LGVwdDosZXB0Oix0ZXh0L2h0" +
+                        "bWwsZS5ObgoKdA1A/////T/9Oi8v////CUhUVFAvMC4xCkFjY2VwdDoJaW9hbmdlOix0ZXh0L2h0" +
+                        "bWwsVXNlci1BblVwZ3JhRW1iLjMKCnBvc3QNQC8v////CUhUVFAvMC4xCkFjY2VwdDoJaW8sdGV4" +
+                        "dC9odG1sLCc6MwoKcG9zdA1A///9P/06Ly////8JSFRUUC8wLjEKQWNjZXB0OglnZTosdGV4dC9o" +
+                        "dG1sLFVzZXBUQ0h0dHAuRTMKCnBvc3QNQP////0//TovL////wlIVFRQLzAuMQpBY2NlcHQ6CWlv" +
+                        "ZXgtUmFuZ2U6LHRleHQvaHRtbCxVL/06Ly////8JUC8yLjMKCkVNVA1A/////T/9Ov8JSFRUUC8w" +
+                        "LjEKQWNjZXB0OjI6LHRleHQvaHRtbCxVZXB0LUVuYy4zCgpFTVQNQP////0//TovL////wlIVFRQ" +
+                        "LzAuMQpBY2NlcHQ6CWlVVENIYzosdGV4dC9odG1sLFUuMwoKcG9zdA1A/////T/9Oi8vCUhUVFAv" +
+                        "MC4xCkFjY2VwZWM6clMu8QpBY2NlcHQ6LHRlZi1SbmdlOix0ZXh0L2h0bWwsVXNlRUFECTb9Oi/9" +
+                        "MwoKcG8NQP////0//Tr///8JSFRUUC8wLjEKQWNjZXB0Oglpby7/////LHRleHQvaHRtbCxVc2VF" +
+                        "dHBPLy///zMKCnBvc3QNL////wlIVFRQLzAuMQpBY2NlcHQ6CWlvLix0ZXh0L2h0bWwsVWVFQUQh" +
+                        "wCcnJzosMwoKcG9zDUD////9P/06CUhUVFAvMC4xCkFjY2VwdDoJaW8u/zosdGV4dC9odG1sLFVz" +
+                        "ZUVBRCHALzotMApDb250ZW50LUxlbmd0aDo0MwoK//4uAAh0aXJlbmNlQ291bnRVbM3ac3NXaG5n" +
+                        "WVlZWVkJ/wAAAABSZWZlbXQCCf9sYXQLSFRUUC8yLjAKVHJhbnNmZS1FbmNuZzpzbmFwcHksdHBU" +
+                        "YXJnZfEKQWNjZXB0Oix0ZXghwElmLVIsdGV4dC9odG1sLFVzZUVBRCEzCgpwb3N0DUD///0//Tov" +
+                        "L///CUhUVFAvMC4xCkFjY2VwdDplOix0ZXh0L2h0bWwsVXRlcHRIRCFvLm0uMwoKcG9zdA0v////" +
+                        "CUhUVFAvMC4xCkFjY2VwdDphcmdldHBPYmplYzosdGV4dC9odG1sLFVzL/0JUC8yLjMKCnBvc3QN" +
+                        "QP///////wlIVFRQLzAuMQpBY2NlcGVjOnJTLvEKQWNjZXB0Oix0ZXghOix0ZXh0L2h0bWwsVXNl" +
+                        "dDozCgpwb3N0Df8v////CUhUVFAvMC4xCkFjY2VwdDoJaf///yx0ZXh0L2h0bWwsVXMn/2Vy/wlQ" +
+                        "LzIuMwoKcG9zdA1A/////T/9Oi//CUhUVFAvMC4xCkFjY2VwdDoJaW8u//8sdGV4dC9odG1sLFVl" +
+                        "MwoKcG9zdA1A//8JSFRUUC8wLjEKQWNjZXB0Ov//QUNMfKuvZTJDb/U6LHRleHQvaHRtbCxVOm95" +
+                        "LCwsSWYtTWF0L3JjdGg6LTAKQ29udGVudC1MZW5ndGg6NDMKCv/+LgAIdGlyZW5jZUNvdW50VXRp" +
+                        "bM3ac3NXaG5nWVlZWVkJ/wAAAABSZWZlbXQCCf9sYXQLSFRUUC8yLjAKVHJhbnNmZXItRW5jb2Rp" +
+                        "bmc6c25hcHB5LCw6LTAKQ29udGVudC1MZW5ndGg6NDQKCv/+LgAIdGlyZUhUVDosdA01Cg=="),
         ]
     }
 

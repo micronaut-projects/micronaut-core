@@ -16,8 +16,6 @@
 package io.micronaut.runtime.converters.time
 
 import io.micronaut.core.convert.DefaultMutableConversionService
-import java.time.temporal.ChronoUnit
-import java.time.temporal.TemporalAmount
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -35,6 +33,7 @@ import java.time.YearMonth
 import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
+import java.time.temporal.TemporalAmount
 
 class TimeConverterRegistrarSpec extends Specification {
 
@@ -50,6 +49,7 @@ class TimeConverterRegistrarSpec extends Specification {
         where:
         val    | expected
         '10ns' | Duration.ofNanos(10)
+        '10us' | Duration.ofNanos(10_000)
         '10ms' | Duration.ofMillis(10)
         '10s'  | Duration.ofSeconds(10)
         '10m'  | Duration.ofMinutes(10)

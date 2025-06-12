@@ -22,6 +22,9 @@ import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.exceptions.HttpClientException;
+import io.micronaut.http.netty.channel.loom.EventLoopVirtualThreadScheduler;
+import io.micronaut.http.netty.channel.loom.PrivateLoomSupport;
+import io.micronaut.scheduling.LoomSupport;
 import io.netty.channel.EventLoop;
 import io.netty.channel.SingleThreadIoEventLoop;
 import io.netty.util.concurrent.EventExecutor;
@@ -183,7 +186,19 @@ final class Pool49 implements Pool {
         LocalPoolPair poolPair = null;
         var configLocality = connectionPoolConfiguration.getConnectionLocality();
         if (configLocality != HttpClientConfiguration.ConnectionPoolConfiguration.ConnectionLocality.IGNORE) {
-            EventExecutor currentExecutor = ThreadExecutorMap.currentExecutor();
+
+            EventExecutor currentExecutor = null;
+
+            if (PrivateLoomSupport.isSupported() &&
+                LoomSupport.isVirtual(Thread.currentThread()) &&
+                PrivateLoomSupport.getScheduler(Thread.currentThread()) instanceof EventLoopVirtualThreadScheduler el) {
+                currentExecutor = el.eventLoop();
+            }
+
+            if (currentExecutor == null) {
+                currentExecutor = ThreadExecutorMap.currentExecutor();
+            }
+
             if (currentExecutor == null) {
                 for (LocalPoolPair pool : localPools) {
                     if (pool.loop.inEventLoop()) {
@@ -194,7 +209,6 @@ final class Pool49 implements Pool {
             } else {
                 poolPair = localPoolsByLoop.get(currentExecutor);
             }
-
             if (poolPair == null && configLocality == HttpClientConfiguration.ConnectionPoolConfiguration.ConnectionLocality.ENFORCED_ALWAYS) {
                 throw new HttpClientException("Attempted to open a HTTP connection from thread " +
                     Thread.currentThread() + " which is not part of the client event loop group, but configured the pool in locality mode ENFORCED_ALWAYS, which disallows " +

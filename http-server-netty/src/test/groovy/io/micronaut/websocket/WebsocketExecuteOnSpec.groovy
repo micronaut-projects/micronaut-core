@@ -2,13 +2,17 @@ package io.micronaut.websocket
 
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
-import io.micronaut.http.context.ServerRequestContext
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.scheduling.LoomSupport
 import io.micronaut.scheduling.TaskExecutors
 import io.micronaut.scheduling.annotation.ExecuteOn
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
-import io.micronaut.websocket.annotation.*
+import io.micronaut.websocket.annotation.ClientWebSocket
+import io.micronaut.websocket.annotation.OnClose
+import io.micronaut.websocket.annotation.OnError
+import io.micronaut.websocket.annotation.OnMessage
+import io.micronaut.websocket.annotation.OnOpen
+import io.micronaut.websocket.annotation.ServerWebSocket
 import jakarta.inject.Inject
 import org.reactivestreams.Publisher
 import org.slf4j.Logger
@@ -20,7 +24,6 @@ import spock.lang.Unroll
 import spock.util.concurrent.PollingConditions
 
 import java.util.concurrent.CompletableFuture
-import java.util.concurrent.Future
 import java.util.function.Predicate
 import java.util.function.Supplier
 import java.util.stream.Collectors
@@ -283,7 +286,7 @@ class WebsocketExecuteOnSpec extends Specification {
             replies.stream()
                     .filter(str -> str.contains(type))
                     .map(str -> str.replaceAll(type, ""))
-                    .map(str -> str.replaceAll("\\d", "").replace("-thread-", ""))
+                    .map(str -> str.replaceAll("-?\\d", "").replace("-thread", ""))
                     .collect(Collectors.toList())
         }
     }
