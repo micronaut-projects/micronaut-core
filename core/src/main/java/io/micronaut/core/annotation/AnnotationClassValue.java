@@ -95,7 +95,7 @@ public final class AnnotationClassValue<T> implements CharSequence, Named {
         this.theClass = (Class<T>) instance.getClass();
         this.name = theClass.getName();
         this.instance = instance;
-        this.instantiated = true;
+        this.instantiated = !(instance instanceof AnnotationClassValue.UnresolvedClass);
     }
 
     /**
@@ -120,8 +120,7 @@ public final class AnnotationClassValue<T> implements CharSequence, Named {
      * @since 1.1
      */
     public boolean isInstantiated() {
-        return instantiated ||
-            (getInstance().isPresent() && !(getInstance().get() instanceof AnnotationClassValue.UnresolvedClass));
+        return instantiated;
     }
 
     /**

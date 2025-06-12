@@ -20,12 +20,9 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableHeaders;
-import io.micronaut.http.ByteBodyHttpResponse;
-import io.micronaut.http.ByteBodyHttpResponseWrapper;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.ResponseBodyWriter;
@@ -56,17 +53,6 @@ public final class InputStreamBodyWriter extends AbstractFileBodyWriter implemen
     InputStreamBodyWriter(HttpServerConfiguration.FileTypeHandlerConfiguration configuration, @Named(TaskExecutors.BLOCKING) ExecutorService executorService) {
         super(configuration);
         this.executorService = executorService;
-    }
-
-    @Override
-    public ByteBodyHttpResponse<?> write(@NonNull ByteBodyFactory bodyFactory,
-                                         HttpRequest<?> request,
-                                         MutableHttpResponse<InputStream> outgoingResponse,
-                                         Argument<InputStream> type,
-                                         MediaType mediaType,
-                                         InputStream object) throws CodecException {
-        outgoingResponse.getHeaders().contentTypeIfMissing(mediaType);
-        return ByteBodyHttpResponseWrapper.wrap(outgoingResponse, InputStreamByteBody.create(object, OptionalLong.empty(), executorService, bodyFactory));
     }
 
     @Override

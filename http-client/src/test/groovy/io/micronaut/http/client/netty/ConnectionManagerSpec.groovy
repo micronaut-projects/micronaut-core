@@ -50,6 +50,7 @@ import io.netty.handler.codec.http2.DefaultHttp2DataFrame
 import io.netty.handler.codec.http2.DefaultHttp2GoAwayFrame
 import io.netty.handler.codec.http2.DefaultHttp2Headers
 import io.netty.handler.codec.http2.DefaultHttp2HeadersFrame
+import io.netty.handler.codec.http2.DefaultHttp2PingFrame
 import io.netty.handler.codec.http2.Http2Error
 import io.netty.handler.codec.http2.Http2FrameCodec
 import io.netty.handler.codec.http2.Http2FrameCodecBuilder
@@ -69,7 +70,6 @@ import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler
 import io.netty.handler.ssl.SslContextBuilder
 import io.netty.handler.ssl.util.SelfSignedCertificate
 import io.netty.util.AsciiString
-import io.netty.util.concurrent.GenericFutureListener
 import jakarta.inject.Singleton
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.function.Executable
@@ -77,6 +77,7 @@ import org.spockframework.runtime.model.parallel.ExecutionMode
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import spock.lang.Execution
+import spock.lang.Ignore
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -91,40 +92,34 @@ import java.util.zip.GZIPOutputStream
 @Execution(ExecutionMode.CONCURRENT)
 class ConnectionManagerSpec extends Specification {
     private static void patch(DefaultHttpClient httpClient, EmbeddedTestConnectionBase... connections) {
-        httpClient.connectionManager = new ConnectionManager(httpClient.connectionManager) {
-            int i = 0
+        List<EmbeddedChannel> channels = new ArrayList<>()
+        List<ChannelFuture> openFutures = new ArrayList<>()
+        for (EmbeddedTestConnectionBase connection : connections) {
+            connection.clientChannel = new EmbeddedChannel(new DummyChannelId('client'), connection.clientInitializer) {
+                def loop
 
-            @Override
-            protected ChannelFuture doConnect(DefaultHttpClient.RequestKey requestKey, ConnectionManager.CustomizerAwareInitializer channelInitializer, Thread requestingThread) {
-                try {
-                    channelInitializer.bootstrappedCustomizer = clientCustomizer
-                    def connection = connections[i++]
-                    connection.clientChannel = new EmbeddedChannel(new DummyChannelId('client' + i), connection.clientInitializer, channelInitializer) {
-                        def loop
-
-                        @Override
-                        EventLoop eventLoop() {
-                            if (loop == null) {
-                                loop = new DelegateEventLoop(super.eventLoop()) {
-                                    @Override
-                                    boolean inEventLoop() {
-                                        return connection.inEventLoop
-                                    }
-                                }
+                @Override
+                EventLoop eventLoop() {
+                    if (loop == null) {
+                        loop = new DelegateEventLoop(super.eventLoop()) {
+                            @Override
+                            boolean inEventLoop() {
+                                return connection.inEventLoop
                             }
-                            return loop
                         }
                     }
-                    def promise = connection.clientChannel.newPromise()
-                    promise.setSuccess()
-                    return promise
-                } catch (Throwable t) {
-                    // print it immediately to make sure it's not swallowed
-                    t.printStackTrace()
-                    throw t
+                    return loop
                 }
             }
+            channels.add(connection.clientChannel)
+            ChannelPromise openFuture = connection.clientChannel.newPromise()
+            connection.openFuture.whenComplete((v, t) -> {
+                if (t == null) openFuture.setSuccess()
+                else openFuture.setFailure(t)
+            })
+            openFutures.add(openFuture)
         }
+        httpClient.connectionManager = new EmbeddedConnectionManager(httpClient.connectionManager, channels, openFutures);
     }
 
     def 'simple http2 get'() {
@@ -541,17 +536,15 @@ class ConnectionManagerSpec extends Specification {
 
         // do one request
         conn.testExchangeResponse(conn.testExchangeRequest(client))
-        conn.clientChannel.unfreezeTime()
         // connection is in reserve, should not time out
-        TimeUnit.SECONDS.sleep(10)
+        conn.clientChannel.advanceTimeBy(10, TimeUnit.SECONDS)
         conn.advance()
 
         // second request
         def future = Mono.from(client.exchange('http://example.com/foo', String)).toFuture()
         conn.advance()
 
-        // todo: move to advanceTime once IdleStateHandler supports it
-        TimeUnit.SECONDS.sleep(5)
+        conn.clientChannel.advanceTimeBy(5, TimeUnit.SECONDS)
         conn.advance()
 
         assert future.isDone()
@@ -584,18 +577,16 @@ class ConnectionManagerSpec extends Specification {
         def r1 = conn.testExchangeRequest(client)
         conn.exchangeSettings()
         conn.testExchangeResponse(r1)
-        conn.clientChannel.unfreezeTime()
 
         // connection is in reserve, should not time out
-        TimeUnit.SECONDS.sleep(10)
+        conn.clientChannel.advanceTimeBy(10, TimeUnit.SECONDS)
         conn.advance()
 
         // second request
         def future = Mono.from(client.exchange('https://example.com/foo', String)).toFuture()
         conn.advance()
 
-        // todo: move to advanceTime once IdleStateHandler supports it
-        TimeUnit.SECONDS.sleep(5)
+        conn.clientChannel.advanceTimeBy(5, TimeUnit.SECONDS)
         conn.advance()
 
         assert future.isDone()
@@ -625,18 +616,16 @@ class ConnectionManagerSpec extends Specification {
 
         // do one request
         conn.testExchangeResponse(conn.testExchangeRequest(client))
-        conn.clientChannel.unfreezeTime()
         // wait for one part of the interval
-        TimeUnit.SECONDS.sleep(2)
+        conn.clientChannel.advanceTimeBy(2, TimeUnit.SECONDS)
         conn.advance()
 
         // second request
         def future = Mono.from(client.exchange('http://example.com/foo', String)).toFuture()
         conn.advance()
 
-        // todo: move to advanceTime once IdleStateHandler supports it
         // wait for the second part of the interval: below read-timeout, but together with the first sleep, above it
-        TimeUnit.SECONDS.sleep(3)
+        conn.clientChannel.advanceTimeBy(3, TimeUnit.SECONDS)
         conn.advance()
 
         assert !future.isDone()
@@ -721,9 +710,7 @@ class ConnectionManagerSpec extends Specification {
         patch(client, conn1, conn2)
 
         conn1.testExchangeResponse(conn1.testExchangeRequest(client))
-        conn1.clientChannel.unfreezeTime()
-        // todo: move to advanceTime once IdleStateHandler supports it
-        TimeUnit.SECONDS.sleep(5)
+        conn1.clientChannel.advanceTimeBy(5, TimeUnit.SECONDS)
         conn1.advance()
         // conn1 should expire now, conn2 will be the next connection
         conn2.testExchangeResponse(conn2.testExchangeRequest(client))
@@ -793,27 +780,7 @@ class ConnectionManagerSpec extends Specification {
         def conn = new EmbeddedTestConnectionHttp1()
         conn.setupHttp1()
 
-        ChannelPromise delayPromise
-        def normalInit = conn.clientInitializer
-        // hack: delay the channelActive call until we complete delayPromise
-        conn.clientInitializer = new ChannelInitializer<EmbeddedChannel>() {
-            @Override
-            protected void initChannel(EmbeddedChannel ch) throws Exception {
-                ch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
-                    @Override
-                    void channelActive(ChannelHandlerContext chtx) throws Exception {
-                        delayPromise = chtx.newPromise()
-                        delayPromise.addListener(new GenericFutureListener<io.netty.util.concurrent.Future<? super Void>>() {
-                            @Override
-                            void operationComplete(io.netty.util.concurrent.Future<? super Void> future) throws Exception {
-                                chtx.fireChannelActive()
-                            }
-                        })
-                    }
-                })
-                ch.pipeline().addLast(normalInit)
-            }
-        }
+        conn.openFuture = new CompletableFuture<>()
 
         patch(client, conn)
 
@@ -821,7 +788,7 @@ class ConnectionManagerSpec extends Specification {
         conn.advance()
         subscription.dispose()
         // this completes the handshake
-        delayPromise.setSuccess()
+        conn.openFuture.complete(null)
         conn.advance()
 
         conn.testExchangeResponse(conn.testExchangeRequest(client))
@@ -842,27 +809,7 @@ class ConnectionManagerSpec extends Specification {
         def conn = new EmbeddedTestConnectionHttp1()
         conn.setupHttp1()
 
-        ChannelPromise delayPromise
-        def normalInit = conn.clientInitializer
-        // hack: delay the channelActive call until we complete delayPromise
-        conn.clientInitializer = new ChannelInitializer<EmbeddedChannel>() {
-            @Override
-            protected void initChannel(EmbeddedChannel ch) throws Exception {
-                ch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
-                    @Override
-                    void channelActive(ChannelHandlerContext chtx) throws Exception {
-                        delayPromise = chtx.newPromise()
-                        delayPromise.addListener(new GenericFutureListener<io.netty.util.concurrent.Future<? super Void>>() {
-                            @Override
-                            void operationComplete(io.netty.util.concurrent.Future<? super Void> future) throws Exception {
-                                chtx.fireChannelActive()
-                            }
-                        })
-                    }
-                })
-                ch.pipeline().addLast(normalInit)
-            }
-        }
+        conn.openFuture = new CompletableFuture<>() // delay open
 
         patch(client, conn)
 
@@ -1070,6 +1017,7 @@ class ConnectionManagerSpec extends Specification {
         ctx.close()
     }
 
+    @Ignore("EmbeddedChannel.close cancels the scheduled task that runs the timeout")
     def 'http2 channel inactive but fire inactive channel scheduled after acquire'() {
         def ctx = ApplicationContext.run([
                 'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
@@ -1143,9 +1091,8 @@ class ConnectionManagerSpec extends Specification {
             conn.exchangeSettings()
         }
         conn.testExchangeResponse(r1)
-        conn.clientChannel.unfreezeTime()
         // trigger timeout
-        TimeUnit.SECONDS.sleep(2)
+        conn.clientChannel.advanceTimeBy(2, TimeUnit.SECONDS)
 
         // second request
         // this triggers the dispatch0 logic to be delayed with execute
@@ -1184,10 +1131,9 @@ class ConnectionManagerSpec extends Specification {
         conn.exchangeSettings()
         conn.testExchangeResponse(r1)
 
-        conn.clientChannel.unfreezeTime()
         for (int i = 0; i < 8; i++) {
             conn.testExchangeRequest(client)
-            TimeUnit.MILLISECONDS.sleep(250)
+            conn.clientChannel.advanceTimeBy(250, TimeUnit.MILLISECONDS)
         }
         conn.advance()
 
@@ -1227,8 +1173,7 @@ class ConnectionManagerSpec extends Specification {
         conn.exchangeSettings()
         conn.testExchangeResponse(r1)
 
-        conn.clientChannel.unfreezeTime()
-        TimeUnit.SECONDS.sleep(2)
+        conn.clientChannel.advanceTimeBy(2, TimeUnit.SECONDS)
         conn.advance()
 
         expect:
@@ -1245,6 +1190,38 @@ class ConnectionManagerSpec extends Specification {
         'micronaut.http.client.http2.ping-interval-idle'  | true
     }
 
+    def 'http2 server ping'() {
+        given:
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+                'spec.name': ConnectionManagerSpec.simpleName,
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp2()
+        conn.setupHttp2Tls()
+        patch(client, conn)
+
+        def future = conn.testExchangeRequest(client)
+        conn.exchangeSettings()
+        conn.testExchangeResponse(future)
+
+        assertPoolConnections(client, 1)
+
+        conn.serverChannel.writeAndFlush(new DefaultHttp2PingFrame(123))
+        conn.advance()
+
+        expect:
+        def pong = conn.serverChannel.readInbound()
+        pong instanceof Http2PingFrame
+        pong.ack
+        pong.content == 123
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
     void assertPoolConnections(DefaultHttpClient client, int count) {
         assert client.connectionManager.getChannels().size() == count
         client.connectionManager.getChannels().forEach { assert it.isActive() }
@@ -1252,6 +1229,7 @@ class ConnectionManagerSpec extends Specification {
 
     static class EmbeddedTestConnectionBase {
         final EmbeddedChannel serverChannel
+        CompletableFuture<?> openFuture = CompletableFuture.completedFuture(null)
         EmbeddedChannel clientChannel
         ChannelInitializer<EmbeddedChannel> clientInitializer = new ChannelInitializer<EmbeddedChannel>() {
             @Override

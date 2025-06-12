@@ -832,6 +832,12 @@ public class DefaultApplicationContext extends DefaultBeanContext implements Con
                 public ClassPathResourceLoader getResourceLoader() {
                     return resourceLoader;
                 }
+
+                @Nullable
+                @Override
+                public List<String> getOverrideConfigLocations() {
+                    return configuration.getOverrideConfigLocations();
+                }
             });
         }
 
@@ -959,6 +965,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements Con
         public Environment stop() {
             if (bootstrapEnvironment != null) {
                 bootstrapEnvironment.stop();
+                bootstrapEnvironment = null;
             }
             return super.stop();
         }

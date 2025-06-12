@@ -41,6 +41,17 @@ import java.util.Set;
 public interface TypeElementVisitor<C, E> extends Ordered, Toggleable {
 
     /**
+     * The query which allows to reduce the scope which the visitor is visiting.
+     *
+     * @return The query if the visitor.
+     * @since 4.9
+     */
+    @Experimental
+    default TypeElementQuery query() {
+        return TypeElementQuery.DEFAULT;
+    }
+
+    /**
      * Executed when a class is encountered that matches the {@literal <}C{@literal >} generic.
      *
      * @param element The element

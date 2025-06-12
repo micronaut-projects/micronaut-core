@@ -19,7 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.client.exceptions.HttpClientException;
-import io.netty.channel.EventLoop;
+import io.netty.util.concurrent.EventExecutor;
 
 /**
  * Information about what threads are blocked waiting for a request to complete. This is used to
@@ -64,7 +64,7 @@ public record BlockHint(Thread blockedThread, @Nullable BlockHint next) {
                 "https://docs.micronaut.io/latest/guide/index.html#clientConfiguration");
     }
 
-    boolean blocks(EventLoop eventLoop) {
+    boolean blocks(EventExecutor eventLoop) {
         BlockHint bh = this;
         while (bh != null) {
             if (eventLoop.inEventLoop(bh.blockedThread)) {

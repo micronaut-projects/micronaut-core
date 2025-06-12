@@ -1,18 +1,18 @@
 package io.micronaut.management.health.indicator.threads;
 
 import io.micronaut.context.ApplicationContext;
-import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.StartupEvent;
 import io.micronaut.core.type.Argument;
-import io.micronaut.health.HealthStatus;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.management.endpoint.health.DetailsVisibility;
-import io.micronaut.management.endpoint.health.HealthLevelOfDetail;
+import io.micronaut.management.endpoint.health.HealthEndpoint;
+import io.micronaut.management.health.aggregator.DefaultHealthAggregator;
 import io.micronaut.runtime.server.EmbeddedServer;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
@@ -22,11 +22,23 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
 
 class DeadlockedThreadsHealthIndicatorTest {
+    @Test
+    void diskSpaceHealthIndicatorViaConfiguration() {
+        Map<String, Object> configuration = Map.of("endpoints.health.deadlocked-threads.enabled", StringUtils.FALSE);
+        try (ApplicationContext context = ApplicationContext.run(configuration)) {
+            assertFalse(context.containsBean(DeadlockedThreadsHealthIndicator.class));
+        }
+        // enabled by default
+        try (ApplicationContext context = ApplicationContext.run()) {
+            assertTrue(context.containsBean(DeadlockedThreadsHealthIndicator.class));
+        }
+    }
 
     @Test
     void testDeadlockedThreadsHealthIndicator() {

@@ -26,6 +26,8 @@ import io.micronaut.runtime.context.env.ConfigurationAdvice
 import jakarta.validation.Valid
 import spock.lang.PendingFeature
 
+import static io.micronaut.annotation.processing.test.KotlinCompiler.buildContext
+
 class ClassElementSpec extends AbstractKotlinCompilerSpec {
 
     void "test Java Record compile"() {
@@ -169,6 +171,29 @@ class MyBean {}
         enmConsts.find {
             it.name == "SYSTEM2"
         } != null
+    }
+
+    void "test interface native properties"() {
+
+        when:
+        def nativeProps = buildClassElementMapped('test.BaseConfiguration', '''
+package test
+
+import io.micronaut.context.annotation.ConfigurationProperties
+
+@ConfigurationProperties("base")
+interface BaseConfiguration : Other {
+    val port: Int
+}
+
+interface Other {
+    val host: String
+}
+''', ce -> ce.syntheticBeanProperties)
+
+        then:
+            nativeProps.size() == 2
+            nativeProps.collect { it.name } == ["port", "host"]
     }
 
     void "test visitGeneratedFile"() {

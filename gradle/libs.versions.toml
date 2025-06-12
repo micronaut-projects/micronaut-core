@@ -1,16 +1,16 @@
 [versions]
-awaitility = "4.2.2"
+awaitility = "4.3.0"
 bcpkix = "1.70"
-blaze = "1.6.14"
+blaze = "1.6.15"
 brotli4j = "1.18.0"
-bytebuddy = "1.17.1"
+bytebuddy = "1.17.5"
 caffeine = "2.9.3"
 classgraph = "4.8.179"
 compile-testing = "0.21.0"
 
 geb = "7.0"
 # be sure to update graal version in gradle.properties as well
-graal-svm = "23.1.6"
+graal-svm = "23.1.7"
 h2 = "2.2.224"
 hibernate = "5.5.9.Final"
 htmlunit = "2.70.0"
@@ -29,63 +29,64 @@ jsr107 = "1.1.1"
 jsr305 = "3.0.2"
 jakarta-el = "5.0.1"
 jakarta-el-impl = "5.0.0-M1"
-japicmp-gradle-plugin="0.4.5"
+japicmp-gradle-plugin="0.4.6"
 jazzer = "0.24.0"
 jcache = "1.1.1"
 junit5 = "5.11.4"
 junit-platform="1.11.4"
-logback = "1.5.16"
-lombok = "1.18.36"
-logbook-netty = "3.10.0"
+logback = "1.5.18"
+lombok = "1.18.38"
+logbook-netty = "3.12.1"
 log4j = "2.24.3"
-micronaut-aws = "4.8.0"
-micronaut-build-plugins="7.3.2"
-micronaut-groovy = "4.5.0"
-micronaut-session = "4.5.0"
+micronaut-aws = "4.10.0"
+micronaut-build-plugins="7.4.0"
+micronaut-groovy = "4.6.0"
+micronaut-session = "4.6.0"
 micronaut-sql = "5.3.0"
 micronaut-test = "4.6.2"
-micronaut-validation = "4.8.1"
-micronaut-rxjava2 = "2.6.0"
-micronaut-rxjava3 = "3.6.0"
+micronaut-validation = "4.9.0"
+micronaut-rxjava2 = "2.7.0"
+micronaut-rxjava3 = "3.7.0"
 micronaut-reactor = "3.7.0"
-micronaut-kotlin = "4.5.0"
+micronaut-kotlin = "4.6.0"
 native-gradle-plugin = "0.10.5"
 neo4j-java-driver = "5.17.0"
 selenium = "4.27.0"
 okio = "3.9.1"
-slf4j = "2.0.16"
-smallrye = "6.7.3"
+slf4j = "2.0.17"
+smallrye = "6.9.1"
 spock = "2.3-groovy-4.0"
 spotbugs = "4.7.1"
 systemlambda = "1.2.1"
-testcontainers = "1.20.5"
+testcontainers = "1.21.1"
 tomlj="1.1.1"
-vertx = "4.5.12"
+vertx = "4.5.14"
 wiremock = "2.33.2"
 mimepull = "1.10.0"
-micronaut-sourcegen = "1.6.2"
+micronaut-sourcegen = "1.7.10"
+icu4j = "76.1"
+jfrunit = "1.0.0.Alpha2"
 
 #
 # Versions which start with managed- are managed by Micronaut in the sense
 # that they will appear in the Micronaut BOM as <properties>
 #
-managed-groovy = "4.0.25"
+managed-groovy = "4.0.27"
 managed-jakarta-annotation-api = "2.1.1"
-managed-jackson = "2.18.2"
+managed-jackson = "2.18.3"
 #@NextMajorVersion @Deprecated Delete in Micronaut Framework 5.
 managed-jackson-databind = "2.18.2"
 managed-kotlin = "1.9.25"
 managed-kotlin-coroutines = "1.8.1"
-managed-methvin-directory-watcher = "0.18.0"
-managed-netty = "4.1.118.Final"
-managed-netty-iouring = "0.0.26.Final"
-managed-netty-http3 = "0.0.28.Final"
-managed-netty-tcnative = "2.0.70.Final"
+managed-methvin-directory-watcher = "0.19.0"
+managed-netty = "4.2.2.Final"
+managed-netty-http3 = "0.0.29.Final"
+managed-netty-tcnative = "2.0.72.Final"
 managed-reactive-streams = "1.0.4"
 # This should be kept aligned with https://github.com/micronaut-projects/micronaut-reactor/blob/master/gradle.properties from the BOM
-managed-reactor = "3.7.2"
-managed-snakeyaml = "2.3"
-managed-java-parser-core = "3.26.3"
+managed-reactor = "3.7.6"
+managed-snakeyaml = "2.4"
+managed-java-parser-core = "3.26.4"
 managed-ksp = "1.9.25-1.0.20"
 sonatype-scan = "3.0.0"
 micronaut-docs = "2.0.0"
@@ -158,7 +159,7 @@ managed-netty-handler = { module = "io.netty:netty-handler", version.ref = "mana
 managed-netty-handler-proxy = { module = "io.netty:netty-handler-proxy", version.ref = "managed-netty" }
 managed-netty-transport-native-epoll = { module = "io.netty:netty-transport-native-epoll", version.ref = "managed-netty" }
 managed-netty-transport-native-kqueue = { module = "io.netty:netty-transport-native-kqueue", version.ref = "managed-netty" }
-managed-netty-transport-native-iouring = { module = "io.netty.incubator:netty-incubator-transport-native-io_uring", version.ref = "managed-netty-iouring" }
+managed-netty-transport-native-iouring = { module = "io.netty:netty-transport-native-io_uring", version.ref = "managed-netty" }
 managed-netty-transport-native-unix-common = { module = "io.netty:netty-transport-native-unix-common", version.ref = "managed-netty" }
 managed-netty-tcnative-boringssl-static = { module = "io.netty:netty-tcnative-boringssl-static", version.ref = "managed-netty-tcnative" }
 
@@ -201,6 +202,8 @@ hibernate = { module = "org.hibernate:hibernate-core", version.ref = "hibernate"
 
 htmlunit = { module = "net.sourceforge.htmlunit:htmlunit", version.ref = "htmlunit" }
 htmlsanitycheck = { module = "org.aim42:htmlSanityCheck", version.ref = "htmlsanitycheck"}
+
+icu4j = { module = "com.ibm.icu:icu4j", version.ref = "icu4j" }
 
 jakarta-inject-api = { module = "jakarta.inject:jakarta.inject-api", version.ref = "jakarta-inject-api" }
 jakarta-inject-tck = { module = "jakarta.inject:jakarta.inject-tck", version.ref = "jakarta-inject-tck" }
@@ -300,6 +303,8 @@ httpcomponents-mime = { module = "org.apache.httpcomponents:httpmime", version.r
 mimepull = { module = "org.jvnet.mimepull:mimepull", version.ref = "mimepull" }
 
 wiremock = { module = "com.github.tomakehurst:wiremock-jre8", version.ref = "wiremock" }
+
+jfrunit-core = { module = "org.moditect.jfrunit:jfrunit-core", version.ref = "jfrunit" }
 
 [plugins]
 managed-kotlin-allopen = { id = "org.jetbrains.kotlin.plugin.allopen", version.ref = "managed-kotlin" }

@@ -9,6 +9,7 @@ import io.netty.util.concurrent.AbstractEventExecutor;
 import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.ScheduledFuture;
+import io.netty.util.concurrent.Ticker;
 
 import java.util.Collection;
 import java.util.Iterator;
@@ -183,5 +184,10 @@ public abstract class DelegateEventLoop extends AbstractEventExecutor implements
     @Deprecated
     public ChannelFuture register(Channel channel, ChannelPromise promise) {
         return delegate.register(channel, promise);
+    }
+
+    @Override
+    public Ticker ticker() {
+        return delegate.ticker();
     }
 }

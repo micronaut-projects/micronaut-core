@@ -17,11 +17,12 @@ package io.micronaut.runtime.context.scope;
 
 import jakarta.inject.Scope;
 
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * A {@link io.micronaut.context.scope.CustomScope} that stores objects in thread local storage.
@@ -35,4 +36,13 @@ import java.lang.annotation.Target;
 @Target({ElementType.TYPE, ElementType.METHOD})
 @Scope
 public @interface ThreadLocal {
+    /**
+     * If enabled, track bean life cycle. This means that the bean will be stopped, destroy
+     * listeners will be called etc., when the application context is closed or when the associated
+     * thread terminates. Note that this adds some overhead, so it's off by default.
+     *
+     * @return Whether to enable lifecycle support for this bean
+     * @since 4.9.0
+     */
+    boolean lifecycle() default false;
 }

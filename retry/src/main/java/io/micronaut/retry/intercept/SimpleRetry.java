@@ -23,6 +23,7 @@ import io.micronaut.retry.annotation.RetryPredicate;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.OptionalDouble;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -44,6 +45,7 @@ class SimpleRetry implements RetryState, MutableRetryState {
     private final AtomicLong overallDelay = new AtomicLong(0);
     private final RetryPredicate predicate;
     private final Class<? extends Throwable> capturedException;
+    private final double jitter;
 
     /**
      * @param maxAttempts The maximum number of attempts
@@ -59,7 +61,8 @@ class SimpleRetry implements RetryState, MutableRetryState {
         Duration delay,
         Duration maxDelay,
         RetryPredicate predicate,
-        Class<? extends Throwable> capturedException) {
+        Class<? extends Throwable> capturedException,
+        double jitter) {
 
         this.maxAttempts = maxAttempts;
         this.multiplier = multiplier;
@@ -67,6 +70,7 @@ class SimpleRetry implements RetryState, MutableRetryState {
         this.maxDelay = maxDelay;
         this.predicate = predicate;
         this.capturedException = capturedException;
+        this.jitter = jitter;
     }
 
     /**
@@ -75,18 +79,20 @@ class SimpleRetry implements RetryState, MutableRetryState {
      * @param delay The overall delay so far
      * @param maxDelay The maximum overall delay
      * @param capturedException The capture exception types
+     * @param jitter The jitter factor used to apply random deviation to retry delays
      */
-    SimpleRetry(int maxAttempts, double multiplier, Duration delay, Duration maxDelay, Class<? extends Throwable> capturedException) {
-        this(maxAttempts, multiplier, delay, maxDelay, new DefaultRetryPredicate(), capturedException);
+    SimpleRetry(int maxAttempts, double multiplier, Duration delay, Duration maxDelay, Class<? extends Throwable> capturedException, double jitter) {
+        this(maxAttempts, multiplier, delay, maxDelay, new DefaultRetryPredicate(), capturedException, jitter);
     }
 
     /**
      * @param maxAttempts The maximum number of attempts
      * @param multiplier The multiplier to use between delays
      * @param delay The overall delay so far
+     * @param jitter The jitter factor used to apply random deviation to retry delays
      */
-    SimpleRetry(int maxAttempts, double multiplier, Duration delay) {
-        this(maxAttempts, multiplier, delay, null, null);
+    SimpleRetry(int maxAttempts, double multiplier, Duration delay, double jitter) {
+        this(maxAttempts, multiplier, delay, null, null, jitter);
     }
 
     /**
@@ -166,6 +172,14 @@ class SimpleRetry implements RetryState, MutableRetryState {
     }
 
     /**
+     * @return The jitter factor used to apply random deviation to retry delays
+     */
+    @Override
+    public OptionalDouble getJitter() {
+        return jitter > 0 ? OptionalDouble.of(jitter) : OptionalDouble.empty();
+    }
+
+    /**
      * @return Return the millisecond value for the next delay
      */
     @Override
@@ -173,6 +187,10 @@ class SimpleRetry implements RetryState, MutableRetryState {
     public long nextDelay() {
         double multiplier = getMultiplier().orElse(1.0);
         long delay = (long) ((getDelay().toMillis()) * pow(multiplier, attemptNumber.get() - 1));
+        double jitter = getJitter().orElse(0);
+        if (jitter > 0) {
+            delay = Math.max(0, (long) (delay * (1.0 + ThreadLocalRandom.current().nextDouble(-jitter, jitter))));
+        }
         overallDelay.addAndGet(delay);
         return delay;
     }

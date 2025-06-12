@@ -321,23 +321,33 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
         return when (typeArgument.variance) {
             Variance.STAR, Variance.COVARIANT, Variance.CONTRAVARIANT -> {
                 // example List<*>, IN, OUT
-                val type = typeArgument.type!!
-                val stripTypeArguments = !visitedTypes.add(type)
-                val upperBounds =
-                    resolveUpperBounds(
+                val stripTypeArguments = when (typeArgument.type) {
+                    null -> false
+                    else -> !visitedTypes.add(typeArgument.type!!)
+                }
+                val upperBound =
+                    resolveUpperBound(
                         owner,
                         typeArgument,
                         parentTypeArguments,
                         visitedTypes,
                         stripTypeArguments
                     )
-                val lowerBounds = resolveLowerBounds(
+                if (upperBound is PrimitiveElement) {
+                    return upperBound
+                }
+                val lowerBound = resolveLowerBound(
                     owner,
                     typeArgument,
                     parentTypeArguments,
                     visitedTypes,
                     stripTypeArguments
                 )
+                if (lowerBound is PrimitiveElement) {
+                    return upperBound
+                }
+                val upperBounds = listOf(upperBound as KotlinClassElement)
+                val lowerBounds = if (lowerBound == null) listOf() else  listOf(lowerBound as KotlinClassElement)
                 val upper = WildcardElement.findUpperType(upperBounds, lowerBounds)!!
                 KotlinWildcardElement(
                     KotlinTypeArgumentNativeElement(typeArgument, owner),
@@ -357,54 +367,48 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
         }
     }
 
-    private fun resolveLowerBounds(
+    private fun resolveLowerBound(
         owner: KotlinNativeElement,
         typeArgument: KSTypeArgument,
         parentTypeArguments: Map<String, ClassElement>,
         visitedTypes: MutableSet<Any>,
         stripTypeArguments: Boolean,
-    ): List<KotlinClassElement?> {
+    ): ClassElement? {
         return if (typeArgument.variance == Variance.CONTRAVARIANT) {
-            listOf(
+            resolveTypeArgumentType(
+                owner,
+                typeArgument,
+                parentTypeArguments,
+                visitedTypes,
+                stripTypeArguments
+            )
+        } else {
+            null
+        }
+    }
+
+    private fun resolveUpperBound(
+        owner: KotlinNativeElement,
+        typeArgument: KSTypeArgument,
+        parentTypeArguments: Map<String, ClassElement> = emptyMap(),
+        visitedTypes: MutableSet<Any>,
+        stripTypeArguments: Boolean
+    ): ClassElement {
+        return when (typeArgument.variance) {
+            Variance.COVARIANT, Variance.STAR -> {
                 resolveTypeArgumentType(
                     owner,
                     typeArgument,
                     parentTypeArguments,
                     visitedTypes,
                     stripTypeArguments
-                ) as KotlinClassElement
-            )
-        } else {
-            return emptyList()
-        }
-    }
-
-    private fun resolveUpperBounds(
-        owner: KotlinNativeElement,
-        typeArgument: KSTypeArgument,
-        parentTypeArguments: Map<String, ClassElement> = emptyMap(),
-        visitedTypes: MutableSet<Any>,
-        stripTypeArguments: Boolean
-    ): List<KotlinClassElement?> {
-        return when (typeArgument.variance) {
-            Variance.COVARIANT, Variance.STAR -> {
-                listOf(
-                    resolveTypeArgumentType(
-                        owner,
-                        typeArgument,
-                        parentTypeArguments,
-                        visitedTypes,
-                        stripTypeArguments
-                    ) as KotlinClassElement
                 )
             }
 
             else -> {
                 val objectType =
                     visitorContext.resolver.getClassDeclarationByName(Object::class.java.name)!!
-                listOf(
-                    newKotlinClassElement(objectType, parentTypeArguments, visitedTypes)
-                )
+                newKotlinClassElement(objectType, parentTypeArguments, visitedTypes)
             }
         }
     }

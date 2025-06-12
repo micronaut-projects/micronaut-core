@@ -38,6 +38,7 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.functional.ThrowingFunction;
+import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpResponseWrapper;
@@ -58,6 +59,7 @@ import io.micronaut.http.body.ContextlessMessageBodyHandlerRegistry;
 import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
+import io.micronaut.http.body.WritableBodyWriter;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.ClientAttributes;
@@ -78,6 +80,7 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.client.exceptions.NoHostException;
 import io.micronaut.http.client.exceptions.ReadTimeoutException;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
+import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
 import io.micronaut.http.client.multipart.MultipartBody;
 import io.micronaut.http.client.multipart.MultipartDataFactory;
 import io.micronaut.http.client.netty.ssl.ClientSslBuilder;
@@ -101,7 +104,6 @@ import io.micronaut.http.netty.body.NettyByteBody;
 import io.micronaut.http.netty.body.NettyByteBufMessageBodyHandler;
 import io.micronaut.http.netty.body.NettyJsonHandler;
 import io.micronaut.http.netty.body.NettyJsonStreamHandler;
-import io.micronaut.http.netty.body.NettyWritableBodyWriter;
 import io.micronaut.http.netty.body.StreamingNettyByteBody;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.stream.DefaultStreamedHttpResponse;
@@ -1464,8 +1466,14 @@ public class DefaultHttpClient implements
         if (loadBalancer == null) {
             return ExecutionFlow.error(decorate(new NoHostException("Request URI specifies no host to connect to")));
         }
+        ExecutionFlow<ServiceInstance> selected;
+        if (loadBalancer instanceof FixedLoadBalancer fixed) {
+            selected = ExecutionFlow.just(fixed.getServiceInstance());
+        } else {
+            selected = ReactiveExecutionFlow.fromPublisher(loadBalancer.select(getLoadBalancerDiscriminator()));
+        }
 
-        return ReactiveExecutionFlow.fromPublisher(loadBalancer.select(getLoadBalancerDiscriminator())).map(server -> {
+        return selected.map(server -> {
                     Optional<String> authInfo = server.getMetadata().get(io.micronaut.http.HttpHeaders.AUTHORIZATION_INFO, String.class);
                     if (request instanceof MutableHttpRequest<?> httpRequest && authInfo.isPresent()) {
                         httpRequest.getHeaders().auth(authInfo.get());
@@ -1596,7 +1604,7 @@ public class DefaultHttpClient implements
         }
 
         // first: connect
-        return connectionManager.connect(requestKey, blockHint)
+        return connectionManager.connect(requestKey, blockHint, preferredScheduler)
             .flatMap(poolHandle -> {
                 preferredScheduler.set(poolHandle.channel.eventLoop());
 
@@ -2009,7 +2017,7 @@ public class DefaultHttpClient implements
             applicationConfiguration,
             NettyByteBufferFactory.DEFAULT,
             new NettyByteBufMessageBodyHandler(),
-            new NettyWritableBodyWriter(applicationConfiguration)
+            new WritableBodyWriter(applicationConfiguration)
         );
         JsonMapper mapper = JsonMapper.createDefault();
         registry.add(MediaType.APPLICATION_JSON_TYPE, new NettyJsonHandler<>(mapper));

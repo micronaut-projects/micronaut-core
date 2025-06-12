@@ -36,6 +36,7 @@ import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.ElementPostponedToNextRoundException;
+import io.micronaut.inject.visitor.TypeElementQuery;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
@@ -245,6 +246,11 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
             for (Object nativeType : postponedTypes.values()) {
                 AbstractAnnotationMetadataBuilder.clearMutated(nativeType);
+                javaVisitorContext.getNativeElementsHelper().cleanupForClass(nativeType);
+                if (nativeType instanceof Element element) {
+                    AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata cachedAnnotationMetadata = javaVisitorContext.getAnnotationMetadataBuilder().lookupOrBuildForType(element);
+                    cachedAnnotationMetadata.markCleared();
+                }
             }
             postponedTypes.keySet().stream().map(elementUtils::getTypeElement).filter(Objects::nonNull).forEach(elements::add);
             postponedTypes.clear();
@@ -277,16 +283,9 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                             }
                             error(originatingElement.element(), e.getMessage());
                         } catch (PostponeToNextRoundException e) {
-                            postponedTypes.put(javaClassElement.getCanonicalName(), e.getErrorElement());
+                            postponeElement(javaClassElement, e.getErrorElement(), e);
                         } catch (ElementPostponedToNextRoundException e) {
-                            Object nativeType = e.getOriginatingElement().getNativeType();
-                            if (nativeType instanceof JavaNativeElement jne) {
-                                Element element = jne.element();
-                                postponedTypes.put(javaClassElement.getCanonicalName(), element);
-                            } else {
-                                // should never happen.
-                                throw e;
-                            }
+                            postponeElement(javaClassElement, e.getOriginatingElement(), e);
                         }
                     }
                 }
@@ -323,22 +322,69 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         return false;
     }
 
-    private void visitClass(LoadedVisitor visitor, JavaClassElement classElement) {
-        visitor.getVisitor().visitClass(classElement, javaVisitorContext);
-
-        for (ConstructorElement constructorElement : classElement.getSourceEnclosedElements(ElementQuery.CONSTRUCTORS)) {
-            visitConstructor(visitor, constructorElement);
-        }
-        for (MemberElement memberElement : classElement.getSourceEnclosedElements(ElementQuery.ALL_FIELD_AND_METHODS)) {
-            if (memberElement instanceof EnumConstantElement enumConstantElement) {
-                visitEnumConstant(visitor, enumConstantElement);
-            } else if (memberElement instanceof FieldElement fieldElement) {
-                visitField(visitor, fieldElement);
-            } else if (memberElement instanceof MethodElement methodElement) {
-                visitMethod(visitor, methodElement);
+    private <T extends Throwable> void postponeElement(JavaClassElement javaClassElement, Object originalElement, T e) throws T {
+        Element postponedElement;
+        if (originalElement instanceof Element element) {
+            postponedElement = element;
+        } else if (originalElement instanceof io.micronaut.inject.ast.Element element) {
+            Object nativeType = element.getNativeType();
+            if (nativeType instanceof JavaNativeElement jne) {
+                postponedElement = jne.element();
             } else {
-                throw new IllegalStateException("Unknown element: " + memberElement);
+                // should never happen.
+                throw e;
             }
+        } else {
+            // should never happen.
+            throw e;
+        }
+        postponedTypes.put(javaClassElement.getCanonicalName(), postponedElement);
+    }
+
+    private void visitClass(LoadedVisitor visitor, JavaClassElement classElement) {
+        TypeElementQuery query = visitor.getVisitor().query();
+
+        try {
+            javaVisitorContext.setVisitUnresolvedInterfaces(query.visitsUnresolvedInterfaces());
+
+            visitor.getVisitor().visitClass(classElement, javaVisitorContext);
+
+            if (query.includesConstructors()) {
+                for (ConstructorElement constructorElement : classElement.getSourceEnclosedElements(ElementQuery.CONSTRUCTORS)) {
+                    visitConstructor(visitor, constructorElement);
+                }
+            }
+            boolean includesFields = query.includesFields() || query.includesEnumConstants();
+            boolean includesMethods = query.includesMethods();
+            List<? extends MemberElement> elements;
+            if (includesMethods && includesFields) {
+                elements = classElement.getSourceEnclosedElements(ElementQuery.ALL_FIELD_AND_METHODS);
+            } else if (includesMethods) {
+                elements = classElement.getSourceEnclosedElements(ElementQuery.ALL_METHODS);
+            } else if (includesFields) {
+                elements = classElement.getSourceEnclosedElements(ElementQuery.ALL_FIELDS);
+            } else {
+                elements = List.of();
+            }
+            for (MemberElement memberElement : elements) {
+                if (memberElement instanceof EnumConstantElement enumConstantElement) {
+                    if (query.includesEnumConstants()) {
+                        visitEnumConstant(visitor, enumConstantElement);
+                    }
+                } else if (memberElement instanceof FieldElement fieldElement) {
+                    if (query.includesFields()) {
+                        visitField(visitor, fieldElement);
+                    }
+                } else if (memberElement instanceof MethodElement methodElement) {
+                    if (includesMethods) {
+                        visitMethod(visitor, methodElement);
+                    }
+                } else {
+                    throw new IllegalStateException("Unknown element: " + memberElement);
+                }
+            }
+        } finally {
+            javaVisitorContext.setVisitUnresolvedInterfaces(false);
         }
     }
 

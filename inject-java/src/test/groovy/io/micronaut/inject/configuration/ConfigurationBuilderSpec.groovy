@@ -6,6 +6,54 @@ import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 
 class ConfigurationBuilderSpec extends AbstractTypeElementSpec {
 
+    void "test duplicate"() {
+        when:
+        ApplicationContext ctx = buildContext("test.MySQLClientConfiguration", '''
+package test;
+
+import io.micronaut.context.annotation.ConfigurationBuilder;
+import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.inject.configuration.MyOptions;
+
+@ConfigurationProperties("dd")
+class MySQLClientConfiguration {
+
+    @ConfigurationBuilder
+    protected MyOptions connectOptions = new MyOptions();
+
+    @ConfigurationBuilder
+    protected MyOptions poolOptions = new MyOptions();
+
+    protected String uri;
+
+    /**
+     * @return The MySQL connection URI.
+     */
+    public String getUri() {
+        return uri;
+    }
+
+    /**
+     *
+     * @return The options for configuring a connection.
+     */
+    public MyOptions getConnectOptions() {
+        return connectOptions;
+    }
+
+    /**
+     *
+     * @return The options for configuring a connection pool.
+     */
+    public MyOptions getPoolOptions() {
+        return poolOptions;
+    }
+}
+''')
+        then:
+        noExceptionThrown()
+    }
+
     void "test definition uses getter instead of field"() {
         given:
         ApplicationContext ctx = buildContext("test.TestProps", '''

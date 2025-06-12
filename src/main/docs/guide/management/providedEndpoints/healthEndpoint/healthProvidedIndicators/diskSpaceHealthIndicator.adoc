@@ -1,0 +1,17 @@
+A health indicator is provided that determines the health of the application based on the amount of free disk space. Configuration for the disk space health indicator can be provided under the `endpoints.health.disk-space` key.
+
+.Disk Space Indicator Configuration Example
+[configuration]
+----
+endpoints:
+  health:
+    disk-space:
+      enabled: Boolean
+      path: String
+      threshold: String | Long
+----
+
+- `path` specifies the path used to determine the disk space
+- `threshold` specifies the minimum amount of free space
+
+The threshold can be provided as a string like "10MB" or "200KB", or the number of bytes.

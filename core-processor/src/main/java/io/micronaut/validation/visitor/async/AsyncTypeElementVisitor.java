@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.visitor.TypeElementQuery;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import org.reactivestreams.Publisher;
@@ -47,6 +48,11 @@ public final class AsyncTypeElementVisitor implements TypeElementVisitor<Object,
     @Override
     public VisitorKind getVisitorKind() {
         return VisitorKind.ISOLATING;
+    }
+
+    @Override
+    public TypeElementQuery query() {
+        return TypeElementQuery.onlyMethods();
     }
 
     @Override

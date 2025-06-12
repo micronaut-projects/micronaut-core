@@ -73,4 +73,24 @@ public interface EmbeddedApplication<T extends EmbeddedApplication> extends Appl
     default boolean isForceExit() {
         return false;
     }
+
+    /**
+     * Determines whether the application requires a shutdown hook
+     * for graceful shutdown.
+     * <p>
+     * Due to the JVM's non-deterministic shutdown hook execution order,
+     * a custom hook may be necessary to perform certain actions before
+     * or after closing the application context. Additionally, tests
+     * often close the application context immediately after execution,
+     * making a shutdown hook unnecessary. In such cases, registering
+     * a shutdown hook may lead to memory leaks due to excessive
+     * application context creation.
+     * </p>
+     *
+     * @return {@code true} if the application allows registering shutdown hooks,
+     * {@code false} otherwise
+     */
+    default boolean isShutdownHookNeeded() {
+        return true;
+    }
 }

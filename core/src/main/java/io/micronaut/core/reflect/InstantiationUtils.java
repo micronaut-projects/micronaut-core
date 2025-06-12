@@ -15,6 +15,8 @@
  */
 package io.micronaut.core.reflect;
 
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanIntrospector;
 import io.micronaut.core.convert.ConversionContext;
@@ -28,9 +30,12 @@ import io.micronaut.core.util.CollectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import io.micronaut.core.annotation.NonNull;
 import java.lang.reflect.Constructor;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -232,19 +237,37 @@ public class InstantiationUtils {
      */
     public static <T> T instantiate(Class<T> type, Class<?>[] argTypes, Object... args) {
         try {
-            return BeanIntrospector.SHARED.findIntrospection(type).map(bi -> bi.instantiate(args)).orElseGet(() -> {
-                try {
-                    Logger log = ClassUtils.REFLECTION_LOGGER;
-                    if (log.isDebugEnabled()) {
-                        log.debug("Reflectively instantiating type: {}", type);
-                    }
-                    final Constructor<T> declaredConstructor = type.getDeclaredConstructor(argTypes);
-                    declaredConstructor.setAccessible(true);
-                    return declaredConstructor.newInstance(args);
-                } catch (Throwable e) {
-                    throw new InstantiationException("Could not instantiate type [" + type.getName() + "]: " + e.getMessage(), e);
-                }
-            });
+            return BeanIntrospector.SHARED.findIntrospection(type)
+                .map(bi -> bi.instantiate(args))
+                .orElseGet(() -> instantiateReflectively(type, argTypes, args));
+        } catch (Throwable e) {
+            throw new InstantiationException("Could not instantiate type [" + type.getName() + "]: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Instantiate the given class rethrowing any exceptions as {@link InstantiationException},
+     * only using reflection.
+     *
+     * @param type     The type
+     * @param argTypes The argument types
+     * @param args     The values of arguments
+     * @param <T>      The generic type
+     * @return The instantiated instance
+     * @throws InstantiationException When an error occurs
+     * @since 4.8.0
+     */
+    @NonNull
+    @UsedByGeneratedCode
+    public static <T> T instantiateReflectively(Class<T> type, Class<?>[] argTypes, Object[] args) {
+        try {
+            Logger log = ClassUtils.REFLECTION_LOGGER;
+            if (log.isDebugEnabled()) {
+                log.debug("Reflectively instantiating type: {}", type);
+            }
+            final Constructor<T> declaredConstructor = type.getDeclaredConstructor(argTypes);
+            declaredConstructor.setAccessible(true);
+            return declaredConstructor.newInstance(args);
         } catch (Throwable e) {
             throw new InstantiationException("Could not instantiate type [" + type.getName() + "]: " + e.getMessage(), e);
         }

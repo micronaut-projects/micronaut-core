@@ -36,6 +36,7 @@ import io.micronaut.inject.ast.PackageElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.PropertyElementQuery;
+import io.micronaut.inject.ast.UnresolvedTypeKind;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
@@ -106,6 +107,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     private ClassElement resolvedSuperType;
     @Nullable
     private List<ClassElement> resolvedInterfaces;
+    private boolean hasErrorousInterface;
     private final JavaEnclosedElementsQuery enclosedElementsQuery = new JavaEnclosedElementsQuery(false);
     private final JavaEnclosedElementsQuery sourceEnclosedElementsQuery = new JavaEnclosedElementsQuery(true);
     @Nullable
@@ -190,6 +192,32 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     }
 
     @Override
+    public boolean hasUnresolvedTypes(UnresolvedTypeKind... kind) {
+        List<? extends TypeMirror> interfaces = this.classElement.getInterfaces();
+        for (UnresolvedTypeKind unresolvedTypeKind : kind) {
+            switch (unresolvedTypeKind) {
+                case INTERFACE -> {
+                    for (TypeMirror anInterface : interfaces) {
+                        if (anInterface.getKind() == TypeKind.ERROR) {
+                            return true;
+                        }
+                    }
+                }
+                case SUPERCLASS -> {
+                    TypeMirror superclass = this.classElement.getSuperclass();
+                    if (superclass.getKind() == TypeKind.ERROR) {
+                        return true;
+                    }
+                }
+                default -> {
+                    // no-op
+                }
+            }
+        }
+        return false;
+    }
+
+    @Override
     public JavaNativeElement.@NonNull Class getNativeType() {
         return (JavaNativeElement.Class) super.getNativeType();
     }
@@ -271,7 +299,20 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     @Override
     public Collection<ClassElement> getInterfaces() {
         if (resolvedInterfaces == null) {
-            resolvedInterfaces = classElement.getInterfaces().stream().filter(this::onlyAvailable).map(mirror -> newClassElement(mirror, getTypeArguments())).toList();
+            if (!visitorContext.isVisitUnresolvedInterfaces()) {
+                resolvedInterfaces = classElement.getInterfaces().stream()
+                    .filter(this::onlyAvailable)
+                    .map(mirror -> newClassElement(mirror, getTypeArguments())).toList();
+                hasErrorousInterface = classElement.getInterfaces().size() != resolvedInterfaces.size();
+            } else {
+                resolvedInterfaces = classElement.getInterfaces().stream()
+                    .map(mirror -> newClassElement(mirror, getTypeArguments())).toList();
+                hasErrorousInterface = false;
+            }
+        } else if (hasErrorousInterface && visitorContext.isVisitUnresolvedInterfaces()) {
+            resolvedInterfaces = classElement.getInterfaces().stream()
+                .map(mirror -> newClassElement(mirror, getTypeArguments())).toList();
+            hasErrorousInterface = false;
         }
         return resolvedInterfaces;
     }
@@ -385,26 +426,24 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     private List<MethodElement> getRecordMethods() {
         var recordComponents = new HashSet<String>();
         var methodElements = new ArrayList<MethodElement>();
-        if (JavaModelUtils.isRecord(classElement)) {
-            for (Element enclosedElement : classElement.getEnclosedElements()) {
-                if (JavaModelUtils.isRecordComponent(enclosedElement) || enclosedElement instanceof ExecutableElement) {
-                    if (enclosedElement.getKind() == ElementKind.CONSTRUCTOR) {
-                        continue;
+        for (Element enclosedElement : classElement.getEnclosedElements()) {
+            if (JavaModelUtils.isRecordComponent(enclosedElement) || enclosedElement instanceof ExecutableElement) {
+                if (enclosedElement.getKind() == ElementKind.CONSTRUCTOR) {
+                    continue;
+                }
+                String name = enclosedElement.getSimpleName().toString();
+                if (enclosedElement instanceof ExecutableElement executableElement) {
+                    if (recordComponents.contains(name)) {
+                        methodElements.add(
+                            new JavaMethodElement(
+                                JavaClassElement.this,
+                                new JavaNativeElement.Method(executableElement),
+                                elementAnnotationMetadataFactory,
+                                visitorContext)
+                        );
                     }
-                    String name = enclosedElement.getSimpleName().toString();
-                    if (enclosedElement instanceof ExecutableElement executableElement) {
-                        if (recordComponents.contains(name)) {
-                            methodElements.add(
-                                new JavaMethodElement(
-                                    JavaClassElement.this,
-                                    new JavaNativeElement.Method(executableElement),
-                                    elementAnnotationMetadataFactory,
-                                    visitorContext)
-                            );
-                        }
-                    } else if (enclosedElement instanceof VariableElement) {
-                        recordComponents.add(name);
-                    }
+                } else if (enclosedElement instanceof VariableElement) {
+                    recordComponents.add(name);
                 }
             }
         }
@@ -413,17 +452,15 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
 
     private List<FieldElement> getRecordFields() {
         var fieldElements = new ArrayList<FieldElement>();
-        if (JavaModelUtils.isRecord(classElement)) {
-            for (Element enclosedElement : classElement.getEnclosedElements()) {
-                if (!JavaModelUtils.isRecordComponent(enclosedElement) && enclosedElement instanceof VariableElement variableElement) {
-                    fieldElements.add(
-                        new JavaFieldElement(
-                            JavaClassElement.this,
-                            new JavaNativeElement.Variable(variableElement),
-                            elementAnnotationMetadataFactory,
-                            visitorContext)
-                    );
-                }
+        for (Element enclosedElement : classElement.getEnclosedElements()) {
+            if (!JavaModelUtils.isRecordComponent(enclosedElement) && enclosedElement instanceof VariableElement variableElement) {
+                fieldElements.add(
+                    new JavaFieldElement(
+                        JavaClassElement.this,
+                        new JavaNativeElement.Variable(variableElement),
+                        elementAnnotationMetadataFactory,
+                        visitorContext)
+                );
             }
         }
         return fieldElements;

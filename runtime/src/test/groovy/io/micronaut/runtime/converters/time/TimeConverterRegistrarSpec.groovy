@@ -16,6 +16,8 @@
 package io.micronaut.runtime.converters.time
 
 import io.micronaut.core.convert.DefaultMutableConversionService
+import java.time.temporal.ChronoUnit
+import java.time.temporal.TemporalAmount
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -47,12 +49,12 @@ class TimeConverterRegistrarSpec extends Specification {
 
         where:
         val    | expected
+        '10ns' | Duration.ofNanos(10)
         '10ms' | Duration.ofMillis(10)
         '10s'  | Duration.ofSeconds(10)
         '10m'  | Duration.ofMinutes(10)
-        '10d'  | Duration.ofDays(10)
         '10h'  | Duration.ofHours(10)
-        '10ns' | Duration.ofNanos(10)
+        '10d'  | Duration.ofDays(10)
     }
 
     @Unroll
@@ -66,10 +68,34 @@ class TimeConverterRegistrarSpec extends Specification {
 
         where:
         val   | expected
-        '10y' | Period.ofYears(10)
-        '10m' | Period.ofMonths(10)
-        '10w' | Period.ofWeeks(10)
         '10d' | Period.ofDays(10)
+        '10D' | Period.ofDays(10)
+        '10w' | Period.ofWeeks(10)
+        '10m' | Period.ofMonths(10)
+        '10M' | Period.ofMonths(10)
+        '10y' | Period.ofYears(10)
+    }
+
+    @Unroll
+    void "test convert to TemporalAmount #val"() {
+        given:
+        def conversionService = new DefaultMutableConversionService()
+        new TimeConverterRegistrar().register(conversionService)
+
+        expect:
+        conversionService.convert(val, TemporalAmount).get() == expected
+
+        where:
+        val   | expected
+        '10ns' | Duration.ofNanos(10)
+        '10ms' | Duration.ofMillis(10)
+        '10s' | Duration.ofSeconds(10)
+        '10m' | Duration.ofMinutes(10)
+        '10d' | Duration.ofDays(10)
+        '10D' | Period.ofDays(10)
+        '10M' | Period.ofMonths(10)
+        '10w' | Period.ofWeeks(10)
+        '10y' | Period.ofYears(10)
     }
 
     @Unroll

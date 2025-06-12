@@ -225,14 +225,14 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
         TypeMirror returnType = executableElement.getReturnType();
         TypeKind returnKind = returnType.getKind();
         if (returnKind == TypeKind.ERROR) {
-            throw new PostponeToNextRoundException(executableElement, member.getName() + " " + executableElement);
+            throw new PostponeToNextRoundException(member, member.getName() + " " + executableElement);
         }
     }
 
     private void failIfPostponeIsNeeded(TypedElement member, VariableElement variableElement) {
         TypeMirror type = variableElement.asType();
         if (type.getKind() == TypeKind.ERROR) {
-            throw new PostponeToNextRoundException(variableElement, member.getName() + " " + variableElement);
+            throw new PostponeToNextRoundException(member, member.getName() + " " + variableElement);
         }
     }
 

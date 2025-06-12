@@ -1040,19 +1040,20 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
     @Override
     public <T> T createBean(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier, @Nullable Map<String, Object> argumentValues) {
         ArgumentUtils.requireNonNull("beanType", beanType);
-        Optional<BeanDefinition<T>> candidate = findBeanDefinition(Argument.of(beanType), qualifier);
+        Argument<T> beanArg = Argument.of(beanType);
+        Optional<BeanDefinition<T>> candidate = findBeanDefinition(beanArg, qualifier);
         if (candidate.isPresent()) {
             BeanDefinition<T> beanDefinition = candidate.get();
             try (BeanResolutionContext resolutionContext = newResolutionContext(beanDefinition, null)) {
                 if (beanDefinition instanceof InstantiatableBeanDefinition<T> instantiatableBeanDefinition) {
                     T bean = resolveByBeanFactory(resolutionContext, instantiatableBeanDefinition, qualifier, argumentValues);
-                    return postBeanCreated(resolutionContext, beanDefinition, qualifier, bean);
+                    return postBeanCreated(resolutionContext, beanDefinition, beanArg, qualifier, bean);
                 }
             }
         }
         throw newNoSuchBeanException(
             null,
-            Argument.of(beanType),
+            beanArg,
             qualifier,
             null
         );
@@ -1067,7 +1068,7 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
         if (candidate.isPresent()) {
             BeanDefinition<T> definition = candidate.get();
             try (BeanResolutionContext resolutionContext = newResolutionContext(definition, null)) {
-                return doCreateBeanWithArguments(resolutionContext, definition, qualifier, args);
+                return doCreateBeanWithArguments(resolutionContext, definition, beanArg, qualifier, args);
             }
         }
         throw newNoSuchBeanException(
@@ -1081,6 +1082,7 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
     @NonNull
     private <T> T doCreateBeanWithArguments(@NonNull BeanResolutionContext resolutionContext,
                                             @NonNull BeanDefinition<T> definition,
+                                            @NonNull Argument<T> beanType,
                                             @Nullable Qualifier<T> qualifier,
                                             @Nullable Object... args) {
         Map<String, Object> argumentValues = resolveArgumentValues(resolutionContext, definition, args);
@@ -1089,7 +1091,7 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
         }
         if (definition instanceof InstantiatableBeanDefinition<T> instantiatableBeanDefinition) {
             T bean = resolveByBeanFactory(resolutionContext, instantiatableBeanDefinition, qualifier, argumentValues);
-            return postBeanCreated(resolutionContext, definition, qualifier, bean);
+            return postBeanCreated(resolutionContext, definition, beanType, qualifier, bean);
         } else {
             throw new BeanInstantiationException("BeanDefinition doesn't support creating a new instance of the bean");
         }
@@ -1264,7 +1266,7 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
     @NonNull
     private <T> T triggerPreDestroyListeners(@NonNull BeanDefinition<T> beanDefinition, @NonNull T bean) {
         if (beanPreDestroyEventListeners == null) {
-            beanPreDestroyEventListeners = loadListeners(BeanPreDestroyEventListener.class);
+            beanPreDestroyEventListeners = loadBeanEventListeners(BeanPreDestroyEventListener.class);
         }
         if (!beanPreDestroyEventListeners.isEmpty()) {
             Class<T> beanType = getBeanType(beanDefinition);
@@ -1338,7 +1340,7 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
     @NonNull
     private <T> void triggerBeanDestroyedListeners(@NonNull BeanDefinition<T> beanDefinition, @NonNull T bean) {
         if (beanDestroyedEventListeners == null) {
-            beanDestroyedEventListeners = loadListeners(BeanDestroyedEventListener.class);
+            beanDestroyedEventListeners = loadBeanEventListeners(BeanDestroyedEventListener.class);
         }
         if (!beanDestroyedEventListeners.isEmpty()) {
             Class<T> beanType = getBeanType(beanDefinition);
@@ -1402,7 +1404,7 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
             try (BeanResolutionContext context = newResolutionContext(candidate, resolutionContext)) {
                 if (candidate instanceof InstantiatableBeanDefinition<T> instantiatableBeanDefinition) {
                     T bean = resolveByBeanFactory(context, instantiatableBeanDefinition, qualifier, Collections.emptyMap());
-                    return postBeanCreated(context, candidate, qualifier, bean);
+                    return postBeanCreated(context, candidate, Argument.of(beanType), qualifier, bean);
                 } else {
                     throw new BeanInstantiationException("BeanDefinition doesn't support creating a new instance of the bean");
                 }
@@ -1962,13 +1964,13 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
      * Initialize the event listeners.
      */
     protected void initializeEventListeners() {
-        this.beanCreationEventListeners = loadListeners(BeanCreatedEventListener.class);
+        this.beanCreationEventListeners = loadBeanEventListeners(BeanCreatedEventListener.class);
         this.beanCreationEventListeners.add(new AbstractMap.SimpleEntry<>(AnnotationProcessor.class, new AnnotationProcessorListenersSupplier()));
-        this.beanInitializedEventListeners = loadListeners(BeanInitializedEventListener.class);
+        this.beanInitializedEventListeners = loadBeanEventListeners(BeanInitializedEventListener.class);
     }
 
     @NonNull
-    private <T extends EventListener> List<Map.Entry<Class<?>, ListenersSupplier<T>>> loadListeners(@NonNull Class<T> listenerType) {
+    private <T extends EventListener> List<Map.Entry<Class<?>, ListenersSupplier<T>>> loadBeanEventListeners(@NonNull Class<T> listenerType) {
         final Map<Class<?>, List<BeanDefinition<T>>> typeToListener = getTypeToListenerMap(listenerType);
         if (typeToListener.isEmpty()) {
             return new ArrayList<>(1);
@@ -2195,7 +2197,7 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
                 if (producer.isDisabledOptimistic() || !producer.isReferenceCandidateBean(beanType)) {
                     continue;
                 }
-                BeanDefinition<T> loadedBean = producer.getDefinitionIfEnabled(this, null, false, beanType, predicate);
+                BeanDefinition<T> loadedBean = producer.getDefinitionIfEnabled(this, null, beanType, predicate);
                 if (loadedBean == null) {
                     continue;
                 }
@@ -2358,11 +2360,12 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
     @NonNull
     private <T> T postBeanCreated(@NonNull BeanResolutionContext resolutionContext,
                                   @NonNull BeanDefinition<T> beanDefinition,
+                                  @NonNull Argument<T> beanType,
                                   @Nullable Qualifier<T> qualifier,
                                   @NonNull T bean) {
         Qualifier<T> finalQualifier = qualifier != null ? qualifier : beanDefinition.getDeclaredQualifier();
 
-        bean = triggerBeanCreatedEventListener(resolutionContext, beanDefinition, bean, finalQualifier);
+        bean = triggerBeanCreatedEventListener(resolutionContext, beanDefinition, bean, beanType, finalQualifier);
 
         if (beanDefinition instanceof ValidatedBeanDefinition<T> validatedBeanDefinition) {
             bean = validatedBeanDefinition.validate(resolutionContext, bean);
@@ -2377,15 +2380,16 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
     private <T> T triggerBeanCreatedEventListener(@NonNull BeanResolutionContext resolutionContext,
                                                   @NonNull BeanDefinition<T> beanDefinition,
                                                   @NonNull T bean,
+                                                  @NonNull Argument<T> beanType,
                                                   @Nullable Qualifier<T> finalQualifier) {
         if (!(beanDefinition instanceof AbstractProviderDefinition<?>)) {
-            Class<T> beanType = beanDefinition.getBeanType();
             if (!(bean instanceof BeanCreatedEventListener) && CollectionUtils.isNotEmpty(beanCreationEventListeners)) {
+                Class<T> beanClass = beanDefinition.getBeanType();
                 for (Map.Entry<Class<?>, ListenersSupplier<BeanCreatedEventListener>> entry : beanCreationEventListeners) {
-                    if (entry.getKey().isAssignableFrom(beanType)) {
+                    if (entry.getKey().isAssignableFrom(beanClass)) {
                         BeanKey<T> beanKey = new BeanKey<>(beanDefinition, finalQualifier);
                         for (BeanCreatedEventListener<?> listener : entry.getValue().get(resolutionContext)) {
-                            bean = (T) listener.onCreated(new BeanCreatedEvent(this, beanDefinition, beanKey, bean));
+                            bean = (T) listener.onCreated(new BeanCreatedEvent(this, beanDefinition, beanKey, beanType, bean));
                             if (bean == null) {
                                 throw new BeanInstantiationException(resolutionContext, "Listener [" + listener + "] returned null from onCreated event");
                             }
@@ -2670,9 +2674,14 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
     }
 
     private void loadEagerBeans(BeanDefinitionProducer producer, Collection<BeanDefinition<Object>> collector) {
-        BeanDefinition<Object> definition = producer.getDefinitionIfEnabled(this, null, true);
-        if (definition != null) {
-            collector.add(definition);
+        BeanDefinitionReference<Object> reference = producer.getReferenceIfEnabled(this, null);
+        if (reference != null) {
+            BeanDefinition<Object> beanDefinition = reference.load(this);
+            try (BeanResolutionContext resolutionContext = newResolutionContext(beanDefinition, null)) {
+                if (beanDefinition.isEnabled(this, resolutionContext)) {
+                    collector.add(beanDefinition);
+                }
+            }
         }
     }
 
@@ -3142,7 +3151,7 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
                 } else {
                     throw new BeanInstantiationException("BeanDefinition doesn't support creating a new instance of the bean");
                 }
-                bean = postBeanCreated(context, definition, qualifier, bean);
+                bean = postBeanCreated(context, definition, beanType, qualifier, bean);
 
                 BeanRegistration<?> dependentFactoryBean = context.getAndResetDependentFactoryBean();
                 if (dependentFactoryBean != null) {
@@ -3273,9 +3282,13 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
         if (candidates.size() == 1) {
             return candidates.iterator().next();
         }
+        Collection<BeanDefinition<T>> originalCandidates = candidates;
         candidates = candidates.stream().filter(candidate -> !candidate.hasDeclaredStereotype(Secondary.class)).toList();
         if (candidates.size() == 1) {
             return candidates.iterator().next();
+        }
+        if (candidates.isEmpty()) {
+            throw new NonUniqueBeanException(beanType.getType(), originalCandidates.iterator());
         }
         // pick the bean with the highest priority
         ArrayList<BeanDefinition<T>> listCandidates = new ArrayList<>(candidates);
@@ -4152,15 +4165,16 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
         public Iterable<T> get(BeanResolutionContext beanResolutionContext) {
             if (listeners == null) {
                 List<T> listeners = new ArrayList<>(listenersDefinitions.size());
+                List<BeanRegistration<T>> registrations = new ArrayList<>(listenersDefinitions.size());
                 for (BeanDefinition<T> listenersDefinition : listenersDefinitions) {
-                    T listener;
+                    BeanRegistration<T> registration;
                     if (beanResolutionContext == null) {
                         try (BeanResolutionContext context = newResolutionContext(listenersDefinition, null)) {
                             try (BeanResolutionContext.Path ignored = context.getPath().pushEventListenerResolve(
                                 listenersDefinition,
                                 eventType
                             )) {
-                                listener = resolveBeanRegistration(context, listenersDefinition).bean;
+                                registration = resolveBeanRegistration(context, listenersDefinition);
                             }
                         }
                     } else {
@@ -4168,12 +4182,15 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
                             listenersDefinition,
                             eventType
                         )) {
-                            listener = resolveBeanRegistration(beanResolutionContext, listenersDefinition).bean;
+                            registration = resolveBeanRegistration(beanResolutionContext, listenersDefinition);
                         }
                     }
-                    listeners.add(listener);
+                    registrations.add(registration);
                 }
-                OrderUtil.sort(listeners);
+                OrderUtil.sort(registrations);
+                for (BeanRegistration<T> registration : registrations) {
+                    listeners.add(registration.getBean());
+                }
                 this.listeners = listeners;
             }
             return listeners;
@@ -4335,12 +4352,7 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
 
         @Nullable
         <T> BeanDefinition<T> getDefinitionIfEnabled(DefaultBeanContext context) {
-            return getDefinitionIfEnabled(context, null, false);
-        }
-
-        @Nullable
-        <T> BeanDefinition<T> getDefinitionIfEnabled(DefaultBeanContext context, @Nullable BeanResolutionContext resolutionContext, boolean newContext) {
-            return getDefinitionIfEnabled(context, resolutionContext, newContext, null, null);
+            return getDefinitionIfEnabled(context, null, null, null);
         }
 
         /**
@@ -4348,7 +4360,6 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
          *
          * @param context           The context
          * @param resolutionContext The resolution context (optional)
-         * @param newContext        If {@code true}, a new resolution context is created for checking {@link BeanDefinition#isEnabled}
          * @param beanType          The bean type this definition must match. This is checked before {@link BeanDefinition#isEnabled}, to avoid infinite loops
          * @param predicate         The predicate this definition must match. This is checked before {@link BeanDefinition#isEnabled}, to avoid infinite loops
          * @return The definition or {@code null} if it's disabled (or {@code beanType} or {@code predicate} did not match)
@@ -4356,12 +4367,18 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
         @Nullable
         <T> BeanDefinition<T> getDefinitionIfEnabled(DefaultBeanContext context,
                                                      @Nullable BeanResolutionContext resolutionContext,
-                                                     boolean newContext,
                                                      @Nullable Argument<T> beanType,
                                                      @Nullable Predicate<BeanDefinition<T>> predicate) {
             Object defObject = this.definition;
             if (defObject != DEFINITION_DISABLED_SENTINEL && defObject != null) {
-                return (BeanDefinition<T>) defObject;
+                BeanDefinition<T> def = (BeanDefinition<T>) defObject;
+                if (beanType != null && !def.isCandidateBean(beanType)) {
+                    return null;
+                }
+                if (predicate != null && !predicate.test(def)) {
+                    return null;
+                }
+                return def;
             }
             BeanDefinitionReference<T> ref = getReferenceIfEnabled(context, resolutionContext);
             if (ref == null) {
@@ -4376,15 +4393,7 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
             if (predicate != null && !predicate.test(def)) {
                 return null;
             }
-            boolean definitionEnabled;
-            if (newContext) {
-                try (BeanResolutionContext ctx = context.newResolutionContext(def, resolutionContext)) {
-                    definitionEnabled = isDefinitionEnabled(context, ctx, def);
-                }
-            } else {
-                definitionEnabled = isDefinitionEnabled(context, resolutionContext, def);
-            }
-            if (definitionEnabled) {
+            if (isDefinitionEnabled(context, resolutionContext, def)) {
                 if (DEFINITION_UPDATER.compareAndSet(this, null, def)) {
                     return def;
                 } else {

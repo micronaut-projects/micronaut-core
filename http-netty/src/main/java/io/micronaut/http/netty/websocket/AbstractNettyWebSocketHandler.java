@@ -319,30 +319,36 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                         CloseReason.UNSUPPORTED_DATA
                 );
             } else {
-                ByteBuf msgContent = msg.content().retain();
-                if (!msg.isFinalFragment()) {
-                    frameBuffer.updateAndGet((buffer) -> {
-                        if (buffer == null) {
-                            buffer = ctx.alloc().compositeBuffer();
-                        }
-                        buffer.addComponent(true, msgContent);
-                        return buffer;
-                    });
-                    return;
-                }
-
-                ByteBuf content;
-                CompositeByteBuf buffer = frameBuffer.getAndSet(null);
-                if (buffer == null) {
-                    content = msgContent;
-                } else {
-                    buffer.addComponent(true, msgContent);
-                    content = buffer;
-                }
-
                 Argument<?> bodyArgument = this.getBodyArgument();
-                Object data = conversionService.convert(content, ByteBuf.class, bodyArgument).orElse(null);
-                content.release();
+                Object data;
+
+                if (WebSocketFrame.class.isAssignableFrom(bodyArgument.getType())) {
+                    data = msg.retain();
+                } else {
+                    ByteBuf msgContent = msg.content().retain();
+                    if (!msg.isFinalFragment()) {
+                        frameBuffer.updateAndGet((buffer) -> {
+                            if (buffer == null) {
+                                buffer = ctx.alloc().compositeBuffer();
+                            }
+                            buffer.addComponent(true, msgContent);
+                            return buffer;
+                        });
+                        return;
+                    }
+
+                    ByteBuf content;
+                    CompositeByteBuf buffer = frameBuffer.getAndSet(null);
+                    if (buffer == null) {
+                        content = msgContent;
+                    } else {
+                        buffer.addComponent(true, msgContent);
+                        content = buffer;
+                    }
+
+                    data = conversionService.convert(content, ByteBuf.class, bodyArgument).orElse(null);
+                    content.release();
+                }
 
                 if (data == null) {
                     MediaType mediaType;

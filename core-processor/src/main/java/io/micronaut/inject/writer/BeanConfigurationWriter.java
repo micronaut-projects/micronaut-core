@@ -22,7 +22,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanConfiguration;
 import io.micronaut.inject.annotation.AnnotationMetadataGenUtils;
 import io.micronaut.inject.ast.Element;
-import io.micronaut.sourcegen.bytecode.ByteCodeWriter;
+import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.sourcegen.model.AnnotationDef;
 import io.micronaut.sourcegen.model.ClassDef;
 import io.micronaut.sourcegen.model.ClassTypeDef;
@@ -61,20 +61,23 @@ public class BeanConfigurationWriter implements ClassOutputWriter {
     private final String configurationClassName;
     private final Element originatingElement;
     private final AnnotationMetadata annotationMetadata;
+    private final VisitorContext visitorContext;
 
     /**
      * @param packageName        The package name
      * @param originatingElement The originating element
      * @param annotationMetadata The annotation metadata
+     * @param visitorContext     The visitor context
      */
     public BeanConfigurationWriter(
         String packageName,
         Element originatingElement,
-        AnnotationMetadata annotationMetadata) {
+        AnnotationMetadata annotationMetadata, VisitorContext visitorContext) {
         this.packageName = packageName;
         this.configurationClassName = packageName + '.' + CLASS_SUFFIX;
         this.originatingElement = originatingElement;
         this.annotationMetadata = annotationMetadata;
+        this.visitorContext = visitorContext;
     }
 
     @Override
@@ -127,7 +130,7 @@ public class BeanConfigurationWriter implements ClassOutputWriter {
             }
         }
 
-        return new ByteCodeWriter().write(configurationClass);
+        return ByteCodeWriterUtils.writeByteCode(configurationClass, visitorContext);
     }
 
 }

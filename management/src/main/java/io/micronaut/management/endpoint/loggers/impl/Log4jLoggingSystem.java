@@ -34,7 +34,7 @@ import java.util.Collection;
 import static java.util.stream.Collectors.toList;
 
 /**
- * An implementation of {@link ManagedLoggingSystem} that works with logback.
+ * An implementation of {@link ManagedLoggingSystem} that works with Log4j.
  *
  * @author Matteo Vaccari, Matthew Moss
  * @since 2.2.0

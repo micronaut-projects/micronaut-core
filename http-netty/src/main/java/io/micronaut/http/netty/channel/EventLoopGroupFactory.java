@@ -15,11 +15,14 @@
  */
 package io.micronaut.http.netty.channel;
 
+import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.ArgumentUtils;
 import io.netty.channel.Channel;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.IoHandlerFactory;
+import io.netty.channel.MultiThreadIoEventLoopGroup;
 import io.netty.channel.ServerChannel;
 import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.socket.SocketChannel;
@@ -35,6 +38,7 @@ import java.util.concurrent.ThreadFactory;
  * @author graemerocher
  * @since 1.2.0
  */
+@NextMajorVersion("This doesn't create event loops anymore. Rename to e.g. NettyTransport")
 public interface EventLoopGroupFactory {
     /**
      * Qualifier used to resolve the native factory.
@@ -49,31 +53,60 @@ public interface EventLoopGroupFactory {
     }
 
     /**
+     * Create a new {@link IoHandlerFactory} for this transport.
+     *
+     * @return The handler factory
+     * @since 4.9
+     */
+    @NonNull
+    default IoHandlerFactory createIoHandlerFactory() {
+        throw new UnsupportedOperationException();
+    }
+
+    /**
+     * Create a new {@link IoHandlerFactory} for this transport.
+     *
+     * @param configuration The netty configuration
+     * @return The handler factory
+     * @since 4.9
+     */
+    @NonNull
+    default IoHandlerFactory createIoHandlerFactory(@NonNull EventLoopGroupConfiguration configuration) {
+        return createIoHandlerFactory();
+    }
+
+    /**
      * Creates an EventLoopGroup.
      *
      * @param threads  The number of threads to use.
      * @param executor An Executor.
      * @param ioRatio  The io ratio.
      * @return An EventLoopGroup.
+     * @deprecated Go through {@link #createIoHandlerFactory(EventLoopGroupConfiguration)}
      */
-    EventLoopGroup createEventLoopGroup(
+    @Deprecated
+    default EventLoopGroup createEventLoopGroup(
             int threads,
             Executor executor,
             @Nullable Integer ioRatio
-    );
+    ) {
+        return new MultiThreadIoEventLoopGroup(threads, executor, createIoHandlerFactory());
+    }
 
     /**
      * Create an event loop group for the given configuration and thread factory.
      * @param configuration The configuration
      * @param threadFactory The thread factory
      * @return The event loop group
+     * @deprecated Go through {@link #createIoHandlerFactory(EventLoopGroupConfiguration)}
      */
+    @Deprecated
     default EventLoopGroup createEventLoopGroup(
             EventLoopGroupConfiguration configuration, ThreadFactory threadFactory) {
         ArgumentUtils.requireNonNull("configuration", configuration);
         ArgumentUtils.requireNonNull("threadFactory", threadFactory);
         return createEventLoopGroup(
-                configuration.getNumThreads(),
+                DefaultEventLoopGroupRegistry.numThreads(configuration),
                 threadFactory,
                 configuration.getIoRatio().orElse(null)
         );
@@ -86,12 +119,16 @@ public interface EventLoopGroupFactory {
      * @param threadFactory The thread factory.
      * @param ioRatio       The io ratio.
      * @return An EventLoopGroup.
+     * @deprecated Go through {@link #createIoHandlerFactory(EventLoopGroupConfiguration)}
      */
-    EventLoopGroup createEventLoopGroup(
+    @Deprecated
+    default EventLoopGroup createEventLoopGroup(
             int threads,
             @Nullable ThreadFactory threadFactory,
             @Nullable Integer ioRatio
-    );
+    ) {
+        return new MultiThreadIoEventLoopGroup(threads, threadFactory, createIoHandlerFactory());
+    }
 
     /**
      * Creates an EventLoopGroup.
@@ -99,7 +136,9 @@ public interface EventLoopGroupFactory {
      * @param threads The number of threads to use.
      * @param ioRatio The io ratio.
      * @return An EventLoopGroup.
+     * @deprecated Go through {@link #createIoHandlerFactory(EventLoopGroupConfiguration)}
      */
+    @Deprecated
     default EventLoopGroup createEventLoopGroup(int threads, @Nullable Integer ioRatio) {
         return createEventLoopGroup(threads, (ThreadFactory) null, ioRatio);
     }

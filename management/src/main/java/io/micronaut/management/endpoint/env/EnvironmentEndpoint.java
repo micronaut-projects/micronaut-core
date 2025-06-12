@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -45,11 +46,18 @@ public class EnvironmentEndpoint {
      * Endpoint name.
      */
     public static final String NAME = "env";
-
+    private static final String ACTIVE_ENVIRONMENTS_KEY = "activeEnvironments";
+    private static final String PACKAGES_KEY = "packages";
+    private static final String PROPERTY_SOURCES_KEY = "propertySources";
+    /**
+     * Default keys to be displayed.
+     */
+    private static final List<String> DEFAULT_ACTIVE_SECTIONS = List.of(EnvironmentEndpoint.ACTIVE_ENVIRONMENTS_KEY,
+        EnvironmentEndpoint.PACKAGES_KEY, EnvironmentEndpoint.PROPERTY_SOURCES_KEY);
     private static final String MASK_VALUE = "*****";
-
     private final Environment environment;
     private final EnvironmentEndpointFilter environmentFilter;
+    private List<String> activeKeys = DEFAULT_ACTIVE_SECTIONS;
 
     /**
      * @param environment The {@link Environment}
@@ -63,9 +71,31 @@ public class EnvironmentEndpoint {
      * @param environmentFilter The registered {@link EnvironmentEndpointFilter} bean if one is registered
      */
     @Inject
-    public EnvironmentEndpoint(Environment environment, @Nullable EnvironmentEndpointFilter environmentFilter) {
+    public EnvironmentEndpoint(Environment environment,
+                               @Nullable EnvironmentEndpointFilter environmentFilter) {
         this.environment = environment;
         this.environmentFilter = environmentFilter;
+    }
+
+    /**
+     * Gets the keys to be displayed by the environment endpoint.
+     * Defaults to ["activeEnvironments", "packages", "propertySources"] if not configured.
+     * Configurable via {@code endpoints.env.active-keys}.
+     *
+     * @return The list of active sections.
+     */
+    public List<String> getActiveKeys() {
+        return activeKeys;
+    }
+
+    /**
+     * Sets the sections to be displayed by the environment endpoint.
+     * Example: {@code endpoints.env.active-keys=activeEnvironments,packages}
+     *
+     * @param activeKeys The list of sections. If an empty list is provided, no sections will be displayed.
+     */
+    public void setActiveKeys(List<String> activeKeys) {
+        this.activeKeys = activeKeys;
     }
 
     /**
@@ -75,17 +105,25 @@ public class EnvironmentEndpoint {
     @Read
     public Map<String, Object> getEnvironmentInfo() {
         EnvironmentFilterSpecification filter = createFilterSpecification();
-
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("activeEnvironments", environment.getActiveNames());
-        result.put("packages", environment.getPackages());
-        Collection<Map<String, Object>> propertySources = new ArrayList<>();
-        environment.getPropertySources()
-            .stream()
-            .sorted(Comparator.comparing(PropertySource::getOrder))
-            .map(ps -> buildPropertySourceInfo(ps, filter))
-            .forEach(propertySources::add);
-        result.put("propertySources", propertySources);
+        List<String> activeKeys = getActiveKeys();
+
+        if (activeKeys.contains(ACTIVE_ENVIRONMENTS_KEY)) {
+            result.put(ACTIVE_ENVIRONMENTS_KEY, environment.getActiveNames());
+        }
+        if (activeKeys.contains(PACKAGES_KEY)) {
+            result.put(PACKAGES_KEY, environment.getPackages());
+        }
+
+        if (activeKeys.contains(PROPERTY_SOURCES_KEY)) {
+            Collection<Map<String, Object>> propertySources = new ArrayList<>();
+            environment.getPropertySources()
+                .stream()
+                .sorted(Comparator.comparing(PropertySource::getOrder))
+                .map(ps -> buildPropertySourceInfo(ps, filter))
+                .forEach(propertySources::add);
+            result.put(PROPERTY_SOURCES_KEY, propertySources);
+        }
         return result;
     }
 

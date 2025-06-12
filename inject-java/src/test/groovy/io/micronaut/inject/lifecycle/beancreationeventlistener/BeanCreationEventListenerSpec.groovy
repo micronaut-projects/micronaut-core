@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2025 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,8 +17,8 @@ package io.micronaut.inject.lifecycle.beancreationeventlistener
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.exceptions.CircularDependencyException
+import io.micronaut.core.type.Argument
 import io.micronaut.inject.lifecycle.beancreationeventlistener.circular.Bar
 import io.micronaut.inject.lifecycle.beancreationeventlistener.circular.Foo
 import spock.lang.Specification
@@ -110,7 +110,7 @@ class BeanCreationEventListenerSpec extends Specification {
     void "test application bean creation listener"() {
         given:
         ApplicationContext context = ApplicationContext.run()
-        
+
         when:
         B b = context.getBean(B)
 
@@ -155,5 +155,26 @@ class BeanCreationEventListenerSpec extends Specification {
 
         cleanup:
         context.close()
+    }
+
+    void "test bean type in listener"() {
+        when:
+        ApplicationContext context = ApplicationContext.run()
+        I I = context.getBean(Argument.of(I.class, "someName"))
+
+        ICreatedListener iListener = context.getBean(ICreatedListener);
+        JCreatedListener jListener = context.getBean(JCreatedListener);
+
+        then: "Bean type passed to getBean is passed to listener"
+        iListener.executed
+        Argument<I> iBeanType = iListener.beanType
+        iBeanType.getType() == I.class
+        iBeanType.getName() == "someName"
+
+        and: "Bean type for J listener matches injected parameter name"
+        jListener.executed
+        Argument<J> jBeanType = jListener.beanType
+        jBeanType.getType() == J.class
+        jBeanType.getName() == "someParamName"
     }
 }

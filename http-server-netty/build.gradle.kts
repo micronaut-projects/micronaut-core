@@ -77,6 +77,7 @@ dependencies {
     testImplementation(libs.httpcomponents.client)
     testImplementation(libs.httpcomponents.mime)
     testImplementation(libs.jetty.alpn.openjdk8.client)
+    testImplementation(libs.jfrunit.core)
 
     testImplementation(libs.managed.groovy.json)
     testImplementation(libs.managed.groovy.templates)

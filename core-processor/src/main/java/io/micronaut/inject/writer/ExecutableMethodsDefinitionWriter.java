@@ -29,7 +29,7 @@ import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.TypedElement;
-import io.micronaut.sourcegen.bytecode.ByteCodeWriter;
+import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.sourcegen.model.ClassDef;
 import io.micronaut.sourcegen.model.ClassTypeDef;
 import io.micronaut.sourcegen.model.ExpressionDef;
@@ -87,7 +87,6 @@ public class ExecutableMethodsDefinitionWriter implements ClassOutputWriter {
 
     private static final Method AT_INDEX_MATCHED_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractExecutableMethodsDefinition.class, "methodAtIndexMatches", int.class, String.class, Class[].class);
 
-    private static final String FIELD_METHODS_REFERENCES = "$METHODS_REFERENCES";
     private static final String FIELD_INTERCEPTABLE = "$interceptable";
 
     private static final int MIN_METHODS_TO_GENERATE_GET_METHOD = 5;
@@ -106,19 +105,21 @@ public class ExecutableMethodsDefinitionWriter implements ClassOutputWriter {
     private ClassDef.ClassDefBuilder classDefBuilder;
 
     private final OriginatingElements originatingElements;
+    private final VisitorContext visitorContext;
 
     public ExecutableMethodsDefinitionWriter(EvaluatedExpressionProcessor evaluatedExpressionProcessor,
                                              AnnotationMetadata annotationMetadataWithDefaults,
                                              String beanDefinitionClassName,
                                              String beanDefinitionReferenceClassName,
-                                             OriginatingElements originatingElements) {
+                                             OriginatingElements originatingElements, VisitorContext visitorContext) {
         this.originatingElements = originatingElements;
         this.annotationMetadataWithDefaults = annotationMetadataWithDefaults;
         this.evaluatedExpressionProcessor = evaluatedExpressionProcessor;
         this.className = beanDefinitionClassName + CLASS_SUFFIX;
+        this.visitorContext = visitorContext;
         this.thisType = ClassTypeDef.of(className);
         this.beanDefinitionReferenceClassName = beanDefinitionReferenceClassName;
-        this.methodDispatchWriter = new DispatchWriter();
+        this.methodDispatchWriter = new DispatchWriter(className);
     }
 
     /**
@@ -195,14 +196,14 @@ public class ExecutableMethodsDefinitionWriter implements ClassOutputWriter {
      * @param declaringType                    The declaring type of the method. Either a Class or a string representing the
      *                                         name of the type
      * @param methodElement                    The method element
-     * @param interceptedProxyClassName        The intercepted proxy class name
-     * @param interceptedProxyBridgeMethodName The intercepted proxy bridge method name
+     * @param interceptedProxyType             The intercepted proxy type
+     * @param interceptedProxyBridgeMethod     The intercepted proxy bridge method
      * @return The method index
      */
     public int visitExecutableMethod(TypedElement declaringType,
                                      MethodElement methodElement,
-                                     String interceptedProxyClassName,
-                                     String interceptedProxyBridgeMethodName) {
+                                     ClassTypeDef interceptedProxyType,
+                                     MethodDef interceptedProxyBridgeMethod) {
         evaluatedExpressionProcessor.processEvaluatedExpressions(methodElement);
 
         String methodKey = methodElement.getName() +
@@ -217,17 +218,17 @@ public class ExecutableMethodsDefinitionWriter implements ClassOutputWriter {
             return index;
         }
         addedMethods.add(methodKey);
-        if (interceptedProxyClassName == null) {
+        if (interceptedProxyType == null) {
             return methodDispatchWriter.addMethod(declaringType, methodElement);
         } else {
-            return methodDispatchWriter.addInterceptedMethod(declaringType, methodElement, interceptedProxyClassName, interceptedProxyBridgeMethodName);
+            return methodDispatchWriter.addInterceptedMethod(declaringType, methodElement, interceptedProxyType, interceptedProxyBridgeMethod);
         }
     }
 
     @Override
     public void accept(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
         try (OutputStream outputStream = classWriterOutputVisitor.visitClass(className, originatingElements.getOriginatingElements())) {
-            outputStream.write(new ByteCodeWriter().write(classDefBuilder.build()));
+            outputStream.write(ByteCodeWriterUtils.writeByteCode(classDefBuilder.build(), visitorContext));
         }
     }
 
@@ -270,16 +271,12 @@ public class ExecutableMethodsDefinitionWriter implements ClassOutputWriter {
 
         metadataMethods.forEach(classDefBuilder::addMethod);
 
-        FieldDef methodReferencesField = FieldDef.builder(FIELD_METHODS_REFERENCES, methodsFieldType)
-            .addModifiers(Modifier.STATIC, Modifier.FINAL, Modifier.PRIVATE)
-            .initializer(
-                methodsFieldType.instantiate(
-                    metadataMethods.stream().map(thisType::invokeStatic).toList()
-                )
-            )
-            .build();
+        // We don't store methods into a static array, the $Exec class is always stored into a static field
+        // Otherwise we have a circular initialization problem $Exec -> $Definition.cinit -> new $Exec
 
-        classDefBuilder.addField(methodReferencesField);
+        ExpressionDef createMethodsArrayExp = methodsFieldType.instantiate(
+            metadataMethods.stream().map(thisType::invokeStatic).toList()
+        );
 
         if (methodDispatchWriter.isHasInterceptedMethod()) {
             FieldDef interceptable = FieldDef.builder(FIELD_INTERCEPTABLE, TypeDef.Primitive.BOOLEAN)
@@ -292,7 +289,7 @@ public class ExecutableMethodsDefinitionWriter implements ClassOutputWriter {
                 .addModifiers(Modifier.PUBLIC)
                 .addParameters(boolean.class)
                 .addStatement((aThis, methodParameters) -> aThis.superRef()
-                    .invokeConstructor(SUPER_CONSTRUCTOR, thisType.getStaticField(methodReferencesField)))
+                    .invokeConstructor(SUPER_CONSTRUCTOR, createMethodsArrayExp))
                 .addStatement((aThis, methodParameters) -> aThis.field(interceptable).put(methodParameters.get(0)))
                 .build();
 
@@ -312,7 +309,7 @@ public class ExecutableMethodsDefinitionWriter implements ClassOutputWriter {
                 MethodDef.constructor()
                     .addModifiers(Modifier.PUBLIC)
                     .build((aThis, methodParameters) -> aThis.superRef()
-                        .invokeConstructor(SUPER_CONSTRUCTOR, thisType.getStaticField(methodReferencesField))
+                        .invokeConstructor(SUPER_CONSTRUCTOR, createMethodsArrayExp)
                     )
             );
         }

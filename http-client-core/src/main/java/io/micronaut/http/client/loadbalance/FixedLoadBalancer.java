@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.loadbalance;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.discovery.ServiceInstance;
@@ -36,6 +37,7 @@ import java.util.Optional;
  */
 public class FixedLoadBalancer implements LoadBalancer  {
     private final Publisher<ServiceInstance> publisher;
+    private final ServiceInstance serviceInstance;
     private final URI uri;
 
     /**
@@ -56,7 +58,8 @@ public class FixedLoadBalancer implements LoadBalancer  {
      */
     public FixedLoadBalancer(URI uri) {
         this.uri = uri;
-        this.publisher = Publishers.just(ServiceInstance.of(uri.getHost(), uri));
+        serviceInstance = ServiceInstance.of(uri.getHost(), uri);
+        this.publisher = Publishers.just(serviceInstance);
     }
 
     @Override
@@ -82,6 +85,16 @@ public class FixedLoadBalancer implements LoadBalancer  {
      */
     public URI getUri() {
         return uri;
+    }
+
+    /**
+     * The fixed {@link ServiceInstance} returned by {@link #select}. Internal use only.
+     *
+     * @return The service instance
+     */
+    @Internal
+    public ServiceInstance getServiceInstance() {
+        return serviceInstance;
     }
 
     @Override

@@ -22,6 +22,9 @@ import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.exceptions.HttpClientException;
+import io.netty.channel.EventLoop;
+import io.netty.channel.EventLoopGroup;
+import io.netty.util.concurrent.EventExecutor;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
@@ -36,6 +39,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
+import java.util.function.IntUnaryOperator;
 
 /**
  * This class handles the sizing of a connection pool to conform to the configuration in
@@ -49,9 +53,11 @@ import java.util.function.Consumer;
  * call.
  */
 @Internal
-abstract class PoolResizer {
+final class Pool40 implements Pool {
+    private final Pool.Listener listener;
     private final Logger log;
     private final HttpClientConfiguration.ConnectionPoolConfiguration connectionPoolConfiguration;
+    private final EventLoopGroup group;
 
     private final AtomicReference<WorkState> state = new AtomicReference<>(WorkState.IDLE);
 
@@ -61,9 +67,31 @@ abstract class PoolResizer {
     private final ConnectionList http1Connections = new ConnectionList();
     private final ConnectionList http2Connections = new ConnectionList();
 
-    PoolResizer(Logger log, HttpClientConfiguration.ConnectionPoolConfiguration connectionPoolConfiguration) {
+    Pool40(Pool.Listener listener, Logger log, HttpClientConfiguration.ConnectionPoolConfiguration connectionPoolConfiguration, EventLoopGroup group) {
+        this.listener = listener;
         this.log = log;
         this.connectionPoolConfiguration = connectionPoolConfiguration;
+        this.group = group;
+    }
+
+    @Override
+    public Pool.PendingRequest createPendingRequest(@Nullable BlockHint blockHint) {
+        return new PendingRequest(blockHint);
+    }
+
+    @Override
+    public Http1PoolEntry createHttp1PoolEntry(@NonNull EventLoop eventLoop, @NonNull ResizerConnection connection) {
+        return new Http1(eventLoop, connection);
+    }
+
+    @Override
+    public Http2PoolEntry createHttp2PoolEntry(@NonNull EventLoop eventLoop, @NonNull ResizerConnection connection) {
+        return new Http2(eventLoop, connection);
+    }
+
+    @Override
+    public void onNewConnectionFailure(@NonNull EventLoop eventLoop, @Nullable Throwable error) throws Exception {
+        onNewConnectionFailure(error);
     }
 
     private void dirty() {
@@ -103,8 +131,8 @@ abstract class PoolResizer {
         }
     }
 
-    private ResizerConnection[] sort(PendingRequest request, ConnectionList connections) {
-        ResizerConnection[] items = connections.unsafeItems;
+    private PoolEntry[] sort(PendingRequest request, ConnectionList connections) {
+        PoolEntry[] items = connections.unsafeItems;
         if (items.length == 0) {
             return items;
         }
@@ -114,8 +142,8 @@ abstract class PoolResizer {
             // the same thread
             int copies = 0;
             for (int i = 1; i < items.length; i++) {
-                ResizerConnection connection = items[i];
-                if (connection.inEventLoop(request.requestingThread)) {
+                PoolEntry connection = items[i];
+                if (connection.eventLoop.inEventLoop(request.requestingThread)) {
                     // place that connection at the front
                     System.arraycopy(items, 0, items, 1, i);
                     items[0] = connection;
@@ -128,9 +156,9 @@ abstract class PoolResizer {
         } else if (locality == HttpClientConfiguration.ConnectionPoolConfiguration.ConnectionLocality.ENFORCED_IF_SAME_GROUP ||
             locality == HttpClientConfiguration.ConnectionPoolConfiguration.ConnectionLocality.ENFORCED_ALWAYS) {
 
-            List<ResizerConnection> options = new ArrayList<>();
-            for (ResizerConnection item : items) {
-                if (item.inEventLoop(request.requestingThread)) {
+            List<PoolEntry> options = new ArrayList<>();
+            for (PoolEntry item : items) {
+                if (item.eventLoop.inEventLoop(request.requestingThread)) {
                     options.add(item);
                 }
             }
@@ -138,7 +166,7 @@ abstract class PoolResizer {
                 locality == HttpClientConfiguration.ConnectionPoolConfiguration.ConnectionLocality.ENFORCED_ALWAYS ||
                 containsThread(request.requestingThread)) {
 
-                return options.toArray(new ResizerConnection[0]);
+                return options.toArray(new PoolEntry[0]);
             }
             // escape hatch: in ENFORCED_IF_SAME_GROUP, we can use any connection if the
             // requesting thread is *not* in the same event loop group.
@@ -154,14 +182,14 @@ abstract class PoolResizer {
                 break;
             }
             boolean dispatched = false;
-            for (ResizerConnection c : sort(toDispatch, http2Connections)) {
+            for (PoolEntry c : sort(toDispatch, http2Connections)) {
                 if (dispatchSafe(c, toDispatch)) {
                     dispatched = true;
                     break;
                 }
             }
             if (!dispatched) {
-                for (ResizerConnection c : sort(toDispatch, http1Connections)) {
+                for (PoolEntry c : sort(toDispatch, http1Connections)) {
                     if (dispatchSafe(c, toDispatch)) {
                         dispatched = true;
                         break;
@@ -225,9 +253,18 @@ abstract class PoolResizer {
         }
     }
 
-    private boolean dispatchSafe(ResizerConnection connection, PendingRequest toDispatch) {
+    private boolean dispatchSafe(PoolEntry connection, PendingRequest toDispatch) {
         try {
-            return connection.dispatch(toDispatch);
+            BlockHint blockHint = toDispatch.blockHint;
+            if (blockHint != null && blockHint.blocks(connection.eventLoop)) {
+                toDispatch.tryCompleteExceptionally(BlockHint.createException());
+                return true;
+            }
+            if (!connection.tryEarmarkForRequest()) {
+                return false;
+            }
+            connection.connection.dispatch(toDispatch);
+            return true;
         } catch (Exception e) {
             try {
                 if (!toDispatch.tryCompleteExceptionally(e)) {
@@ -241,53 +278,71 @@ abstract class PoolResizer {
         }
     }
 
-    abstract void openNewConnection(@Nullable BlockHint blockedPendingRequests, @NonNull Thread requestingThread) throws Exception;
-
-    abstract boolean containsThread(@NonNull Thread thread);
-
-    static boolean incrementWithLimit(AtomicInteger variable, int limit) {
-        while (true) {
-            int old = variable.get();
-            if (old >= limit) {
-                return false;
+    void openNewConnection(@Nullable BlockHint blockedPendingRequests, @NonNull Thread requestingThread) throws Exception {
+        EventLoop target = null;
+        for (EventExecutor executor : group) {
+            if (executor.inEventLoop(requestingThread)) {
+                target = (EventLoop) executor;
+                break;
             }
-            if (variable.compareAndSet(old, old + 1)) {
+        }
+        if (target == null) {
+            target = group.next();
+        }
+        if (blockedPendingRequests != null && blockedPendingRequests.blocks(target)) {
+            onNewConnectionFailure(BlockHint.createException());
+            return;
+        }
+        listener.openNewConnection(target);
+    }
+
+    boolean containsThread(@NonNull Thread thread) {
+        for (EventExecutor executor : group) {
+            if (executor.inEventLoop(thread)) {
                 return true;
             }
         }
+        return false;
     }
 
-    // can be overridden, so `throws Exception` ensures we handle any errors
     void onNewConnectionFailure(@Nullable Throwable error) throws Exception {
         // todo: implement a circuit breaker here? right now, we just fail one connection in the
         //  subclass implementation, but maybe we should do more.
         pendingConnectionCount.decrementAndGet();
         dirty();
+
+        PendingRequest pending = pollPendingRequest();
+        if (pending != null) {
+            if (pending.tryCompleteExceptionally(listener.wrapError(error))) {
+                return;
+            }
+        }
+        log.error("Failed to connect to remote", error);
     }
 
-    final void onNewConnectionEstablished1(ResizerConnection connection) {
+    void onNewConnectionEstablished1(Http1 connection) {
         http1Connections.add(connection);
         pendingConnectionCount.decrementAndGet();
         dirty();
     }
 
-    final void onNewConnectionEstablished2(ResizerConnection connection) {
+    void onNewConnectionEstablished2(Http2 connection) {
         http2Connections.add(connection);
         pendingConnectionCount.decrementAndGet();
         dirty();
     }
 
-    final void onConnectionInactive1(ResizerConnection connection) {
+    void onConnectionInactive1(Http1 connection) {
         http1Connections.remove(connection);
         dirty();
     }
 
-    final void onConnectionInactive2(ResizerConnection connection) {
+    void onConnectionInactive2(Http2 connection) {
         http2Connections.remove(connection);
         dirty();
     }
 
-    final void addPendingRequest(PendingRequest sink) {
+    void addPendingRequest(PendingRequest sink) {
         int maxPendingAcquires = connectionPoolConfiguration.getMaxPendingAcquires();
         if (maxPendingAcquires != Integer.MAX_VALUE && pendingRequests.size() >= maxPendingAcquires) {
             sink.tryCompleteExceptionally(new HttpClientException("Cannot acquire connection, exceeded max pending acquires configuration"));
@@ -297,7 +352,7 @@ abstract class PoolResizer {
         dirty();
     }
 
-    final PendingRequest pollPendingRequest() {
+    PendingRequest pollPendingRequest() {
         PendingRequest req = pendingRequests.pollFirst();
         if (req != null) {
             dirty();
@@ -305,11 +360,12 @@ abstract class PoolResizer {
         return req;
     }
 
-    final void markConnectionAvailable() {
+    void markConnectionAvailable() {
         dirty();
     }
 
-    final void forEachConnection(Consumer<ResizerConnection> c) {
+    @Override
+    public void forEachConnection(Consumer<Pool.ResizerConnection> c) {
         http1Connections.forEach(c);
         http2Connections.forEach(c);
     }
@@ -320,7 +376,7 @@ abstract class PoolResizer {
      * {@link #doSomeWork()}.
      */
     private static final class ConnectionList {
-        private static final ResizerConnection[] EMPTY = new ResizerConnection[0];
+        private static final PoolEntry[] EMPTY = new PoolEntry[0];
 
         private final Lock lock = new ReentrantLock();
 
@@ -328,30 +384,30 @@ abstract class PoolResizer {
          * Copy of {@link #safeItems} <i>only</i> for use in {@link #doSomeWork()}, without lock.
          * {@link #doSomeWork()} may shuffle and reorder this array in-place as needed.
          */
-        private volatile ResizerConnection[] unsafeItems = EMPTY;
+        private volatile PoolEntry[] unsafeItems = EMPTY;
         /**
          * Items for concurrent access, guarded by {@link #lock}.
          */
-        private ResizerConnection[] safeItems = EMPTY;
+        private PoolEntry[] safeItems = EMPTY;
 
         void forEach(Consumer<ResizerConnection> c) {
-            ResizerConnection[] items;
+            PoolEntry[] items;
             lock.lock();
             try {
                 items = safeItems;
             } finally {
                 lock.unlock();
             }
-            for (ResizerConnection item : items) {
-                c.accept(item);
+            for (PoolEntry item : items) {
+                c.accept(item.connection);
             }
         }
 
-        void add(ResizerConnection connection) {
+        void add(PoolEntry connection) {
             lock.lock();
             try {
-                ResizerConnection[] prev = safeItems;
-                ResizerConnection[] next = Arrays.copyOf(prev, prev.length + 1);
+                PoolEntry[] prev = safeItems;
+                PoolEntry[] next = Arrays.copyOf(prev, prev.length + 1);
                 next[prev.length] = connection;
                 this.safeItems = next;
                 this.unsafeItems = next.clone();
@@ -360,15 +416,15 @@ abstract class PoolResizer {
             }
         }
 
-        void remove(ResizerConnection connection) {
+        void remove(PoolEntry connection) {
             lock.lock();
             try {
-                ResizerConnection[] prev = safeItems;
+                PoolEntry[] prev = safeItems;
                 int index = Arrays.asList(prev).indexOf(connection);
                 if (index == -1) {
                     return;
                 }
-                ResizerConnection[] next = Arrays.copyOf(prev, prev.length - 1);
+                PoolEntry[] next = Arrays.copyOf(prev, prev.length - 1);
                 System.arraycopy(prev, index + 1, next, index, prev.length - index - 1);
 
                 this.safeItems = next;
@@ -396,20 +452,7 @@ abstract class PoolResizer {
         ACTIVE_WITHOUT_PENDING_WORK,
     }
 
-    abstract static class ResizerConnection {
-        abstract boolean inEventLoop(Thread thread);
-
-        /**
-         * Attempt to dispatch a stream on this connection.
-         *
-         * @param sink The pending request that wants to acquire this connection
-         * @return {@code true} if the acquisition may succeed (if it fails later, the pending
-         * request must be readded), or {@code false} if it fails immediately
-         */
-        abstract boolean dispatch(PendingRequest sink) throws Exception;
-    }
-
-    static final class PendingRequest extends AtomicBoolean {
+    final class PendingRequest extends AtomicBoolean implements Pool.PendingRequest {
         final Thread requestingThread = Thread.currentThread();
         final @Nullable BlockHint blockHint;
         private final DelayedExecutionFlow<ConnectionManager.PoolHandle> sink = DelayedExecutionFlow.create();
@@ -418,8 +461,24 @@ abstract class PoolResizer {
             this.blockHint = blockHint;
         }
 
-        ExecutionFlow<ConnectionManager.PoolHandle> flow() {
+        @Override
+        public ExecutionFlow<ConnectionManager.PoolHandle> flow() {
             return sink;
+        }
+
+        @Override
+        public void dispatch() {
+            addPendingRequest(this);
+        }
+
+        @Override
+        public void redispatch() {
+            dispatch();
+        }
+
+        @Override
+        public @Nullable EventExecutor likelyEventLoop() {
+            return null;
         }
 
         // DelayedExecutionFlow does not allow concurrent completes, so this is a simple guard
@@ -433,7 +492,8 @@ abstract class PoolResizer {
             }
         }
 
-        boolean tryComplete(ConnectionManager.PoolHandle value) {
+        @Override
+        public boolean tryComplete(ConnectionManager.PoolHandle value) {
             if (compareAndSet(false, true)) {
                 if (sink.isCancelled()) {
                     return false;
@@ -443,6 +503,96 @@ abstract class PoolResizer {
             } else {
                 return false;
             }
+        }
+    }
+
+    private abstract static sealed class PoolEntry {
+        final EventLoop eventLoop;
+        final ResizerConnection connection;
+
+        private PoolEntry(EventLoop eventLoop, ResizerConnection connection) {
+            this.eventLoop = eventLoop;
+            this.connection = connection;
+        }
+
+        abstract boolean tryEarmarkForRequest();
+    }
+
+    final class Http1 extends PoolEntry implements Http1PoolEntry {
+        private final AtomicBoolean earmarkedOrLive = new AtomicBoolean(false);
+
+        public Http1(EventLoop eventLoop, @NonNull ResizerConnection connection) {
+            super(eventLoop, connection);
+        }
+
+        @Override
+        public void onConnectionEstablished() {
+            onNewConnectionEstablished1(this);
+        }
+
+        @Override
+        public void onConnectionInactive() {
+            onConnectionInactive1(this);
+        }
+
+        @Override
+        boolean tryEarmarkForRequest() {
+            return earmarkedOrLive.compareAndSet(false, true);
+        }
+
+        @Override
+        public void markAvailable() {
+            earmarkedOrLive.set(false);
+            markConnectionAvailable();
+        }
+
+        @Override
+        public void markUnavailable() {
+            earmarkedOrLive.set(true);
+        }
+    }
+
+    final class Http2 extends PoolEntry implements Http2PoolEntry {
+        private final AtomicInteger earmarkedOrLiveRequests = new AtomicInteger(0);
+        private int maxStreamCount;
+
+        public Http2(EventLoop eventLoop, @NonNull ResizerConnection connection) {
+            super(eventLoop, connection);
+        }
+
+        @Override
+        boolean tryEarmarkForRequest() {
+            IntUnaryOperator upd = old -> {
+                if (old >= Math.min(connectionPoolConfiguration.getMaxConcurrentRequestsPerHttp2Connection(), maxStreamCount)) {
+                    return old;
+                } else {
+                    return old + 1;
+                }
+            };
+            int old = earmarkedOrLiveRequests.updateAndGet(upd);
+            return upd.applyAsInt(old) != old;
+        }
+
+        @Override
+        public void onConnectionEstablished(int maxStreamCount) {
+            this.maxStreamCount = maxStreamCount;
+            onNewConnectionEstablished2(this);
+        }
+
+        @Override
+        public void onConnectionInactive() {
+            onConnectionInactive2(this);
+        }
+
+        @Override
+        public void markAvailable() {
+            earmarkedOrLiveRequests.decrementAndGet();
+            markConnectionAvailable();
+        }
+
+        @Override
+        public void markUnavailable() {
+            earmarkedOrLiveRequests.set(Integer.MAX_VALUE);
         }
     }
 }
