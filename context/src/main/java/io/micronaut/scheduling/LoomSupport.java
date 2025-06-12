@@ -26,6 +26,7 @@ import java.lang.invoke.MethodType;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 /**
@@ -71,10 +72,18 @@ public final class LoomSupport {
             isVirtual = MethodHandles.lookup()
                 .findVirtual(Thread.class, "isVirtual", MethodType.methodType(boolean.class));
 
-            // invoke, this will throw an UnsupportedOperationException if we don't have --enable-preview
-            ofVirtual.invoke();
+            // This will throw if this Java doesn't support Loom, or if it does but only with
+            // --enable-preview.
+            Thread probe = (Thread) unstarted.invoke(ofVirtual.invoke(), (Runnable) () -> { });
 
-            sup = true;
+            // This checks if the JVM actually creates real virtual threads, or if it uses
+            // 'bound threads' which are just platform threads. As of June 2025 the Espresso JVM
+            // falls into this category. Checking here voids casting issues later in code that
+            // makes assumptions about the internals.
+            sup = Class.forName("java.lang.VirtualThread").isInstance(probe);
+            if (!sup) {
+                failure = new Exception("This JVM doesn't fully implement virtual threads and produces regular platform threads instead.");
+            }
         } catch (Throwable e) {
             newThreadPerTaskExecutor = null;
             ofVirtual = null;
