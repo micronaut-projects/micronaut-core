@@ -77,9 +77,9 @@ include "test-suite-http-server-tck-netty"
 include "test-suite-http2-server-tck-netty"
 include "test-suite-kotlin"
 include "test-suite-kotlin-ksp"
-//include "test-suite-kotlin2-ksp2"
-//include 'test-inject-kotlin2-test'
-//include "test-inject-kotlin2-ksp2"
+include "test-suite-kotlin2-ksp2"
+include 'test-inject-kotlin2-test'
+include "test-inject-kotlin2-ksp2"
 include "test-suite-kotlin-ksp-all-open"
 include "test-suite-groovy"
 include "test-suite-groovy"
