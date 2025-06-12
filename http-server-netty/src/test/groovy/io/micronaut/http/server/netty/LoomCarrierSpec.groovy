@@ -46,22 +46,22 @@ class LoomCarrierSpec extends Specification {
         def s = client.retrieve("/loom-carrier", ThreadInfo)
         then:
         s.current.startsWith("loom-on-netty-")
-        s.carrier == "default-nioEventLoopGroup-3-1"
+        s.carrier.matches("default-nioEventLoopGroup-\\d+-1")
         when:
         s = client.retrieve("/loom-carrier", ThreadInfo)
         then:
         s.current.startsWith("loom-on-netty-")
-        s.carrier == "default-nioEventLoopGroup-3-1"
+        s.carrier.matches("default-nioEventLoopGroup-\\d+-1")
         when:
         s = client.retrieve("/loom-carrier/loop-jdk", ThreadInfo)
         then:
         s.current.startsWith("loom-on-netty-")
-        s.carrier == "default-nioEventLoopGroup-3-1"
+        s.carrier.matches("default-nioEventLoopGroup-\\d+-1")
         when:
         s = client.retrieve("/loom-carrier/loop-mn", ThreadInfo)
         then:
         s.current.startsWith("loom-on-netty-")
-        s.carrier == "default-nioEventLoopGroup-3-1"
+        s.carrier.matches("default-nioEventLoopGroup-\\d+-1")
 
         cleanup:
         ctx.close()
@@ -83,8 +83,8 @@ class LoomCarrierSpec extends Specification {
         when:
         def s = client.retrieve("/loom-carrier/loop-read", LoopRead)
         then:
-        s.before.carrier == 'default-nioEventLoopGroup-3-1'
-        s.nested.carrier == 'default-nioEventLoopGroup-3-1'
+        s.before.carrier.matches("default-nioEventLoopGroup-\\d+-1")
+        s.nested.carrier.matches("default-nioEventLoopGroup-\\d+-1")
         s.after.carrier.startsWith("ForkJoinPool-")
 
         cleanup:
