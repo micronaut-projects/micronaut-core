@@ -41,3 +41,6 @@ if (System.getenv("SONAR_TOKEN") != null) {
 configurations.jacocoAggregation.dependencies.removeIf {
     it instanceof ProjectDependency && it.path.startsWith(":test-")
 }
+configurations.javadocAggregatorBase.dependencies.removeIf {
+    it instanceof ProjectDependency && it.path.startsWith(":test-")
+}
