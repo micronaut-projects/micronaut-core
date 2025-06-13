@@ -17,6 +17,8 @@ package io.micronaut.http.server;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.exceptions.BeanCreationException;
+import io.micronaut.context.propagation.instrument.execution.ContextPropagatingExecutorService;
+import io.micronaut.context.propagation.instrument.execution.ContextPropagatingScheduledExecutorService;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -52,8 +54,6 @@ import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
 import io.micronaut.inject.BeanType;
 import io.micronaut.inject.MethodReference;
 import io.micronaut.scheduling.executor.ExecutorSelector;
-import io.micronaut.scheduling.instrument.InstrumentedExecutorService;
-import io.micronaut.scheduling.instrument.InstrumentedScheduledExecutorService;
 import io.micronaut.web.router.DefaultRouteInfo;
 import io.micronaut.web.router.MethodBasedRouteInfo;
 import io.micronaut.web.router.RouteAttributes;
@@ -78,7 +78,6 @@ import java.time.LocalDateTime;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
@@ -376,45 +375,18 @@ public final class RouteExecutor {
         if (executor == null) {
             return Flux.from(publisher).subscribeOn(Schedulers.fromExecutor(command -> propagatedContext.wrap(command).run()));
         }
-        if (executor instanceof InstrumentedExecutorService instrumentedExecutorService) {
-            executor = instrumentedExecutorService.getTarget();
+        Optional<ExecutorService> wrappedTarget = ContextPropagatingExecutorService.unwrap(executor);
+        if (wrappedTarget.isPresent()) {
+            executor = wrappedTarget.get();
         }
         if (executor instanceof ScheduledExecutorService scheduledExecutorService) {
-            executor = new InstrumentedScheduledExecutorService() {
-                @Override
-                public ScheduledExecutorService getTarget() {
-                    return scheduledExecutorService;
-                }
-
-                @Override
-                public <X> Callable<X> instrument(Callable<X> task) {
-                    return propagatedContext.wrap(task);
-                }
-
-                @Override
-                public Runnable instrument(Runnable command) {
-                    return propagatedContext.wrap(command);
-                }
-            };
+            executor = new ContextPropagatingScheduledExecutorService(
+                scheduledExecutorService,
+                propagatedContext
+            );
         } else {
             ExecutorService finalExecutor = executor;
-            executor = new InstrumentedExecutorService() {
-
-                @Override
-                public ExecutorService getTarget() {
-                    return finalExecutor;
-                }
-
-                @Override
-                public <X> Callable<X> instrument(Callable<X> task) {
-                    return propagatedContext.wrap(task);
-                }
-
-                @Override
-                public Runnable instrument(Runnable command) {
-                    return propagatedContext.wrap(command);
-                }
-            };
+            executor = new ContextPropagatingExecutorService(finalExecutor, propagatedContext);
         }
         final Scheduler scheduler = Schedulers.fromExecutorService(executor);
         return Flux.from(publisher)
