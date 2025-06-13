@@ -825,15 +825,27 @@ public class DefaultHttpClient implements
         setupConversionService(request);
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
         return new MicronautFlux<>(toMono(resolveRequestURI(request), propagatedContext)
-                .flatMapMany(requestURI -> dataStreamImpl(toMutableRequest(request), errorType, propagatedContext, requestURI)))
-                .doAfterNext(buffer -> {
-                    Object o = buffer.asNativeBuffer();
-                    if (o instanceof ByteBuf byteBuf) {
-                        if (byteBuf.refCnt() > 0) {
-                            ReferenceCountUtil.safeRelease(byteBuf);
-                        }
+            .flatMapMany(requestURI -> dataStreamImpl(toMutableRequest(request), errorType, propagatedContext, requestURI))
+            .map(bb -> {
+                if (bb.asNativeBuffer() instanceof ByteBuf byteBuf && byteBuf.refCnt() > 1) {
+                    // if we aren't the exclusive owner of this buffer, we need to detect whether
+                    // the downstream consumer releases it or not. For that, we need our own
+                    // refCnt. A composite buffer provides that.
+                    CompositeByteBuf composite = byteBuf.alloc().compositeBuffer(1);
+                    composite.addComponent(true, byteBuf);
+                    return byteBufferFactory.wrap(composite);
+                } else {
+                    return bb;
+                }
+            }))
+            .doAfterNext(buffer -> {
+                Object o = buffer.asNativeBuffer();
+                if (o instanceof ByteBuf byteBuf) {
+                    if (byteBuf.refCnt() > 0) {
+                        ReferenceCountUtil.safeRelease(byteBuf);
                     }
-                });
+                }
+            });
     }
 
     @Override
