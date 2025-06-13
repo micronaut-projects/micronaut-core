@@ -1,6 +1,6 @@
 plugins {
     id("io.micronaut.build.internal.convention-test-library")
-    alias(libs.plugins.managed.kotlin2.jvm)
+    alias(libs.plugins.kotlin2.jvm)
 }
 
 dependencies {
@@ -9,9 +9,9 @@ dependencies {
     api(libs.spock) {
         exclude(module = "groovy-all")
     }
-    api(libs.managed.ksp2.api)
-    api(libs.managed.ksp2)
-    implementation(libs.managed.kotlin2.compiler.embeddable)
+    api(libs.ksp2.api)
+    api(libs.ksp2)
+    implementation(libs.kotlin2.compiler.embeddable)
     implementation(libs.ksp2.commonDeps)
     implementation(libs.ksp2.aaEmbeddable)
     implementation(libs.okio)
@@ -19,7 +19,7 @@ dependencies {
     testImplementation(libs.javax.persistence)
     testImplementation(projects.micronautRuntime)
     api(libs.blaze.persistence.core)
-    implementation(libs.managed.kotlin2.stdlib)
+    implementation(libs.kotlin2.stdlib)
 }
 
 tasks {

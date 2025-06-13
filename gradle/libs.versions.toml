@@ -139,13 +139,6 @@ managed-kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version
 managed-kotlin-stdlib-jdk8 = { module = "org.jetbrains.kotlin:kotlin-stdlib-jdk8", version.ref = "managed-kotlin" }
 managed-kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "managed-kotlin" }
 
-managed-kotlin2-annotation-processing-embeddable = { module = "org.jetbrains.kotlin:kotlin-annotation-processing-embeddable", version.ref = "managed-kotlin2" }
-managed-kotlin2-compiler-embeddable = { module = "org.jetbrains.kotlin:kotlin-compiler-embeddable", version.ref = "managed-kotlin2" }
-managed-kotlin2-reflect = { module = "org.jetbrains.kotlin:kotlin-reflect", version.ref = "managed-kotlin2" }
-managed-kotlin2-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "managed-kotlin2" }
-managed-kotlin2-stdlib-jdk8 = { module = "org.jetbrains.kotlin:kotlin-stdlib-jdk8", version.ref = "managed-kotlin2" }
-managed-kotlin2-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "managed-kotlin2" }
-
 managed-kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "managed-kotlin-coroutines" }
 managed-kotlinx-coroutines-jdk8 = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-jdk8", version.ref = "managed-kotlin-coroutines" }
 managed-kotlinx-coroutines-reactive = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-reactive", version.ref = "managed-kotlin-coroutines" }
@@ -155,9 +148,6 @@ managed-kotlinx-coroutines-reactor = { module = "org.jetbrains.kotlinx:kotlinx-c
 
 managed-ksp-api = { module = "com.google.devtools.ksp:symbol-processing-api", version.ref = "managed-ksp" }
 managed-ksp = { module = "com.google.devtools.ksp:symbol-processing", version.ref = "managed-ksp" }
-
-managed-ksp2-api = { module = "com.google.devtools.ksp:symbol-processing-api", version.ref = "managed-ksp2" }
-managed-ksp2 = { module = "com.google.devtools.ksp:symbol-processing", version.ref = "managed-ksp2" }
 
 managed-java-parser-core = { module = "com.github.javaparser:javaparser-symbol-solver-core", version.ref = "managed-java-parser-core" }
 managed-methvin-directoryWatcher = { module = "io.methvin:directory-watcher", version.ref = "managed-methvin-directory-watcher" }
@@ -323,6 +313,18 @@ ksp2-aaEmbeddable = { module = "com.google.devtools.ksp:symbol-processing-aa-emb
 
 jfrunit-core = { module = "org.moditect.jfrunit:jfrunit-core", version.ref = "jfrunit" }
 
+# Kotlin 2 KSP 2 for testing
+
+kotlin2-annotation-processing-embeddable = { module = "org.jetbrains.kotlin:kotlin-annotation-processing-embeddable", version.ref = "managed-kotlin2" }
+kotlin2-compiler-embeddable = { module = "org.jetbrains.kotlin:kotlin-compiler-embeddable", version.ref = "managed-kotlin2" }
+kotlin2-reflect = { module = "org.jetbrains.kotlin:kotlin-reflect", version.ref = "managed-kotlin2" }
+kotlin2-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "managed-kotlin2" }
+kotlin2-stdlib-jdk8 = { module = "org.jetbrains.kotlin:kotlin-stdlib-jdk8", version.ref = "managed-kotlin2" }
+kotlin2-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "managed-kotlin2" }
+
+ksp2-api = { module = "com.google.devtools.ksp:symbol-processing-api", version.ref = "managed-ksp2" }
+ksp2 = { module = "com.google.devtools.ksp:symbol-processing", version.ref = "managed-ksp2" }
+
 [plugins]
 managed-kotlin-allopen = { id = "org.jetbrains.kotlin.plugin.allopen", version.ref = "managed-kotlin" }
 managed-kotlin-noarg = { id = "org.jetbrains.kotlin.plugin.noarg", version.ref = "managed-kotlin" }
@@ -330,5 +332,5 @@ managed-kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "managed-k
 managed-kotlin-kapt = { id = "org.jetbrains.kotlin.kapt", version.ref = "managed-kotlin" }
 managed-ksp = { id = "com.google.devtools.ksp", version.ref = "managed-ksp" }
 
-managed-kotlin2-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "managed-kotlin2" }
-managed-ksp2 = { id = "com.google.devtools.ksp", version.ref = "managed-ksp2" }
+kotlin2-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "managed-kotlin2" }
+ksp2 = { id = "com.google.devtools.ksp", version.ref = "managed-ksp2" }

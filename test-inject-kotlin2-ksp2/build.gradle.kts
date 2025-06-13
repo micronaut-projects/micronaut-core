@@ -1,7 +1,7 @@
 plugins {
     id("io.micronaut.build.internal.convention-test-library")
-    alias(libs.plugins.managed.kotlin2.jvm)
-    alias(libs.plugins.managed.ksp2)
+    alias(libs.plugins.kotlin2.jvm)
+    alias(libs.plugins.ksp2)
 }
 
 micronautBuild {
@@ -17,7 +17,7 @@ dependencies {
     // We use ASM API for some type conversions
     implementation(mnSourcegen.asm)
 
-    implementation(libs.managed.ksp2.api)
+    implementation(libs.ksp2.api)
 
     implementation(projects.micronautInjectKotlin) {
         exclude(group = "org.jetbrains.kotlin")
@@ -36,7 +36,7 @@ dependencies {
     testImplementation(projects.testInjectKotlin2Test)
     testImplementation(projects.micronautContext)
     testImplementation(projects.micronautJacksonDatabind)
-    testImplementation(libs.managed.kotlin2.stdlib)
+    testImplementation(libs.kotlin2.stdlib)
     testImplementation(projects.micronautHttpClient)
     testImplementation(libs.managed.jackson.annotations)
     testImplementation(libs.managed.reactor)

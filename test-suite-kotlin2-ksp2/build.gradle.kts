@@ -1,7 +1,7 @@
 plugins {
     id("io.micronaut.build.internal.convention-test-library")
-    alias(libs.plugins.managed.kotlin2.jvm)
-    alias(libs.plugins.managed.ksp2)
+    alias(libs.plugins.kotlin2.jvm)
+    alias(libs.plugins.ksp2)
 }
 
 micronautBuild {
@@ -13,8 +13,8 @@ micronautBuild {
 }
 
 dependencies {
-    api(libs.managed.kotlin2.stdlib)
-    api(libs.managed.kotlin2.reflect)
+    api(libs.kotlin2.stdlib)
+    api(libs.kotlin2.reflect)
     api(libs.managed.kotlinx.coroutines.core)
     api(libs.managed.kotlinx.coroutines.jdk8)
     api(libs.managed.kotlinx.coroutines.rx2)
@@ -23,7 +23,7 @@ dependencies {
     api(projects.micronautRuntime)
 
     testImplementation(projects.micronautContext)
-    testImplementation(libs.managed.kotlin2.test)
+    testImplementation(libs.kotlin2.test)
     testImplementation(libs.managed.kotlinx.coroutines.core)
     testImplementation(libs.managed.kotlinx.coroutines.rx2)
     testImplementation(libs.managed.kotlinx.coroutines.slf4j)
