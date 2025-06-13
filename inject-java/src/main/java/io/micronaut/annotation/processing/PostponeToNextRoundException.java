@@ -15,6 +15,12 @@
  */
 package io.micronaut.annotation.processing;
 
+import io.micronaut.annotation.processing.visitor.AbstractJavaElement;
+import io.micronaut.annotation.processing.visitor.JavaNativeElement;
+import io.micronaut.core.annotation.Nullable;
+
+import javax.lang.model.element.Element;
+
 /**
  * Exception to indicate postponing processing to next round.
  */
@@ -34,6 +40,24 @@ public final class PostponeToNextRoundException extends RuntimeException {
 
     public Object getErrorElement() {
         return errorElement;
+    }
+
+    public @Nullable Element getNativeErrorElement() {
+        return resolvedFailedElement(errorElement);
+    }
+
+    public static Element resolvedFailedElement(Object errorElement) {
+        Element failedElement;
+        if (errorElement instanceof Element el) {
+            failedElement = el;
+        } else if (errorElement instanceof JavaNativeElement jne) {
+            failedElement = jne.element();
+        } else if (errorElement instanceof AbstractJavaElement aje) {
+            failedElement = aje.getNativeType().element();
+        } else {
+            failedElement = null;
+        }
+        return failedElement;
     }
 
     public String getPath() {

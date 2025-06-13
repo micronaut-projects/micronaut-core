@@ -105,11 +105,11 @@ public class MixinVisitorProcessor extends AbstractInjectAnnotationProcessor {
                     }
                     error(originatingElement.element(), e.getMessage());
                 } catch (PostponeToNextRoundException e) {
-                    postponedTypes.put(mixin.getCanonicalName(), e.getErrorElement());
+                    postponedTypes.put(mixin.getCanonicalName(), e.getNativeErrorElement());
                 } catch (ElementPostponedToNextRoundException e) {
                     Object nativeType = e.getOriginatingElement().getNativeType();
-                    if (nativeType instanceof JavaNativeElement jne) {
-                        Element element = jne.element();
+                    Element element = PostponeToNextRoundException.resolvedFailedElement(nativeType);
+                    if (element != null) {
                         postponedTypes.put(mixin.getCanonicalName(), element);
                     } else {
                         // should never happen.

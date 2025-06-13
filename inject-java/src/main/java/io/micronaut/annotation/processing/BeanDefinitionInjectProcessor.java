@@ -15,7 +15,6 @@
  */
 package io.micronaut.annotation.processing;
 
-import io.micronaut.annotation.processing.visitor.AbstractJavaElement;
 import io.micronaut.annotation.processing.visitor.JavaClassElement;
 import io.micronaut.annotation.processing.visitor.JavaNativeElement;
 import io.micronaut.context.annotation.ClassImport;
@@ -42,7 +41,6 @@ import io.micronaut.inject.writer.BeanDefinitionWriter;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedOptions;
-import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.Name;
@@ -194,9 +192,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         final TypeElement typeElement = elementUtils.getTypeElement(className);
                         PostponeToNextRoundException nextRoundException = postponed.get(className);
                         if (nextRoundException != null) {
-                            Object errorElement = nextRoundException.getErrorElement();
-                            if (errorElement instanceof Element element) {
-                                AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata cachedAnnotationMetadata = javaVisitorContext.getAnnotationMetadataBuilder().lookupOrBuildForType(element);
+                            Element errorElement = nextRoundException.getNativeErrorElement();
+                            if (errorElement != null) {
+                                AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata cachedAnnotationMetadata = javaVisitorContext.getAnnotationMetadataBuilder().lookupOrBuildForType(errorElement);
                                 if (!cachedAnnotationMetadata.wasCleared()) {
                                     AbstractAnnotationMetadataBuilder.clearMutated(errorElement);
                                 }
@@ -230,7 +228,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 }
                             }
                         } catch (ProcessingException ex) {
-                            error(((JavaNativeElement) ex.getOriginatingElement()).element(), ex.getMessage());
+                            JavaNativeElement javaNativeElement = (JavaNativeElement) ex.getOriginatingElement();
+                            error(javaNativeElement != null ? javaNativeElement.element() : null, ex.getMessage());
                         } catch (PostponeToNextRoundException e) {
                             processed.remove(className);
                             postponed.put(className, e);
@@ -247,8 +246,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         if (processingOver) {
             for (Map.Entry<String, PostponeToNextRoundException> e : postponed.entrySet()) {
                 String className = e.getKey();
-                Object errorElement = e.getValue().getErrorElement();
-                Element failedElement = resolvedFailedElement(errorElement);
+                Element failedElement = e.getValue().getNativeErrorElement();
                 javaVisitorContext.warn("Bean definition generation [" + className + "] skipped from processing because of prior error: [" + e.getValue().getPath() + "]." +
                     " This error is normally due to missing classes on the classpath. Verify the compilation classpath is correct to resolve the problem.", failedElement);
             }
@@ -280,20 +278,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         }
 
         return false;
-    }
-
-    private static Element resolvedFailedElement(Object errorElement) {
-        Element failedElement;
-        if (errorElement instanceof Element el) {
-            failedElement = el;
-        } else if (errorElement instanceof JavaNativeElement jne) {
-            failedElement = jne.element();
-        } else if (errorElement instanceof AbstractJavaElement aje) {
-            failedElement = aje.getNativeType().element();
-        } else {
-            failedElement = null;
-        }
-        return failedElement;
     }
 
     /**

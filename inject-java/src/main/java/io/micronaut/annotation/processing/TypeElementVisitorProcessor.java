@@ -291,9 +291,10 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                             }
                             error(originatingElement.element(), e.getMessage());
                         } catch (PostponeToNextRoundException e) {
-                            postponeElement(javaClassElement, e.getErrorElement(), e);
+                            postponeElement(javaClassElement, e.getNativeErrorElement(), e);
                         } catch (ElementPostponedToNextRoundException e) {
-                            postponeElement(javaClassElement, e.getOriginatingElement(), e);
+                            Element element = PostponeToNextRoundException.resolvedFailedElement(e.getOriginatingElement());
+                            postponeElement(javaClassElement, element, e);
                         }
                     }
                 }
@@ -330,23 +331,12 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         return false;
     }
 
-    private <T extends Throwable> void postponeElement(JavaClassElement javaClassElement, Object originalElement, T e) throws T {
-        Element postponedElement;
-        if (originalElement instanceof Element element) {
-            postponedElement = element;
-        } else if (originalElement instanceof io.micronaut.inject.ast.Element element) {
-            Object nativeType = element.getNativeType();
-            if (nativeType instanceof JavaNativeElement jne) {
-                postponedElement = jne.element();
-            } else {
-                // should never happen.
-                throw e;
-            }
-        } else {
+    private <T extends Throwable> void postponeElement(JavaClassElement javaClassElement, Element originalElement, T e) throws T {
+        if (originalElement == null) {
             // should never happen.
             throw e;
         }
-        postponedTypes.put(javaClassElement.getCanonicalName(), postponedElement);
+        postponedTypes.put(javaClassElement.getCanonicalName(), originalElement);
     }
 
     private void visitClass(LoadedVisitor visitor, JavaClassElement classElement) {
