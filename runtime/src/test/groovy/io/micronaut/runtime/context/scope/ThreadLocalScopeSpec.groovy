@@ -174,7 +174,7 @@ class ThreadLocalBean {
         when:
         ctx.close()
         then:
-        listener.numCleaned == 2
+        synchronized (listener) { listener.numCleaned == 2 }
     }
 
     void "cleaned up on thread termination"() {
@@ -198,7 +198,7 @@ class ThreadLocalBean {
         then:
         new PollingConditions().eventually {
             triggerGc()
-            listener.numCleaned == 2
+            synchronized (listener) { listener.numCleaned == 2 }
         }
 
         cleanup:
@@ -350,7 +350,9 @@ class LifecycleBean implements LifeCycle<LifecycleBean> {
 
     @Override
     LifecycleBean stop() {
-        cleanupListener.numCleaned++
+        synchronized (cleanupListener) {
+            cleanupListener.numCleaned++
+        }
         return this
     }
 }
