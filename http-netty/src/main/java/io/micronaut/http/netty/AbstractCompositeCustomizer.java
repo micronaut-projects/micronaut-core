@@ -63,7 +63,7 @@ public abstract class AbstractCompositeCustomizer<C, R> {
         assert members instanceof CopyOnWriteArrayList : "only allow adding to root customizer";
         // do the insertion in one operation, so that concurrent readers don't see an inconsistent
         // (unsorted) state
-        int insertionIndex = Collections.binarySearch(members, customizer, OrderUtil.COMPARATOR);
+        int insertionIndex = Collections.binarySearch(members, customizer, OrderUtil.COMPARATOR_ZERO);
         if (insertionIndex < 0) {
             insertionIndex = ~insertionIndex;
         }

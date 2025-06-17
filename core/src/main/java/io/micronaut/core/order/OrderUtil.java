@@ -36,10 +36,30 @@ import java.util.stream.Stream;
 public class OrderUtil {
 
     /**
-     * Provide a comparator for collections.
+     * Orders objects using {@link #getOrder(Object)}, i.e. objects that don't implement
+     * {@link Ordered} and which are not {@link AnnotationMetadata} will be placed
+     * non-deterministically in the final position.
+     *
+     * <p>
+     * You probably want to use {@link #COMPARATOR_ZERO} instead, as with this comparator
+     * no object can sort itself to the back of the collection.
      */
     // Keep as an anonymous class to avoid lambda overhead during the startup
     public static final Comparator<Object> COMPARATOR = new Comparator<Object>() {
+        @Override
+        public int compare(Object o1, Object o2) {
+            int order1 = getOrder(o1);
+            int order2 = getOrder(o2);
+            return Integer.compare(order1, order2);
+        }
+    };
+
+    /**
+     * Orders objects using {@link #getOrderWithDefaultPrecedence(Object, int)} using zero as the
+     * default precedence.
+     */
+    // Keep as an anonymous class to avoid lambda overhead during the startup
+    public static final Comparator<Object> COMPARATOR_ZERO = new Comparator<Object>() {
         @Override
         public int compare(Object o1, Object o2) {
             int order1 = getOrder(o1);
@@ -66,11 +86,25 @@ public class OrderUtil {
 
     /**
      * Provide a comparator, in reversed order, for collections.
+     *
+     * <p>
+     * You probably want to use {@link #REVERSE_COMPARATOR_ZERO} instead, as with this
+     * comparator no object can sort itself to the front of the collection.
      */
     public static final Comparator<Object> REVERSE_COMPARATOR = Collections.reverseOrder(COMPARATOR);
 
     /**
-     * Sort the given list.
+     * Provide a comparator, in reversed order, for collections.
+     */
+    public static final Comparator<Object> REVERSE_COMPARATOR_ZERO = Collections.reverseOrder(COMPARATOR_ZERO);
+
+    /**
+     * Sort the given list using {@link #COMPARATOR}.
+     *
+     * <p>
+     * You should probably not use this method. Prefer calling
+     * {@code list.sort(OrderUtil.COMPARATOR_ZERO)} instead, which offers more intuitive behavior
+     * for beans that don't expose an ordering.
      *
      * @param list The list to sort
      */
@@ -80,6 +114,11 @@ public class OrderUtil {
 
     /**
      * Sort the given list.
+     *
+     * <p>
+     * You should probably not use this method. Prefer calling
+     * {@code stream.sorted(OrderUtil.COMPARATOR_ZERO)} instead, which offers more intuitive behavior
+     * for beans that don't expose an ordering.
      *
      * @param list The list to sort
      * @param <T>  The stream generic type
@@ -140,6 +179,11 @@ public class OrderUtil {
     /**
      * Sort the given list.
      *
+     * <p>
+     * You should probably not use this method. Prefer calling
+     * {@code list.sort(OrderUtil.REVERSE_COMPARATOR_ZERO)} instead, which offers more intuitive
+     * behavior for beans that don't expose an ordering.
+     *
      * @param list The list to sort
      */
     public static void reverseSort(List<?> list) {
@@ -158,6 +202,11 @@ public class OrderUtil {
     /**
      * Sort the given array.
      *
+     * <p>
+     * You should probably not use this method. Prefer calling
+     * {@code Arrays.sort(objects, OrderUtil.COMPARATOR_ZERO)} instead, which offers more intuitive
+     * behavior for beans that don't expose an ordering.
+     *
      * @param objects The array to sort
      */
     public static void sort(Ordered... objects) {
@@ -167,6 +216,11 @@ public class OrderUtil {
     /**
      * Sort the given array.
      *
+     * <p>
+     * You should probably not use this method. Prefer calling
+     * {@code Arrays.sort(objects, OrderUtil.COMPARATOR_ZERO)} instead, which offers more intuitive
+     * behavior for beans that don't expose an ordering.
+     *
      * @param objects The array to sort
      */
     public static void sort(Object[] objects) {
@@ -174,18 +228,40 @@ public class OrderUtil {
     }
 
     /**
-     * Get the order for the given object.
+     * Get the order for the given bean instance or {@link AnnotationMetadata} object.
+     *
+     * <p>
+     * You should probably not use this method. Prefer calling
+     * {@link #getOrderWithDefaultPrecedence(Object, int)} with 0 instead, which offers more
+     * intuitive behavior for beans that don't expose an ordering.
      *
      * @param o The object
-     * @return {@link Ordered#getOrder} when object is instance of Ordered otherwise {@link Ordered#LOWEST_PRECEDENCE}
+     * @return {@link Ordered#getOrder} when object is instance of Ordered, or the order
+     * of the {@link AnnotationMetadata}, or {@link Ordered#LOWEST_PRECEDENCE} if the
+     * parameter is neither of those.
      */
     public static int getOrder(Object o) {
+        return getOrderWithDefaultPrecedence(o, Ordered.LOWEST_PRECEDENCE);
+    }
+
+    /**
+     * Get the order for the given bean instance if it implements {@link Ordered}, or for the
+     * given {@link AnnotationMetadata} object.
+     *
+     * @param o The object
+     * @param defaultPrecedence What to return if the object is neither an ordered bean nor an
+     *                          annotation metadata object.
+     * @return {@link Ordered#getOrder} when object is instance of Ordered, or the order
+     * of the {@link AnnotationMetadata}, or {@code defaultPrecedence} if the parameter is
+     * neither of those.
+     */
+    public static int getOrderWithDefaultPrecedence(Object o, int defaultPrecedence) {
         if (o instanceof Ordered ordered) {
             return ordered.getOrder();
         } else if (o instanceof AnnotationMetadata metadata) {
             return getOrder(metadata);
         }
-        return Ordered.LOWEST_PRECEDENCE;
+        return defaultPrecedence;
     }
 
     /**
@@ -206,7 +282,7 @@ public class OrderUtil {
     /**
      * Get the order for the given annotation metadata.
      * @param annotationMetadata The metadata
-     * @return The order
+     * @return The order or zero if there is no {@link Order} annotation.
      * @since 3.0.0
      */
     public static int getOrder(@NonNull AnnotationMetadata annotationMetadata) {

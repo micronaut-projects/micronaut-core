@@ -214,7 +214,7 @@ public final class ApplicationEventPublisherFactory<T>
 
             private final Supplier<ApplicationEventListener[]> lazyListeners = SupplierUtil.memoized(() -> beanContext.getBeansOfType(ApplicationEventListener.class, Qualifiers.byTypeArguments(eventType.getType()))
                 .stream()
-                .sorted(OrderUtil.COMPARATOR)
+                .sorted(OrderUtil.COMPARATOR_ZERO)
                 .toArray(ApplicationEventListener[]::new));
 
             @Override

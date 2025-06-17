@@ -799,7 +799,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
                 filterEntries.add(filterRoute);
             }
         }
-        filterEntries.sort(OrderUtil.COMPARATOR);
+        filterEntries.sort(OrderUtil.COMPARATOR_ZERO);
         return Collections.unmodifiableList(filterEntries);
     }
 
@@ -829,7 +829,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             }
             httpFilters.add(entry.getFilter());
         }
-        httpFilters.sort(OrderUtil.COMPARATOR);
+        httpFilters.sort(OrderUtil.COMPARATOR_ZERO);
         return Collections.unmodifiableList(httpFilters);
     }
 

@@ -364,7 +364,7 @@ public interface JsonMapper {
                     return Stream.empty();
                 }
             })
-            .sorted(OrderUtil.COMPARATOR)
+            .sorted(OrderUtil.COMPARATOR_ZERO)
             .flatMap(jsonMapperSupplier -> {
                 try {
                     return Stream.of(jsonMapperSupplier.get());

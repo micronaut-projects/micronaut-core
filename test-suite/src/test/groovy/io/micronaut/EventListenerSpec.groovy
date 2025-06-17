@@ -47,11 +47,11 @@ class EventListenerSpec extends Specification {
         TestAllEventsListener t = embeddedServer.getApplicationContext().getBean(TestAllEventsListener)
         def serverStartupListeners = embeddedServer.getApplicationContext().getBeansOfType(ApplicationEventListener.class, Qualifiers.byTypeArguments(ServerStartupEvent))
                     .stream()
-                    .sorted(OrderUtil.COMPARATOR)
+                    .sorted(OrderUtil.COMPARATOR_ZERO)
                     .toArray(ApplicationEventListener[]::new)
         def serverShutdownListeners = embeddedServer.getApplicationContext().getBeansOfType(ApplicationEventListener.class, Qualifiers.byTypeArguments(ServerShutdownEvent))
                     .stream()
-                    .sorted(OrderUtil.COMPARATOR)
+                    .sorted(OrderUtil.COMPARATOR_ZERO)
                     .toArray(ApplicationEventListener[]::new)
         then:
         serverStartupListeners.last().getClass().name.contains "NettyServiceDiscovery"

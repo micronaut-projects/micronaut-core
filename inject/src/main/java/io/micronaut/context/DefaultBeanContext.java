@@ -15,16 +15,7 @@
  */
 package io.micronaut.context;
 
-import io.micronaut.context.annotation.ConfigurationReader;
-import io.micronaut.context.annotation.Context;
-import io.micronaut.context.annotation.DefaultImplementation;
-import io.micronaut.context.annotation.Executable;
-import io.micronaut.context.annotation.Infrastructure;
-import io.micronaut.context.annotation.Parallel;
-import io.micronaut.context.annotation.Primary;
-import io.micronaut.context.annotation.Prototype;
-import io.micronaut.context.annotation.Replaces;
-import io.micronaut.context.annotation.Secondary;
+import io.micronaut.context.annotation.*;
 import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.context.condition.Failure;
 import io.micronaut.context.env.CachedEnvironment;
@@ -77,6 +68,7 @@ import io.micronaut.core.naming.NameResolver;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.order.OrderUtil;
+import io.micronaut.core.order.Ordered;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
@@ -1263,27 +1255,33 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
         }
     }
 
-    @NonNull
+    @SuppressWarnings("unchecked") @NonNull
     private <T> T triggerPreDestroyListeners(@NonNull BeanDefinition<T> beanDefinition, @NonNull T bean) {
         if (beanPreDestroyEventListeners == null) {
             beanPreDestroyEventListeners = loadBeanEventListeners(BeanPreDestroyEventListener.class);
         }
         if (!beanPreDestroyEventListeners.isEmpty()) {
+            BeanPreDestroyEvent<T> event = new BeanPreDestroyEvent<>(this, beanDefinition, bean);
             Class<T> beanType = getBeanType(beanDefinition);
+            List<ListenersSupplier.ListenerAndOrder<BeanPreDestroyEventListener>> listeners = new ArrayList<>();
             for (Map.Entry<Class<?>, ListenersSupplier<BeanPreDestroyEventListener>> entry : beanPreDestroyEventListeners) {
                 if (entry.getKey().isAssignableFrom(beanType)) {
-                    final BeanPreDestroyEvent<T> event = new BeanPreDestroyEvent<>(this, beanDefinition, bean);
-                    for (BeanPreDestroyEventListener<T> listener : entry.getValue().get(null)) {
-                        try {
-                            bean = Objects.requireNonNull(
-                                    listener.onPreDestroy(event),
-                                    "PreDestroy event listener illegally returned null: " + listener.getClass()
-                            );
-                        } catch (Exception e) {
-                            throw new BeanDestructionException(beanDefinition, e);
-                        }
+                    for (ListenersSupplier.ListenerAndOrder<BeanPreDestroyEventListener> listener : entry.getValue().get(null)) {
+                        listeners.add(listener);
                     }
-
+                }
+            }
+            if (listeners.size() > 1) {
+                listeners.sort(OrderUtil.COMPARATOR_ZERO);
+            }
+            for (ListenersSupplier.ListenerAndOrder<BeanPreDestroyEventListener> listener : listeners) {
+                try {
+                    bean = (T) Objects.requireNonNull(
+                        listener.bean.onPreDestroy(event),
+                        "PreDestroy event listener illegally returned null: " + listener.getClass()
+                    );
+                } catch (Exception e) {
+                    throw new BeanDestructionException(beanDefinition, e);
                 }
             }
         }
@@ -1343,17 +1341,24 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
             beanDestroyedEventListeners = loadBeanEventListeners(BeanDestroyedEventListener.class);
         }
         if (!beanDestroyedEventListeners.isEmpty()) {
+            BeanDestroyedEvent<T> event = new BeanDestroyedEvent<>(this, beanDefinition, bean);
             Class<T> beanType = getBeanType(beanDefinition);
+            List<ListenersSupplier.ListenerAndOrder<BeanDestroyedEventListener>> listeners = new ArrayList<>();
             for (Map.Entry<Class<?>, ListenersSupplier<BeanDestroyedEventListener>> entry : beanDestroyedEventListeners) {
                 if (entry.getKey().isAssignableFrom(beanType)) {
-                    final BeanDestroyedEvent<T> event = new BeanDestroyedEvent<>(this, beanDefinition, bean);
-                    for (BeanDestroyedEventListener<T> listener : entry.getValue().get(null)) {
-                        try {
-                            listener.onDestroyed(event);
-                        } catch (Exception e) {
-                            throw new BeanDestructionException(beanDefinition, e);
-                        }
+                    for (ListenersSupplier.ListenerAndOrder<BeanDestroyedEventListener> listener : entry.getValue().get(null)) {
+                        listeners.add(listener);
                     }
+                }
+            }
+            if (listeners.size() > 1) {
+                listeners.sort(OrderUtil.COMPARATOR_ZERO);
+            }
+            for (ListenersSupplier.ListenerAndOrder<BeanDestroyedEventListener> listener : listeners) {
+                try {
+                    listener.bean.onDestroyed(event);
+                } catch (Exception e) {
+                    throw new BeanDestructionException(beanDefinition, e);
                 }
             }
         }
@@ -2385,15 +2390,22 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
         if (!(beanDefinition instanceof AbstractProviderDefinition<?>)) {
             if (!(bean instanceof BeanCreatedEventListener) && CollectionUtils.isNotEmpty(beanCreationEventListeners)) {
                 Class<T> beanClass = beanDefinition.getBeanType();
+                List<ListenersSupplier.ListenerAndOrder<BeanCreatedEventListener>> listeners = new ArrayList<>();
                 for (Map.Entry<Class<?>, ListenersSupplier<BeanCreatedEventListener>> entry : beanCreationEventListeners) {
                     if (entry.getKey().isAssignableFrom(beanClass)) {
-                        BeanKey<T> beanKey = new BeanKey<>(beanDefinition, finalQualifier);
-                        for (BeanCreatedEventListener<?> listener : entry.getValue().get(resolutionContext)) {
-                            bean = (T) listener.onCreated(new BeanCreatedEvent(this, beanDefinition, beanKey, beanType, bean));
-                            if (bean == null) {
-                                throw new BeanInstantiationException(resolutionContext, "Listener [" + listener + "] returned null from onCreated event");
-                            }
+                        for (ListenersSupplier.ListenerAndOrder<BeanCreatedEventListener> listener : entry.getValue().get(resolutionContext)) {
+                            listeners.add(listener);
                         }
+                    }
+                }
+                if (listeners.size() > 1) {
+                    listeners.sort(OrderUtil.COMPARATOR_ZERO);
+                }
+                BeanKey<T> beanKey = new BeanKey<>(beanDefinition, finalQualifier);
+                for (ListenersSupplier.ListenerAndOrder<BeanCreatedEventListener> listener : listeners) {
+                    bean = (T) listener.bean.onCreated(new BeanCreatedEvent(this, beanDefinition, beanKey, beanType, bean));
+                    if (bean == null) {
+                        throw new BeanInstantiationException(resolutionContext, "Listener [" + listener + "] returned null from onCreated event");
                     }
                 }
             }
@@ -4006,11 +4018,16 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
          * Retrieved the listeners lazily.
          *
          * @param beanResolutionContext The bean resolution context
-         * @return the collection of listeners
+         * @return the collection of listeners along with their order value for later sorting.
          */
         @NonNull
-        Iterable<T> get(@Nullable BeanResolutionContext beanResolutionContext);
+        Iterable<ListenerAndOrder<T>> get(@Nullable BeanResolutionContext beanResolutionContext);
 
+        record ListenerAndOrder<T>(T bean, int order) implements Ordered {
+            @Override public int getOrder() {
+                return order;
+            }
+        }
     }
 
     /**
@@ -4154,7 +4171,7 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
         // The supplier can be triggered concurrently.
         // We allow for the listeners collection to be initialized multiple times.
         @SuppressWarnings("java:S3077")
-        private volatile List<T> listeners;
+        private volatile List<ListenerAndOrder<T>> listeners;
 
         EventListenerListenersSupplier(Argument<?> eventType, List<BeanDefinition<T>> listenersDefinitions) {
             this.eventType = eventType;
@@ -4162,9 +4179,9 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
         }
 
         @Override
-        public Iterable<T> get(BeanResolutionContext beanResolutionContext) {
+        public Iterable<ListenerAndOrder<T>> get(BeanResolutionContext beanResolutionContext) {
             if (listeners == null) {
-                List<T> listeners = new ArrayList<>(listenersDefinitions.size());
+                List<ListenerAndOrder<T>> listeners = new ArrayList<>(listenersDefinitions.size());
                 List<BeanRegistration<T>> registrations = new ArrayList<>(listenersDefinitions.size());
                 for (BeanDefinition<T> listenersDefinition : listenersDefinitions) {
                     BeanRegistration<T> registration;
@@ -4187,9 +4204,8 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
                     }
                     registrations.add(registration);
                 }
-                OrderUtil.sort(registrations);
                 for (BeanRegistration<T> registration : registrations) {
-                    listeners.add(registration.getBean());
+                    listeners.add(new ListenerAndOrder<>(registration.getBean(), registration.getOrder()));
                 }
                 this.listeners = listeners;
             }
@@ -4200,8 +4216,8 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
     private static final class AnnotationProcessorListenersSupplier implements ListenersSupplier<BeanCreatedEventListener> {
 
         @Override
-        public Iterable<BeanCreatedEventListener> get(BeanResolutionContext beanResolutionContext) {
-            return Collections.singletonList(new AnnotationProcessorListener());
+        public Iterable<ListenerAndOrder<BeanCreatedEventListener>> get(BeanResolutionContext beanResolutionContext) {
+            return Collections.singletonList(new ListenerAndOrder<>(new AnnotationProcessorListener(), 0));
         }
 
     }
@@ -4517,5 +4533,4 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
             return method.toString();
         }
     }
-
 }

@@ -41,6 +41,7 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.Named;
+import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
@@ -808,14 +809,20 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         final List<Map.Entry<Class<?>, ListenersSupplier<BeanInitializedEventListener>>> beanInitializedEventListeners
                 = ((DefaultBeanContext) context).beanInitializedEventListeners;
         if (CollectionUtils.isNotEmpty(beanInitializedEventListeners)) {
+            BeanInitializingEvent event = new BeanInitializingEvent(context, this, bean);
+            List<ListenersSupplier.ListenerAndOrder<BeanInitializedEventListener>> listeners = new ArrayList<>();
             for (Map.Entry<Class<?>, ListenersSupplier<BeanInitializedEventListener>> entry : beanInitializedEventListeners) {
                 if (entry.getKey().isAssignableFrom(getBeanType())) {
-                    for (BeanInitializedEventListener listener : entry.getValue().get(resolutionContext)) {
-                        bean = listener.onInitialized(new BeanInitializingEvent(context, this, bean));
-                        if (bean == null) {
-                            throw new BeanInstantiationException(resolutionContext, "Listener [" + listener + "] returned null from onInitialized event");
-                        }
+                    for (ListenersSupplier.ListenerAndOrder<BeanInitializedEventListener> listener : entry.getValue().get(resolutionContext)) {
+                        listeners.add(listener);
                     }
+                }
+            }
+            OrderUtil.sort(listeners);
+            for (ListenersSupplier.ListenerAndOrder<BeanInitializedEventListener> listener : listeners) {
+                bean = listener.bean().onInitialized(event);
+                if (bean == null) {
+                    throw new BeanInstantiationException(resolutionContext, "Listener [" + listener + "] returned null from onInitialized event");
                 }
             }
         }
