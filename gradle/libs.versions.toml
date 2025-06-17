@@ -63,7 +63,7 @@ tomlj="1.1.1"
 vertx = "4.5.14"
 wiremock = "2.33.2"
 mimepull = "1.10.0"
-micronaut-sourcegen = "1.8.1"
+micronaut-sourcegen = "1.8.2"
 icu4j = "76.1"
 jfrunit = "1.0.0.Alpha2"
 
