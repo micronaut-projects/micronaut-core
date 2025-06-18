@@ -247,11 +247,14 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             ).filter(notGroovyObject).forEach(elements::add);
 
             for (Object nativeType : postponedTypes.values()) {
-                AbstractAnnotationMetadataBuilder.clearMutated(nativeType);
-                javaVisitorContext.getNativeElementsHelper().cleanupForClass(nativeType);
                 if (nativeType instanceof Element element) {
                     AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata cachedAnnotationMetadata = javaVisitorContext.getAnnotationMetadataBuilder().lookupOrBuildForType(element);
-                    cachedAnnotationMetadata.markCleared();
+                    if (!cachedAnnotationMetadata.wasCleared()) {
+                        AbstractAnnotationMetadataBuilder.clearMutated(nativeType);
+                        cachedAnnotationMetadata = javaVisitorContext.getAnnotationMetadataBuilder().lookupOrBuildForType(element);
+                        javaVisitorContext.getNativeElementsHelper().cleanupForClass(nativeType);
+                        cachedAnnotationMetadata.markCleared();
+                    }
                 }
             }
             postponedTypes.keySet().stream().map(elementUtils::getTypeElement).filter(Objects::nonNull).forEach(elements::add);
