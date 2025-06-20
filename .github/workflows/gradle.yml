@@ -54,7 +54,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: "🔧 Setup Gradle"
-        uses: gradle/gradle-build-action@v3.5.0
+        uses: gradle/actions/setup-gradle@v4
 
       - name: "❓ Optional setup step"
         run: |
@@ -71,7 +71,7 @@ jobs:
           ./gradlew check --no-daemon --continue
 
       - name: "🔎 Run static analysis"
-        if: env.SONAR_TOKEN != '' && matrix.java == '21' && github.event_name != 'push'
+        if: env.SONAR_TOKEN != '' && matrix.java == '17'
         run: |
           ./gradlew sonar
 
