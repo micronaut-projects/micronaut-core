@@ -33,4 +33,8 @@ dependencies {
     testImplementation(projects.micronautInjectGroovy)
     testImplementation("com.fasterxml.jackson.dataformat:jackson-dataformat-xml")
     testImplementation(libs.managed.snakeyaml)
+    testImplementation(libs.micronaut.test.junit5) {
+        exclude(group = "io.micronaut")
+    }
+    testImplementation(libs.junit.jupiter.api)
 }
