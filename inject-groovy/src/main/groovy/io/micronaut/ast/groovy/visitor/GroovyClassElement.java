@@ -135,6 +135,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     private final GroovyEnclosedElementsQuery groovySourceEnclosedElementsQuery = new GroovyEnclosedElementsQuery(true);
     @Nullable
     private AnnotationMetadata annotationMetadata;
+    private List<PropertyNode> propertyElements;
 
     /**
      * @param visitorContext The visitor context
@@ -252,6 +253,11 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     @Override
     public boolean isTypeVariable() {
         return isTypeVar;
+    }
+
+    @Override
+    public boolean isRecord() {
+        return classNode.isRecord();
     }
 
     @Override
@@ -390,7 +396,20 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
 
     @Override
     public @NonNull List<PropertyElement> getBeanProperties(@NonNull PropertyElementQuery propertyElementQuery) {
-        Set<String> nativeProps = getPropertyNodes().stream().map(PropertyNode::getName).collect(Collectors.toCollection(LinkedHashSet::new));
+        if (isRecord()) {
+            return AstBeanPropertiesUtils.resolveBeanProperties(propertyElementQuery,
+                this,
+                this::getRecordMethods,
+                this::getRecordFields,
+                true,
+                Collections.emptySet(),
+                methodElement -> Optional.empty(),
+                methodElement -> Optional.empty(),
+                this::mapToPropertyElement);
+        }
+        Set<String> nativeProps = getPropertyNodes().stream()
+            .map(PropertyNode::getName)
+            .collect(Collectors.toCollection(LinkedHashSet::new));
         return AstBeanPropertiesUtils.resolveBeanProperties(propertyElementQuery,
             this,
             () -> getEnclosedElements(ElementQuery.ALL_METHODS.onlyInstance()),
@@ -408,6 +427,54 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
             properties = getBeanProperties(PropertyElementQuery.of(this));
         }
         return properties;
+    }
+
+    private GroovyPropertyElement mapToPropertyElement(AstBeanPropertiesUtils.BeanPropertyData value) {
+        return new GroovyPropertyElement(
+            visitorContext,
+            GroovyClassElement.this,
+            value.type,
+            value.readAccessKind == null ? null : value.getter,
+            value.writeAccessKind == null ? null : value.setter,
+            value.field,
+            elementAnnotationMetadataFactory,
+            value.propertyName,
+            value.readAccessKind == null ? PropertyElement.AccessKind.METHOD : PropertyElement.AccessKind.valueOf(value.readAccessKind.name()),
+            value.writeAccessKind == null ? PropertyElement.AccessKind.METHOD : PropertyElement.AccessKind.valueOf(value.writeAccessKind.name()),
+            value.isExcluded
+        );
+    }
+
+    private List<MethodElement> getRecordMethods() {
+        var methodElements = new ArrayList<MethodElement>();
+        for (var recordComponentNode : classNode.getRecordComponents()) {
+            var method = classNode.getMethods(recordComponentNode.getName()).get(0);
+            methodElements.add(
+                new GroovyMethodElement(
+                    GroovyClassElement.this,
+                    visitorContext,
+                    new GroovyNativeElement.Method(method),
+                    method,
+                    elementAnnotationMetadataFactory
+                )
+            );
+        }
+        return methodElements;
+    }
+
+    private List<FieldElement> getRecordFields() {
+        var fieldElements = new ArrayList<FieldElement>();
+        for (var recordComponentNode : classNode.getRecordComponents()) {
+            fieldElements.add(
+                new GroovyFieldElement(
+                    visitorContext,
+                    GroovyClassElement.this,
+                    classNode.getField(recordComponentNode.getName()),
+                    elementAnnotationMetadataFactory
+                )
+            );
+        }
+        return fieldElements;
     }
 
     @Nullable
@@ -487,7 +554,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         if (value.readAccessKind != BeanProperties.AccessKind.METHOD) {
             value.getter = null;
         }
-        GroovyPropertyElement propertyElement = new GroovyPropertyElement(
+        var propertyElement = new GroovyPropertyElement(
             visitorContext,
             this,
             value.type,
@@ -498,7 +565,8 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
             value.propertyName,
             value.readAccessKind == null ? PropertyElement.AccessKind.METHOD : PropertyElement.AccessKind.valueOf(value.readAccessKind.name()),
             value.writeAccessKind == null ? PropertyElement.AccessKind.METHOD : PropertyElement.AccessKind.valueOf(value.writeAccessKind.name()),
-            value.isExcluded);
+            value.isExcluded
+        );
         ref.set(propertyElement);
         return propertyElement;
     }
@@ -541,15 +609,14 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     @Override
     public PackageElement getPackage() {
         final PackageNode aPackage = classNode.getPackage();
-        if (aPackage != null) {
-            return new GroovyPackageElement(
-                visitorContext,
-                aPackage,
-                elementAnnotationMetadataFactory
-            );
-        } else {
+        if (aPackage == null) {
             return PackageElement.DEFAULT_PACKAGE;
         }
+        return new GroovyPackageElement(
+            visitorContext,
+            aPackage,
+            elementAnnotationMetadataFactory
+        );
     }
 
     @Override
@@ -632,6 +699,9 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     }
 
     private List<PropertyNode> getPropertyNodes() {
+        if (propertyElements != null) {
+            return propertyElements;
+        }
         var propertyNodes = new ArrayList<PropertyNode>();
         ClassNode classNode = this.classNode;
         while (classNode != null && !classNode.equals(ClassHelper.OBJECT_TYPE) && !classNode.equals(ClassHelper.Enum_Type)) {
@@ -644,6 +714,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                 propertyElements.add(propertyNode);
             }
         }
+        this.propertyElements = propertyElements;
         return propertyElements;
     }
 
@@ -708,7 +779,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         @Override
         protected Set<AnnotatedNode> getExcludedNativeElements(ElementQuery.Result<?> result) {
             if (result.isExcludePropertyElements()) {
-                Set<AnnotatedNode> excluded = new HashSet<>();
+                var excluded = new HashSet<AnnotatedNode>();
                 for (PropertyElement excludePropertyElement : getBeanProperties()) {
                     excludePropertyElement.getReadMethod()
                         .filter(m -> !m.isSynthetic())

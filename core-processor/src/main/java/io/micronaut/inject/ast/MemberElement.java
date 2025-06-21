@@ -113,6 +113,9 @@ public interface MemberElement extends Element {
         if (isPublic()) {
             return true;
         }
+        if (getOwningType().hasAnnotation(ImportedClass.class)) {
+            return allowReflection && hasAnnotation(ReflectiveAccess.class);
+        }
         boolean packagePrivate = isPackagePrivate();
         if (isProtected() || packagePrivate) {
             // the declaring type might be a super class in which

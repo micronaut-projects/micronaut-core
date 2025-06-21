@@ -193,7 +193,6 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
     private final Map<String, FieldDef> annotationIndexFields = new HashMap<>(2);
     private final ClassTypeDef beanType;
     private final ClassElement beanClassElement;
-    private boolean executed = false;
     private MethodElement constructor;
     private MethodElement defaultConstructor;
 
@@ -208,6 +207,8 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
 
     private CopyConstructorDispatchTarget copyConstructorDispatchTarget;
     private VisitorContext visitorContext;
+
+    private byte[] output;
 
     /**
      * Default constructor.
@@ -406,15 +407,23 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
         indexByAnnotations.computeIfAbsent(annotationName, (a) -> new LinkedHashSet<>()).add(property);
     }
 
+    /**
+     * Finish writing the introspection.
+     */
+    public void finish() {
+        // Generate the bytecode in the round it's being invoked
+        output = generateIntrospectionClass();
+        evaluatedExpressionProcessor.finish();
+    }
+
     @Override
     public void accept(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
-        if (!executed) {
-
-            // Run only once
-            executed = true;
-
-            // First write the introspection for the annotation metadata can be populated with defaults that reference will contain
-            writeIntrospectionClass(classWriterOutputVisitor);
+        if (output != null) {
+            classWriterOutputVisitor.visitServiceDescriptor(BeanIntrospectionReference.class, introspectionName, beanClassElement);
+            try (OutputStream outputStream = classWriterOutputVisitor.visitClass(introspectionName, getOriginatingElements())) {
+                outputStream.write(output);
+            }
+            output = null;
             this.evaluatedExpressionProcessor.writeEvaluatedExpressions(classWriterOutputVisitor);
         }
     }
@@ -538,7 +547,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
         return false;
     }
 
-    private void writeIntrospectionClass(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
+    private byte[] generateIntrospectionClass() {
         boolean isEnum = beanClassElement.isEnum();
 
         Map<String, MethodDef> loadTypeMethods = new LinkedHashMap<>();
@@ -549,8 +558,6 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
 
         ClassDef.ClassDefBuilder classDefBuilder = ClassDef.builder(introspectionName).synthetic().addModifiers(Modifier.FINAL, Modifier.PUBLIC);
         classDefBuilder.superclass(isEnum ? ClassTypeDef.of(AbstractEnumBeanIntrospectionAndReference.class) : ClassTypeDef.of(AbstractInitializableBeanIntrospectionAndReference.class));
-
-        classWriterOutputVisitor.visitServiceDescriptor(BeanIntrospectionReference.class, introspectionName, beanClassElement);
 
         classDefBuilder.addAnnotation(AnnotationDef.builder(Generated.class).addMember("service", introspectionName).build());
         // init expressions at build time
@@ -831,9 +838,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
 
         loadTypeMethods.values().forEach(classDefBuilder::addMethod);
 
-        try (OutputStream outputStream = classWriterOutputVisitor.visitClass(introspectionName, getOriginatingElements())) {
-            outputStream.write(ByteCodeWriterUtils.writeByteCode(classDefBuilder.build(), visitorContext));
-        }
+        return ByteCodeWriterUtils.writeByteCode(classDefBuilder.build(), visitorContext);
     }
 
     private MethodDef getBooleanMethod(Method method, boolean state) {

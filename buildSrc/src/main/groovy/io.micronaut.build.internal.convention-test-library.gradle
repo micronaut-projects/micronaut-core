@@ -1,3 +1,11 @@
 plugins {
     id "io.micronaut.build.internal.convention-base"
 }
+
+afterEvaluate {
+    tasks.withType(Test).configureEach {
+        jacoco {
+            enabled = false
+        }
+    }
+}

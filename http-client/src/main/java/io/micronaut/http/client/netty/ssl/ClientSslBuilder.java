@@ -19,8 +19,8 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.ssl.SslConfiguration;
+import io.netty.handler.codec.quic.QuicSslContext;
 import io.netty.handler.ssl.SslContext;
-import io.netty.incubator.codec.quic.QuicSslContext;
 
 /**
  * Interface used by the netty HTTP client to construct the SSL context.

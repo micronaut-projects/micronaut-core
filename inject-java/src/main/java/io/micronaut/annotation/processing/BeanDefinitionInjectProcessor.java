@@ -17,7 +17,9 @@ package io.micronaut.annotation.processing;
 
 import io.micronaut.annotation.processing.visitor.JavaClassElement;
 import io.micronaut.annotation.processing.visitor.JavaNativeElement;
+import io.micronaut.context.annotation.ClassImport;
 import io.micronaut.context.annotation.ConfigurationReader;
+import io.micronaut.context.visitor.VisitorUtils;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
@@ -52,6 +54,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static javax.lang.model.element.ElementKind.ENUM;
 
@@ -85,6 +88,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         "io.micronaut.context.annotation.Value",
         "io.micronaut.context.annotation.Property",
         "io.micronaut.context.annotation.Executable",
+        ClassImport.class.getName(),
         AnnotationUtil.ANN_AROUND,
         AnnotationUtil.ANN_INTERCEPTOR_BINDINGS,
         AnnotationUtil.ANN_INTERCEPTOR_BINDING,
@@ -134,6 +138,16 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 annotations.forEach(annotation -> modelUtils.resolveTypeElements(
                         roundEnv.getElementsAnnotatedWith(annotation)
                     )
+                    .flatMap(typeElement -> {
+                        if (annotation.getQualifiedName().toString().equals(ClassImport.class.getName())) {
+                            ElementAnnotationMetadataFactory annotationMetadataFactory = javaVisitorContext.getElementAnnotationMetadataFactory().readOnly();
+                            JavaClassElement classElement = javaVisitorContext.getElementFactory()
+                                .newClassElement(typeElement, annotationMetadataFactory);
+                            return VisitorUtils.collectImportedElements(classElement, javaVisitorContext)
+                                .stream().map(e -> ((JavaClassElement) e).getNativeType().element());
+                        }
+                        return Stream.of(typeElement);
+                    })
                     .forEach(typeElement -> {
                         if (typeElement.getKind() == ENUM) {
                             final AnnotationMetadata am = annotationMetadataBuilder.lookupOrBuildForType(typeElement);
@@ -178,9 +192,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         final TypeElement typeElement = elementUtils.getTypeElement(className);
                         PostponeToNextRoundException nextRoundException = postponed.get(className);
                         if (nextRoundException != null) {
-                            Object errorElement = nextRoundException.getErrorElement();
-                            if (errorElement instanceof Element element) {
-                                AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata cachedAnnotationMetadata = javaVisitorContext.getAnnotationMetadataBuilder().lookupOrBuildForType(element);
+                            Element errorElement = nextRoundException.getNativeErrorElement();
+                            if (errorElement != null) {
+                                AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata cachedAnnotationMetadata = javaVisitorContext.getAnnotationMetadataBuilder().lookupOrBuildForType(errorElement);
                                 if (!cachedAnnotationMetadata.wasCleared()) {
                                     AbstractAnnotationMetadataBuilder.clearMutated(errorElement);
                                 }
@@ -214,7 +228,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 }
                             }
                         } catch (ProcessingException ex) {
-                            error(((JavaNativeElement) ex.getOriginatingElement()).element(), ex.getMessage());
+                            JavaNativeElement javaNativeElement = (JavaNativeElement) ex.getOriginatingElement();
+                            error(javaNativeElement != null ? javaNativeElement.element() : null, ex.getMessage());
                         } catch (PostponeToNextRoundException e) {
                             processed.remove(className);
                             postponed.put(className, e);
@@ -230,8 +245,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         */
         if (processingOver) {
             for (Map.Entry<String, PostponeToNextRoundException> e : postponed.entrySet()) {
-                javaVisitorContext.warn("Bean definition generation [" + e.getKey() + "] skipped from processing because of prior error: [" + e.getValue().getPath() + "]." +
-                    " This error is normally due to missing classes on the classpath. Verify the compilation classpath is correct to resolve the problem.", (Element) e.getValue().getErrorElement());
+                String className = e.getKey();
+                Element failedElement = e.getValue().getNativeErrorElement();
+                javaVisitorContext.warn("Bean definition generation [" + className + "] skipped from processing because of prior error: [" + e.getValue().getPath() + "]." +
+                    " This error is normally due to missing classes on the classpath. Verify the compilation classpath is correct to resolve the problem.", failedElement);
             }
 
             try {

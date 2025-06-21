@@ -49,7 +49,7 @@ class BufferLeakDetection<T> extends ResourceLeakDetector<T> {
     }
 
     private static void leakCanary() {
-        ByteBuf resource = ByteBufAllocator.DEFAULT.directBuffer()
+        ByteBuf resource = ByteBufAllocator.DEFAULT.heapBuffer()
         resource.touch(canaryString)
     }
 
@@ -80,7 +80,7 @@ class BufferLeakDetection<T> extends ResourceLeakDetector<T> {
             }
 
             // Give the GC something to work on.
-            for (int i = 0; i < 1000; i++) {
+            for (int i = 0; i < 10000; i++) {
                 sink = System.identityHashCode(new byte[10000]);
             }
         } while (!canaryDetected && !Thread.interrupted());

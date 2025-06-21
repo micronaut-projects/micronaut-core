@@ -48,6 +48,7 @@ import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
+import io.micronaut.runtime.graceful.GracefulShutdownCapable;
 import io.micronaut.runtime.server.event.ServerShutdownEvent;
 import io.micronaut.runtime.server.event.ServerStartupEvent;
 import io.micronaut.scheduling.TaskExecutors;
@@ -58,21 +59,25 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelFactory;
 import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.ChannelPromise;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.IoEventLoopGroup;
 import io.netty.channel.ServerChannel;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.channel.group.ChannelGroup;
 import io.netty.channel.group.DefaultChannelGroup;
-import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.nio.NioIoHandler;
+import io.netty.channel.socket.DatagramChannel;
 import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.unix.DomainSocketAddress;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
 import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.GenericFutureListener;
 import io.netty.util.concurrent.GlobalEventExecutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -94,7 +99,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -103,6 +112,7 @@ import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Implements the bootstrap and configuration logic for the Netty implementation of {@link io.micronaut.runtime.server.EmbeddedServer}.
@@ -213,6 +223,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                     if (exposedPort == -1 || exposedPort == 0 || implicit.stream().noneMatch(cfg -> cfg.getPort() == exposedPort)) {
                         NettyHttpServerConfiguration.NettyListenerConfiguration mgmt = NettyHttpServerConfiguration.NettyListenerConfiguration.createTcp(configuredHost, exposedPort, false);
                         mgmt.setExposeDefaultRoutes(false);
+                        mgmt.setSupportGracefulShutdown(false);
                         implicit.add(mgmt);
                     }
                 }
@@ -599,7 +610,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                                 }
                             });
                             if (cfg.isBind()) {
-                                if (listenerBootstrap.config().group() instanceof NioEventLoopGroup) {
+                                if (((IoEventLoopGroup) listenerBootstrap.config().group()).isIoType(NioIoHandler.class)) {
                                     // jdk UnixDomainSocketAddress
                                     future = listenerBootstrap.bind(UnixDomainSocketAddress.of(cfg.getPath()));
                                 } else {
@@ -690,6 +701,18 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 }
             }
         };
+    }
+
+    public static <T> CompletionStage<T> toCompletionStage(Future<T> future) {
+        CompletableFuture<T> cf = new CompletableFuture<>();
+        future.addListener((GenericFutureListener<Future<T>>) f -> {
+            if (f.isSuccess()) {
+                cf.complete(f.getNow());
+            } else {
+                cf.completeExceptionally(f.cause());
+            }
+        });
+        return cf;
     }
 
     private void fireStartupEvents() {
@@ -831,6 +854,24 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     }
 
     @Override
+    public CompletionStage<?> shutdownGracefully() {
+        List<Listener> listeners = activeListeners;
+        if (listeners == null) {
+            return CompletableFuture.completedStage(null);
+        }
+        return GracefulShutdownCapable.shutdownAll(listeners.stream());
+    }
+
+    @Override
+    public OptionalLong reportActiveTasks() {
+        List<Listener> listeners = this.activeListeners;
+        if (listeners == null) {
+            return OptionalLong.empty();
+        }
+        return GracefulShutdownCapable.combineActiveTasks(listeners);
+    }
+
+    @Override
     public void onApplicationEvent(RefreshEvent event) {
         // if anything under HttpServerConfiguration.PREFIX changes re-build
         // the NettyHttpServerInitializer in the server bootstrap to apply changes
@@ -918,12 +959,14 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         }
     }
 
-    private class Listener extends ChannelInitializer<Channel> {
+    private class Listener extends ChannelInitializer<Channel> implements GracefulShutdownCapable {
         Channel serverChannel;
         NettyServerCustomizer listenerCustomizer;
         NettyHttpServerConfiguration.NettyListenerConfiguration config;
 
         volatile HttpPipelineBuilder httpPipelineBuilder;
+
+        final Set<HttpPipelineBuilder.ConnectionPipeline> activeConnections = ConcurrentHashMap.newKeySet();
 
         Listener(NettyHttpServerConfiguration.NettyListenerConfiguration config) {
             this.config = config;
@@ -948,7 +991,38 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
         @Override
         protected void initChannel(@NonNull Channel ch) throws Exception {
-            httpPipelineBuilder.new ConnectionPipeline(ch, config.isSsl()).initChannel();
+            HttpPipelineBuilder.ConnectionPipeline cp = httpPipelineBuilder.new ConnectionPipeline(ch, config.isSsl());
+            activeConnections.add(cp);
+            ch.closeFuture().addListener((ChannelFutureListener) future -> activeConnections.remove(cp));
+            cp.initChannel();
+        }
+
+        @Override
+        public CompletionStage<?> shutdownGracefully() {
+            if (!config.isSupportGracefulShutdown()) {
+                return CompletableFuture.completedFuture(null);
+            }
+
+            Stream<CompletionStage<?>> close;
+            if (serverChannel instanceof DatagramChannel) {
+                // HTTP/3 still needs the channel to send the goaway
+                close = Stream.empty();
+            } else {
+                close = Stream.of(toCompletionStage(serverChannel.close()));
+            }
+            return GracefulShutdownCapable.allOf(Stream.concat(
+                close,
+                activeConnections.stream().map(HttpPipelineBuilder.ConnectionPipeline::shutdownGracefully)
+            ));
+        }
+
+        @Override
+        public OptionalLong reportActiveTasks() {
+            if (config.isSupportGracefulShutdown()) {
+                return GracefulShutdownCapable.combineActiveTasks(activeConnections);
+            } else {
+                return OptionalLong.empty();
+            }
         }
     }
 
@@ -961,7 +1035,10 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         protected void initChannel(Channel ch) throws Exception {
             // udp does not have connection channels
             setServerChannel(ch);
-            httpPipelineBuilder.new ConnectionPipeline(ch, true).initHttp3Channel();
+            HttpPipelineBuilder.ConnectionPipeline cp = httpPipelineBuilder.new ConnectionPipeline(ch, true);
+            activeConnections.add(cp);
+            ch.closeFuture().addListener((ChannelFutureListener) future -> activeConnections.remove(cp));
+            cp.initHttp3Channel();
         }
     }
 

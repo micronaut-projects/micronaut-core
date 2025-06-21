@@ -124,7 +124,7 @@ class MyBean implements GeneratedInterface  {
 
     void "test information collecting visitor"() {
         when:
-        buildClassLoader('example.Trigger', '''
+        def definition = buildBeanDefinition('example.Child', '''
 package example;
 
 import jakarta.inject.Singleton;
@@ -146,6 +146,7 @@ class Child implements Parent {
 }
 ''')
         then:
+        definition.executableMethods.first().hasAnnotation("test.CustomAnn")
         CollectingVisitor.numVisited == 1
         CollectingVisitor.numMethodVisited == 1
         CollectingVisitor.getPath == "/get"
@@ -155,7 +156,7 @@ class Child implements Parent {
 
     void "test information collecting visitor not through parent"() {
         when:
-        buildClassLoader('example.Trigger', '''
+        def definition = buildBeanDefinition('example.Child', '''
 package example;
 
 import jakarta.inject.Singleton;
@@ -178,6 +179,7 @@ class Child {
 }
 ''')
         then:
+        definition.executableMethods.first().hasAnnotation("test.CustomAnn")
         CollectingVisitor.numVisited == 1
         CollectingVisitor.numMethodVisited == 1
         CollectingVisitor.getPath == "/get"

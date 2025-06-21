@@ -19,8 +19,8 @@ dependencies {
     api(projects.micronautHttpNetty)
     api(libs.managed.netty.handler.proxy)
 
-    compileOnly(libs.managed.netty.incubator.codec.http3)
-    testImplementation(libs.managed.netty.incubator.codec.http3)
+    compileOnly(projects.micronautHttpNettyHttp3)
+    testImplementation(projects.micronautHttpNettyHttp3)
 
     testAnnotationProcessor(platform(libs.test.boms.micronaut.validation))
     testAnnotationProcessor(libs.micronaut.validation.processor) {

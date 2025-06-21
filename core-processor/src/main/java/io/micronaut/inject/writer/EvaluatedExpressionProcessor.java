@@ -39,16 +39,23 @@ import io.micronaut.sourcegen.model.ClassDef;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 /**
  * Internal utility class for writing annotation metadata with evaluated expressions.
  */
 @Internal
 public final class EvaluatedExpressionProcessor {
+    private static final Set<String> WRITTEN_CLASSES = new HashSet<>();
+
     private final Collection<ExpressionWithContext> evaluatedExpressions = new ArrayList<>(2);
     private final DefaultExpressionCompilationContextFactory expressionCompilationContextFactory;
     private final VisitorContext visitorContext;
     private final Element originatingElement;
+
+    private List<EvaluatedExpressionWriter> writers;
 
     /**
      * Default constructor.
@@ -118,16 +125,27 @@ public final class EvaluatedExpressionProcessor {
         return evaluatedExpressions;
     }
 
-    public void writeEvaluatedExpressions(ClassWriterOutputVisitor visitor) throws IOException {
-        for (ExpressionWithContext expressionMetadata: getEvaluatedExpressions()) {
-            EvaluatedExpressionWriter expressionWriter = new EvaluatedExpressionWriter(
-                expressionMetadata,
-                visitorContext,
-                originatingElement
-            );
-
-            expressionWriter.accept(visitor);
+    public void finish() {
+        Collection<ExpressionWithContext> expressions = getEvaluatedExpressions();
+        writers = new ArrayList<>(expressions.size());
+        for (ExpressionWithContext expression : expressions) {
+            if (WRITTEN_CLASSES.add(expression.expressionClassName())) {
+                EvaluatedExpressionWriter writer = new EvaluatedExpressionWriter(
+                    expression,
+                    visitorContext,
+                    originatingElement
+                );
+                writer.finish();
+                writers.add(writer);
+            }
         }
+    }
+
+    public void writeEvaluatedExpressions(ClassWriterOutputVisitor visitor) throws IOException {
+        for (EvaluatedExpressionWriter writer : writers) {
+            writer.accept(visitor);
+        }
+        writers = null;
     }
 
     public boolean hasEvaluatedExpressions() {

@@ -91,4 +91,10 @@ public @interface Retryable {
      * @return The capture exception types (defaults to RuntimeException)
      */
     Class<? extends Throwable> capturedException() default RuntimeException.class;
+
+    /**
+     * @return The jitter factor used to apply random deviation to retry delays
+     */
+    @Digits(integer = 1, fraction = 2)
+    String jitter() default "0.0";
 }

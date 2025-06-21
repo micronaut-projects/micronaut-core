@@ -246,10 +246,12 @@ public class AopProxyWriter implements ProxyingBeanDefinitionVisitor, ClassOutpu
 
     private final OriginatingElements originatingElements;
 
-    private final ClassDef.ClassDefBuilder proxyBuilder;
+    private ClassDef.ClassDefBuilder proxyBuilder;
     private final FieldDef interceptorsField;
     private final FieldDef proxyMethodsField;
     private FieldDef targetField;
+
+    private byte[] output;
 
     /**
      * <p>Constructs a new {@link AopProxyWriter} for the given parent {@link BeanDefinitionWriter} and starting interceptors types.</p>
@@ -827,6 +829,9 @@ public class AopProxyWriter implements ProxyingBeanDefinitionVisitor, ClassOutpu
         }
 
         proxyBeanDefinitionWriter.visitBeanDefinitionEnd();
+
+        output = ByteCodeWriterUtils.writeByteCode(proxyBuilder.build(), visitorContext);
+        proxyBuilder = null;
     }
 
     private void generateProxyTarget(ClassTypeDef targetType) {
@@ -1127,7 +1132,7 @@ public class AopProxyWriter implements ProxyingBeanDefinitionVisitor, ClassOutpu
     public void accept(ClassWriterOutputVisitor visitor) throws IOException {
         proxyBeanDefinitionWriter.accept(visitor);
         try (OutputStream out = visitor.visitClass(proxyFullName, getOriginatingElements())) {
-            out.write(ByteCodeWriterUtils.writeByteCode(proxyBuilder.build(), visitorContext));
+            out.write(output);
         }
     }
 

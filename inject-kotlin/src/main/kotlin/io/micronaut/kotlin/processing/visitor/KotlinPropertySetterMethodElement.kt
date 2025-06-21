@@ -54,7 +54,6 @@ internal class KotlinPropertySetterMethodElement(
         visitorContext
     )
 
-
     override val internalDeclaredTypeArguments: Map<String, ClassElement> = emptyMap()
 
     override val internalReturnType: ClassElement = PrimitiveElement.VOID

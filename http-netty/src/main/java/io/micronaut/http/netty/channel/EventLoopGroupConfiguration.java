@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.netty.channel;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.naming.Named;
 
 import java.time.Duration;
@@ -100,5 +101,14 @@ public interface EventLoopGroupConfiguration extends Named {
      */
     default Duration getShutdownTimeout() {
         return Duration.ofSeconds(DEFAULT_SHUTDOWN_TIMEOUT);
+    }
+
+    /**
+     * @return When set to {@code true}, use a special <i>experimental</i> event loop that can also
+     * execute virtual threads, in order to improve virtual thread performance.
+     */
+    @Experimental
+    default boolean isLoomCarrier() {
+        return false;
     }
 }

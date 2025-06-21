@@ -5,3 +5,22 @@ The Micronaut framework will detect virtual thread support and use it for the ex
 To use the `blocking` executor, simply mark e.g. a controller with `ExecuteOn`:
 
 snippet::io.micronaut.docs.taskexecutors.HelloWorldController[tags="clazz", indent=0, title="Configuring the Server I/O Thread Pool"]
+
+=== Event loop carrier
+
+Micronaut HTTP Server Netty 4.9 introduces an *experimental* mode to run virtual threads on the Netty event loop. This
+can improve performance of virtual threads, since it avoids a context switch between the Netty event loop and the JDK
+ForkJoinPool.
+
+This mode requires access to internal JDK APIs. Please run your application with
+`--add-opens=java.base/java.lang=ALL-UNNAMED`. Then, enable the `loom-carrier` flag for the event loop, e.g. `micronaut.netty.event-loops.loom-carrier=true`
+
+.Enabling the event loop carrier
+[configuration]
+----
+micronaut:
+  netty:
+    event-loops:
+      default:
+        loom-carrier: true
+----

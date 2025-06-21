@@ -1,0 +1,7 @@
+And much more is possible! See more mapping examples in the following snippet.
+
+snippet::io.micronaut.docs.ioc.mappers.AdditionalMappers[tags="mapper", indent=0]
+
+<1> Merge three or more types.
+<2> Create mappings that specify `Map` as a parameter and define mappings for this parameter.
+<3> Define a custom merge strategy as a singleton and use it for mapping.

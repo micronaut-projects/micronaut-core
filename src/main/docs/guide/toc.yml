@@ -41,6 +41,7 @@ ioc:
   replaces: Bean Replacement
   beanConfigurations: Bean Configurations
   lifecycle: Life-Cycle Methods
+  gracefulShutdown: Graceful Shutdown
   contextEvents: Context Events
   events: Bean Events
   introspection:
@@ -58,10 +59,16 @@ ioc:
     beanWrapperApi: The BeanWrapper API
     jacksonAndBeanIntrospection: Jackson and Bean Introspection
     kotlinAndBeanIntrospection: Kotlin and Bean Introspection
-  beanMappers: Bean Mappers
+  beanMappers:
+    title: Bean Mappers
+    beanMappersMerging:
+      title: Bean Mappers Merging
+      beanMappersMergingStrategy: Merging Strategy
   beanValidation: Bean Validation
   annotationMetadata: Bean Annotation Metadata
   beanImport: Importing Beans from Libraries
+  classImport: Importing Classes from Libraries
+  mixin: Modifying Class Annotations With A Mixin
   nullabilityAnnotations: Nullability Annotations
   springBeans: Micronaut Beans And Spring
   android: Android Support

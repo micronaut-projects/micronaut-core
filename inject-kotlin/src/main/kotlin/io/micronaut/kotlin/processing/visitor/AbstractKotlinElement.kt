@@ -294,8 +294,16 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
         } else {
             type.arguments.forEachIndexed { i, typeArgument ->
                 val variableName = typeParameters[i].name.asString()
-                typeArguments[variableName] =
-                    resolveTypeArgument(owner, typeArgument, parentTypeArguments, visitedTypes)
+                if (typeArgument.variance == Variance.STAR) {
+                    val typeParameter =
+                        resolveTypeParameter(owner, typeParameters[i], parentTypeArguments, visitedTypes)
+                    typeArguments[variableName] =
+                        resolveStarTypeArgument(owner, typeArgument,
+                            typeParameter as KotlinClassElement, parentTypeArguments, visitedTypes)
+                } else {
+                    typeArguments[variableName] =
+                        resolveTypeArgument(owner, typeArgument, parentTypeArguments, visitedTypes)
+                }
             }
         }
         return typeArguments
@@ -319,7 +327,9 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
     ): ClassElement {
 
         return when (typeArgument.variance) {
-            Variance.STAR, Variance.COVARIANT, Variance.CONTRAVARIANT -> {
+            Variance.STAR ->
+                throw IllegalStateException("This method doesn't support STAR")
+            Variance.COVARIANT, Variance.CONTRAVARIANT -> {
                 // example List<*>, IN, OUT
                 val stripTypeArguments = when (typeArgument.type) {
                     null -> false
@@ -365,6 +375,55 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
                 resolveTypeArgumentType(owner, typeArgument, parentTypeArguments, visitedTypes)
             }
         }
+    }
+
+    private fun resolveStarTypeArgument(
+        owner: KotlinNativeElement,
+        typeArgument: KSTypeArgument,
+        typeParameter: KotlinClassElement,
+        parentTypeArguments: Map<String, ClassElement>,
+        visitedTypes: MutableSet<Any>
+    ): ClassElement {
+
+        val stripTypeArguments = when (typeArgument.type) {
+            null -> false
+            else -> !visitedTypes.add(typeArgument.type!!)
+        }
+        val upperBound =
+            resolveUpperBound(
+                owner,
+                typeArgument,
+                parentTypeArguments,
+                visitedTypes,
+                stripTypeArguments
+            )
+        val lowerBound = resolveLowerBound(
+            owner,
+            typeArgument,
+            parentTypeArguments,
+            visitedTypes,
+            stripTypeArguments
+        )
+        if (lowerBound is PrimitiveElement) {
+            return upperBound
+        }
+        var upperBounds = listOf(upperBound as KotlinClassElement)
+        var lowerBounds = if (lowerBound == null) listOf() else  listOf(lowerBound as KotlinClassElement)
+        var upper = WildcardElement.findUpperType(upperBounds, lowerBounds)!!
+        if (upper.name == Object::class.java.name) {
+            upper = typeParameter
+            upperBounds = listOf(typeParameter)
+            lowerBounds = listOf()
+        }
+        return KotlinWildcardElement(
+            KotlinTypeArgumentNativeElement(typeArgument, owner),
+            upper,
+            upperBounds,
+            lowerBounds,
+            elementAnnotationMetadataFactory,
+            visitorContext,
+            typeArgument.variance == Variance.STAR
+        )
     }
 
     private fun resolveLowerBound(
@@ -467,7 +526,10 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
         stripTypeArguments: Boolean = false
     ): ClassElement {
         val type = typeArgument.type
-        val resolvedType = type!!.resolve()
+        if (type == null) {
+            return visitorContext.getClassElement("kotlin.Any").get()
+        }
+        val resolvedType = type.resolve()
         val stripTypeArguments2 = stripTypeArguments || !visitedTypes.add(type)
 
         val resolved = newTypeArgument(
@@ -552,7 +614,11 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
                 }
             }
             if (type != null && qualifiedNameString == "kotlin.Array") {
-                val component = type.arguments[0].type!!.resolve()
+                val arrayType = type.arguments[0].type
+                if (arrayType == null) {
+                    return visitorContext.getClassElement(Object::class.java.name).get().toArray()
+                }
+                val component = arrayType.resolve()
                 return newTypeArgument(
                     owner,
                     component,

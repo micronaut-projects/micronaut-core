@@ -15,13 +15,13 @@
  */
 package io.micronaut.context.annotation;
 
+import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.Experimental;
+
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
-
-import io.micronaut.core.annotation.AnnotationUtil;
-import io.micronaut.core.annotation.Experimental;
 
 /**
  * Allows importing an already compiled set of beans, placing any generating beans relative to the class

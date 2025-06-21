@@ -18,9 +18,7 @@ package io.micronaut.core.propagation;
 import io.micronaut.core.annotation.Experimental;
 
 /**
- * Propagated element of {@link PropagatedContext}.
- * <p>
- * Simple implementation intended for the propagation in the context as a data carrier.
+ * Marker interface for an object that can be placed into a {@link PropagatedContext}.
  *
  * @author Denis Stepanov
  * @since 4.0.0

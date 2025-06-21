@@ -53,7 +53,7 @@ internal class KotlinEnumConstantElement(
     override fun getModifiers(): MutableSet<ElementModifier> = EnumConstantElement.ENUM_CONSTANT_MODIFIERS
 
     override fun getName(): String {
-        return nativeType.element.toString()
+        return declaration.simpleName.asString()
     }
 
     override fun isPackagePrivate(): Boolean {

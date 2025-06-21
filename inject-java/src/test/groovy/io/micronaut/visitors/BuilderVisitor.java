@@ -6,6 +6,7 @@ import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 
 public class BuilderVisitor implements TypeElementVisitor<Builder, Object> {
+
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {
         element.getAllTypeArguments();

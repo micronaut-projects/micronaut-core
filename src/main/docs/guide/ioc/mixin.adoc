@@ -1,0 +1,101 @@
+There are scenarios where a class cannot be accessed to add or remove annotations for the annotation processor
+
+The most used scenario is to modify the annotations when the class is imported with ann:context.annotation.ClassImport[] or a scenario when classes are generated and cannot be modified.
+
+It's possible to define a mixin class by annotating it with ann:context.annotation.Mixin[] and specifying which class does it reference.
+
+All the annotations of the mixin will be copied to the original class and all the annotations of the constructor with matching parameters, fields of the same name and methods of the same name with matching parameters will be copied.
+
+In this example we have a simple bean class included in an external library for which we want to apply Micronaut Serialization:
+
+[source,java]
+----
+package my.external.library;
+
+class MyBean {
+    String name;
+}
+----
+
+To add serialization annotations we can create a mixin that is referencing the original class:
+
+[source,java]
+----
+package example;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.micronaut.context.annotation.Mixin;
+import io.micronaut.core.annotation.Introspected;
+
+@Mixin(my.external.library.MyBean.class) <1>
+@Introspected(accessKind = Introspected.AccessKind.FIELD) <2>
+class MyBeanMixin {
+    @JsonProperty("hello") <3>
+    String name; <4>
+}
+----
+<1> The ann:context.annotation.Mixin[] is defined referencing the bean from the external library
+<2> The extra annotation that will be copied to the referenced class
+<3> The extra annotation of the field `name` that will be copied to the field of the referenced class
+<4> The field name must match the field name of the referenced class
+
+NOTE: Mixins currently supported only for the Java language.
+
+Following the example from <<classImport, Importing Classes from Libraries>> of importing Jakarta Inject TCK, most of the beans from the TCK have the correct Jakarta Inject annotations except one bean which is not annotated at all, to fix that we can create a mixin to fix that:
+
+[source,java]
+----
+package example;
+
+import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.ClassImport;
+import io.micronaut.context.annotation.Mixin;
+import org.atinject.tck.auto.FuelTank;
+
+@Mixin(FuelTank.class)
+@Bean
+class FuelTankMixin {
+}
+
+@ClassImport(packages = {"org.atinject.tck.auto", "org.atinject.tck.auto.accessories"})
+class BeanImportTest {
+}
+----
+
+The mixin supports copying only specific annotations
+ by defining `includeAnnotations`, the set of annotations or packages that should be copied. Alternatively there is `excludeAnnotation` that will copy only annotations not excluded.
+
+Each mixin point (constructor, method, field, parameter) can have specific rules of copying using ann:context.annotation.Mixin.Filter[].
+
+The annotation ann:context.annotation.Mixin.Filter[] also support removing existing annotations of the original class.
+
+In this example all the Jakarta Validation are removed from the original method referenced by the mixin:
+
+[source,java]
+----
+package example;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.context.annotation.Mixin;
+import io.micronaut.core.annotation.Introspected;
+
+@Mixin(MyBean.class) <1>
+@Introspected(accessKind = Introspected.AccessKind.FIELD) <2>
+class MyBeanMixin {
+    String name;
+
+    @Executable
+    @JsonProperty("hello") <3>
+    @Mixin.Filter(removeAnnotations = "jakarta.validation") <4>
+    public String getXyz() {
+        return name;
+    }
+}
+----
+<1> The ann:context.annotation.Mixin[] is defined referencing the bean from the external library
+<2> The extra annotation that will be copied to the referenced class
+<3> The extra annotation of the method `getXyz` that will be copied to the same method of the referenced class
+<4> The definition to remove all the annotations with a full name prefixed by `jakarta.validation`
+
+NOTE: Mixins only modify the Micronaut annotations metadata model. Original classes are not modified in any way.

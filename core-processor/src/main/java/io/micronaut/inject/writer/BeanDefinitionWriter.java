@@ -616,7 +616,6 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
     private final List<String> beanTypeInnerClasses;
     private final EvaluatedExpressionProcessor evaluatedExpressionProcessor;
 
-    private boolean beanFinalized = false;
     private ClassTypeDef superType = TYPE_ABSTRACT_BEAN_DEFINITION_AND_REFERENCE;
     private boolean superBeanDefinition = false;
     private boolean isSuperFactory = false;
@@ -646,7 +645,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
 
     private final OriginatingElements originatingElements;
 
-    private final ClassDef.ClassDefBuilder classDefBuilder;
+    private ClassDef.ClassDefBuilder classDefBuilder;
 
     private BuildMethodDefinition buildMethodDefinition;
     private final List<InjectMethodCommand> injectCommands = new ArrayList<>();
@@ -654,6 +653,8 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
     private boolean validated;
 
     private final Function<String, ExpressionDef> loadClassValueExpressionFn;
+
+    private Map<String, byte[]> output;
 
     /**
      * Creates a bean definition writer.
@@ -1255,7 +1256,17 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
 
         loadTypeMethods.values().forEach(classDefBuilder::addMethod);
 
-        this.beanFinalized = true;
+        output = new LinkedHashMap<>();
+        // Generate the bytecode in the round it's being invoked
+        generateFiles(classDefBuilder.build());
+        evaluatedExpressionProcessor.finish();
+    }
+
+    private void generateFiles(ObjectDef objectDef) {
+        output.put(objectDef.getName(), ByteCodeWriterUtils.writeByteCode(objectDef, visitorContext));
+        for (ObjectDef innerType : objectDef.getInnerTypes()) {
+            generateFiles(innerType);
+        }
     }
 
     private MethodDef getGetInterceptedType(TypeDef interceptedType) {
@@ -2387,7 +2398,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
      * @return The bytes of the class
      */
     public byte[] toByteArray() {
-        if (!beanFinalized) {
+        if (output == null) {
             throw new IllegalStateException("Bean definition not finalized. Call visitBeanDefinitionEnd() first.");
         }
         return ByteCodeWriterUtils.writeByteCode(classDefBuilder.build(), visitorContext);
@@ -2403,7 +2414,11 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
             beanDefinitionName,
             getOriginatingElement()
         );
-        write(visitor, classDefBuilder.build());
+        for (Map.Entry<String, byte[]> e1 : output.entrySet()) {
+            try (OutputStream out = visitor.visitClass(e1.getKey(), getOriginatingElements())) {
+                out.write(e1.getValue());
+            }
+        }
         try {
             if (executableMethodsDefinitionWriter != null) {
                 executableMethodsDefinitionWriter.accept(visitor);
@@ -2417,15 +2432,6 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
             }
         }
         evaluatedExpressionProcessor.writeEvaluatedExpressions(visitor);
-    }
-
-    private void write(ClassWriterOutputVisitor visitor, ObjectDef objectDef) throws IOException {
-        try (OutputStream out = visitor.visitClass(objectDef.getName(), getOriginatingElements())) {
-            out.write(ByteCodeWriterUtils.writeByteCode(objectDef, visitorContext));
-        }
-        for (ObjectDef innerType : objectDef.getInnerTypes()) {
-            write(visitor, innerType);
-        }
     }
 
     @Override

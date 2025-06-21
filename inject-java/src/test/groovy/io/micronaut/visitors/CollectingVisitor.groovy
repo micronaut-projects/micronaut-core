@@ -19,6 +19,11 @@ class CollectingVisitor implements TypeElementVisitor<Object, Object> {
     static String controllerPath
 
     @Override
+    VisitorKind getVisitorKind() {
+        return VisitorKind.AGGREGATING
+    }
+
+    @Override
     void start(VisitorContext visitorContext) {
         numVisited = 0
         numMethodVisited = 0

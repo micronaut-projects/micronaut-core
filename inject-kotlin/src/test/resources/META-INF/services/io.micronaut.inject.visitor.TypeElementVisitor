@@ -13,3 +13,4 @@ io.micronaut.kotlin.processing.annotations.AddsUnseenInnerRepeatableAnnotationSp
 io.micronaut.kotlin.processing.annotations.AddsUnseenRepeatableAnnotationSpec$AddUnseenRepeatableTypeElementVisitor
 io.micronaut.kotlin.processing.aop.introduction.MyRepo3Spec$MyRepositoryVisitor
 io.micronaut.kotlin.processing.aop.introduction.MyIsEnumInTypeArgumentSpec$MyControllerVisitor
+io.micronaut.kotlin.processing.visitor.TypeElementQuerySpec$TypeElementQueryVisitor

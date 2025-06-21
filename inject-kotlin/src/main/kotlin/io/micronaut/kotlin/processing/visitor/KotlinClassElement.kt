@@ -186,33 +186,22 @@ internal open class KotlinClassElement(
         declaration.getBinaryName(visitorContext.resolver, visitorContext)
     }
 
-    private val resolvedInterfaces: Collection<ClassElement> by lazy {
+    private val resolvedSuperTypes: Collection<ClassElement> by lazy {
         declaration.superTypes.map { it.resolve() }
             .filter {
                 it != visitorContext.resolver.builtIns.anyType
-            }
-            .filter {
-                val declaration = it.declaration
-                declaration is KSClassDeclaration && declaration.classKind == ClassKind.INTERFACE
             }.map {
                 newClassElement(nativeType, it, typeArguments)
             }.toList()
     }
 
+    private val resolvedInterfaces: Collection<ClassElement> by lazy {
+        resolvedSuperTypes.filter { it.isInterface }.toList()
+    }
+
     private val resolvedSuperType: Optional<ClassElement> by lazy {
-        val superType = declaration.superTypes.firstOrNull {
-            val resolved = it.resolve()
-            if (resolved == visitorContext.resolver.builtIns.anyType) {
-                false
-            } else {
-                val declaration = resolved.declaration
-                declaration is KSClassDeclaration && declaration.classKind != ClassKind.INTERFACE
-            }
-        }
+        val superType = resolvedSuperTypes.firstOrNull { !it.isInterface }
         Optional.ofNullable(superType)
-            .map {
-                newClassElement(nativeType, it.resolve(), typeArguments)
-            }
     }
 
     private val resolvedPrimaryConstructor: Optional<MethodElement> by lazy {
@@ -708,8 +697,20 @@ internal open class KotlinClassElement(
     override fun <T : Element> getEnclosedElements(query: ElementQuery<T>): List<T> =
         enclosedElementsQuery.getEnclosedElements(this, query)
 
+    private fun resolveClassDeclaration(value: KSDeclaration): KSClassDeclaration {
+        var declaration = value
+        if (declaration is KSTypeAlias) {
+            // Interface in KSP2
+            declaration = declaration.type.resolve().declaration
+        }
+        if (declaration is KSClassDeclaration) {
+            return declaration
+        }
+        throw IllegalArgumentException("Unknown declaration: " + declaration + " of type: " + declaration::class)
+    }
+
     private inner class KotlinEnclosedElementsQuery :
-        EnclosedElementsQuery<KSClassDeclaration, KSNode>() {
+        EnclosedElementsQuery<KSDeclaration, KSNode>() {
 
         override fun hasAnnotation(element: KSNode, annotation: Class<out Annotation>): Boolean {
             if (element is KSAnnotated) {
@@ -724,7 +725,7 @@ internal open class KotlinClassElement(
                 return element.simpleName.asString()
             }
             if (element is KSFunctionDeclaration) {
-                return visitorContext.resolver.getJvmName(element)!!
+                return element.getBinaryName(visitorContext.resolver)
             }
             if (element is KSDeclaration) {
                 return element.getBinaryName(visitorContext.resolver, visitorContext)
@@ -765,7 +766,8 @@ internal open class KotlinClassElement(
             return emptySet()
         }
 
-        override fun getSuperClass(classNode: KSClassDeclaration): KSClassDeclaration? {
+        override fun getSuperClass(declaration: KSDeclaration): KSClassDeclaration? {
+            val classNode = resolveClassDeclaration(declaration);
             val superTypes = classNode.superTypes
             for (superclass in superTypes) {
                 val resolved = superclass.resolve()
@@ -779,23 +781,22 @@ internal open class KotlinClassElement(
             return null
         }
 
-        override fun getInterfaces(classDeclaration: KSClassDeclaration): Collection<KSClassDeclaration> {
-            val superTypes = classDeclaration.superTypes
+        override fun getInterfaces(declaration: KSDeclaration): Collection<KSClassDeclaration> {
+            val classNode = resolveClassDeclaration(declaration)
+            val superTypes = classNode.superTypes
             val result: MutableCollection<KSClassDeclaration> = ArrayList()
             for (superclass in superTypes) {
                 val resolved = superclass.resolve()
-                val declaration = resolved.declaration
-                if (declaration is KSClassDeclaration) {
-                    if (declaration.classKind == ClassKind.INTERFACE) {
-                        result.add(declaration)
-                    }
+                val declaration = resolveClassDeclaration(resolved.declaration)
+                if (declaration.classKind == ClassKind.INTERFACE) {
+                    result.add(declaration)
                 }
             }
             return result
         }
 
         override fun getEnclosedElements(
-            classNode: KSClassDeclaration,
+            classNode: KSDeclaration,
             result: ElementQuery.Result<*>,
             includeAbstract: Boolean
         ): List<KSNode> {
@@ -804,11 +805,12 @@ internal open class KotlinClassElement(
         }
 
         private fun getEnclosedElements(
-            classNode: KSClassDeclaration,
+            declaration: KSDeclaration,
             result: ElementQuery.Result<*>,
             elementType: Class<*>,
             includeAbstract: Boolean
         ): List<KSNode> {
+            val classNode: KSClassDeclaration = resolveClassDeclaration(declaration)
             return when (elementType) {
                 MemberElement::class.java -> {
                     Stream.concat(
@@ -818,25 +820,27 @@ internal open class KotlinClassElement(
                 }
 
                 MethodElement::class.java -> {
-                    val functions = if (isJavaRecord(classNode)) {
+                    return if (isJavaRecord(classNode)) {
                         classNode.getAllFunctions().filter {
                             !listOf(
                                 "hashCode",
                                 "toString",
                                 "equals"
                             ).contains(it.simpleName.asString())
-                        }
-                    } else {
-                        classNode.getDeclaredFunctions()
-                    }
-
-                    functions
-                        .filter { func: KSFunctionDeclaration ->
+                        }.filter { func: KSFunctionDeclaration ->
                             !func.isConstructor() &&
-                                    func.origin != Origin.SYNTHETIC &&
                                     (includeAbstract || !func.isAbstract || !classNode.isAbstract())
                         }
-                        .toList()
+                            .toList()
+                    } else {
+                        classNode.getDeclaredFunctions()
+                            .filter { func: KSFunctionDeclaration ->
+                                !func.isConstructor() &&
+                                        func.origin != Origin.SYNTHETIC &&
+                                        (includeAbstract || !func.isAbstract || !classNode.isAbstract())
+                            }
+                            .toList()
+                    }
                 }
 
                 FieldElement::class.java -> {
@@ -859,7 +863,7 @@ internal open class KotlinClassElement(
 
                 ClassElement::class.java -> {
                     classNode.declarations.filter {
-                        it is KSClassDeclaration
+                        it is KSClassDeclaration && it.classKind != ClassKind.ENUM_ENTRY
                     }.toList()
                 }
 
@@ -869,21 +873,27 @@ internal open class KotlinClassElement(
             }
         }
 
-        override fun excludeClass(classNode: KSClassDeclaration): Boolean {
+        override fun excludeClass(declaration: KSDeclaration): Boolean {
+            val classNode = resolveClassDeclaration(declaration);
             val t = classNode.asStarProjectedType()
             val builtIns = visitorContext.resolver.builtIns
             return t == builtIns.anyType ||
                     t == builtIns.nothingType ||
                     t == builtIns.unitType ||
                     (classNode.qualifiedName != null && (
+                            classNode.qualifiedName!!.asString() == Enum::class.qualifiedName ||
                             classNode.qualifiedName!!.asString() == Enum::class.java.name ||
-                                    classNode.qualifiedName!!.asString() == Record::class.java.name
-                            ))
+                            classNode.qualifiedName!!.asString() == Record::class.java.name
+                        ))
         }
 
-        override fun isAbstractClass(classNode: KSClassDeclaration) = classNode.isAbstract()
+        override fun isAbstractClass(declaration: KSDeclaration) : Boolean {
+            return resolveClassDeclaration(declaration).isAbstract()
+        }
 
-        override fun isInterface(classNode: KSClassDeclaration) = classNode.classKind == ClassKind.INTERFACE
+        override fun isInterface(declaration: KSDeclaration) : Boolean {
+            return resolveClassDeclaration(declaration).classKind == ClassKind.INTERFACE
+        }
 
         override fun toAstElement(
             nativeType: KSNode,
