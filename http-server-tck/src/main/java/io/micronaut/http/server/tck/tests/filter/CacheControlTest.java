@@ -74,7 +74,7 @@ public class CacheControlTest {
     }
 
     @Requires(property = "spec.name", value = SPEC_NAME)
-    @ServerFilter(patternStyle = FilterPatternStyle.REGEX, value = "^/assets/bootstrap.*$")
+    @ServerFilter(patternStyle = FilterPatternStyle.REGEX, value = "/assets/bootstrap.*")
     static class PublicInmmutableCacheControlFilter {
         @ResponseFilter
         void filterResponse(MutableHttpResponse<?> rsp) {
