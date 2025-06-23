@@ -420,20 +420,17 @@ public class BeanIntrospectionModule extends SimpleModule {
                         if (property.isPresent() &&
                             !property.get().isAnnotationPresent(JsonIgnore.class) &&
                             // we can't support XmlBeanPropertyWriter easily https://github.com/micronaut-projects/micronaut-core/issues/5907
-                            !existing.getClass().getName().equals("com.fasterxml.jackson.dataformat.xml.ser.XmlBeanPropertyWriter")) { // NOSONAR
+                            !existing.getClass().getName().equals("com.fasterxml.jackson.dataformat.xml.ser.XmlBeanPropertyWriter")
+                            && !(existing instanceof AnyGetterWriter)) { // NOSONAR
                             final UnsafeBeanProperty<Object, Object> beanProperty = (UnsafeBeanProperty<Object, Object>) property.get();
-                            if (existing instanceof AnyGetterWriter anyGetterWriter) {
-                                newProperties.set(i, anyGetterWriter);
-                            } else {
-                                newProperties.set(i, new BeanIntrospectionPropertyWriter(
-                                        existing,
-                                        beanProperty,
-                                        existing.getSerializer(),
-                                        config.getTypeFactory(),
-                                        existing.getViews()
-                                    )
-                                );
-                            }
+                            newProperties.set(i, new BeanIntrospectionPropertyWriter(
+                                    existing,
+                                    beanProperty,
+                                    existing.getSerializer(),
+                                    config.getTypeFactory(),
+                                    existing.getViews()
+                                )
+                            );
                         } else {
                             newProperties.set(i, existing);
                         }
