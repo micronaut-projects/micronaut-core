@@ -21,6 +21,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -29,10 +30,13 @@ import java.util.function.Supplier;
 final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
     private static final Logger LOG = LoggerFactory.getLogger(DelayedExecutionFlowImpl.class);
 
+    private static final AtomicReferenceFieldUpdater<DelayedExecutionFlowImpl, DelayedExecutionFlowImpl.Head> HEAD_UPDATER =
+        AtomicReferenceFieldUpdater.newUpdater(DelayedExecutionFlowImpl.class, Head.class, "head");
+
     /**
      * The head of the linked list of steps in this flow.
      */
-    private Head head = new Head();
+    private volatile Head head = new Head();
     /**
      * The tail of the linked list of steps in this flow.
      */
@@ -62,11 +66,12 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
     }
 
     /**
-     * Complete with initial execution flow.
+     * Complete with initial execution flow. Single-threaded version that does not allow completing
+     * twice.
      *
      * @param executionFlow The execution flow
      */
-    private void complete0(@NonNull ExecutionFlow<Object> executionFlow) {
+    private void completeLazy(@NonNull ExecutionFlow<Object> executionFlow) {
         if (head == null) {
             throw new IllegalStateException("Delayed flow has been completed");
         }
@@ -77,14 +82,36 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
         head = null;
     }
 
+    private boolean completeAtomic(@NonNull ExecutionFlow<Object> executionFlow) {
+        Head head = HEAD_UPDATER.getAndSet(this, null);
+        if (head == null) {
+            return false;
+        }
+        Step immediateStep = head.atomicSetOutput(executionFlow);
+        if (immediateStep != null) {
+            work(immediateStep, executionFlow);
+        }
+        return true;
+    }
+
     @Override
     public void complete(T result) {
-        complete0(result == null ? ExecutionFlow.empty() : ExecutionFlow.just(result));
+        completeLazy(result == null ? ExecutionFlow.empty() : ExecutionFlow.just(result));
     }
 
     @Override
     public void completeExceptionally(Throwable exc) {
-        complete0(ExecutionFlow.error(exc));
+        completeLazy(ExecutionFlow.error(exc));
+    }
+
+    @Override
+    public boolean tryComplete(@Nullable T result) {
+        return completeAtomic(result == null ? ExecutionFlow.empty() : ExecutionFlow.just(result));
+    }
+
+    @Override
+    public boolean tryCompleteExceptionally(Throwable exc) {
+        return completeAtomic(ExecutionFlow.error(exc));
     }
 
     /**

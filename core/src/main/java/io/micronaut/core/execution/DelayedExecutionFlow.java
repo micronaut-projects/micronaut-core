@@ -46,6 +46,22 @@ public sealed interface DelayedExecutionFlow<T> extends ExecutionFlow<T> permits
     void completeExceptionally(Throwable exc);
 
     /**
+     * Complete this flow normally.
+     *
+     * @param result The result value
+     * @return {@code false} if this flow has already been completed
+     */
+    boolean tryComplete(@Nullable T result);
+
+    /**
+     * Complete this flow with an exception.
+     *
+     * @param exc The exception
+     * @return {@code false} if this flow has already been completed
+     */
+    boolean tryCompleteExceptionally(Throwable exc);
+
+    /**
      * Check for cancellation.
      *
      * @return {@code true} iff this flow or any downstream flow has been cancelled
