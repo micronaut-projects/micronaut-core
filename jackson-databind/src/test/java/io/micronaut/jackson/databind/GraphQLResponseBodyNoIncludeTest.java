@@ -10,12 +10,13 @@ import java.io.IOException;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-class GraphQLResponseBodyTest {
+
+class GraphQLResponseBodyNoIncludeTest {
     @Test
     void testRawJackson() throws JsonProcessingException {
         ObjectMapper objectMapper = new ObjectMapper();
         String result = objectMapper.writeValueAsString(
-            new GraphQLResponseBody(Map.of("data", "test")));
+            new GraphQLResponseBodyNoInclude(Map.of("data", "test")));
         assertEquals("""
             {"data":"test"}""", result);
     }
@@ -25,7 +26,7 @@ class GraphQLResponseBodyTest {
         try (ApplicationContext ctx = ApplicationContext.run()) {
             ObjectMapper objectMapper = ctx.getBean(ObjectMapper.class);
             String result = objectMapper.writeValueAsString(
-                new GraphQLResponseBody(Map.of("data", "test")));
+                new GraphQLResponseBodyNoInclude(Map.of("data", "test")));
             assertEquals("""
             {"data":"test"}""", result);
         }
@@ -36,7 +37,7 @@ class GraphQLResponseBodyTest {
         try (ApplicationContext ctx = ApplicationContext.run()) {
             JsonMapper objectMapper = ctx.getBean(JsonMapper.class);
             String result = objectMapper.writeValueAsString(
-                new GraphQLResponseBody(Map.of("data", "test")));
+                new GraphQLResponseBodyNoInclude(Map.of("data", "test")));
             assertEquals("""
             {"data":"test"}""", result);
         }

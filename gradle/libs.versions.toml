@@ -73,7 +73,7 @@ jfrunit = "1.0.0.Alpha2"
 #
 managed-groovy = "4.0.27"
 managed-jakarta-annotation-api = "2.1.1"
-managed-jackson = "2.18.3"
+managed-jackson = "2.19.1"
 #@NextMajorVersion @Deprecated Delete in Micronaut Framework 5.
 managed-jackson-databind = "2.18.2"
 managed-kotlin = "1.9.25"
