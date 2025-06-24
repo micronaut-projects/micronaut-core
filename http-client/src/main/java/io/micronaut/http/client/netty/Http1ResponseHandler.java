@@ -145,6 +145,8 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
         @Override
         void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
             listener.fail(ctx, cause);
+            transitionToState(ctx, this, AfterContent.INSTANCE);
+            listener.finish(ctx);
         }
     }
 
@@ -278,6 +280,8 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
         @Override
         void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
             streaming.error(cause);
+            transitionToState(ctx, this, AfterContent.INSTANCE);
+            listener.finish(ctx);
         }
 
         @Override
@@ -378,6 +382,8 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
         @Override
         void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
             streaming.error(cause);
+            transitionToState(ctx, this, AfterContent.INSTANCE);
+            listener.finish(ctx);
         }
     }
 

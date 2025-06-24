@@ -1,0 +1,1 @@
+io.micronaut.http.tck.netty.LeakDetectionExtension

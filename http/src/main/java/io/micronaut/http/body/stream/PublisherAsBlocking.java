@@ -82,14 +82,18 @@ public class PublisherAsBlocking<T> implements Subscriber<T>, Closeable {
     @Override
     public void onSubscribe(Subscription s) {
         boolean pendingDemand;
+        boolean closed;
         lock.lock();
         try {
             this.subscription = s;
             pendingDemand = this.pendingDemand;
+            closed = this.closed;
         } finally {
             lock.unlock();
         }
-        if (pendingDemand) {
+        if (closed) {
+            s.cancel();
+        } else if (pendingDemand) {
             s.request(1);
         }
     }
@@ -180,15 +184,20 @@ public class PublisherAsBlocking<T> implements Subscriber<T>, Closeable {
 
     @Override
     public void close() {
+        Subscription subscription;
         lock.lock();
         try {
             closed = true;
+            subscription = this.subscription;
             if (swap != null) {
                 release(swap);
                 swap = null;
             }
         } finally {
             lock.unlock();
+        }
+        if (subscription != null) {
+            subscription.cancel();
         }
     }
 }

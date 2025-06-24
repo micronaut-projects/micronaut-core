@@ -9,6 +9,7 @@ import io.micronaut.http.annotation.Post
 import io.micronaut.http.netty.channel.EventLoopGroupConfiguration
 import io.micronaut.http.netty.channel.EventLoopGroupRegistry
 import io.micronaut.http.server.netty.NettyHttpServer
+import io.micronaut.http.tck.netty.TestLeakDetector
 import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.bootstrap.Bootstrap
 import io.netty.buffer.Unpooled
@@ -29,7 +30,7 @@ class FuzzyInputSpec extends Specification {
 
     def 'http1 cleartext buffer leaks'() {
         given:
-        BufferLeakDetection.startTracking()
+        TestLeakDetector.startTracking("")
 
         ApplicationContext ctx = ApplicationContext.run([
                 'spec.name': 'FuzzyInputSpec',
@@ -60,7 +61,7 @@ class FuzzyInputSpec extends Specification {
         channel.closeFuture().sync()
 
         then:
-        BufferLeakDetection.stopTrackingAndReportLeaks()
+        TestLeakDetector.stopTrackingAndReportLeaks()
 
         cleanup:
         embeddedServer.stop()
@@ -75,7 +76,7 @@ class FuzzyInputSpec extends Specification {
     def 'http1 cleartext embedded channel'() {
         given:
         FlagAppender.clear()
-        BufferLeakDetection.startTracking()
+        TestLeakDetector.startTracking("")
 
         ApplicationContext ctx = ApplicationContext.run([
                 'spec.name': 'FuzzyInputSpec',
@@ -100,7 +101,7 @@ class FuzzyInputSpec extends Specification {
         then:
         embeddedChannel.checkException()
 
-        BufferLeakDetection.stopTrackingAndReportLeaks()
+        TestLeakDetector.stopTrackingAndReportLeaks()
         FlagAppender.checkTriggered()
 
         where:
@@ -122,7 +123,7 @@ class FuzzyInputSpec extends Specification {
     def 'http2 cleartext embedded channel'() {
         given:
         FlagAppender.clear()
-        BufferLeakDetection.startTracking()
+        TestLeakDetector.startTracking("")
 
         ApplicationContext ctx = ApplicationContext.run([
                 'spec.name': 'FuzzyInputSpec',
@@ -148,7 +149,7 @@ class FuzzyInputSpec extends Specification {
         then:
         embeddedChannel.checkException()
 
-        BufferLeakDetection.stopTrackingAndReportLeaks()
+        TestLeakDetector.stopTrackingAndReportLeaks()
         FlagAppender.checkTriggered()
 
         where:
