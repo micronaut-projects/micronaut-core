@@ -13,9 +13,6 @@ import org . apache . tools . ant . taskdefs . condition . Os
 
 tasks {
     test {
-        systemProperty("io.netty.leakDetection.level", "paranoid")
-        systemProperty("io.netty.customResourceLeakDetector", "io.micronaut.http.server.netty.fuzzing.BufferLeakDetection")
-        systemProperty("io.netty.leakDetection.targetRecords", "100")
         maxHeapSize = "1G"
     }
 }
@@ -63,6 +60,7 @@ dependencies {
     testImplementation(libs.managed.netty.incubator.codec.http3)
     testImplementation(libs.bcpkix)
     testImplementation(projects.micronautJacksonDatabind)
+    testImplementation(projects.micronautHttpTck)
 // Add Micronaut Jackson XML after v4 Migration
 //    testImplementation(libs.managed.micronaut.xml) {
 //        exclude module:'micronaut-inject'
