@@ -37,12 +37,41 @@ final class CleanerJava24 {
 final class MemorySessionImpl {
 }
 
-@TargetClass(className = "jdk.internal.misc.ScopedMemoryAccess", onlyWith = Jdk19OrLater.class)
-final class ScopedMemoryAccess {
+@TargetClass(className = "jdk.internal.misc.ScopedMemoryAccess$ScopedAccessError", onlyWith = Jdk23OrLater.class)
+final class ScopedAccessError {
+}
+
+@TargetClass(className = "jdk.internal.misc.ScopedMemoryAccess", onlyWith = Jdk19To22.class)
+final class ScopedMemoryAccess21 {
     @Substitute
     @TargetElement(name = "closeScope0")
     boolean closeScope0Unsupported(MemorySessionImpl memorySessionImpl) {
         throw new UnsupportedOperationException();
+    }
+}
+
+@TargetClass(className = "jdk.internal.misc.ScopedMemoryAccess", onlyWith = Jdk23OrLater.class)
+final class ScopedMemoryAccess23 {
+    @Substitute
+    @TargetElement(name = "closeScope0")
+    void closeScope0Unsupported(MemorySessionImpl memorySessionImpl, ScopedAccessError error) {
+        throw new UnsupportedOperationException();
+    }
+}
+
+final class Jdk19To22 implements BooleanSupplier {
+    @Override
+    public boolean getAsBoolean() {
+        int v = Integer.getInteger("java.specification.version", 17);
+        return v >= 19 && v < 22;
+    }
+}
+
+final class Jdk23OrLater implements BooleanSupplier {
+    @Override
+    public boolean getAsBoolean() {
+        int v = Integer.getInteger("java.specification.version", 17);
+        return v >= 23 && v < 25; // fixed in 25 according to graal team
     }
 }
 
