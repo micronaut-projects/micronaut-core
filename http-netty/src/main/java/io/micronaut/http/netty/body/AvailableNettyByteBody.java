@@ -177,4 +177,12 @@ public final class AvailableNettyByteBody extends NettyByteBody implements Close
         }
         return new AvailableNettyByteBody(b.retainedSlice());
     }
+
+    @Override
+    public void touch() {
+        ByteBuf b = buffer;
+        if (b != null) {
+            b.touch();
+        }
+    }
 }

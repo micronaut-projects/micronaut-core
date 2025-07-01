@@ -141,6 +141,12 @@ public interface ByteBody {
     CompletableFuture<? extends CloseableAvailableByteBody> buffer();
 
     /**
+     * Debug trace for leak detection.
+     */
+    default void touch() {
+    }
+
+    /**
      * This enum controls how backpressure should be handled if one of the two bodies
      * ("downstreams") is consuming data slower than the other.
      */

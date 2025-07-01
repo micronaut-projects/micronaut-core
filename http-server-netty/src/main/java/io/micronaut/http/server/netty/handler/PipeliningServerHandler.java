@@ -853,6 +853,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         @Override
         public void write(@NonNull HttpResponse response, @NonNull ByteBody body) {
             NettyByteBody nbb = NettyBodyAdapter.adapt(body, ctx.channel().eventLoop());
+            nbb.touch();
             if (nbb instanceof AvailableNettyByteBody available) {
                 writeFull(new DefaultFullHttpResponse(response.protocolVersion(), response.status(), AvailableNettyByteBody.toByteBuf(available), response.headers(), EmptyHttpHeaders.INSTANCE), false);
             } else {
