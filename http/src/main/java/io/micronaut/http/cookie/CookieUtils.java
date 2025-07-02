@@ -46,7 +46,7 @@ public final class CookieUtils {
                                           @NonNull Cookie cookie,
                                           @NonNull String cookieEncoded) {
         if (logger.isWarnEnabled()) {
-            int byteCount = StringUtils.byteCount(cookieEncoded);
+            int byteCount = StringUtils.utf8Bytes(cookieEncoded);
             if (byteCount > COOKIE_BYTE_LIMIT) {
                 logger.warn("Cookie {} size {} greater than limit {}", cookie.getName(), byteCount, COOKIE_BYTE_LIMIT);
             }
