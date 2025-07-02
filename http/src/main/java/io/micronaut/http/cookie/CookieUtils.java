@@ -59,9 +59,9 @@ public final class CookieUtils {
      * @param headers HTTP Headers
      * @param cookie Cookie
      */
-    public static void populateCookie(@NonNull Logger logger,
-                                      @NonNull MutableHttpHeaders headers,
-                                      @NonNull Cookie cookie) {
+    public static void setCookieHeader(@NonNull Logger logger,
+                                       @NonNull MutableHttpHeaders headers,
+                                       @NonNull Cookie cookie) {
         ServerCookieEncoder.INSTANCE.encode(cookie)
             .forEach(cookieEncoded -> {
                 CookieUtils.logCookieByteLimit(logger, cookie, cookieEncoded);

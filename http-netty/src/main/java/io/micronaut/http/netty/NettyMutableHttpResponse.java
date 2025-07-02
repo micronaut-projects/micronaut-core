@@ -293,7 +293,7 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
 
     @Override
     public MutableHttpResponse<B> cookie(Cookie cookie) {
-        CookieUtils.populateCookie(LOG, headers, cookie);
+        CookieUtils.setCookieHeader(LOG, headers, cookie);
         return this;
     }
 

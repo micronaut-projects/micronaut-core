@@ -27,7 +27,6 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.CookieUtils;
 import io.micronaut.http.cookie.Cookies;
-import io.micronaut.http.cookie.ServerCookieEncoder;
 import io.micronaut.http.simple.cookies.SimpleCookies;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,7 +65,7 @@ class SimpleHttpResponse<B> implements MutableHttpResponse<B> {
     private void updateCookies() {
         headers.remove(HttpHeaders.SET_COOKIE);
         for (Cookie cookie : cookies.getAll()) {
-            CookieUtils.populateCookie(LOG, headers, cookie);
+            CookieUtils.setCookieHeader(LOG, headers, cookie);
         }
     }
 
