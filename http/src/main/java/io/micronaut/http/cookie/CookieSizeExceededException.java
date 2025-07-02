@@ -34,8 +34,8 @@ public final class CookieSizeExceededException extends HttpException {
      * @param size Cookie Size Bytes
      */
     public CookieSizeExceededException(String cookieName, int maxSize, int size) {
-        super("""
-            The cookie [%s] byte size [%d] exceeds the maximum cookie size [%d]""".formatted(cookieName, size, maxSize));
+        super("The cookie [%s] byte size [%d] exceeds the maximum cookie size [%d]"
+            .formatted(cookieName, size, maxSize));
         this.cookieName = cookieName;
         this.maxSize = maxSize;
         this.size = size;
