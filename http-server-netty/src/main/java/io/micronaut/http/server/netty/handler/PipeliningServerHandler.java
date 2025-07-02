@@ -811,6 +811,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 return;
             }
 
+            if (removed) {
+                handler.discardOutbound();
+                return;
+            }
+
             if (this.handler instanceof ContinueOutboundHandler cont) {
                 cont.next = handler;
                 writeSome();

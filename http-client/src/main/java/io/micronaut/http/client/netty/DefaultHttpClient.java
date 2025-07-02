@@ -1572,6 +1572,7 @@ public class DefaultHttpClient implements
         // first: connect
         return connectionManager.connect(requestKey, blockHint)
             .flatMap(poolHandle -> {
+                poolHandle.touch();
                 // build the raw request
                 request.setAttribute(NettyClientHttpRequest.CHANNEL, poolHandle.channel);
 
@@ -1640,6 +1641,7 @@ public class DefaultHttpClient implements
         io.micronaut.http.HttpRequest<?> request,
         NettyByteBody byteBody
     ) {
+        poolHandle.touch();
         URI uri = request.getUri();
         String uriWithoutHost = uri.getRawPath();
         if (uri.getRawQuery() != null) {
@@ -1650,6 +1652,7 @@ public class DefaultHttpClient implements
             .setUri(uriWithoutHost);
 
         return Mono.<NettyClientByteBodyResponse>create(sink -> {
+            poolHandle.touch();
             if (log.isDebugEnabled()) {
                 log.debug("Sending HTTP {} to {}", request.getMethodName(), request.getUri());
             }
