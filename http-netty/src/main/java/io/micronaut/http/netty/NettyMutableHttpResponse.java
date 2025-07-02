@@ -35,6 +35,7 @@ import io.micronaut.http.MutableHttpMessage;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.cookie.Cookie;
+import io.micronaut.http.cookie.CookieUtils;
 import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.cookie.ServerCookieEncoder;
 import io.micronaut.http.netty.cookies.NettyCookies;
@@ -54,6 +55,8 @@ import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.Objects;
@@ -70,6 +73,7 @@ import java.util.Set;
 @Internal
 @TypeHint(value = NettyMutableHttpResponse.class)
 public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, NettyHttpResponseBuilder {
+    private static final Logger LOG = LoggerFactory.getLogger(NettyMutableHttpResponse.class);
     private final HttpVersion httpVersion;
     private HttpResponseStatus httpResponseStatus;
     private final NettyHttpHeaders headers;
@@ -290,7 +294,10 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
 
     @Override
     public MutableHttpResponse<B> cookie(Cookie cookie) {
-        ServerCookieEncoder.INSTANCE.encode(cookie).forEach(c -> headers.add(HttpHeaderNames.SET_COOKIE, c));
+        ServerCookieEncoder.INSTANCE.encode(cookie).forEach(c -> {
+            CookieUtils.logCookieByteLimit(LOG, cookie, c);
+            headers.add(HttpHeaderNames.SET_COOKIE, c);
+        });
         return this;
     }
 
