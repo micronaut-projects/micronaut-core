@@ -37,7 +37,6 @@ import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.CookieUtils;
 import io.micronaut.http.cookie.Cookies;
-import io.micronaut.http.cookie.ServerCookieEncoder;
 import io.micronaut.http.netty.cookies.NettyCookies;
 import io.micronaut.http.netty.stream.DefaultStreamedHttpResponse;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
@@ -294,10 +293,7 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
 
     @Override
     public MutableHttpResponse<B> cookie(Cookie cookie) {
-        ServerCookieEncoder.INSTANCE.encode(cookie).forEach(c -> {
-            CookieUtils.logCookieByteLimit(LOG, cookie, c);
-            headers.add(HttpHeaderNames.SET_COOKIE, c);
-        });
+        CookieUtils.populateCookie(LOG, headers, cookie);
         return this;
     }
 

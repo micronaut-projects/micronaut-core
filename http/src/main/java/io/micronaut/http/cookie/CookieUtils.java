@@ -18,6 +18,7 @@ package io.micronaut.http.cookie;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.http.MutableHttpHeaders;
 import org.slf4j.Logger;
 
 /**
@@ -30,6 +31,7 @@ public final class CookieUtils {
      * @see <a href="https://datatracker.ietf.org/doc/html/rfc6265#section-6.1">Cookie Limits</a>
      */
     private static final int COOKIE_BYTE_LIMIT = 4096;
+    private static final String SET_COOKIE = "Set-Cookie";
 
     private CookieUtils() {
     }
@@ -49,5 +51,21 @@ public final class CookieUtils {
                 logger.warn("Cookie {} size {} greater than limit {}", cookie.getName(), byteCount, COOKIE_BYTE_LIMIT);
             }
         }
+    }
+
+    /**
+     * Sets the HTTP Header Set-Cookie with the supplied cookie encoded.
+     * @param logger Logger
+     * @param headers HTTP Headers
+     * @param cookie Cookie
+     */
+    public static void populateCookie(@NonNull Logger logger,
+                                      @NonNull MutableHttpHeaders headers,
+                                      @NonNull Cookie cookie) {
+        ServerCookieEncoder.INSTANCE.encode(cookie)
+            .forEach(cookieEncoded -> {
+                CookieUtils.logCookieByteLimit(logger, cookie, cookieEncoded);
+                headers.add(SET_COOKIE, cookieEncoded);
+            });
     }
 }

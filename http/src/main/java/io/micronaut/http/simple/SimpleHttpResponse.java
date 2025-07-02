@@ -66,10 +66,7 @@ class SimpleHttpResponse<B> implements MutableHttpResponse<B> {
     private void updateCookies() {
         headers.remove(HttpHeaders.SET_COOKIE);
         for (Cookie cookie : cookies.getAll()) {
-            ServerCookieEncoder.INSTANCE.encode(cookie).forEach(c -> {
-                CookieUtils.logCookieByteLimit(LOG, cookie, c);
-                headers.add(HttpHeaders.SET_COOKIE, c);
-            });
+            CookieUtils.populateCookie(LOG, headers, cookie);
         }
     }
 

@@ -27,13 +27,11 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.CookieUtils;
 import io.micronaut.http.cookie.Cookies;
-import io.micronaut.http.cookie.ServerCookieEncoder;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
 import io.micronaut.http.netty.cookies.NettyCookies;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.netty.handler.codec.http.FullHttpResponse;
-import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -141,11 +139,7 @@ final class NettyStreamedHttpResponse<B> implements MutableHttpResponse<B>, Nett
 
     @Override
     public synchronized MutableHttpResponse<B> cookie(Cookie cookie) {
-        ServerCookieEncoder.INSTANCE.encode(cookie)
-                .forEach(cookieEncoded -> {
-                    CookieUtils.logCookieByteLimit(LOG, cookie, cookieEncoded);
-                    headers.add(HttpHeaderNames.SET_COOKIE, cookieEncoded);
-                });
+        CookieUtils.populateCookie(LOG, headers, cookie);
         nettyCookies = null; // need to rebuild cookie map
         return this;
     }
