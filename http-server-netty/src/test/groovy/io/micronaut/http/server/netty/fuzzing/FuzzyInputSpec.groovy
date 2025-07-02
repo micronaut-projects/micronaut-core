@@ -1,14 +1,19 @@
 package io.micronaut.http.server.netty.fuzzing
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.BeanProvider
+import io.micronaut.context.annotation.Replaces
 import io.micronaut.context.annotation.Requires
+import io.micronaut.core.annotation.Nullable
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.netty.channel.EventLoopGroupConfiguration
 import io.micronaut.http.netty.channel.EventLoopGroupRegistry
+import io.micronaut.http.server.HttpServerConfiguration
 import io.micronaut.http.server.netty.NettyHttpServer
+import io.micronaut.http.server.util.DefaultHttpHostResolver
 import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.bootstrap.Bootstrap
 import io.netty.buffer.Unpooled
@@ -22,6 +27,7 @@ import io.netty.util.ReferenceCountUtil
 import jakarta.inject.Singleton
 import org.reactivestreams.Publisher
 import spock.lang.Specification
+
 /**
  * HTTP inputs generated from fuzzing.
  */
@@ -139,6 +145,7 @@ class FuzzyInputSpec extends Specification {
                         "LCwsSWYtTWF0L3JjdGg6LTAKQ29udGVudC1MZW5ndGg6NDMKCv/+LgAIdGlyZW5jZUNvdW50VXRp" +
                         "bM3ac3NXaG5nWVlZWVkJ/wAAAABSZWZlbXQCCf9sYXQLSFRUUC8yLjAKVHJhbnNmZXItRW5jb2Rp" +
                         "bmc6c25hcHB5LCw6LTAKQ29udGVudC1MZW5ndGg6NDQKCv/+LgAIdGlyZUhUVDosdA01Cg=="),
+                Base64.decoder.decode("cG9zdA0vZWNoby1hcnJheQtIVFRQLzIuMApDb250ZW50LUxlbmd0aDo5Ck9yaWdpbjoKCg=="),
         ]
     }
 
@@ -156,9 +163,30 @@ class FuzzyInputSpec extends Specification {
             return foo
         }
 
+        @Post("/echo-array")
+        public byte[] echo(@Body byte[] foo) {
+            return foo;
+        }
+
         @Post("/echo-publisher")
         public Publisher<byte[]> echo(@Body Publisher<byte[]> foo) {
             return foo;
+        }
+    }
+
+    @Singleton
+    @Replaces(DefaultHttpHostResolver.class)
+    @Requires(property = "spec.name", value = "FuzzyInputSpec")
+    public static class StableHttpHostResolver extends DefaultHttpHostResolver {
+        private static final boolean LOCAL = false;
+
+        public StableHttpHostResolver(HttpServerConfiguration serverConfiguration, @Nullable BeanProvider<EmbeddedServer> embeddedServer) {
+            super(serverConfiguration, embeddedServer);
+        }
+
+        @Override
+        protected String getEmbeddedHost() {
+            return LOCAL ? "http://localhost:8080" : "http://example.com:8080";
         }
     }
 }

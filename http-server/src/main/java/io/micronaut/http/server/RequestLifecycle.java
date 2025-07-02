@@ -36,7 +36,12 @@ import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.filter.FilterRunner;
 import io.micronaut.http.filter.GenericHttpFilter;
-import io.micronaut.http.server.exceptions.*;
+import io.micronaut.http.server.exceptions.ExceptionHandler;
+import io.micronaut.http.server.exceptions.NotAcceptableException;
+import io.micronaut.http.server.exceptions.NotAllowedException;
+import io.micronaut.http.server.exceptions.NotFoundException;
+import io.micronaut.http.server.exceptions.NotWebSocketRequestException;
+import io.micronaut.http.server.exceptions.UnsupportedMediaException;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
 import io.micronaut.inject.BeanDefinition;
@@ -249,7 +254,8 @@ public class RequestLifecycle {
             }
             if (RouteExecutor.isIgnorable(cause)) {
                 RouteExecutor.logIgnoredException(cause);
-                return ExecutionFlow.empty();
+                // the client won't see this response, but we need one for filters and such
+                return ExecutionFlow.just(HttpResponse.badRequest("Stream closed"));
             }
             return createDefaultErrorResponseFlow(request, cause);
         }
