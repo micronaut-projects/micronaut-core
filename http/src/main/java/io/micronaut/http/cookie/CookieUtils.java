@@ -81,6 +81,6 @@ public final class CookieUtils {
      * @param cookie Cookie
      */
     public static void setCookieHeader(@NonNull MutableHttpHeaders headers, @NonNull Cookie cookie) {
-        setCookieHeader( headers, cookie, COOKIE_BYTE_LIMIT);
+        setCookieHeader(headers, cookie, COOKIE_BYTE_LIMIT);
     }
 }
