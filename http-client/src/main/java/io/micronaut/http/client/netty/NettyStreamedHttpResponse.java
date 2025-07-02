@@ -33,8 +33,6 @@ import io.micronaut.http.netty.cookies.NettyCookies;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import java.util.Optional;
 
 /**
@@ -46,7 +44,6 @@ import java.util.Optional;
  */
 @Internal
 final class NettyStreamedHttpResponse<B> implements MutableHttpResponse<B>, NettyHttpResponseBuilder {
-    private static final Logger LOG = LoggerFactory.getLogger(NettyStreamedHttpResponse.class);
     private final StreamedHttpResponse nettyResponse;
     private final NettyHttpHeaders headers;
     @GuardedBy("this")

@@ -54,8 +54,6 @@ import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.Objects;
@@ -72,7 +70,6 @@ import java.util.Set;
 @Internal
 @TypeHint(value = NettyMutableHttpResponse.class)
 public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, NettyHttpResponseBuilder {
-    private static final Logger LOG = LoggerFactory.getLogger(NettyMutableHttpResponse.class);
     private final HttpVersion httpVersion;
     private HttpResponseStatus httpResponseStatus;
     private final NettyHttpHeaders headers;
