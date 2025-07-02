@@ -45,12 +45,44 @@ public final class CookieUtils {
     public static void logCookieByteLimit(@NonNull Logger logger,
                                           @NonNull Cookie cookie,
                                           @NonNull String cookieEncoded) {
+        logCookieByteLimit(logger, cookie, cookieEncoded, COOKIE_BYTE_LIMIT);
+    }
+
+    /**
+     *
+     * @param logger Logger
+     * @param cookie Cookie
+     * @param cookieEncoded Encoded cookie
+     * @param cookieByteLimit Cookie byte Limit
+     */
+    public static void logCookieByteLimit(@NonNull Logger logger,
+                                          @NonNull Cookie cookie,
+                                          @NonNull String cookieEncoded,
+                                          @NonNull Integer cookieByteLimit) {
         if (logger.isWarnEnabled()) {
             int byteCount = StringUtils.utf8Bytes(cookieEncoded);
-            if (byteCount > COOKIE_BYTE_LIMIT) {
-                logger.warn("Cookie {} size {} greater than limit {}", cookie.getName(), byteCount, COOKIE_BYTE_LIMIT);
+            if (byteCount > cookieByteLimit) {
+                logger.warn("Cookie {} size {} greater than limit {}", cookie.getName(), byteCount, cookieByteLimit);
             }
         }
+    }
+
+    /**
+     * Sets the HTTP Header Set-Cookie with the supplied cookie encoded.
+     * @param logger Logger
+     * @param headers HTTP Headers
+     * @param cookie Cookie
+     * @param cookieByteLimit Cookie byte Limit
+     */
+    public static void setCookieHeader(@NonNull Logger logger,
+                                       @NonNull MutableHttpHeaders headers,
+                                       @NonNull Cookie cookie,
+                                       @NonNull Integer cookieByteLimit) {
+        ServerCookieEncoder.INSTANCE.encode(cookie)
+            .forEach(cookieEncoded -> {
+                CookieUtils.logCookieByteLimit(logger, cookie, cookieEncoded, cookieByteLimit);
+                headers.add(SET_COOKIE, cookieEncoded);
+            });
     }
 
     /**
@@ -62,10 +94,6 @@ public final class CookieUtils {
     public static void setCookieHeader(@NonNull Logger logger,
                                        @NonNull MutableHttpHeaders headers,
                                        @NonNull Cookie cookie) {
-        ServerCookieEncoder.INSTANCE.encode(cookie)
-            .forEach(cookieEncoded -> {
-                CookieUtils.logCookieByteLimit(logger, cookie, cookieEncoded);
-                headers.add(SET_COOKIE, cookieEncoded);
-            });
+        setCookieHeader(logger, headers, cookie, COOKIE_BYTE_LIMIT);
     }
 }
