@@ -15,8 +15,10 @@
  */
 package io.micronaut.core.util;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -498,6 +500,10 @@ public final class StringUtils {
     public static Iterator<String> splitOmitEmptyStringsIterator(final CharSequence sequence, final char splitCharacter) {
         Objects.requireNonNull(sequence);
         return new SplitOmitEmptyIterator(sequence, splitCharacter);
+    }
+
+    public static int byteCount(@NonNull String str) {
+        return str.getBytes(StandardCharsets.UTF_8).length;
     }
 
     /**
