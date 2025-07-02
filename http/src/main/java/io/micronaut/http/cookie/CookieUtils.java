@@ -19,7 +19,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.MutableHttpHeaders;
-import org.slf4j.Logger;
 
 /**
  * Utils class to work with cookies.
@@ -38,62 +37,50 @@ public final class CookieUtils {
 
     /**
      *
-     * @param logger Logger
      * @param cookie Cookie
      * @param cookieEncoded Encoded cookie
      */
-    public static void logCookieByteLimit(@NonNull Logger logger,
-                                          @NonNull Cookie cookie,
-                                          @NonNull String cookieEncoded) {
-        logCookieByteLimit(logger, cookie, cookieEncoded, COOKIE_BYTE_LIMIT);
+    public static void verifyCookieSize(@NonNull Cookie cookie,
+                                        @NonNull String cookieEncoded) {
+        verifyCookieSize(cookie, cookieEncoded, COOKIE_BYTE_LIMIT);
     }
 
     /**
-     *
-     * @param logger Logger
      * @param cookie Cookie
      * @param cookieEncoded Encoded cookie
      * @param cookieByteLimit Cookie byte Limit
      */
-    public static void logCookieByteLimit(@NonNull Logger logger,
-                                          @NonNull Cookie cookie,
-                                          @NonNull String cookieEncoded,
-                                          @NonNull Integer cookieByteLimit) {
-        if (logger.isWarnEnabled()) {
+    public static void verifyCookieSize(@NonNull Cookie cookie,
+                                        @NonNull String cookieEncoded,
+                                        @NonNull Integer cookieByteLimit) {
             int byteCount = StringUtils.utf8Bytes(cookieEncoded);
             if (byteCount > cookieByteLimit) {
-                logger.warn("Cookie {} size {} greater than limit {}", cookie.getName(), byteCount, cookieByteLimit);
+                throw new CookieSizeExceededException(cookie.getName(), cookieByteLimit, byteCount);
             }
-        }
     }
 
     /**
      * Sets the HTTP Header Set-Cookie with the supplied cookie encoded.
-     * @param logger Logger
      * @param headers HTTP Headers
      * @param cookie Cookie
      * @param cookieByteLimit Cookie byte Limit
      */
-    public static void setCookieHeader(@NonNull Logger logger,
-                                       @NonNull MutableHttpHeaders headers,
+    public static void setCookieHeader(@NonNull MutableHttpHeaders headers,
                                        @NonNull Cookie cookie,
                                        @NonNull Integer cookieByteLimit) {
         ServerCookieEncoder.INSTANCE.encode(cookie)
             .forEach(cookieEncoded -> {
-                CookieUtils.logCookieByteLimit(logger, cookie, cookieEncoded, cookieByteLimit);
+                CookieUtils.verifyCookieSize(cookie, cookieEncoded, cookieByteLimit);
                 headers.add(SET_COOKIE, cookieEncoded);
             });
     }
 
     /**
      * Sets the HTTP Header Set-Cookie with the supplied cookie encoded.
-     * @param logger Logger
      * @param headers HTTP Headers
      * @param cookie Cookie
      */
-    public static void setCookieHeader(@NonNull Logger logger,
-                                       @NonNull MutableHttpHeaders headers,
-                                       @NonNull Cookie cookie) {
-        setCookieHeader(logger, headers, cookie, COOKIE_BYTE_LIMIT);
+    public static void setCookieHeader(@NonNull MutableHttpHeaders headers, @NonNull Cookie cookie) {
+        setCookieHeader( headers, cookie, COOKIE_BYTE_LIMIT);
     }
 }

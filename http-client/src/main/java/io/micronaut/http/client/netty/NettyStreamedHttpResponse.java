@@ -139,7 +139,7 @@ final class NettyStreamedHttpResponse<B> implements MutableHttpResponse<B>, Nett
 
     @Override
     public synchronized MutableHttpResponse<B> cookie(Cookie cookie) {
-        CookieUtils.setCookieHeader(LOG, headers, cookie);
+        CookieUtils.setCookieHeader(headers, cookie);
         nettyCookies = null; // need to rebuild cookie map
         return this;
     }

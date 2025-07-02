@@ -28,9 +28,6 @@ import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.CookieUtils;
 import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.simple.cookies.SimpleCookies;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.Optional;
 import java.util.Set;
 
@@ -44,8 +41,6 @@ import java.util.Set;
  */
 @TypeHint(value = SimpleHttpResponse.class)
 class SimpleHttpResponse<B> implements MutableHttpResponse<B> {
-    private static final Logger LOG = LoggerFactory.getLogger(SimpleHttpResponse.class);
-
     private final MutableHttpHeaders headers = new SimpleHttpHeaders(ConversionService.SHARED);
     private final SimpleCookies cookies = new SimpleCookies(ConversionService.SHARED);
     private final MutableConvertibleValues<Object> attributes = new MutableConvertibleValuesMap<>();
@@ -65,7 +60,7 @@ class SimpleHttpResponse<B> implements MutableHttpResponse<B> {
     private void updateCookies() {
         headers.remove(HttpHeaders.SET_COOKIE);
         for (Cookie cookie : cookies.getAll()) {
-            CookieUtils.setCookieHeader(LOG, headers, cookie);
+            CookieUtils.setCookieHeader(headers, cookie);
         }
     }
 
