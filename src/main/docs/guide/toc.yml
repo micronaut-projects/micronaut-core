@@ -1,6 +1,5 @@
 introduction:
   title: Introduction
-  whatsNew: What's New?
   upgrading: Upgrading your Micronaut Application
 quickStart:
   title: Quick Start
