@@ -32,6 +32,7 @@ dependencies {
     testAnnotationProcessor(projects.micronautInjectJava)
     testImplementation(projects.micronautInject)
     testImplementation(projects.micronautInjectJavaTest)
+    testImplementation(libs.junit.jupiter.params)
     testCompileOnly(projects.micronautInjectGroovy)
 }
 

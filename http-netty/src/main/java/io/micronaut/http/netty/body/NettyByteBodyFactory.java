@@ -90,6 +90,53 @@ public final class NettyByteBodyFactory extends ByteBodyFactory {
     }
 
     @Override
+    public @NonNull BufferingOutputStream outputStreamBuffer() {
+        return new BufferingOutputStream() {
+            ByteBufOutputStream out = new ByteBufOutputStream(alloc().buffer());
+
+            @Override
+            public OutputStream stream() throws IllegalStateException {
+                OutputStream out = this.out;
+                if (out == null) {
+                    throw new IllegalStateException("Already converted to buffer");
+                }
+                return out;
+            }
+
+            @Override
+            public CloseableAvailableByteBody finishBuffer() throws IOException {
+                ByteBufOutputStream out = this.out;
+                if (out == null) {
+                    throw new IllegalStateException("Already converted to buffer");
+                }
+                this.out = null;
+                boolean release = true;
+                try {
+                    out.close();
+                    release = false;
+                } finally {
+                    if (release) {
+                        out.buffer().release();
+                    }
+                }
+                return new AvailableNettyByteBody(out.buffer());
+            }
+
+            @Override
+            public void close() throws IOException {
+                ByteBufOutputStream out = this.out;
+                if (out != null) {
+                    try {
+                        out.close();
+                    } finally {
+                        out.buffer().release();
+                    }
+                }
+            }
+        };
+    }
+
+    @Override
     public @NonNull CloseableAvailableByteBody createEmpty() {
         return AvailableNettyByteBody.empty();
     }
