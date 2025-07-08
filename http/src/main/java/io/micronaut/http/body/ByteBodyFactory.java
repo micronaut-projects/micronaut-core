@@ -142,6 +142,7 @@ public class ByteBodyFactory {
      * convenient, but this method offers more control over the stream lifecycle.
      *
      * @return The {@link BufferingOutputStream} wrapper
+     * @since 4.10.0
      */
     @NonNull
     public BufferingOutputStream outputStreamBuffer() {
@@ -214,6 +215,8 @@ public class ByteBodyFactory {
      * Wrapper around a {@link OutputStream} that buffers into a
      * {@link CloseableAvailableByteBody}. Must be closed after use, even if
      * {@link #finishBuffer()} has not been called (e.g. on error), to avoid resource leaks.
+     *
+     * @since 4.10.0
      */
     public interface BufferingOutputStream extends Closeable {
         /**
@@ -223,6 +226,7 @@ public class ByteBodyFactory {
          * @throws IllegalStateException If the buffer has already
          * {@link #finishBuffer() been finalized}
          */
+        @NonNull
         OutputStream stream() throws IllegalStateException;
 
         /**
@@ -235,6 +239,7 @@ public class ByteBodyFactory {
          * @throws IOException If there was an exception finishing up the buffer
          * @throws IllegalStateException If this method has already been called
          */
+        @NonNull
         CloseableAvailableByteBody finishBuffer() throws IOException, IllegalStateException;
 
         /**
