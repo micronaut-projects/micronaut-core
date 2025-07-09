@@ -25,6 +25,8 @@ import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.core.io.file.FileSystemResourceLoader;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
+import io.micronaut.core.io.value.Base64ResourceLoader;
+import io.micronaut.core.io.value.StringResourceLoader;
 
 import java.util.Arrays;
 import java.util.List;
@@ -50,7 +52,9 @@ public record MatchesPresenceOfResourcesCondition(String[] resourcePaths) implem
         } else {
             resourceLoaders = Arrays.asList(
                 ClassPathResourceLoader.defaultLoader(beanContext.getClassLoader()),
-                FileSystemResourceLoader.defaultLoader()
+                FileSystemResourceLoader.defaultLoader(),
+                Base64ResourceLoader.getInstance(),
+                StringResourceLoader.getInstance()
             );
         }
         ResourceResolver resolver = new ResourceResolver(resourceLoaders);

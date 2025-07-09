@@ -15,11 +15,13 @@
  */
 package io.micronaut.core.io;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.file.FileSystemResourceLoader;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
+import io.micronaut.core.io.value.Base64ResourceLoader;
+import io.micronaut.core.io.value.StringResourceLoader;
 import io.micronaut.core.util.ArgumentUtils;
 
-import io.micronaut.core.annotation.NonNull;
 import java.io.InputStream;
 import java.net.URL;
 import java.util.Arrays;
@@ -59,7 +61,9 @@ public class ResourceResolver {
     public ResourceResolver() {
         this(new ResourceLoader[]{
             ClassPathResourceLoader.defaultLoader(ResourceResolver.class.getClassLoader()),
-            FileSystemResourceLoader.defaultLoader()});
+            FileSystemResourceLoader.defaultLoader(),
+            Base64ResourceLoader.getInstance(),
+            StringResourceLoader.getInstance()});
     }
 
     /**
