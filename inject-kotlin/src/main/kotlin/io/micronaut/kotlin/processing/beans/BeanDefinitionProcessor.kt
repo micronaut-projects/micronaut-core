@@ -99,8 +99,6 @@ internal class BeanDefinitionProcessor(private val environment: SymbolProcessorE
                     }
                 } catch (e: ProcessingException) {
                     handleProcessingException(environment, e)
-                } finally {
-                    BeanDefinitionWriter.finish()
                 }
             }
         }
