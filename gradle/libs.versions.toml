@@ -165,6 +165,7 @@ managed-netty-transport-native-epoll = { module = "io.netty:netty-transport-nati
 managed-netty-transport-native-kqueue = { module = "io.netty:netty-transport-native-kqueue", version.ref = "managed-netty" }
 managed-netty-transport-native-iouring = { module = "io.netty:netty-transport-native-io_uring", version.ref = "managed-netty" }
 managed-netty-transport-native-unix-common = { module = "io.netty:netty-transport-native-unix-common", version.ref = "managed-netty" }
+managed-netty-pkitesting = { module = "io.netty:netty-pkitesting", version.ref = "managed-netty" }
 managed-netty-tcnative-boringssl-static = { module = "io.netty:netty-tcnative-boringssl-static", version.ref = "managed-netty-tcnative" }
 
 managed-reactive-streams = { module = "org.reactivestreams:reactive-streams", version.ref = "managed-reactive-streams" }

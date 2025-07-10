@@ -39,7 +39,7 @@ import java.util.regex.Pattern;
  * @since 3.8.0
  */
 public final class HttpHeadersUtil {
-    private final static Charset DEFAULT_CHARSET = StandardCharsets.UTF_8;
+    private static final Charset DEFAULT_CHARSET = StandardCharsets.UTF_8;
     private static final Supplier<Pattern> HEADER_MASK_PATTERNS = SupplierUtil.memoized(() ->
         Pattern.compile(".*(password|cred|cert|key|secret|token|auth|signat).*", Pattern.CASE_INSENSITIVE)
     );

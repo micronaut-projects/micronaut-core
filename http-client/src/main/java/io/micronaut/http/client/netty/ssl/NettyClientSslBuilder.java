@@ -27,10 +27,10 @@ import io.micronaut.http.ssl.ClientAuthentication;
 import io.micronaut.http.ssl.SslBuilder;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.http.ssl.SslConfigurationException;
+import io.netty.handler.codec.http2.Http2SecurityUtil;
 import io.netty.handler.codec.http3.Http3;
 import io.netty.handler.codec.quic.QuicSslContext;
 import io.netty.handler.codec.quic.QuicSslContextBuilder;
-import io.netty.handler.codec.http2.Http2SecurityUtil;
 import io.netty.handler.ssl.ApplicationProtocolConfig;
 import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.SslContext;
@@ -121,7 +121,7 @@ public class NettyClientSslBuilder extends SslBuilder<SslContext> implements Cli
             }
         }
         if (versionSelection.isAlpn()) {
-            SslProvider provider = SslProvider.isAlpnSupported(SslProvider.OPENSSL) ? SslProvider.OPENSSL : SslProvider.JDK;
+            SslProvider provider = ssl.isPreferOpenssl() && SslProvider.isAlpnSupported(SslProvider.OPENSSL) ? SslProvider.OPENSSL : SslProvider.JDK;
             sslBuilder.sslProvider(provider);
             sslBuilder.applicationProtocolConfig(new ApplicationProtocolConfig(
                 ApplicationProtocolConfig.Protocol.ALPN,

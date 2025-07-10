@@ -15,13 +15,24 @@
  */
 package io.micronaut.http.ssl;
 
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.http.HttpVersion;
 
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.TrustManagerFactory;
-import java.net.URL;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
 import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.NoSuchProviderException;
+import java.security.PrivateKey;
+import java.security.UnrecoverableKeyException;
+import java.security.cert.X509Certificate;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -97,8 +108,12 @@ public abstract class SslBuilder<T> {
         SslConfiguration.TrustStoreConfiguration trustStore = ssl.getTrustStore();
         Optional<String> path = trustStore.getPath();
         if (path.isPresent()) {
-            return Optional.of(load(trustStore.getType(),
-                path.get(), trustStore.getPassword()));
+            return Optional.of(loadCompat(new KeyStoreBasedCertificateSpec(
+                trustStore.getType().orElse(null),
+                trustStore.getPassword().orElse(null),
+                trustStore.getProvider().orElse(null),
+                path.get()
+            )));
         } else {
             return Optional.empty();
         }
@@ -137,10 +152,39 @@ public abstract class SslBuilder<T> {
         SslConfiguration.KeyStoreConfiguration keyStore = ssl.getKeyStore();
         Optional<String> path = keyStore.getPath();
         if (path.isPresent()) {
-            return Optional.of(load(keyStore.getType(),
-                path.get(), keyStore.getPassword()));
+            if (keyStore.getKeyPath() != null || keyStore.getCertificatePath() != null) {
+                throw new IllegalArgumentException("Cannot specify key store path and key-path or certificate-path at the same time");
+            }
+            return Optional.of(loadCompat(new KeyStoreBasedCertificateSpec(
+                keyStore.getType().orElse(null),
+                keyStore.getPassword().orElse(null),
+                keyStore.getProvider().orElse(null),
+                path.get()
+            )));
+        } else if (keyStore.getKeyPath() != null) {
+            if (keyStore.getCertificatePath() == null) {
+                throw new IllegalArgumentException("Must also specify certificate-path");
+            }
+            return Optional.of(loadCompat(new PemBasedCertificateSpec(
+                keyStore.getType().orElse(null),
+                keyStore.getPassword().orElse(null),
+                keyStore.getProvider().orElse(null),
+                keyStore.getKeyPath(),
+                keyStore.getCertificatePath()
+            )));
+        } else if (keyStore.getCertificatePath() != null) {
+            throw new IllegalArgumentException("Must also specify key-path");
         } else {
             return Optional.empty();
+        }
+    }
+
+    private KeyStore loadCompat(CertificateSpec spec) throws Exception {
+        if (spec instanceof KeyStoreBasedCertificateSpec ks && ks.getProvider() == null) {
+            // we need to call the old method to make sure we hit any overrides
+            return load(Optional.ofNullable(ks.getType()), ks.getPath(), Optional.ofNullable(ks.getPassword()));
+        } else {
+            return load(spec);
         }
     }
 
@@ -150,20 +194,227 @@ public abstract class SslBuilder<T> {
      * @param optionalPassword The optional password
      * @return A {@link KeyStore}
      * @throws Exception if there is an error
+     * @deprecated Please override {@link #load(CertificateSpec)} instead
      */
+    @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
+    @Deprecated(forRemoval = true)
     protected KeyStore load(Optional<String> optionalType,
                             String resource,
                             Optional<String> optionalPassword) throws Exception {
-        String type = optionalType.orElse("JKS");
-        String password = optionalPassword.orElse(null);
-        KeyStore store = KeyStore.getInstance(type);
+        return load(new KeyStoreBasedCertificateSpec(optionalType.orElse(null), optionalPassword.orElse(null), null, resource));
+    }
 
-        Optional<URL> url = resourceResolver.getResource(resource);
-        if (url.isPresent()) {
-            store.load(url.get().openStream(), password == null ? null : password.toCharArray());
+    /**
+     * @param spec The configured certificate spec
+     * @return A {@link KeyStore}
+     * @throws Exception if there is an error
+     */
+    protected KeyStore load(CertificateSpec spec) throws Exception {
+        if (spec instanceof KeyStoreBasedCertificateSpec ks) {
+            KeyStore store = createEmptyKeyStore(spec.provider, spec.type == null ? "JKS" : spec.type);
+
+            InputStream stream = resourceResolver.getResourceAsStream(ks.path)
+                .orElseThrow(() -> new SslConfigurationException("The resource " + ks.path + " could not be found"));
+            try {
+                store.load(stream, spec.password == null ? null : spec.password.toCharArray());
+            } catch (IOException e) {
+                if (!(e.getCause() instanceof UnrecoverableKeyException)) {
+                    try {
+                        if (spec.type == null) {
+                            // we can't add passwordless keys to a JKS key store
+                            store = createEmptyKeyStore(spec.provider, "PKCS12");
+                        }
+
+                        loadPem(ks.path, spec.password, spec.provider, store);
+                    } catch (PemParser.NotPemException f) {
+                        // probably should have been loaded as KS
+                        e.addSuppressed(new Exception("Also tried and failed to load the input as PEM:", f));
+                        throw e;
+                    } catch (Exception f) {
+                        // probably should have been loaded as PEM
+                        f.addSuppressed(new Exception("Also tried and failed to load the input as a key store:", e));
+                        throw f;
+                    }
+                } else {
+                    throw e;
+                }
+            }
+            return store;
+        } else if (spec instanceof PemBasedCertificateSpec pem) {
+            List<Object> keyItems;
+            try (InputStream s = resourceResolver.getResourceAsStream(pem.keyPath).orElseThrow()) {
+                keyItems = new PemParser(pem.provider, pem.password)
+                    .loadPem(new String(s.readAllBytes(), StandardCharsets.UTF_8));
+            }
+            List<Object> certItems;
+            try (InputStream s = resourceResolver.getResourceAsStream(pem.certificatePath).orElseThrow()) {
+                certItems = new PemParser(pem.provider, pem.password)
+                    .loadPem(new String(s.readAllBytes(), StandardCharsets.UTF_8));
+            }
+
+            if (keyItems.size() != 1) {
+                throw new IllegalArgumentException("key-path contained more than one PEM object. It should only contain the private key.");
+            }
+            if (!(keyItems.get(0) instanceof PrivateKey pk)) {
+                throw new IllegalArgumentException("key-path contained a certificate instead of a private key.");
+            }
+            KeyStore store = createEmptyKeyStore(spec.provider, spec.type == null ? "PKCS12" : spec.type);
+            store.load(null, null);
+            store.setKeyEntry(
+                "key",
+                pk,
+                null,
+                certificates(certItems).toArray(new X509Certificate[0])
+            );
             return store;
         } else {
-            throw new SslConfigurationException("The resource " + resource + " could not be found");
+            throw new AssertionError("Weird CertificateSpec");
+        }
+    }
+
+    private static @NonNull KeyStore createEmptyKeyStore(@Nullable String provider, String type) throws KeyStoreException, NoSuchProviderException {
+        return provider == null ? KeyStore.getInstance(type) : KeyStore.getInstance(type, provider);
+    }
+
+    private void loadPem(@NonNull String resource, @Nullable String password, @Nullable String provider, KeyStore store) throws IOException, GeneralSecurityException, PemParser.NotPemException {
+        List<Object> items;
+        try (InputStream s = resourceResolver.getResourceAsStream(resource).orElseThrow()) {
+            items = new PemParser(provider, password)
+                .loadPem(new String(s.readAllBytes(), StandardCharsets.UTF_8));
+        }
+        if (items.get(0) instanceof PrivateKey pk) {
+            X509Certificate[] certs = certificates(items.subList(1, items.size())).toArray(new X509Certificate[0]);
+            store.load(null, null);
+            store.setKeyEntry("key", pk, null, certs);
+        } else if (items.get(0) instanceof X509Certificate) {
+            store.load(null, null);
+            List<X509Certificate> certificates = certificates(items);
+            for (int i = 0; i < certificates.size(); i++) {
+                store.setCertificateEntry("cert" + i, certificates.get(i));
+            }
+        } else {
+            throw new IllegalArgumentException("Unrecognized PEM entries");
+        }
+    }
+
+    private static List<X509Certificate> certificates(List<Object> pemObjects) {
+        for (Object pemObject : pemObjects) {
+            if (!(pemObject instanceof X509Certificate)) {
+                throw new IllegalArgumentException("PEM must only contain the private key and a certificate chain");
+            }
+        }
+        //noinspection unchecked,rawtypes
+        return (List) pemObjects;
+    }
+
+    /**
+     * Specification for building a {@link KeyStore}, either as a key store or a trust store.
+     *
+     * @since 4.10.0
+     */
+    protected abstract static sealed class CertificateSpec {
+        final String type;
+        final String password;
+        final String provider;
+
+        private CertificateSpec(String type, String password, String provider) {
+            this.type = type;
+            this.password = password;
+            this.provider = provider;
+        }
+
+        /**
+         * {@link KeyStore} type, e.g. JKS or PKCS12.
+         *
+         * @return Key store type
+         */
+        @Nullable
+        public String getType() {
+            return type;
+        }
+
+        /**
+         * Key store password.
+         *
+         * @return The password
+         */
+        @Nullable
+        public String getPassword() {
+            return password;
+        }
+
+        /**
+         * JCA provider for creating the key store and other objects.
+         *
+         * @return The JCA provider
+         */
+        @Nullable
+        public String getProvider() {
+            return provider;
+        }
+    }
+
+    /**
+     * Certificate spec based on {@link SslConfiguration.KeyStoreConfiguration#getPath()} or
+     * {@link SslConfiguration.TrustStoreConfiguration#getPath()}. Note that the path can still
+     * point to a PEM.
+     *
+     * @since 4.10.0
+     */
+    protected static final class KeyStoreBasedCertificateSpec extends CertificateSpec {
+        final String path;
+
+        KeyStoreBasedCertificateSpec(String type, String password, String provider, String path) {
+            super(type, password, provider);
+            this.path = path;
+        }
+
+        /**
+         * The path to the JKS, PKCS12 or PEM file.
+         *
+         * @return The path
+         */
+        @NonNull
+        public String getPath() {
+            return path;
+        }
+    }
+
+    /**
+     * Certificate spec based on {@link SslConfiguration.KeyStoreConfiguration#getKeyPath()} and
+     * {@link SslConfiguration.KeyStoreConfiguration#getCertificatePath()}, both of which must
+     * contain a PEM.
+     *
+     * @since 4.10.0
+     */
+    protected static final class PemBasedCertificateSpec extends CertificateSpec {
+        final String keyPath;
+        final String certificatePath;
+
+        private PemBasedCertificateSpec(String type, String password, String provider, String keyPath, String certificatePath) {
+            super(type, password, provider);
+            this.keyPath = keyPath;
+            this.certificatePath = certificatePath;
+        }
+
+        /**
+         * The path to the PEM file containing the private key.
+         *
+         * @return The path
+         */
+        @NonNull
+        public String getKeyPath() {
+            return keyPath;
+        }
+
+        /**
+         * The path to the PEM file containing the certificate chain.
+         *
+         * @return The path
+         */
+        @NonNull
+        public String getCertificatePath() {
+            return certificatePath;
         }
     }
 }

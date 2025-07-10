@@ -63,6 +63,7 @@ dependencies {
     testImplementation(libs.spotbugs)
     testImplementation(projects.micronautHttpNettyHttp3)
     testImplementation(libs.bcpkix)
+    testImplementation(libs.managed.netty.pkitesting)
     testImplementation(projects.micronautJacksonDatabind)
     testImplementation(projects.micronautHttpTck)
 // Add Micronaut Jackson XML after v4 Migration
