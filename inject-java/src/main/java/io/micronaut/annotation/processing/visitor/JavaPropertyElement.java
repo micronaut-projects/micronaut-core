@@ -223,4 +223,8 @@ final class JavaPropertyElement extends AbstractJavaMemberElement implements Pro
         return owningElement;
     }
 
+    @Override
+    public Optional<String> getDocumentation() {
+        return PropertyElement.super.getDocumentation();
+    }
 }

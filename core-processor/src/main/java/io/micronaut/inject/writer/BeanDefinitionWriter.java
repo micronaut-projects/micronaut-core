@@ -123,7 +123,6 @@ import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.ast.beans.BeanElement;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
-import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.qualifiers.AnyQualifier;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.inject.visitor.BeanElementVisitor;
@@ -2675,11 +2674,10 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
         ClassElement type,
         String field,
         AnnotationMetadata annotationMetadata,
-        ConfigurationMetadataBuilder metadataBuilder,
         boolean isInterface) {
 
         ConfigBuilderState state = new ConfigBuilderState(type, field, false, annotationMetadata, isInterface);
-        configBuilderInjectCommand = new ConfigFieldBuilderInjectCommand(type, field, annotationMetadata, metadataBuilder, isInterface, state, new ArrayList<>());
+        configBuilderInjectCommand = new ConfigFieldBuilderInjectCommand(type, field, annotationMetadata, isInterface, state, new ArrayList<>());
         injectCommands.add(configBuilderInjectCommand);
     }
 
@@ -2688,11 +2686,10 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
         ClassElement type,
         String methodName,
         AnnotationMetadata annotationMetadata,
-        ConfigurationMetadataBuilder metadataBuilder,
         boolean isInterface) {
 
         ConfigBuilderState state = new ConfigBuilderState(type, methodName, true, annotationMetadata, isInterface);
-        configBuilderInjectCommand = new ConfigMethodBuilderInjectPointCommand(type, methodName, annotationMetadata, metadataBuilder, isInterface, state, new ArrayList<>());
+        configBuilderInjectCommand = new ConfigMethodBuilderInjectPointCommand(type, methodName, annotationMetadata, isInterface, state, new ArrayList<>());
         injectCommands.add(configBuilderInjectCommand);
     }
 
@@ -4900,7 +4897,6 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
     private record ConfigFieldBuilderInjectCommand(ClassElement type,
                                                    String field,
                                                    AnnotationMetadata annotationMetadata,
-                                                   ConfigurationMetadataBuilder metadataBuilder,
                                                    boolean isInterface,
                                                    ConfigBuilderState configBuilderState,
                                                    List<ConfigBuilderPointInjectCommand> builderPoints) implements ConfigBuilderInjectCommand {
@@ -4915,7 +4911,6 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
     private record ConfigMethodBuilderInjectPointCommand(ClassElement type,
                                                          String methodName,
                                                          AnnotationMetadata annotationMetadata,
-                                                         ConfigurationMetadataBuilder metadataBuilder,
                                                          boolean isInterface,
                                                          ConfigBuilderState configBuilderState,
                                                          List<ConfigBuilderPointInjectCommand> builderPoints) implements ConfigBuilderInjectCommand {

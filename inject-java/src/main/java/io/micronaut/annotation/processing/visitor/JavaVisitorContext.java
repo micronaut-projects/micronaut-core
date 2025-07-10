@@ -17,7 +17,6 @@ package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.annotation.processing.AnnotationProcessingOutputVisitor;
 import io.micronaut.annotation.processing.AnnotationUtils;
-import io.micronaut.inject.visitor.ElementPostponedToNextRoundException;
 import io.micronaut.annotation.processing.GenericUtils;
 import io.micronaut.annotation.processing.JavaAnnotationMetadataBuilder;
 import io.micronaut.annotation.processing.JavaElementAnnotationMetadataFactory;
@@ -39,8 +38,8 @@ import io.micronaut.inject.ast.annotation.AbstractAnnotationElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.beans.BeanElement;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
-import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.visitor.BeanElementVisitorContext;
+import io.micronaut.inject.visitor.ElementPostponedToNextRoundException;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.visitor.util.VisitorContextUtils;
@@ -633,7 +632,6 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
         return new JavaBeanDefinitionBuilder(
             originatingElement,
             type,
-            ConfigurationMetadataBuilder.INSTANCE,
             type instanceof AbstractAnnotationElement aae ? aae.getElementAnnotationMetadataFactory() : elementAnnotationMetadataFactory,
             this
         );

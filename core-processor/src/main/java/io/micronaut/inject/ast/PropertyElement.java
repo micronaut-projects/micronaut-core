@@ -15,9 +15,16 @@
  */
 package io.micronaut.inject.ast;
 
+import com.github.javaparser.StaticJavaParser;
+import com.github.javaparser.javadoc.Javadoc;
+import com.github.javaparser.javadoc.JavadocBlockTag;
+import com.github.javaparser.javadoc.description.JavadocDescriptionElement;
+import com.github.javaparser.javadoc.description.JavadocInlineTag;
+import com.github.javaparser.javadoc.description.JavadocSnippet;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.NonNull;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -179,6 +186,90 @@ public interface PropertyElement extends TypedElement, MemberElement {
      */
     default boolean overrides(PropertyElement overridden) {
         return false;
+    }
+
+    @Override
+    default Optional<String> getDocumentation() {
+        try {
+            Optional<FieldElement> field = getField();
+            if (field.isPresent()) {
+                String javadoc = field.get().getDocumentation().orElse(null);
+                if (javadoc != null) {
+                    StringBuilder builder = new StringBuilder();
+                    Javadoc jd = StaticJavaParser.parseJavadoc(javadoc);
+                    for (JavadocDescriptionElement jde : jd.getDescription().getElements()) {
+                        if (jde instanceof JavadocSnippet snippet) {
+                            builder.append(snippet.toText());
+                        } else if (jde instanceof JavadocInlineTag tag) {
+                            builder.append(tag.toText());
+                        }
+                    }
+                    return Optional.of(builder.toString());
+                }
+            }
+            Optional<MethodElement> readMethod = getReadMethod();
+            if (readMethod.isPresent()) {
+                Optional<String> documentation = readMethod.get().getDocumentation();
+                String javadoc = documentation.orElse(null);
+                if (javadoc != null) {
+                    Javadoc jd = StaticJavaParser.parseJavadoc(javadoc);
+                    List<JavadocDescriptionElement> elements = jd.getDescription().getElements();
+                    if (!elements.isEmpty()) {
+                        StringBuilder builder = new StringBuilder();
+                        for (JavadocDescriptionElement jde : elements) {
+                            if (jde instanceof JavadocSnippet snippet) {
+                                builder.append(snippet.toText());
+                            } else if (jde instanceof JavadocInlineTag tag) {
+                                builder.append(tag.toText());
+                            }
+                        }
+                        return builder.toString().describeConstable();
+                    }
+                    return Optional.ofNullable(resolveReturnBlock(jd));
+                }
+            }
+            Optional<MethodElement> writeMethod = getWriteMethod();
+            if (writeMethod.isPresent()) {
+                String javadoc = writeMethod.get().getDocumentation().orElse(null);
+                if (javadoc != null) {
+                    Javadoc jd = StaticJavaParser.parseJavadoc(javadoc);
+                    List<JavadocDescriptionElement> elements = jd.getDescription().getElements();
+                    if (!elements.isEmpty()) {
+                        StringBuilder builder = new StringBuilder();
+                        for (JavadocDescriptionElement jde : elements) {
+                            if (jde instanceof JavadocSnippet snippet) {
+                                builder.append(snippet.toText());
+                            } else if (jde instanceof JavadocInlineTag tag) {
+                                builder.append(tag.toText());
+                            }
+                        }
+                        return builder.toString().describeConstable();
+                    }
+                    return Optional.ofNullable(resolveParamBlock(jd));
+                }
+            }
+        } catch (Exception ignore) {
+            // ignore
+        }
+        return Optional.empty();
+    }
+
+    private static String resolveReturnBlock(Javadoc jd) {
+        for (JavadocBlockTag bt : jd.getBlockTags()) {
+            if (bt.getType() == JavadocBlockTag.Type.RETURN) {
+                return bt.getContent().toText();
+            }
+        }
+        return null;
+    }
+
+    private static String resolveParamBlock(Javadoc jd) {
+        for (JavadocBlockTag bt : jd.getBlockTags()) {
+            if (bt.getType() == JavadocBlockTag.Type.PARAM) {
+                return bt.getContent().toText();
+            }
+        }
+        return null;
     }
 
     /**

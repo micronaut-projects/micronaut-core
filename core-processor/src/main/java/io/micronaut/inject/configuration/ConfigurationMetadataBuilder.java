@@ -31,7 +31,6 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.MethodElement;
-import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.writer.OriginatingElements;
 
 import java.io.IOException;
@@ -55,7 +54,11 @@ import static io.micronaut.inject.configuration.ConfigurationUtils.getRequiredTy
  */
 public class ConfigurationMetadataBuilder {
 
+    /**
+     * @deprecated Should not be used with the static state
+     */
     @SuppressWarnings({"StaticVariableName", "VisibilityModifier"})
+    @Deprecated(forRemoval = true, since = "4.9.8")
     public static final ConfigurationMetadataBuilder INSTANCE = new ConfigurationMetadataBuilder();
 
     private final OriginatingElements originatingElements = OriginatingElements.of();
@@ -111,45 +114,59 @@ public class ConfigurationMetadataBuilder {
 
     /**
      * Resolves the javadoc description for the given element.
+     *
      * @param element The element
      * @return The javadoc description.
      */
     @Nullable
     public static String resolveJavadocDescription(@NonNull Element element) {
-        String resolvedDocs = null;
-        String javadoc = element.getDocumentation().orElse(null);
-        if (javadoc == null && element instanceof PropertyElement propertyElement) {
-            javadoc = propertyElement.getWriteMethod().flatMap(Element::getDocumentation).orElse(null);
-        }
-        if (javadoc != null) {
-            try {
-                Javadoc jd = StaticJavaParser.parseJavadoc(javadoc);
-                JavadocDescription description = jd.getDescription();
+        if (element instanceof MethodElement || element instanceof ClassElement) {
+            String content = element.getDocumentation().orElse(null);
+            if (content == null) {
+                return null;
+            }
+            Javadoc jd = StaticJavaParser.parseJavadoc(content);
+            JavadocDescription description = jd.getDescription();
+            List<JavadocDescriptionElement> elements = description.getElements();
+            if (!elements.isEmpty()) {
                 StringBuilder builder = new StringBuilder();
-                List<JavadocDescriptionElement> elements = description.getElements();
-                if (!elements.isEmpty()) {
-                    for (JavadocDescriptionElement jde : elements) {
-                        if (jde instanceof JavadocSnippet snippet) {
-                            builder.append(snippet.toText());
-                        } else if (jde instanceof JavadocInlineTag tag) {
-                            builder.append(tag.toText());
-                        }
+                for (JavadocDescriptionElement jde : elements) {
+                    if (jde instanceof JavadocSnippet snippet) {
+                        builder.append(snippet.toText());
+                    } else if (jde instanceof JavadocInlineTag tag) {
+                        builder.append(tag.toText());
                     }
-                } else if (element instanceof MethodElement) {
-                    jd.getBlockTags()
-                        .stream().filter(bt -> bt.getType() == JavadocBlockTag.Type.RETURN)
-                        .findFirst().ifPresent(returnTag -> builder.append(returnTag.getContent().toText()));
-                } else if (element instanceof PropertyElement) {
-                    jd.getBlockTags()
-                        .stream().filter(bt -> bt.getType() == JavadocBlockTag.Type.PARAM)
-                        .findFirst().ifPresent(returnTag -> builder.append(returnTag.getContent().toText()));
                 }
-                resolvedDocs = builder.toString();
-            } catch (Exception e) {
-                // ignore
+                return builder.toString();
+            }
+            String paramBlock = resolveParamBlock(jd);
+            if (paramBlock != null) {
+                return paramBlock;
+            }
+            String returnBlock = resolveReturnBlock(jd);
+            if (returnBlock != null) {
+                return returnBlock;
             }
         }
-        return resolvedDocs;
+        return element.getDocumentation().orElse(null);
+    }
+
+    private static String resolveReturnBlock(Javadoc jd) {
+        for (JavadocBlockTag bt : jd.getBlockTags()) {
+            if (bt.getType() == JavadocBlockTag.Type.RETURN) {
+                return bt.getContent().toText();
+            }
+        }
+        return null;
+    }
+
+    private static String resolveParamBlock(Javadoc jd) {
+        for (JavadocBlockTag bt : jd.getBlockTags()) {
+            if (bt.getType() == JavadocBlockTag.Type.PARAM) {
+                return bt.getContent().toText();
+            }
+        }
+        return null;
     }
 
     /**
@@ -170,24 +187,76 @@ public class ConfigurationMetadataBuilder {
                                           String name,
                                           @Nullable String description,
                                           @Nullable String defaultValue) {
+        String path;
+        if (propertyType.hasStereotype(ConfigurationReader.class)) {
+            path = ConfigurationUtils.getRequiredTypePath(propertyType);
+        } else {
+            path = NameUtils.hyphenate(buildPropertyPath(owningType, declaringType, name), true);
+        }
+        return visitProperty(
+            owningType,
+            declaringType,
+            propertyType,
+            name,
+            path,
+            description,
+            defaultValue
+        );
+    }
+
+    /**
+     * Visit a configuration property.
+     *
+     * @param owningType    The type that owns the property
+     * @param declaringType The declaring type of the property
+     * @param propertyType  The property type
+     * @param name          The property name
+     * @param path          The property path
+     * @param description   A description for the property
+     * @param defaultValue  The default value of the property (only used for constant values such as strings, numbers,
+     *                      enums etc.)
+     * @return This property metadata
+     */
+    public PropertyMetadata visitProperty(ClassElement owningType,
+                                          ClassElement declaringType,
+                                          ClassElement propertyType,
+                                          String name,
+                                          String path,
+                                          @Nullable String description,
+                                          @Nullable String defaultValue) {
         originatingElements.addOriginatingElement(owningType);
         originatingElements.addOriginatingElement(declaringType);
 
         PropertyMetadata metadata = new PropertyMetadata();
         metadata.declaringType = declaringType.getName();
         metadata.name = name;
-        metadata.path = propertyType.stringValue(ConfigurationReader.class, ConfigurationReader.PREFIX)
-            .orElseGet(() -> NameUtils.hyphenate(buildPropertyPath(owningType, declaringType, name), true));
-        if (propertyType.hasStereotype(ConfigurationReader.class)) {
-            metadata.path = ConfigurationUtils.getRequiredTypePath(propertyType);
-        } else {
-            metadata.path = NameUtils.hyphenate(buildPropertyPath(owningType, declaringType, name), true);
-        }
+        metadata.path = path;
         metadata.type = propertyType.getType().getName();
         metadata.description = description;
         metadata.defaultValue = defaultValue;
         properties.add(metadata);
         return metadata;
+    }
+
+    /**
+     * Calculate the path.
+     *
+     * @param owningType    The type that owns the property
+     * @param declaringType The declaring type of the property
+     * @param propertyType  The property type
+     * @param name          The property name
+     *                      enums etc.)
+     * @return This property metadata
+     */
+    public static String calculatePath(ClassElement owningType,
+                                       ClassElement declaringType,
+                                       ClassElement propertyType,
+                                       String name) {
+
+        if (propertyType.hasStereotype(ConfigurationReader.class)) {
+            return ConfigurationUtils.getRequiredTypePath(propertyType);
+        }
+        return NameUtils.hyphenate(buildPropertyPath(owningType, declaringType, name), true);
     }
 
     /**

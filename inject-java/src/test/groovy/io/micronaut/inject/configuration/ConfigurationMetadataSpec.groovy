@@ -1,29 +1,19 @@
 package io.micronaut.inject.configuration
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import io.micronaut.annotation.processing.ConfigurationMetadataProcessor
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.annotation.processing.test.JavaParser
 import org.intellij.lang.annotations.Language
-
-import javax.annotation.processing.Processor
 
 class ConfigurationMetadataSpec extends AbstractTypeElementSpec {
 
     @Override
     protected JavaParser newJavaParser() {
         return new JavaParser() {
-
-            @Override
-            protected List<Processor> getAnnotationProcessors() {
-                def processors = super.getAnnotationProcessors()
-                processors.add(new ConfigurationMetadataProcessor())
-                return processors
-            }
         }
     }
 
-    private boolean jsonEquals(@Language("json") String provided, @Language("json") String expected) {
+    private static boolean jsonEquals(@Language("json") String provided, @Language("json") String expected) {
         ObjectMapper mapper = new ObjectMapper()
         def providedMap = mapper.readValue(provided, Map.class)
         def expectedMap = mapper.readValue(expected, Map.class)
@@ -33,7 +23,7 @@ class ConfigurationMetadataSpec extends AbstractTypeElementSpec {
         true
     }
 
-    private boolean jsonEquals(@Language("json") String provided, Map expected) {
+    private static boolean jsonEquals(@Language("json") String provided, Map expected) {
         ObjectMapper mapper = new ObjectMapper()
         def providedMap = mapper.readValue(provided, Map.class)
         def providedJson = mapper.writeValueAsString(providedMap)
@@ -47,7 +37,6 @@ class ConfigurationMetadataSpec extends AbstractTypeElementSpec {
     }
 
     def setup() {
-        ConfigurationMetadataBuilder.reset()
     }
 
     void "test configuration metadata and records"() {

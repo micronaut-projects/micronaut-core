@@ -34,7 +34,6 @@ import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.beans.BeanParameterElement;
-import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
 import io.micronaut.inject.writer.BeanDefinitionVisitor;
 import io.micronaut.inject.writer.BeanDefinitionWriter;
@@ -60,17 +59,15 @@ class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
      *
      * @param originatingElement The originating element
      * @param beanType The bean type
-     * @param metadataBuilder the metadata builder
      * @param elementAnnotationMetadataFactory The element annotation metadata factory
      * @param visitorContext the visitor context
      */
     GroovyBeanDefinitionBuilder(
         Element originatingElement,
         ClassElement beanType,
-        ConfigurationMetadataBuilder metadataBuilder,
         ElementAnnotationMetadataFactory elementAnnotationMetadataFactory,
         GroovyVisitorContext visitorContext) {
-        super(originatingElement, beanType, metadataBuilder, visitorContext, elementAnnotationMetadataFactory);
+        super(originatingElement, beanType, visitorContext, elementAnnotationMetadataFactory);
         if (getClass() == GroovyBeanDefinitionBuilder.class) {
             visitorContext.addBeanDefinitionBuilder(this);
         }
@@ -84,7 +81,6 @@ class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
         return new GroovyBeanDefinitionBuilder(
             GroovyBeanDefinitionBuilder.this.getOriginatingElement(),
             producerField.getGenericField().getType(),
-            GroovyBeanDefinitionBuilder.this.metadataBuilder,
             elementAnnotationMetadataFactory,
             GroovyBeanDefinitionBuilder.this.visitorContext
         ) {
@@ -120,7 +116,6 @@ class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
         return new GroovyBeanDefinitionBuilder(
             GroovyBeanDefinitionBuilder.this.getOriginatingElement(),
             producerMethod.getGenericReturnType().getType(),
-            GroovyBeanDefinitionBuilder.this.metadataBuilder,
             elementAnnotationMetadataFactory,
             GroovyBeanDefinitionBuilder.this.visitorContext
         ) {

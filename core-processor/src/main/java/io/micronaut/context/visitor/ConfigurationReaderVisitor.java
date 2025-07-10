@@ -15,29 +15,57 @@
  */
 package io.micronaut.context.visitor;
 
+import com.github.javaparser.StaticJavaParser;
+import com.github.javaparser.javadoc.Javadoc;
+import com.github.javaparser.javadoc.JavadocBlockTag;
 import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.ConfigurationBuilder;
+import io.micronaut.context.annotation.ConfigurationInject;
+import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.EachProperty;
+import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Property;
+import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AccessorsStyle;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.DefaultArgument;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.FieldElement;
+import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.configuration.ConfigurationMetadata;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
+import io.micronaut.inject.configuration.ConfigurationMetadataWriter;
+import io.micronaut.inject.configuration.PropertyMetadata;
+import io.micronaut.inject.configuration.builder.ConfigurationBuilderDefinition;
+import io.micronaut.inject.configuration.builder.ConfigurationBuilderDurationMethodDefinition;
+import io.micronaut.inject.configuration.builder.ConfigurationBuilderElementDefinition;
+import io.micronaut.inject.configuration.builder.ConfigurationBuilderPropertyDefinition;
 import io.micronaut.inject.validation.RequiresValidation;
+import io.micronaut.inject.visitor.TypeElementQuery;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 
+import java.io.IOException;
+import java.time.Duration;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.ServiceConfigurationError;
+import java.util.ServiceLoader;
+import java.util.Set;
 
 /**
  * The visitor adds Validated annotation if one of the parameters is a constraint or @Valid.
@@ -46,12 +74,14 @@ import java.util.Map;
  * @since 3.7.0
  */
 @Internal
-public class ConfigurationReaderVisitor implements TypeElementVisitor<ConfigurationReader, Object> {
+public final class ConfigurationReaderVisitor implements TypeElementVisitor<ConfigurationReader, Object> {
+
+    private static final List<String> CONSTRUCTOR_PARAMETERS_INJECTION_ANN =
+        Arrays.asList(Property.class.getName(), Value.class.getName(), Parameter.class.getName(), AnnotationUtil.QUALIFIER, AnnotationUtil.INJECT);
 
     private static final String ANN_CONFIGURATION_ADVICE = "io.micronaut.runtime.context.env.ConfigurationAdvice";
 
-    private final ConfigurationMetadataBuilder metadataBuilder = ConfigurationMetadataBuilder.INSTANCE;
-    private String[] readPrefixes;
+    private ConfigurationMetadataBuilder metadataBuilder = new ConfigurationMetadataBuilder();
 
     @NonNull
     @Override
@@ -61,12 +91,30 @@ public class ConfigurationReaderVisitor implements TypeElementVisitor<Configurat
 
     @Override
     public void finish(VisitorContext visitorContext) {
-        reset();
+        if (metadataBuilder.hasMetadata()) {
+            ServiceLoader<ConfigurationMetadataWriter> writers = ServiceLoader.load(ConfigurationMetadataWriter.class, getClass().getClassLoader());
+            try {
+                for (ConfigurationMetadataWriter writer : writers) {
+                    try {
+                        writer.write(metadataBuilder, visitorContext);
+                    } catch (IOException e) {
+                        visitorContext.warn("Error occurred writing configuration metadata: " + e.getMessage(), null);
+                    }
+                }
+            } catch (ServiceConfigurationError e) {
+                visitorContext.warn("Unable to load ConfigurationMetadataWriter due to : " + e.getMessage(), null);
+            }
+        }
+        metadataBuilder = new ConfigurationMetadataBuilder();
+    }
+
+    @Override
+    public TypeElementQuery query() {
+        return TypeElementQuery.onlyClass();
     }
 
     @Override
     public void visitClass(ClassElement classElement, VisitorContext context) {
-        reset();
 
         if (!classElement.hasStereotype(ConfigurationReader.class)) {
             return;
@@ -77,7 +125,8 @@ public class ConfigurationReaderVisitor implements TypeElementVisitor<Configurat
             classElement.annotate(ConfigurationReader.class, builder -> builder.member(ConfigurationReader.PREFIX, configurationMetadata.getName()));
         }
 
-        if (classElement.isInterface()) {
+        boolean anInterface = classElement.isInterface();
+        if (anInterface) {
             classElement.annotate(ANN_CONFIGURATION_ADVICE);
         }
         if (classElement.hasStereotype(RequiresValidation.class)) {
@@ -85,18 +134,183 @@ public class ConfigurationReaderVisitor implements TypeElementVisitor<Configurat
         }
 
         AnnotationMetadata annotationMetadata = classElement.getAnnotationMetadata();
-        readPrefixes = annotationMetadata.getValue(AccessorsStyle.class, "readPrefixes", String[].class)
+        String[] readPrefixes = annotationMetadata.getValue(AccessorsStyle.class, "readPrefixes", String[].class)
             .orElse(new String[]{AccessorsStyle.DEFAULT_READ_PREFIX});
+
+        classElement.getPrimaryConstructor()
+            .ifPresent(constructorElement -> applyConfigurationInjectionIfNecessary(classElement, constructorElement, context));
+
+        Set<MemberElement> processed = new HashSet<>();
+
+        classElement.getBeanProperties()
+            .forEach(propertyElement -> {
+                Optional<MethodElement> readMethod = propertyElement.getReadMethod();
+                Optional<FieldElement> field = propertyElement.getField();
+                if (propertyElement.hasStereotype(ConfigurationBuilder.class)) {
+                    // Exclude / ignore shouldn't affect builders
+                    if (readMethod.isPresent()) {
+                        MethodElement methodElement = readMethod.get();
+                        visitConfigurationBuilder(
+                            classElement,
+                            ConfigurationBuilderDefinition.of(classElement, methodElement.withAnnotationMetadata(propertyElement.getAnnotationMetadata()), context),
+                            context
+                        );
+                    } else if (field.isPresent()) {
+                        FieldElement fieldElement = field.get();
+                        if (fieldElement.isAccessible(classElement)) {
+                            visitConfigurationBuilder(
+                                classElement,
+                                ConfigurationBuilderDefinition.of(classElement, fieldElement, context),
+                                context
+                            );
+                        }
+                        processed.add(fieldElement);
+                    }
+                } else if (!propertyElement.isExcluded()) {
+                    if (notProcessed(propertyElement.getName(), propertyElement.getDeclaringType())
+                        && (propertyElement.getWriteMethod().isPresent() || anInterface || propertyElement.getField().isPresent())
+                        && !propertyElement.getType().hasStereotype(ConfigurationProperties.class)) {
+                        metadataBuilder.visitProperty(
+                            propertyElement.getOwningType(),
+                            propertyElement.getDeclaringType(),
+                            propertyElement.getType(),
+                            propertyElement.getName(),
+                            ConfigurationMetadataBuilder.resolveJavadocDescription(propertyElement),
+                            propertyElement.getAnnotationMetadata().stringValue(Bindable.class, "defaultValue").orElse(null)
+                        );
+                        propertyElement.getField().ifPresent(processed::add);
+                    }
+                }
+            });
+
+        classElement.getMethods().forEach(methodElement -> {
+            if (!methodElement.isStatic() && isInjectPointMethod(methodElement)) {
+                applyConfigurationInjectionIfNecessary(classElement, methodElement, context);
+            }
+            if (methodElement.isAbstract()) {
+                visitAbstractMethod(methodElement, readPrefixes, context);
+            }
+        });
+        classElement.getFields().forEach(fieldElement -> {
+            if (!fieldElement.isStatic() && fieldElement.isAccessible(classElement) && !processed.contains(fieldElement)) {
+                if (fieldElement.hasStereotype(ConfigurationBuilder.class)) {
+                    visitConfigurationBuilder(
+                        classElement,
+                        ConfigurationBuilderDefinition.of(classElement, fieldElement, context),
+                        context
+                    );
+                }
+            }
+        });
     }
 
-    private void reset() {
-        readPrefixes = null;
+    private boolean notProcessed(String prop, ClassElement declaringType) {
+        return metadataBuilder.getProperties().stream().noneMatch(p -> p.getName().equals(prop) && p.getDeclaringType().equals(declaringType.getName()));
     }
 
-    @Override
-    public void visitMethod(MethodElement method, VisitorContext context) {
-        if (method.isAbstract()) {
-            visitAbstractMethod(method, context);
+    private void visitConfigurationBuilder(ClassElement classElement,
+                                           ConfigurationBuilderDefinition builderDefinition, VisitorContext visitorContext) {
+        String configurationPrefix = builderDefinition.builderElement().stringValue(ConfigurationBuilder.class).map(v -> v + ".").orElse("");
+        for (ConfigurationBuilderElementDefinition element : builderDefinition.elements()) {
+            if (element instanceof ConfigurationBuilderDurationMethodDefinition methodDurationDefinition) {
+                MethodElement method = methodDurationDefinition.method();
+                metadataBuilder.visitProperty(
+                    method.getOwningType(),
+                    method.getDeclaringType(), // Align with the not-duration method which always sets the current class instead the builder class
+                    visitorContext.getClassElement(Duration.class.getName()).get(),
+                    configurationPrefix + element.name(),
+                    methodDurationDefinition.path(),
+                    null,
+                    null
+                );
+            } else if (element instanceof ConfigurationBuilderPropertyDefinition methodDefinition) {
+                MethodElement method = methodDefinition.method();
+                metadataBuilder.visitProperty(
+                    method.getOwningType(),
+                    classElement,
+                    methodDefinition.type(),
+                    configurationPrefix + element.name(),
+                    methodDefinition.path(),
+                    null,
+                    null
+                );
+            }
+        }
+    }
+
+    private boolean isInjectPointMethod(MemberElement memberElement) {
+        return memberElement.hasDeclaredStereotype(AnnotationUtil.INJECT) || memberElement.hasDeclaredStereotype(ConfigurationInject.class);
+    }
+
+    private void applyConfigurationInjectionIfNecessary(ClassElement classElement,
+                                                          MethodElement constructor,
+                                                          VisitorContext visitorContext) {
+        if (!classElement.isRecord() && !constructor.hasAnnotation(ConfigurationInject.class)) {
+            return;
+        }
+        if (classElement.isRecord()) {
+            final List<PropertyElement> beanProperties = constructor
+                .getDeclaringType()
+                .getBeanProperties();
+            final ParameterElement[] parameters = constructor.getParameters();
+            if (beanProperties.size() == parameters.length) {
+                Javadoc javadoc = classElement.getDocumentation().map(StaticJavaParser::parseJavadoc).orElse(null);
+                for (int i = 0; i < parameters.length; i++) {
+                    ParameterElement parameter = parameters[i];
+                    final PropertyElement bp = beanProperties.get(i);
+                    if (CONSTRUCTOR_PARAMETERS_INJECTION_ANN.stream().noneMatch(bp::hasStereotype)) {
+                        String paramDoc = findParameterDoc(javadoc, parameter);
+                        processConfigurationInjectParameter(constructor.getDeclaringType(), parameter, paramDoc, visitorContext);
+                    }
+                }
+                return;
+            }
+        }
+        processConfigurationInject(constructor, visitorContext);
+    }
+
+    @Nullable
+    private static String findParameterDoc(Javadoc javadoc, ParameterElement parameter) {
+        String paramDoc = null;
+        if (javadoc != null) {
+            JavadocBlockTag bt = javadoc.getBlockTags()
+                .stream().filter(t -> t.getType() == JavadocBlockTag.Type.PARAM && t.getName().map(n -> n.equals(parameter.getName())).orElse(false))
+                .findFirst().orElse(null);
+            if (bt != null) {
+                paramDoc = bt.getContent().toText();
+            }
+        }
+        return paramDoc;
+    }
+
+    private void processConfigurationInject(MethodElement injectMethod, VisitorContext visitorContext) {
+        Javadoc javadoc = injectMethod.getDocumentation().map(StaticJavaParser::parseJavadoc).orElse(null);
+        for (ParameterElement parameter : injectMethod.getParameters()) {
+            if (CONSTRUCTOR_PARAMETERS_INJECTION_ANN.stream().noneMatch(parameter::hasStereotype)) {
+                String paramDoc = findParameterDoc(javadoc, parameter);
+                processConfigurationInjectParameter(injectMethod.getDeclaringType(), parameter, paramDoc, visitorContext);
+            }
+        }
+    }
+
+    private void processConfigurationInjectParameter(ClassElement declaringType,
+                                                     ParameterElement parameter,
+                                                     @Nullable String paramDoc,
+                                                     VisitorContext visitorContext) {
+        if (ConfigurationReaderVisitor.isPropertyParameter(parameter, visitorContext)) {
+            PropertyMetadata pm = metadataBuilder.getProperties().stream().filter(p -> p.getName().equals(parameter.getName()) && p.getDeclaringType().equals(declaringType.getName())).findFirst().orElse(null);
+            if (pm == null) {
+                pm = metadataBuilder.visitProperty(
+                    parameter.getMethodElement().getOwningType(),
+                    parameter.getMethodElement().getDeclaringType(),
+                    parameter.getGenericType(),
+                    parameter.getName(),
+                    paramDoc,
+                    parameter.stringValue(Bindable.class, "defaultValue").orElse(null)
+                );
+            }
+            String path = pm.getPath();
+            parameter.annotate(Property.class, (builder) -> builder.member("name", path));
         }
     }
 
@@ -130,9 +344,9 @@ public class ConfigurationReaderVisitor implements TypeElementVisitor<Configurat
         return false;
     }
 
-    private void visitAbstractMethod(MethodElement method, VisitorContext context) {
+    private void visitAbstractMethod(MethodElement method, String[] readPrefixes, VisitorContext context) {
         String methodName = method.getName();
-        if (!isGetter(methodName)) {
+        if (!isGetter(methodName, readPrefixes)) {
             context.fail("Only getter methods are allowed on @ConfigurationProperties interfaces: " + method + ". You can change the accessors using @AccessorsStyle annotation", method.getOwningType());
             return;
         }
@@ -146,17 +360,20 @@ public class ConfigurationReaderVisitor implements TypeElementVisitor<Configurat
         }
 
         boolean isPropertyParameter = isPropertyParameter(method.getGenericReturnType(), context);
+        final String propertyName = getPropertyNameForGetter(methodName, readPrefixes);
         if (isPropertyParameter) {
-            final String propertyName = getPropertyNameForGetter(methodName);
-            String path = metadataBuilder.visitProperty(
-                method.getOwningType(),
-                method.getOwningType(), // interface methods don't inherit the prefix
-                method.getReturnType(),
-                propertyName,
-                ConfigurationMetadataBuilder.resolveJavadocDescription(method),
-                method.getAnnotationMetadata().stringValue(Bindable.class, "defaultValue").orElse(null)
-            ).getPath();
-
+            PropertyMetadata pm = metadataBuilder.getProperties().stream().filter(p -> p.getName().equals(propertyName) && p.getDeclaringType().equals(method.getOwningType().getName())).findFirst().orElse(null);
+            if (pm == null) {
+                pm = metadataBuilder.visitProperty(
+                    method.getOwningType(),
+                    method.getOwningType(), // interface methods don't inherit the prefix
+                    method.getReturnType(),
+                    propertyName,
+                    ConfigurationMetadataBuilder.resolveJavadocDescription(method),
+                    method.getAnnotationMetadata().stringValue(Bindable.class, "defaultValue").orElse(null)
+                );
+            }
+            String path = pm.getPath();
             method.annotate(Property.class, builder -> builder.member("name", path));
         }
 
@@ -171,11 +388,11 @@ public class ConfigurationReaderVisitor implements TypeElementVisitor<Configurat
         });
     }
 
-    private String getPropertyNameForGetter(String methodName) {
+    private String getPropertyNameForGetter(String methodName, String[] readPrefixes) {
         return NameUtils.getPropertyNameForGetter(methodName, readPrefixes);
     }
 
-    private boolean isGetter(String methodName) {
+    private boolean isGetter(String methodName, String[] readPrefixes) {
         return NameUtils.isReaderName(methodName, readPrefixes);
     }
 

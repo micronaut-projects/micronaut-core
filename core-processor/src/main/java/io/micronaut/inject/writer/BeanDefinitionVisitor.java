@@ -26,7 +26,12 @@ import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.TypedElement;
-import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
+import io.micronaut.inject.configuration.builder.ConfigurationBuilderDefinition;
+import io.micronaut.inject.configuration.builder.ConfigurationBuilderDurationMethodDefinition;
+import io.micronaut.inject.configuration.builder.ConfigurationBuilderElementDefinition;
+import io.micronaut.inject.configuration.builder.ConfigurationBuilderOfFieldDefinition;
+import io.micronaut.inject.configuration.builder.ConfigurationBuilderOfMethodDefinition;
+import io.micronaut.inject.configuration.builder.ConfigurationBuilderPropertyDefinition;
 import io.micronaut.inject.visitor.VisitorContext;
 
 import java.io.File;
@@ -337,7 +342,6 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
      * @param type               The type of the builder
      * @param field              The name of the field that represents the builder
      * @param annotationMetadata The annotation metadata associated with the field
-     * @param metadataBuilder    The {@link ConfigurationMetadataBuilder}
      * @param isInterface        Whether the builder type is an interface or not
      * @see io.micronaut.context.annotation.ConfigurationBuilder
      */
@@ -345,7 +349,6 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
             ClassElement type,
             String field,
             AnnotationMetadata annotationMetadata,
-            ConfigurationMetadataBuilder metadataBuilder,
             boolean isInterface);
 
     /**
@@ -354,7 +357,6 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
      * @param type               The type of the builder
      * @param methodName         The name of the method that returns the builder
      * @param annotationMetadata The annotation metadata associated with the field
-     * @param metadataBuilder    The {@link ConfigurationMetadataBuilder}
      * @param isInterface        Whether the builder type is an interface or not
      * @see io.micronaut.context.annotation.ConfigurationBuilder
      */
@@ -362,8 +364,63 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
             ClassElement type,
             String methodName,
             AnnotationMetadata annotationMetadata,
-            ConfigurationMetadataBuilder metadataBuilder,
             boolean isInterface);
+
+    /**
+     * Visit a configuration builder definition.
+     *
+     * @param builderDefinition The builder definition.
+     * @see io.micronaut.context.annotation.ConfigurationBuilder
+     */
+    default void visitConfigBuilder(ConfigurationBuilderDefinition builderDefinition) {
+        if (builderDefinition instanceof ConfigurationBuilderOfFieldDefinition fieldDefinition) {
+            FieldElement fieldElement = fieldDefinition.fieldElement();
+            ClassElement builderType = fieldElement.getType();
+            visitConfigBuilderField(
+                builderType,
+                fieldElement.getName(),
+                fieldElement.getAnnotationMetadata(),
+                builderType.isInterface()
+            );
+        } else if (builderDefinition instanceof ConfigurationBuilderOfMethodDefinition methodDefinition) {
+            MethodElement methodElement = methodDefinition.method();
+            ClassElement builderType = methodElement.getReturnType();
+            visitConfigBuilderMethod(
+                builderType,
+                methodElement.getName(),
+                methodElement.getAnnotationMetadata(),
+                builderType.isInterface()
+            );
+        } else {
+            throw new IllegalStateException("Unknown configuration builder type: " + builderDefinition.getClass().getName());
+        }
+        for (ConfigurationBuilderElementDefinition element : builderDefinition.elements()) {
+            if (element instanceof ConfigurationBuilderPropertyDefinition methodDefinition) {
+                MethodElement method = methodDefinition.method();
+                ParameterElement parameter = methodDefinition.parameter();
+                visitConfigBuilderMethod(
+                    methodDefinition.name(),
+                    method.getReturnType(),
+                    method.getSimpleName(),
+                    parameter == null ? null : parameter.getType(),
+                    parameter == null ? Map.of() : parameter.getType().getTypeArguments(),
+                    methodDefinition.path()
+                );
+            } else if (element instanceof ConfigurationBuilderDurationMethodDefinition durationMethodDefinition) {
+                MethodElement method = durationMethodDefinition.method();
+                visitConfigBuilderDurationMethod(
+                    durationMethodDefinition.name(),
+                    method.getReturnType(),
+                    method.getSimpleName(),
+                    durationMethodDefinition.path()
+                );
+            } else {
+                throw new IllegalStateException("Unknown configuration builder element type: " + element.getClass().getName());
+            }
+        }
+        visitConfigBuilderEnd();
+    }
+
 
     /**
      * Visit a configuration builder method.
