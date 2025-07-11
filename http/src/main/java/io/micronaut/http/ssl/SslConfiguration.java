@@ -17,6 +17,7 @@ package io.micronaut.http.ssl;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
 import org.slf4j.Logger;
@@ -455,6 +456,7 @@ public class SslConfiguration implements Toggleable {
          * @return The key path
          * @since 4.10.0
          */
+        @Nullable
         public String getKeyPath() {
             return keyPath;
         }
@@ -467,7 +469,7 @@ public class SslConfiguration implements Toggleable {
          * @param keyPath The key path
          * @since 4.10.0
          */
-        public void setKeyPath(String keyPath) {
+        public void setKeyPath(@Nullable String keyPath) {
             this.keyPath = keyPath;
         }
 
@@ -479,6 +481,7 @@ public class SslConfiguration implements Toggleable {
          * @return The certificate chain path
          * @since 4.10.0
          */
+        @Nullable
         public String getCertificatePath() {
             return certificatePath;
         }
@@ -491,7 +494,7 @@ public class SslConfiguration implements Toggleable {
          * @param certificatePath The certificate chain path
          * @since 4.10.0
          */
-        public void setCertificatePath(String certificatePath) {
+        public void setCertificatePath(@Nullable String certificatePath) {
             this.certificatePath = certificatePath;
         }
     }

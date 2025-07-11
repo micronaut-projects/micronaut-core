@@ -5,6 +5,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.client.HttpClient;
+import io.micronaut.http.ssl.SslConfigurationException;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.netty.handler.ssl.OpenSsl;
 import io.netty.pkitesting.CertificateBuilder;
@@ -13,13 +14,21 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.security.KeyStore;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
+import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class PemSslConfigTest {
     private static final Set<CertificateBuilder.Algorithm> PQC = Set.of(
@@ -128,6 +137,132 @@ public class PemSslConfigTest {
         @Get("/hello")
         String hello() {
             return "hello";
+        }
+    }
+
+    private static final X509Bundle BUNDLE;
+    private static final String KEY_STORE_RESOURCE;
+    private static final String KEY_STORE_RESOURCE_PASSWORD = "password";
+
+    static {
+        try {
+            BUNDLE = new CertificateBuilder()
+                .algorithm(CertificateBuilder.Algorithm.ecp256)
+                .setIsCertificateAuthority(true)
+                .subject("CN=localhost")
+                .buildSelfSigned();
+
+            KeyStore ks = BUNDLE.toKeyStore(null);
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            ks.store(baos, KEY_STORE_RESOURCE_PASSWORD.toCharArray());
+            KEY_STORE_RESOURCE = "base64:" + Base64.getEncoder().encodeToString(baos.toByteArray());
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    static List<Arguments> simpleErrorConditions() {
+        String doesNotExist = "file:/tmp/" + UUID.randomUUID();
+        return List.of(
+            Arguments.of(Map.of(), "No key store configured"),
+            Arguments.of(
+                Map.of("micronaut.ssl.key-store.path", "string:ks1", "micronaut.ssl.key-store.key-path", "string:k1"),
+                "Cannot specify key store path and key-path or certificate-path at the same time"),
+            Arguments.of(
+                Map.of("micronaut.ssl.key-store.path", "string:ks1", "micronaut.ssl.key-store.certificate-path", "string:k1"),
+                "Cannot specify key store path and key-path or certificate-path at the same time"),
+            Arguments.of(
+                Map.of("micronaut.ssl.key-store.certificate-path", "string:c1"),
+                "Must also specify key-path"),
+            Arguments.of(
+                Map.of("micronaut.ssl.key-store.key-path", "string:k1"),
+                "Must also specify certificate-path"),
+            Arguments.of(
+                Map.of("micronaut.ssl.key-store.path", doesNotExist),
+                "The resource " + doesNotExist + " could not be found"),
+            Arguments.of(
+                Map.of("micronaut.ssl.key-store.key-path", doesNotExist, "micronaut.ssl.key-store.certificate-path", "string:c1"),
+                "The resource " + doesNotExist + " could not be found"),
+            Arguments.of(
+                Map.of("micronaut.ssl.key-store.key-path", "string:" + BUNDLE.getPrivateKeyPEM(), "micronaut.ssl.key-store.certificate-path", doesNotExist),
+                "The resource " + doesNotExist + " could not be found"),
+            Arguments.of(
+                Map.of("micronaut.ssl.key-store.key-path", "string:" + BUNDLE.getPrivateKeyPEM() + BUNDLE.getPrivateKeyPEM(), "micronaut.ssl.key-store.certificate-path", "string:" + BUNDLE.getCertificatePathPEM()),
+                "key-path contained more than one PEM object. It should only contain the private key."),
+            Arguments.of(
+                Map.of("micronaut.ssl.key-store.key-path", "string:" + BUNDLE.getCertificatePathPEM(), "micronaut.ssl.key-store.certificate-path", "string:" + BUNDLE.getCertificatePathPEM()),
+                "key-path contained a certificate instead of a private key."),
+            Arguments.of(
+                Map.of("micronaut.ssl.key-store.path", "string:" + BUNDLE.getPrivateKeyPEM() + BUNDLE.getPrivateKeyPEM() + BUNDLE.getCertificatePathPEM()),
+                "PEM must only contain the private key and a certificate chain")
+        );
+    }
+
+    @ParameterizedTest
+    @MethodSource("simpleErrorConditions")
+    public void simpleErrorConditions(Map<String, Object> cfg, String message) {
+        Map<String, Object> combined = new HashMap<>(cfg);
+        combined.put("micronaut.ssl.enabled", true);
+        try (ApplicationContext ctx = ApplicationContext.run(combined)) {
+            SslConfigurationException ex = assertThrows(
+                SslConfigurationException.class,
+                () -> ctx.getBean(CertificateProvidedSslBuilder.class).build()
+            );
+            try {
+                assertEquals(message, ex.getMessage());
+            } catch (Throwable e) {
+                e.addSuppressed(ex);
+                throw e;
+            }
+        }
+    }
+
+    static List<Arguments> extendedErrorConditions() {
+        return List.of(
+            Arguments.of(
+                Map.of("micronaut.ssl.key-store.path", KEY_STORE_RESOURCE, "micronaut.ssl.key-store.password", "wrong-password"),
+                (Consumer<SslConfigurationException>) e -> {
+                    assertEquals("keystore password was incorrect", e.getCause().getMessage());
+                    assertEquals(0, e.getSuppressed().length);
+                    assertEquals(0, e.getCause().getSuppressed().length);
+                }),
+            Arguments.of(
+                Map.of("micronaut.ssl.key-store.path", "base64:ABCDEFG"),
+                (Consumer<SslConfigurationException>) e -> {
+                    Throwable cause = e.getCause();
+                    assertInstanceOf(IOException.class, cause);
+                    assertEquals(1, cause.getSuppressed().length);
+                    assertEquals("Also tried and failed to load the input as PEM", cause.getSuppressed()[0].getMessage());
+                    assertEquals("Missing start tag", cause.getSuppressed()[0].getCause().getMessage());
+                }),
+            Arguments.of(
+                Map.of("micronaut.ssl.key-store.path", "string:-----BEGIN PRIVATE KEY-----\nabcdef\n-----END PRIVATE KEY-----\n"),
+                (Consumer<SslConfigurationException>) e -> {
+                    Throwable cause = e.getCause();
+                    assertInstanceOf(IllegalArgumentException.class, cause);
+                    assertEquals(1, cause.getSuppressed().length);
+                    assertEquals("Also tried and failed to load the input as a key store", cause.getSuppressed()[0].getMessage());
+                    assertEquals("Invalid keystore format", cause.getSuppressed()[0].getCause().getMessage());
+                })
+        );
+    }
+
+    @ParameterizedTest
+    @MethodSource("extendedErrorConditions")
+    public void extendedErrorConditions(Map<String, Object> cfg, Consumer<SslConfigurationException> check) {
+        Map<String, Object> combined = new HashMap<>(cfg);
+        combined.put("micronaut.ssl.enabled", true);
+        try (ApplicationContext ctx = ApplicationContext.run(combined)) {
+            SslConfigurationException ex = assertThrows(
+                SslConfigurationException.class,
+                () -> ctx.getBean(CertificateProvidedSslBuilder.class).build()
+            );
+            try {
+                check.accept(ex);
+            } catch (Throwable e) {
+                e.addSuppressed(ex);
+                throw e;
+            }
         }
     }
 }

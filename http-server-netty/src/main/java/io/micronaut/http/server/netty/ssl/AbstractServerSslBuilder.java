@@ -25,10 +25,10 @@ import io.micronaut.http.ssl.ServerSslConfiguration;
 import io.micronaut.http.ssl.SslBuilder;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.http.ssl.SslConfigurationException;
+import io.netty.handler.codec.http2.Http2SecurityUtil;
 import io.netty.handler.codec.http3.Http3;
 import io.netty.handler.codec.quic.QuicSslContext;
 import io.netty.handler.codec.quic.QuicSslContextBuilder;
-import io.netty.handler.codec.http2.Http2SecurityUtil;
 import io.netty.handler.ssl.ApplicationProtocolConfig;
 import io.netty.handler.ssl.ApplicationProtocolNames;
 import io.netty.handler.ssl.ClientAuth;
@@ -158,7 +158,9 @@ public abstract class AbstractServerSslBuilder extends SslBuilder<SslContext> im
     @Override
     protected KeyManagerFactory getKeyManagerFactory(SslConfiguration ssl) {
         try {
-            return NettyTlsUtils.storeToFactory(ssl, getKeyStore(ssl).orElse(null));
+            return NettyTlsUtils.storeToFactory(ssl, getKeyStore(ssl).orElseThrow(() -> new SslConfigurationException("No key store configured")));
+        } catch (SslConfigurationException ex) {
+            throw ex;
         } catch (Exception ex) {
             throw new SslConfigurationException(ex);
         }
