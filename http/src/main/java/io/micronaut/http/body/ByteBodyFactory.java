@@ -27,6 +27,7 @@ import io.micronaut.core.util.functional.ThrowingConsumer;
 import io.micronaut.http.body.stream.AvailableByteArrayBody;
 
 import java.io.ByteArrayOutputStream;
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -124,6 +125,57 @@ public class ByteBodyFactory {
     }
 
     /**
+     * Create a new {@link OutputStream} that buffers into a {@link CloseableAvailableByteBody}.
+     * Used like this:
+     *
+     * <pre>{@code
+     * CloseableAvailableByteBody body;
+     * try (BufferingOutputStream bos = byteBodyFactory.outputStreamBuffer()) {
+     *     bos.stream().write(123);
+     *     // ...
+     *     body = bos.finishBuffer();
+     * }
+     * // use body
+     * }</pre>
+     *
+     * <p>Note that for simple use cases, {@link #buffer(ThrowingConsumer)} may be a bit more
+     * convenient, but this method offers more control over the stream lifecycle.
+     *
+     * @return The {@link BufferingOutputStream} wrapper
+     * @since 4.10.0
+     */
+    @NonNull
+    public BufferingOutputStream outputStreamBuffer() {
+        return new BufferingOutputStream() {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+
+            @Override
+            public OutputStream stream() {
+                OutputStream out = this.out;
+                if (out == null) {
+                    throw new IllegalStateException("Already converted to buffer");
+                }
+                return out;
+            }
+
+            @Override
+            public CloseableAvailableByteBody finishBuffer() {
+                ByteArrayOutputStream out = this.out;
+                if (out == null) {
+                    throw new IllegalStateException("Already converted to buffer");
+                }
+                this.out = null;
+                return AvailableByteArrayBody.create(byteBufferFactory(), out.toByteArray());
+            }
+
+            @Override
+            public void close() {
+                this.out = null;
+            }
+        };
+    }
+
+    /**
      * Create an empty body.
      *
      * @return The empty body
@@ -157,5 +209,46 @@ public class ByteBodyFactory {
     @Blocking
     public CloseableAvailableByteBody copyOf(@NonNull InputStream stream) throws IOException {
         return adapt(stream.readAllBytes());
+    }
+
+    /**
+     * Wrapper around a {@link OutputStream} that buffers into a
+     * {@link CloseableAvailableByteBody}. Must be closed after use, even if
+     * {@link #finishBuffer()} has not been called (e.g. on error), to avoid resource leaks.
+     *
+     * @since 4.10.0
+     */
+    public interface BufferingOutputStream extends Closeable {
+        /**
+         * Get the stream you can write to.
+         *
+         * @return The {@link OutputStream}
+         * @throws IllegalStateException If the buffer has already
+         * {@link #finishBuffer() been finalized}
+         */
+        @NonNull
+        OutputStream stream() throws IllegalStateException;
+
+        /**
+         * Finalize this buffer, returning it as a {@link CloseableAvailableByteBody}. This method
+         * can only be called once. Release ownership of the buffer transfers to the caller:
+         * Closing this {@link BufferingOutputStream} after this method has been called will
+         * <i>not</i> close the returned {@link CloseableAvailableByteBody}.
+         *
+         * @return The finished buffer
+         * @throws IOException If there was an exception finishing up the buffer
+         * @throws IllegalStateException If this method has already been called
+         */
+        @NonNull
+        CloseableAvailableByteBody finishBuffer() throws IOException, IllegalStateException;
+
+        /**
+         * Close this buffer. {@link #finishBuffer()} cannot be called after this method. If it has
+         * not been called yet, the content of this buffer will be discarded.
+         *
+         * @throws IOException If there was an exception finishing up the buffer
+         */
+        @Override
+        void close() throws IOException;
     }
 }
