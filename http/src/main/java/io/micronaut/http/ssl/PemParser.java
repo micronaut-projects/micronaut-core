@@ -182,6 +182,10 @@ record PemParser(
                 throw new GeneralSecurityException("Invalid DER", e);
             }
             String cipherAlg = keyInfo.getAlgName();
+            if (cipherAlg.equals("PBES2")) {
+                // Java >= 19 does this automatically
+                cipherAlg = keyInfo.getAlgParameters().toString();
+            }
             SecretKeyFactory skf = provider == null ? SecretKeyFactory.getInstance(cipherAlg) : SecretKeyFactory.getInstance(cipherAlg, provider);
             if (password == null) {
                 throw new IllegalArgumentException("Encrypted private key found but no password given");
@@ -499,7 +503,7 @@ record PemParser(
                     out[lengthOffset] = (byte) length;
                     return;
                 } else if (length < (1 << 8)) {
-                    lengthLength = 2;
+                    lengthLength = 1;
                 } else if (length < (1 << 16)) {
                     lengthLength = 2;
                 } else if (length < (1 << 24)) {
