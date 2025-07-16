@@ -5,11 +5,11 @@ The following snippet shows how to use Micronaut `SNAPSHOT` versions with Gradle
 [source, groovy]
 ----
 ext {
-    micronautVersion = '2.4.0-SNAPSHOT'
+    micronautVersion = '4.10.0-SNAPSHOT'
 }
 repositories {
     mavenCentral() // <1>
-    maven { url "https://s01.oss.sonatype.org/content/repositories/snapshots/" } // <2>
+    maven { url "https://central.sonatype.com/repository/maven-snapshots/" } // <2>
 }
 ----
 
@@ -24,20 +24,20 @@ In the case of Maven, edit `pom.xml`:
   ...
 
   <parent>
-    <groupId>io.micronaut</groupId>
+    <groupId>io.micronaut.platform</groupId>
     <artifactId>micronaut-parent</artifactId>
-    <version>2.4.0-SNAPSHOT</version>
+    <version>4.10.0-SNAPSHOT</version>
   </parent>
 
   <properties>
-    <micronaut.version>2.4.0-SNAPSHOT</micronaut.version> <!--1-->
+    <micronaut.version>4.10.0-SNAPSHOT</micronaut.version> <!--1-->
     ...
   </properties>
 
   <repositories>
     <repository>
       <id>sonatype-snapshots</id>
-      <url>https://s01.oss.sonatype.org/content/repositories/snapshots/</url> <!--2-->
+      <url>https://central.sonatype.com/repository/maven-snapshots/</url> <!--2-->
     </repository>
   </repositories>
 
@@ -46,6 +46,4 @@ In the case of Maven, edit `pom.xml`:
 
 ----
 <1> Set the snapshot version.
-<2> Micronaut snapshots are available on Sonatype OSS Snapshots
-
-NOTE: Previously snapshots were published to Bintray, however due to JFrog shutting the service down, snapshots are now being published to Sonatype.
+<2> Micronaut snapshots are available on Sonatype Central Portal Snapshots
