@@ -155,12 +155,12 @@ public class CorsFilter implements Ordered, ConditionalFilter {
                 return forbidden();
             }
             if (shouldDenyToPreventDriveByLocalhostAttack(corsOriginConfiguration, request)) {
-                LOG.trace("The resolved configuration allows any origin. To prevent drive-by-localhost attacks the request is forbidden");
+                LOG.info("The resolved configuration allows any origin. To prevent drive-by-localhost attacks the request is forbidden");
                 return forbidden();
             }
             return null; // proceed
         } else if (shouldDenyToPreventDriveByLocalhostAttack(origin, request)) {
-            LOG.trace("The request specifies an origin different than localhost. To prevent drive-by-localhost attacks the request is forbidden");
+            LOG.info("The request specifies an origin different than localhost. To prevent drive-by-localhost attacks the request is forbidden");
             return forbidden();
         }
         LOG.trace("CORS configuration not found for {} origin", origin);
