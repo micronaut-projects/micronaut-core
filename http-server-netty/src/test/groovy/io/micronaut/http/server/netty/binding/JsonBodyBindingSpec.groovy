@@ -206,6 +206,17 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         response.body() == "Body: Foo(Fred, 10),Foo(Barney, 11)"
     }
 
+    void "test nested POGO body parsing"() {
+        when:
+        String json = '{"foo":{"name":"Fred", "age":10}}'
+        HttpResponse<String> response = Flux.from(httpClient.exchange(
+                HttpRequest.POST('/json/nested', json), String
+        )).blockFirst()
+
+        then:
+        response.body() == "Body: Foo(Fred, 10)"
+    }
+
     void "test future argument handling with string"() {
         when:
         String json = '{"name":"Fred","age":10}'
@@ -324,6 +335,31 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
     response.body() == 'true'
   }
 
+    void "Test @Body with primitive defaultValue"() {
+        when:
+        String json = '{"title":"The Stand"}'
+        HttpResponse<String> response1 = Flux.from(httpClient.exchange(
+                HttpRequest.POST("/json/body-default-primitive", json), String
+        )).blockFirst()
+
+        then:
+        response1.code() == 200
+        response1.body() == "Body: {\"name\":\"Fred\", \"age\":10}"
+    }
+
+    void "Test @Body with object defaultValue"() {
+        when:
+        String json = '{"title":"The Stand"}'
+        HttpResponse<String> response1 = Flux.from(httpClient.exchange(
+                HttpRequest.POST("/json/body-default-object", json), String
+        )).blockFirst()
+
+        then:
+        def e = thrown(HttpClientResponseException)
+        def response = e.response
+        response.getStatus() == HttpStatus.BAD_REQUEST
+    }
+
   @Controller(value = "/json", produces = io.micronaut.http.MediaType.APPLICATION_JSON)
     @Requires(property = "test.controller", value = "JsonController")
     static class JsonController {
@@ -431,6 +467,17 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         String verifyContextAccessOnDeserialization(@Body ContextChecker contextChecker) {
             return Boolean.toString(contextChecker.contextAccess)
         }
+
+        @Post("/body-default-primitive")
+        String bodyDefaultPrimitive(@Body(value = 'foo', defaultValue = '{"name":"Fred", "age":10}') String body) {
+            return "Body: $body"
+        }
+
+        @Post("/body-default-object")
+        String bodyDefaultObject(@Body(value = 'foo', defaultValue = '{"name":"Fred", "age":10}') Foo body) {
+            return "Body: $body"
+        }
+
 
         @Error(JsonSyntaxException)
         HttpResponse jsonError(HttpRequest request, JsonSyntaxException jsonSyntaxException) {

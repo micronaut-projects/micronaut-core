@@ -106,6 +106,10 @@ public class DefaultBodyAnnotationBinder<T> extends AbstractArgumentBinder<T> im
      */
     public BindingResult<T> bindFullBody(ArgumentConversionContext<T> context, HttpRequest<?> source) {
         Optional<?> body = source.getBody();
-        return body.isPresent() ? doConvert(body.get(), context) : BindingResult.empty();
+        if (body.isPresent()) {
+            return doConvert(body.get(), context);
+        }
+        Optional<String> defaultValue = context.getAnnotationMetadata().stringValue(Body.class, "defaultValue");
+        return defaultValue.isPresent() ? doConvert(defaultValue.get(), context) : BindingResult.empty();
     }
 }
