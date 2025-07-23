@@ -24,16 +24,14 @@ import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Value;
-import io.micronaut.core.annotation.AccessorsStyle;
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.bind.annotation.Bindable;
-import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.DefaultArgument;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
@@ -126,10 +124,6 @@ public final class ConfigurationReaderVisitor implements TypeElementVisitor<Conf
             classElement.annotate(Introspected.class);
         }
 
-        AnnotationMetadata annotationMetadata = classElement.getAnnotationMetadata();
-        String[] readPrefixes = annotationMetadata.getValue(AccessorsStyle.class, "readPrefixes", String[].class)
-            .orElse(new String[]{AccessorsStyle.DEFAULT_READ_PREFIX});
-
         classElement.getPrimaryConstructor()
             .ifPresent(constructorElement -> applyConfigurationInjectionIfNecessary(classElement, constructorElement, context));
 
@@ -145,34 +139,49 @@ public final class ConfigurationReaderVisitor implements TypeElementVisitor<Conf
                         MethodElement methodElement = readMethod.get();
                         visitConfigurationBuilder(
                             prefix,
-                            ConfigurationBuilderDefinition.of(classElement, methodElement.withAnnotationMetadata(propertyElement.getAnnotationMetadata()), context),
-                            context
+                            ConfigurationBuilderDefinition.of(classElement, methodElement.withAnnotationMetadata(propertyElement.getAnnotationMetadata()), context)
                         );
                     } else if (field.isPresent()) {
                         FieldElement fieldElement = field.get();
                         if (fieldElement.isAccessible(classElement)) {
                             visitConfigurationBuilder(
                                 prefix,
-                                ConfigurationBuilderDefinition.of(classElement, fieldElement, context),
-                                context
+                                ConfigurationBuilderDefinition.of(classElement, fieldElement, context)
                             );
                         }
                         processed.add(fieldElement);
                     }
                 } else if (!propertyElement.isExcluded()) {
-                    if (notProcessed(propertyElement.getName(), propertyElement.getDeclaringType())
-                        && (propertyElement.getWriteMethod().isPresent() || anInterface || propertyElement.getField().isPresent())
-                        && !propertyElement.getType().hasStereotype(ConfigurationProperties.class)) {
-                        String doc = getPropertyDocs(propertyElement, anInterface);
-                        metadataBuilder.visitProperty(
-                            propertyElement.getOwningType(),
-                            propertyElement.getDeclaringType(),
-                            propertyElement.getType(),
-                            propertyElement.getName(),
-                            doc,
-                            propertyElement.getAnnotationMetadata().stringValue(Bindable.class, "defaultValue").orElse(null)
-                        );
-                        propertyElement.getField().ifPresent(processed::add);
+                    if (notProcessed(propertyElement.getName(), propertyElement.getDeclaringType())) {
+                        if (anInterface) {
+                            Optional<? extends MethodElement> readMethod = propertyElement.getReadMethod();
+                            if (readMethod.isPresent()) {
+                                MethodElement methodElement = readMethod.get();
+                                // We should skip these getters as valid read methods
+                                if (!methodElement.getReturnType().isVoid() && !methodElement.hasParameters()) {
+                                    abstractGetMethod(methodElement, propertyElement, context);
+                                    processed.add(methodElement);
+                                }
+                            }
+                        } else {
+                            Optional<? extends MemberElement> writeMemberElement = propertyElement.getWriteMember();
+                            if (writeMemberElement.isPresent() && !propertyElement.getType().hasStereotype(ConfigurationProperties.class)) {
+                                MemberElement memberElement = writeMemberElement.get();
+                                PropertyMetadata metadata = metadataBuilder.visitProperty(
+                                    memberElement.getOwningType(),
+                                    memberElement.getDeclaringType(),
+                                    propertyElement.getGenericType(),
+                                    propertyElement.getName(),
+                                    getPropertyDocs(propertyElement),
+                                    propertyElement.getAnnotationMetadata().stringValue(Bindable.class, "defaultValue").orElse(null)
+                                );
+                                if (memberElement instanceof MethodElement) {
+                                    annotateProperty(memberElement, metadata.getPath());
+                                }
+                                processed.add(memberElement);
+                                propertyElement.getField().ifPresent(processed::add);
+                            }
+                        }
                     }
                 }
             });
@@ -180,25 +189,32 @@ public final class ConfigurationReaderVisitor implements TypeElementVisitor<Conf
         classElement.getMethods().forEach(methodElement -> {
             if (!methodElement.isStatic() && isInjectPointMethod(methodElement)) {
                 applyConfigurationInjectionIfNecessary(classElement, methodElement, context);
-            }
-            if (methodElement.isAbstract()) {
-                visitAbstractMethod(methodElement, readPrefixes, context);
+            } else if (anInterface && !processed.contains(methodElement)) {
+                if (methodElement.hasParameters()) {
+                    context.fail("Only getter methods are allowed on @ConfigurationProperties interfaces: " + methodElement + ". You can change the accessors using @AccessorsStyle annotation", methodElement.getOwningType());
+                    return;
+                }
+                if (methodElement.getReturnType().isVoid()) {
+                    context.fail("Getter methods must return a value @ConfigurationProperties interfaces: " + methodElement, methodElement);
+                    return;
+                }
+                context.fail("Method format unrecognized for @ConfigurationProperties interfaces: " + methodElement, methodElement);
             }
         });
         classElement.getFields().forEach(fieldElement -> {
-            if (!fieldElement.isStatic() && fieldElement.isAccessible(classElement) && !processed.contains(fieldElement)) {
-                if (fieldElement.hasStereotype(ConfigurationBuilder.class)) {
-                    visitConfigurationBuilder(
-                        prefix,
-                        ConfigurationBuilderDefinition.of(classElement, fieldElement, context),
-                        context
-                    );
-                }
+            if (!fieldElement.isStatic()
+                && fieldElement.isAccessible(classElement)
+                && !processed.contains(fieldElement)
+                && fieldElement.hasStereotype(ConfigurationBuilder.class)) {
+                visitConfigurationBuilder(
+                    prefix,
+                    ConfigurationBuilderDefinition.of(classElement, fieldElement, context)
+                );
             }
         });
     }
 
-    private String getPropertyDocs(PropertyElement propertyElement, boolean anInterface) {
+    private String getPropertyDocs(PropertyElement propertyElement) {
         String doc = propertyElement.getDocumentation().orElse(null);
         Optional<MethodElement> writeMethod = propertyElement.getWriteMethod();
         if (writeMethod.isPresent()) {
@@ -206,23 +222,19 @@ public final class ConfigurationReaderVisitor implements TypeElementVisitor<Conf
             if (documentation.isPresent()) {
                 doc = documentation.get();
             }
-        } else if (anInterface) {
-            Optional<MethodElement> readMethod = propertyElement.getReadMethod();
-            if (readMethod.isPresent()) {
-                Optional<String> documentation = readMethod.get().getDocumentation();
-                if (documentation.isPresent()) {
-                    doc = documentation.get();
-                }
-            }
         }
         return doc;
+    }
+
+    private void annotateProperty(Element memberElement, String path) {
+        memberElement.annotate(Property.class, (builder) -> builder.member("name", path));
     }
 
     private boolean notProcessed(String prop, ClassElement declaringType) {
         return metadataBuilder.getProperties().stream().noneMatch(p -> p.getName().equals(prop) && p.getDeclaringType().equals(declaringType.getName()));
     }
 
-    private void visitConfigurationBuilder(String prefix, ConfigurationBuilderDefinition builderDefinition, VisitorContext visitorContext) {
+    private void visitConfigurationBuilder(String prefix, ConfigurationBuilderDefinition builderDefinition) {
         String configurationPrefix = metadataBuilder.visitBuilder(prefix, builderDefinition.builderElement(), builderDefinition.builderType()).getName();
         if (!configurationPrefix.isEmpty()) {
             configurationPrefix += ".";
@@ -294,8 +306,7 @@ public final class ConfigurationReaderVisitor implements TypeElementVisitor<Conf
                     parameter.stringValue(Bindable.class, "defaultValue").orElse(null)
                 );
             }
-            String path = pm.getPath();
-            parameter.annotate(Property.class, (builder) -> builder.member("name", path));
+            annotateProperty(parameter, pm.getPath());
         }
     }
 
@@ -329,23 +340,10 @@ public final class ConfigurationReaderVisitor implements TypeElementVisitor<Conf
         return false;
     }
 
-    private void visitAbstractMethod(MethodElement method, String[] readPrefixes, VisitorContext context) {
-        String methodName = method.getName();
-        if (!isGetter(methodName, readPrefixes)) {
-            context.fail("Only getter methods are allowed on @ConfigurationProperties interfaces: " + method + ". You can change the accessors using @AccessorsStyle annotation", method.getOwningType());
-            return;
-        }
-        if (method.hasParameters()) {
-            context.fail("Only zero argument getter methods are allowed on @ConfigurationProperties interfaces: " + method, method);
-            return;
-        }
-        if (method.getReturnType().isVoid()) {
-            context.fail("Getter methods must return a value @ConfigurationProperties interfaces: " + method, method);
-            return;
-        }
+    private void abstractGetMethod(MethodElement method, PropertyElement propertyElement, VisitorContext context) {
 
         boolean isPropertyParameter = isPropertyParameter(method.getGenericReturnType(), context);
-        final String propertyName = getPropertyNameForGetter(methodName, readPrefixes);
+        final String propertyName = propertyElement.getName();
         if (isPropertyParameter) {
             PropertyMetadata pm = metadataBuilder.getProperties().stream().filter(p -> p.getName().equals(propertyName) && p.getDeclaringType().equals(method.getOwningType().getName())).findFirst().orElse(null);
             if (pm == null) {
@@ -354,12 +352,11 @@ public final class ConfigurationReaderVisitor implements TypeElementVisitor<Conf
                     method.getOwningType(), // interface methods don't inherit the prefix
                     method.getReturnType(),
                     propertyName,
-                    method.getDocumentation().orElse(null),
+                    method.getDocumentation().orElse(method.getReturnType().getDocumentation().orElse(null)),
                     method.getAnnotationMetadata().stringValue(Bindable.class, "defaultValue").orElse(null)
                 );
             }
-            String path = pm.getPath();
-            method.annotate(Property.class, builder -> builder.member("name", path));
+            annotateProperty(method, pm.getPath());
         }
 
         method.annotate(ANN_CONFIGURATION_ADVICE, annBuilder -> {
@@ -371,14 +368,6 @@ public final class ConfigurationReaderVisitor implements TypeElementVisitor<Conf
                 annBuilder.member("iterable", true);
             }
         });
-    }
-
-    private String getPropertyNameForGetter(String methodName, String[] readPrefixes) {
-        return NameUtils.getPropertyNameForGetter(methodName, readPrefixes);
-    }
-
-    private boolean isGetter(String methodName, String[] readPrefixes) {
-        return NameUtils.isReaderName(methodName, readPrefixes);
     }
 
 }
