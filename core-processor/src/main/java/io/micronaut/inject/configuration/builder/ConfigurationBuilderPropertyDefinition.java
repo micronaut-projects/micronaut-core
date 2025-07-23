@@ -37,5 +37,5 @@ public record ConfigurationBuilderPropertyDefinition(String name,
                                                      MethodElement method,
                                                      ClassElement type,
                                                      @Nullable ParameterElement parameter,
-                                                     String path) implements ConfigurationBuilderElementDefinition {
+                                                     String path) {
 }

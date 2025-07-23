@@ -31,7 +31,7 @@ import java.util.List;
 @Internal
 public record ConfigurationBuilderOfMethodDefinition(
     MethodElement method,
-    List<ConfigurationBuilderElementDefinition> elements
+    List<ConfigurationBuilderPropertyDefinition> elements
 ) implements ConfigurationBuilderDefinition {
     @Override
     public MemberElement builderElement() {

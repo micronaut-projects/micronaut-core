@@ -44,7 +44,6 @@ import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.configuration.ConfigurationMetadataWriter;
 import io.micronaut.inject.configuration.PropertyMetadata;
 import io.micronaut.inject.configuration.builder.ConfigurationBuilderDefinition;
-import io.micronaut.inject.configuration.builder.ConfigurationBuilderElementDefinition;
 import io.micronaut.inject.configuration.builder.ConfigurationBuilderPropertyDefinition;
 import io.micronaut.inject.validation.RequiresValidation;
 import io.micronaut.inject.visitor.TypeElementQuery;
@@ -229,21 +228,17 @@ public final class ConfigurationReaderVisitor implements TypeElementVisitor<Conf
             configurationPrefix += ".";
         }
 
-        for (ConfigurationBuilderElementDefinition element : builderDefinition.elements()) {
-            if (element instanceof ConfigurationBuilderPropertyDefinition methodDefinition) {
-                MethodElement method = methodDefinition.method();
-                metadataBuilder.visitProperty(
-                    method.getOwningType(),
-                    method.getDeclaringType(),
-                    methodDefinition.type(),
-                    configurationPrefix + element.name(),
-                    methodDefinition.path(),
-                    null,
-                    null
-                );
-            } else {
-                throw new IllegalStateException();
-            }
+        for (ConfigurationBuilderPropertyDefinition methodDefinition : builderDefinition.elements()) {
+            MethodElement method = methodDefinition.method();
+            metadataBuilder.visitProperty(
+                method.getOwningType(),
+                method.getDeclaringType(),
+                methodDefinition.type(),
+                configurationPrefix + methodDefinition.name(),
+                methodDefinition.path(),
+                null,
+                null
+            );
         }
     }
 

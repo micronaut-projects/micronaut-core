@@ -68,11 +68,11 @@ public interface ConfigurationBuilderDefinition {
      * @param visitorContext The visitor context
      * @return The list of elements
      */
-    private static List<ConfigurationBuilderElementDefinition> provide(ClassElement owningType,
+    private static List<ConfigurationBuilderPropertyDefinition> provide(ClassElement owningType,
                                                                        MemberElement builderElement,
                                                                        ClassElement builderType,
                                                                        VisitorContext visitorContext) {
-        List<ConfigurationBuilderElementDefinition> builderElementDefinitions = new ArrayList<>();
+        List<ConfigurationBuilderPropertyDefinition> builderElementDefinitions = new ArrayList<>();
         AnnotationMetadata annotationMetadata = builderElement.getAnnotationMetadata();
         String configurationPrefix = annotationMetadata.stringValue(ConfigurationBuilder.class).map(v -> v + ".").orElse("");
         builderType.getBeanProperties(PropertyElementQuery.of(annotationMetadata))
@@ -152,6 +152,6 @@ public interface ConfigurationBuilderDefinition {
     /**
      * @return The builder elements
      */
-    List<ConfigurationBuilderElementDefinition> elements();
+    List<ConfigurationBuilderPropertyDefinition> elements();
 
 }

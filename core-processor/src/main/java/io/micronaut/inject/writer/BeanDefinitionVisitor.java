@@ -27,15 +27,10 @@ import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.configuration.builder.ConfigurationBuilderDefinition;
-import io.micronaut.inject.configuration.builder.ConfigurationBuilderElementDefinition;
-import io.micronaut.inject.configuration.builder.ConfigurationBuilderOfFieldDefinition;
-import io.micronaut.inject.configuration.builder.ConfigurationBuilderOfMethodDefinition;
-import io.micronaut.inject.configuration.builder.ConfigurationBuilderPropertyDefinition;
 import io.micronaut.inject.visitor.VisitorContext;
 
 import java.io.File;
 import java.io.IOException;
-import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 
@@ -371,57 +366,10 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
      *
      * @param builderDefinition The builder definition.
      * @see io.micronaut.context.annotation.ConfigurationBuilder
+     * @since 4.10
      */
     default void visitConfigBuilder(ConfigurationBuilderDefinition builderDefinition) {
-        if (builderDefinition instanceof ConfigurationBuilderOfFieldDefinition fieldDefinition) {
-            FieldElement fieldElement = fieldDefinition.fieldElement();
-            ClassElement builderType = fieldElement.getType();
-            visitConfigBuilderField(
-                builderType,
-                fieldElement.getName(),
-                fieldElement.getAnnotationMetadata(),
-                builderType.isInterface()
-            );
-        } else if (builderDefinition instanceof ConfigurationBuilderOfMethodDefinition methodDefinition) {
-            MethodElement methodElement = methodDefinition.method();
-            ClassElement builderType = methodElement.getReturnType();
-            visitConfigBuilderMethod(
-                builderType,
-                methodElement.getName(),
-                methodElement.getAnnotationMetadata(),
-                builderType.isInterface()
-            );
-        } else {
-            throw new IllegalStateException("Unknown configuration builder type: " + builderDefinition.getClass().getName());
-        }
-        for (ConfigurationBuilderElementDefinition element : builderDefinition.elements()) {
-            if (element instanceof ConfigurationBuilderPropertyDefinition methodDefinition) {
-                MethodElement method = methodDefinition.method();
-                ParameterElement parameter = methodDefinition.parameter();
-                if (methodDefinition.type().getName().equals(Duration.class.getName()) && parameter == null) {
-                    visitConfigBuilderDurationMethod(
-                        methodDefinition.name(),
-                        method.getReturnType(),
-                        method.getSimpleName(),
-                        methodDefinition.path()
-                    );
-                } else {
-                    visitConfigBuilderMethod(
-                        methodDefinition.name(),
-                        method.getReturnType(),
-                        method.getSimpleName(),
-                        parameter == null ? null : parameter.getType(),
-                        parameter == null ? Map.of() : parameter.getType().getTypeArguments(),
-                        methodDefinition.path()
-                    );
-                }
-            } else {
-                throw new IllegalStateException("Unknown configuration builder element type: " + element.getClass().getName());
-            }
-        }
-        visitConfigBuilderEnd();
     }
-
 
     /**
      * Visit a configuration builder method.

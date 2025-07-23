@@ -28,7 +28,7 @@ import java.util.List;
  * This class is utilized for associating configuration elements with a field element.
  * <p>
  * It encapsulates a {@link FieldElement} to represent the field and a list of
- * {@link ConfigurationBuilderElementDefinition} that define individual configuration
+ * {@link ConfigurationBuilderPropertyDefinition} that define individual configuration
  * elements related to the builder.
  *
  * @param fieldElement The field element used as the basis for the configuration builder.
@@ -39,7 +39,7 @@ import java.util.List;
 @Internal
 public record ConfigurationBuilderOfFieldDefinition(
     FieldElement fieldElement,
-    List<ConfigurationBuilderElementDefinition> elements
+    List<ConfigurationBuilderPropertyDefinition> elements
 ) implements ConfigurationBuilderDefinition {
     @Override
     public MemberElement builderElement() {
