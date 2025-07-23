@@ -15,13 +15,6 @@
  */
 package io.micronaut.inject.configuration;
 
-import com.github.javaparser.StaticJavaParser;
-import com.github.javaparser.javadoc.Javadoc;
-import com.github.javaparser.javadoc.JavadocBlockTag;
-import com.github.javaparser.javadoc.description.JavadocDescription;
-import com.github.javaparser.javadoc.description.JavadocDescriptionElement;
-import com.github.javaparser.javadoc.description.JavadocInlineTag;
-import com.github.javaparser.javadoc.description.JavadocSnippet;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
@@ -30,7 +23,6 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
-import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.writer.OriginatingElements;
 
 import java.io.IOException;
@@ -58,7 +50,7 @@ public class ConfigurationMetadataBuilder {
      * @deprecated Should not be used with the static state
      */
     @SuppressWarnings({"StaticVariableName", "VisibilityModifier"})
-    @Deprecated(forRemoval = true, since = "4.9.8")
+    @Deprecated(forRemoval = true, since = "4.10")
     public static final ConfigurationMetadataBuilder INSTANCE = new ConfigurationMetadataBuilder();
 
     private final OriginatingElements originatingElements = OriginatingElements.of();
@@ -105,68 +97,11 @@ public class ConfigurationMetadataBuilder {
         ConfigurationMetadata configurationMetadata = new ConfigurationMetadata();
         configurationMetadata.name = NameUtils.hyphenate(path, true);
         configurationMetadata.type = classElement.getType().getName();
-        configurationMetadata.description = resolveJavadocDescription(classElement);
+        configurationMetadata.description = classElement.getDocumentation().orElse(null);
         configurationMetadata.includes = CollectionUtils.setOf(classElement.stringValues(ConfigurationReader.class, "includes"));
         configurationMetadata.excludes = CollectionUtils.setOf(classElement.stringValues(ConfigurationReader.class, "excludes"));
         this.configurations.add(configurationMetadata);
         return configurationMetadata;
-    }
-
-    /**
-     * Resolves the javadoc description for the given element.
-     *
-     * @param element The element
-     * @return The javadoc description.
-     */
-    @Nullable
-    public static String resolveJavadocDescription(@NonNull Element element) {
-        if (element instanceof MethodElement || element instanceof ClassElement) {
-            String content = element.getDocumentation().orElse(null);
-            if (content == null) {
-                return null;
-            }
-            Javadoc jd = StaticJavaParser.parseJavadoc(content);
-            JavadocDescription description = jd.getDescription();
-            List<JavadocDescriptionElement> elements = description.getElements();
-            if (!elements.isEmpty()) {
-                StringBuilder builder = new StringBuilder();
-                for (JavadocDescriptionElement jde : elements) {
-                    if (jde instanceof JavadocSnippet snippet) {
-                        builder.append(snippet.toText());
-                    } else if (jde instanceof JavadocInlineTag tag) {
-                        builder.append(tag.toText());
-                    }
-                }
-                return builder.toString();
-            }
-            String paramBlock = resolveParamBlock(jd);
-            if (paramBlock != null) {
-                return paramBlock;
-            }
-            String returnBlock = resolveReturnBlock(jd);
-            if (returnBlock != null) {
-                return returnBlock;
-            }
-        }
-        return element.getDocumentation().orElse(null);
-    }
-
-    private static String resolveReturnBlock(Javadoc jd) {
-        for (JavadocBlockTag bt : jd.getBlockTags()) {
-            if (bt.getType() == JavadocBlockTag.Type.RETURN) {
-                return bt.getContent().toText();
-            }
-        }
-        return null;
-    }
-
-    private static String resolveParamBlock(Javadoc jd) {
-        for (JavadocBlockTag bt : jd.getBlockTags()) {
-            if (bt.getType() == JavadocBlockTag.Type.PARAM) {
-                return bt.getContent().toText();
-            }
-        }
-        return null;
     }
 
     /**

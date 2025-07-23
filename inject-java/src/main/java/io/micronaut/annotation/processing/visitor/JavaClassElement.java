@@ -15,6 +15,9 @@
  */
 package io.micronaut.annotation.processing.visitor;
 
+import com.github.javaparser.StaticJavaParser;
+import com.github.javaparser.javadoc.Javadoc;
+import com.github.javaparser.javadoc.JavadocBlockTag;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Creator;
@@ -91,6 +94,8 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
     protected final TypeElement classElement;
     protected final int arrayDimensions;
     @Nullable
+    protected String doc;
+    @Nullable
     // Not null means raw type definition: "List myMethod()"
     // Null value means a class definition: "class List<T> {}"
     final List<? extends TypeMirror> typeArguments;
@@ -125,7 +130,7 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
      */
     @Internal
     public JavaClassElement(JavaNativeElement.Class nativeType, ElementAnnotationMetadataFactory annotationMetadataFactory, JavaVisitorContext visitorContext) {
-        this(nativeType, annotationMetadataFactory, visitorContext, null, null, 0, false);
+        this(nativeType, annotationMetadataFactory, visitorContext, null, null, 0, false, null);
     }
 
     /**
@@ -141,7 +146,25 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
                      List<? extends TypeMirror> typeArguments,
                      @Nullable
                      Map<String, ClassElement> resolvedTypeArguments) {
-        this(nativeType, annotationMetadataFactory, visitorContext, typeArguments, resolvedTypeArguments, 0, false);
+        this(nativeType, annotationMetadataFactory, visitorContext, typeArguments, resolvedTypeArguments, 0, false, null);
+    }
+
+    /**
+     * @param nativeType The native type
+     * @param annotationMetadataFactory The annotation metadata factory
+     * @param visitorContext The visitor context
+     * @param typeArguments The declared type arguments
+     * @param resolvedTypeArguments The resolvedTypeArguments
+     * @param doc The optional documentation
+     */
+    JavaClassElement(JavaNativeElement.Class nativeType,
+                     ElementAnnotationMetadataFactory annotationMetadataFactory,
+                     JavaVisitorContext visitorContext,
+                     List<? extends TypeMirror> typeArguments,
+                     @Nullable
+                     Map<String, ClassElement> resolvedTypeArguments,
+                     String doc) {
+        this(nativeType, annotationMetadataFactory, visitorContext, typeArguments, resolvedTypeArguments, 0, false, doc);
     }
 
     /**
@@ -159,7 +182,27 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
                      @Nullable
                      Map<String, ClassElement> resolvedTypeArguments,
                      int arrayDimensions) {
-        this(nativeType, annotationMetadataFactory, visitorContext, typeArguments, resolvedTypeArguments, arrayDimensions, false);
+        this(nativeType, annotationMetadataFactory, visitorContext, typeArguments, resolvedTypeArguments, arrayDimensions, false, null);
+    }
+
+    /**
+     * @param nativeType The native type
+     * @param annotationMetadataFactory The annotation metadata factory
+     * @param visitorContext The visitor context
+     * @param typeArguments The declared type arguments
+     * @param resolvedTypeArguments The resolvedTypeArguments
+     * @param arrayDimensions The number of array dimensions
+     * @param doc The optional documentation
+     */
+    JavaClassElement(JavaNativeElement.Class nativeType,
+                     ElementAnnotationMetadataFactory annotationMetadataFactory,
+                     JavaVisitorContext visitorContext,
+                     List<? extends TypeMirror> typeArguments,
+                     @Nullable
+                     Map<String, ClassElement> resolvedTypeArguments,
+                     int arrayDimensions,
+                     String doc) {
+        this(nativeType, annotationMetadataFactory, visitorContext, typeArguments, resolvedTypeArguments, arrayDimensions, false, doc);
     }
 
     /**
@@ -170,6 +213,7 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
      * @param resolvedTypeArguments The resolvedTypeArguments
      * @param arrayDimensions The number of array dimensions
      * @param isTypeVariable Is the type a type variable
+     * @param doc            The optional documentation
      */
     JavaClassElement(JavaNativeElement.Class nativeType,
                      ElementAnnotationMetadataFactory annotationMetadataFactory,
@@ -178,13 +222,21 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
                      @Nullable
                      Map<String, ClassElement> resolvedTypeArguments,
                      int arrayDimensions,
-                     boolean isTypeVariable) {
+                     boolean isTypeVariable,
+                     @Nullable
+                     String doc) {
         super(nativeType, annotationMetadataFactory, visitorContext);
         this.classElement = nativeType.element();
         this.typeArguments = typeArguments;
         this.resolvedTypeArguments = resolvedTypeArguments;
         this.arrayDimensions = arrayDimensions;
         this.isTypeVariable = isTypeVariable;
+        this.doc = doc;
+    }
+
+    @Override
+    public Optional<String> getDocumentation() {
+        return doc == null ? super.getDocumentation() : Optional.of(doc);
     }
 
     @Override
@@ -426,7 +478,28 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
             value.readAccessKind == null ? PropertyElement.AccessKind.METHOD : PropertyElement.AccessKind.valueOf(value.readAccessKind.name()),
             value.writeAccessKind == null ? PropertyElement.AccessKind.METHOD : PropertyElement.AccessKind.valueOf(value.writeAccessKind.name()),
             value.isExcluded,
-            visitorContext);
+            visitorContext,
+            findPropertyDoc(value));
+    }
+
+    @Nullable
+    private String findPropertyDoc(AstBeanPropertiesUtils.BeanPropertyData value) {
+        if (isRecord()) {
+             try {
+                 String docComment = visitorContext.getElements().getDocComment(getNativeType().element());
+                 if (docComment != null) {
+                     Javadoc javadoc = StaticJavaParser.parseJavadoc(docComment);
+                     for (JavadocBlockTag t : javadoc.getBlockTags()) {
+                         if (t.getType() == JavadocBlockTag.Type.PARAM && t.getName().map(n -> n.equals(value.propertyName)).orElse(false)) {
+                             return t.getContent().toText();
+                         }
+                     }
+                 }
+             } catch (Exception ignore) {
+                 // Ignore
+             }
+        }
+        return null;
     }
 
     private List<MethodElement> getRecordMethods() {
@@ -514,7 +587,7 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
         if (this.arrayDimensions - 1 == arrayDimensions  && nativeType.typeMirror() instanceof ArrayType array) {
             nativeType = new JavaNativeElement.Class(nativeType.element(), array.getComponentType(), nativeType.owner());
         }
-        return new JavaClassElement(nativeType, elementAnnotationMetadataFactory, visitorContext, typeArguments, resolvedTypeArguments, arrayDimensions, false);
+        return new JavaClassElement(nativeType, elementAnnotationMetadataFactory, visitorContext, typeArguments, resolvedTypeArguments, arrayDimensions, false, doc);
     }
 
     @Override
@@ -864,8 +937,10 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
 
         @Override
         protected boolean excludeClass(TypeElement classNode) {
-            return classNode.getQualifiedName().toString().equals(Object.class.getName())
-                || classNode.getQualifiedName().toString().equals(Enum.class.getName());
+            String qualifiedName = classNode.getQualifiedName().toString();
+            return qualifiedName.equals(Object.class.getName())
+                || qualifiedName.equals(Record.class.getName())
+                || qualifiedName.equals(Enum.class.getName());
         }
 
         @Override

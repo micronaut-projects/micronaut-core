@@ -15,16 +15,24 @@
  */
 package io.micronaut.annotation.processing.visitor;
 
+import com.github.javaparser.StaticJavaParser;
+import com.github.javaparser.javadoc.Javadoc;
+import com.github.javaparser.javadoc.JavadocBlockTag;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.TypedElement;
+import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 
 import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
 
 /**
  * Implementation of the {@link ParameterElement} interface for Java.
@@ -122,4 +130,51 @@ final class JavaParameterElement extends AbstractTypeAwareJavaElement implements
     protected AnnotationMetadata getTypeAnnotationMetadata() {
         return getType().getTypeAnnotationMetadata();
     }
+
+    @Override
+    public Optional<String> getDocumentation() {
+        try {
+            String methodDocComment = visitorContext.getElements().getDocComment(methodElement.getNativeType().element());
+            if (methodDocComment != null) {
+                String parameterDoc = findParameterDoc(methodDocComment, getName());
+                if (parameterDoc != null) {
+                    return Optional.of(parameterDoc);
+                }
+            }
+            if (owningType.isRecord() && methodElement instanceof ConstructorElement constructor) {
+                final List<PropertyElement> beanProperties = constructor
+                    .getDeclaringType()
+                    .getBeanProperties();
+                final ParameterElement[] parameters = constructor.getParameters();
+                if (beanProperties.size() == parameters.length) {
+                    String docComment = visitorContext.getElements().getDocComment(owningType.getNativeType().element());
+                    if (docComment != null) {
+                        return Optional.ofNullable(findParameterDoc(docComment, getName()));
+                    }
+                }
+            }
+            return Optional.empty();
+        } catch (Exception ignore) {
+            return Optional.empty();
+        }
+    }
+
+    @Nullable
+    private static String findParameterDoc(String javadocString, String name) {
+        try {
+            Javadoc javadoc = StaticJavaParser.parseJavadoc(javadocString);
+            if (javadoc == null) {
+                return null;
+            }
+            for (JavadocBlockTag t : javadoc.getBlockTags()) {
+                if (t.getType() == JavadocBlockTag.Type.PARAM && t.getName().map(n -> n.equals(name)).orElse(false)) {
+                    return t.getContent().toText();
+                }
+            }
+            return null;
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
 }

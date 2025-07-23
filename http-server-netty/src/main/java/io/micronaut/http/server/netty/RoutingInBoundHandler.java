@@ -29,7 +29,6 @@ import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.context.ServerHttpRequestContext;
 import io.micronaut.http.context.event.HttpRequestReceivedEvent;
-import io.micronaut.http.context.event.HttpRequestReceivedEvent;
 import io.micronaut.http.context.event.HttpRequestTerminatedEvent;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.netty.body.AvailableNettyByteBody;

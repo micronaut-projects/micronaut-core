@@ -59,7 +59,8 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
             case ENUM -> new JavaEnumElement(
                 new JavaNativeElement.Class(type),
                 annotationMetadataFactory,
-                visitorContext
+                visitorContext,
+                null
             );
             case ANNOTATION_TYPE -> new JavaAnnotationElement(
                 new JavaNativeElement.Class(type),
@@ -93,7 +94,8 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
             return new JavaEnumElement(
                 new JavaNativeElement.Class(type),
                 annotationMetadataFactory,
-                visitorContext
+                visitorContext,
+                null
             ) {
                 @NonNull
                 @Override

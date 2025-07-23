@@ -15,9 +15,13 @@
  */
 package io.micronaut.annotation.processing.visitor;
 
+import com.github.javaparser.StaticJavaParser;
+import com.github.javaparser.javadoc.Javadoc;
+import com.github.javaparser.javadoc.JavadocBlockTag;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
@@ -347,11 +351,30 @@ public class JavaMethodElement extends AbstractJavaMemberElement implements Meth
             }
         }
         final TypeMirror returnType = executableElement.getReturnType();
-        ClassElement returnClassElement = newClassElement(getNativeType(), returnType, genericInfo);
+        String docComment = visitorContext.getElements().getDocComment(executableElement);
+        ClassElement returnClassElement = newClassElement(getNativeType(), returnType, genericInfo, findReturnDoc(docComment));
         if (canBeMarkedWithNonNull(returnClassElement)) {
             returnClassElement.getTypeAnnotationMetadata().annotate(NonNull.class);
         }
         return returnClassElement;
+    }
+
+    @Nullable
+    private static String findReturnDoc(String javadocString) {
+        try {
+            Javadoc javadoc = StaticJavaParser.parseJavadoc(javadocString);
+            if (javadoc == null) {
+                return null;
+            }
+            for (JavadocBlockTag t : javadoc.getBlockTags()) {
+                if (t.getType() == JavadocBlockTag.Type.RETURN) {
+                    return t.getContent().toText();
+                }
+            }
+            return null;
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     private static boolean sameType(String type, DeclaredType dt) {
