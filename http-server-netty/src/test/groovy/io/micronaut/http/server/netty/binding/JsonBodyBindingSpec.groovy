@@ -335,11 +335,11 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
     response.body() == 'true'
   }
 
-    void "Test @Body with primitive defaultValue"() {
+    void "Test part @Body with primitive defaultValue"() {
         when:
         String json = '{"title":"The Stand"}'
         HttpResponse<String> response1 = Flux.from(httpClient.exchange(
-                HttpRequest.POST("/json/body-default-primitive", json), String
+                HttpRequest.POST("/json/part-body-default-primitive", json), String
         )).blockFirst()
 
         then:
@@ -347,11 +347,36 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         response1.body() == "Body: {\"name\":\"Fred\", \"age\":10}"
     }
 
-    void "Test @Body with object defaultValue"() {
+    void "Test part @Body with object defaultValue"() {
         when:
         String json = '{"title":"The Stand"}'
         HttpResponse<String> response1 = Flux.from(httpClient.exchange(
-                HttpRequest.POST("/json/body-default-object", json), String
+                HttpRequest.POST("/json/part-body-default-object", json), String
+        )).blockFirst()
+
+        then:
+        def e = thrown(HttpClientResponseException)
+        def response = e.response
+        response.getStatus() == HttpStatus.BAD_REQUEST
+    }
+
+    void "Test full @Body with primitive defaultValue"() {
+        when:
+        String json = ''
+        HttpResponse<String> response1 = Flux.from(httpClient.exchange(
+                HttpRequest.POST("/json/full-body-default-primitive", json), String
+        )).blockFirst()
+
+        then:
+        response1.code() == 200
+        response1.body() == "Body: {\"name\":\"Fred\", \"age\":10}"
+    }
+
+    void "Test full @Body with object defaultValue"() {
+        when:
+        String json = ''
+        HttpResponse<String> response1 = Flux.from(httpClient.exchange(
+                HttpRequest.POST("/json/full-body-default-object", json), String
         )).blockFirst()
 
         then:
@@ -468,13 +493,23 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
             return Boolean.toString(contextChecker.contextAccess)
         }
 
-        @Post("/body-default-primitive")
-        String bodyDefaultPrimitive(@Body(value = 'foo', defaultValue = '{"name":"Fred", "age":10}') String body) {
+        @Post("/part-body-default-primitive")
+        String partBodyDefaultPrimitive(@Body(value = 'foo', defaultValue = '{"name":"Fred", "age":10}') String body) {
             return "Body: $body"
         }
 
-        @Post("/body-default-object")
-        String bodyDefaultObject(@Body(value = 'foo', defaultValue = '{"name":"Fred", "age":10}') Foo body) {
+        @Post("/part-body-default-object")
+        String partBodyDefaultObject(@Body(value = 'foo', defaultValue = '{"name":"Fred", "age":10}') Foo body) {
+            return "Body: $body"
+        }
+
+        @Post("/full-body-default-primitive")
+        String fullBodyDefaultPrimitive(@Body(defaultValue = '{"name":"Fred", "age":10}') String body) {
+            return "Body: $body"
+        }
+
+        @Post("/full-body-default-object")
+        String fullBodyDefaultObject(@Body(defaultValue = '{"name":"Fred", "age":10}') Foo body) {
             return "Body: $body"
         }
 

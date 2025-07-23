@@ -28,7 +28,6 @@ import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.Body;
 import io.micronaut.http.bind.binders.DefaultBodyAnnotationBinder;
 import io.micronaut.http.bind.binders.PendingRequestBindingResult;
 import io.micronaut.http.body.AvailableByteBody;
@@ -105,11 +104,7 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
             return super.bindFullBody(context, source);
         }
         if (nhr.byteBody().expectedLength().orElse(-1) == 0) {
-            String defaultValue = context.getAnnotationMetadata().stringValue(Body.class, "defaultValue").orElse(null);
-            if (defaultValue != null) {
-                return super.bindFullBody(context, source); 
-            }
-            return BindingResult.empty();
+            return bindDefaultValue(context);
         }
 
         // If there's an error during conversion, the body must stay available, so we split here.
