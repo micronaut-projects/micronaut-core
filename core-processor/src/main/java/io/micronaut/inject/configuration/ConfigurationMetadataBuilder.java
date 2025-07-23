@@ -15,6 +15,8 @@
  */
 package io.micronaut.inject.configuration;
 
+import io.micronaut.context.annotation.BeanProperties;
+import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
@@ -23,6 +25,7 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.writer.OriginatingElements;
 
 import java.io.IOException;
@@ -105,6 +108,39 @@ public class ConfigurationMetadataBuilder {
     }
 
     /**
+     * Visit a {@link io.micronaut.context.annotation.ConfigurationBuilder} build element.
+     *
+     * @param prefix The prefix
+     * @param builderElement The builder element
+     * @param builderType The type of the {@link io.micronaut.context.annotation.ConfigurationBuilder}
+     * @return This {@link ConfigurationMetadata}
+     */
+    public ConfigurationMetadata visitBuilder(String prefix, MemberElement builderElement, ClassElement builderType) {
+        originatingElements.addOriginatingElement(builderElement);
+        String path = builderElement.stringValue(ConfigurationBuilder.class).orElse("");
+        if (prefix.isEmpty()) {
+            if (!path.isEmpty()) {
+                path = prefix;
+            }
+        } else {
+            if (path.isEmpty()) {
+                path = prefix;
+            } else {
+                path = prefix + "." + path;
+            }
+        }
+
+        ConfigurationMetadata configurationMetadata = new ConfigurationMetadata();
+        configurationMetadata.name = NameUtils.hyphenate(path, true);
+        configurationMetadata.type = builderType.getName();
+        configurationMetadata.description = builderElement.getDocumentation().orElse(null);
+        configurationMetadata.includes = CollectionUtils.setOf(builderElement.stringValues(BeanProperties.class, BeanProperties.MEMBER_INCLUDES));
+        configurationMetadata.excludes = CollectionUtils.setOf(builderElement.stringValues(BeanProperties.class, BeanProperties.MEMBER_EXCLUDES));
+        this.configurations.add(configurationMetadata);
+        return configurationMetadata;
+    }
+
+    /**
      * Visit a configuration property.
      *
      * @param owningType    The type that owns the property
@@ -171,6 +207,19 @@ public class ConfigurationMetadataBuilder {
         metadata.defaultValue = defaultValue;
         properties.add(metadata);
         return metadata;
+    }
+
+    /**
+     * Finalizes the building process by removing configurations from the list
+     * of configurations that have no associated properties.
+     *
+     * This method iterates over the configurations list and removes any configuration
+     * for which none of the properties in the properties list have a matching
+     * declaring type.
+     */
+    public void finish() {
+        configurations.removeIf(configuration -> properties.stream()
+            .noneMatch(p -> p.getDeclaringType().equals(configuration.getType())));
     }
 
     /**

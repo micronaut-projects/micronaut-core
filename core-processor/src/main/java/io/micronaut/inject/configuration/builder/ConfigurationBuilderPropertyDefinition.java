@@ -20,7 +20,6 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
-import io.micronaut.inject.ast.PrimitiveElement;
 
 /**
  * Configuration builder method.
@@ -36,10 +35,7 @@ import io.micronaut.inject.ast.PrimitiveElement;
 @Internal
 public record ConfigurationBuilderPropertyDefinition(String name,
                                                      MethodElement method,
+                                                     ClassElement type,
                                                      @Nullable ParameterElement parameter,
                                                      String path) implements ConfigurationBuilderElementDefinition {
-    @Override
-    public ClassElement type() {
-        return parameter == null ? PrimitiveElement.BOOLEAN : parameter.getType();
-    }
 }

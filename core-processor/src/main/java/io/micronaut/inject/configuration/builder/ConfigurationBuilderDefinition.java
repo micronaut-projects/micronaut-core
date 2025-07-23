@@ -19,11 +19,11 @@ import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.PropertyElementQuery;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.visitor.VisitorContext;
@@ -47,28 +47,28 @@ import java.util.concurrent.TimeUnit;
 @Internal
 public interface ConfigurationBuilderDefinition {
 
-    static ConfigurationBuilderDefinition of(ClassElement classElement,
+    static ConfigurationBuilderDefinition of(ClassElement owningType,
                                              FieldElement fieldElement,
                                              VisitorContext visitorContext) {
-        return new ConfigurationBuilderOfFieldDefinition(fieldElement, provide(classElement, fieldElement, fieldElement.getType(), visitorContext));
+        return new ConfigurationBuilderOfFieldDefinition(fieldElement, provide(owningType, fieldElement, fieldElement.getType(), visitorContext));
     }
 
-    static ConfigurationBuilderDefinition of(ClassElement classElement,
+    static ConfigurationBuilderDefinition of(ClassElement owningType,
                                              MethodElement methodElement,
                                              VisitorContext visitorContext) {
-        return new ConfigurationBuilderOfMethodDefinition(methodElement, provide(classElement, methodElement, methodElement.getReturnType(), visitorContext));
+        return new ConfigurationBuilderOfMethodDefinition(methodElement, provide(owningType, methodElement, methodElement.getReturnType(), visitorContext));
     }
 
     /**
      * Provide the builder definition.
      *
-     * @param classElement   The class element
+     * @param owningType   The class element
      * @param builderElement The builder element
      * @param builderType    The builder type
      * @param visitorContext The visitor context
      * @return The list of elements
      */
-    private static List<ConfigurationBuilderElementDefinition> provide(ClassElement classElement,
+    private static List<ConfigurationBuilderElementDefinition> provide(ClassElement owningType,
                                                                        MemberElement builderElement,
                                                                        ClassElement builderType,
                                                                        VisitorContext visitorContext) {
@@ -99,7 +99,7 @@ public interface ConfigurationBuilderDefinition {
                     ParameterElement parameterElement = paramCount == 1 ? params[0] : null;
 
                     String path = ConfigurationMetadataBuilder.calculatePath(
-                        classElement,
+                        owningType,
                         builderElement.getDeclaringType(),
                         propertyElement.getType(),
                         configurationPrefix + propertyName
@@ -108,6 +108,7 @@ public interface ConfigurationBuilderDefinition {
                     builderElementDefinitions.add(new ConfigurationBuilderPropertyDefinition(
                         propertyName,
                         methodElement,
+                        parameterElement == null ? PrimitiveElement.BOOLEAN : parameterElement.getType(),
                         parameterElement,
                         path));
                 } else if (paramCount == 2) {
@@ -119,15 +120,17 @@ public interface ConfigurationBuilderDefinition {
 
                     if (firstParamType.getSimpleName().equals("long") && secondParamType.isAssignable(TimeUnit.class)) {
                         String path = ConfigurationMetadataBuilder.calculatePath(
-                            classElement,
+                            owningType,
                             methodElement.getDeclaringType(),
                             visitorContext.getClassElement(Duration.class.getName()).get(),
                             configurationPrefix + propertyName
                         );
 
-                        builderElementDefinitions.add(new ConfigurationBuilderDurationMethodDefinition(
+                        builderElementDefinitions.add(new ConfigurationBuilderPropertyDefinition(
                             propertyName,
                             methodElement,
+                            visitorContext.getClassElement(Duration.class.getName()).get(),
+                            null,
                             path));
 
                     }
@@ -136,7 +139,15 @@ public interface ConfigurationBuilderDefinition {
         return builderElementDefinitions;
     }
 
-    Element builderElement();
+    /**
+     * @return The builder element
+     */
+    MemberElement builderElement();
+
+    /**
+     * @return The builder type
+     */
+    ClassElement builderType();
 
     /**
      * @return The builder elements

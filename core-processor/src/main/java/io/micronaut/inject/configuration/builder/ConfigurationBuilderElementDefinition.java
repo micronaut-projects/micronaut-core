@@ -20,18 +20,13 @@ import io.micronaut.inject.ast.ClassElement;
 
 /**
  * Represents a common interface for definitions of configuration builder methods.
- * <p>
- * This sealed interface is implemented by specific types of builder method definitions,
- * such as {@link ConfigurationBuilderDurationMethodDefinition} for methods that accept a long and a TimeUnit,
- * and {@link ConfigurationBuilderPropertyDefinition} for general configuration builder methods.
  *
  * @author Denis Stepanov
- * @see ConfigurationBuilderDurationMethodDefinition
  * @see ConfigurationBuilderPropertyDefinition
  * @since 4.10
  */
 @Internal
-public sealed interface ConfigurationBuilderElementDefinition permits ConfigurationBuilderDurationMethodDefinition, ConfigurationBuilderPropertyDefinition {
+public sealed interface ConfigurationBuilderElementDefinition permits ConfigurationBuilderPropertyDefinition {
 
     /**
      * @return The name of the property.

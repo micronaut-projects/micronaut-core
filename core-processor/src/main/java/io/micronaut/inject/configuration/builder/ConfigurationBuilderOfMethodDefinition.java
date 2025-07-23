@@ -16,7 +16,8 @@
 package io.micronaut.inject.configuration.builder;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 
 import java.util.List;
@@ -33,7 +34,12 @@ public record ConfigurationBuilderOfMethodDefinition(
     List<ConfigurationBuilderElementDefinition> elements
 ) implements ConfigurationBuilderDefinition {
     @Override
-    public Element builderElement() {
+    public MemberElement builderElement() {
         return method;
+    }
+
+    @Override
+    public ClassElement builderType() {
+        return method.getReturnType();
     }
 }

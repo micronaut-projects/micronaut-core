@@ -2933,8 +2933,8 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                                     ).doCatch(NoSuchMethodError.class, exceptionVar -> StatementDef.multi())
                                 );
                             }
-                            List<ExpressionDef> values = new ArrayList<>();
-                            List<TypeDef> parameterTypes = new ArrayList<>();
+                            List<ExpressionDef> values = new ArrayList<>(2);
+                            List<TypeDef> parameterTypes = new ArrayList<>(2);
                             if (isDurationWithTimeUnit) {
                                 parameterTypes.add(TypeDef.Primitive.LONG);
                                 ClassTypeDef timeInitType = ClassTypeDef.of(TimeUnit.class);

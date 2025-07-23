@@ -44,7 +44,6 @@ import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.configuration.ConfigurationMetadataWriter;
 import io.micronaut.inject.configuration.PropertyMetadata;
 import io.micronaut.inject.configuration.builder.ConfigurationBuilderDefinition;
-import io.micronaut.inject.configuration.builder.ConfigurationBuilderDurationMethodDefinition;
 import io.micronaut.inject.configuration.builder.ConfigurationBuilderElementDefinition;
 import io.micronaut.inject.configuration.builder.ConfigurationBuilderPropertyDefinition;
 import io.micronaut.inject.validation.RequiresValidation;
@@ -53,7 +52,6 @@ import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 
 import java.io.IOException;
-import java.time.Duration;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -88,6 +86,7 @@ public final class ConfigurationReaderVisitor implements TypeElementVisitor<Conf
     @Override
     public void finish(VisitorContext visitorContext) {
         if (metadataBuilder.hasMetadata()) {
+            metadataBuilder.finish();
             ServiceLoader<ConfigurationMetadataWriter> writers = ServiceLoader.load(ConfigurationMetadataWriter.class, getClass().getClassLoader());
             try {
                 for (ConfigurationMetadataWriter writer : writers) {
@@ -117,9 +116,8 @@ public final class ConfigurationReaderVisitor implements TypeElementVisitor<Conf
         }
 
         ConfigurationMetadata configurationMetadata = metadataBuilder.visitProperties(classElement);
-        if (configurationMetadata != null) {
-            classElement.annotate(ConfigurationReader.class, builder -> builder.member(ConfigurationReader.PREFIX, configurationMetadata.getName()));
-        }
+        String prefix = configurationMetadata.getName();
+        classElement.annotate(ConfigurationReader.class, builder -> builder.member(ConfigurationReader.PREFIX, prefix));
 
         boolean anInterface = classElement.isInterface();
         if (anInterface) {
@@ -147,7 +145,7 @@ public final class ConfigurationReaderVisitor implements TypeElementVisitor<Conf
                     if (readMethod.isPresent()) {
                         MethodElement methodElement = readMethod.get();
                         visitConfigurationBuilder(
-                            classElement,
+                            prefix,
                             ConfigurationBuilderDefinition.of(classElement, methodElement.withAnnotationMetadata(propertyElement.getAnnotationMetadata()), context),
                             context
                         );
@@ -155,7 +153,7 @@ public final class ConfigurationReaderVisitor implements TypeElementVisitor<Conf
                         FieldElement fieldElement = field.get();
                         if (fieldElement.isAccessible(classElement)) {
                             visitConfigurationBuilder(
-                                classElement,
+                                prefix,
                                 ConfigurationBuilderDefinition.of(classElement, fieldElement, context),
                                 context
                             );
@@ -192,7 +190,7 @@ public final class ConfigurationReaderVisitor implements TypeElementVisitor<Conf
             if (!fieldElement.isStatic() && fieldElement.isAccessible(classElement) && !processed.contains(fieldElement)) {
                 if (fieldElement.hasStereotype(ConfigurationBuilder.class)) {
                     visitConfigurationBuilder(
-                        classElement,
+                        prefix,
                         ConfigurationBuilderDefinition.of(classElement, fieldElement, context),
                         context
                     );
@@ -225,32 +223,26 @@ public final class ConfigurationReaderVisitor implements TypeElementVisitor<Conf
         return metadataBuilder.getProperties().stream().noneMatch(p -> p.getName().equals(prop) && p.getDeclaringType().equals(declaringType.getName()));
     }
 
-    private void visitConfigurationBuilder(ClassElement classElement,
-                                           ConfigurationBuilderDefinition builderDefinition, VisitorContext visitorContext) {
-        String configurationPrefix = builderDefinition.builderElement().stringValue(ConfigurationBuilder.class).map(v -> v + ".").orElse("");
+    private void visitConfigurationBuilder(String prefix, ConfigurationBuilderDefinition builderDefinition, VisitorContext visitorContext) {
+        String configurationPrefix = metadataBuilder.visitBuilder(prefix, builderDefinition.builderElement(), builderDefinition.builderType()).getName();
+        if (!configurationPrefix.isEmpty()) {
+            configurationPrefix += ".";
+        }
+
         for (ConfigurationBuilderElementDefinition element : builderDefinition.elements()) {
-            if (element instanceof ConfigurationBuilderDurationMethodDefinition methodDurationDefinition) {
-                MethodElement method = methodDurationDefinition.method();
-                metadataBuilder.visitProperty(
-                    method.getOwningType(),
-                    method.getDeclaringType(), // Align with the not-duration method which always sets the current class instead the builder class
-                    visitorContext.getClassElement(Duration.class.getName()).get(),
-                    configurationPrefix + element.name(),
-                    methodDurationDefinition.path(),
-                    null,
-                    null
-                );
-            } else if (element instanceof ConfigurationBuilderPropertyDefinition methodDefinition) {
+            if (element instanceof ConfigurationBuilderPropertyDefinition methodDefinition) {
                 MethodElement method = methodDefinition.method();
                 metadataBuilder.visitProperty(
                     method.getOwningType(),
-                    classElement,
+                    method.getDeclaringType(),
                     methodDefinition.type(),
                     configurationPrefix + element.name(),
                     methodDefinition.path(),
                     null,
                     null
                 );
+            } else {
+                throw new IllegalStateException();
             }
         }
     }

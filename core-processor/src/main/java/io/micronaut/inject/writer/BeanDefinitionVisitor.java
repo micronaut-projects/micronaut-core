@@ -27,7 +27,6 @@ import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.configuration.builder.ConfigurationBuilderDefinition;
-import io.micronaut.inject.configuration.builder.ConfigurationBuilderDurationMethodDefinition;
 import io.micronaut.inject.configuration.builder.ConfigurationBuilderElementDefinition;
 import io.micronaut.inject.configuration.builder.ConfigurationBuilderOfFieldDefinition;
 import io.micronaut.inject.configuration.builder.ConfigurationBuilderOfMethodDefinition;
@@ -36,6 +35,7 @@ import io.micronaut.inject.visitor.VisitorContext;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 
@@ -398,22 +398,23 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
             if (element instanceof ConfigurationBuilderPropertyDefinition methodDefinition) {
                 MethodElement method = methodDefinition.method();
                 ParameterElement parameter = methodDefinition.parameter();
-                visitConfigBuilderMethod(
-                    methodDefinition.name(),
-                    method.getReturnType(),
-                    method.getSimpleName(),
-                    parameter == null ? null : parameter.getType(),
-                    parameter == null ? Map.of() : parameter.getType().getTypeArguments(),
-                    methodDefinition.path()
-                );
-            } else if (element instanceof ConfigurationBuilderDurationMethodDefinition durationMethodDefinition) {
-                MethodElement method = durationMethodDefinition.method();
-                visitConfigBuilderDurationMethod(
-                    durationMethodDefinition.name(),
-                    method.getReturnType(),
-                    method.getSimpleName(),
-                    durationMethodDefinition.path()
-                );
+                if (methodDefinition.type().getName().equals(Duration.class.getName()) && parameter == null) {
+                    visitConfigBuilderDurationMethod(
+                        methodDefinition.name(),
+                        method.getReturnType(),
+                        method.getSimpleName(),
+                        methodDefinition.path()
+                    );
+                } else {
+                    visitConfigBuilderMethod(
+                        methodDefinition.name(),
+                        method.getReturnType(),
+                        method.getSimpleName(),
+                        parameter == null ? null : parameter.getType(),
+                        parameter == null ? Map.of() : parameter.getType().getTypeArguments(),
+                        methodDefinition.path()
+                    );
+                }
             } else {
                 throw new IllegalStateException("Unknown configuration builder element type: " + element.getClass().getName());
             }
