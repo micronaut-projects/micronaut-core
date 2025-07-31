@@ -274,12 +274,15 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                 List<JavaClassElement> javaClassElements = elements.stream()
                     .map(typeElement -> elementFactory.newSourceClassElement(typeElement, elementAnnotationMetadataFactory))
                     .collect(Collectors.toCollection(() -> new ArrayList<>(elements.size())));
-
                 List<ClassElement> extraClasses = new ArrayList<>();
-                for (JavaClassElement javaClassElement : javaClassElements) {
-                    extraClasses.addAll(VisitorUtils.collectImportedElements(javaClassElement, javaVisitorContext));
+                for (JavaClassElement javaClassElement : new ArrayList<>(javaClassElements)) {
+                    try {
+                        extraClasses.addAll(VisitorUtils.collectImportedElements(javaClassElement, javaVisitorContext));
+                        javaClassElements.addAll((Collection) extraClasses);
+                    } catch (PostponeToNextRoundException e) {
+                        postponeElement(javaClassElement, e.getNativeErrorElement(), e);
+                    }
                 }
-                javaClassElements.addAll((Collection) extraClasses);
 
                 for (LoadedVisitor loadedVisitor : loadedVisitors) {
                     for (JavaClassElement javaClassElement : javaClassElements) {
