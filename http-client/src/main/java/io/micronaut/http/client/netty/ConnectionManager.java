@@ -553,7 +553,10 @@ public class ConnectionManager {
                 }
 
                 ch.pipeline()
-                    .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC, new HttpClientCodec())
+                    .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC, new HttpClientCodec(
+                        HttpClientConfiguration.DEFAULT_MAX_INITIAL_LINE_LENGTH,
+                        configuration.getMaxHeaderSize(),
+                        HttpClientConfiguration.DEFAULT_MAX_CHUNK_SIZE))
                     .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_AGGREGATOR, new HttpObjectAggregator(configuration.getMaxContentLength()));
 
                 Optional<Duration> readIdleTime = configuration.getReadIdleTimeout();
@@ -673,7 +676,10 @@ public class ConnectionManager {
         addLogHandler(ch);
 
         ch.pipeline()
-            .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC, new HttpClientCodec())
+            .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC, new HttpClientCodec(
+                HttpClientConfiguration.DEFAULT_MAX_INITIAL_LINE_LENGTH,
+                configuration.getMaxHeaderSize(),
+                HttpClientConfiguration.DEFAULT_MAX_CHUNK_SIZE))
             .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECODER, new HttpContentDecompressor());
     }
 
@@ -964,7 +970,10 @@ public class ConnectionManager {
 
             Http2FrameCodec frameCodec = makeFrameCodec();
 
-            HttpClientCodec sourceCodec = new HttpClientCodec();
+            HttpClientCodec sourceCodec = new HttpClientCodec(
+                HttpClientConfiguration.DEFAULT_MAX_INITIAL_LINE_LENGTH,
+                configuration.getMaxHeaderSize(),
+                HttpClientConfiguration.DEFAULT_MAX_CHUNK_SIZE);
             Http2ClientUpgradeCodec upgradeCodec = new Http2ClientUpgradeCodec(frameCodec,
                 new ChannelInitializer<Channel>() {
                     @Override
