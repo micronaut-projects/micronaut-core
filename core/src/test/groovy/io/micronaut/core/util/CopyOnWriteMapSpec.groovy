@@ -13,7 +13,7 @@ import java.util.stream.IntStream
 class CopyOnWriteMapSpec extends Specification {
     def "simple ops"() {
         given:
-        def map = new CopyOnWriteMap<String, String>(Integer.MAX_VALUE)
+        def map = CopyOnWriteMap.create(Integer.MAX_VALUE)
 
         when:
         map.put("foo", "bar")
@@ -83,7 +83,7 @@ class CopyOnWriteMapSpec extends Specification {
 
     def eviction(def maxSize) {
         given:
-        def map = new CopyOnWriteMap<String, String>(maxSize)
+        def map = CopyOnWriteMap.create(maxSize)
 
         when:
         for (int i = 0; i < maxSize + CopyOnWriteMap.EVICTION_BATCH - 1; i++) {
