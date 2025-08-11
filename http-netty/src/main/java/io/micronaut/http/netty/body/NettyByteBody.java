@@ -25,7 +25,6 @@ import io.micronaut.http.body.CloseableAvailableByteBody;
 import io.micronaut.http.body.InternalByteBody;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
-import io.netty.buffer.Unpooled;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,17 +37,9 @@ import reactor.core.publisher.Flux;
  * @author Jonas Konrad
  */
 @Internal
-public abstract sealed class NettyByteBody implements ByteBody, InternalByteBody permits AvailableNettyByteBody, StreamingNettyByteBody {
+abstract sealed class NettyByteBody implements ByteBody, InternalByteBody permits AvailableNettyByteBody, StreamingNettyByteBody {
     // don't change this, isolate body buffering to separate logging name space
     protected static final Logger LOG = LoggerFactory.getLogger(ByteBody.class);
-
-    public static Flux<ByteBuf> toByteBufs(ByteBody body) {
-        if (body instanceof NettyByteBody net) {
-            return net.toByteBufPublisher();
-        } else {
-            return Flux.from(body.toByteArrayPublisher()).map(Unpooled::wrappedBuffer);
-        }
-    }
 
     @Override
     public @NonNull Publisher<byte[]> toByteArrayPublisher() {

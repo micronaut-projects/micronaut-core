@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.server.netty;
 
-import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -28,7 +27,6 @@ import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
-import io.micronaut.core.io.buffer.DelegateByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpAttributes;
@@ -45,13 +43,13 @@ import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.InternalByteBody;
+import io.micronaut.http.body.stream.AvailableByteArrayBody;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.NettyHttpParameters;
 import io.micronaut.http.netty.NettyHttpRequestBuilder;
-import io.micronaut.http.netty.body.AvailableNettyByteBody;
-import io.micronaut.http.netty.body.NettyByteBody;
+import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.cookies.NettyCookie;
 import io.micronaut.http.netty.cookies.NettyCookies;
@@ -64,7 +62,6 @@ import io.micronaut.http.server.netty.multipart.NettyCompletedFileUpload;
 import io.micronaut.web.router.DefaultUriRouteMatch;
 import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteMatch;
-import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFutureListener;
@@ -635,7 +632,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
 
     @Override
     public Optional<io.netty.handler.codec.http.HttpRequest> toHttpRequestDirect() {
-        return Optional.of(new DelegateStreamedHttpRequest(nettyRequest, NettyByteBody.toByteBufs(byteBody()).map(DefaultHttpContent::new)));
+        return Optional.of(new DelegateStreamedHttpRequest(nettyRequest, NettyByteBodyFactory.toByteBufs(byteBody()).map(DefaultHttpContent::new)));
     }
 
     @Override
@@ -688,12 +685,12 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
 
     @Override
     public boolean isFull() {
-        return byteBody() instanceof AvailableNettyByteBody;
+        return byteBody() instanceof AvailableByteArrayBody;
     }
 
     @Override
     public ByteBuffer<?> contents() {
-        if (byteBody() instanceof AvailableNettyByteBody immediate) {
+        if (byteBody() instanceof AvailableByteArrayBody immediate) {
             return toByteBuffer(immediate);
         }
         return null;
@@ -701,12 +698,12 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
 
     @Override
     public ExecutionFlow<ByteBuffer<?>> bufferContents() {
-        return InternalByteBody.bufferFlow(byteBody()).map(c -> toByteBuffer((AvailableNettyByteBody) c));
+        return InternalByteBody.bufferFlow(byteBody()).map(c -> toByteBuffer((AvailableByteArrayBody) c));
     }
 
-    private static ByteBuffer<ByteBuf> toByteBuffer(AvailableNettyByteBody immediateByteBody) {
+    private static ByteBuffer<?> toByteBuffer(AvailableByteArrayBody immediateByteBody) {
         // use delegate because we don't want to implement ReferenceCounted
-        return new DelegateByteBuffer<>(NettyByteBufferFactory.DEFAULT.wrap(immediateByteBody.peek()));
+        return immediateByteBody.peek().toByteBuffer();
     }
 
     /**

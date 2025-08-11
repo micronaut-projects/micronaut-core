@@ -5,9 +5,6 @@ import io.micronaut.core.annotation.NonNull
 import io.micronaut.http.body.CloseableByteBody
 import io.micronaut.http.body.InternalByteBody
 import io.micronaut.http.body.stream.InputStreamByteBody
-import io.micronaut.http.netty.body.AvailableNettyByteBody
-import io.micronaut.http.netty.body.NettyBodyAdapter
-import io.micronaut.http.netty.body.NettyByteBody
 import io.micronaut.http.netty.body.NettyByteBodyFactory
 import io.micronaut.http.server.netty.EmbeddedTestUtil
 import io.netty.buffer.ByteBuf
@@ -116,7 +113,7 @@ class Http2ServerHandlerSpec extends Specification {
                 Assertions.assertEquals("/", request.uri())
                 Assertions.assertEquals("yawk.at", request.headers().getAsString(HttpHeaderNames.HOST))
 
-                outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), AvailableNettyByteBody.empty())
+                outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), NettyByteBodyFactory.empty())
             }
 
             @Override
@@ -158,7 +155,7 @@ class Http2ServerHandlerSpec extends Specification {
         def (server, client, duplexHandler) = configure(new RequestHandler() {
             @Override
             void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
-                NettyByteBody.toByteBufs(body).subscribe(new Subscriber<ByteBuf>() {
+                NettyByteBodyFactory.toByteBufs(body).subscribe(new Subscriber<ByteBuf>() {
                     @Override
                     void onSubscribe(Subscription s) {
                         serverSubscription = s
@@ -252,7 +249,7 @@ class Http2ServerHandlerSpec extends Specification {
             @Override
             void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
                 body.close()
-                outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), NettyBodyAdapter.adapt(new Publisher<ByteBuf>() {
+                outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), new NettyByteBodyFactory(ctx.channel()).adapt(new Publisher<ByteBuf>() {
                     @Override
                     void subscribe(Subscriber<? super ByteBuf> s) {
                         subscriber = s
@@ -268,7 +265,7 @@ class Http2ServerHandlerSpec extends Specification {
                             }
                         })
                     }
-                }, ctx.channel().eventLoop()))
+                }))
             }
 
             @Override
@@ -419,7 +416,7 @@ class Http2ServerHandlerSpec extends Specification {
         def (server, client, duplexHandler) = configure(new RequestHandler() {
             @Override
             void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
-                NettyByteBody.toByteBufs(body).subscribe(new Subscriber<ByteBuf>() {
+                NettyByteBodyFactory.toByteBufs(body).subscribe(new Subscriber<ByteBuf>() {
                     @Override
                     void onSubscribe(Subscription s) {
                         s.request(Long.MAX_VALUE)
@@ -495,7 +492,7 @@ class Http2ServerHandlerSpec extends Specification {
             @Override
             void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
                 body.close()
-                outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), NettyBodyAdapter.adapt(new Publisher<ByteBuf>() {
+                outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), new NettyByteBodyFactory(ctx.channel()).adapt(new Publisher<ByteBuf>() {
                     @Override
                     void subscribe(Subscriber<? super ByteBuf> s) {
                         subscriber = s
@@ -509,7 +506,7 @@ class Http2ServerHandlerSpec extends Specification {
                             }
                         })
                     }
-                }, ctx.channel().eventLoop()))
+                }))
             }
 
             @Override
@@ -599,7 +596,7 @@ class Http2ServerHandlerSpec extends Specification {
         client.readInbound() == null
 
         when:"response can still be sent"
-        oa.write(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), AvailableNettyByteBody.empty())
+        oa.write(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), NettyByteBodyFactory.empty())
         EmbeddedTestUtil.advance(server, client)
         then:"we get the response but then a reset"
         Http2HeadersFrame response = client.readInbound()
@@ -626,7 +623,7 @@ class Http2ServerHandlerSpec extends Specification {
             @Override
             void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
                 body.close()
-                outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), NettyBodyAdapter.adapt(new Publisher<ByteBuf>() {
+                outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), new NettyByteBodyFactory(ctx.channel()).adapt(new Publisher<ByteBuf>() {
                     @Override
                     void subscribe(Subscriber<? super ByteBuf> s) {
                         subscriber = s
@@ -642,7 +639,7 @@ class Http2ServerHandlerSpec extends Specification {
                             }
                         })
                     }
-                }, ctx.channel().eventLoop()))
+                }))
             }
 
             @Override
@@ -734,7 +731,7 @@ class Http2ServerHandlerSpec extends Specification {
                 Assertions.assertEquals("/", request.uri())
                 Assertions.assertEquals("yawk.at", request.headers().getAsString(HttpHeaderNames.HOST))
 
-                outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), AvailableNettyByteBody.empty())
+                outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), NettyByteBodyFactory.empty())
             }
 
             @Override
@@ -778,8 +775,8 @@ class Http2ServerHandlerSpec extends Specification {
                 Assertions.assertEquals("yawk.at", request.headers().getAsString(HttpHeaderNames.HOST))
 
                 InternalByteBody.bufferFlow(body).onComplete((imm, t) -> {
-                    def bb = AvailableNettyByteBody.toByteBuf(imm)
-                    outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), new AvailableNettyByteBody(bb))
+                    def bb = NettyByteBodyFactory.toByteBuf(imm)
+                    outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), new NettyByteBodyFactory(ctx.channel()).adapt(bb))
                 })
             }
 

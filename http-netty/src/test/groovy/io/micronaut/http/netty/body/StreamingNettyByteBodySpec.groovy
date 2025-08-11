@@ -10,7 +10,7 @@ import java.nio.charset.StandardCharsets
 class StreamingNettyByteBodySpec extends Specification {
     def move() {
         given:
-        def a = NettyBodyAdapter.adapt(Flux.just(Unpooled.copiedBuffer("foo", StandardCharsets.UTF_8)), new EmbeddedChannel().eventLoop())
+        def a = new NettyByteBodyFactory(new EmbeddedChannel()).adapt(Flux.just(Unpooled.copiedBuffer("foo", StandardCharsets.UTF_8)))
         def b = a.move()
 
         when:

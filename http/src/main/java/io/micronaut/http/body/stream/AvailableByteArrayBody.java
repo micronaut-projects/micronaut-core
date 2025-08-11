@@ -16,17 +16,15 @@
 package io.micronaut.http.body.stream;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.execution.ExecutionFlow;
-import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
+import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.core.io.buffer.ReadBufferFactory;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.http.body.CloseableAvailableByteBody;
-import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.InternalByteBody;
-
-import java.io.ByteArrayInputStream;
-import java.io.InputStream;
 
 /**
  * {@link io.micronaut.http.body.AvailableByteBody} implementation based on a simple byte array.
@@ -36,72 +34,92 @@ import java.io.InputStream;
  */
 @Experimental
 public final class AvailableByteArrayBody implements CloseableAvailableByteBody, InternalByteBody {
-    // originally from micronaut-servlet
+    private ReadBuffer readBuffer;
 
-    private final ByteBufferFactory<?, ?> bufferFactory;
-    private byte[] array;
-
-    private AvailableByteArrayBody(ByteBufferFactory<?, ?> bufferFactory, byte[] array) {
-        this.bufferFactory = bufferFactory;
-        this.array = array;
+    private AvailableByteArrayBody(ReadBuffer readBuffer) {
+        this.readBuffer = readBuffer;
     }
 
+    /**
+     * Creates a new {@link AvailableByteArrayBody} instance.
+     *
+     * @param bufferFactory the {@link ByteBufferFactory} to use for creating buffers
+     * @param array         the byte array to wrap
+     * @return a new {@link AvailableByteArrayBody} instance
+     * @deprecated Construct through {@link io.micronaut.http.body.ByteBodyFactory} instead
+     */
+    @Deprecated
     @NonNull
     public static AvailableByteArrayBody create(@NonNull ByteBufferFactory<?, ?> bufferFactory, byte @NonNull [] array) {
         ArgumentUtils.requireNonNull("bufferFactory", bufferFactory);
         ArgumentUtils.requireNonNull("array", array);
-        return new AvailableByteArrayBody(bufferFactory, array);
+        return new AvailableByteArrayBody(ReadBufferFactory.getJdkFactory().adapt(array));
+    }
+
+    @NonNull
+    public static AvailableByteArrayBody create(@NonNull ReadBuffer readBuffer) {
+        return new AvailableByteArrayBody(readBuffer);
     }
 
     @Override
     public @NonNull CloseableAvailableByteBody split() {
-        if (array == null) {
+        if (readBuffer == null) {
             BaseSharedBuffer.failClaim();
         }
-        return new AvailableByteArrayBody(bufferFactory, array);
-    }
-
-    @Override
-    public @NonNull InputStream toInputStream() {
-        return new ByteArrayInputStream(array);
+        return new AvailableByteArrayBody(readBuffer.duplicate());
     }
 
     @Override
     public long length() {
-        if (array == null) {
+        if (readBuffer == null) {
             BaseSharedBuffer.failClaim();
         }
-        return array.length;
+        return readBuffer.readable();
     }
 
     @Override
     public byte @NonNull [] toByteArray() {
-        byte[] a = array;
+        try (ReadBuffer rb = toReadBuffer()) {
+            return rb.toArray();
+        }
+    }
+
+    @Override
+    public @NonNull ReadBuffer toReadBuffer() {
+        ReadBuffer a = readBuffer;
         if (a == null) {
             BaseSharedBuffer.failClaim();
         }
-        array = null;
+        readBuffer = null;
         BaseSharedBuffer.logClaim();
         return a;
     }
 
     @Override
-    public @NonNull ByteBuffer<?> toByteBuffer() {
-        return bufferFactory.wrap(toByteArray());
-    }
-
-    @Override
-    public @NonNull CloseableByteBody move() {
-        return new AvailableByteArrayBody(bufferFactory, toByteArray());
+    public @NonNull CloseableAvailableByteBody move() {
+        return new AvailableByteArrayBody(toReadBuffer());
     }
 
     @Override
     public void close() {
-        array = null;
+        ReadBuffer rb = readBuffer;
+        if (rb != null) {
+            rb.close();
+            readBuffer = null;
+        }
     }
 
     @Override
     public @NonNull ExecutionFlow<? extends CloseableAvailableByteBody> bufferFlow() {
-        return ExecutionFlow.just(new AvailableByteArrayBody(bufferFactory, toByteArray()));
+        return ExecutionFlow.just(move());
+    }
+
+    @Internal
+    public ReadBuffer peek() {
+        ReadBuffer b = readBuffer;
+        if (b == null) {
+            BaseSharedBuffer.failClaim();
+        }
+        return b;
     }
 }

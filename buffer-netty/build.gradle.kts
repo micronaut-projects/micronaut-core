@@ -9,4 +9,13 @@ dependencies {
     compileOnly(libs.graal)
 
     annotationProcessor(projects.micronautInjectJava)
+
+    testRuntimeOnly(projects.micronautHttpTck) // leak detection module
+}
+
+tasks {
+    test {
+        useJUnitPlatform()
+        systemProperty("junit.jupiter.extensions.autodetection.enabled", "true")
+    }
 }

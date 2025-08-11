@@ -22,23 +22,20 @@ import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.ByteBodyHttpResponseWrapper;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.body.AvailableByteBody;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.ConcatenatingSubscriber;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.netty.EventLoopFlow;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
-import io.micronaut.http.netty.body.AvailableNettyByteBody;
 import io.micronaut.http.netty.body.ByteBufConsumer;
-import io.micronaut.http.netty.body.NettyBodyAdapter;
-import io.micronaut.http.netty.body.NettyByteBody;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.netty.body.StreamingNettyByteBody;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.micronaut.http.server.ResponseLifecycle;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-import io.netty.channel.EventLoop;
 import io.netty.handler.codec.http.HttpContent;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
@@ -78,7 +75,7 @@ final class NettyResponseLifecycle extends ResponseLifecycle {
             io.netty.handler.codec.http.HttpResponse nettyResponse = builder.toHttpResponse();
             if (nettyResponse instanceof StreamedHttpResponse streamed) {
                 return LazySendingSubscriber.create(streamed).map(contents -> {
-                    CloseableByteBody body = NettyBodyAdapter.adapt(Flux.from(contents).map(HttpContent::content), eventLoop());
+                    CloseableByteBody body = byteBodyFactory().adapt(Flux.from(contents).map(HttpContent::content), null, null);
                     return ByteBodyHttpResponseWrapper.wrap(response, body);
                 }).onErrorResume(e -> (ExecutionFlow) handleStreamingError(request, e));
             }
@@ -87,46 +84,47 @@ final class NettyResponseLifecycle extends ResponseLifecycle {
         return super.encodeNoBody(response);
     }
 
-    private EventLoop eventLoop() {
-        return request.getChannelHandlerContext().channel().eventLoop();
+    private NettyByteBodyFactory byteBodyFactory() {
+        return new NettyByteBodyFactory(request.getChannelHandlerContext().channel());
     }
 
     @Override
     protected @NonNull CloseableByteBody concatenate(Publisher<ByteBody> items) {
-        return NettyConcatenatingSubscriber.concatenate(eventLoop(), items);
+        return NettyConcatenatingSubscriber.concatenate(byteBodyFactory(), items);
     }
 
     @Override
     protected @NonNull CloseableByteBody concatenateJson(Publisher<ByteBody> items) {
-        return JsonNettyConcatenatingSubscriber.concatenateJson(eventLoop(), items);
+        return JsonNettyConcatenatingSubscriber.concatenateJson(byteBodyFactory(), items);
     }
 
     private static class NettyConcatenatingSubscriber extends ConcatenatingSubscriber implements ByteBufConsumer {
         final StreamingNettyByteBody.SharedBuffer sharedBuffer;
-        private final EventLoop eventLoop;
+        private final NettyByteBodyFactory byteBodyFactory;
         private final EventLoopFlow flow;
 
-        NettyConcatenatingSubscriber(EventLoop eventLoop) {
-            this.eventLoop = eventLoop;
-            this.flow = new EventLoopFlow(eventLoop);
-            sharedBuffer = new StreamingNettyByteBody.SharedBuffer(eventLoop, BodySizeLimits.UNLIMITED, this);
+        NettyConcatenatingSubscriber(NettyByteBodyFactory byteBodyFactory) {
+            this.byteBodyFactory = byteBodyFactory;
+            sharedBuffer = byteBodyFactory.createStreamingBuffer(BodySizeLimits.UNLIMITED, this);
+            this.flow = new EventLoopFlow(sharedBuffer.eventLoop());
         }
 
-        static CloseableByteBody concatenate(EventLoop eventLoop, Publisher<ByteBody> publisher) {
-            NettyConcatenatingSubscriber subscriber = new NettyConcatenatingSubscriber(eventLoop);
+        static CloseableByteBody concatenate(NettyByteBodyFactory byteBodyFactory, Publisher<ByteBody> publisher) {
+            NettyConcatenatingSubscriber subscriber = new NettyConcatenatingSubscriber(byteBodyFactory);
             publisher.subscribe(subscriber);
             return new StreamingNettyByteBody(subscriber.sharedBuffer);
         }
 
         @Override
         protected Upstream forward(ByteBody body) {
-            NettyByteBody adapted = NettyBodyAdapter.adapt(body, eventLoop);
-            if (adapted instanceof StreamingNettyByteBody streaming) {
-                return streaming.primary(this);
-            } else {
-                add(AvailableNettyByteBody.toByteBuf((AvailableNettyByteBody) adapted));
+            if (body instanceof AvailableByteBody abb) {
+                add(NettyByteBodyFactory.toByteBuf(abb));
                 complete();
                 return null;
+            } else {
+                try (StreamingNettyByteBody snbb = byteBodyFactory.toStreaming(body)) {
+                    return snbb.primary(this);
+                }
             }
         }
 
@@ -164,12 +162,12 @@ final class NettyResponseLifecycle extends ResponseLifecycle {
         private static final ByteBuf SEPARATOR = Unpooled.unreleasableBuffer(Unpooled.copiedBuffer(",", StandardCharsets.UTF_8)).asReadOnly();
         private static final ByteBuf EMPTY_ARRAY = Unpooled.unreleasableBuffer(Unpooled.copiedBuffer("[]", StandardCharsets.UTF_8)).asReadOnly();
 
-        JsonNettyConcatenatingSubscriber(EventLoop eventLoop) {
-            super(eventLoop);
+        JsonNettyConcatenatingSubscriber(NettyByteBodyFactory byteBodyFactory) {
+            super(byteBodyFactory);
         }
 
-        static CloseableByteBody concatenateJson(EventLoop eventLoop, Publisher<ByteBody> publisher) {
-            JsonNettyConcatenatingSubscriber subscriber = new JsonNettyConcatenatingSubscriber(eventLoop);
+        static CloseableByteBody concatenateJson(NettyByteBodyFactory byteBodyFactory, Publisher<ByteBody> publisher) {
+            JsonNettyConcatenatingSubscriber subscriber = new JsonNettyConcatenatingSubscriber(byteBodyFactory);
             publisher.subscribe(subscriber);
             return new StreamingNettyByteBody(subscriber.sharedBuffer);
         }

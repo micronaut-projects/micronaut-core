@@ -19,14 +19,13 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.NativeImageUtils;
+import io.micronaut.http.body.AvailableByteBody;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
 import io.micronaut.http.netty.EventLoopFlow;
-import io.micronaut.http.netty.body.AvailableNettyByteBody;
 import io.micronaut.http.netty.body.ByteBufConsumer;
-import io.micronaut.http.netty.body.NettyBodyAdapter;
-import io.micronaut.http.netty.body.NettyByteBody;
+import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.netty.body.StreamingNettyByteBody;
 import io.micronaut.http.netty.reactive.HotObservable;
 import io.netty.buffer.ByteBuf;
@@ -138,7 +137,7 @@ abstract class MultiplexedServerHandler {
             this.request = headers;
             if (endOfStream) {
                 requestAccepted = true;
-                requestHandler.accept(ctx, headers, AvailableNettyByteBody.empty(), this);
+                requestHandler.accept(ctx, headers, NettyByteBodyFactory.empty(), this);
             }
         }
 
@@ -173,7 +172,7 @@ abstract class MultiplexedServerHandler {
 
                     requestAccepted = true;
                     notifyDataConsumed(fullBody.readableBytes());
-                    requestHandler.accept(ctx, request, AvailableNettyByteBody.createChecked(ctx.channel().eventLoop(), bodySizeLimits, fullBody), this);
+                    requestHandler.accept(ctx, request, new NettyByteBodyFactory(ctx.channel()).createChecked(bodySizeLimits, fullBody), this);
                 } else {
                     if (bufferedContent == null) {
                         bufferedContent = new ArrayList<>();
@@ -266,11 +265,11 @@ abstract class MultiplexedServerHandler {
                 response.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
             }
 
-            NettyByteBody nbb = NettyBodyAdapter.adapt(body, ctx.channel().eventLoop());
-            if (nbb instanceof AvailableNettyByteBody available) {
-                writeFull(response, AvailableNettyByteBody.toByteBuf(available));
+            NettyByteBodyFactory byteBodyFactory = new NettyByteBodyFactory(ctx.channel());
+            if (body instanceof AvailableByteBody available) {
+                writeFull(response, NettyByteBodyFactory.toByteBuf(available));
             } else {
-                StreamingNettyByteBody snbb = (StreamingNettyByteBody) nbb;
+                StreamingNettyByteBody snbb = byteBodyFactory.toStreaming(body);
                 var consumer = new ByteBufConsumer() {
                     Upstream upstream;
                     final EventLoopFlow flow = new EventLoopFlow(ctx.channel().eventLoop());
@@ -491,7 +490,7 @@ abstract class MultiplexedServerHandler {
          * request case.
          */
         private class InputStreamer implements BufferConsumer.Upstream, ByteBufConsumer {
-            final StreamingNettyByteBody.SharedBuffer dest = new StreamingNettyByteBody.SharedBuffer(ctx.channel().eventLoop(), bodySizeLimits, this);
+            final StreamingNettyByteBody.SharedBuffer dest = new NettyByteBodyFactory(ctx.channel()).createStreamingBuffer(bodySizeLimits, this);
             /**
              * Number of bytes that have been received by {@link #add(ByteBuf)} but the downstream
              * hasn't consumed ({@link #onBytesConsumed(long)}). May be negative if the downstream

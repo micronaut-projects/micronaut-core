@@ -5,8 +5,7 @@ import io.micronaut.http.body.AvailableByteBody
 import io.micronaut.http.body.ByteBody
 import io.micronaut.http.body.CloseableAvailableByteBody
 import io.micronaut.http.body.CloseableByteBody
-import io.micronaut.http.netty.body.AvailableNettyByteBody
-import io.micronaut.http.netty.body.NettyBodyAdapter
+import io.micronaut.http.netty.body.NettyByteBodyFactory
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.CompositeByteBuf
 import io.netty.buffer.Unpooled
@@ -54,7 +53,7 @@ class PipeliningServerHandlerSpec extends Specification {
             @Override
             void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
                 body.close()
-                outboundAccess.write(resp, AvailableNettyByteBody.empty())
+                outboundAccess.write(resp, NettyByteBodyFactory.empty())
             }
 
             @Override
@@ -100,7 +99,7 @@ class PipeliningServerHandlerSpec extends Specification {
             @Override
             void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
                 body.close()
-                outboundAccess.write(resp, NettyBodyAdapter.adapt(sink.asFlux(), ctx.channel().eventLoop()))
+                outboundAccess.write(resp, new NettyByteBodyFactory(ctx.channel()).adapt(sink.asFlux()))
             }
 
             @Override
@@ -150,7 +149,7 @@ class PipeliningServerHandlerSpec extends Specification {
             void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
                 assert body instanceof AvailableByteBody
                 assert new String(body.toByteArray(), StandardCharsets.UTF_8) == "foobar"
-                outboundAccess.write(resp, AvailableNettyByteBody.empty())
+                outboundAccess.write(resp, NettyByteBodyFactory.empty())
             }
 
             @Override
@@ -190,7 +189,7 @@ class PipeliningServerHandlerSpec extends Specification {
         def ch = new EmbeddedChannel(mon, new PipeliningServerHandler(new RequestHandler() {
             @Override
             void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
-                Flux.from(body.toByteArrayPublisher()).collectList().subscribe { outboundAccess.write(resp, AvailableNettyByteBody.empty()) }
+                Flux.from(body.toByteArrayPublisher()).collectList().subscribe { outboundAccess.write(resp, NettyByteBodyFactory.empty()) }
             }
 
             @Override
@@ -235,7 +234,7 @@ class PipeliningServerHandlerSpec extends Specification {
             @Override
             void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
                 body.close()
-                outboundAccess.write(resp, AvailableNettyByteBody.empty())
+                outboundAccess.write(resp, NettyByteBodyFactory.empty())
             }
 
             @Override
@@ -272,10 +271,10 @@ class PipeliningServerHandlerSpec extends Specification {
             void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
                 assert request instanceof FullHttpRequest
                 body.close()
-                outboundAccess.write(resp, NettyBodyAdapter.adapt(sink.asFlux().doOnCancel {
+                outboundAccess.write(resp, new NettyByteBodyFactory(ctx.channel()).adapt(sink.asFlux().doOnCancel {
                     // optional extra weirdness: onComplete *after* cancel. Could lead to double call to responseWritten, if I was an idiot.
                     if (completeOnCancel) sink.tryEmitComplete()
-                }, ctx.channel().eventLoop()))
+                }))
             }
 
             @Override
@@ -335,7 +334,7 @@ class PipeliningServerHandlerSpec extends Specification {
 
                     @Override
                     void onComplete() {
-                        outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT), AvailableNettyByteBody.empty())
+                        outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT), NettyByteBodyFactory.empty())
                     }
                 })
             }
@@ -381,7 +380,7 @@ class PipeliningServerHandlerSpec extends Specification {
             void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
                 req = request
                 ibb = body
-                outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT), AvailableNettyByteBody.empty())
+                outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT), NettyByteBodyFactory.empty())
             }
 
             @Override
@@ -433,7 +432,7 @@ class PipeliningServerHandlerSpec extends Specification {
             void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
                 req = request
                 ibb = body
-                outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT), AvailableNettyByteBody.empty())
+                outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT), NettyByteBodyFactory.empty())
             }
 
             @Override
@@ -484,7 +483,7 @@ class PipeliningServerHandlerSpec extends Specification {
             void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
                 req = request
                 sbb = body
-                outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT), AvailableNettyByteBody.empty())
+                outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT), NettyByteBodyFactory.empty())
             }
 
             @Override
@@ -545,9 +544,9 @@ class PipeliningServerHandlerSpec extends Specification {
             void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
                 body.close()
                 if (i++ == 0) {
-                    outboundAccess.write(resp, NettyBodyAdapter.adapt(sink.asFlux(), ctx.channel().eventLoop()))
+                    outboundAccess.write(resp, new NettyByteBodyFactory(ctx.channel()).adapt(sink.asFlux()))
                 } else {
-                    outboundAccess.write(resp, NettyBodyAdapter.adapt(Flux.empty(), ctx.channel().eventLoop()))
+                    outboundAccess.write(resp, new NettyByteBodyFactory(ctx.channel()).adapt(Flux.empty()))
                 }
             }
 
@@ -581,7 +580,7 @@ class PipeliningServerHandlerSpec extends Specification {
             void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
                 unwritten++
                 body.close()
-                outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT), AvailableNettyByteBody.empty())
+                outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT), NettyByteBodyFactory.empty())
             }
 
             @Override

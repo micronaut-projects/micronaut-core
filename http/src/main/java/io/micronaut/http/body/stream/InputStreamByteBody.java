@@ -19,8 +19,8 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.execution.ExecutionFlow;
-import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
+import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableAvailableByteBody;
@@ -164,8 +164,8 @@ public final class InputStreamByteBody implements CloseableByteBody, InternalByt
     }
 
     @Override
-    public @NonNull Publisher<ByteBuffer<?>> toByteBufferPublisher() {
-        return toByteArrayPublisher().map(context.bodyFactory.byteBufferFactory()::wrap);
+    public @NonNull Publisher<ReadBuffer> toReadBufferPublisher() {
+        return Flux.from(toByteArrayPublisher()).map(context.bodyFactory.readBufferFactory()::adapt);
     }
 
     @Override

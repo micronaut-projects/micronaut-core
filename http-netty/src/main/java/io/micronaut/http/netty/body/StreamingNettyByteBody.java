@@ -150,7 +150,7 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
         BaseSharedBuffer.logClaim();
         upstream.start();
         upstream.onBytesConsumed(Long.MAX_VALUE);
-        return sharedBuffer.subscribeFull(upstream, forceDelaySubscribe).map(AvailableNettyByteBody::new);
+        return sharedBuffer.subscribeFull(upstream, forceDelaySubscribe).map(sharedBuffer.byteBodyFactory::adapt);
     }
 
     @Override
@@ -210,6 +210,7 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
         private final ResourceLeakTracker<SharedBuffer> tracker = LEAK_DETECTOR.get().track(this);
 
         private final EventLoop eventLoop;
+        private final NettyByteBodyFactory byteBodyFactory;
         /**
          * Buffered data. This is forwarded to new subscribers.
          */
@@ -220,9 +221,14 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
         private List<@NonNull DelayedExecutionFlow<ByteBuf>> fullSubscribers;
         private ByteBuf addingBuffer;
 
-        public SharedBuffer(EventLoop loop, BodySizeLimits limits, Upstream rootUpstream) {
+        public SharedBuffer(EventLoop loop, NettyByteBodyFactory byteBodyFactory, BodySizeLimits limits, Upstream rootUpstream) {
             super(limits, rootUpstream);
             this.eventLoop = loop;
+            this.byteBodyFactory = byteBodyFactory;
+        }
+
+        public EventLoop eventLoop() {
+            return eventLoop;
         }
 
         public void setExpectedLengthFrom(HttpHeaders headers) {

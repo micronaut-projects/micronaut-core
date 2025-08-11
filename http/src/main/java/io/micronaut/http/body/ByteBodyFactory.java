@@ -21,13 +21,12 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
+import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.core.io.buffer.ReadBufferFactory;
 import io.micronaut.core.io.buffer.ReferenceCounted;
-import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.functional.ThrowingConsumer;
 import io.micronaut.http.body.stream.AvailableByteArrayBody;
 
-import java.io.ByteArrayOutputStream;
-import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -43,15 +42,18 @@ import java.nio.charset.Charset;
 @Experimental
 public class ByteBodyFactory {
     private final ByteBufferFactory<?, ?> byteBufferFactory;
+    private final ReadBufferFactory readBufferFactory;
 
     /**
      * Internal constructor.
      *
      * @param byteBufferFactory The buffer factory
+     * @param readBufferFactory The read buffer factory
      */
     @Internal
-    protected ByteBodyFactory(@NonNull ByteBufferFactory<?, ?> byteBufferFactory) {
+    protected ByteBodyFactory(@NonNull ByteBufferFactory<?, ?> byteBufferFactory, ReadBufferFactory readBufferFactory) {
         this.byteBufferFactory = byteBufferFactory;
+        this.readBufferFactory = readBufferFactory;
     }
 
     /**
@@ -64,7 +66,7 @@ public class ByteBodyFactory {
      */
     @NonNull
     public static ByteBodyFactory createDefault(@NonNull ByteBufferFactory<?, ?> byteBufferFactory) {
-        return new ByteBodyFactory(byteBufferFactory);
+        return new ByteBodyFactory(byteBufferFactory, ReadBufferFactory.getJdkFactory());
     }
 
     /**
@@ -72,10 +74,22 @@ public class ByteBodyFactory {
      * body factory directly.
      *
      * @return The buffer factory
+     * @deprecated Use {@link #readBufferFactory()}
      */
     @NonNull
+    @Deprecated
     public final ByteBufferFactory<?, ?> byteBufferFactory() {
         return byteBufferFactory;
+    }
+
+    /**
+     * Get the underlying {@link ReadBufferFactory}.
+     *
+     * @return The factory
+     */
+    @NonNull
+    public ReadBufferFactory readBufferFactory() {
+        return readBufferFactory;
     }
 
     /**
@@ -89,11 +103,7 @@ public class ByteBodyFactory {
      */
     @NonNull
     public CloseableAvailableByteBody adapt(@NonNull ByteBuffer<?> buffer) {
-        byte[] byteArray = buffer.toByteArray();
-        if (buffer instanceof ReferenceCounted rc) {
-            rc.release();
-        }
-        return adapt(byteArray);
+        return adapt(readBufferFactory.adapt(buffer));
     }
 
     /**
@@ -106,7 +116,11 @@ public class ByteBodyFactory {
      */
     @NonNull
     public CloseableAvailableByteBody adapt(byte @NonNull [] array) {
-        return AvailableByteArrayBody.create(byteBufferFactory(), array);
+        return adapt(readBufferFactory().adapt(array));
+    }
+
+    public CloseableAvailableByteBody adapt(ReadBuffer readBuffer) {
+        return AvailableByteArrayBody.create(readBuffer);
     }
 
     /**
@@ -119,60 +133,7 @@ public class ByteBodyFactory {
      */
     @NonNull
     public <T extends Throwable> CloseableAvailableByteBody buffer(@NonNull ThrowingConsumer<? super OutputStream, T> writer) throws T {
-        ByteArrayOutputStream s = new ByteArrayOutputStream();
-        writer.accept(s);
-        return AvailableByteArrayBody.create(byteBufferFactory(), s.toByteArray());
-    }
-
-    /**
-     * Create a new {@link OutputStream} that buffers into a {@link CloseableAvailableByteBody}.
-     * Used like this:
-     *
-     * <pre>{@code
-     * CloseableAvailableByteBody body;
-     * try (BufferingOutputStream bos = byteBodyFactory.outputStreamBuffer()) {
-     *     bos.stream().write(123);
-     *     // ...
-     *     body = bos.finishBuffer();
-     * }
-     * // use body
-     * }</pre>
-     *
-     * <p>Note that for simple use cases, {@link #buffer(ThrowingConsumer)} may be a bit more
-     * convenient, but this method offers more control over the stream lifecycle.
-     *
-     * @return The {@link BufferingOutputStream} wrapper
-     * @since 4.10.0
-     */
-    @NonNull
-    public BufferingOutputStream outputStreamBuffer() {
-        return new BufferingOutputStream() {
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-
-            @Override
-            public OutputStream stream() {
-                OutputStream out = this.out;
-                if (out == null) {
-                    throw new IllegalStateException("Already converted to buffer");
-                }
-                return out;
-            }
-
-            @Override
-            public CloseableAvailableByteBody finishBuffer() {
-                ByteArrayOutputStream out = this.out;
-                if (out == null) {
-                    throw new IllegalStateException("Already converted to buffer");
-                }
-                this.out = null;
-                return AvailableByteArrayBody.create(byteBufferFactory(), out.toByteArray());
-            }
-
-            @Override
-            public void close() {
-                this.out = null;
-            }
-        };
+        return adapt(readBufferFactory().buffer(writer));
     }
 
     /**
@@ -182,7 +143,7 @@ public class ByteBodyFactory {
      */
     @NonNull
     public CloseableAvailableByteBody createEmpty() {
-        return adapt(ArrayUtils.EMPTY_BYTE_ARRAY);
+        return adapt(readBufferFactory().createEmpty());
     }
 
     /**
@@ -194,7 +155,7 @@ public class ByteBodyFactory {
      */
     @NonNull
     public CloseableAvailableByteBody copyOf(@NonNull CharSequence cs, @NonNull Charset charset) {
-        return adapt(cs.toString().getBytes(charset));
+        return adapt(readBufferFactory().copyOf(cs, charset));
     }
 
     /**
@@ -208,47 +169,7 @@ public class ByteBodyFactory {
     @NonNull
     @Blocking
     public CloseableAvailableByteBody copyOf(@NonNull InputStream stream) throws IOException {
-        return adapt(stream.readAllBytes());
+        return adapt(readBufferFactory().copyOf(stream));
     }
 
-    /**
-     * Wrapper around a {@link OutputStream} that buffers into a
-     * {@link CloseableAvailableByteBody}. Must be closed after use, even if
-     * {@link #finishBuffer()} has not been called (e.g. on error), to avoid resource leaks.
-     *
-     * @since 4.10.0
-     */
-    public interface BufferingOutputStream extends Closeable {
-        /**
-         * Get the stream you can write to.
-         *
-         * @return The {@link OutputStream}
-         * @throws IllegalStateException If the buffer has already
-         * {@link #finishBuffer() been finalized}
-         */
-        @NonNull
-        OutputStream stream() throws IllegalStateException;
-
-        /**
-         * Finalize this buffer, returning it as a {@link CloseableAvailableByteBody}. This method
-         * can only be called once. Release ownership of the buffer transfers to the caller:
-         * Closing this {@link BufferingOutputStream} after this method has been called will
-         * <i>not</i> close the returned {@link CloseableAvailableByteBody}.
-         *
-         * @return The finished buffer
-         * @throws IOException If there was an exception finishing up the buffer
-         * @throws IllegalStateException If this method has already been called
-         */
-        @NonNull
-        CloseableAvailableByteBody finishBuffer() throws IOException, IllegalStateException;
-
-        /**
-         * Close this buffer. {@link #finishBuffer()} cannot be called after this method. If it has
-         * not been called yet, the content of this buffer will be discarded.
-         *
-         * @throws IOException If there was an exception finishing up the buffer
-         */
-        @Override
-        void close() throws IOException;
-    }
 }

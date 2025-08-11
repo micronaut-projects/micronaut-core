@@ -21,7 +21,7 @@ import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
 import io.micronaut.http.client.exceptions.ResponseClosedException;
-import io.micronaut.http.netty.body.AvailableNettyByteBody;
+import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.netty.body.StreamingNettyByteBody;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.CompositeByteBuf;
@@ -153,8 +153,8 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
     /**
      * After the {@link HttpResponse}, but before the first {@link #channelReadComplete}. We
      * optimistically buffer data until {@link #channelReadComplete} so that we may return it as a
-     * more efficient {@link AvailableNettyByteBody}. If there's too much data, fall back to
-     * streaming.
+     * more efficient {@link io.micronaut.http.body.AvailableByteBody}. If there's too much data,
+     * fall back to streaming.
      */
     private final class BufferedContent extends ReaderState<HttpContent> {
         private final ResponseListener listener;
@@ -182,13 +182,13 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
                 transitionToState(ctx, this, AfterContent.INSTANCE);
                 BodySizeLimits limits = listener.sizeLimits();
                 if (buffered == null) {
-                    complete(AvailableNettyByteBody.empty());
+                    complete(NettyByteBodyFactory.empty());
                 } else if (buffered.size() == 1) {
-                    complete(AvailableNettyByteBody.createChecked(ctx.channel().eventLoop(), limits, buffered.get(0)));
+                    complete(new NettyByteBodyFactory(ctx.channel()).createChecked(limits, buffered.get(0)));
                 } else {
                     CompositeByteBuf composite = ctx.alloc().compositeBuffer();
                     composite.addComponents(true, buffered);
-                    complete(AvailableNettyByteBody.createChecked(ctx.channel().eventLoop(), limits, composite));
+                    complete(new NettyByteBodyFactory(ctx.channel()).createChecked(limits, composite));
                 }
                 listener.finish(ctx);
             }
@@ -237,7 +237,7 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
 
         UnbufferedContent(ResponseListener listener, ChannelHandlerContext ctx, HttpResponse response) {
             this.listener = listener;
-            streaming = new StreamingNettyByteBody.SharedBuffer(ctx.channel().eventLoop(), listener.sizeLimits(), this);
+            streaming = new NettyByteBodyFactory(ctx.channel()).createStreamingBuffer(listener.sizeLimits(), this);
             if (!listener.isHeadResponse()) {
                 streaming.setExpectedLengthFrom(response.headers());
             }

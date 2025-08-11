@@ -19,14 +19,13 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.NativeImageUtils;
+import io.micronaut.http.body.AvailableByteBody;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
 import io.micronaut.http.netty.EventLoopFlow;
-import io.micronaut.http.netty.body.AvailableNettyByteBody;
 import io.micronaut.http.netty.body.ByteBufConsumer;
-import io.micronaut.http.netty.body.NettyBodyAdapter;
-import io.micronaut.http.netty.body.NettyByteBody;
+import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.netty.body.StreamingNettyByteBody;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.micronaut.http.server.netty.HttpCompressionStrategy;
@@ -434,7 +433,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             // getClass for performance
             boolean full = request.getClass() != DefaultHttpRequest.class && request instanceof FullHttpRequest;
             if (full && decompressionChannel == null) {
-                requestHandler.accept(ctx, request, AvailableNettyByteBody.createChecked(ctx.channel().eventLoop(), bodySizeLimits, ((FullHttpRequest) request).content()), outboundAccess);
+                requestHandler.accept(ctx, request, new NettyByteBodyFactory(ctx.channel()).createChecked(bodySizeLimits, ((FullHttpRequest) request).content()), outboundAccess);
             } else if (!hasBody(request)) {
                 inboundHandler = droppingInboundHandler;
                 if (full) {
@@ -443,7 +442,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 if (decompressionChannel != null) {
                     decompressionChannel.finish();
                 }
-                requestHandler.accept(ctx, request, AvailableNettyByteBody.empty(), outboundAccess);
+                requestHandler.accept(ctx, request, NettyByteBodyFactory.empty(), outboundAccess);
             } else {
                 optimisticBufferingInboundHandler.init(request, outboundAccess);
                 if (decompressionChannel == null) {
@@ -530,7 +529,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 this.request = null;
                 OutboundAccess outboundAccess = this.outboundAccess;
                 this.outboundAccess = null;
-                requestHandler.accept(ctx, request, AvailableNettyByteBody.createChecked(ctx.channel().eventLoop(), bodySizeLimits, fullBody), outboundAccess);
+                requestHandler.accept(ctx, request, new NettyByteBodyFactory(ctx.channel()).createChecked(bodySizeLimits, fullBody), outboundAccess);
 
                 inboundHandler = baseInboundHandler;
             }
@@ -590,7 +589,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         private StreamingInboundHandler(OutboundAccessImpl outboundAccess, boolean sendContinue) {
             this.outboundAccess = outboundAccess;
             this.sendContinue = sendContinue;
-            this.dest = new StreamingNettyByteBody.SharedBuffer(ctx.channel().eventLoop(), bodySizeLimits, this);
+            this.dest = new NettyByteBodyFactory(ctx.channel()).createStreamingBuffer(bodySizeLimits, this);
         }
 
         @Override
@@ -940,9 +939,8 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         public void write(@NonNull HttpResponse response, @NonNull ByteBody body) {
-            NettyByteBody nbb = NettyBodyAdapter.adapt(body, ctx.channel().eventLoop());
-            if (nbb instanceof AvailableNettyByteBody available) {
-                writeFull(new DefaultFullHttpResponse(response.protocolVersion(), response.status(), AvailableNettyByteBody.toByteBuf(available), response.headers(), EmptyHttpHeaders.INSTANCE), false);
+            if (body instanceof AvailableByteBody available) {
+                writeFull(new DefaultFullHttpResponse(response.protocolVersion(), response.status(), NettyByteBodyFactory.toByteBuf(available), response.headers(), EmptyHttpHeaders.INSTANCE), false);
             } else {
                 OptionalLong expectedLength = body.expectedLength();
                 if (expectedLength.isPresent()) {
@@ -963,7 +961,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 preprocess(response);
                 StreamingOutboundHandler oh = new StreamingOutboundHandler(this, response);
                 prepareCompression(response, oh, expectedLength.orElse(-1));
-                oh.upstream = ((StreamingNettyByteBody) nbb).primary(oh);
+                oh.upstream = new NettyByteBodyFactory(ctx.channel()).toStreaming(body).primary(oh);
                 write(oh);
             }
         }

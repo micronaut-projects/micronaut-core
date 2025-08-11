@@ -8,7 +8,7 @@ import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.body.ByteBody
-import io.micronaut.http.netty.body.NettyBodyAdapter
+import io.micronaut.http.netty.body.NettyByteBodyFactory
 import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.buffer.Unpooled
 import io.netty.channel.embedded.EmbeddedChannel
@@ -28,9 +28,8 @@ class RawHttpClientSpec extends Specification {
         server.start()
         def client = ctx.createBean(RawHttpClient, server.URI)
 
-        def requestBody = NettyBodyAdapter.adapt(
-                Mono.just(Unpooled.copiedBuffer("foo", StandardCharsets.UTF_8)),
-                new EmbeddedChannel().eventLoop())
+        def requestBody = new NettyByteBodyFactory(new EmbeddedChannel()).adapt(
+                Mono.just(Unpooled.copiedBuffer("foo", StandardCharsets.UTF_8)))
         requestBody.split(ByteBody.SplitBackpressureMode.FASTEST).buffer().get().close()
 
         when:

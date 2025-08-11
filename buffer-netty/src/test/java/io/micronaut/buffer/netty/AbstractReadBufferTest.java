@@ -1,0 +1,200 @@
+package io.micronaut.buffer.netty;
+
+import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
+import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.core.io.buffer.ReadBufferFactory;
+import org.junit.jupiter.api.Test;
+
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.ByteBuffer;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
+abstract class AbstractReadBufferTest {
+    final ReadBufferFactory factory;
+
+    AbstractReadBufferTest(ReadBufferFactory factory) {
+        this.factory = factory;
+    }
+
+    @Test
+    public void readable() {
+        try (ReadBuffer rb = factory.adapt(new byte[]{1, 2, 3})) {
+            assertEquals(3, rb.readable());
+            assertEquals(3, rb.readable());
+            rb.close();
+            assertThrows(IllegalStateException.class, rb::readable);
+        }
+    }
+
+    @Test
+    public void duplicate() {
+        try (ReadBuffer rb1 = factory.copyOf("foo", UTF_8);
+             ReadBuffer rb2 = rb1.duplicate()) {
+            assertEquals("foo", rb1.toString(UTF_8));
+            assertEquals("foo", rb2.toString(UTF_8));
+        }
+        try (ReadBuffer rb1 = factory.copyOf("foo", UTF_8);
+             ReadBuffer rb2 = rb1.duplicate()) {
+            rb2.close();
+            assertEquals("foo", rb1.toString(UTF_8));
+        }
+        try (ReadBuffer rb1 = factory.copyOf("foo", UTF_8);
+             ReadBuffer rb2 = rb1.duplicate()) {
+            rb1.close();
+            assertEquals("foo", rb2.toString(UTF_8));
+        }
+    }
+
+    @Test
+    public void readSome() {
+        try (ReadBuffer rb1 = factory.copyOf("foo", UTF_8);
+             ReadBuffer rb2 = rb1.readSome(1)) {
+            assertEquals("oo", rb1.toString(UTF_8));
+            assertEquals("f", rb2.toString(UTF_8));
+        }
+        try (ReadBuffer rb1 = factory.copyOf("foo", UTF_8);
+             ReadBuffer rb2 = rb1.readSome(1)) {
+            rb1.close();
+            assertEquals("f", rb2.toString(UTF_8));
+        }
+        try (ReadBuffer rb1 = factory.copyOf("foo", UTF_8);
+             ReadBuffer rb2 = rb1.readSome(1)) {
+            rb2.close();
+            assertEquals("oo", rb1.toString(UTF_8));
+        }
+        try (ReadBuffer rb = factory.copyOf("foo", UTF_8)) {
+            assertThrows(IndexOutOfBoundsException.class, () -> rb.readSome(4));
+            assertEquals("foo", rb.toString(UTF_8));
+        }
+    }
+
+    @Test
+    public void move() {
+        try (ReadBuffer rb1 = factory.copyOf("foo", UTF_8);
+             ReadBuffer rb2 = rb1.move()) {
+            assertThrows(IllegalStateException.class, rb1::toArray);
+            rb1.close();
+            assertEquals("foo", rb2.toString(UTF_8));
+        }
+    }
+
+    @Test
+    public void toArrayDest() {
+        try (ReadBuffer rb = factory.adapt(new byte[]{1, 2, 3})) {
+            byte[] arr = new byte[3];
+            rb.toArray(arr, 0);
+            assertArrayEquals(new byte[]{1, 2, 3}, arr);
+        }
+        try (ReadBuffer rb = factory.adapt(new byte[]{1, 2, 3})) {
+            byte[] arr = new byte[4];
+            rb.toArray(arr, 1);
+            assertArrayEquals(new byte[]{0, 1, 2, 3}, arr);
+        }
+        try (ReadBuffer rb = factory.adapt(new byte[]{1, 2, 3})) {
+            assertThrows(IndexOutOfBoundsException.class, () -> rb.toArray(new byte[2], 0));
+            assertThrows(IllegalStateException.class, rb::toArray);
+        }
+        try (ReadBuffer rb = factory.adapt(new byte[]{1, 2, 3})) {
+            assertThrows(IndexOutOfBoundsException.class, () -> rb.toArray(new byte[3], 1));
+            assertThrows(IllegalStateException.class, rb::toArray);
+        }
+        try (ReadBuffer rb = factory.adapt(new byte[]{1, 2, 3})) {
+            assertThrows(IndexOutOfBoundsException.class, () -> rb.toArray(new byte[4], -1));
+            assertThrows(IllegalStateException.class, rb::toArray);
+        }
+        try (ReadBuffer rb = factory.createEmpty()) {
+            assertThrows(IndexOutOfBoundsException.class, () -> rb.toArray(new byte[2], 3));
+            assertThrows(IllegalStateException.class, rb::toArray);
+        }
+    }
+
+    @Test
+    public void toArray() {
+        try (ReadBuffer rb = factory.adapt(new byte[]{1, 2, 3})) {
+            assertArrayEquals(new byte[]{1, 2, 3}, rb.toArray());
+        }
+    }
+
+    @Test
+    public void toInputStream() throws IOException {
+        try (ReadBuffer rb = factory.adapt(new byte[]{1, 2, 3});
+             InputStream is = rb.toInputStream()) {
+            rb.close();
+            assertArrayEquals(new byte[]{1, 2, 3}, is.readAllBytes());
+        }
+    }
+
+    @Test
+    public void createEmpty() {
+        try (ReadBuffer rb = factory.createEmpty()) {
+            assertEquals(0, rb.readable());
+            assertArrayEquals(new byte[0], rb.toArray());
+        }
+    }
+
+    @Test
+    public void copyOfString() {
+        try (ReadBuffer rb = factory.copyOf("foo", UTF_8)) {
+            assertEquals("foo", rb.toString(UTF_8));
+        }
+    }
+
+    @Test
+    public void copyOfStream() throws IOException {
+        try (ReadBuffer rb = factory.copyOf(new ByteArrayInputStream(new byte[]{1, 2, 3}))) {
+            assertArrayEquals(new byte[]{1, 2, 3}, rb.toArray());
+        }
+    }
+
+    @Test
+    public void copyOfBuffer() {
+        try (ReadBuffer rb = factory.copyOf(ByteBuffer.wrap(new byte[]{1, 2, 3}))) {
+            assertArrayEquals(new byte[]{1, 2, 3}, rb.toArray());
+        }
+    }
+
+    @Test
+    public void adaptBuffer() {
+        try (ReadBuffer rb = factory.adapt(ByteBuffer.wrap(new byte[]{1, 2, 3}))) {
+            assertArrayEquals(new byte[]{1, 2, 3}, rb.toArray());
+        }
+    }
+
+    @Test
+    public void adaptIoBuffer() {
+        try (ReadBuffer rb = factory.adapt(ByteArrayBufferFactory.INSTANCE.wrap(new byte[]{1, 2, 3}))) {
+            assertArrayEquals(new byte[]{1, 2, 3}, rb.toArray());
+        }
+    }
+
+    @Test
+    public void adaptArray() {
+        try (ReadBuffer rb = factory.adapt(new byte[]{1, 2, 3})) {
+            assertArrayEquals(new byte[]{1, 2, 3}, rb.toArray());
+        }
+    }
+
+    @Test
+    public void buffer() throws IOException {
+        try (ReadBuffer rb = factory.buffer(os -> os.write(new byte[]{1, 2, 3}))) {
+            assertArrayEquals(new byte[]{1, 2, 3}, rb.toArray());
+        }
+    }
+
+    @Test
+    public void outputStreamBuffer() throws IOException {
+        ReadBuffer body;
+        try (ReadBufferFactory.BufferingOutputStream bos = factory.outputStreamBuffer()) {
+            bos.stream().write("foo".getBytes());
+            body = bos.finishBuffer();
+        }
+        assertEquals("foo", body.toString(UTF_8));
+        body.close();
+    }
+}

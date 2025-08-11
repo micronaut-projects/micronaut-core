@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.client.exceptions.ContentLengthExceededException;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.CompositeByteBuf;
 import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
@@ -71,33 +72,43 @@ final class SseSplitter {
      */
     @NonNull
     static Flux<ByteBuf> split(@NonNull Flux<ByteBuf> buf, @NonNull BodySizeLimits limits) {
-        AtomicReference<ByteBuf> last = new AtomicReference<>();
+        AtomicReference<CompositeByteBuf> last = new AtomicReference<>();
         return buf.concatMapIterable(bb -> {
-            ByteBuf joined = last.get();
-            if (joined == null) {
-                joined = bb;
-            } else {
-                long combinedLength = (long) joined.readableBytes() + bb.readableBytes();
-                if (combinedLength > limits.maxBufferSize()) {
-                    bb.release();
-                    throw new ContentLengthExceededException(limits.maxBufferSize(), combinedLength);
+                CompositeByteBuf joined = last.getAndSet(null);
+                ByteBuf here;
+                if (joined == null) {
+                    here = bb;
+                } else {
+                    long combinedLength = (long) joined.readableBytes() + bb.readableBytes();
+                    if (combinedLength > limits.maxBufferSize()) {
+                        bb.release();
+                        throw new ContentLengthExceededException(limits.maxBufferSize(), combinedLength);
+                    }
+                    joined.addComponent(true, bb);
+                    here = joined;
                 }
-                joined.writeBytes(bb);
-            }
-            List<ByteBuf> split = split(joined);
-            ByteBuf l = split.get(split.size() - 1);
-            // copy & release to avoid endless accumulation in the same buffer
-            last.set(l.copy());
-            l.release();
-            return split.subList(0, split.size() - 1);
-        })
+                List<ByteBuf> split = split(here);
+                ByteBuf l = split.get(split.size() - 1);
+                if (l.isReadable()) {
+                    l.discardSomeReadBytes();
+                    if (joined != null) {
+                        assert l == joined;
+                    } else {
+                        joined = l.alloc().compositeBuffer();
+                        joined.addComponent(true, l);
+                    }
+                    last.set(joined);
+                } else {
+                    l.release();
+                }
+                return split.subList(0, split.size() - 1);
+            })
             .doOnDiscard(ByteBuf.class, ByteBuf::release)
             .doOnTerminate(() -> {
-                // last line is *not* emitted, same as LineBasedFrameDecoder. This line is normally
+                // Last line is *not* emitted, same as LineBasedFrameDecoder. This line is normally
                 // empty anyway
-                ByteBuf l = last.get();
+                ByteBuf l = last.getAndSet(null);
                 if (l != null) {
-                    last.set(null);
                     l.release();
                 }
             });

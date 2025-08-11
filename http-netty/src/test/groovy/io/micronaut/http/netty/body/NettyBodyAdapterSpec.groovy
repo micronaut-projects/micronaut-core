@@ -10,7 +10,7 @@ class NettyBodyAdapterSpec extends Specification {
     def 'empty buffers'() {
         given:
         def flux = Flux.just(Unpooled.EMPTY_BUFFER, Unpooled.wrappedBuffer(new byte[] {1, 2, 3}))
-        def adapter = NettyBodyAdapter.adapt(flux, new EmbeddedChannel().eventLoop())
+        def adapter = new NettyByteBodyFactory(new EmbeddedChannel()).adapt(flux)
         def received = Unpooled.buffer()
         def upstream = adapter.primary(new ByteBufConsumer() {
             @Override

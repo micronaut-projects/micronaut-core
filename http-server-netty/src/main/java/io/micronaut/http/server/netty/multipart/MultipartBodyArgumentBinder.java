@@ -23,11 +23,11 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
 import io.micronaut.http.multipart.CompletedPart;
+import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.server.multipart.MultipartBody;
 import io.micronaut.http.server.netty.FormDataHttpContentProcessor;
 import io.micronaut.http.server.netty.HttpContentProcessorAsReactiveProcessor;
 import io.micronaut.http.server.netty.NettyHttpRequest;
-import io.micronaut.http.netty.body.NettyByteBody;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.multipart.Attribute;
@@ -70,7 +70,7 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
             FormDataHttpContentProcessor processor = new FormDataHttpContentProcessor(nhr, httpServerConfiguration.get());
             @NonNull Flux<HttpData> multiObjectBody;
             try {
-                multiObjectBody = HttpContentProcessorAsReactiveProcessor.asPublisher(processor, NettyByteBody.toByteBufs(nhr.byteBody()).map(DefaultHttpContent::new));
+                multiObjectBody = HttpContentProcessorAsReactiveProcessor.asPublisher(processor, NettyByteBodyFactory.toByteBufs(nhr.byteBody()).map(DefaultHttpContent::new));
             } catch (Throwable e) {
                 return () -> Optional.of(Flux.<CompletedPart>error(e)::subscribe);
             }
