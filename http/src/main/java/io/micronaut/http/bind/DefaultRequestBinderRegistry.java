@@ -30,11 +30,12 @@ import io.micronaut.http.HttpParameters;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.PushCapableHttpRequest;
+import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.bind.binders.AnnotatedRequestArgumentBinder;
 import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
-import io.micronaut.http.bind.binders.CookieObjectArgumentBinder;
 import io.micronaut.http.bind.binders.CookieAnnotationBinder;
+import io.micronaut.http.bind.binders.CookieObjectArgumentBinder;
 import io.micronaut.http.bind.binders.DefaultBodyAnnotationBinder;
 import io.micronaut.http.bind.binders.DefaultUnmatchedRequestArgumentBinder;
 import io.micronaut.http.bind.binders.HeaderAnnotationBinder;
@@ -46,6 +47,8 @@ import io.micronaut.http.bind.binders.RequestArgumentBinder;
 import io.micronaut.http.bind.binders.RequestAttributeAnnotationBinder;
 import io.micronaut.http.bind.binders.RequestBeanAnnotationBinder;
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
+import io.micronaut.http.body.ByteBody;
+import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
 import jakarta.inject.Inject;
@@ -115,10 +118,17 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
         registerDefaultAnnotationBinders(byAnnotation);
 
         byType.put(Argument.of(HttpHeaders.class).typeHashCode(), (RequestArgumentBinder<HttpHeaders>) (argument, source) -> () -> Optional.of(source.getHeaders()));
-        byType.put(Argument.of(HttpRequest.class).typeHashCode(), (RequestArgumentBinder<HttpRequest<?>>) (argument, source) -> convertBodyIfNecessary(bodyAnnotationBinder, argument, source, false));
+        byType.put(Argument.of(HttpRequest.class).typeHashCode(), (RequestArgumentBinder<HttpRequest<?>>) (argument, source) -> convertBodyIfNecessary(bodyAnnotationBinder, argument, source, RequestType.STANDARD));
+        byType.put(Argument.of(ServerHttpRequest.class).typeHashCode(), (RequestArgumentBinder<ServerHttpRequest<?>>) (argument, source) -> {
+            if (source instanceof ServerHttpRequest<?>) {
+                return convertBodyIfNecessary(bodyAnnotationBinder, argument, source, RequestType.SERVER);
+            } else {
+                return ArgumentBinder.BindingResult.unsatisfied();
+            }
+        });
         byType.put(Argument.of(PushCapableHttpRequest.class).typeHashCode(), (RequestArgumentBinder<PushCapableHttpRequest<?>>) (argument, source) -> {
             if (source instanceof PushCapableHttpRequest<?>) {
-                return convertBodyIfNecessary(bodyAnnotationBinder, argument, source, true);
+                return convertBodyIfNecessary(bodyAnnotationBinder, argument, source, RequestType.PUSH_CAPABLE);
             } else {
                 return ArgumentBinder.BindingResult.unsatisfied();
             }
@@ -260,7 +270,7 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
         DefaultBodyAnnotationBinder<Object> bodyAnnotationBinder,
         ArgumentConversionContext<? extends HttpRequest<?>> context,
         HttpRequest<?> source,
-        boolean pushCapable
+        RequestType type
     ) {
         if (source.getMethod().permitsRequestBody()) {
             Optional<Argument<?>> typeVariable = context.getFirstTypeVariable()
@@ -285,21 +295,26 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
                     @Override
                     public Optional<HttpRequest<?>> getValue() {
                         Optional<Object> body = bodyBound.getValue();
-                        if (pushCapable) {
-                            return Optional.of(new PushCapableRequestWrapper<Object>((HttpRequest<Object>) source, (PushCapableHttpRequest<?>) source) {
+                        return Optional.of(switch (type) {
+                            case STANDARD -> new HttpRequestWrapper<>((HttpRequest<Object>) source) {
                                 @Override
                                 public Optional<Object> getBody() {
                                     return body;
                                 }
-                            });
-                        } else {
-                            return Optional.of(new HttpRequestWrapper<Object>((HttpRequest<Object>) source) {
+                            };
+                            case PUSH_CAPABLE -> new PushCapableRequestWrapper<>((HttpRequest<Object>) source, (PushCapableHttpRequest<?>) source) {
                                 @Override
                                 public Optional<Object> getBody() {
                                     return body;
                                 }
-                            });
-                        }
+                            };
+                            case SERVER -> new ServerRequestWrapper<>((HttpRequest<Object>) source, (ServerRequestWrapper<?>) source) {
+                                @Override
+                                public Optional<Object> getBody() {
+                                    return body;
+                                }
+                            };
+                        });
                     }
                 };
             }
@@ -366,5 +381,30 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
             push.serverPush(request);
             return this;
         }
+    }
+
+    private static class ServerRequestWrapper<B> extends HttpRequestWrapper<B> implements ServerHttpRequest<B> {
+        private final ServerHttpRequest<?> server;
+
+        public ServerRequestWrapper(HttpRequest<B> primary, ServerHttpRequest<?> server) {
+            super(primary);
+            this.server = server;
+        }
+
+        @Override
+        public @NonNull ByteBody byteBody() {
+            return server.byteBody();
+        }
+
+        @Override
+        public @NonNull ByteBodyFactory byteBodyFactory() {
+            return server.byteBodyFactory();
+        }
+    }
+
+    private enum RequestType {
+        STANDARD,
+        PUSH_CAPABLE,
+        SERVER;
     }
 }

@@ -107,16 +107,14 @@ public abstract class ResponseLifecycle {
         try {
             return encodeHttpResponse(
                 httpRequest,
-                response,
-                response.body()
+                response
             );
         } catch (Throwable e) {
             try {
                 response = routeExecutor.createDefaultErrorResponse(httpRequest, e);
                 return encodeHttpResponse(
                     httpRequest,
-                    response,
-                    response.body()
+                    response
                 );
             } catch (Throwable f) {
                 f.addSuppressed(e);
@@ -128,8 +126,8 @@ public abstract class ResponseLifecycle {
     @SuppressWarnings("unchecked")
     private ExecutionFlow<? extends ByteBodyHttpResponse<?>> encodeHttpResponse(
         HttpRequest<?> nettyRequest,
-        HttpResponse<?> httpResponse,
-        Object body) {
+        HttpResponse<?> httpResponse) {
+        Object body = httpResponse.body();
         MutableHttpResponse<?> response = httpResponse.toMutableResponse();
         if (nettyRequest.getMethod() != HttpMethod.HEAD && body != null) {
             Object routeInfoO = RouteAttributes.getRouteInfo(response).orElse(null);
@@ -291,8 +289,7 @@ public abstract class ResponseLifecycle {
         }
         return encodeHttpResponse(
             request,
-            errorResponse,
-            errorResponse.body()
+            errorResponse
         );
     }
 

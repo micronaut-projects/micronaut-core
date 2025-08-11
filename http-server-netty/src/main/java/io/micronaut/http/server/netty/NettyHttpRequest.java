@@ -43,6 +43,7 @@ import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.PushCapableHttpRequest;
 import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.body.ByteBody;
+import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.cookie.Cookie;
@@ -52,6 +53,7 @@ import io.micronaut.http.netty.NettyHttpParameters;
 import io.micronaut.http.netty.NettyHttpRequestBuilder;
 import io.micronaut.http.netty.body.AvailableNettyByteBody;
 import io.micronaut.http.netty.body.NettyByteBody;
+import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.cookies.NettyCookie;
 import io.micronaut.http.netty.cookies.NettyCookies;
@@ -209,6 +211,11 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     @Override
     public ByteBody byteBody() {
         return body;
+    }
+
+    @Override
+    public @NonNull ByteBodyFactory byteBodyFactory() {
+        return new NettyByteBodyFactory(channelHandlerContext.channel());
     }
 
     public void setLegacyBody(Object legacyBody) {

@@ -20,8 +20,10 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
+import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.BodyAssertion;
 import io.micronaut.http.tck.HttpResponseAssertion;
@@ -52,6 +54,16 @@ public class OctetTest {
                 .build()));
     }
 
+    @Test
+    void byteBody() throws IOException {
+        asserts(SPEC_NAME,
+            HttpRequest.GET("/octets/byteBody"),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body(BodyAssertion.builder().body(OctetController.BODY_BYTES).equals())
+                .build()));
+    }
+
     @Controller("/octets")
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class OctetController {
@@ -65,6 +77,11 @@ public class OctetTest {
         @Get(produces = MediaType.APPLICATION_OCTET_STREAM)
         HttpResponse<byte[]> byteArray() {
             return HttpResponse.ok(BODY_BYTES);
+        }
+
+        @Get(value = "/byteBody", produces = MediaType.APPLICATION_OCTET_STREAM)
+        ByteBody byteBody(ServerHttpRequest<?> request) {
+            return request.byteBodyFactory().adapt(BODY_BYTES.clone());
         }
     }
 }
