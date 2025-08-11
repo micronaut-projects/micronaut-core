@@ -86,6 +86,7 @@ public class ByteBodyFactory {
      * Get the underlying {@link ReadBufferFactory}.
      *
      * @return The factory
+     * @since 4.10.0
      */
     @NonNull
     public ReadBufferFactory readBufferFactory() {
@@ -119,7 +120,16 @@ public class ByteBodyFactory {
         return adapt(readBufferFactory().adapt(array));
     }
 
-    public CloseableAvailableByteBody adapt(ReadBuffer readBuffer) {
+    /**
+     * Create a new {@link CloseableAvailableByteBody} from the given buffer. Ownership of the
+     * buffer is transferred to this method.
+     *
+     * @param readBuffer The buffer
+     * @return A {@link ByteBody} with the same content as the buffer
+     * @since 4.10.0
+     */
+    @NonNull
+    public CloseableAvailableByteBody adapt(@NonNull ReadBuffer readBuffer) {
         return AvailableByteArrayBody.create(readBuffer);
     }
 
