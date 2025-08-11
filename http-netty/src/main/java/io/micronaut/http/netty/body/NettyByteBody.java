@@ -37,7 +37,7 @@ import reactor.core.publisher.Flux;
  * @author Jonas Konrad
  */
 @Internal
-abstract sealed class NettyByteBody implements ByteBody, InternalByteBody permits AvailableNettyByteBody, StreamingNettyByteBody {
+abstract sealed class NettyByteBody extends InternalByteBody implements ByteBody permits AvailableNettyByteBody, StreamingNettyByteBody {
     // don't change this, isolate body buffering to separate logging name space
     protected static final Logger LOG = LoggerFactory.getLogger(ByteBody.class);
 

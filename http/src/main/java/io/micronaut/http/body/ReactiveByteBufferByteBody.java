@@ -48,7 +48,7 @@ import java.util.concurrent.locks.ReentrantLock;
  * @author Jonas Konrad
  */
 @Internal
-public final class ReactiveByteBufferByteBody implements CloseableByteBody, InternalByteBody {
+public final class ReactiveByteBufferByteBody extends InternalByteBody implements CloseableByteBody {
     private final SharedBuffer sharedBuffer;
     private BufferConsumer.Upstream upstream;
 

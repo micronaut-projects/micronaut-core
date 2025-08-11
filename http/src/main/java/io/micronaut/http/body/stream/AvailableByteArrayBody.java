@@ -33,7 +33,7 @@ import io.micronaut.http.body.InternalByteBody;
  * @since 4.6.0
  */
 @Experimental
-public final class AvailableByteArrayBody implements CloseableAvailableByteBody, InternalByteBody {
+public final class AvailableByteArrayBody extends InternalByteBody implements CloseableAvailableByteBody {
     private ReadBuffer readBuffer;
 
     private AvailableByteArrayBody(ReadBuffer readBuffer) {

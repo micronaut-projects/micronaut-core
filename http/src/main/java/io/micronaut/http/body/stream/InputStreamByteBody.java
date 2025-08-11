@@ -43,7 +43,7 @@ import java.util.concurrent.Executor;
  * @author Jonas Konrad
  */
 @Experimental
-public final class InputStreamByteBody implements CloseableByteBody, InternalByteBody {
+public final class InputStreamByteBody extends InternalByteBody implements CloseableByteBody {
     // originally from micronaut-servlet
 
     private final Context context;

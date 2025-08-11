@@ -29,20 +29,21 @@ import java.util.concurrent.CompletableFuture;
  * @since 4.5.0
  */
 @Internal
-public interface InternalByteBody extends ByteBody {
+public abstract class InternalByteBody implements ByteBody {
     /**
      * Variant of {@link #buffer()} that uses the {@link ExecutionFlow} API for extra efficiency.
      *
      * @return A flow that completes when all bytes are available
      */
-    @NonNull ExecutionFlow<? extends CloseableAvailableByteBody> bufferFlow();
+    @NonNull
+    public abstract ExecutionFlow<? extends CloseableAvailableByteBody> bufferFlow();
 
     @Override
-    default CompletableFuture<? extends CloseableAvailableByteBody> buffer() {
+    public final CompletableFuture<? extends CloseableAvailableByteBody> buffer() {
         return bufferFlow().toCompletableFuture();
     }
 
-    static ExecutionFlow<? extends CloseableAvailableByteBody> bufferFlow(ByteBody body) {
+    public static ExecutionFlow<? extends CloseableAvailableByteBody> bufferFlow(ByteBody body) {
         if (body instanceof InternalByteBody internal) {
             return internal.bufferFlow();
         } else {
