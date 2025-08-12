@@ -41,9 +41,10 @@ import org.slf4j.LoggerFactory;
 @Singleton
 @Internal
 @Requires(classes = KQueue.class, condition = KQueueAvailabilityCondition.class)
-@Named(EventLoopGroupFactory.NATIVE)
+@Named(KQueueEventLoopGroupFactory.NAME)
 @BootstrapContextCompatible
 public class KQueueEventLoopGroupFactory implements EventLoopGroupFactory {
+    public static final String NAME = "kqueue";
     private static final Logger LOG = LoggerFactory.getLogger(KQueueEventLoopGroupFactory.class);
 
     @Override

@@ -29,6 +29,11 @@ import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
 
@@ -42,34 +47,51 @@ import java.util.concurrent.ThreadFactory;
 @Singleton
 @BootstrapContextCompatible
 public class DefaultEventLoopGroupFactory implements EventLoopGroupFactory {
+    static final List<String> FACTORY_PRIORITY = List.of(
+        IoUringEventLoopGroupFactory.NAME,
+        EpollEventLoopGroupFactory.NAME,
+        KQueueEventLoopGroupFactory.NAME,
+        NioEventLoopGroupFactory.NAME
+    );
 
-    private final EventLoopGroupFactory nativeFactory;
-    private final EventLoopGroupFactory defaultFactory;
+    private final Map<String, EventLoopGroupFactory> factories;
 
     /**
      * Default constructor.
      * @param nioEventLoopGroupFactory The NIO factory
      * @param nativeFactory The native factory if available
      */
+    @Deprecated
     public DefaultEventLoopGroupFactory(
             NioEventLoopGroupFactory nioEventLoopGroupFactory,
             @Nullable @Named(EventLoopGroupFactory.NATIVE) EventLoopGroupFactory nativeFactory) {
         this(nioEventLoopGroupFactory, nativeFactory, null);
     }
 
+    @Deprecated
+    public DefaultEventLoopGroupFactory(
+        NioEventLoopGroupFactory nioEventLoopGroupFactory,
+        @Nullable @Named(EventLoopGroupFactory.NATIVE) EventLoopGroupFactory nativeFactory,
+        @Nullable NettyGlobalConfiguration nettyGlobalConfiguration) {
+        this(
+            nativeFactory == null ? Map.of(NioEventLoopGroupFactory.NAME, nioEventLoopGroupFactory) :
+                Map.of(NioEventLoopGroupFactory.NAME, nioEventLoopGroupFactory, EventLoopGroupFactory.NATIVE, nativeFactory),
+            nettyGlobalConfiguration
+        );
+    }
+
     /**
      * Default constructor.
-     * @param nioEventLoopGroupFactory The NIO factory
-     * @param nativeFactory The native factory if available
+     * @param eventLoopGroupFactories The available transports
      * @param nettyGlobalConfiguration The netty global configuration
      */
     @Inject
     public DefaultEventLoopGroupFactory(
-            NioEventLoopGroupFactory nioEventLoopGroupFactory,
-            @Nullable @Named(EventLoopGroupFactory.NATIVE) EventLoopGroupFactory nativeFactory,
-            @Nullable NettyGlobalConfiguration nettyGlobalConfiguration) {
-        this.defaultFactory = nioEventLoopGroupFactory;
-        this.nativeFactory = nativeFactory != null ? nativeFactory : defaultFactory;
+        @NonNull Map<String, EventLoopGroupFactory> eventLoopGroupFactories,
+        @Nullable NettyGlobalConfiguration nettyGlobalConfiguration) {
+
+        this.factories = eventLoopGroupFactories;
+
         if (nettyGlobalConfiguration != null && nettyGlobalConfiguration.getResourceLeakDetectorLevel() != null) {
             ResourceLeakDetector.setLevel(nettyGlobalConfiguration.getResourceLeakDetectorLevel());
         } else if (ResourceLeakDetector.getLevel() == ResourceLeakDetector.Level.SIMPLE &&
@@ -85,9 +107,16 @@ public class DefaultEventLoopGroupFactory implements EventLoopGroupFactory {
         }
     }
 
+    private EventLoopGroupFactory nativeFactory() {
+        return factories.entrySet().stream()
+            .min(Comparator.comparingInt(e -> FACTORY_PRIORITY.indexOf(e.getKey())))
+            .orElseThrow()
+            .getValue();
+    }
+
     @Override
     public IoHandlerFactory createIoHandlerFactory() {
-        return nativeFactory.createIoHandlerFactory();
+        return nativeFactory().createIoHandlerFactory();
     }
 
     @Override
@@ -107,18 +136,18 @@ public class DefaultEventLoopGroupFactory implements EventLoopGroupFactory {
     @Override
     @Deprecated
     public EventLoopGroup createEventLoopGroup(int threads, Executor executor, @Nullable Integer ioRatio) {
-        return nativeFactory.createEventLoopGroup(threads, executor, ioRatio);
+        return nativeFactory().createEventLoopGroup(threads, executor, ioRatio);
     }
 
     @Override
     @Deprecated
     public EventLoopGroup createEventLoopGroup(int threads, @Nullable ThreadFactory threadFactory, @Nullable Integer ioRatio) {
-        return nativeFactory.createEventLoopGroup(threads, threadFactory, ioRatio);
+        return nativeFactory().createEventLoopGroup(threads, threadFactory, ioRatio);
     }
 
     @Override
     public Class<? extends Channel> channelClass(NettyChannelType type) throws UnsupportedOperationException {
-        return nativeFactory.channelClass(type);
+        return nativeFactory().channelClass(type);
     }
 
     @Override
@@ -137,10 +166,14 @@ public class DefaultEventLoopGroupFactory implements EventLoopGroupFactory {
     }
 
     private EventLoopGroupFactory getFactory(@Nullable EventLoopGroupConfiguration configuration) {
-        if (configuration != null && configuration.isPreferNativeTransport()) {
-            return this.nativeFactory;
+        if (configuration != null) {
+            return configuration.getTransport().stream()
+                .map(factories::get)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElseThrow(() -> new NoSuchElementException("No matching transport was found. Configured transports are " + configuration.getTransport() + ", available transports are " + factories.keySet()));
         } else {
-            return this.defaultFactory;
+            return factories.get(NioEventLoopGroupFactory.NAME);
         }
     }
 

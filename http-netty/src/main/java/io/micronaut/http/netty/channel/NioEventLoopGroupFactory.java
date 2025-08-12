@@ -27,6 +27,7 @@ import io.netty.channel.socket.nio.NioDomainSocketChannel;
 import io.netty.channel.socket.nio.NioServerDomainSocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 
 import java.io.IOException;
@@ -38,8 +39,10 @@ import java.io.IOException;
  */
 @Internal
 @Singleton
+@Named(NioEventLoopGroupFactory.NAME)
 @BootstrapContextCompatible
 public class NioEventLoopGroupFactory implements EventLoopGroupFactory {
+    public static final String NAME = "nio";
 
     @Override
     public IoHandlerFactory createIoHandlerFactory() {

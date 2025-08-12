@@ -9,7 +9,7 @@ import spock.lang.Requires
 import spock.util.environment.OperatingSystem
 
 @Requires({ os.family == OperatingSystem.Family.LINUX })
-class LinuxNativeTransportSpec extends AbstractMicronautSpec {
+class NewLinuxNativeTransportSpec extends AbstractMicronautSpec {
 
     void "test a basic request works with epoll"() {
         when:
@@ -26,7 +26,7 @@ class LinuxNativeTransportSpec extends AbstractMicronautSpec {
     @Override
     Map<String, Object> getConfiguration() {
         super.getConfiguration() << [
-                'micronaut.server.netty.use-native-transport': true,
+                'micronaut.server.netty.transport': 'epoll',
                 'spec': 'TransportSpec']
     }
 }

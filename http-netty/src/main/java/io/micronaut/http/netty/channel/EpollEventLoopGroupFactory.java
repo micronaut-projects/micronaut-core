@@ -42,10 +42,11 @@ import org.slf4j.LoggerFactory;
 @Singleton
 @Requires(classes = Epoll.class, condition = EpollAvailabilityCondition.class)
 @Internal
-@Named(EventLoopGroupFactory.NATIVE)
+@Named(EpollEventLoopGroupFactory.NAME)
 @BootstrapContextCompatible
 @Order(100)
 public class EpollEventLoopGroupFactory implements EventLoopGroupFactory {
+    public static final String NAME = "epoll";
     private static final Logger LOG = LoggerFactory.getLogger(EpollEventLoopGroupFactory.class);
 
     @Override

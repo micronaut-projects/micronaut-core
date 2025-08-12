@@ -124,7 +124,6 @@ micronaut:
     event-loops:
       default:
         num-threads: 10
-        prefer-native-transport: true
 ----
 
 You can also use the `micronaut.netty.event-loops` setting to configure one or more additional event loops. The following table summarizes the properties:
@@ -143,7 +142,6 @@ micronaut:
     event-loops:
       other:
         num-threads: 10
-        prefer-native-transport: true
 ----
 
 Once an additional event loop has been configured you can alter the HTTP client configuration to use it:

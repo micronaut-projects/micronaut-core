@@ -1302,6 +1302,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         private Integer ioRatio;
         private String executor;
         private boolean preferNativeTransport = false;
+        private List<String> transport;
         private Duration shutdownQuietPeriod = Duration.ofSeconds(DEFAULT_SHUTDOWN_QUIET_PERIOD);
         private Duration shutdownTimeout = Duration.ofSeconds(DEFAULT_SHUTDOWN_TIMEOUT);
         private String name;
@@ -1436,6 +1437,26 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         @Override
         public boolean isPreferNativeTransport() {
             return preferNativeTransport;
+        }
+
+        @Override
+        public @NonNull List<String> getTransport() {
+            return transport == null ? EventLoopGroupConfiguration.super.getTransport() : transport;
+        }
+
+        /**
+         * The transports to use for this event loop, in order of preference. Supported values are
+         * {@code io_uring,epoll,kqueue,nio}. The first available transport out of those listed will
+         * be used (nio is always available). If no listed transport is available, an exception will be
+         * thrown.
+         * <p>By default, only {@code nio} is used, even if native transports are available. If the
+         * legacy {@link #isPreferNativeTransport() prefer-native-transport} property is set to
+         * {@code true}, this defaults to {@code io_uring,epoll,kqueue,nio}.
+         *
+         * @param transport The available transports, in order of preference
+         */
+        public void setTransport(@NonNull List<String> transport) {
+            this.transport = transport;
         }
 
         @Override
