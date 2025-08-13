@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 
 import java.util.Collections;
@@ -32,10 +33,10 @@ import java.util.Collections;
  * @since 1.0
  */
 @Internal
-final class JavaParameterElement extends AbstractJavaElement implements ParameterElement {
+final class JavaParameterElement extends AbstractTypeAwareJavaElement implements ParameterElement, TypedElement {
 
     private final JavaClassElement owningType;
-    private final MethodElement methodElement;
+    private final JavaMethodElement methodElement;
     private ClassElement typeElement;
     private ClassElement genericTypeElement;
 
@@ -49,7 +50,7 @@ final class JavaParameterElement extends AbstractJavaElement implements Paramete
      * @param visitorContext The visitor context
      */
     JavaParameterElement(JavaClassElement owningType,
-                         MethodElement methodElement,
+                         JavaMethodElement methodElement,
                          JavaNativeElement.Variable nativeElement,
                          ElementAnnotationMetadataFactory annotationMetadataFactory,
                          JavaVisitorContext visitorContext) {
@@ -72,6 +73,11 @@ final class JavaParameterElement extends AbstractJavaElement implements Paramete
     @Override
     public ParameterElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
         return (ParameterElement) super.withAnnotationMetadata(annotationMetadata);
+    }
+
+    @Override
+    protected boolean hasNullMarked() {
+        return methodElement.hasNullMarked();
     }
 
     @Override
@@ -112,4 +118,8 @@ final class JavaParameterElement extends AbstractJavaElement implements Paramete
         return methodElement;
     }
 
+    @Override
+    protected AnnotationMetadata getTypeAnnotationMetadata() {
+        return getType().getTypeAnnotationMetadata();
+    }
 }

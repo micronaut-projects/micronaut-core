@@ -36,7 +36,7 @@ import java.util.Optional;
  * @since 1.0
  */
 @Internal
-final class JavaPropertyElement extends AbstractJavaElement implements PropertyElement {
+final class JavaPropertyElement extends AbstractJavaMemberElement implements PropertyElement {
 
     private final ClassElement type;
     private final String name;
@@ -74,6 +74,12 @@ final class JavaPropertyElement extends AbstractJavaElement implements PropertyE
         this.owningElement = owningElement;
         this.excluded = excluded;
         this.annotationMetadata = new PropertyElementAnnotationMetadata(this, getter, setter, field, null, false);
+    }
+
+    @Override
+    protected AnnotationMetadata getTypeAnnotationMetadata() {
+        // TODO: aggregate type annotations from all the accessors
+        return type.getTypeAnnotationMetadata();
     }
 
     @Override

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2023 original authors
+ * Copyright 2017-2025 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,10 +15,10 @@
  */
 package io.micronaut.inject.annotation.internal;
 
-import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.NullMarked;
 import io.micronaut.inject.annotation.NamedAnnotationTransformer;
 import io.micronaut.inject.visitor.VisitorContext;
 
@@ -27,22 +27,23 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * A transformer that remaps org.jspecify.annotations.Nullable to {@link AnnotationUtil#NULLABLE}.
+ * A transformer that remaps org.jspecify.annotations.NullMarked to {@link NullMarked}.
  *
- * @since 4.0.0
+ * @since 4.10
+ * @author Denis Stepanov
  */
 @Internal
-public final class JspecifyNullableTransformer implements NamedAnnotationTransformer {
+public final class JspecifyNullMarkedTransformer implements NamedAnnotationTransformer {
 
     @Override
     public @NonNull String getName() {
-        return "org.jspecify.annotations.Nullable";
+        return "org.jspecify.annotations.NullMarked";
     }
 
     @Override
     public List<AnnotationValue<?>> transform(AnnotationValue<Annotation> annotation, VisitorContext visitorContext) {
         return Collections.singletonList(
-            AnnotationValue.builder(AnnotationUtil.NULLABLE).build()
+            AnnotationValue.builder(NullMarked.class).build()
         );
     }
 }

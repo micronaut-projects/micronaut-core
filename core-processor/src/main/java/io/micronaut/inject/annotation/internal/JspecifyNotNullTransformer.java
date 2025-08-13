@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2023 original authors
+ * Copyright 2017-2025 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,22 +27,23 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * A transformer that remaps org.jspecify.annotations.Nullable to {@link AnnotationUtil#NULLABLE}.
+ * A transformer that remaps org.jspecify.annotations.NonNull to {@link AnnotationUtil#NON_NULL}.
  *
- * @since 4.0.0
+ * @since 4.10
+ * @author Denis Stepanov
  */
 @Internal
-public final class JspecifyNullableTransformer implements NamedAnnotationTransformer {
+public final class JspecifyNotNullTransformer implements NamedAnnotationTransformer {
 
     @Override
     public @NonNull String getName() {
-        return "org.jspecify.annotations.Nullable";
+        return "org.jspecify.annotations.NonNull";
     }
 
     @Override
     public List<AnnotationValue<?>> transform(AnnotationValue<Annotation> annotation, VisitorContext visitorContext) {
         return Collections.singletonList(
-            AnnotationValue.builder(AnnotationUtil.NULLABLE).build()
+            AnnotationValue.builder(AnnotationUtil.NON_NULL).build()
         );
     }
 }

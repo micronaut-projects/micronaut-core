@@ -52,6 +52,7 @@ import javax.lang.model.element.RecordComponentElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.TypeParameterElement;
 import javax.lang.model.element.VariableElement;
+import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
@@ -88,7 +89,6 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     private static final String PREFIX_IS = "is";
     protected final TypeElement classElement;
     protected final int arrayDimensions;
-
     @Nullable
     // Not null means raw type definition: "List myMethod()"
     // Null value means a class definition: "class List<T> {}"
@@ -504,7 +504,11 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         if (arrayDimensions == this.arrayDimensions) {
             return this;
         }
-        return new JavaClassElement(getNativeType(), elementAnnotationMetadataFactory, visitorContext, typeArguments, resolvedTypeArguments, arrayDimensions, false);
+        JavaNativeElement.Class nativeType = getNativeType();
+        if (this.arrayDimensions - 1 == arrayDimensions  && nativeType.typeMirror() instanceof ArrayType array) {
+            nativeType = new JavaNativeElement.Class(nativeType.element(), array.getComponentType(), nativeType.owner());
+        }
+        return new JavaClassElement(nativeType, elementAnnotationMetadataFactory, visitorContext, typeArguments, resolvedTypeArguments, arrayDimensions, false);
     }
 
     @Override

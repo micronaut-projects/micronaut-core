@@ -57,7 +57,7 @@ import static io.micronaut.inject.ast.ParameterElement.ZERO_PARAMETER_ELEMENTS;
  * @since 1.0
  */
 @Internal
-public class JavaMethodElement extends AbstractJavaElement implements MethodElement {
+public class JavaMethodElement extends AbstractJavaMemberElement implements MethodElement {
 
     protected final JavaClassElement owningType;
     protected final ExecutableElement executableElement;
@@ -84,6 +84,11 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
         this.executableElement = nativeElement.element();
         this.owningType = owningType;
         this.helper = new MethodElementAnnotationsHelper(this, annotationMetadataFactory);
+    }
+
+    @Override
+    protected AnnotationMetadata getTypeAnnotationMetadata() {
+        return getReturnType().getTypeAnnotationMetadata();
     }
 
     @Override
@@ -298,7 +303,7 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
      * @return The parameter element
      */
     @NonNull
-    protected JavaParameterElement newParameterElement(@NonNull MethodElement methodElement, @NonNull VariableElement variableElement) {
+    JavaParameterElement newParameterElement(@NonNull JavaMethodElement methodElement, @NonNull VariableElement variableElement) {
         return new JavaParameterElement(owningType, methodElement, new JavaNativeElement.Variable(variableElement), elementAnnotationMetadataFactory, visitorContext);
     }
 
@@ -342,7 +347,11 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
             }
         }
         final TypeMirror returnType = executableElement.getReturnType();
-        return newClassElement(getNativeType(), returnType, genericInfo);
+        ClassElement returnClassElement = newClassElement(getNativeType(), returnType, genericInfo);
+        if (canBeMarkedWithNonNull(returnClassElement)) {
+            returnClassElement.getTypeAnnotationMetadata().annotate(NonNull.class);
+        }
+        return returnClassElement;
     }
 
     private static boolean sameType(String type, DeclaredType dt) {
