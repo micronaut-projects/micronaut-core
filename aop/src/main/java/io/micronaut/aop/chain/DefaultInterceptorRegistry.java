@@ -26,6 +26,7 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanContextConfigurable;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.EnvironmentConfigurable;
+import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.NonNull;
@@ -206,8 +207,15 @@ public class DefaultInterceptorRegistry implements InterceptorRegistry {
 
     private <T> boolean isApplicableByType(BeanRegistration<Interceptor<T, ?>> beanRegistration,
                                            AnnotationValue<?> applicableValue) {
-        return applicableValue.classValue("interceptorType")
-            .map(t -> t.isInstance(beanRegistration.getBean())).orElse(false);
+        AnnotationClassValue<?> interceptorType = applicableValue.annotationClassValue(InterceptorBindingQualifier.META_MEMBER_INTERCEPTOR_TYPE).orElse(null);
+        if (interceptorType == null) {
+            return false;
+        }
+        Class<?> type = interceptorType.getType().orElse(null);
+        if (type != null) {
+            return type.isInstance(beanRegistration.getBean());
+        }
+        return interceptorType.getName().equals(beanRegistration.getBean().getClass().getName());
     }
 
     @Override
