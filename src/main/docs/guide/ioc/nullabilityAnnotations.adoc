@@ -80,6 +80,9 @@ Throughout the history of the framework, we used other nullability annotation li
 
 **Are Micronaut Nullability annotations recognized by Kotlin?**
 
-Micronaut framework's nullability annotations are not recognized by Kotlin, it's recommended to use JSpecify or any other nullability annotations that are supported by Micronaut https://kotlinlang.org/docs/java-interop.html#nullability-annotations:[Kotlin Recognizable Nullability annotations]
+Kotlin does not recognize Micronaut framework's nullability annotations. However, Micronaut supports other nullability annotations via api:inject.annotation.AnnotationMapper[annotation mapping].
 
-NOTE: Micronaut framework supports other known nullability annotations from: Android, FindBugs, Javax, Eclipse, JetBrains
+NOTE: Micronaut framework supports other known nullability annotations from: Android, FindBugs, Javax, Eclipse, JetBrains, https://jspecify.dev/[JSpecify]
+
+To better support Kotlin, we recommended to use https://jspecify.dev/[JSpecify]
+or any other https://kotlinlang.org/docs/java-interop.html#nullability-annotations:[Kotlin recognizable nullability annotations].
