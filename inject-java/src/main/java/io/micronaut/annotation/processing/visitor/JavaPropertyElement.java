@@ -78,7 +78,8 @@ final class JavaPropertyElement extends AbstractJavaMemberElement implements Pro
 
     @Override
     protected AnnotationMetadata getTypeAnnotationMetadata() {
-        // TODO: aggregate type annotations from all the accessors
+        // The correct check for the nullability of the property should base on the read / write accessor
+        // We might need to introduce new methods to check if reader value / write value can be null
         return type.getTypeAnnotationMetadata();
     }
 

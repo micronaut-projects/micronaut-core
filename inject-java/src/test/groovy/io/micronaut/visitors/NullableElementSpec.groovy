@@ -19,6 +19,7 @@ import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.FieldElement
 import io.micronaut.inject.ast.MethodElement
+import io.micronaut.inject.ast.PropertyElement
 
 class NullableElementSpec extends AbstractTypeElementSpec {
 
@@ -256,6 +257,78 @@ class Test {
 
             assert nullToEmpty.getParameters()[0].isNullable()
             assert !nullToEmpty.getParameters()[0].isNonNull()
+
+            classElement
+        }
+    }
+
+    void "test jspecify @NullMarked annotation on a property"() {
+        expect:
+        buildClassElement('''
+package test;
+
+import org.jspecify.annotations.Nullable;
+
+class Test {
+
+    private final @Nullable String name;
+
+    Test(String name) {
+        this.name = name;
+    }
+
+    public String getName() {
+        return name;
+    }
+}
+''') { ClassElement classElement ->
+
+            PropertyElement propertyElement = classElement.getBeanProperties().iterator().next()
+            assert !propertyElement.isNonNull()
+            assert propertyElement.isNullable()
+
+            assert !propertyElement.getType().isNonNull()
+            assert propertyElement.getType().isNullable()
+
+            assert !propertyElement.getGenericType().isNonNull()
+            assert propertyElement.getGenericType().isNullable()
+
+            classElement
+        }
+    }
+
+    void "test jspecify @NullMarked annotation on a property @NullMarked"() {
+        expect:
+        buildClassElement('''
+package test;
+
+import org.jspecify.annotations.Nullable;
+import org.jspecify.annotations.NullMarked;
+
+@NullMarked
+class Test {
+
+    private final String name;
+
+    Test(String name) {
+        this.name = name;
+    }
+
+    public String getName() {
+        return name;
+    }
+}
+''') { ClassElement classElement ->
+
+            PropertyElement propertyElement = classElement.getBeanProperties().iterator().next()
+            assert propertyElement.isNonNull()
+            assert !propertyElement.isNullable()
+
+            assert propertyElement.getType().isNonNull()
+            assert !propertyElement.getType().isNullable()
+
+            assert propertyElement.getGenericType().isNonNull()
+            assert !propertyElement.getGenericType().isNullable()
 
             classElement
         }
