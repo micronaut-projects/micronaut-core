@@ -28,7 +28,7 @@ import java.util.List;
 
 /**
  * A transformer that remaps org.jspecify.annotations.Nullable to {@link AnnotationUtil#NULLABLE}.
- *
+ * @see <a href="https://jspecify.dev">JSpecify</a>
  * @since 4.0.0
  */
 @Internal

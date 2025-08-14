@@ -29,6 +29,7 @@ import java.util.List;
 /**
  * A transformer that remaps org.jspecify.annotations.NonNull to {@link AnnotationUtil#NON_NULL}.
  *
+ * @see <a href="https://jspecify.dev">JSpecify</a>
  * @since 4.10
  * @author Denis Stepanov
  */
