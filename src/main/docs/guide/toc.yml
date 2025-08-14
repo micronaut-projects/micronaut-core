@@ -69,7 +69,9 @@ ioc:
   beanImport: Importing Beans from Libraries
   classImport: Importing Classes from Libraries
   mixin: Modifying Class Annotations With A Mixin
-  nullabilityAnnotations: Nullability Annotations
+  nullabilityAnnotations:
+    title: Nullability Annotations
+    jspecify: JSpecify Nullability Annotations
   springBeans: Micronaut Beans And Spring
   android: Android Support
 config:
