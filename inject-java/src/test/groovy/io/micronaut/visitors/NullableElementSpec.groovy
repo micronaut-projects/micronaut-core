@@ -227,7 +227,6 @@ class Test {
         buildClassElement('''
 @NullMarked
 package test;
-
 import org.jspecify.annotations.NullMarked;
 
 ''','''
@@ -264,33 +263,21 @@ class Test {
 
     void "test jspecify annotations arrays"() {
         expect:
-        buildClassElement('''
+            buildClassElement('''
 package test;
 
-import jakarta.validation.constraints.Max;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
-
-import java.lang.annotation.Documented;
-import java.lang.annotation.Retention;
-import java.lang.annotation.Target;
-
-import static java.lang.annotation.ElementType.FIELD;
-import static java.lang.annotation.ElementType.METHOD;
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
-@Target({ METHOD, FIELD })
-@Retention(RUNTIME)
-@Documented
-@interface Abc {
-}
 
 class Test {
 
+    @Nullable
+    String[] jspecifyArrayField;
     @io.micronaut.core.annotation.Nullable
-    @Abc
-    String[] micronautArrayField1;
+    String[] micronautArrayField;
 
-    @Abc
+    String @Nullable [] jspecifyArrayField2;
+
     String @io.micronaut.core.annotation.Nullable [] micronautArrayField2;
 
 }

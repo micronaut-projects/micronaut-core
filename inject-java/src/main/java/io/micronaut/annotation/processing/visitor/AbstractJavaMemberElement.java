@@ -50,11 +50,14 @@ public abstract class AbstractJavaMemberElement extends AbstractTypeAwareJavaEle
 
     @Override
     protected boolean hasNullMarked() {
+        if (hasStereotype(NullMarked.class)) {
+            return true;
+        }
         ClassElement owningType = getOwningType();
         if (owningType instanceof AbstractTypeAwareJavaElement typeAwareJavaElement) {
             return typeAwareJavaElement.hasNullMarked();
         }
-        return owningType.hasStereotype(NullMarked.class) || hasStereotype(NullMarked.class);
+        return owningType.hasStereotype(NullMarked.class);
     }
 
 }
