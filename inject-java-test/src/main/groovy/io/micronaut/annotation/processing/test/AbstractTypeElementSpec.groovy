@@ -109,8 +109,15 @@ abstract class AbstractTypeElementSpec extends Specification {
         return new JavaElementFactory(visitorContext).newClassElement(typeElement, visitorContext.getElementAnnotationMetadataFactory())
     }
 
+    <T> T buildClassElement(@Language("java") String packageInfo, @Language("java") String cls, Closure<T> closure) {
+        return buildClassElement(List.of(Map.entry("Test", cls), Map.entry("package-info", packageInfo)), closure)
+    }
+
     <T> T buildClassElement(@Language("java") String cls, Closure<T> closure) {
-        buildTypeElementInfo(cls) { TypeElementInfo typeElementInfo ->
+        return buildClassElement(List.of(Map.entry("", cls)), closure)
+    }
+    protected <T> T buildClassElement(List<Map.Entry<String, String>> files, Closure<T> closure) {
+        buildTypeElementInfo(files) { TypeElementInfo typeElementInfo ->
             TypeElement typeElement = typeElementInfo.typeElement
             def lastTask = typeElementInfo.javaParser.lastTask.get()
             def elements = lastTask.elements
@@ -391,14 +398,20 @@ class Test {
 
     }
 
-    protected <T> T buildTypeElementInfo(@Language("java") String cls, Closure<T> callable) {
-        List<Element> elements = []
-
+    protected <T> T buildTypeElementInfo(List<Map.Entry<String, String>> cls, Closure<T> callable) {
         try (def parser = newJavaParser()) {
-            parser.parseLines("",
-                    cls
-            ).each { elements.add(it) }
-            def element = elements ? elements[0] : null
+            JavaFileObject[] sources = cls.stream()
+                    .map { e -> JavaFileObjects.forSourceLines(e.key, e.value) }
+                    .toArray(JavaFileObject[]::new)
+            Iterator<? extends Element> elements = parser.parse(sources).iterator()
+
+            TypeElement element = null
+            for (Element e : elements) {
+                if (e instanceof TypeElement) {
+                    element = e
+                    break
+                }
+            }
 
             return callable.call( new TypeElementInfo(
                     typeElement: element,

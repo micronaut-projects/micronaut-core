@@ -222,23 +222,75 @@ class Test {
         }
     }
 
+    void "test jspecify @NullMarked annotation on a package"() {
+        expect:
+        buildClassElement('''
+@NullMarked
+package test;
+
+import org.jspecify.annotations.NullMarked;
+
+''','''
+package test;
+
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
+import org.jspecify.annotations.NullMarked;
+
+class Test {
+
+    static String nullToEmpty(@Nullable String x) {
+        return x == null ? "" : x;
+    }
+}
+''') { ClassElement classElement ->
+
+            MethodElement nullToEmpty = classElement.findMethod("nullToEmpty").get()
+            assert nullToEmpty.isNonNull()
+            assert !nullToEmpty.isNullable()
+
+            assert nullToEmpty.getReturnType().isNonNull()
+            assert !nullToEmpty.getReturnType().isNullable()
+
+            assert nullToEmpty.getGenericReturnType().isNonNull()
+            assert !nullToEmpty.getGenericReturnType().isNullable()
+
+            assert nullToEmpty.getParameters()[0].isNullable()
+            assert !nullToEmpty.getParameters()[0].isNonNull()
+
+            classElement
+        }
+    }
+
     void "test jspecify annotations arrays"() {
         expect:
         buildClassElement('''
 package test;
 
-import org.jspecify.annotations.NonNull;
+import jakarta.validation.constraints.Max;
 import org.jspecify.annotations.Nullable;
+
+import java.lang.annotation.Documented;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+
+import static java.lang.annotation.ElementType.FIELD;
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+@Target({ METHOD, FIELD })
+@Retention(RUNTIME)
+@Documented
+@interface Abc {
+}
 
 class Test {
 
-    @Nullable
-    String[] jspecifyArrayField;
     @io.micronaut.core.annotation.Nullable
-    String[] micronautArrayField;
+    @Abc
+    String[] micronautArrayField1;
 
-    String @Nullable [] jspecifyArrayField2;
-
+    @Abc
     String @io.micronaut.core.annotation.Nullable [] micronautArrayField2;
 
 }

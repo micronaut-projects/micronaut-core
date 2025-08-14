@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Creator;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.NullMarked;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
@@ -84,7 +85,7 @@ import java.util.stream.Collectors;
  * @since 1.0
  */
 @Internal
-public class JavaClassElement extends AbstractJavaElement implements ArrayableClassElement {
+public class JavaClassElement extends AbstractTypeAwareJavaElement implements ArrayableClassElement {
     private static final String KOTLIN_METADATA = "kotlin.Metadata";
     private static final String PREFIX_IS = "is";
     protected final TypeElement classElement;
@@ -260,6 +261,11 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             }
         }
         return annotationMetadata;
+    }
+
+    @Override
+    protected boolean hasNullMarked() {
+        return getPackage().hasStereotype(NullMarked.class) || hasStereotype(NullMarked.class);
     }
 
     @NonNull

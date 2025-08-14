@@ -18,6 +18,7 @@ package io.micronaut.annotation.processing.visitor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NullMarked;
+import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 
@@ -49,7 +50,11 @@ public abstract class AbstractJavaMemberElement extends AbstractTypeAwareJavaEle
 
     @Override
     protected boolean hasNullMarked() {
-        return getOwningType().hasStereotype(NullMarked.class) || hasStereotype(NullMarked.class);
+        ClassElement owningType = getOwningType();
+        if (owningType instanceof AbstractTypeAwareJavaElement typeAwareJavaElement) {
+            return typeAwareJavaElement.hasNullMarked();
+        }
+        return owningType.hasStereotype(NullMarked.class) || hasStereotype(NullMarked.class);
     }
 
 }
