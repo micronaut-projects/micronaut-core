@@ -1390,11 +1390,6 @@ public class DefaultHttpClient implements
                             .writeTo(type, requestContentType, bodyValue, request.getHeaders(), byteBufferFactory);
                         bodyContent = byteBodyFactory.readBufferFactory().adapt(buffer);
                     }
-                    if (bodyContent == null) {
-                        bodyContent = byteBodyFactory.readBufferFactory().adapt(conversionService.convert(bodyValue, ByteBuf.class).orElseThrow(() ->
-                            decorate(new HttpClientException("Body [" + bodyValue + "] cannot be encoded to content type [" + requestContentType + "]. No possible codecs or converters found."))
-                        ));
-                    }
                 } else {
                     bodyContent = byteBodyFactory.readBufferFactory().createEmpty();
                 }

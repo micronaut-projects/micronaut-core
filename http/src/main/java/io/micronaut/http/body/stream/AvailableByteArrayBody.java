@@ -26,6 +26,8 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.http.body.CloseableAvailableByteBody;
 import io.micronaut.http.body.InternalByteBody;
 
+import java.util.Objects;
+
 /**
  * {@link io.micronaut.http.body.AvailableByteBody} implementation based on a simple byte array.
  *
@@ -37,7 +39,7 @@ public final class AvailableByteArrayBody extends InternalByteBody implements Cl
     private ReadBuffer readBuffer;
 
     private AvailableByteArrayBody(ReadBuffer readBuffer) {
-        this.readBuffer = readBuffer;
+        this.readBuffer = Objects.requireNonNull(readBuffer, "readBuffer");
     }
 
     /**
