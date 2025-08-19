@@ -215,7 +215,7 @@ public class ReadBufferFactory {
      */
     public interface BufferingOutputStream extends Closeable {
         /**
-         * Get the stream you can write to.
+         * Get the stream you can write to. May be called multiple times.
          *
          * @return The {@link OutputStream}
          * @throws IllegalStateException If the buffer has already

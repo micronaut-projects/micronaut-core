@@ -47,7 +47,7 @@ import java.util.Objects;
  * @deprecated Use {@link NettyByteBodyFactory}
  */
 @Internal
-@Deprecated(forRemoval = true) // still used by micronaut-oracle-cloud
+@Deprecated(since = "4.10.0", forRemoval = true) // still used by micronaut-oracle-cloud
 public final class AvailableNettyByteBody extends NettyByteBody implements CloseableAvailableByteBody {
     private final long length;
     @Nullable
@@ -59,7 +59,8 @@ public final class AvailableNettyByteBody extends NettyByteBody implements Close
     }
 
     public static CloseableAvailableByteBody empty() {
-        return AvailableByteArrayBody.create(NettyReadBufferFactory.of(ByteBufAllocator.DEFAULT).createEmpty());
+        return AvailableByteArrayBody.create(
+            NettyReadBufferFactory.of(ByteBufAllocator.DEFAULT).createEmpty());
     }
 
     @NonNull

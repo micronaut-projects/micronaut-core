@@ -202,6 +202,7 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
      * thread, the {@link #eventLoop} thread. The other methods (subscribe, reserve) can be
      * called from any thread.
      */
+    @Internal
     public static final class SharedBuffer extends BaseSharedBuffer<ByteBufConsumer, ByteBuf> implements ByteBufConsumer {
         private static final Supplier<ResourceLeakDetector<SharedBuffer>> LEAK_DETECTOR = SupplierUtil.memoized(() ->
             ResourceLeakDetectorFactory.instance().newResourceLeakDetector(SharedBuffer.class));
