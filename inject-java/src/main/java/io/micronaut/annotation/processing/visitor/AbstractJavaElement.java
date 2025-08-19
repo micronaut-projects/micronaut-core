@@ -219,7 +219,7 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement {
     protected final ClassElement newClassElement(JavaNativeElement owner,
                                                  TypeMirror type,
                                                  Map<String, ClassElement> declaredElementTypeArguments) {
-        return newClassElement(owner, type, declaredElementTypeArguments, new HashSet<>(), false);
+        return newClassElement(owner, type, declaredElementTypeArguments, new HashSet<>(), false, null);
     }
 
     /**
@@ -249,7 +249,7 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement {
     @NonNull
     protected final ClassElement newClassElement(TypeMirror type,
                                                  Map<String, ClassElement> declaredElementTypeArguments) {
-        return newClassElement(null, type, declaredElementTypeArguments, new HashSet<>(), false);
+        return newClassElement(null, type, declaredElementTypeArguments, new HashSet<>(), false, null);
     }
 
     @NonNull
@@ -283,7 +283,7 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement {
             Element element = dt.asElement();
             // Declared types can wrap other types, like primitives
             if (!(element.asType() instanceof DeclaredType)) {
-                return newClassElement(owner, element.asType(), declaredTypeArguments, visitedTypes, isTypeVariable);
+                return newClassElement(owner, element.asType(), declaredTypeArguments, visitedTypes, isTypeVariable, doc);
             }
             if (element instanceof TypeElement typeElement) {
                 List<? extends TypeMirror> typeMirrorArguments = dt.getTypeArguments();
@@ -366,16 +366,16 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement {
             upperBounds = Stream.of(extendsBound);
         }
         List<ClassElement> upperBoundsAsElements = upperBounds
-            .map(tm -> newClassElement(owner, tm, declaredTypeArguments, visitedTypes, true))
+            .map(tm -> newClassElement(owner, tm, declaredTypeArguments, visitedTypes, true, doc))
             .toList();
         List<ClassElement> lowerBoundsAsElements = lowerBounds
-            .map(tm -> newClassElement(owner, tm, declaredTypeArguments, visitedTypes, true))
+            .map(tm -> newClassElement(owner, tm, declaredTypeArguments, visitedTypes, true, doc))
             .toList();
         ClassElement upperType = WildcardElement.findUpperType(upperBoundsAsElements, lowerBoundsAsElements);
         if (upperType.getType().getName().equals(Object.class.getName())) {
             // Not bounded wildcard: <?>
             if (representedTypeParameter != null) {
-                ClassElement definedTypeBound = newClassElement(owner, representedTypeParameter.asType(), declaredTypeArguments, visitedTypes, true);
+                ClassElement definedTypeBound = newClassElement(owner, representedTypeParameter.asType(), declaredTypeArguments, visitedTypes, true, doc);
                 // Use originating parameter to extract the bound defined
                 if (definedTypeBound instanceof JavaGenericPlaceholderElement javaGenericPlaceholderElement) {
                     upperType = WildcardElement.findUpperType(javaGenericPlaceholderElement.getBounds(), Collections.emptyList());
@@ -422,7 +422,7 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement {
                 String variableName = typeParameter.getSimpleName().toString();
                 resolved.put(
                     variableName,
-                    newClassElement(getNativeType(), typeParameterMirror, parentTypeArguments, visitedTypes, typeParameterMirror instanceof TypeVariable, false, typeParameter, null)
+                    newClassElement(getNativeType(), typeParameterMirror, parentTypeArguments, visitedTypes, typeParameterMirror instanceof TypeVariable, false, typeParameter, null, null)
                 );
             }
         } else {
@@ -433,7 +433,7 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement {
                 String variableName = typeParameter.getSimpleName().toString();
                 resolved.put(
                     variableName,
-                    newClassElement(getNativeType(), typeParameter.asType(), parentTypeArguments, visitedTypes, true, isRaw, null, null)
+                    newClassElement(getNativeType(), typeParameter.asType(), parentTypeArguments, visitedTypes, true, isRaw, null, null, null)
                 );
             }
         }
@@ -480,7 +480,7 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement {
                 it.getBounds() :
                 Collections.singletonList(upperBound);
             boundsUnresolved.stream()
-                .map(tm -> (JavaClassElement) newClassElement(owner, tm, parentTypeArguments, visitedTypes, true))
+                .map(tm -> (JavaClassElement) newClassElement(owner, tm, parentTypeArguments, visitedTypes, true, doc))
                 .forEach(bounds::add);
         }
         return new JavaGenericPlaceholderElement(new JavaNativeElement.Placeholder(tv.asElement(), tv, getNativeType()), tv, declaredElement, resolved, bounds, elementAnnotationMetadataFactory, arrayDimensions, isRawType, doc);
