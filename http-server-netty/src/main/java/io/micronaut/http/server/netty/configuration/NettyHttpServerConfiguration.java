@@ -19,26 +19,21 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Replaces;
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.format.ReadableBytes;
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
-import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.netty.channel.ChannelOption;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.ssl.ApplicationProtocolNames;
 import jakarta.inject.Inject;
-import jakarta.inject.Named;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -185,8 +180,8 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
 
     private Map<ChannelOption, Object> childOptions = Collections.emptyMap();
     private Map<ChannelOption, Object> options = Collections.emptyMap();
-    private Worker worker;
-    private Parent parent;
+    private String workerLoopName = "default";
+    private String parentLoopName = "default";
     private FileTypeHandlerConfiguration fileTypeHandlerConfiguration = new FileTypeHandlerConfiguration();
     private int maxInitialLineLength = DEFAULT_MAXINITIALLINELENGTH;
     private int maxHeaderSize = DEFAULT_MAXHEADERSIZE;
@@ -200,7 +195,6 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private LogLevel logLevel;
     private int compressionThreshold = DEFAULT_COMPRESSIONTHRESHOLD;
     private int compressionLevel = DEFAULT_COMPRESSIONLEVEL;
-    private boolean useNativeTransport = DEFAULT_USE_NATIVE_TRANSPORT;
     private String fallbackProtocol = ApplicationProtocolNames.HTTP_1_1;
     private AccessLogger accessLogger;
     private Http2Settings http2Settings = new Http2Settings();
@@ -426,15 +420,6 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     }
 
     /**
-     * Whether to use netty's native transport (epoll or kqueue) if available.
-     *
-     * @return To use netty's native transport (epoll or kqueue) if available.
-     */
-    public boolean isUseNativeTransport() {
-        return useNativeTransport;
-    }
-
-    /**
      * Whether to validate headers.
      *
      * @return Whether to validate headers
@@ -489,13 +474,6 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     }
 
     /**
-     * @return Configuration for the worker {@link io.netty.channel.EventLoopGroup}
-     */
-    public Worker getWorker() {
-        return worker;
-    }
-
-    /**
      * @return The file type handler configuration.
      * @since 3.1.0
      */
@@ -516,10 +494,41 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     }
 
     /**
-     * @return Configuration for the parent {@link io.netty.channel.EventLoopGroup}
+     * The name of the worker event loop to use.
+     *
+     * @return The worker loop name
      */
-    public Parent getParent() {
-        return parent;
+    @NonNull
+    public String getWorkerLoopName() {
+        return workerLoopName;
+    }
+
+    /**
+     * The name of the worker event loop to use.
+     *
+     * @param workerLoopName The worker loop name
+     */
+    public void setWorkerLoopName(@NonNull String workerLoopName) {
+        this.workerLoopName = workerLoopName;
+    }
+
+    /**
+     * The name of the parent event loop to use.
+     *
+     * @return The parent loop name
+     */
+    @NonNull
+    public String getParentLoopName() {
+        return parentLoopName;
+    }
+
+    /**
+     * The name of the parent event loop to use.
+     *
+     * @param parentLoopName The parent loop name
+     */
+    public void setParentLoopName(@NonNull String parentLoopName) {
+        this.parentLoopName = parentLoopName;
     }
 
     /**
@@ -544,22 +553,6 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     public void setOptions(Map<ChannelOption, Object> options) {
         this.options = options;
-    }
-
-    /**
-     * Sets the worker event loop configuration.
-     * @param worker The worker config
-     */
-    public void setWorker(Worker worker) {
-        this.worker = worker;
-    }
-
-    /**
-     * Sets the parent event loop configuration.
-     * @param parent The parent config
-     */
-    public void setParent(Parent parent) {
-        this.parent = parent;
     }
 
     /**
@@ -606,14 +599,6 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     public void setChunkedSupported(boolean chunkedSupported) {
         this.chunkedSupported = chunkedSupported;
-    }
-
-    /**
-     * Sets whether to use netty's native transport (epoll or kqueue) if available . Default value ({@value #DEFAULT_USE_NATIVE_TRANSPORT}).
-     * @param useNativeTransport True if netty's native transport should be use if available.
-     */
-    public void setUseNativeTransport(boolean useNativeTransport) {
-        this.useNativeTransport = useNativeTransport;
     }
 
     /**
@@ -1133,38 +1118,6 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     }
 
     /**
-     * Configuration for Netty worker.
-     */
-    @ConfigurationProperties("worker")
-    @Named("netty-server-worker-event-loop")
-    public static class Worker extends EventLoopConfig {
-        /**
-         * Default constructor.
-         */
-        Worker() {
-            super(DEFAULT);
-        }
-    }
-
-    /**
-     * Configuration for Netty parent.
-     */
-    @ConfigurationProperties(Parent.NAME)
-    @Requires(missingProperty = EventLoopGroupConfiguration.EVENT_LOOPS + ".parent")
-    @Named("netty-server-parent-event-loop")
-    public static class Parent extends EventLoopConfig {
-
-        public static final String NAME = "parent";
-
-        /**
-         * Default constructor.
-         */
-        Parent() {
-            super(NAME);
-        }
-    }
-
-    /**
      * Allows configuration of properties for the {@link io.micronaut.http.server.netty.body.AbstractFileBodyWriter}.
      *
      * @author James Kleeh
@@ -1266,145 +1219,6 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
             public boolean getPublic() {
                 return publicCache;
             }
-        }
-    }
-
-    /**
-     * Abstract class for configuring the Netty event loop.
-     */
-    public abstract static class EventLoopConfig implements EventLoopGroupConfiguration {
-        private int threads;
-        private Integer ioRatio;
-        private String executor;
-        private boolean preferNativeTransport = false;
-        private Duration shutdownQuietPeriod = Duration.ofSeconds(DEFAULT_SHUTDOWN_QUIET_PERIOD);
-        private Duration shutdownTimeout = Duration.ofSeconds(DEFAULT_SHUTDOWN_TIMEOUT);
-        private String name;
-
-        /**
-         * @param name The name;
-         */
-        EventLoopConfig(String name) {
-            this.name = name;
-        }
-
-        @NonNull
-        @Override
-        public String getName() {
-            return name;
-        }
-
-        /**
-         * Sets the name to use.
-         * @param name The name
-         */
-        public void setEventLoopGroup(String name) {
-            if (StringUtils.isNotEmpty(name)) {
-                this.name = name;
-            }
-        }
-
-        /**
-         * Sets the number of threads for the event loop group.
-         * @param threads The number of threads
-         */
-        public void setThreads(int threads) {
-            this.threads = threads;
-        }
-
-        /**
-         * Sets the I/O ratio.
-         * @param ioRatio The I/O ratio
-         */
-        public void setIoRatio(Integer ioRatio) {
-            this.ioRatio = ioRatio;
-        }
-
-        /**
-         * A named executor service to use for event loop threads
-         * (optional). This property is very specialized. In particular,
-         * it will <i>not</i> solve read timeouts or fix blocking
-         * operations on the event loop, in fact it may do the opposite.
-         * Don't use unless you really know what this does.
-         *
-         * @param executor The executor
-         */
-        public void setExecutor(String executor) {
-            this.executor = executor;
-        }
-
-        /**
-         * @param preferNativeTransport Set whether to prefer the native transport if available
-         */
-        public void setPreferNativeTransport(boolean preferNativeTransport) {
-            this.preferNativeTransport = preferNativeTransport;
-        }
-
-        /**
-         * @param shutdownQuietPeriod Set the shutdown quiet period
-         */
-        public void setShutdownQuietPeriod(Duration shutdownQuietPeriod) {
-            if (shutdownQuietPeriod != null) {
-                this.shutdownQuietPeriod = shutdownQuietPeriod;
-            }
-        }
-
-        /**
-         * @param shutdownTimeout Set the shutdown timeout (must be >= shutdownQuietPeriod)
-         */
-        public void setShutdownTimeout(Duration shutdownTimeout) {
-            if (shutdownTimeout != null) {
-                this.shutdownTimeout = shutdownTimeout;
-            }
-        }
-
-        /**
-         * @return The number of threads to use
-         */
-        public int getNumOfThreads() {
-            return threads;
-        }
-
-        /**
-         * @return The I/O ratio to use
-         */
-        @Override
-        public Optional<Integer> getIoRatio() {
-            if (ioRatio != null) {
-                return Optional.of(ioRatio);
-            }
-            return Optional.empty();
-        }
-
-        /**
-         * @return The name of the configured executor to use
-         */
-        @Override
-        public Optional<String> getExecutorName() {
-            if (executor != null) {
-                return Optional.of(executor);
-            }
-            return Optional.empty();
-        }
-
-        @Override
-        public int getNumThreads() {
-            return threads;
-        }
-
-        @Override
-        public boolean isPreferNativeTransport() {
-            return preferNativeTransport;
-        }
-
-        @Override
-        public Duration getShutdownQuietPeriod() {
-            return shutdownQuietPeriod;
-        }
-
-        @Override
-        public Duration getShutdownTimeout() {
-            return shutdownTimeout;
         }
     }
 

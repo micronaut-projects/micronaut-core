@@ -270,9 +270,12 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             }
             //suppress unused
             //done here to prevent a blocking service loader in the event loop
-            EventLoopGroupConfiguration workerConfig = resolveWorkerConfiguration();
-            workerGroup = createWorkerEventLoopGroup(workerConfig);
-            parentGroup = createParentEventLoopGroup();
+            EventLoopGroupConfiguration workerConfig = nettyEmbeddedServices.getEventLoopGroupRegistry()
+                .getEventLoopGroupConfiguration(serverConfiguration.getWorkerLoopName()).orElse(null);
+            workerGroup = nettyEmbeddedServices.getEventLoopGroupRegistry().getEventLoopGroup(serverConfiguration.getWorkerLoopName())
+                .orElseThrow(() -> new ConfigurationException("No event loop with name '" + serverConfiguration.getWorkerLoopName() + "' available, but this name was configured as the worker-loop-name"));
+            parentGroup = nettyEmbeddedServices.getEventLoopGroupRegistry().getEventLoopGroup(serverConfiguration.getParentLoopName())
+                .orElseThrow(() -> new ConfigurationException("No event loop with name '" + serverConfiguration.getParentLoopName() + "' available, but this name was configured as the parent-loop-name"));
             Supplier<ServerBootstrap> serverBootstrap = SupplierUtil.memoized(() -> {
                 ServerBootstrap sb = createServerBootstrap();
                 processOptions(serverConfiguration.getOptions(), sb::option);
@@ -316,21 +319,6 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         }
 
         return this;
-    }
-
-    private EventLoopGroupConfiguration resolveWorkerConfiguration() {
-        EventLoopGroupConfiguration workerConfig = serverConfiguration.getWorker();
-        if (workerConfig == null) {
-            workerConfig = nettyEmbeddedServices.getEventLoopGroupRegistry()
-                    .getEventLoopGroupConfiguration(EventLoopGroupConfiguration.DEFAULT).orElse(null);
-        } else {
-            final String eventLoopGroupName = workerConfig.getName();
-            if (!EventLoopGroupConfiguration.DEFAULT.equals(eventLoopGroupName)) {
-                workerConfig = nettyEmbeddedServices.getEventLoopGroupRegistry()
-                        .getEventLoopGroupConfiguration(eventLoopGroupName).orElse(workerConfig);
-            }
-        }
-        return workerConfig;
     }
 
     @Override
@@ -474,21 +462,6 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 .filter(InetSocketAddress.class::isInstance)
                 .map(addr -> ((InetSocketAddress) addr).getPort())
                 .collect(Collectors.<Integer, Set<Integer>>toCollection(LinkedHashSet::new)));
-    }
-
-    /**
-     * @return The parent event loop group
-     */
-    @SuppressWarnings("WeakerAccess")
-    protected EventLoopGroup createParentEventLoopGroup() {
-        final NettyHttpServerConfiguration.Parent parent = serverConfiguration.getParent();
-        return nettyEmbeddedServices.getEventLoopGroupRegistry()
-                .getEventLoopGroup(parent != null ? parent.getName() : NettyHttpServerConfiguration.Parent.NAME)
-                .orElseGet(() -> {
-                    final EventLoopGroup newGroup = newEventLoopGroup(parent);
-                    shutdownParent = true;
-                    return newGroup;
-                });
     }
 
     /**
@@ -703,7 +676,8 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         List<Future<?>> futures = new ArrayList<>(2);
         try {
             if (shutdownParent) {
-                EventLoopGroupConfiguration parent = serverConfiguration.getParent();
+                EventLoopGroupConfiguration parent = nettyEmbeddedServices.getEventLoopGroupRegistry()
+                    .getEventLoopGroupConfiguration(serverConfiguration.getParentLoopName()).orElse(null);
                 if (parent != null) {
                     long quietPeriod = parent.getShutdownQuietPeriod().toMillis();
                     long timeout = parent.getShutdownTimeout().toMillis();
@@ -960,7 +934,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         }
     }
 
-    private static class DomainSocketHolder {
+    private static final class DomainSocketHolder {
         @NonNull
         private static SocketAddress makeDomainSocketAddress(String path) {
             try {

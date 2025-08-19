@@ -76,26 +76,6 @@ class NettyHttpServerConfigurationSpec extends Specification {
         'idle-timeout'       | 'idleTimeout'      | '-1s' | Duration.ofSeconds(-1)
     }
 
-    @Unroll
-    void "test config for worker #key"() {
-        given:
-        def ctx = ApplicationContext.run(
-                ("micronaut.server.netty.worker.$key".toString()): value
-        )
-        NettyHttpServerConfiguration config = ctx.getBean(NettyHttpServerConfiguration)
-
-        expect:
-        config.worker[property] == expected
-
-        cleanup:
-        ctx.close()
-
-        where:
-        key                     | property              | value     | expected
-        'shutdown-quiet-period' | 'shutdownQuietPeriod' | '500ms'   | Duration.ofMillis(500)
-        'shutdown-timeout'      | 'shutdownTimeout'     | '2s'      | Duration.ofSeconds(2)
-    }
-
     void "test netty server epoll native channel option conversion"() {
         given:
         ChannelOptionFactory epollChannelOptionFactory = new EpollChannelOptionFactory()
@@ -206,8 +186,7 @@ class NettyHttpServerConfigurationSpec extends Specification {
         given:
         ApplicationContext beanContext = new DefaultApplicationContext("test")
         beanContext.environment.addPropertySource(PropertySource.of("test",
-              ['micronaut.server.netty.use-native-transport': true,
-               'micronaut.server.netty.childOptions.tcpQuickack': true]
+              ['micronaut.server.netty.childOptions.tcpQuickack': true]
 
         ))
         beanContext.start()
@@ -216,7 +195,6 @@ class NettyHttpServerConfigurationSpec extends Specification {
         NettyHttpServerConfiguration config = beanContext.getBean(NettyHttpServerConfiguration)
 
         then:
-        config.useNativeTransport
         config.childOptions.size() == 1
 
         when:
@@ -250,7 +228,6 @@ class NettyHttpServerConfigurationSpec extends Specification {
         EventLoopGroupFactory eventLoopGroupFactory = beanContext.getBean(EventLoopGroupFactory)
 
         then:
-        config.useNativeTransport
         config.childOptions.size() == 1
 
         when:
@@ -291,10 +268,6 @@ class NettyHttpServerConfigurationSpec extends Specification {
         ApplicationContext beanContext = new DefaultApplicationContext("test")
         beanContext.environment.addPropertySource(PropertySource.of("test",
                 ['micronaut.server.netty.childOptions.autoRead'         : 'true',
-                 'micronaut.server.netty.worker.threads'                : 8,
-                 'micronaut.server.netty.worker.shutdown-quiet-period'  : '500ms',
-                 'micronaut.server.netty.worker.shutdown-timeout'       : '2s',
-                 'micronaut.server.netty.parent.threads'                : 8,
                  'micronaut.server.multipart.maxFileSize'               : 2048,
                  'micronaut.server.maxRequestSize'                      : '2MB',
                  'micronaut.server.netty.childOptions.write_buffer_water_mark.high': 262143,
@@ -308,7 +281,6 @@ class NettyHttpServerConfigurationSpec extends Specification {
         NettyHttpServerConfiguration config = beanContext.getBean(NettyHttpServerConfiguration)
 
         then:
-        !config.useNativeTransport
         config.maxRequestSize == 2097152
         config.multipart.maxFileSize == 2048
         config.childOptions.size() == 2
@@ -317,10 +289,6 @@ class NettyHttpServerConfigurationSpec extends Specification {
         config.childOptions.get(ChannelOption.WRITE_BUFFER_WATER_MARK).high == 262143
         config.childOptions.get(ChannelOption.WRITE_BUFFER_WATER_MARK).low == 65535
         !config.host.isPresent()
-        config.parent.numThreads == 8
-        config.worker.numThreads == 8
-        config.worker.shutdownQuietPeriod == Duration.ofMillis(500)
-        config.worker.shutdownTimeout == Duration.ofSeconds(2)
 
         then:
         NettyEmbeddedServer server = beanContext.getBean(NettyEmbeddedServer)

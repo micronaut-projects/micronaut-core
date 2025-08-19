@@ -11,15 +11,12 @@ micronaut:
     host: localhost
     netty:
       maxHeaderSize: 500KB
-      worker:
-        threads: 8
       childOptions:
-        autoRead: true
+        tcpQuickack: true
 ----
 - By default, Micronaut framework binds to all network interfaces. Use `localhost` to bind only to loopback network interface
 - `maxHeaderSize` sets the maximum size for headers
-- `worker.threads` specifies the number of Netty worker threads
-- `autoRead` enables request body auto read
+- `tcpQuickack` enables TCP quick acks
 
 include::{includedir}configurationProperties/io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration.adoc[]
 

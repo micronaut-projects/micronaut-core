@@ -638,7 +638,6 @@ class AccessLogSpec extends Specification {
         def ctx = ApplicationContext.run([
                 'spec.name': 'AccessLogSpec',
                 'micronaut.netty.event-loops.default.prefer-native-transport': true,
-                'micronaut.netty.event-loops.parent.prefer-native-transport': true,
                 'micronaut.server.netty.listeners.main.family': 'UNIX',
                 'micronaut.server.netty.listeners.main.path': sock.toString(),
                 'micronaut.server.netty.access-logger.enabled': true,

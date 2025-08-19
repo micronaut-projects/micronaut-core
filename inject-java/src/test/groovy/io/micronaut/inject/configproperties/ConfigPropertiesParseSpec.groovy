@@ -13,8 +13,6 @@ import io.micronaut.inject.InstantiatableBeanDefinition
 import io.micronaut.inject.configuration.Engine
 import spock.lang.Issue
 
-import java.time.Duration
-
 class ConfigPropertiesParseSpec extends AbstractTypeElementSpec {
 
     void "test configuration properties implementing interface"() {
@@ -96,70 +94,6 @@ class ParentConfiguration {
         then:
         bean != null
         bean.properties() as Map == [url_escaping_charset:'UTF-8']
-    }
-
-    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/8480")
-    void "test configuration properties inheritance for compiled classes - inherited props"() {
-        when:
-        def context = buildContext('''
-package test;
-
-import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.http.server.HttpServerConfiguration;
-
-@ConfigurationProperties("netty")
-class NettyHttpServerConfiguration extends
- HttpServerConfiguration {
-    private Parent parent;
-    private Child child;
-    public test.NettyHttpServerConfiguration.Parent getParent() {
-        return parent;
-    }
-
-    public void setParent(test.NettyHttpServerConfiguration.Parent parent) {
-        this.parent = parent;
-    }
-
-    public void setChild(test.NettyHttpServerConfiguration.Child child) {
-        this.child = child;
-    }
-    public test.NettyHttpServerConfiguration.Child getChild() {
-        return child;
-    }
-    @ConfigurationProperties("child")
-    public static class Child extends EventLoopConfig {
-
-    }
-    @ConfigurationProperties("parent")
-    public static class Parent extends EventLoopConfig {
-
-    }
-    public abstract static class EventLoopConfig {
-        private Integer ioRatio;
-        private int threads;
-        public void setIoRatio(Integer ioRatio) {
-            this.ioRatio = ioRatio;
-        }
-        public Integer getIoRatio() {
-            return ioRatio;
-        }
-        public void setThreads(int threads) {
-            this.threads = threads;
-        }
-        public int getNumOfThreads() {
-            return threads;
-        }
-    }
-}
-''')
-        def config = getBean(context, "test.NettyHttpServerConfiguration")
-
-        then:
-        config.idleTimeout == Duration.ofSeconds(2)
-        config.parent.ioRatio == 10
-        config.parent.numOfThreads == 5
-        config.child.ioRatio == 15
-        config.child.numOfThreads == 55
     }
 
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/8480")
@@ -254,8 +188,6 @@ class MyConfig {
                 "micronaut.session.http.test.uri": "http://localhost:9999",
                 "micronaut.session.http.test.uris": "http://localhost:9999",
                 "micronaut.server.idle-timeout": "2s",
-                "micronaut.server.netty.parent.io-ratio": "10",
-                "micronaut.server.netty.parent.threads": "5",
                 "micronaut.server.netty.child.io-ratio": "15",
                 "micronaut.server.netty.child.threads": "55",
                 "freemarker.settings.urlEscapingCharset": 'UTF-8'

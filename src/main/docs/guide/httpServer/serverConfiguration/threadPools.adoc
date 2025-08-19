@@ -1,14 +1,8 @@
 The HTTP server is built on https://netty.io[Netty] which is designed as a non-blocking I/O toolkit in an event loop model.
 
-The Netty worker event loop uses the "default" named event loop group. This can be configured through `micronaut.netty.event-loops.default`.
+The Netty worker event loop uses the "default" named event loop group. This loop can be configured through `micronaut.netty.event-loops.default`.
 
-IMPORTANT: The event loop configuration under `micronaut.server.netty.worker` is only used if the `event-loop-group` is set to a name which doesn't correspond to any `micronaut.netty.event-loops` configuration. This behavior is deprecated and will be removed in a future version. Use `micronaut.netty.event-loops.*` for any event loop group configuration beyond setting the name through `event-loop-group`. This does not apply to the parent event loop configuration (`micronaut.server.netty.parent`).
-
-include::{includedir}configurationProperties/io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration$Worker.adoc[]
-
-TIP: The parent event loop can be configured with `micronaut.server.netty.parent` with the same configuration options.
-
-The server can also be configured to use a different named worker event loop:
+The server can also be configured to use a different named event loop:
 
 .Using a different event loop for the server
 [configuration]
@@ -16,8 +10,8 @@ The server can also be configured to use a different named worker event loop:
 micronaut:
   server:
     netty:
-      worker:
-        event-loop-group: other
+      worker-loop-name: other
+      parent-loop-name: other
   netty:
     event-loops:
       other:

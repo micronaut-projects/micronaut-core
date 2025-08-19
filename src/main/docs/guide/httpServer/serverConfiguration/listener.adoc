@@ -54,8 +54,6 @@ micronaut:
   netty:
     event-loops:
       # use epoll
-      parent:
-        prefer-native-transport: true
       default:
         prefer-native-transport: true
     listeners:
