@@ -82,7 +82,7 @@ public abstract class AbstractTypeAwareJavaElement extends AbstractJavaElement {
             || getTypeAnnotationMetadata().hasDeclaredStereotype(AnnotationUtil.NON_NULL);
     }
 
-    protected boolean canBeMarkedWithNonNull(ClassElement classElement) {
+    protected final boolean canBeMarkedWithNonNull(ClassElement classElement) {
         return !classElement.isVoid()
             && !classElement.isPrimitive()
             && !classElement.isNullable()

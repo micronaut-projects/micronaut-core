@@ -191,6 +191,7 @@ public class GroovyVisitorContext implements VisitorContext {
         return classElements.toArray(ClassElement.ZERO_CLASS_ELEMENTS);
     }
 
+
     @NonNull
     @Override
     public GroovyElementFactory getElementFactory() {

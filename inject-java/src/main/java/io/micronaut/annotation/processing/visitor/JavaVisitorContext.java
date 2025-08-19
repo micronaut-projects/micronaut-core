@@ -280,14 +280,12 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
     }
 
     @Override
-    public @NonNull
-    ClassElement[] getClassElements(@NonNull String aPackage, @NonNull String... stereotypes) {
+    public @NonNull ClassElement[] getClassElements(@NonNull String aPackage, @NonNull String... stereotypes) {
         ArgumentUtils.requireNonNull("aPackage", aPackage);
         ArgumentUtils.requireNonNull("stereotypes", stereotypes);
         final PackageElement packageElement = elements.getPackageElement(aPackage);
         if (packageElement != null) {
             var classElements = new ArrayList<ClassElement>();
-
             populateClassElements(stereotypes, packageElement, classElements);
             return classElements.toArray(ClassElement.ZERO_CLASS_ELEMENTS);
         }
@@ -557,11 +555,11 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
         final List<? extends Element> enclosedElements = packageElement.getEnclosedElements();
         boolean includeAll = Arrays.equals(stereotypes, new String[] {"*"});
         for (Element enclosedElement : enclosedElements) {
-            populateClassElements(stereotypes, includeAll, packageElement, enclosedElement, classElements);
+            populateClassElements(stereotypes, includeAll, enclosedElement, classElements);
         }
     }
 
-    private void populateClassElements(@NonNull String[] stereotypes, boolean includeAll, PackageElement packageElement, Element enclosedElement, List<ClassElement> classElements) {
+    private void populateClassElements(@NonNull String[] stereotypes, boolean includeAll, Element enclosedElement, List<ClassElement> classElements) {
         if (enclosedElement instanceof TypeElement element) {
             JavaClassElement classElement = elementFactory.newClassElement(element, elementAnnotationMetadataFactory);
             if ((includeAll || Arrays.stream(stereotypes).anyMatch(classElement::hasStereotype)) && !classElement.isAbstract()) {
@@ -569,7 +567,7 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
             }
             List<? extends Element> nestedElements = enclosedElement.getEnclosedElements();
             for (Element nestedElement : nestedElements) {
-                populateClassElements(stereotypes, includeAll, packageElement, nestedElement, classElements);
+                populateClassElements(stereotypes, includeAll, nestedElement, classElements);
             }
         } else if (enclosedElement instanceof PackageElement element) {
             populateClassElements(stereotypes, element, classElements);

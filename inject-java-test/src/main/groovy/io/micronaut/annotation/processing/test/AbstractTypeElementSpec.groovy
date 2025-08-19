@@ -168,10 +168,10 @@ abstract class AbstractTypeElementSpec extends Specification {
     }
 
     /**
-    * Build and return a {@link BeanIntrospection} for the given class name and class data.
-    *
-    * @return the introspection if it is correct
-    **/
+     * Build and return a {@link BeanIntrospection} for the given class name and class data.
+     *
+     * @return the introspection if it is correct
+     **/
     protected BeanIntrospection buildBeanIntrospection(String className, @Language("java") String cls) {
         def simpleName = NameUtils.getSimpleName(className)
         def beanDefName = (simpleName.startsWith('$') ? '' : '$') + simpleName + '$Introspection'
@@ -271,8 +271,27 @@ class Test {
      * @return The context. Should be shutdown after use
      */
     ApplicationContext buildContext(String className, @Language("java") String cls, boolean includeAllBeans = false, Map properties = [:]) {
+        return buildContext(null, className, cls, includeAllBeans, properties)
+    }
+
+    /**
+     * Builds a {@link ApplicationContext} containing only the classes produced by the given class.
+     *
+     * @param className The class name
+     * @param cls The class data
+     * @return The context. Should be shutdown after use
+     */
+    ApplicationContext buildContext(@Nullable @Language("java") String packageJava, String className, @Language("java") String cls, boolean includeAllBeans = false, Map properties = [:]) {
         try (def parser = newJavaParser()) {
-            def files = parser.generate(className, cls)
+            def files
+            if (packageJava == null) {
+                files = parser.generate(JavaFileObjects.forSourceString(className, cls))
+            } else {
+                files = parser.generate(
+                        JavaFileObjects.forSourceString(className, cls),
+                        JavaFileObjects.forSourceString("package-info", packageJava)
+                )
+            }
             ClassLoader classLoader = new JavaFileObjectClassLoader(files)
 
             def builder = ApplicationContext.builder()

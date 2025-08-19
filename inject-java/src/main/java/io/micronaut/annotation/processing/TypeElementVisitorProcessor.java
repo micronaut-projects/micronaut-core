@@ -82,7 +82,6 @@ import static io.micronaut.core.util.StringUtils.EMPTY_STRING;
     VisitorContext.MICRONAUT_PROCESSING_MODULE
 })
 public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcessor {
-    private static final SoftServiceLoader<TypeElementVisitor> SERVICE_LOADER = SoftServiceLoader.load(TypeElementVisitor.class, TypeElementVisitorProcessor.class.getClassLoader()).disableFork();
     private static final Set<String> VISITOR_WARNINGS;
     private static final Set<String> SUPPORTED_ANNOTATION_NAMES;
 
@@ -281,6 +280,9 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                         javaClassElements.addAll((Collection) extraClasses);
                     } catch (PostponeToNextRoundException e) {
                         postponeElement(javaClassElement, e.getNativeErrorElement(), e);
+                    } catch (ElementPostponedToNextRoundException e) {
+                        Element element = PostponeToNextRoundException.resolvedFailedElement(e.getOriginatingElement());
+                        postponeElement(javaClassElement, element, e);
                     }
                 }
 
@@ -332,7 +334,6 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
         if (roundEnv.processingOver()) {
             javaVisitorContext.finish();
-            writeBeanDefinitionsToMetaInf();
         }
         return false;
     }
@@ -432,22 +433,11 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         return typeElementVisitors;
     }
 
-    /**
-     * Writes {@link io.micronaut.inject.BeanDefinitionReference} into /META-INF/services/io.micronaut.inject.BeanDefinitionReference.
-     */
-    private void writeBeanDefinitionsToMetaInf() {
-        try {
-            classWriterOutputVisitor.finish();
-        } catch (Exception e) {
-            String message = e.getMessage();
-            error("Error occurred writing META-INF files: %s", message != null ? message : e);
-        }
-    }
-
     @NonNull
-    private static Collection<? extends TypeElementVisitor<?, ?>> findCoreTypeElementVisitors(
-        @Nullable Set<String> warnings) {
-        return SERVICE_LOADER.collectAll(visitor -> {
+    private static Collection<? extends TypeElementVisitor<?, ?>> findCoreTypeElementVisitors(@Nullable Set<String> warnings) {
+        return SoftServiceLoader.load(TypeElementVisitor.class, TypeElementVisitorProcessor.class.getClassLoader())
+            .disableFork()
+            .collectAll(visitor -> {
                 if (!visitor.isEnabled()) {
                     return false;
                 }

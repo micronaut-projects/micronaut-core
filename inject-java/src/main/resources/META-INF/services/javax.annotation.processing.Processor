@@ -1,5 +1,5 @@
 io.micronaut.annotation.processing.MixinVisitorProcessor
+io.micronaut.annotation.processing.PackageElementVisitorProcessor
 io.micronaut.annotation.processing.TypeElementVisitorProcessor
 io.micronaut.annotation.processing.AggregatingTypeElementVisitorProcessor
-io.micronaut.annotation.processing.PackageConfigurationInjectProcessor
 io.micronaut.annotation.processing.BeanDefinitionInjectProcessor
