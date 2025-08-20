@@ -47,7 +47,7 @@ public non-sealed class AggregatingPackageElementVisitorProcessor extends Packag
             // if a visitor is interested in Object than fall back to all
             for (PackageLoadedVisitor loadedVisitor : getPackageVisitors()) {
                 PackageElementVisitor<?> visitor = loadedVisitor.visitor();
-                Set<String> supportedAnnotationNames = visitor.getSupportedPackageAnnotationNames();
+                Set<String> supportedAnnotationNames = visitor.getSupportedAnnotationNames();
                 if (supportedAnnotationNames.contains("*")) {
                     return super.getSupportedAnnotationTypes();
                 } else {

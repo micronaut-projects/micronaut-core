@@ -20,7 +20,7 @@ import io.micronaut.annotation.processing.visitor.JavaElementFactory;
 import io.micronaut.annotation.processing.visitor.JavaNativeElement;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.visitor.VisitorUtils;
-import io.micronaut.core.annotation.Generated;
+import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.service.SoftServiceLoader;
@@ -222,10 +222,11 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             .collect(Collectors.toSet());
     }
 
+    @NextMajorVersion("`roundEnv.getRootElements()` should be removed in Micronaut 4. " +
+        "It should not be possible to process elements without at least one annotation present and this call breaks that assumption")
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
-        if (!loadedVisitors.isEmpty() && !(annotations.size() == 1
-            && Generated.class.getName().equals(annotations.iterator().next().getQualifiedName().toString()))) {
+        if (!loadedVisitors.isEmpty() && !processingGeneratedAnnotation(annotations)) {
 
             TypeElement groovyObjectTypeElement = elementUtils.getTypeElement("groovy.lang.GroovyObject");
             TypeMirror groovyObjectType = groovyObjectTypeElement != null ? groovyObjectTypeElement.asType() : null;
@@ -239,8 +240,6 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                 ).filter(notGroovyObject).forEach(elements::add);
             }
 
-            // This call to getRootElements() should be removed in Micronaut 4. It should not be possible
-            // to process elements without at least one annotation present and this call breaks that assumption.
             modelUtils.resolveTypeElements(
                 roundEnv.getRootElements()
             ).filter(notGroovyObject).forEach(elements::add);

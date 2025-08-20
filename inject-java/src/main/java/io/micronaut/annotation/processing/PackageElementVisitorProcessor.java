@@ -62,7 +62,7 @@ public sealed class PackageElementVisitorProcessor extends AbstractInjectAnnotat
         var names = new HashSet<String>();
         for (PackageElementVisitor<?> packageElementVisitor : findPackageElementVisitors()) {
             try {
-                Set<String> supportedAnnotationNames = packageElementVisitor.getSupportedPackageAnnotationNames();
+                Set<String> supportedAnnotationNames = packageElementVisitor.getSupportedAnnotationNames();
                 if (!supportedAnnotationNames.equals(Collections.singleton("*"))) {
                     names.addAll(supportedAnnotationNames);
                 }

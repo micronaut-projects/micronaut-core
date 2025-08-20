@@ -15,3 +15,7 @@ snippet::io.micronaut.docs.ioc.beans.IntrospectionSpec[tags="usage", indent=0]
 It's possible to apply the introspection to all the classes in one package. Simply create `package-info` file and annotate the package with ann:core.annotation.Introspected[].
 
 snippet::io.micronaut.docs.ioc.introspection.pck.foobar.package-info[tags="usage", indent=0]
+
+WARNING: The package should contain only classes that can be introspected.
+
+NOTE: Only classes located directly within the package are processed; subpackages are ignored.

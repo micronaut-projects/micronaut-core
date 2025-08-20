@@ -23,6 +23,7 @@ import io.micronaut.core.util.Toggleable;
 import io.micronaut.inject.ast.PackageElement;
 import io.micronaut.inject.processing.ProcessingException;
 
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -48,10 +49,10 @@ public interface PackageElementVisitor<A> extends Ordered, Toggleable {
      * @return The supported default annotation names.
      */
     @NonNull
-    default Set<String> getSupportedPackageAnnotationNames() {
-        Class<?>[] classes = GenericTypeUtils.resolveInterfaceTypeArguments(getClass(), PackageElementVisitor.class);
-        if (classes.length == 1) {
-            Class<?> classType = classes[0];
+    default Set<String> getSupportedAnnotationNames() {
+        Optional<Class<?>> clazz = GenericTypeUtils.resolveInterfaceTypeArgument(getClass(), PackageElementVisitor.class);
+        if (clazz.isPresent()) {
+            Class<?> classType = clazz.get();
             String classTypeName = classType.getName();
             if (classType == Object.class) {
                 classTypeName = getPackageAnnotationName();

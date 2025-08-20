@@ -252,7 +252,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             }
 
             try {
-                writeBeanDefinitionsToMetaInf();
                 for (BeanElementVisitor<?> visitor : BeanElementVisitor.VISITORS) {
                     if (visitor.isEnabled()) {
                         try {
@@ -272,25 +271,13 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         error("Unexpected error: %s", message != null ? message : e.getClass().getSimpleName());
                     }
                 }
+                javaVisitorContext.finish();
             } finally {
                 BeanDefinitionWriter.finish();
             }
         }
 
         return false;
-    }
-
-    /**
-     * Writes {@link io.micronaut.inject.BeanDefinitionReference} into /META-INF/services/io
-     * .micronaut.inject.BeanDefinitionReference.
-     */
-    private void writeBeanDefinitionsToMetaInf() {
-        try {
-            classWriterOutputVisitor.finish();
-        } catch (Exception e) {
-            String message = e.getMessage();
-            error("Error occurred writing META-INF files: %s", message != null ? message : e);
-        }
     }
 
     private void processBeanDefinitions(BeanDefinitionVisitor beanDefinitionWriter) {
