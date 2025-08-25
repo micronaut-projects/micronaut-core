@@ -23,7 +23,9 @@ import io.netty.util.ResourceLeakTracker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.lang.reflect.Field;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -142,6 +144,21 @@ public final class TestLeakDetector {
                 sink = System.identityHashCode(new byte[10000]);
             }
         } while (!canaryDetected && !Thread.interrupted());
+    }
+
+    public static void reportStillOpen() throws Exception {
+        triggerGc();
+        Field allLeaksField = ResourceLeakDetector.class.getDeclaredField("allLeaks");
+        allLeaksField.trySetAccessible();
+        for (ResourceLeakDetector<?> detector : ALL_DETECTORS) {
+            Set<?> allLeaks = (Set<?>) allLeaksField.get(detector);
+            for (Object leak : allLeaks) {
+                String stack = leak.toString();
+                if (!stack.contains("<clinit>")) {
+                    throw new IllegalStateException("Still open: " + stack);
+                }
+            }
+        }
     }
 
     private static final class TestResourceLeakDetector<T> extends ResourceLeakDetector<T> {
