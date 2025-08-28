@@ -704,7 +704,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                         decompressed.release();
                         return;
                     }
-                    delegate.read(new DefaultHttpContent(decompressed));
+                    DecompressingInboundHandler.this.delegate.read(new DefaultHttpContent(decompressed));
                 }
             });
         }
