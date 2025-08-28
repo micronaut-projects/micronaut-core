@@ -10,8 +10,6 @@ import io.micronaut.http.annotation.Post;
 import io.micronaut.http.server.netty.NettyHttpServer;
 import io.micronaut.http.tck.netty.TestLeakDetector;
 import io.micronaut.runtime.server.EmbeddedServer;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.embedded.EmbeddedChannel;
 import org.junit.jupiter.api.AfterEach;
@@ -30,10 +28,6 @@ public class FuzzyInputTest {
     void tearDown() throws Exception {
         FlagAppender.checkTriggered();
         TestLeakDetector.reportStillOpen();
-    }
-
-    private static ByteBuf copiedBuffer(String s) {
-        return ByteBufUtil.writeUtf8(ByteBufAllocator.DEFAULT, s);
     }
 
     @Test
@@ -65,6 +59,24 @@ public class FuzzyInputTest {
                 C
                 O:"""));
             channel.writeInbound(ByteBufUtil.writeUtf8(channel.alloc(), "aaaaaa"));
+
+            channel.finishAndReleaseAll();
+            channel.checkException();
+        }
+    }
+
+    @Test
+    public void testEmptyLast() {
+        try (ApplicationContext ctx = ApplicationContext.run(Map.of("spec.name", "FuzzyInputTest"))) {
+            EmbeddedChannel channel = ((NettyHttpServer) ctx.getBean(EmbeddedServer.class)).buildEmbeddedChannel(false);
+            channel.writeInbound(ByteBufUtil.writeUtf8(channel.alloc(), """
+                POST / HTTP/1.1
+                Transfer-Encoding: snappy,chunked
+
+                1
+                2
+
+                """));
 
             channel.finishAndReleaseAll();
             channel.checkException();
