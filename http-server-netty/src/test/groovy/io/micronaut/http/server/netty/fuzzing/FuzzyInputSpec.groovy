@@ -146,6 +146,7 @@ class FuzzyInputSpec extends Specification {
                         "bM3ac3NXaG5nWVlZWVkJ/wAAAABSZWZlbXQCCf9sYXQLSFRUUC8yLjAKVHJhbnNmZXItRW5jb2Rp" +
                         "bmc6c25hcHB5LCw6LTAKQ29udGVudC1MZW5ndGg6NDQKCv/+LgAIdGlyZUhUVDosdA01Cg=="),
                 Base64.decoder.decode("cG9zdA0vZWNoby1hcnJheQtIVFRQLzIuMApDb250ZW50LUxlbmd0aDo5Ck9yaWdpbjoKCg=="),
+                "POST / HTTP/1.1\nTransfer-Encoding: snappy,chunked\n\n1\n2\n\n\n".bytes
         ]
     }
 

@@ -648,17 +648,30 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         public DecompressingInboundHandler(EmbeddedChannel channel, InboundHandler delegate) {
             this.channel = channel;
             this.delegate = delegate;
+
+            channel.pipeline().addLast(new ChannelInboundHandlerAdapter() {
+                @Override
+                public void channelRead(ChannelHandlerContext ctx, Object msg) {
+                    ByteBuf decompressed = (ByteBuf) msg;
+                    if (!decompressed.isReadable()) {
+                        decompressed.release();
+                        return;
+                    }
+                    DecompressingInboundHandler.this.delegate.read(new DefaultHttpContent(decompressed));
+                }
+            });
         }
 
         @Override
         void read(Object message) {
+            boolean last = message instanceof LastHttpContent;
+
             ByteBuf compressed = ((HttpContent) message).content();
-            if (!compressed.isReadable()) {
+            if (!compressed.isReadable() && !last) {
                 delegate.read(message);
                 return;
             }
 
-            boolean last = message instanceof LastHttpContent;
             try {
                 channel.writeInbound(compressed);
                 if (last) {
@@ -672,18 +685,6 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                     inboundHandler.read(LastHttpContent.EMPTY_LAST_CONTENT);
                 }
                 return;
-            }
-
-            while (true) {
-                ByteBuf decompressed = channel.readInbound();
-                if (decompressed == null) {
-                    break;
-                }
-                if (!decompressed.isReadable()) {
-                    decompressed.release();
-                    continue;
-                }
-                delegate.read(new DefaultHttpContent(decompressed));
             }
 
             if (last) {
