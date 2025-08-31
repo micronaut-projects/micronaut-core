@@ -153,7 +153,7 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
 
         boolean hasHeaders = nettyHeaders != null;
         if (!hasHeaders) {
-            nettyHeaders = new DefaultHttpHeaders(false);
+            nettyHeaders = new DefaultHttpHeaders();
         }
         this.nettyHeaders = nettyHeaders;
         this.headers = new NettyHttpHeaders(nettyHeaders, conversionService);
