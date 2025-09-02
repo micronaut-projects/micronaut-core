@@ -52,24 +52,24 @@ abstract class AbstractReadBufferTest {
     }
 
     @Test
-    public void readSome() {
+    public void split() {
         try (ReadBuffer rb1 = factory.copyOf("foo", UTF_8);
-             ReadBuffer rb2 = rb1.readSome(1)) {
+             ReadBuffer rb2 = rb1.split(1)) {
             assertEquals("oo", rb1.toString(UTF_8));
             assertEquals("f", rb2.toString(UTF_8));
         }
         try (ReadBuffer rb1 = factory.copyOf("foo", UTF_8);
-             ReadBuffer rb2 = rb1.readSome(1)) {
+             ReadBuffer rb2 = rb1.split(1)) {
             rb1.close();
             assertEquals("f", rb2.toString(UTF_8));
         }
         try (ReadBuffer rb1 = factory.copyOf("foo", UTF_8);
-             ReadBuffer rb2 = rb1.readSome(1)) {
+             ReadBuffer rb2 = rb1.split(1)) {
             rb2.close();
             assertEquals("oo", rb1.toString(UTF_8));
         }
         try (ReadBuffer rb = factory.copyOf("foo", UTF_8)) {
-            assertThrows(IndexOutOfBoundsException.class, () -> rb.readSome(4));
+            assertThrows(IndexOutOfBoundsException.class, () -> rb.split(4));
             assertEquals("foo", rb.toString(UTF_8));
         }
     }

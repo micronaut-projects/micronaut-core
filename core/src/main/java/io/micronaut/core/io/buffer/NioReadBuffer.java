@@ -56,13 +56,13 @@ final class NioReadBuffer extends ReadBuffer {
     }
 
     @Override
-    public @NonNull ReadBuffer readSome(int n) {
+    public @NonNull ReadBuffer split(int splitPosition) {
         checkOpen();
-        if (n > buffer.remaining()) {
+        if (splitPosition > buffer.remaining()) {
             throw new IndexOutOfBoundsException();
         }
-        ByteBuffer slice = buffer.slice(buffer.position(), n);
-        buffer.position(buffer.position() + n);
+        ByteBuffer slice = buffer.slice(buffer.position(), splitPosition);
+        buffer.position(buffer.position() + splitPosition);
         return new NioReadBuffer(slice);
     }
 

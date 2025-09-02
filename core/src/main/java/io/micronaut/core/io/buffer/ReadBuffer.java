@@ -61,17 +61,17 @@ public abstract class ReadBuffer implements AutoCloseable {
     public abstract ReadBuffer duplicate();
 
     /**
-     * Read some (but not all) bytes from this buffer. Those bytes will be removed from this
-     * buffer. This is <i>not</i> a <a href="#consuming">consuming operation</a>, even if
-     * {@code n == readable()}.
+     * Split this buffer in two, returning the bytes up until {@code splitPosition} as a new
+     * buffer. Those bytes will be removed from this buffer. This is <i>not</i> a
+     * <a href="#consuming">consuming operation</a>, even if {@code n == readable()}.
      *
-     * @param n How many bytes to read
-     * @return A new, independent buffer that reads the first {@code n} bytes
+     * @param splitPosition Position where to split the data
+     * @return A new, independent buffer that reads the first {@code splitPosition} bytes
      * @throws IllegalStateException     If this buffer is already closed or consumed
      * @throws IndexOutOfBoundsException If {@code n > readable()}
      */
     @NonNull
-    public abstract ReadBuffer readSome(int n) throws IndexOutOfBoundsException;
+    public abstract ReadBuffer split(int splitPosition) throws IndexOutOfBoundsException;
 
     /**
      * Create a new buffer with the same content as this one, consuming this buffer in the process.

@@ -58,8 +58,8 @@ final class NettyReadBuffer extends ReadBuffer {
     }
 
     @Override
-    public @NonNull ReadBuffer readSome(int n) {
-        return new NettyReadBuffer(getBuf().readRetainedSlice(n));
+    public @NonNull ReadBuffer split(int splitPosition) {
+        return new NettyReadBuffer(getBuf().readRetainedSlice(splitPosition));
     }
 
     @Override
