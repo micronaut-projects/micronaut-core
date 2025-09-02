@@ -99,7 +99,7 @@ class PipeliningServerHandlerSpec extends Specification {
             @Override
             void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
                 body.close()
-                outboundAccess.write(resp, new NettyByteBodyFactory(ctx.channel()).adapt(sink.asFlux()))
+                outboundAccess.write(resp, new NettyByteBodyFactory(ctx.channel()).adaptNetty(sink.asFlux()))
             }
 
             @Override
@@ -271,7 +271,7 @@ class PipeliningServerHandlerSpec extends Specification {
             void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
                 assert request instanceof FullHttpRequest
                 body.close()
-                outboundAccess.write(resp, new NettyByteBodyFactory(ctx.channel()).adapt(sink.asFlux().doOnCancel {
+                outboundAccess.write(resp, new NettyByteBodyFactory(ctx.channel()).adaptNetty(sink.asFlux().doOnCancel {
                     // optional extra weirdness: onComplete *after* cancel. Could lead to double call to responseWritten, if I was an idiot.
                     if (completeOnCancel) sink.tryEmitComplete()
                 }))
@@ -544,9 +544,9 @@ class PipeliningServerHandlerSpec extends Specification {
             void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
                 body.close()
                 if (i++ == 0) {
-                    outboundAccess.write(resp, new NettyByteBodyFactory(ctx.channel()).adapt(sink.asFlux()))
+                    outboundAccess.write(resp, new NettyByteBodyFactory(ctx.channel()).adaptNetty(sink.asFlux()))
                 } else {
-                    outboundAccess.write(resp, new NettyByteBodyFactory(ctx.channel()).adapt(Flux.empty()))
+                    outboundAccess.write(resp, new NettyByteBodyFactory(ctx.channel()).adaptNetty(Flux.empty()))
                 }
             }
 

@@ -18,6 +18,7 @@ package io.micronaut.http.body.stream;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.io.buffer.ReadBuffer;
@@ -25,6 +26,7 @@ import io.micronaut.core.io.buffer.ReadBufferFactory;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.http.body.CloseableAvailableByteBody;
 import io.micronaut.http.body.InternalByteBody;
+import org.reactivestreams.Publisher;
 
 import java.util.Objects;
 
@@ -95,6 +97,12 @@ public final class AvailableByteArrayBody extends InternalByteBody implements Cl
         readBuffer = null;
         BaseSharedBuffer.logClaim();
         return a;
+    }
+
+    @SuppressWarnings("deprecation")
+    @Override
+    public @NonNull Publisher<ReadBuffer> toReadBufferPublisher() {
+        return Publishers.just(toReadBuffer());
     }
 
     @Override

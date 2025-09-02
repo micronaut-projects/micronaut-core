@@ -22,9 +22,11 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.body.AvailableByteBody;
 import io.micronaut.http.body.CloseableAvailableByteBody;
 import io.micronaut.http.body.CloseableByteBody;
+import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.body.stream.AvailableByteArrayBody;
 import io.micronaut.http.body.stream.BaseSharedBuffer;
 import io.micronaut.http.body.stream.BodySizeLimits;
@@ -33,6 +35,7 @@ import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.EventLoop;
+import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
 import java.io.InputStream;
@@ -48,7 +51,7 @@ import java.util.Objects;
  */
 @Internal
 @Deprecated(since = "4.10.0", forRemoval = true) // still used by micronaut-oracle-cloud
-public final class AvailableNettyByteBody extends NettyByteBody implements CloseableAvailableByteBody {
+public final class AvailableNettyByteBody extends InternalByteBody implements CloseableAvailableByteBody {
     private final long length;
     @Nullable
     private ByteBuf buffer;
@@ -126,9 +129,10 @@ public final class AvailableNettyByteBody extends NettyByteBody implements Close
         }
     }
 
+    @SuppressWarnings("deprecation")
     @Override
-    protected Flux<ByteBuf> toByteBufPublisher() {
-        return Flux.just(claim());
+    public @NonNull Publisher<ReadBuffer> toReadBufferPublisher() {
+        return Flux.just(NettyReadBufferFactory.of(ByteBufAllocator.DEFAULT).adapt(claim()));
     }
 
     @Override

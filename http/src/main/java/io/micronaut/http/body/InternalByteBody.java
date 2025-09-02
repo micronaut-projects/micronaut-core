@@ -19,6 +19,9 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.core.io.buffer.ReadBuffer;
+import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 
 import java.util.concurrent.CompletableFuture;
 
@@ -42,6 +45,16 @@ public abstract class InternalByteBody implements ByteBody {
     public final CompletableFuture<? extends CloseableAvailableByteBody> buffer() {
         return bufferFlow().toCompletableFuture();
     }
+
+    @Override
+    public @NonNull Publisher<byte[]> toByteArrayPublisher() {
+        return Flux.from(toReadBufferPublisher())
+            .doOnDiscard(ReadBuffer.class, ReadBuffer::close)
+            .map(ReadBuffer::toArray);
+    }
+
+    @Override
+    public abstract @NonNull Publisher<ReadBuffer> toReadBufferPublisher();
 
     public static ExecutionFlow<? extends CloseableAvailableByteBody> bufferFlow(ByteBody body) {
         if (body instanceof InternalByteBody internal) {

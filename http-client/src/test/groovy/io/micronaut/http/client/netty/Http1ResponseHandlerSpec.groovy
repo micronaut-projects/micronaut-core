@@ -1,11 +1,12 @@
 package io.micronaut.http.client.netty
 
+import io.micronaut.buffer.netty.NettyReadBufferFactory
+import io.micronaut.core.io.buffer.ReadBuffer
 import io.micronaut.http.body.AvailableByteBody
 import io.micronaut.http.body.CloseableByteBody
 import io.micronaut.http.body.InternalByteBody
-import io.micronaut.http.netty.body.ByteBufConsumer
+import io.micronaut.http.body.stream.BufferConsumer
 import io.micronaut.http.netty.body.StreamingNettyByteBody
-import io.netty.buffer.ByteBuf
 import io.netty.buffer.Unpooled
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.ChannelOutboundHandlerAdapter
@@ -211,10 +212,10 @@ class Http1ResponseHandlerSpec extends Specification {
         when:
         def completed = false
         def buffer = Unpooled.compositeBuffer()
-        def upstream = ((StreamingNettyByteBody) listener.body).primary(new ByteBufConsumer() {
+        def upstream = ((StreamingNettyByteBody) listener.body).primary(new BufferConsumer(){
             @Override
-            void add(ByteBuf buf) {
-                buffer.addComponent(true, buf)
+            void add(ReadBuffer buf) {
+                buffer.addComponent(true, NettyReadBufferFactory.toByteBuf(buf))
             }
 
             @Override

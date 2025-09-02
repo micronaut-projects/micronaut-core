@@ -19,18 +19,26 @@ import io.micronaut.core.annotation.Blocking;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.io.buffer.ReadBufferFactory;
 import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.util.functional.ThrowingConsumer;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.body.stream.AvailableByteArrayBody;
+import io.micronaut.http.body.stream.BaseSharedBuffer;
+import io.micronaut.http.body.stream.BaseStreamingByteBody;
+import io.micronaut.http.body.stream.BodySizeLimits;
+import io.micronaut.http.body.stream.BufferConsumer;
+import org.reactivestreams.Publisher;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.Charset;
+import java.util.OptionalLong;
 
 /**
  * Factory methods for {@link ByteBody}s.
@@ -182,4 +190,109 @@ public class ByteBodyFactory {
         return adapt(readBufferFactory().copyOf(stream));
     }
 
+    /**
+     * Create a new streaming body to push data into. <b>Internal API.</b>
+     *
+     * @param limits   The input limits
+     * @param upstream The upstream for backpressure
+     * @return The streaming body tuple
+     */
+    @Internal
+    @NonNull
+    public StreamingBody createStreamingBody(@NonNull BodySizeLimits limits, @NonNull BufferConsumer.Upstream upstream) {
+        ReactiveByteBufferByteBody.SharedBuffer sb = new ReactiveByteBufferByteBody.SharedBuffer(this.readBufferFactory(), limits, upstream);
+        return new StreamingBody(sb, new ReactiveByteBufferByteBody(sb));
+    }
+
+    /**
+     * Create a new body adapter for transforming a publisher into a {@link ByteBody}. <b>Internal
+     * API.</b>
+     *
+     * @param publisher The publisher to transform
+     * @param onDiscard Optional runnable to run on {@link BufferConsumer.Upstream#allowDiscard()}
+     * @return The adapter
+     */
+    @Internal
+    protected AbstractBodyAdapter createBodyAdapter(@NonNull Publisher<ReadBuffer> publisher, @Nullable Runnable onDiscard) {
+        return new AbstractBodyAdapter(publisher, onDiscard);
+    }
+
+    /**
+     * Create a new {@link ByteBody} that streams the given input buffers.
+     *
+     * @param publisher The input buffer publisher
+     * @return The combined {@link ByteBody}
+     */
+    @NonNull
+    public CloseableByteBody adapt(@NonNull Publisher<ReadBuffer> publisher) {
+        return adapt(publisher, BodySizeLimits.UNLIMITED, null, null);
+    }
+
+    /**
+     * Create a new {@link ByteBody} that streams the given input buffers.
+     *
+     * @param publisher        The input buffer publisher
+     * @param sizeLimits       The input size limit
+     * @param headersForLength A {@link HttpHeaders} object to introspect for determining the
+     *                         {@link ByteBody#expectedLength()}
+     * @param onDiscard        An optional {@link Runnable} to run when the body is
+     *                         {@link ByteBody#allowDiscard() discarded}
+     * @return The combined {@link ByteBody}
+     */
+    @NonNull
+    public CloseableByteBody adapt(@NonNull Publisher<ReadBuffer> publisher, @NonNull BodySizeLimits sizeLimits, @Nullable HttpHeaders headersForLength, @Nullable Runnable onDiscard) {
+        AbstractBodyAdapter adapter = createBodyAdapter(publisher, onDiscard);
+        StreamingBody sb = createStreamingBody(sizeLimits, adapter);
+        adapter.setSharedBuffer(sb.sharedBuffer);
+        if (headersForLength != null) {
+            sb.sharedBuffer.setExpectedLengthFrom(headersForLength.get(HttpHeaders.CONTENT_LENGTH));
+        }
+        return sb.rootBody;
+    }
+
+    /**
+     * Create a new {@link ByteBody} that streams the given input buffers.
+     *
+     * @param publisher     The input buffer publisher
+     * @param contentLength The optional content length for {@link ByteBody#expectedLength()}
+     * @return The combined {@link ByteBody}
+     */
+    @NonNull
+    public CloseableByteBody adapt(@NonNull Publisher<ReadBuffer> publisher, @NonNull OptionalLong contentLength) {
+        AbstractBodyAdapter adapter = createBodyAdapter(publisher, null);
+        StreamingBody sb = createStreamingBody(BodySizeLimits.UNLIMITED, adapter);
+        adapter.setSharedBuffer(sb.sharedBuffer);
+        contentLength.ifPresent(sb.sharedBuffer::setExpectedLength);
+        return sb.rootBody;
+    }
+
+    /**
+     * Convert a {@link ByteBody} into a {@link BaseStreamingByteBody} with the same content.
+     * <b>Internal API.</b>
+     *
+     * @param body The body to convert
+     * @return A streaming body with the same content
+     */
+    @Internal
+    public BaseStreamingByteBody<?> toStreaming(@NonNull ByteBody body) {
+        if (body instanceof BaseStreamingByteBody<?> bsbb) {
+            return bsbb;
+        }
+        AbstractBodyAdapter adapter = createBodyAdapter(body.toReadBufferPublisher(), null);
+        StreamingBody sb = createStreamingBody(BodySizeLimits.UNLIMITED, adapter);
+        adapter.setSharedBuffer(sb.sharedBuffer);
+        body.expectedLength().ifPresent(sb.sharedBuffer::setExpectedLength);
+        return sb.rootBody;
+    }
+
+    /**
+     * Return type for {@link #createStreamingBody(BodySizeLimits, BufferConsumer.Upstream)}.
+     * <b>Internal API.</b>
+     *
+     * @param sharedBuffer The shared buffer to write data to
+     * @param rootBody     The root body to read data from
+     */
+    @Internal
+    public record StreamingBody(BaseSharedBuffer sharedBuffer, BaseStreamingByteBody<?> rootBody) {
+    }
 }

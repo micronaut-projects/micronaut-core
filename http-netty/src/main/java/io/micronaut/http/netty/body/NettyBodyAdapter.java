@@ -16,15 +16,12 @@
 package io.micronaut.http.netty.body;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.body.AbstractBodyAdapter;
 import io.micronaut.http.body.ByteBody;
-import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.netty.EventLoopFlow;
-import io.netty.buffer.ByteBuf;
 import io.netty.channel.EventLoop;
-import io.netty.handler.codec.http.HttpHeaders;
 import org.reactivestreams.Publisher;
 
 /**
@@ -34,42 +31,18 @@ import org.reactivestreams.Publisher;
  * @since 4.6.0
  */
 @Internal
-final class NettyBodyAdapter extends AbstractBodyAdapter<ByteBuf, StreamingNettyByteBody.SharedBuffer> {
+final class NettyBodyAdapter extends AbstractBodyAdapter {
     private final EventLoopFlow eventLoopFlow;
 
-    private NettyBodyAdapter(EventLoop eventLoop, Publisher<ByteBuf> source, @Nullable Runnable onDiscard) {
+    NettyBodyAdapter(EventLoop eventLoop, Publisher<ReadBuffer> source, @Nullable Runnable onDiscard) {
         super(source, onDiscard);
         this.eventLoopFlow = new EventLoopFlow(eventLoop);
     }
 
-    static @NonNull StreamingNettyByteBody adaptStreaming(@NonNull ByteBody body, @NonNull EventLoop eventLoop, @NonNull NettyByteBodyFactory bodyFactory) {
-        NettyBodyAdapter adapter = new NettyBodyAdapter(eventLoop, NettyByteBodyFactory.toByteBufs(body), null);
-        adapter.sharedBuffer = bodyFactory.createStreamingBuffer(BodySizeLimits.UNLIMITED, adapter);
-        body.expectedLength().ifPresent(adapter.sharedBuffer::setExpectedLength);
-        return new StreamingNettyByteBody(adapter.sharedBuffer);
-    }
-
-    static StreamingNettyByteBody adapt(Publisher<ByteBuf> publisher, EventLoop eventLoop, @NonNull NettyByteBodyFactory bodyFactory, @Nullable HttpHeaders headersForLength, @Nullable Runnable onDiscard) {
-        NettyBodyAdapter adapter = new NettyBodyAdapter(eventLoop, publisher, onDiscard);
-        adapter.sharedBuffer = bodyFactory.createStreamingBuffer(BodySizeLimits.UNLIMITED, adapter);
-        if (headersForLength != null) {
-            adapter.sharedBuffer.setExpectedLengthFrom(headersForLength);
-        }
-        return new StreamingNettyByteBody(adapter.sharedBuffer);
-    }
-
     @Override
-    public void onNext(ByteBuf bytes) {
-        if (eventLoopFlow.executeNow(() -> onNext0(bytes))) {
-            onNext0(bytes);
-        }
-    }
-
-    private void onNext0(ByteBuf bytes) {
-        long newDemand = demand.addAndGet(-bytes.readableBytes());
-        sharedBuffer.add(bytes);
-        if (newDemand > 0) {
-            subscription.request(1);
+    public void onNext(ReadBuffer bytes) {
+        if (eventLoopFlow.executeNow(() -> super.onNext(bytes))) {
+            super.onNext(bytes);
         }
     }
 

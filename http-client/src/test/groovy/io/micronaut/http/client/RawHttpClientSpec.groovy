@@ -28,7 +28,7 @@ class RawHttpClientSpec extends Specification {
         server.start()
         def client = ctx.createBean(RawHttpClient, server.URI)
 
-        def requestBody = new NettyByteBodyFactory(new EmbeddedChannel()).adapt(
+        def requestBody = new NettyByteBodyFactory(new EmbeddedChannel()).adaptNetty(
                 Mono.just(Unpooled.copiedBuffer("foo", StandardCharsets.UTF_8)))
         requestBody.split(ByteBody.SplitBackpressureMode.FASTEST).buffer().get().close()
 

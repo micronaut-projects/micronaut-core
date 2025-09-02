@@ -249,7 +249,7 @@ class Http2ServerHandlerSpec extends Specification {
             @Override
             void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
                 body.close()
-                outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), new NettyByteBodyFactory(ctx.channel()).adapt(new Publisher<ByteBuf>() {
+                outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), new NettyByteBodyFactory(ctx.channel()).adaptNetty(new Publisher<ByteBuf>() {
                     @Override
                     void subscribe(Subscriber<? super ByteBuf> s) {
                         subscriber = s
@@ -492,7 +492,7 @@ class Http2ServerHandlerSpec extends Specification {
             @Override
             void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
                 body.close()
-                outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), new NettyByteBodyFactory(ctx.channel()).adapt(new Publisher<ByteBuf>() {
+                outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), new NettyByteBodyFactory(ctx.channel()).adaptNetty(new Publisher<ByteBuf>() {
                     @Override
                     void subscribe(Subscriber<? super ByteBuf> s) {
                         subscriber = s
@@ -623,7 +623,7 @@ class Http2ServerHandlerSpec extends Specification {
             @Override
             void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
                 body.close()
-                outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), new NettyByteBodyFactory(ctx.channel()).adapt(new Publisher<ByteBuf>() {
+                outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), new NettyByteBodyFactory(ctx.channel()).adaptNetty(new Publisher<ByteBuf>() {
                     @Override
                     void subscribe(Subscriber<? super ByteBuf> s) {
                         subscriber = s

@@ -15,12 +15,13 @@
  */
 package io.micronaut.http.client.netty;
 
+import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.http.body.stream.BufferConsumer;
 import io.micronaut.http.body.stream.LazyUpstream;
 import io.micronaut.http.netty.EventLoopFlow;
-import io.micronaut.http.netty.body.ByteBufConsumer;
 import io.micronaut.http.netty.body.StreamingNettyByteBody;
-import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
@@ -37,7 +38,7 @@ import java.util.function.Consumer;
  * @since 4.7.0
  */
 @Internal
-final class StreamWriter extends ChannelInboundHandlerAdapter implements ByteBufConsumer {
+final class StreamWriter extends ChannelInboundHandlerAdapter implements BufferConsumer {
     private final StreamingNettyByteBody body;
     private final Consumer<Throwable> errorHandler;
     private ChannelHandlerContext ctx;
@@ -97,21 +98,21 @@ final class StreamWriter extends ChannelInboundHandlerAdapter implements ByteBuf
     }
 
     @Override
-    public void add(ByteBuf buf) {
+    public void add(ReadBuffer buf) {
         if (flow.executeNow(() -> add0(buf))) {
             add0(buf);
         }
     }
 
-    private void add0(ByteBuf buf) {
+    private void add0(ReadBuffer buf) {
         if (ctx == null) {
             // discarded
-            buf.release();
+            buf.close();
             return;
         }
 
-        int readable = buf.readableBytes();
-        ctx.writeAndFlush(new DefaultHttpContent(buf)).addListener((ChannelFutureListener) future -> {
+        int readable = buf.readable();
+        ctx.writeAndFlush(new DefaultHttpContent(NettyReadBufferFactory.toByteBuf(buf))).addListener((ChannelFutureListener) future -> {
             assert ctx.executor().inEventLoop();
             if (future.isSuccess()) {
                 if (ctx.channel().isWritable()) {
@@ -168,7 +169,7 @@ final class StreamWriter extends ChannelInboundHandlerAdapter implements ByteBuf
     }
 
     @Override
-    public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
+    public void handlerRemoved(ChannelHandlerContext ctx) {
         cancel();
     }
 }

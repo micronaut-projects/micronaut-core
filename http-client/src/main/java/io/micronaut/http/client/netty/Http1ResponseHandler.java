@@ -15,8 +15,10 @@
  */
 package io.micronaut.http.client.netty;
 
+import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
@@ -84,7 +86,7 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
     }
 
     @Override
-    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
         state.exceptionCaught(ctx, cause);
     }
 
@@ -212,7 +214,7 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
             UnbufferedContent unbufferedContent = new UnbufferedContent(listener, ctx, response);
             if (buffered != null) {
                 for (ByteBuf buf : buffered) {
-                    unbufferedContent.add(buf);
+                    unbufferedContent.add(NettyReadBufferFactory.of(ctx.alloc()).adapt(buf));
                 }
             }
             transitionToState(ctx, this, unbufferedContent);
@@ -251,18 +253,19 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
             ctx.channel().config().setAutoRead(wasAutoRead);
         }
 
-        void add(ByteBuf buf) {
-            if (buf.isReadable()) {
-                demand -= buf.readableBytes();
+        void add(ReadBuffer buf) {
+            int n = buf.readable();
+            if (n != 0) {
+                demand -= n;
                 streaming.add(buf);
             } else {
-                buf.release();
+                buf.close();
             }
         }
 
         @Override
         void read(ChannelHandlerContext ctx, HttpContent msg) {
-            add(msg.content());
+            add(NettyReadBufferFactory.of(ctx.alloc()).adapt(msg.content()));
             if (msg instanceof LastHttpContent) {
                 transitionToState(ctx, this, AfterContent.INSTANCE);
                 streaming.complete();

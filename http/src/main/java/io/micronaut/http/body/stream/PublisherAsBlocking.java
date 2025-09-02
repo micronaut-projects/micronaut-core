@@ -17,6 +17,7 @@ package io.micronaut.http.body.stream;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.io.buffer.ReadBuffer;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import reactor.core.scheduler.NonBlocking;
@@ -29,12 +30,11 @@ import java.util.concurrent.locks.ReentrantLock;
 /**
  * A subscriber that allows blocking reads from a publisher. Handles resource cleanup properly.
  *
- * @param <T> Stream type
  * @since 4.2.0
  * @author Jonas Konrad
  */
 @Internal
-public class PublisherAsBlocking<T> implements Subscriber<T>, Closeable {
+public final class PublisherAsBlocking implements Subscriber<ReadBuffer>, Closeable {
     private final Lock lock = new ReentrantLock();
     private final Condition newDataCondition = lock.newCondition();
     /**
@@ -45,7 +45,7 @@ public class PublisherAsBlocking<T> implements Subscriber<T>, Closeable {
     /**
      * Pending object, this field is used to transfer from {@link #onNext} to {@link #take}.
      */
-    private T swap;
+    private ReadBuffer swap;
     /**
      * The upstream subscription.
      */
@@ -62,10 +62,6 @@ public class PublisherAsBlocking<T> implements Subscriber<T>, Closeable {
      * Failure from {@link #onError}.
      */
     private Throwable failure;
-
-    protected void release(T item) {
-        // optional resource management for subclasses
-    }
 
     /**
      * The failure from {@link #onError(Throwable)}. When {@link #take()} returns {@code null}, this
@@ -99,11 +95,11 @@ public class PublisherAsBlocking<T> implements Subscriber<T>, Closeable {
     }
 
     @Override
-    public void onNext(T o) {
+    public void onNext(ReadBuffer o) {
         lock.lock();
         try {
             if (closed) {
-                release(o);
+                o.close();
                 return;
             }
             swap = o;
@@ -118,7 +114,7 @@ public class PublisherAsBlocking<T> implements Subscriber<T>, Closeable {
         lock.lock();
         try {
             if (swap != null) {
-                release(swap);
+                swap.close();
                 swap = null;
             }
             failure = t;
@@ -146,13 +142,13 @@ public class PublisherAsBlocking<T> implements Subscriber<T>, Closeable {
      * @return The next object, or {@code null} if the stream is done
      */
     @Nullable
-    public T take() throws InterruptedException {
+    public ReadBuffer take() throws InterruptedException {
         boolean demanded = false;
         while (true) {
             Subscription subscription;
             lock.lock();
             try {
-                T swap = this.swap;
+                ReadBuffer swap = this.swap;
                 if (swap != null) {
                     this.swap = null;
                     return swap;
@@ -190,7 +186,7 @@ public class PublisherAsBlocking<T> implements Subscriber<T>, Closeable {
             closed = true;
             subscription = this.subscription;
             if (swap != null) {
-                release(swap);
+                swap.close();
                 swap = null;
             }
         } finally {
