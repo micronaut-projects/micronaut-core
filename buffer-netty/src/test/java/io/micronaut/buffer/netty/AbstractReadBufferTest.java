@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.List;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -233,6 +234,15 @@ abstract class AbstractReadBufferTest {
         Arrays.fill(array, (byte) '.');
         try (ReadBuffer rb = factory.adapt(array)) {
             assertEquals(rb.getClass().getSimpleName() + "[len=45, data='................................'…]", rb.toString());
+        }
+    }
+
+    @Test
+    public void compose() {
+        ReadBuffer a = factory.adapt(new byte[]{1, 2, 3});
+        ReadBuffer b = factory.adapt(new byte[]{4, 5, 6});
+        try (ReadBuffer composed = factory.compose(List.of(a, b))) {
+            assertArrayEquals(new byte[]{1, 2, 3, 4, 5, 6}, composed.toArray());
         }
     }
 }

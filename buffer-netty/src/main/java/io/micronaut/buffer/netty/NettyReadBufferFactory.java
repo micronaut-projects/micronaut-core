@@ -23,6 +23,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufOutputStream;
 import io.netty.buffer.ByteBufUtil;
+import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
 
 import java.io.IOException;
@@ -220,5 +221,26 @@ public final class NettyReadBufferFactory extends ReadBufferFactory {
                 }
             }
         };
+    }
+
+    @Override
+    public @NonNull ReadBuffer compose(@NonNull Iterable<@NonNull ReadBuffer> buffers) {
+        CompositeByteBuf composite = allocator.compositeBuffer();
+        try {
+            for (ReadBuffer buffer : buffers) {
+                composite.addComponent(true, toByteBuf(buffer));
+            }
+            return adapt(composite);
+        } catch (Throwable e) {
+            composite.release();
+            for (ReadBuffer buffer : buffers) {
+                try {
+                    buffer.close();
+                } catch (Throwable f) {
+                    e.addSuppressed(f);
+                }
+            }
+            throw e;
+        }
     }
 }

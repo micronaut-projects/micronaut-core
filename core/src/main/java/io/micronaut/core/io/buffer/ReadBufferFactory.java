@@ -24,6 +24,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 
@@ -153,7 +154,7 @@ public class ReadBufferFactory {
      */
     @NonNull
     public <T extends Throwable> ReadBuffer buffer(@NonNull ThrowingConsumer<@NonNull ? super OutputStream, T> writer) throws T {
-        var s = new NoCopyByteArrayOutputStream();
+        var s = new NoCopyByteArrayOutputStream(NoCopyByteArrayOutputStream.DEFAULT_CAPACITY);
         writer.accept(s);
         return adapt(s.toByteBuffer());
     }
@@ -179,8 +180,13 @@ public class ReadBufferFactory {
      */
     @NonNull
     public ReadBufferFactory.BufferingOutputStream outputStreamBuffer() {
-        return new ReadBufferFactory.BufferingOutputStream() {
-            NoCopyByteArrayOutputStream out = new NoCopyByteArrayOutputStream();
+        return outputStreamBuffer(NoCopyByteArrayOutputStream.DEFAULT_CAPACITY);
+    }
+
+    @NonNull
+    private BufferingOutputStream outputStreamBuffer(int capacity) {
+        return new BufferingOutputStream() {
+            NoCopyByteArrayOutputStream out = new NoCopyByteArrayOutputStream(capacity);
 
             @Override
             public OutputStream stream() {
@@ -206,6 +212,41 @@ public class ReadBufferFactory {
                 this.out = null;
             }
         };
+    }
+
+    /**
+     * Create a new composite buffer out of the given collection of buffers. This operation
+     * consumes all input buffers, even if there is an exception along the way.
+     *
+     * @param buffers The input buffers to compose
+     * @return The composite buffer
+     * @throws IllegalStateException If any given buffer is already closed or consumed
+     */
+    @NonNull
+    public ReadBuffer compose(@NonNull Iterable<@NonNull ReadBuffer> buffers) {
+        try {
+            int capacity = 0;
+            for (ReadBuffer buffer : buffers) {
+                capacity = Math.addExact(capacity, buffer.readable());
+            }
+            try (BufferingOutputStream bos = outputStreamBuffer(capacity)) {
+                for (ReadBuffer buffer : buffers) {
+                    buffer.transferTo(bos.stream());
+                }
+                return bos.finishBuffer();
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        } catch (Throwable e) {
+            for (ReadBuffer buffer : buffers) {
+                try {
+                    buffer.close();
+                } catch (Throwable f) {
+                    e.addSuppressed(f);
+                }
+            }
+            throw e;
+        }
     }
 
     /**
@@ -248,6 +289,12 @@ public class ReadBufferFactory {
     }
 
     private static final class NoCopyByteArrayOutputStream extends ByteArrayOutputStream {
+        static final int DEFAULT_CAPACITY = 32; // default ByteArrayOutputStream parameter
+
+        NoCopyByteArrayOutputStream(int capacity) {
+            super(capacity);
+        }
+
         ByteBuffer toByteBuffer() {
             return ByteBuffer.wrap(buf, 0, count);
         }
