@@ -135,4 +135,17 @@ final class NettyReadBuffer extends ReadBuffer {
             this.buf = null;
         }
     }
+
+    @Override
+    protected boolean isConsumed() {
+        return buf == null;
+    }
+
+    @Override
+    protected byte[] peekArray(int n) {
+        ByteBuf b = getBuf();
+        byte[] arr = new byte[n];
+        b.getBytes(b.readerIndex(), arr);
+        return arr;
+    }
 }

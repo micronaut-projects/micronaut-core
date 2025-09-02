@@ -122,4 +122,16 @@ final class NioReadBuffer extends ReadBuffer {
     public void close() {
         closed = true;
     }
+
+    @Override
+    protected boolean isConsumed() {
+        return closed;
+    }
+
+    @Override
+    protected byte[] peekArray(int n) {
+        byte[] bytes = new byte[n];
+        buffer.get(buffer.position(), bytes, 0, n);
+        return bytes;
+    }
 }

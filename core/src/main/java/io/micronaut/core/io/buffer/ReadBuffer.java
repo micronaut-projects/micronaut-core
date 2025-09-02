@@ -49,6 +49,7 @@ public abstract class ReadBuffer implements AutoCloseable {
      * Returns the number of bytes that can be read from this buffer.
      *
      * @return The number of readable bytes
+     * @throws IllegalStateException If this buffer is already closed or consumed
      */
     public abstract int readable();
 
@@ -181,4 +182,43 @@ public abstract class ReadBuffer implements AutoCloseable {
      */
     @Override
     public abstract void close();
+
+    // Protected methods for toString. Please don't make them public for now, they don't fit into
+    // the API design well
+
+    protected abstract boolean isConsumed();
+
+    protected abstract byte[] peekArray(int n);
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append(getClass().getSimpleName());
+        if (isConsumed()) {
+            sb.append("[consumed]");
+        } else {
+            int readable = readable();
+            sb.append("[len=").append(readable).append(", data='");
+            byte[] bytes = peekArray(Math.min(readable, 32));
+            for (byte b : bytes) {
+                if (b < 0x20 || b > 0x7e) {
+                    sb.append("\\x");
+                    int i = b & 0xff;
+                    if (i < 0x10) {
+                        sb.append('0');
+                    }
+                    sb.append(Integer.toHexString(i));
+                } else {
+                    sb.append((char) b);
+                }
+            }
+            sb.append("'");
+            if (readable > bytes.length) {
+                sb.append('…');
+            }
+            sb.append("]");
+        }
+
+        return sb.toString();
+    }
 }

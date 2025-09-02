@@ -10,6 +10,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -206,5 +207,32 @@ abstract class AbstractReadBufferTest {
         }
         assertEquals("foo", body.toString(UTF_8));
         body.close();
+    }
+
+    @Test
+    public void toStringConsumed() {
+        ReadBuffer rb = factory.adapt(new byte[]{1, 2, 3});
+        rb.close();
+        assertEquals(rb.getClass().getSimpleName() + "[consumed]", rb.toString());
+    }
+
+    @Test
+    public void toStringNormal() {
+        try (ReadBuffer rb = factory.adapt(new byte[]{
+            1, 2, 3,
+            0x48, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0x57, 0x6f, 0x72, 0x6c, 0x64, // Hello World
+            0x7e, 0x7f, (byte) 0x80
+        })) {
+            assertEquals(rb.getClass().getSimpleName() + "[len=17, data='\\x01\\x02\\x03Hello World~\\x7f\\x80']", rb.toString());
+        }
+    }
+
+    @Test
+    public void toStringLong() {
+        byte[] array = new byte[45];
+        Arrays.fill(array, (byte) '.');
+        try (ReadBuffer rb = factory.adapt(array)) {
+            assertEquals(rb.getClass().getSimpleName() + "[len=45, data='................................'…]", rb.toString());
+        }
     }
 }
