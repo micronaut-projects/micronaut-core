@@ -19,7 +19,9 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.ByteBuffer;
 
 /**
@@ -102,6 +104,17 @@ final class NioReadBuffer extends ReadBuffer {
             return new ByteArrayInputStream(buffer.array(), buffer.arrayOffset() + buffer.position(), buffer.remaining());
         } else {
             return super.toInputStream();
+        }
+    }
+
+    @Override
+    public void transferTo(@NonNull OutputStream stream) throws IOException {
+        checkOpen();
+        if (buffer.hasArray()) {
+            closed = true;
+            stream.write(buffer.array(), buffer.arrayOffset() + buffer.position(), buffer.remaining());
+        } else {
+            super.transferTo(stream);
         }
     }
 

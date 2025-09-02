@@ -6,6 +6,7 @@ import io.micronaut.core.io.buffer.ReadBufferFactory;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -127,6 +128,15 @@ abstract class AbstractReadBufferTest {
              InputStream is = rb.toInputStream()) {
             rb.close();
             assertArrayEquals(new byte[]{1, 2, 3}, is.readAllBytes());
+        }
+    }
+
+    @Test
+    public void transferTo() throws IOException {
+        try (ReadBuffer rb = factory.adapt(new byte[]{1, 2, 3})) {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            rb.transferTo(baos);
+            assertArrayEquals(new byte[]{1, 2, 3}, baos.toByteArray());
         }
     }
 

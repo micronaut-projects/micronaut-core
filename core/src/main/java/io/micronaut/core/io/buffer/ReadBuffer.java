@@ -19,7 +19,9 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.charset.Charset;
 
 /**
@@ -157,6 +159,19 @@ public abstract class ReadBuffer implements AutoCloseable {
     @NonNull
     public InputStream toInputStream() {
         return new ByteArrayInputStream(toArray());
+    }
+
+    /**
+     * Write this buffer to the given {@link OutputStream}.
+     *
+     * <p>This is a <a href="#consuming">consuming operation</a>.
+     *
+     * @param stream The stream to write to
+     * @throws IllegalStateException If this buffer is already closed or consumed
+     * @throws IOException           If the {@link OutputStream} throws an exception
+     */
+    public void transferTo(@NonNull OutputStream stream) throws IOException {
+        stream.write(toArray());
     }
 
     /**

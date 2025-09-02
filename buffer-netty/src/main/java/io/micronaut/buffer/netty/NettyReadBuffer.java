@@ -22,7 +22,9 @@ import io.micronaut.core.io.buffer.ReadBuffer;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.charset.Charset;
 
 /**
@@ -106,6 +108,17 @@ final class NettyReadBuffer extends ReadBuffer {
         ByteBuf b = getBuf();
         buf = null;
         return new ByteBufInputStream(b, true);
+    }
+
+    @Override
+    public void transferTo(@NonNull OutputStream stream) throws IOException {
+        ByteBuf b = getBuf();
+        buf = null;
+        try {
+            b.readBytes(stream, b.readableBytes());
+        } finally {
+            b.release();
+        }
     }
 
     ByteBuf toByteBuf() {
