@@ -337,8 +337,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
             long newLength = lengthSoFar + rb.readable();
             long expectedLength = this.expectedLength;
             if (expectedLength != -1 && newLength > expectedLength) {
-                addDoNotBuffer();
-            throw new IncorrectContentLengthException("Received more bytes than specified by Content-Length");
+                throw new IncorrectContentLengthException("Received more bytes than specified by Content-Length");
             }
             lengthSoFar = newLength;
 
