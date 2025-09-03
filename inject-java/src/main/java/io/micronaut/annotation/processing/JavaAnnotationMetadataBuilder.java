@@ -373,15 +373,18 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
             Object resolvedValue = resolver.resolvedValue;
 
             if (resolvedValue != null) {
-                if ("<error>".equals(resolvedValue) &&
-                    Class.class.getName().equals(this.modelUtils.resolveTypeName(((ExecutableElement) member).getReturnType()))) {
-                    resolvedValue = new AnnotationClassValue<>(
-                        new AnnotationClassValue.UnresolvedClass(new PostponeToNextRoundException(
-                            originatingElement,
-                            originatingElement.getSimpleName().toString() + "@" + annotationName + "(" + memberName + ")"
-                        ))
-                    );
-                    annotationValues.put(memberName, resolvedValue);
+                if ("<error>".equals(resolvedValue)) {
+                    if (Class.class.getName().equals(this.modelUtils.resolveTypeName(((ExecutableElement) member).getReturnType()))) {
+                        resolvedValue = new AnnotationClassValue<>(
+                            new AnnotationClassValue.UnresolvedClass(new PostponeToNextRoundException(
+                                originatingElement,
+                                originatingElement.getSimpleName().toString() + "@" + annotationName + "(" + memberName + ")"
+                            ))
+                        );
+                        annotationValues.put(memberName, resolvedValue);
+                    } else {
+                        throw new PostponeToNextRoundException(originatingElement,  memberName);
+                    }
                 } else {
                     if (isEvaluatedExpression(resolvedValue)) {
                         resolvedValue = buildEvaluatedExpressionReference(originatingElement, annotationName, memberName, resolvedValue);

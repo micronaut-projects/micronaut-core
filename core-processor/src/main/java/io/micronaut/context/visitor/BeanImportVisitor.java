@@ -85,7 +85,7 @@ public class BeanImportVisitor implements TypeElementVisitor<Import, Object> {
     public static List<ClassElement> collectInjectableElements(AnnotationMetadata element, VisitorContext context) {
         List<ClassElement> beanElements = new ArrayList<>();
         AnnotationValue<Import> annotation = element.getAnnotation(Import.class);
-        if (annotation == null ) {
+        if (annotation == null) {
             return beanElements;
         }
         final String[] classNames = annotation.stringValues("classes");

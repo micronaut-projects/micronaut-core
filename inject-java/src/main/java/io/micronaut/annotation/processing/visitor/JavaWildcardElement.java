@@ -54,13 +54,15 @@ final class JavaWildcardElement extends JavaClassElement implements WildcardElem
                         @NonNull WildcardType wildcardType,
                         @NonNull JavaClassElement mostUpper,
                         @NonNull List<JavaClassElement> upperBounds,
-                        @NonNull List<JavaClassElement> lowerBounds) {
+                        @NonNull List<JavaClassElement> lowerBounds,
+                        @Nullable String doc) {
         super(
             mostUpper.getNativeType(),
             elementAnnotationMetadataFactory,
             mostUpper.visitorContext,
             mostUpper.typeArguments,
-            mostUpper.getTypeArguments()
+            mostUpper.getTypeArguments(),
+            doc
         );
         this.wildcardType = wildcardType;
         this.upperBound = mostUpper;
@@ -139,7 +141,7 @@ final class JavaWildcardElement extends JavaClassElement implements WildcardElem
         List<JavaClassElement> lowerBounds = this.lowerBounds.stream()
             .map(ele -> toJavaClassElement(ele.foldBoundGenericTypes(fold)))
             .toList();
-        return fold.apply(upperBounds.contains(null) || lowerBounds.contains(null) ? null : new JavaWildcardElement(elementAnnotationMetadataFactory, wildcardType, upperBound, upperBounds, lowerBounds));
+        return fold.apply(upperBounds.contains(null) || lowerBounds.contains(null) ? null : new JavaWildcardElement(elementAnnotationMetadataFactory, wildcardType, upperBound, upperBounds, lowerBounds, doc));
     }
 
     private JavaClassElement toJavaClassElement(ClassElement element) {

@@ -15,11 +15,15 @@
  */
 package io.micronaut.annotation.processing.visitor;
 
+import com.github.javaparser.StaticJavaParser;
+import com.github.javaparser.javadoc.Javadoc;
+import com.github.javaparser.javadoc.JavadocBlockTag;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Creator;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.NullMarked;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
@@ -52,6 +56,7 @@ import javax.lang.model.element.RecordComponentElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.TypeParameterElement;
 import javax.lang.model.element.VariableElement;
+import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
@@ -83,12 +88,13 @@ import java.util.stream.Collectors;
  * @since 1.0
  */
 @Internal
-public class JavaClassElement extends AbstractJavaElement implements ArrayableClassElement {
+public class JavaClassElement extends AbstractTypeAwareJavaElement implements ArrayableClassElement {
     private static final String KOTLIN_METADATA = "kotlin.Metadata";
     private static final String PREFIX_IS = "is";
     protected final TypeElement classElement;
     protected final int arrayDimensions;
-
+    @Nullable
+    protected String doc;
     @Nullable
     // Not null means raw type definition: "List myMethod()"
     // Null value means a class definition: "class List<T> {}"
@@ -124,7 +130,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
      */
     @Internal
     public JavaClassElement(JavaNativeElement.Class nativeType, ElementAnnotationMetadataFactory annotationMetadataFactory, JavaVisitorContext visitorContext) {
-        this(nativeType, annotationMetadataFactory, visitorContext, null, null, 0, false);
+        this(nativeType, annotationMetadataFactory, visitorContext, null, null, 0, false, null);
     }
 
     /**
@@ -140,7 +146,25 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                      List<? extends TypeMirror> typeArguments,
                      @Nullable
                      Map<String, ClassElement> resolvedTypeArguments) {
-        this(nativeType, annotationMetadataFactory, visitorContext, typeArguments, resolvedTypeArguments, 0, false);
+        this(nativeType, annotationMetadataFactory, visitorContext, typeArguments, resolvedTypeArguments, 0, false, null);
+    }
+
+    /**
+     * @param nativeType The native type
+     * @param annotationMetadataFactory The annotation metadata factory
+     * @param visitorContext The visitor context
+     * @param typeArguments The declared type arguments
+     * @param resolvedTypeArguments The resolvedTypeArguments
+     * @param doc The optional documentation
+     */
+    JavaClassElement(JavaNativeElement.Class nativeType,
+                     ElementAnnotationMetadataFactory annotationMetadataFactory,
+                     JavaVisitorContext visitorContext,
+                     List<? extends TypeMirror> typeArguments,
+                     @Nullable
+                     Map<String, ClassElement> resolvedTypeArguments,
+                     String doc) {
+        this(nativeType, annotationMetadataFactory, visitorContext, typeArguments, resolvedTypeArguments, 0, false, doc);
     }
 
     /**
@@ -158,7 +182,27 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                      @Nullable
                      Map<String, ClassElement> resolvedTypeArguments,
                      int arrayDimensions) {
-        this(nativeType, annotationMetadataFactory, visitorContext, typeArguments, resolvedTypeArguments, arrayDimensions, false);
+        this(nativeType, annotationMetadataFactory, visitorContext, typeArguments, resolvedTypeArguments, arrayDimensions, false, null);
+    }
+
+    /**
+     * @param nativeType The native type
+     * @param annotationMetadataFactory The annotation metadata factory
+     * @param visitorContext The visitor context
+     * @param typeArguments The declared type arguments
+     * @param resolvedTypeArguments The resolvedTypeArguments
+     * @param arrayDimensions The number of array dimensions
+     * @param doc The optional documentation
+     */
+    JavaClassElement(JavaNativeElement.Class nativeType,
+                     ElementAnnotationMetadataFactory annotationMetadataFactory,
+                     JavaVisitorContext visitorContext,
+                     List<? extends TypeMirror> typeArguments,
+                     @Nullable
+                     Map<String, ClassElement> resolvedTypeArguments,
+                     int arrayDimensions,
+                     String doc) {
+        this(nativeType, annotationMetadataFactory, visitorContext, typeArguments, resolvedTypeArguments, arrayDimensions, false, doc);
     }
 
     /**
@@ -169,6 +213,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
      * @param resolvedTypeArguments The resolvedTypeArguments
      * @param arrayDimensions The number of array dimensions
      * @param isTypeVariable Is the type a type variable
+     * @param doc            The optional documentation
      */
     JavaClassElement(JavaNativeElement.Class nativeType,
                      ElementAnnotationMetadataFactory annotationMetadataFactory,
@@ -177,13 +222,21 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                      @Nullable
                      Map<String, ClassElement> resolvedTypeArguments,
                      int arrayDimensions,
-                     boolean isTypeVariable) {
+                     boolean isTypeVariable,
+                     @Nullable
+                     String doc) {
         super(nativeType, annotationMetadataFactory, visitorContext);
         this.classElement = nativeType.element();
         this.typeArguments = typeArguments;
         this.resolvedTypeArguments = resolvedTypeArguments;
         this.arrayDimensions = arrayDimensions;
         this.isTypeVariable = isTypeVariable;
+        this.doc = doc;
+    }
+
+    @Override
+    public Optional<String> getDocumentation() {
+        return doc == null ? super.getDocumentation() : Optional.of(doc);
     }
 
     @Override
@@ -260,6 +313,11 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             }
         }
         return annotationMetadata;
+    }
+
+    @Override
+    protected boolean hasNullMarked() {
+        return getPackage().hasStereotype(NullMarked.class) || hasStereotype(NullMarked.class);
     }
 
     @NonNull
@@ -420,7 +478,28 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             value.readAccessKind == null ? PropertyElement.AccessKind.METHOD : PropertyElement.AccessKind.valueOf(value.readAccessKind.name()),
             value.writeAccessKind == null ? PropertyElement.AccessKind.METHOD : PropertyElement.AccessKind.valueOf(value.writeAccessKind.name()),
             value.isExcluded,
-            visitorContext);
+            visitorContext,
+            findPropertyDoc(value));
+    }
+
+    @Nullable
+    private String findPropertyDoc(AstBeanPropertiesUtils.BeanPropertyData value) {
+        if (isRecord()) {
+             try {
+                 String docComment = visitorContext.getElements().getDocComment(getNativeType().element());
+                 if (docComment != null) {
+                     Javadoc javadoc = StaticJavaParser.parseJavadoc(docComment);
+                     for (JavadocBlockTag t : javadoc.getBlockTags()) {
+                         if (t.getType() == JavadocBlockTag.Type.PARAM && t.getName().map(n -> n.equals(value.propertyName)).orElse(false)) {
+                             return t.getContent().toText();
+                         }
+                     }
+                 }
+             } catch (Exception ignore) {
+                 // Ignore
+             }
+        }
+        return null;
     }
 
     private List<MethodElement> getRecordMethods() {
@@ -504,7 +583,11 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         if (arrayDimensions == this.arrayDimensions) {
             return this;
         }
-        return new JavaClassElement(getNativeType(), elementAnnotationMetadataFactory, visitorContext, typeArguments, resolvedTypeArguments, arrayDimensions, false);
+        JavaNativeElement.Class nativeType = getNativeType();
+        if (this.arrayDimensions - 1 == arrayDimensions  && nativeType.typeMirror() instanceof ArrayType array) {
+            nativeType = new JavaNativeElement.Class(nativeType.element(), array.getComponentType(), nativeType.owner());
+        }
+        return new JavaClassElement(nativeType, elementAnnotationMetadataFactory, visitorContext, typeArguments, resolvedTypeArguments, arrayDimensions, false, doc);
     }
 
     @Override
@@ -854,8 +937,10 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
 
         @Override
         protected boolean excludeClass(TypeElement classNode) {
-            return classNode.getQualifiedName().toString().equals(Object.class.getName())
-                || classNode.getQualifiedName().toString().equals(Enum.class.getName());
+            String qualifiedName = classNode.getQualifiedName().toString();
+            return qualifiedName.equals(Object.class.getName())
+                || qualifiedName.equals(Record.class.getName())
+                || qualifiedName.equals(Enum.class.getName());
         }
 
         @Override

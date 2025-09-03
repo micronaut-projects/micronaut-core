@@ -50,6 +50,7 @@ dependencies {
     testImplementation(libs.javax.inject)
     testImplementation(libs.graal)
     testImplementation(libs.managed.snakeyaml)
+    testImplementation(libs.managed.jspecify)
     testRuntimeOnly(libs.jakarta.el.impl)
     testRuntimeOnly(libs.jakarta.el)
 }

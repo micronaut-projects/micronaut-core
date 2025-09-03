@@ -181,6 +181,49 @@ public interface PropertyElement extends TypedElement, MemberElement {
         return false;
     }
 
+    @Override
+    default Optional<String> getDocumentation() {
+        try {
+            Optional<FieldElement> field = getField();
+            if (field.isPresent()) {
+                String javadoc = field.get().getDocumentation().orElse(null);
+                if (javadoc != null) {
+                    return Optional.of(javadoc);
+                }
+            }
+            Optional<MethodElement> readMethod = getReadMethod();
+            if (readMethod.isPresent()) {
+                MethodElement methodElement = readMethod.get();
+                Optional<String> returnDoc = methodElement.getReturnType().getDocumentation();
+                if (returnDoc.isPresent()) {
+                    return returnDoc;
+                }
+                Optional<String> methodDoc = methodElement.getDocumentation();
+                if (methodDoc.isPresent()) {
+                    return methodDoc;
+                }
+            }
+            Optional<MethodElement> writeMethod = getWriteMethod();
+            if (writeMethod.isPresent()) {
+                MethodElement methodElement = writeMethod.get();
+                if (methodElement.getParameters().length > 0) {
+                    ParameterElement parameter = methodElement.getParameters()[0];
+                    Optional<String> paramDoc = parameter.getDocumentation();
+                    if (paramDoc.isPresent()) {
+                        return paramDoc;
+                    }
+                }
+                Optional<String> methodDoc = methodElement.getDocumentation();
+                if (methodDoc.isPresent()) {
+                    return methodDoc;
+                }
+            }
+        } catch (Exception ignore) {
+            // ignore
+        }
+        return Optional.empty();
+    }
+
     /**
      * The access type for bean properties.
      * @since 4.0.0

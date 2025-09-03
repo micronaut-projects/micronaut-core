@@ -65,7 +65,7 @@ public class CopyOnWriteMapBenchmark {
         public void setUp() {
             map = switch (type) {
                 case CHM -> new ConcurrentHashMap<>(16, 0.75f, 1);
-                case COW -> new CopyOnWriteMap<>(16);
+                case COW -> CopyOnWriteMap.create(16);
             };
             // doesn't really stress the collision avoidance algorithm but oh well
             map.put("foo", "bar");

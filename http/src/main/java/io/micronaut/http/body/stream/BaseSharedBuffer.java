@@ -337,7 +337,8 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
             long newLength = lengthSoFar + rb.readable();
             long expectedLength = this.expectedLength;
             if (expectedLength != -1 && newLength > expectedLength) {
-                throw new IllegalStateException("Received more bytes than specified by Content-Length");
+                addDoNotBuffer();
+            throw new IncorrectContentLengthException("Received more bytes than specified by Content-Length");
             }
             lengthSoFar = newLength;
 
@@ -386,7 +387,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      */
     public void complete() {
         if (expectedLength > lengthSoFar) {
-            throw new IllegalStateException("Received fewer bytes than specified by Content-Length");
+            throw new IncorrectContentLengthException("Received fewer bytes than specified by Content-Length");
         }
         complete = true;
         expectedLength = lengthSoFar;
@@ -478,6 +479,16 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                     upstream.disregardBackpressure();
                 })
                 .doOnDiscard(ReadBuffer.class, ReadBuffer::close);
+        }
+    }
+
+    /**
+     * Thrown when {@link #complete()} is called before {@link #getExpectedLength()} bytes are
+     * received.
+     */
+    public static final class IncorrectContentLengthException extends IllegalStateException {
+        IncorrectContentLengthException(String msg) {
+            super(msg);
         }
     }
 }

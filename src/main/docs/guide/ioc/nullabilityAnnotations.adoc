@@ -1,21 +1,88 @@
-In Java, you can use annotations showing whether a variable can or cannot be null. Such annotations aren't part of the standard library, but you can add them separately.
+In Java, you can use annotations showing whether a variable can or cannot be null. Such annotations aren't part of the standard library.
 
-Micronaut framework comes with its own set of annotations to declare nullability; ann:core.annotation.Nullable[] and ann:core.annotation.NonNull[].
+== Micronaut’s Nullability Annotations
+
+Micronaut framework provides first-class nullability annotations:
+
+- ann:core.annotation.NonNull[] — the annotated element must never be null.
+- ann:core.annotation.Nullable[] — the annotated element may be null.
+- ann:core.annotation.NullMarked[] — sets a default non-null policy within the annotated scope (package, type, or method), unless overridden.
+
+These annotations are designed for use on parameters, return values, fields, and type-use positions (for example, generic type arguments).
+
+NOTE: Micronaut will default to the non-null policy in most of the places if not defined explicitly as nullable
+
+.Optional request parameter in a controller
+[source,java]
+----
+package example;
+
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.QueryValue;
+
+@Controller("/greet") // <1>
+class GreetingController {
+
+    @Get // <2>
+    String hello(@QueryValue @Nullable String nickname) { // <3>
+        return nickname == null ? "Hello" : "Hello, " + nickname; // <4>
+    }
+}
+----
+<1> Defines a controller mapped to the /greet path.
+<2> Exposes an HTTP GET endpoint.
+<3> Marks the query parameter as optional with ann:core.annotation.Nullable[]; requests may omit it.
+<4> Null-safe handling when the parameter is not provided.
+
+.Optional dependency in a factory-produced bean
+[source,java]
+----
+package example;
+
+import io.micronaut.context.annotation.Factory;
+import io.micronaut.core.annotation.Nullable;
+import jakarta.inject.Singleton;
+
+@Factory // <1>
+class ClientFactory {
+
+    @Singleton // <2>
+    Client client(@Nullable OptionalDependency optional) { // <3>
+        return new Client(optional); // <4>
+    }
+}
+
+final class Client {
+    private final OptionalDependency optional;
+
+    Client(@Nullable OptionalDependency optional) { // <5>
+        this.optional = optional;
+    }
+
+    String description() {
+        return optional == null ? "No optional dependency" : "Has optional dependency";
+    }
+}
+
+interface OptionalDependency {}
+----
+<1> Declares a factory class that produces beans.
+<2> Defines a bean-producing method with singleton scope.
+<3> The dependency is optional and annotated with ann:core.annotation.Nullable[]; if no bean of that type exists, injection does not fail and null is injected.
+<4> The produced bean is created regardless of whether the optional dependency is present.
+<5> The consumer explicitly declares the constructor parameter as nullable and handles a potential null value.
 
 **Why does the Micronaut framework add its own set of nullability annotations instead of using one of the existing nullability annotations libraries?**
 
-Throughout the history of the framework, we used other nullability annotation libraries. However, licensing issues made us change nullability annotations several times. To avoid having to change nullability annotations in the future,  we added our own set of nullability annotations in Micronaut framework 2.4
+Throughout the history of the framework, we used other nullability annotation libraries. However, licensing issues made us change nullability annotations several times. To avoid having to change nullability annotations in the future, we added our own set of nullability annotations in Micronaut framework 2.4
 
 **Are Micronaut Nullability annotations recognized by Kotlin?**
 
-Yes, Micronaut framework's nullability annotations are mapped at compilation time to `jakarta.annotation.Nullable` and `jakarta.annotation.Nonnull`.
+Kotlin does not recognize Micronaut framework's nullability annotations. However, Micronaut supports other nullability annotations via api:inject.annotation.AnnotationMapper[annotation mapping].
 
-**Why should you use nullability annotations in your code?**
+NOTE: Micronaut framework supports other known nullability annotations from: Android, FindBugs, Javax, Eclipse, JetBrains, https://jspecify.dev/[JSpecify]
 
-It makes your code easier to consume from Kotlin. https://kotlinlang.org/docs/java-interop.html#nullability-annotations[Kotlin recognizes nullability annotations when you're calling Java code from Kotlin code and will treat types according to their annotations].
-
-Moreover, you can use ann:core.annotation.Nullable[] annotation to mark:
-
-* A <<routing, Controller>> method parameter as optional.
-* An injection point as optional. For example, when using constructor injection you can annotate one a constructor parameter as optional by adding the ann:core.annotation.Nullable[] annotation.
-
+To better support Kotlin, we recommended to use https://jspecify.dev/[JSpecify]
+or any other https://kotlinlang.org/docs/java-interop.html#nullability-annotations:[Kotlin recognizable nullability annotations].

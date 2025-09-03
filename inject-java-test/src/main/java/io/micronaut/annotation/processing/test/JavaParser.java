@@ -309,9 +309,9 @@ public class JavaParser implements Closeable {
     protected @NonNull List<Processor> getAnnotationProcessors() {
         List<Processor> processors = new ArrayList<>();
         processors.add(new MixinVisitorProcessor());
+        processors.add(new PackageElementVisitorProcessor());
         processors.add(getTypeElementVisitorProcessor());
         processors.add(getAggregatingTypeElementVisitorProcessor());
-        processors.add(new PackageConfigurationInjectProcessor());
         processors.add(getBeanDefinitionInjectProcessor());
         return processors;
     }
