@@ -20,6 +20,7 @@ import groovy.transform.CompileStatic
 import io.micronaut.ast.groovy.utils.AstMessageUtils
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.ast.groovy.visitor.LoadedVisitor
+import io.micronaut.ast.groovy.visitor.PackageLoadedVisitor
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.env.CachedEnvironment
 import io.micronaut.core.io.service.ServiceDefinition
@@ -28,6 +29,7 @@ import io.micronaut.core.order.OrderUtil
 import io.micronaut.core.reflect.InstantiationUtils
 import io.micronaut.core.util.StringUtils
 import io.micronaut.core.version.VersionUtils
+import io.micronaut.inject.visitor.PackageElementVisitor
 import io.micronaut.inject.visitor.TypeElementVisitor
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ModuleNode
@@ -36,7 +38,6 @@ import org.codehaus.groovy.control.CompilePhase
 import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.transform.ASTTransformation
 import org.codehaus.groovy.transform.GroovyASTTransformation
-
 /**
  * Loads the type element visitors.
  *
@@ -54,7 +55,6 @@ class TypeElementVisitorStart implements ASTTransformation, CompilationUnitAware
     @Override
     void visit(ASTNode[] nodes, SourceUnit source) {
         Map<String, LoadedVisitor> loadedVisitors = TypeElementVisitorTransform.loadedVisitors.get()
-
         if (loadedVisitors == null) {
             loadedVisitors = [:]
 
@@ -108,6 +108,8 @@ class TypeElementVisitorStart implements ASTTransformation, CompilationUnitAware
                             "Error starting type visitor [$loadedVisitor.visitor]: $e.message")
                 }
             }
+
+            TypeElementVisitorTransform.loadedVisitors.set(loadedVisitors)
         }
 
         def val = CachedEnvironment.getProperty(ELEMENT_VISITORS_PROPERTY)
@@ -121,7 +123,28 @@ class TypeElementVisitorStart implements ASTTransformation, CompilationUnitAware
             }
         }
 
-        TypeElementVisitorTransform.loadedVisitors.set(loadedVisitors)
+        def packageLoadedVisitors = PackageElementVisitorTransform.packageLoadedVisitorsLocal.get()
+        if (packageLoadedVisitors == null) {
+            SoftServiceLoader serviceLoader = SoftServiceLoader.load(PackageElementVisitor, TypeElementVisitorStart.classLoader)
+            List<PackageLoadedVisitor> visitors = new ArrayList<>()
+            for (ServiceDefinition<PackageElementVisitor> definition : serviceLoader) {
+                if (definition.isPresent()) {
+                    PackageElementVisitor visitor = definition.load()
+                    try {
+                        def newLoadedVisitor = new PackageLoadedVisitor(source, compilationUnit, visitor)
+                        visitors.add(newLoadedVisitor)
+                    } catch (TypeNotPresentException e) {
+                        // skip, all classes not on classpath
+                    } catch (NoClassDefFoundError e) {
+                        // skip, all classes not on classpath
+                    } catch (ClassNotFoundException e) {
+                        // skip, all classes not on classpath
+                    }
+                }
+            }
+            OrderUtil.reverseSort(visitors)
+            PackageElementVisitorTransform.packageLoadedVisitorsLocal.set(visitors)
+        }
     }
 
     @Override

@@ -150,7 +150,7 @@ internal class KotlinVisitorContext(
         return resolver.getDeclarationsFromPackage(aPackage)
             .filterIsInstance<KSClassDeclaration>()
             .filter { declaration ->
-                declaration.annotations.any { ann ->
+                stereotypes.isEmpty() || declaration.annotations.any { ann ->
                     stereotypes.contains(
                         KotlinAnnotationMetadataBuilder.getAnnotationTypeName(
                             resolver,

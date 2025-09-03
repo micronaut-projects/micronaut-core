@@ -34,7 +34,6 @@ import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.beans.BeanParameterElement;
-import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
 import io.micronaut.inject.writer.BeanDefinitionVisitor;
@@ -53,7 +52,6 @@ import java.util.function.Predicate;
  */
 @Internal
 class JavaBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
-    private final JavaVisitorContext javaVisitorContext;
     private final JavaAnnotationMetadataBuilder annotationMetadataBuilder;
 
     /**
@@ -61,17 +59,14 @@ class JavaBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
      *
      * @param originatingElement The originating element
      * @param beanType The bean type
-     * @param metadataBuilder the metadata builder
      * @param elementAnnotationMetadataFactory The element annotation metadata factory
      * @param visitorContext the visitor context
      */
     JavaBeanDefinitionBuilder(Element originatingElement,
                               ClassElement beanType,
-                              ConfigurationMetadataBuilder metadataBuilder,
                               ElementAnnotationMetadataFactory elementAnnotationMetadataFactory,
                               JavaVisitorContext visitorContext) {
-        super(originatingElement, beanType, metadataBuilder, visitorContext, elementAnnotationMetadataFactory);
-        this.javaVisitorContext = visitorContext;
+        super(originatingElement, beanType, visitorContext, elementAnnotationMetadataFactory);
         if (visitorContext.getVisitorKind() == TypeElementVisitor.VisitorKind.ISOLATING) {
             if (getClass() == JavaBeanDefinitionBuilder.class) {
                 visitorContext.addBeanDefinitionBuilder(this);
@@ -79,7 +74,7 @@ class JavaBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
         } else {
             visitorContext.fail("Cannot add bean definition using addAssociatedBean(..) from a AGGREGATING TypeElementVisitor, consider overriding getVisitorKind()", originatingElement);
         }
-        this.annotationMetadataBuilder = javaVisitorContext.getAnnotationMetadataBuilder();
+        this.annotationMetadataBuilder = visitorContext.getAnnotationMetadataBuilder();
     }
 
     @NonNull
@@ -89,7 +84,6 @@ class JavaBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
         return new JavaBeanDefinitionBuilder(
             JavaBeanDefinitionBuilder.this.getOriginatingElement(),
             producerField.getGenericField().getType(),
-            JavaBeanDefinitionBuilder.this.metadataBuilder,
             elementAnnotationMetadataFactory,
             (JavaVisitorContext) JavaBeanDefinitionBuilder.this.visitorContext
         ) {
@@ -152,7 +146,6 @@ class JavaBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
         return new JavaBeanDefinitionBuilder(
             JavaBeanDefinitionBuilder.this.getOriginatingElement(),
             producerMethod.getGenericReturnType(),
-            JavaBeanDefinitionBuilder.this.metadataBuilder,
             elementAnnotationMetadataFactory,
             (JavaVisitorContext) JavaBeanDefinitionBuilder.this.visitorContext
         ) {

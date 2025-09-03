@@ -15,13 +15,8 @@
  */
 package io.micronaut.inject.configuration;
 
-import com.github.javaparser.StaticJavaParser;
-import com.github.javaparser.javadoc.Javadoc;
-import com.github.javaparser.javadoc.JavadocBlockTag;
-import com.github.javaparser.javadoc.description.JavadocDescription;
-import com.github.javaparser.javadoc.description.JavadocDescriptionElement;
-import com.github.javaparser.javadoc.description.JavadocInlineTag;
-import com.github.javaparser.javadoc.description.JavadocSnippet;
+import io.micronaut.context.annotation.BeanProperties;
+import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
@@ -30,8 +25,7 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
-import io.micronaut.inject.ast.MethodElement;
-import io.micronaut.inject.ast.PropertyElement;
+import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.writer.OriginatingElements;
 
 import java.io.IOException;
@@ -55,7 +49,11 @@ import static io.micronaut.inject.configuration.ConfigurationUtils.getRequiredTy
  */
 public class ConfigurationMetadataBuilder {
 
+    /**
+     * @deprecated Should not be used with the static state
+     */
     @SuppressWarnings({"StaticVariableName", "VisibilityModifier"})
+    @Deprecated(forRemoval = true, since = "4.10")
     public static final ConfigurationMetadataBuilder INSTANCE = new ConfigurationMetadataBuilder();
 
     private final OriginatingElements originatingElements = OriginatingElements.of();
@@ -102,7 +100,7 @@ public class ConfigurationMetadataBuilder {
         ConfigurationMetadata configurationMetadata = new ConfigurationMetadata();
         configurationMetadata.name = NameUtils.hyphenate(path, true);
         configurationMetadata.type = classElement.getType().getName();
-        configurationMetadata.description = resolveJavadocDescription(classElement);
+        configurationMetadata.description = classElement.getDocumentation().orElse(null);
         configurationMetadata.includes = CollectionUtils.setOf(classElement.stringValues(ConfigurationReader.class, "includes"));
         configurationMetadata.excludes = CollectionUtils.setOf(classElement.stringValues(ConfigurationReader.class, "excludes"));
         this.configurations.add(configurationMetadata);
@@ -110,46 +108,36 @@ public class ConfigurationMetadataBuilder {
     }
 
     /**
-     * Resolves the javadoc description for the given element.
-     * @param element The element
-     * @return The javadoc description.
+     * Visit a {@link io.micronaut.context.annotation.ConfigurationBuilder} build element.
+     *
+     * @param prefix The prefix
+     * @param builderElement The builder element
+     * @param builderType The type of the {@link io.micronaut.context.annotation.ConfigurationBuilder}
+     * @return This {@link ConfigurationMetadata}
      */
-    @Nullable
-    public static String resolveJavadocDescription(@NonNull Element element) {
-        String resolvedDocs = null;
-        String javadoc = element.getDocumentation().orElse(null);
-        if (javadoc == null && element instanceof PropertyElement propertyElement) {
-            javadoc = propertyElement.getWriteMethod().flatMap(Element::getDocumentation).orElse(null);
-        }
-        if (javadoc != null) {
-            try {
-                Javadoc jd = StaticJavaParser.parseJavadoc(javadoc);
-                JavadocDescription description = jd.getDescription();
-                StringBuilder builder = new StringBuilder();
-                List<JavadocDescriptionElement> elements = description.getElements();
-                if (!elements.isEmpty()) {
-                    for (JavadocDescriptionElement jde : elements) {
-                        if (jde instanceof JavadocSnippet snippet) {
-                            builder.append(snippet.toText());
-                        } else if (jde instanceof JavadocInlineTag tag) {
-                            builder.append(tag.toText());
-                        }
-                    }
-                } else if (element instanceof MethodElement) {
-                    jd.getBlockTags()
-                        .stream().filter(bt -> bt.getType() == JavadocBlockTag.Type.RETURN)
-                        .findFirst().ifPresent(returnTag -> builder.append(returnTag.getContent().toText()));
-                } else if (element instanceof PropertyElement) {
-                    jd.getBlockTags()
-                        .stream().filter(bt -> bt.getType() == JavadocBlockTag.Type.PARAM)
-                        .findFirst().ifPresent(returnTag -> builder.append(returnTag.getContent().toText()));
-                }
-                resolvedDocs = builder.toString();
-            } catch (Exception e) {
-                // ignore
+    public ConfigurationMetadata visitBuilder(String prefix, MemberElement builderElement, ClassElement builderType) {
+        originatingElements.addOriginatingElement(builderElement);
+        String path = builderElement.stringValue(ConfigurationBuilder.class).orElse("");
+        if (prefix.isEmpty()) {
+            if (!path.isEmpty()) {
+                path = prefix;
+            }
+        } else {
+            if (path.isEmpty()) {
+                path = prefix;
+            } else {
+                path = prefix + "." + path;
             }
         }
-        return resolvedDocs;
+
+        ConfigurationMetadata configurationMetadata = new ConfigurationMetadata();
+        configurationMetadata.name = NameUtils.hyphenate(path, true);
+        configurationMetadata.type = builderType.getName();
+        configurationMetadata.description = builderElement.getDocumentation().orElse(null);
+        configurationMetadata.includes = CollectionUtils.setOf(builderElement.stringValues(BeanProperties.class, BeanProperties.MEMBER_INCLUDES));
+        configurationMetadata.excludes = CollectionUtils.setOf(builderElement.stringValues(BeanProperties.class, BeanProperties.MEMBER_EXCLUDES));
+        this.configurations.add(configurationMetadata);
+        return configurationMetadata;
     }
 
     /**
@@ -170,24 +158,89 @@ public class ConfigurationMetadataBuilder {
                                           String name,
                                           @Nullable String description,
                                           @Nullable String defaultValue) {
+        String path;
+        if (propertyType.hasStereotype(ConfigurationReader.class)) {
+            path = ConfigurationUtils.getRequiredTypePath(propertyType);
+        } else {
+            path = NameUtils.hyphenate(buildPropertyPath(owningType, declaringType, name), true);
+        }
+        return visitProperty(
+            owningType,
+            declaringType,
+            propertyType,
+            name,
+            path,
+            description,
+            defaultValue
+        );
+    }
+
+    /**
+     * Visit a configuration property.
+     *
+     * @param owningType    The type that owns the property
+     * @param declaringType The declaring type of the property
+     * @param propertyType  The property type
+     * @param name          The property name
+     * @param path          The property path
+     * @param description   A description for the property
+     * @param defaultValue  The default value of the property (only used for constant values such as strings, numbers,
+     *                      enums etc.)
+     * @return This property metadata
+     */
+    public PropertyMetadata visitProperty(ClassElement owningType,
+                                          ClassElement declaringType,
+                                          ClassElement propertyType,
+                                          String name,
+                                          String path,
+                                          @Nullable String description,
+                                          @Nullable String defaultValue) {
         originatingElements.addOriginatingElement(owningType);
         originatingElements.addOriginatingElement(declaringType);
 
         PropertyMetadata metadata = new PropertyMetadata();
         metadata.declaringType = declaringType.getName();
         metadata.name = name;
-        metadata.path = propertyType.stringValue(ConfigurationReader.class, ConfigurationReader.PREFIX)
-            .orElseGet(() -> NameUtils.hyphenate(buildPropertyPath(owningType, declaringType, name), true));
-        if (propertyType.hasStereotype(ConfigurationReader.class)) {
-            metadata.path = ConfigurationUtils.getRequiredTypePath(propertyType);
-        } else {
-            metadata.path = NameUtils.hyphenate(buildPropertyPath(owningType, declaringType, name), true);
-        }
+        metadata.path = path;
         metadata.type = propertyType.getType().getName();
         metadata.description = description;
         metadata.defaultValue = defaultValue;
         properties.add(metadata);
         return metadata;
+    }
+
+    /**
+     * Finalizes the building process by removing configurations from the list
+     * of configurations that have no associated properties.
+     *
+     * This method iterates over the configurations list and removes any configuration
+     * for which none of the properties in the properties list have a matching
+     * declaring type.
+     */
+    public void finish() {
+        configurations.removeIf(configuration -> properties.stream()
+            .noneMatch(p -> p.getDeclaringType().equals(configuration.getType())));
+    }
+
+    /**
+     * Calculate the path.
+     *
+     * @param owningType    The type that owns the property
+     * @param declaringType The declaring type of the property
+     * @param propertyType  The property type
+     * @param name          The property name
+     *                      enums etc.)
+     * @return This property metadata
+     */
+    public static String calculatePath(ClassElement owningType,
+                                       ClassElement declaringType,
+                                       ClassElement propertyType,
+                                       String name) {
+
+        if (propertyType.hasStereotype(ConfigurationReader.class)) {
+            return ConfigurationUtils.getRequiredTypePath(propertyType);
+        }
+        return NameUtils.hyphenate(buildPropertyPath(owningType, declaringType, name), true);
     }
 
     /**

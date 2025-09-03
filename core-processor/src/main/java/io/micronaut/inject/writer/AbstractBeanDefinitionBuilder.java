@@ -35,7 +35,6 @@ import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.Element;
-import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
@@ -43,12 +42,12 @@ import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.TypedElement;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.beans.BeanConstructorElement;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
 import io.micronaut.inject.ast.beans.BeanFieldElement;
 import io.micronaut.inject.ast.beans.BeanMethodElement;
 import io.micronaut.inject.ast.beans.BeanParameterElement;
-import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.visitor.VisitorContext;
 
 import java.io.IOException;
@@ -100,7 +99,6 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
             }
         }
     };
-    protected final ConfigurationMetadataBuilder metadataBuilder;
     protected final VisitorContext visitorContext;
     protected final ElementAnnotationMetadataFactory elementAnnotationMetadataFactory;
     private final Element originatingElement;
@@ -125,14 +123,12 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
      *
      * @param originatingElement               The originating element
      * @param beanType                         The bean type
-     * @param metadataBuilder                  the metadata builder
      * @param visitorContext                   the visitor context
      * @param elementAnnotationMetadataFactory The element annotation metadata factory
      */
     protected AbstractBeanDefinitionBuilder(
         Element originatingElement,
         ClassElement beanType,
-        ConfigurationMetadataBuilder metadataBuilder,
         VisitorContext visitorContext,
         ElementAnnotationMetadataFactory elementAnnotationMetadataFactory) {
         this.originatingElement = originatingElement;
@@ -145,7 +141,6 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
             throw new IllegalArgumentException("Invalid originating element: " + originatingElement);
         }
         this.beanType = beanType;
-        this.metadataBuilder = metadataBuilder;
         this.visitorContext = visitorContext;
         this.identifier = BEAN_COUNTER.computeIfAbsent(beanType.getName(), (s) -> new AtomicInteger(0))
             .getAndIncrement();

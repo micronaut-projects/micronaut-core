@@ -26,7 +26,7 @@ import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.TypedElement;
-import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
+import io.micronaut.inject.configuration.builder.ConfigurationBuilderDefinition;
 import io.micronaut.inject.visitor.VisitorContext;
 
 import java.io.File;
@@ -337,7 +337,6 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
      * @param type               The type of the builder
      * @param field              The name of the field that represents the builder
      * @param annotationMetadata The annotation metadata associated with the field
-     * @param metadataBuilder    The {@link ConfigurationMetadataBuilder}
      * @param isInterface        Whether the builder type is an interface or not
      * @see io.micronaut.context.annotation.ConfigurationBuilder
      */
@@ -345,7 +344,6 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
             ClassElement type,
             String field,
             AnnotationMetadata annotationMetadata,
-            ConfigurationMetadataBuilder metadataBuilder,
             boolean isInterface);
 
     /**
@@ -354,7 +352,6 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
      * @param type               The type of the builder
      * @param methodName         The name of the method that returns the builder
      * @param annotationMetadata The annotation metadata associated with the field
-     * @param metadataBuilder    The {@link ConfigurationMetadataBuilder}
      * @param isInterface        Whether the builder type is an interface or not
      * @see io.micronaut.context.annotation.ConfigurationBuilder
      */
@@ -362,8 +359,17 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
             ClassElement type,
             String methodName,
             AnnotationMetadata annotationMetadata,
-            ConfigurationMetadataBuilder metadataBuilder,
             boolean isInterface);
+
+    /**
+     * Visit a configuration builder definition.
+     *
+     * @param builderDefinition The builder definition.
+     * @see io.micronaut.context.annotation.ConfigurationBuilder
+     * @since 4.10
+     */
+    default void visitConfigBuilder(ConfigurationBuilderDefinition builderDefinition) {
+    }
 
     /**
      * Visit a configuration builder method.

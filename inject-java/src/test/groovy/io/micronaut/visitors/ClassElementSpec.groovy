@@ -3646,36 +3646,38 @@ class TestNamed {
     }
 }
 
-''')
-        def properties = ce.findMethod("method").get().getReturnType().getBeanProperties()
-                .stream()
-                .filter {it.getName() == "orderBy"}.findFirst()
-                .get()
-                .getGenericType()
-                .getFirstTypeArgument()
-                .get()
-                .getBeanProperties()
-        expect:
-            properties.stream().map {it.getName()}.sorted().toList() == [
+''', {
+            def properties = ce.findMethod("method").get().getReturnType().getBeanProperties()
+                    .stream()
+                    .filter {it.getName() == "orderBy"}.findFirst()
+                    .get()
+                    .getGenericType()
+                    .getFirstTypeArgument()
+                    .get()
+                    .getBeanProperties()
+
+            assert properties.stream().map {it.getName()}.sorted().toList() == [
                     "ignoreCase",
                     "direction",
                     "property",
                     "ascending"
             ].sort()
-            properties.stream()
+            assert properties.stream()
                     .filter { it.getName() == "direction" }
                     .findFirst()
                     .get()
                     .getType()
                     .isEnum()
-            properties.stream()
+            assert properties.stream()
                     .filter { it.getName() == "direction" }
                     .findFirst()
                     .get()
                     .getType() instanceof EnumElement
+        })
+
     }
 
-    private void assertListGenericArgument(ClassElement type, Closure cl) {
+    private static void assertListGenericArgument(ClassElement type, Closure cl) {
         def arg1 = type.getAllTypeArguments().get(List.class.name).get("E")
         def arg2 = type.getAllTypeArguments().get(Collection.class.name).get("E")
         def arg3 = type.getAllTypeArguments().get(Iterable.class.name).get("T")
@@ -3684,7 +3686,7 @@ class TestNamed {
         cl.call(arg3)
     }
 
-    private void assertMethodsByName(List<MethodElement> allMethods, String name, List<String> expectedDeclaringTypeSimpleNames) {
+    private static void assertMethodsByName(List<MethodElement> allMethods, String name, List<String> expectedDeclaringTypeSimpleNames) {
         Collection<MethodElement> methods = collectElements(allMethods, name)
         assert expectedDeclaringTypeSimpleNames.size() == methods.size()
         for (String expectedDeclaringTypeSimpleName : expectedDeclaringTypeSimpleNames) {
@@ -3692,7 +3694,7 @@ class TestNamed {
         }
     }
 
-    private void assertFieldsByName(List<FieldElement> allFields, String name, List<String> expectedDeclaringTypeSimpleNames) {
+    private static void assertFieldsByName(List<FieldElement> allFields, String name, List<String> expectedDeclaringTypeSimpleNames) {
         Collection<FieldElement> fields = collectElements(allFields, name)
         assert expectedDeclaringTypeSimpleNames.size() == fields.size()
         for (String expectedDeclaringTypeSimpleName : expectedDeclaringTypeSimpleNames) {
@@ -3700,13 +3702,13 @@ class TestNamed {
         }
     }
 
-    private boolean oneElementPresentWithDeclaringType(Collection<MemberElement> elements, String declaringTypeSimpleName) {
+    private static boolean oneElementPresentWithDeclaringType(Collection<MemberElement> elements, String declaringTypeSimpleName) {
         elements.stream()
                 .filter { it -> it.getDeclaringType().getSimpleName() == declaringTypeSimpleName }
                 .count() == 1
     }
 
-    static <T extends Element> Collection<T> collectElements(List<T> allElements, String name) {
+    private static <T extends Element> Collection<T> collectElements(List<T> allElements, String name) {
         return allElements.findAll { it.name == name }
     }
 }

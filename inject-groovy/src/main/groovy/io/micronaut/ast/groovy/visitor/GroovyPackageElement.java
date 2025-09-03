@@ -35,7 +35,7 @@ public class GroovyPackageElement extends AbstractGroovyElement implements Packa
      * Default constructor.
      *
      * @param visitorContext The visitor context
-     * @param packageNode The annotated node
+     * @param packageNode The package node
      * @param annotationMetadataFactory The annotation metadata
      */
     public GroovyPackageElement(GroovyVisitorContext visitorContext,

@@ -123,7 +123,10 @@ import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.ast.beans.BeanElement;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
-import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
+import io.micronaut.inject.configuration.builder.ConfigurationBuilderDefinition;
+import io.micronaut.inject.configuration.builder.ConfigurationBuilderOfFieldDefinition;
+import io.micronaut.inject.configuration.builder.ConfigurationBuilderOfMethodDefinition;
+import io.micronaut.inject.configuration.builder.ConfigurationBuilderPropertyDefinition;
 import io.micronaut.inject.qualifiers.AnyQualifier;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.inject.visitor.BeanElementVisitor;
@@ -649,7 +652,6 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
 
     private BuildMethodDefinition buildMethodDefinition;
     private final List<InjectMethodCommand> injectCommands = new ArrayList<>();
-    private ConfigBuilderInjectCommand configBuilderInjectCommand;
     private boolean validated;
 
     private final Function<String, ExpressionDef> loadClassValueExpressionFn;
@@ -1371,60 +1373,68 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                 injectFieldValueInjectCommand.isOptional
             );
         }
-        if (injectionPoint instanceof ConfigMethodBuilderInjectPointCommand configBuilderMethodInjectPoint) {
-            String factoryMethod = configBuilderMethodInjectPoint.configBuilderState.getAnnotationMetadata()
-                .stringValue(ConfigurationBuilder.class, "factoryMethod").orElse(null);
+        if (injectionPoint instanceof ConfigBuilderInjectCommand configBuilderInjectCommand) {
+            ConfigurationBuilderDefinition configurationBuilderDefinition = configBuilderInjectCommand.configurationBuilderDefinition;
+            if (configurationBuilderDefinition instanceof ConfigurationBuilderOfMethodDefinition methodDefinition) {
+                String factoryMethod = methodDefinition.builderElement().getAnnotationMetadata()
+                    .stringValue(ConfigurationBuilder.class, "factoryMethod").orElse(null);
 
-            ClassTypeDef builderType = ClassTypeDef.of(configBuilderMethodInjectPoint.type);
-            if (StringUtils.isNotEmpty(factoryMethod)) {
-                return builderType.invokeStatic(factoryMethod, builderType).newLocal("builder" + NameUtils.capitalize(configBuilderMethodInjectPoint.methodName), builderVar -> {
-                    List<StatementDef> statements =
-                        getBuilderMethodStatements(injectMethodSignature, configBuilderMethodInjectPoint.builderPoints, (VariableDef.Local) builderVar);
+                ClassTypeDef builderType = ClassTypeDef.of(methodDefinition.builderType());
+                MethodElement method = methodDefinition.method();
+                String methodName = method.getName();
+                if (StringUtils.isNotEmpty(factoryMethod)) {
+                    return builderType.invokeStatic(factoryMethod, builderType).newLocal("builder" + NameUtils.capitalize(methodName), builderVar -> {
+                        List<StatementDef> statements =
+                            getBuilderMethodStatements(injectMethodSignature, methodDefinition.elements(), (VariableDef.Local) builderVar);
 
-                    String propertyName = NameUtils.getPropertyNameForGetter(configBuilderMethodInjectPoint.methodName);
-                    String setterName = NameUtils.setterNameFor(propertyName);
+                        String propertyName = NameUtils.getPropertyNameForGetter(methodName);
+                        String setterName = NameUtils.setterNameFor(propertyName);
 
-                    statements.add(injectMethodSignature.instanceVar
-                        .invoke(setterName, TypeDef.VOID, builderVar));
+                        statements.add(injectMethodSignature.instanceVar
+                            .invoke(setterName, TypeDef.VOID, builderVar));
 
-                    return StatementDef.multi(statements);
-                });
+                        return StatementDef.multi(statements);
+                    });
+                } else {
+                    return injectMethodSignature.instanceVar
+                        .invoke(methodName, builderType)
+                        .newLocal("builder" + NameUtils.capitalize(methodName), builderVar -> StatementDef.multi(
+                            getBuilderMethodStatements(injectMethodSignature, methodDefinition.elements(), (VariableDef.Local) builderVar)
+                        ));
+                }
+            } else if (configurationBuilderDefinition instanceof ConfigurationBuilderOfFieldDefinition fieldDefinition) {
+                String factoryMethod = fieldDefinition.fieldElement().getAnnotationMetadata()
+                    .stringValue(ConfigurationBuilder.class, "factoryMethod").orElse(null);
+                String field = fieldDefinition.fieldElement().getName();
+                ClassTypeDef builderType = ClassTypeDef.of(fieldDefinition.builderType());
+                if (StringUtils.isNotEmpty(factoryMethod)) {
+                    return builderType.invokeStatic(factoryMethod, builderType).newLocal("builder" + NameUtils.capitalize(field), builderVar -> {
+                        List<StatementDef> statements = getBuilderMethodStatements(injectMethodSignature, fieldDefinition.elements(), (VariableDef.Local) builderVar);
+
+                        statements.add(injectMethodSignature.instanceVar
+                            .field(field, builderType)
+                            .put(builderVar));
+
+                        return StatementDef.multi(statements);
+                    });
+                } else {
+                    return injectMethodSignature.instanceVar
+                        .field(field, builderType)
+                        .newLocal("builder" + NameUtils.capitalize(field), builderVar -> StatementDef.multi(
+                            getBuilderMethodStatements(injectMethodSignature, fieldDefinition.elements(), (VariableDef.Local) builderVar)
+                        ));
+                }
             } else {
-                return injectMethodSignature.instanceVar
-                    .invoke(configBuilderMethodInjectPoint.methodName, builderType)
-                    .newLocal("builder" + NameUtils.capitalize(configBuilderMethodInjectPoint.methodName), builderVar -> StatementDef.multi(
-                        getBuilderMethodStatements(injectMethodSignature, configBuilderMethodInjectPoint.builderPoints, (VariableDef.Local) builderVar)
-                    ));
-            }
-        }
-        if (injectionPoint instanceof ConfigFieldBuilderInjectCommand configBuilderFieldInjectPoint) {
-            String factoryMethod = configBuilderFieldInjectPoint.configBuilderState.getAnnotationMetadata()
-                .stringValue(ConfigurationBuilder.class, "factoryMethod").orElse(null);
-            ClassTypeDef builderType = ClassTypeDef.of(configBuilderFieldInjectPoint.type);
-            if (StringUtils.isNotEmpty(factoryMethod)) {
-                return builderType.invokeStatic(factoryMethod, builderType).newLocal("builder" + NameUtils.capitalize(configBuilderFieldInjectPoint.field), builderVar -> {
-                    List<StatementDef> statements = getBuilderMethodStatements(injectMethodSignature, configBuilderFieldInjectPoint.builderPoints, (VariableDef.Local) builderVar);
-
-                    statements.add(injectMethodSignature.instanceVar
-                        .field(configBuilderFieldInjectPoint.field, builderType)
-                        .put(builderVar));
-
-                    return StatementDef.multi(statements);
-                });
-            } else {
-                return injectMethodSignature.instanceVar
-                    .field(configBuilderFieldInjectPoint.field, builderType)
-                    .newLocal("builder" + NameUtils.capitalize(configBuilderFieldInjectPoint.field), builderVar -> StatementDef.multi(
-                        getBuilderMethodStatements(injectMethodSignature, configBuilderFieldInjectPoint.builderPoints, (VariableDef.Local) builderVar)
-                    ));
+                throw new IllegalStateException("Unknown configuration builder def type: " + configurationBuilderDefinition.getClass());
             }
         }
         throw new IllegalStateException();
     }
 
-    private List<StatementDef> getBuilderMethodStatements(InjectMethodSignature injectMethodSignature, List<ConfigBuilderPointInjectCommand> points, VariableDef.Local builderVar) {
+    private List<StatementDef> getBuilderMethodStatements(InjectMethodSignature injectMethodSignature,
+                                                          List<ConfigurationBuilderPropertyDefinition> points, VariableDef.Local builderVar) {
         List<StatementDef> statements = new ArrayList<>();
-        for (ConfigBuilderPointInjectCommand builderPoint : points) {
+        for (ConfigurationBuilderPropertyDefinition builderPoint : points) {
             statements.add(
                 getConfigBuilderPointStatement(injectMethodSignature, builderVar, builderPoint)
             );
@@ -1434,34 +1444,48 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
 
     private StatementDef getConfigBuilderPointStatement(InjectMethodSignature injectMethodSignature,
                                                         VariableDef.Local builderVar,
-                                                        ConfigBuilderPointInjectCommand builderPoint) {
-        if (builderPoint instanceof ConfigBuilderMethodInjectCommand configBuilderMethodInjectPoint) {
-            return visitConfigBuilderMethodInternal(
-                injectMethodSignature,
-                configBuilderMethodInjectPoint.propertyName,
-                configBuilderMethodInjectPoint.returnType,
-                configBuilderMethodInjectPoint.methodName,
-                configBuilderMethodInjectPoint.paramType,
-                configBuilderMethodInjectPoint.generics,
-                false,
-                configBuilderMethodInjectPoint.path,
-                builderVar
-            );
-        }
-        if (builderPoint instanceof ConfigBuilderMethodDurationInjectCommand configBuilderMethodDurationInjectPoint) {
-            return visitConfigBuilderMethodInternal(
-                injectMethodSignature,
-                configBuilderMethodDurationInjectPoint.propertyName,
-                configBuilderMethodDurationInjectPoint.returnType,
-                configBuilderMethodDurationInjectPoint.methodName,
-                ClassElement.of(Duration.class),
-                Map.of(),
-                true,
-                configBuilderMethodDurationInjectPoint.path,
-                builderVar
-            );
-        }
-        throw new IllegalStateException();
+                                                        ConfigurationBuilderPropertyDefinition builderPoint) {
+        boolean isDurationWithTimeUnit = builderPoint.parameter() == null && builderPoint.type().getName().equals(Duration.class.getName());
+        ClassElement paramType = builderPoint.type();
+        Map<String, ClassElement> generics = builderPoint.method().getTypeArguments();
+
+        boolean zeroArgs = builderPoint.parameter() == null && !isDurationWithTimeUnit;
+
+        // Optional optional = AbstractBeanDefinition.getValueForPath(...)
+        String propertyPath = builderPoint.path();
+        String localName = builderVar.name() + "_optional" + NameUtils.capitalize(propertyPath.replace("[*]", "__all__").replace('.', '_').replace('-', '_'));
+        return getGetValueForPathCall(injectMethodSignature, paramType, builderPoint.name(), propertyPath, zeroArgs, generics)
+            .newLocal(localName, optionalVar -> {
+                return optionalVar.invoke(OPTIONAL_IS_PRESENT_METHOD)
+                    .ifTrue(
+                        optionalVar.invoke(OPTIONAL_GET_METHOD).newLocal(localName + "_value", valueVar -> {
+                            if (zeroArgs) {
+                                return valueVar.cast(boolean.class).ifTrue(
+                                    StatementDef.doTry(
+                                        builderVar.invoke(builderPoint.method())
+                                    ).doCatch(NoSuchMethodError.class, exceptionVar -> StatementDef.multi())
+                                );
+                            }
+                            List<ExpressionDef> values = new ArrayList<>(2);
+                            if (isDurationWithTimeUnit) {
+                                ClassTypeDef timeInitType = ClassTypeDef.of(TimeUnit.class);
+                                values.add(
+                                    valueVar.cast(ClassTypeDef.of(Duration.class))
+                                        .invoke(DURATION_TO_MILLIS_METHOD)
+                                );
+                                values.add(
+                                    timeInitType.getStaticField("MILLISECONDS", timeInitType)
+                                );
+                            } else {
+                                TypeDef paramTypeDef = TypeDef.erasure(paramType);
+                                values.add(valueVar.cast(paramTypeDef));
+                            }
+                            return StatementDef.doTry(
+                                builderVar.invoke(builderPoint.method(), values)
+                            ).doCatch(NoSuchMethodError.class, exceptionVar -> StatementDef.multi());
+                        })
+                    );
+            });
     }
 
     private StatementDef setFieldValue(InjectMethodSignature injectMethodSignature,
@@ -2671,54 +2695,28 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
     }
 
     @Override
-    public void visitConfigBuilderField(
-        ClassElement type,
-        String field,
-        AnnotationMetadata annotationMetadata,
-        ConfigurationMetadataBuilder metadataBuilder,
-        boolean isInterface) {
-
-        ConfigBuilderState state = new ConfigBuilderState(type, field, false, annotationMetadata, isInterface);
-        configBuilderInjectCommand = new ConfigFieldBuilderInjectCommand(type, field, annotationMetadata, metadataBuilder, isInterface, state, new ArrayList<>());
-        injectCommands.add(configBuilderInjectCommand);
+    public void visitConfigBuilder(ConfigurationBuilderDefinition builderDefinition) {
+        injectCommands.add(new ConfigBuilderInjectCommand(builderDefinition));
     }
 
     @Override
-    public void visitConfigBuilderMethod(
-        ClassElement type,
-        String methodName,
-        AnnotationMetadata annotationMetadata,
-        ConfigurationMetadataBuilder metadataBuilder,
-        boolean isInterface) {
-
-        ConfigBuilderState state = new ConfigBuilderState(type, methodName, true, annotationMetadata, isInterface);
-        configBuilderInjectCommand = new ConfigMethodBuilderInjectPointCommand(type, methodName, annotationMetadata, metadataBuilder, isInterface, state, new ArrayList<>());
-        injectCommands.add(configBuilderInjectCommand);
+    public void visitConfigBuilderField(ClassElement type, String field, AnnotationMetadata annotationMetadata, boolean isInterface) {
     }
 
     @Override
-    public void visitConfigBuilderDurationMethod(
-        String propertyName,
-        ClassElement returnType,
-        String methodName,
-        String path) {
-        configBuilderInjectCommand.builderPoints().add(new ConfigBuilderMethodDurationInjectCommand(propertyName, returnType, methodName, path));
+    public void visitConfigBuilderMethod(ClassElement type, String methodName, AnnotationMetadata annotationMetadata, boolean isInterface) {
     }
 
     @Override
-    public void visitConfigBuilderMethod(
-        String propertyName,
-        ClassElement returnType,
-        String methodName,
-        ClassElement paramType,
-        Map<String, ClassElement> generics,
-        String path) {
-        configBuilderInjectCommand.builderPoints().add(new ConfigBuilderMethodInjectCommand(propertyName, returnType, methodName, paramType, generics, path));
+    public void visitConfigBuilderMethod(String propertyName, ClassElement returnType, String methodName, ClassElement paramType, Map<String, ClassElement> generics, String path) {
+    }
+
+    @Override
+    public void visitConfigBuilderDurationMethod(String propertyName, ClassElement returnType, String methodName, String path) {
     }
 
     @Override
     public void visitConfigBuilderEnd() {
-        configBuilderInjectCommand = null;
     }
 
     @Override
@@ -2909,59 +2907,6 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
             ).cast(TypeDef.erasure(fieldElement.getType()));
     }
 
-    private StatementDef visitConfigBuilderMethodInternal(
-        InjectMethodSignature injectMethodSignature,
-        String propertyName,
-        ClassElement returnType,
-        String methodName,
-        ClassElement paramType,
-        Map<String, ClassElement> generics,
-        boolean isDurationWithTimeUnit,
-        String propertyPath,
-        VariableDef.Local builderVar) {
-
-        boolean zeroArgs = paramType == null;
-
-        // Optional optional = AbstractBeanDefinition.getValueForPath(...)
-        String localName = builderVar.name() + "_optional" + NameUtils.capitalize(propertyPath.replace("[*]", "__all__").replace('.', '_').replace('-', '_'));
-        return getGetValueForPathCall(injectMethodSignature, paramType, propertyName, propertyPath, zeroArgs, generics)
-            .newLocal(localName, optionalVar -> {
-                return optionalVar.invoke(OPTIONAL_IS_PRESENT_METHOD)
-                    .ifTrue(
-                        optionalVar.invoke(OPTIONAL_GET_METHOD).newLocal(localName + "_value", valueVar -> {
-                            if (zeroArgs) {
-                                return valueVar.cast(boolean.class).ifTrue(
-                                    StatementDef.doTry(
-                                        builderVar.invoke(methodName, TypeDef.erasure(returnType))
-                                    ).doCatch(NoSuchMethodError.class, exceptionVar -> StatementDef.multi())
-                                );
-                            }
-                            List<ExpressionDef> values = new ArrayList<>();
-                            List<TypeDef> parameterTypes = new ArrayList<>();
-                            if (isDurationWithTimeUnit) {
-                                parameterTypes.add(TypeDef.Primitive.LONG);
-                                ClassTypeDef timeInitType = ClassTypeDef.of(TimeUnit.class);
-                                parameterTypes.add(timeInitType);
-                                values.add(
-                                    valueVar.cast(ClassTypeDef.of(Duration.class))
-                                        .invoke(DURATION_TO_MILLIS_METHOD)
-                                );
-                                values.add(
-                                    timeInitType.getStaticField("MILLISECONDS", timeInitType)
-                                );
-                            } else {
-                                TypeDef paramTypeDef = TypeDef.erasure(paramType);
-                                parameterTypes.add(paramTypeDef);
-                                values.add(valueVar.cast(paramTypeDef));
-                            }
-                            return StatementDef.doTry(
-                                builderVar.invoke(methodName, parameterTypes, TypeDef.erasure(returnType), values)
-                            ).doCatch(NoSuchMethodError.class, exceptionVar -> StatementDef.multi());
-                        })
-                    );
-            });
-    }
-
     private ExpressionDef getGetValueForPathCall(InjectMethodSignature injectMethodSignature,
                                                  ClassElement propertyType,
                                                  String propertyName,
@@ -2992,7 +2937,6 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
             );
     }
 
-    @Internal
     private ExpressionDef getValueBypassingBeanContext(ClassElement type, List<VariableDef.MethodParameter> methodParameters) {
         // Used in instantiate and inject methods
         if (type.isAssignable(BeanResolutionContext.class)) {
@@ -4897,56 +4841,11 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
 
     }
 
-    private record ConfigFieldBuilderInjectCommand(ClassElement type,
-                                                   String field,
-                                                   AnnotationMetadata annotationMetadata,
-                                                   ConfigurationMetadataBuilder metadataBuilder,
-                                                   boolean isInterface,
-                                                   ConfigBuilderState configBuilderState,
-                                                   List<ConfigBuilderPointInjectCommand> builderPoints) implements ConfigBuilderInjectCommand {
-
+    private record ConfigBuilderInjectCommand(ConfigurationBuilderDefinition configurationBuilderDefinition) implements InjectMethodCommand {
         @Override
         public boolean hasInjectScope() {
             return false;
         }
-
-    }
-
-    private record ConfigMethodBuilderInjectPointCommand(ClassElement type,
-                                                         String methodName,
-                                                         AnnotationMetadata annotationMetadata,
-                                                         ConfigurationMetadataBuilder metadataBuilder,
-                                                         boolean isInterface,
-                                                         ConfigBuilderState configBuilderState,
-                                                         List<ConfigBuilderPointInjectCommand> builderPoints) implements ConfigBuilderInjectCommand {
-
-        @Override
-        public boolean hasInjectScope() {
-            return false;
-        }
-    }
-
-    private record ConfigBuilderMethodDurationInjectCommand(String propertyName,
-                                                            ClassElement returnType,
-                                                            String methodName,
-                                                            String path) implements ConfigBuilderPointInjectCommand {
-
-    }
-
-    private record ConfigBuilderMethodInjectCommand(String propertyName,
-                                                    ClassElement returnType,
-                                                    String methodName,
-                                                    ClassElement paramType,
-                                                    Map<String, ClassElement> generics,
-                                                    String path) implements ConfigBuilderPointInjectCommand {
-
-    }
-
-    private interface ConfigBuilderInjectCommand extends InjectMethodCommand {
-        List<ConfigBuilderPointInjectCommand> builderPoints();
-    }
-
-    private interface ConfigBuilderPointInjectCommand {
     }
 
     private record InjectFieldInjectCommand(TypedElement declaringType,
