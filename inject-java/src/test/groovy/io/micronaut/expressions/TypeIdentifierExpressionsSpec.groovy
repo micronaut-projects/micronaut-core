@@ -49,4 +49,20 @@ class TypeIdentifierExpressionsSpec extends AbstractEvaluatedExpressionsSpec {
         expr2 instanceof Class && expr2 == Object.class
     }
 
+    void "test type identifier including env in package naming"(){
+        given:
+        Object expr1 = evaluateAgainstContext("#{ #getType(T(io.micronaut.context.env.Environment)) }",
+          """
+                  @jakarta.inject.Singleton
+                  class Context {
+                      Class<?> getType(Class<?> type) {
+                          return type;
+                      }
+                  }
+              """)
+    
+        expect:
+        expr1 instanceof Class && expr1 == Environment.class
+    }
+
 }
