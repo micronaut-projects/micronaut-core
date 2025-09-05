@@ -16,7 +16,6 @@
 package io.micronaut.core.beans;
 
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
-import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.beans.exceptions.IntrospectionException;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -413,7 +412,6 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
      * @param <T> The bean type.
      * @since 4.1.0
      */
-    @Experimental
     interface Builder<T> {
         /**
          * All the arguments possible for creating the instance.
