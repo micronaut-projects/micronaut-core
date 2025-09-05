@@ -413,7 +413,6 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
      * @param <T> The bean type.
      * @since 4.1.0
      */
-    @Experimental
     interface Builder<T> {
         /**
          * All the arguments possible for creating the instance.
