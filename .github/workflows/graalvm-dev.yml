@@ -18,7 +18,7 @@ jobs:
     outputs:
       matrix: ${{ steps.build-matrix.outputs.matrix }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Build Matrix
         uses: micronaut-projects/github-actions/graalvm/build-matrix@master
         id: build-matrix
@@ -42,7 +42,7 @@ jobs:
       DEVELOCITY_CACHE_USERNAME: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME }}
       DEVELOCITY_CACHE_PASSWORD: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Pre-Build Steps
         uses: micronaut-projects/github-actions/graalvm/pre-build@master
         id: pre-build
