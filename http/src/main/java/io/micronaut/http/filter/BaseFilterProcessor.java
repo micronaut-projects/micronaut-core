@@ -16,7 +16,7 @@
 package io.micronaut.http.filter;
 
 import io.micronaut.context.BeanContext;
-import io.micronaut.context.processor.ExecutableMethodProcessor;
+import io.micronaut.context.processor.BeanDefinitionProcessor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
@@ -62,7 +62,7 @@ import java.util.function.Supplier;
  * @since 4.0.0
  */
 @Internal
-public abstract class BaseFilterProcessor<A extends Annotation> implements ExecutableMethodProcessor<A> {
+public abstract class BaseFilterProcessor<A extends Annotation> implements BeanDefinitionProcessor<A> {
     @Nullable
     private final BeanContext beanContext;
     private final Class<A> filterAnnotation;
@@ -103,13 +103,14 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements Execu
     }
 
     @Override
-    public void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
-        //noinspection unchecked,rawtypes
-        process0(beanDefinition, (ExecutableMethod) method);
+    public final void process(BeanDefinition<?> beanDefinition, BeanContext beanContext) {
+        for (ExecutableMethod<?, ?> executableMethod : beanDefinition.getExecutableMethods()) {
+            process0(beanDefinition, (ExecutableMethod) executableMethod);
+        }
     }
 
     /**
-     * Add a filter. Called during {@link #process(BeanDefinition, ExecutableMethod)}.
+     * Add a filter.
      *
      * @param factory           Factory that will create the filter instance
      * @param methodAnnotations Annotations on the filter method

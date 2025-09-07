@@ -62,6 +62,18 @@ context.registerBeanDefinition(
 );
 ----
 
+==== Runtime annotation processors changes
+
+The `@Executable` methods processor api:context.processor[ExecutableMethodProcessor] should be used only for the annotations annotated with `@Executable(processOnStartup = true)` to process beans that are annotated with some annotation (executable or not) api:context.processor[BeanDefinitionProcessor] should be used.
+
+To replicate the previous behavior of api:context.processor[ExecutableMethodProcessor] for the annotations that are not supported to be processed at the startup, it's enough to implement api:context.processor[BeanDefinitionProcessor] and iterate all the executable methods on the bean definition.
+
+Both interfaces are revisited to have better generics and no longer have a superclass.
+
+Executable methods annotated with `@Parallel` will not trigger parallel execution of api:context.processor[ExecutableMethodProcessor]. Users who relied on that functionality should handle parallelism separately.
+
+`@Scheduled` is no longer processed in parallel, this reduced the complexity of the method processor and removed unnecessary overhead.
+
 == 4.0.0
 
 === Core Changes

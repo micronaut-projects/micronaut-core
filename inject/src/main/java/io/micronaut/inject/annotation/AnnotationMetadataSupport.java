@@ -181,7 +181,7 @@ public final class AnnotationMetadataSupport {
         );
         coreAnnotationsDefaults.put(
             Executable.class.getName(),
-            Map.of("processOnStartup", false)
+            Map.of(Executable.MEMBER_PROCESS_ON_STARTUP, false)
         );
         coreAnnotationsDefaults.put(
             ConfigurationProperties.class.getName(),

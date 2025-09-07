@@ -743,7 +743,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
                 executableMethod,
                 visitorContext
             );
-            if (executableMethod.getAnnotationMetadata().isTrue(Executable.class, "processOnStartup")) {
+            if (executableMethod.getAnnotationMetadata().isTrue(Executable.class, Executable.MEMBER_PROCESS_ON_STARTUP)) {
                 beanDefinitionWriter.setRequiresMethodProcessing(true);
             }
         }

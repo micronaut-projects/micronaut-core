@@ -15,7 +15,8 @@
  */
 package io.micronaut.function;
 
-import io.micronaut.context.processor.ExecutableMethodProcessor;
+import io.micronaut.context.BeanContext;
+import io.micronaut.context.processor.BeanDefinitionProcessor;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.StringUtils;
@@ -36,6 +37,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
@@ -46,7 +48,7 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 @Singleton
-public class DefaultLocalFunctionRegistry implements ExecutableMethodProcessor<FunctionBean>, LocalFunctionRegistry, MediaTypeCodecRegistry {
+public class DefaultLocalFunctionRegistry implements BeanDefinitionProcessor<FunctionBean>, LocalFunctionRegistry, MediaTypeCodecRegistry {
     private final Map<String, ExecutableMethod<?, ?>> consumers = new LinkedHashMap<>(1);
     private final Map<String, ExecutableMethod<?, ?>> functions = new LinkedHashMap<>(1);
     private final Map<String, ExecutableMethod<?, ?>> biFunctions = new LinkedHashMap<>(1);
@@ -150,29 +152,30 @@ public class DefaultLocalFunctionRegistry implements ExecutableMethodProcessor<F
     }
 
     @Override
-    public void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
-        if (method.hasAnnotation(FunctionBean.class)) {
-
-            String functionId = method.stringValue(FunctionBean.class).orElse(null);
-            Class<?> declaringType = method.getDeclaringType();
-            if (StringUtils.isEmpty(functionId)) {
-                String typeName = declaringType.getSimpleName();
-                if (typeName.contains("$")) {
-                    // generated lambda
-                    functionId = NameUtils.hyphenate(method.getMethodName());
-                } else {
-                    functionId = NameUtils.hyphenate(typeName);
+    public void process(BeanDefinition<?> beanDefinition, BeanContext beanContext) {
+        for (ExecutableMethod<?, ?> executableMethod : beanDefinition.getExecutableMethods()) {
+            if (executableMethod.hasAnnotation(FunctionBean.class)) {
+                String functionId = executableMethod.stringValue(FunctionBean.class).orElse(null);
+                Class<?> declaringType = executableMethod.getDeclaringType();
+                if (StringUtils.isEmpty(functionId)) {
+                    String typeName = declaringType.getSimpleName();
+                    if (typeName.contains("$")) {
+                        // generated lambda
+                        functionId = NameUtils.hyphenate(executableMethod.getMethodName());
+                    } else {
+                        functionId = NameUtils.hyphenate(typeName);
+                    }
                 }
-            }
 
-            if (java.util.function.Function.class.isAssignableFrom(declaringType) && method.getMethodName().equals("apply")) {
-                registerFunction(method, functionId);
-            } else if (Consumer.class.isAssignableFrom(declaringType) && method.getMethodName().equals("accept")) {
-                registerConsumer(method, functionId);
-            } else if (BiFunction.class.isAssignableFrom(declaringType) && method.getMethodName().equals("apply")) {
-                registerBiFunction(method, functionId);
-            } else if (Supplier.class.isAssignableFrom(declaringType) && method.getMethodName().equals("get")) {
-                registerSupplier(method, functionId);
+                if (Function.class.isAssignableFrom(declaringType) && executableMethod.getMethodName().equals("apply")) {
+                    registerFunction(executableMethod, functionId);
+                } else if (Consumer.class.isAssignableFrom(declaringType) && executableMethod.getMethodName().equals("accept")) {
+                    registerConsumer(executableMethod, functionId);
+                } else if (BiFunction.class.isAssignableFrom(declaringType) && executableMethod.getMethodName().equals("apply")) {
+                    registerBiFunction(executableMethod, functionId);
+                } else if (Supplier.class.isAssignableFrom(declaringType) && executableMethod.getMethodName().equals("get")) {
+                    registerSupplier(executableMethod, functionId);
+                }
             }
         }
     }

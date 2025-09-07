@@ -395,7 +395,7 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
             return false;
         }
         // This method requires pre-processing. See Executable#processOnStartup()
-        boolean preprocess = methodElement.isTrue(Executable.class, "processOnStartup");
+        boolean preprocess = methodElement.isTrue(Executable.class, Executable.MEMBER_PROCESS_ON_STARTUP);
         if (preprocess) {
             visitor.setRequiresMethodProcessing(true);
         }

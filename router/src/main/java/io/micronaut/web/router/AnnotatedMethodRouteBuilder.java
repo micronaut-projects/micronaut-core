@@ -15,8 +15,9 @@
  */
 package io.micronaut.web.router;
 
+import io.micronaut.context.BeanContext;
 import io.micronaut.context.ExecutionHandleLocator;
-import io.micronaut.context.processor.ExecutableMethodProcessor;
+import io.micronaut.context.processor.BeanDefinitionProcessor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.ArrayUtils;
@@ -61,7 +62,7 @@ import java.util.function.Consumer;
  * @since 1.0
  */
 @Singleton
-public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements ExecutableMethodProcessor<Controller> {
+public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements BeanDefinitionProcessor<Controller> {
 
     private static final MediaType[] DEFAULT_MEDIA_TYPES = {MediaType.APPLICATION_JSON_TYPE};
     private final Map<Class<?>, Consumer<RouteDefinition>> httpMethodsHandlers = new LinkedHashMap<>();
@@ -355,34 +356,35 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
     }
 
     @Override
-    public void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
-        Optional<Class<? extends Annotation>> actionAnn = method.getAnnotationTypeByStereotype(HttpMethodMapping.class);
-        actionAnn.ifPresent(annotationClass -> {
-                Consumer<RouteDefinition> handler = httpMethodsHandlers.get(annotationClass);
-                if (handler != null) {
-                    final int port = beanDefinition.intValue(Controller.class, "port").orElse(-1);
-                    handler.accept(new RouteDefinition(beanDefinition, method, port));
+    public void process(BeanDefinition<?> beanDefinition, BeanContext beanContext) {
+        for (ExecutableMethod<?, ?> method : beanDefinition.getExecutableMethods()) {
+            Optional<Class<? extends Annotation>> actionAnn = method.getAnnotationTypeByStereotype(HttpMethodMapping.class);
+            actionAnn.ifPresent(annotationClass -> {
+                    Consumer<RouteDefinition> handler = httpMethodsHandlers.get(annotationClass);
+                    if (handler != null) {
+                        final int port = beanDefinition.intValue(Controller.class, "port").orElse(-1);
+                        handler.accept(new RouteDefinition(beanDefinition, method, port));
+                    }
                 }
-            }
-        );
+            );
 
-        if (actionAnn.isEmpty() && method.isDeclaredAnnotationPresent(UriMapping.class)) {
-            Set<String> uris = CollectionUtils.setOf(method.stringValues(UriMapping.class, "uris"));
-            uris.add(method.stringValue(UriMapping.class).orElse(UriMapping.DEFAULT_URI));
-            for (String uri: uris) {
-                MediaType[] produces = MediaType.of(method.stringValues(Produces.class));
-                Route route = GET(resolveUri(beanDefinition, uri,
-                        method,
-                        uriNamingStrategy),
+            if (actionAnn.isEmpty() && method.isDeclaredAnnotationPresent(UriMapping.class)) {
+                Set<String> uris = CollectionUtils.setOf(method.stringValues(UriMapping.class, "uris"));
+                uris.add(method.stringValue(UriMapping.class).orElse(UriMapping.DEFAULT_URI));
+                for (String uri: uris) {
+                    MediaType[] produces = MediaType.of(method.stringValues(Produces.class));
+                    Route route = GET(resolveUri(beanDefinition, uri,
+                            method,
+                            uriNamingStrategy),
                         method.getDeclaringType(),
                         method.getMethodName(),
                         method.getArgumentTypes()).produces(produces);
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Created Route: {}", route);
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Created Route: {}", route);
+                    }
                 }
             }
         }
-
     }
 
     private String resolveUri(BeanDefinition bean, String value, ExecutableMethod method, UriNamingStrategy uriNamingStrategy) {

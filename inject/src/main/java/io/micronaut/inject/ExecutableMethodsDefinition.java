@@ -16,9 +16,11 @@
 package io.micronaut.inject;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.util.CollectionUtils;
 
-import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 
@@ -53,11 +55,23 @@ public interface ExecutableMethodsDefinition<T> {
     @NonNull
     <R> Stream<ExecutableMethod<T, R>> findPossibleMethods(@NonNull String name);
 
-
     /**
      * @return The {@link ExecutableMethod} instances for this definition
      */
     @NonNull
-    Collection<ExecutableMethod<T, ?>> getExecutableMethods();
+    List<ExecutableMethod<T, ?>> getExecutableMethods();
+
+    /**
+     * Retrieves an {@link ExecutableMethod} from the collection of executable methods by the specified index.
+     *
+     * @param index The index of the {@link ExecutableMethod} to retrieve
+     * @return The {@link ExecutableMethod} at the specified index
+     */
+    @NonNull
+    @NextMajorVersion("Remove default method in v6")
+    default <R> ExecutableMethod<T, R> getExecutableMethodByIndex(int index) {
+        List<ExecutableMethod<T, ?>> executableMethods = CollectionUtils.iterableToList(getExecutableMethods());
+        return (ExecutableMethod<T, R>) executableMethods.get(index);
+    }
 
 }

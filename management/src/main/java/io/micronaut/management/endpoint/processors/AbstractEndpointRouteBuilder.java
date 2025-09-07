@@ -16,8 +16,9 @@
 package io.micronaut.management.endpoint.processors;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.BeanContext;
 import io.micronaut.context.LifeCycle;
-import io.micronaut.context.processor.ExecutableMethodProcessor;
+import io.micronaut.context.processor.BeanDefinitionProcessor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
@@ -49,11 +50,11 @@ import java.util.regex.Pattern;
  * @since 1.0
  */
 @Internal
-abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implements ExecutableMethodProcessor<Endpoint>, LifeCycle<AbstractEndpointRouteBuilder> {
+abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implements BeanDefinitionProcessor<Endpoint>, LifeCycle<AbstractEndpointRouteBuilder> {
 
     private static final Pattern ENDPOINT_ID_PATTERN = Pattern.compile("[\\w-]+");
 
-    private Map<Class<?>, Optional<String>> endpointIds = new ConcurrentHashMap<>();
+    private final Map<Class<?>, Optional<String>> endpointIds = new ConcurrentHashMap<>();
 
     private final ApplicationContext beanContext;
 
@@ -109,17 +110,14 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
         return true;
     }
 
-    /**
-     * @param beanDefinition The bean definition to process
-     * @param method The executable method
-     */
     @Override
-    public void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
-        Class<?> declaringType = method.getDeclaringType();
-        if (method.hasStereotype(getSupportedAnnotation())) {
-            Optional<String> endPointId = resolveActiveEndPointId(declaringType);
-            final Integer port = endpointDefaultConfiguration.getPort().orElse(null);
-            endPointId.ifPresent(id -> registerRoute(method, id, port));
+    public void process(BeanDefinition<?> beanDefinition, BeanContext beanContext) {
+        for (ExecutableMethod<?, ?> method : beanDefinition.getExecutableMethods()) {
+            if (method.hasStereotype(getSupportedAnnotation())) {
+                Optional<String> endPointId = resolveActiveEndPointId(method.getDeclaringType());
+                final Integer port = endpointDefaultConfiguration.getPort().orElse(null);
+                endPointId.ifPresent(id -> registerRoute(method, id, port));
+            }
         }
     }
 

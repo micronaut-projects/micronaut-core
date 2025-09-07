@@ -15,10 +15,11 @@
  */
 package io.micronaut.function.web;
 
+import io.micronaut.context.BeanContext;
 import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Value;
-import io.micronaut.context.processor.ExecutableMethodProcessor;
+import io.micronaut.context.processor.BeanDefinitionProcessor;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
@@ -63,7 +64,7 @@ import java.util.stream.Stream;
 @Singleton
 @Replaces(DefaultLocalFunctionRegistry.class)
 public class AnnotatedFunctionRouteBuilder extends DefaultRouteBuilder
-    implements ExecutableMethodProcessor<FunctionBean>, LocalFunctionRegistry, MediaTypeCodecRegistry {
+    implements BeanDefinitionProcessor<FunctionBean>, LocalFunctionRegistry, MediaTypeCodecRegistry {
 
     private final LocalFunctionRegistry localFunctionRegistry;
     private final String contextPath;
@@ -91,104 +92,108 @@ public class AnnotatedFunctionRouteBuilder extends DefaultRouteBuilder
     }
 
     @Override
-    public void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
-        if (beanDefinition.hasAnnotation(FunctionBean.class)) {
-            String methodName = method.getMethodName();
-            Class<?> declaringType = method.getDeclaringType();
-            String functionName = beanDefinition.stringValue(FunctionBean.class).orElse(methodName);
-            String functionMethod = beanDefinition.stringValue(FunctionBean.class, "method").orElse(null);
+    public void process(BeanDefinition<?> beanDefinition, BeanContext beanContext) {
+        for (ExecutableMethod<?, ?> method : beanDefinition.getExecutableMethods()) {
+            process(beanDefinition, method, beanContext);
+        }
+    }
 
-            if (StringUtils.isNotEmpty(functionMethod) && !functionMethod.equals(methodName)) {
-                return;
-            }
+    private void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method, BeanContext beanContext) {
+        String methodName = method.getMethodName();
+        Class<?> declaringType = method.getDeclaringType();
+        String functionName = beanDefinition.stringValue(FunctionBean.class).orElse(methodName);
+        String functionMethod = beanDefinition.stringValue(FunctionBean.class, "method").orElse(null);
 
-            var routes = new ArrayList<UriRoute>(2);
-            MediaType[] consumes = Arrays.stream(method.stringValues(Consumes.class)).map(MediaType::of).toArray(MediaType[]::new);
-            MediaType[] produces = Arrays.stream(method.stringValues(Produces.class)).map(MediaType::of).toArray(MediaType[]::new);
-            boolean implementsFnInterface = false;
-            if (Stream.of(java.util.function.Function.class, Consumer.class, BiFunction.class, BiConsumer.class).anyMatch(type -> type.isAssignableFrom(declaringType))) {
-                implementsFnInterface = true;
-                if (methodName.equals("accept") || methodName.equals("apply")) {
-                    String functionPath = resolveFunctionPath(methodName, declaringType, functionName);
-                    String[] argumentNames = method.getArgumentNames();
-                    String argumentName = argumentNames[0];
-                    int argCount = argumentNames.length;
+        if (StringUtils.isNotEmpty(functionMethod) && !functionMethod.equals(methodName)) {
+            return;
+        }
 
-                    UriRoute route = POST(functionPath, beanDefinition, method);
-                    routes.add(route);
-                    if (argCount == 1) {
-                        route.body(argumentName);
-                    }
+        var routes = new ArrayList<UriRoute>(2);
+        MediaType[] consumes = Arrays.stream(method.stringValues(Consumes.class)).map(MediaType::of).toArray(MediaType[]::new);
+        MediaType[] produces = Arrays.stream(method.stringValues(Produces.class)).map(MediaType::of).toArray(MediaType[]::new);
+        boolean implementsFnInterface = false;
+        if (Stream.of(java.util.function.Function.class, Consumer.class, BiFunction.class, BiConsumer.class).anyMatch(type -> type.isAssignableFrom(declaringType))) {
+            implementsFnInterface = true;
+            if (methodName.equals("accept") || methodName.equals("apply")) {
+                String functionPath = resolveFunctionPath(methodName, declaringType, functionName);
+                String[] argumentNames = method.getArgumentNames();
+                String argumentName = argumentNames[0];
+                int argCount = argumentNames.length;
 
-                    List<Argument<?>> typeArguments = beanDefinition.getTypeArguments();
-                    if (!typeArguments.isEmpty()) {
-                        int size = typeArguments.size();
+                UriRoute route = POST(functionPath, beanDefinition, method);
+                routes.add(route);
+                if (argCount == 1) {
+                    route.body(argumentName);
+                }
 
-                        Argument<?> firstArgument = typeArguments.get(0);
-                        if (size < 3 && ClassUtils.isJavaLangType(firstArgument.getType()) && consumes.length == 0) {
-                            consumes = new MediaType[] {MediaType.TEXT_PLAIN_TYPE, MediaType.APPLICATION_JSON_TYPE};
-                        }
+                List<Argument<?>> typeArguments = beanDefinition.getTypeArguments();
+                if (!typeArguments.isEmpty()) {
+                    int size = typeArguments.size();
 
-                        if (size < 3) {
-                            route.body(Argument.of(firstArgument.getType(), argumentName));
-                        }
-
-                        if (size > 1) {
-                            Argument<?> argument = typeArguments.get(size == 3 ? 2 : 1);
-                            if (ClassUtils.isJavaLangType(argument.getType()) && produces.length == 0) {
-                                produces = new MediaType[] {MediaType.TEXT_PLAIN_TYPE, MediaType.APPLICATION_JSON_TYPE};
-                            }
-                        }
-                    } else if (argCount == 1 && ClassUtils.isJavaLangType(method.getArgumentTypes()[0]) && consumes.length == 0) {
+                    Argument<?> firstArgument = typeArguments.get(0);
+                    if (size < 3 && ClassUtils.isJavaLangType(firstArgument.getType()) && consumes.length == 0) {
                         consumes = new MediaType[] {MediaType.TEXT_PLAIN_TYPE, MediaType.APPLICATION_JSON_TYPE};
                     }
-                }
-            }
 
-            if (routes.isEmpty() && Supplier.class.isAssignableFrom(declaringType)) {
-                implementsFnInterface = true;
-                if (methodName.equals("get")) {
-                    String functionPath = resolveFunctionPath(methodName, declaringType, functionName);
-                    routes.add(GET(functionPath, beanDefinition, method));
-                    routes.add(HEAD(functionPath, beanDefinition, method));
-                }
-            }
+                    if (size < 3) {
+                        route.body(Argument.of(firstArgument.getType(), argumentName));
+                    }
 
-            if (routes.isEmpty() && (!implementsFnInterface || StringUtils.isNotEmpty(functionMethod))) {
-                // Only add a custom method when it's explicitly defined or if the bean doesn't implement known functional interface
-                Argument<?>[] argumentTypes = method.getArguments();
-                int argCount = argumentTypes.length;
-                if (argCount < 3) {
-                    String functionPath = resolveFunctionPath(methodName, declaringType, functionName);
-                    if (argCount == 0) {
-                        routes.add(GET(functionPath, beanDefinition, method));
-                        routes.add(HEAD(functionPath, beanDefinition, method));
-                    } else {
-                        UriRoute route = POST(functionPath, beanDefinition, method);
-                        routes.add(route);
-                        if (argCount != 2 && ClassUtils.isJavaLangType(argumentTypes[0].getType())) {
-                            route.body(method.getArgumentNames()[0])
-                                .consumesAll();
+                    if (size > 1) {
+                        Argument<?> argument = typeArguments.get(size == 3 ? 2 : 1);
+                        if (ClassUtils.isJavaLangType(argument.getType()) && produces.length == 0) {
+                            produces = new MediaType[] {MediaType.TEXT_PLAIN_TYPE, MediaType.APPLICATION_JSON_TYPE};
                         }
                     }
+                } else if (argCount == 1 && ClassUtils.isJavaLangType(method.getArgumentTypes()[0]) && consumes.length == 0) {
+                    consumes = new MediaType[] {MediaType.TEXT_PLAIN_TYPE, MediaType.APPLICATION_JSON_TYPE};
                 }
             }
+        }
 
-            if (!routes.isEmpty()) {
-                for (UriRoute route : routes) {
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("Created Route to Function: {}", route);
-                    }
-
-                    route.consumes(consumes);
-                    route.produces(produces);
-                }
-
+        if (routes.isEmpty() && Supplier.class.isAssignableFrom(declaringType)) {
+            implementsFnInterface = true;
+            if (methodName.equals("get")) {
                 String functionPath = resolveFunctionPath(methodName, declaringType, functionName);
-                availableFunctions.put(functionName, URI.create(functionPath));
-
-                ((ExecutableMethodProcessor<?>) localFunctionRegistry).process(beanDefinition, method);
+                routes.add(GET(functionPath, beanDefinition, method));
+                routes.add(HEAD(functionPath, beanDefinition, method));
             }
+        }
+
+        if (routes.isEmpty() && (!implementsFnInterface || StringUtils.isNotEmpty(functionMethod))) {
+            // Only add a custom method when it's explicitly defined or if the bean doesn't implement known functional interface
+            Argument<?>[] argumentTypes = method.getArguments();
+            int argCount = argumentTypes.length;
+            if (argCount < 3) {
+                String functionPath = resolveFunctionPath(methodName, declaringType, functionName);
+                if (argCount == 0) {
+                    routes.add(GET(functionPath, beanDefinition, method));
+                    routes.add(HEAD(functionPath, beanDefinition, method));
+                } else {
+                    UriRoute route = POST(functionPath, beanDefinition, method);
+                    routes.add(route);
+                    if (argCount != 2 && ClassUtils.isJavaLangType(argumentTypes[0].getType())) {
+                        route.body(method.getArgumentNames()[0])
+                            .consumesAll();
+                    }
+                }
+            }
+        }
+
+        if (!routes.isEmpty()) {
+            for (UriRoute route : routes) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Created Route to Function: {}", route);
+                }
+
+                route.consumes(consumes);
+                route.produces(produces);
+            }
+
+            String functionPath = resolveFunctionPath(methodName, declaringType, functionName);
+            availableFunctions.put(functionName, URI.create(functionPath));
+
+            ((BeanDefinitionProcessor<?>) localFunctionRegistry).process(beanDefinition, beanContext);
         }
     }
 
