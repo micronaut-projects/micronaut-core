@@ -23,6 +23,7 @@ import io.micronaut.inject.processing.JavaModelUtils;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.DeclaredType;
@@ -75,14 +76,17 @@ public class ModelUtils {
     public Stream<TypeElement> resolveTypeElements(Set<? extends Element> annotatedElements) {
         return annotatedElements
             .stream()
-            .map(element -> {
+            .flatMap(element -> {
                 if (element instanceof ExecutableElement executableElement) {
-                    return executableElement.getEnclosingElement();
+                    return Stream.of(executableElement.getEnclosingElement());
                 }
                 if (element instanceof VariableElement variableElement) {
-                    return variableElement.getEnclosingElement();
+                    return Stream.of(variableElement.getEnclosingElement());
                 }
-                return element;
+                if (element instanceof PackageElement packageElement) {
+                    return packageElement.getEnclosedElements().stream();
+                }
+                return Stream.of(element);
             })
             .filter(element -> JavaModelUtils.isClassOrInterface(element) || JavaModelUtils.isEnum(element) || JavaModelUtils.isRecord(element))
             .map(this::classElementFor)

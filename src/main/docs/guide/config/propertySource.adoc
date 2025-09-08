@@ -144,6 +144,8 @@ Environment variables are treated specially to allow more flexibility. Note that
 
 IMPORTANT: Because the number of properties generated is exponential based on the number of `_` characters in an environment variable, it is recommended to refine which, if any, environment variables are included in configuration if the number of environment variables with multiple underscores is high.
 
+IMPORTANT: Because of the way `_` characters are treated in environment variables, it is not possible to target a poperty with `_` in the name. Per the above, properties should be in kebab case to maintain the ability to target the property with environment variables.
+
 To control how environment properties participate in configuration, call the respective methods on the `Micronaut` builder.
 
 snippet::io.micronaut.docs.context.Application[tags="imports,class",title="Application class"]

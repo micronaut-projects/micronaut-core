@@ -20,7 +20,7 @@ import io.micronaut.annotation.processing.visitor.JavaElementFactory;
 import io.micronaut.annotation.processing.visitor.JavaNativeElement;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.visitor.VisitorUtils;
-import io.micronaut.core.annotation.Generated;
+import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.service.SoftServiceLoader;
@@ -82,7 +82,6 @@ import static io.micronaut.core.util.StringUtils.EMPTY_STRING;
     VisitorContext.MICRONAUT_PROCESSING_MODULE
 })
 public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcessor {
-    private static final SoftServiceLoader<TypeElementVisitor> SERVICE_LOADER = SoftServiceLoader.load(TypeElementVisitor.class, TypeElementVisitorProcessor.class.getClassLoader()).disableFork();
     private static final Set<String> VISITOR_WARNINGS;
     private static final Set<String> SUPPORTED_ANNOTATION_NAMES;
 
@@ -223,10 +222,11 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             .collect(Collectors.toSet());
     }
 
+    @NextMajorVersion("`roundEnv.getRootElements()` should be removed in Micronaut 4. " +
+        "It should not be possible to process elements without at least one annotation present and this call breaks that assumption")
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
-        if (!loadedVisitors.isEmpty() && !(annotations.size() == 1
-            && Generated.class.getName().equals(annotations.iterator().next().getQualifiedName().toString()))) {
+        if (!loadedVisitors.isEmpty() && !processingGeneratedAnnotation(annotations)) {
 
             TypeElement groovyObjectTypeElement = elementUtils.getTypeElement("groovy.lang.GroovyObject");
             TypeMirror groovyObjectType = groovyObjectTypeElement != null ? groovyObjectTypeElement.asType() : null;
@@ -240,8 +240,6 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                 ).filter(notGroovyObject).forEach(elements::add);
             }
 
-            // This call to getRootElements() should be removed in Micronaut 4. It should not be possible
-            // to process elements without at least one annotation present and this call breaks that assumption.
             modelUtils.resolveTypeElements(
                 roundEnv.getRootElements()
             ).filter(notGroovyObject).forEach(elements::add);
@@ -274,12 +272,18 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                 List<JavaClassElement> javaClassElements = elements.stream()
                     .map(typeElement -> elementFactory.newSourceClassElement(typeElement, elementAnnotationMetadataFactory))
                     .collect(Collectors.toCollection(() -> new ArrayList<>(elements.size())));
-
                 List<ClassElement> extraClasses = new ArrayList<>();
-                for (JavaClassElement javaClassElement : javaClassElements) {
-                    extraClasses.addAll(VisitorUtils.collectImportedElements(javaClassElement, javaVisitorContext));
+                for (JavaClassElement javaClassElement : new ArrayList<>(javaClassElements)) {
+                    try {
+                        extraClasses.addAll(VisitorUtils.collectImportedElements(javaClassElement, javaVisitorContext));
+                        javaClassElements.addAll((Collection) extraClasses);
+                    } catch (PostponeToNextRoundException e) {
+                        postponeElement(javaClassElement, e.getNativeErrorElement(), e);
+                    } catch (ElementPostponedToNextRoundException e) {
+                        Element element = PostponeToNextRoundException.resolvedFailedElement(e.getOriginatingElement());
+                        postponeElement(javaClassElement, element, e);
+                    }
                 }
-                javaClassElements.addAll((Collection) extraClasses);
 
                 for (LoadedVisitor loadedVisitor : loadedVisitors) {
                     for (JavaClassElement javaClassElement : javaClassElements) {
@@ -329,7 +333,6 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
         if (roundEnv.processingOver()) {
             javaVisitorContext.finish();
-            writeBeanDefinitionsToMetaInf();
         }
         return false;
     }
@@ -429,22 +432,11 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         return typeElementVisitors;
     }
 
-    /**
-     * Writes {@link io.micronaut.inject.BeanDefinitionReference} into /META-INF/services/io.micronaut.inject.BeanDefinitionReference.
-     */
-    private void writeBeanDefinitionsToMetaInf() {
-        try {
-            classWriterOutputVisitor.finish();
-        } catch (Exception e) {
-            String message = e.getMessage();
-            error("Error occurred writing META-INF files: %s", message != null ? message : e);
-        }
-    }
-
     @NonNull
-    private static Collection<? extends TypeElementVisitor<?, ?>> findCoreTypeElementVisitors(
-        @Nullable Set<String> warnings) {
-        return SERVICE_LOADER.collectAll(visitor -> {
+    private static Collection<? extends TypeElementVisitor<?, ?>> findCoreTypeElementVisitors(@Nullable Set<String> warnings) {
+        return SoftServiceLoader.load(TypeElementVisitor.class, TypeElementVisitorProcessor.class.getClassLoader())
+            .disableFork()
+            .collectAll(visitor -> {
                 if (!visitor.isEnabled()) {
                     return false;
                 }

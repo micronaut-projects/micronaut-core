@@ -251,21 +251,21 @@ public abstract class ResponseLifecycle {
     }
 
     /**
-     * @see ConcatenatingSubscriber.ByteBufferConcatenatingSubscriber#concatenate
+     * @see ConcatenatingSubscriber#concatenate
      * @param items The items
      * @return The concatenated body
      */
     protected @NonNull CloseableByteBody concatenate(@NonNull Publisher<ByteBody> items) {
-        return ConcatenatingSubscriber.ByteBufferConcatenatingSubscriber.concatenate(items);
+        return ConcatenatingSubscriber.concatenate(byteBodyFactory, items, ConcatenatingSubscriber.Separators.NONE);
     }
 
     /**
-     * @see ConcatenatingSubscriber.JsonByteBufferConcatenatingSubscriber#concatenateJson
+     * @see ConcatenatingSubscriber#concatenate
      * @param items The items
      * @return The concatenated body
      */
     protected @NonNull CloseableByteBody concatenateJson(@NonNull Publisher<ByteBody> items) {
-        return ConcatenatingSubscriber.JsonByteBufferConcatenatingSubscriber.concatenateJson(items);
+        return ConcatenatingSubscriber.concatenate(byteBodyFactory, items, ConcatenatingSubscriber.Separators.JDK_JSON);
     }
 
     /**

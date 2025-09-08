@@ -17,10 +17,11 @@ package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
-import io.micronaut.http.HttpHeaders;
-import io.micronaut.http.body.stream.BodySizeLimits;
+import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
+import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.core.io.buffer.ReadBufferFactory;
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 
 import java.nio.ByteBuffer;
 import java.util.OptionalLong;
@@ -30,11 +31,17 @@ import java.util.OptionalLong;
  *
  * @since 4.8.0
  * @author Jonas Konrad
+ * @deprecated Use {@link ByteBodyFactory#adapt}
  */
+@Deprecated(forRemoval = true)
 @Experimental
-public final class ByteBufferBodyAdapter extends AbstractBodyAdapter<ByteBuffer, ReactiveByteBufferByteBody.SharedBuffer> {
-    private ByteBufferBodyAdapter(Publisher<ByteBuffer> source, @Nullable Runnable onDiscard) {
-        super(source, onDiscard);
+public final class ByteBufferBodyAdapter {
+    private static @NonNull ByteBodyFactory byteBodyFactory() {
+        return ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE);
+    }
+
+    private static @NonNull Flux<ReadBuffer> toReadBuffers(@NonNull Publisher<ByteBuffer> source) {
+        return Flux.from(source).map(ReadBufferFactory.getJdkFactory()::adapt);
     }
 
     /**
@@ -45,25 +52,8 @@ public final class ByteBufferBodyAdapter extends AbstractBodyAdapter<ByteBuffer,
      */
     @NonNull
     static ReactiveByteBufferByteBody adapt(@NonNull Publisher<ByteBuffer> source) {
-        return adapt(source, null, null);
-    }
-
-    /**
-     * Create a new body that contains the bytes of the given publisher.
-     *
-     * @param publisher        The byte publisher
-     * @param headersForLength Optional headers for reading the {@code content-length} header
-     * @param onDiscard        Optional runnable to call if the body is discarded ({@link #allowDiscard()})
-     * @return A body with those bytes
-     */
-    @NonNull
-    static ReactiveByteBufferByteBody adapt(@NonNull Publisher<ByteBuffer> publisher, @Nullable HttpHeaders headersForLength, @Nullable Runnable onDiscard) {
-        ByteBufferBodyAdapter adapter = new ByteBufferBodyAdapter(publisher, onDiscard);
-        adapter.sharedBuffer = new ReactiveByteBufferByteBody.SharedBuffer(BodySizeLimits.UNLIMITED, adapter);
-        if (headersForLength != null) {
-            adapter.sharedBuffer.setExpectedLengthFrom(headersForLength.get(HttpHeaders.CONTENT_LENGTH));
-        }
-        return new ReactiveByteBufferByteBody(adapter.sharedBuffer);
+        ByteBodyFactory bbf = byteBodyFactory();
+        return (ReactiveByteBufferByteBody) bbf.adapt(toReadBuffers(source));
     }
 
     /**
@@ -74,18 +64,7 @@ public final class ByteBufferBodyAdapter extends AbstractBodyAdapter<ByteBuffer,
      * @return The ByteBody fed by the publisher
      */
     public static CloseableByteBody adapt(@NonNull Publisher<ByteBuffer> publisher, @NonNull OptionalLong contentLength) {
-        ByteBufferBodyAdapter adapter = new ByteBufferBodyAdapter(publisher, null);
-        adapter.sharedBuffer = new ReactiveByteBufferByteBody.SharedBuffer(BodySizeLimits.UNLIMITED, adapter);
-        contentLength.ifPresent(adapter.sharedBuffer::setExpectedLength);
-        return new ReactiveByteBufferByteBody(adapter.sharedBuffer);
-    }
-
-    @Override
-    public void onNext(ByteBuffer buffer) {
-        long newDemand = demand.addAndGet(-buffer.remaining());
-        sharedBuffer.add(buffer);
-        if (newDemand > 0) {
-            subscription.request(1);
-        }
+        ByteBodyFactory bbf = byteBodyFactory();
+        return bbf.adapt(toReadBuffers(publisher), contentLength);
     }
 }

@@ -21,13 +21,10 @@ import io.micronaut.ast.groovy.utils.AstMessageUtils
 import io.micronaut.ast.groovy.utils.InMemoryByteCodeGroovyClassLoader
 import io.micronaut.ast.groovy.utils.InMemoryClassWriterOutputVisitor
 import io.micronaut.ast.groovy.visitor.GroovyNativeElement
-import io.micronaut.ast.groovy.visitor.GroovyPackageElement
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
-import io.micronaut.context.annotation.Configuration
 import io.micronaut.inject.processing.BeanDefinitionCreator
 import io.micronaut.inject.processing.BeanDefinitionCreatorFactory
 import io.micronaut.inject.processing.ProcessingException
-import io.micronaut.inject.writer.BeanConfigurationWriter
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 import io.micronaut.inject.writer.ClassWriterOutputVisitor
 import io.micronaut.inject.writer.DirectoryClassWriterOutputVisitor
@@ -36,7 +33,6 @@ import org.codehaus.groovy.ast.AnnotatedNode
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.InnerClassNode
 import org.codehaus.groovy.ast.ModuleNode
-import org.codehaus.groovy.ast.PackageNode
 import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.CompilePhase
 import org.codehaus.groovy.control.SourceUnit
@@ -74,29 +70,6 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         }
 
         List<ClassNode> classes = moduleNode.getClasses()
-        if (classes.size() == 1) {
-            ClassNode classNode = classes[0]
-            if (classNode.nameWithoutPackage == 'package-info') {
-                PackageNode packageNode = classNode.getPackage()
-                def visitorContext = new GroovyVisitorContext(source, unit)
-                def groovyPackageElement = new GroovyPackageElement(visitorContext, packageNode, visitorContext.getElementAnnotationMetadataFactory())
-                if (groovyPackageElement.hasStereotype(Configuration)) {
-                    def writer = new BeanConfigurationWriter(
-                            classNode.packageName,
-                            groovyPackageElement,
-                            groovyPackageElement.getAnnotationMetadata(),
-                            visitorContext
-                    )
-                    try {
-                        writer.accept(outputVisitor)
-                        outputVisitor.finish()
-                    } catch (Throwable e) {
-                        AstMessageUtils.error(source, classNode, "Error generating bean configuration for package-info class [${classNode.name}]: $e.message")
-                    }
-                }
-                return
-            }
-        }
 
         def groovyVisitorContext = new GroovyVisitorContext(source, unit)
         def elementAnnotationMetadataFactory = groovyVisitorContext

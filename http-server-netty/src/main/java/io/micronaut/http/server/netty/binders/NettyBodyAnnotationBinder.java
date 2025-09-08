@@ -38,7 +38,7 @@ import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.context.ServerHttpRequestContext;
-import io.micronaut.http.netty.body.AvailableNettyByteBody;
+import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.server.netty.FormDataHttpContentProcessor;
 import io.micronaut.http.server.netty.FormRouteCompleter;
 import io.micronaut.http.server.netty.MicronautHttpData;
@@ -159,7 +159,7 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
         }
         if (reader == null && nhr.isFormOrMultipartData()) {
             FormDataHttpContentProcessor processor = new FormDataHttpContentProcessor(nhr, httpServerConfiguration);
-            ByteBuf buf = AvailableNettyByteBody.toByteBuf(imm);
+            ByteBuf buf = NettyByteBodyFactory.toByteBuf(imm);
             List<InterfaceHttpData> data = new ArrayList<>();
             if (buf.isReadable()) {
                 processor.add(new DefaultLastHttpContent(buf), data);
@@ -203,7 +203,7 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
             nhr.setLegacyBody(result);
             return Optional.ofNullable(result);
         }
-        ByteBuf byteBuf = AvailableNettyByteBody.toByteBuf(imm);
+        ByteBuf byteBuf = NettyByteBodyFactory.toByteBuf(imm);
         Optional<T> converted = conversionService.convert(byteBuf, ByteBuf.class, context.getArgument().getType(), context);
         NettyConverters.postProcess(byteBuf, converted);
         nhr.setLegacyBody(converted.orElse(null));

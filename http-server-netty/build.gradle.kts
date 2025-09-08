@@ -14,8 +14,8 @@ import org . apache . tools . ant . taskdefs . condition . Os
 tasks {
     test {
         systemProperty("io.netty.leakDetection.level", "paranoid")
-        systemProperty("io.netty.customResourceLeakDetector", "io.micronaut.http.server.netty.fuzzing.BufferLeakDetection")
         systemProperty("io.netty.leakDetection.targetRecords", "100")
+        systemProperty("junit.jupiter.extensions.autodetection.enabled", "true")
         jvmArgs("--add-opens=java.base/java.lang=ALL-UNNAMED")
         maxHeapSize = "1G"
     }

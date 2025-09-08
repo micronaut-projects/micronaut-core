@@ -92,6 +92,24 @@ public abstract class HttpClientConfiguration {
     public static final int DEFAULT_MAX_CONTENT_LENGTH = 1024 * 1024 * 10; // 10MiB;
 
     /**
+     * The default max header size in bytes.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_MAX_HEADER_SIZE = 8192;
+
+    /**
+     * The default max initial line length for HTTP client codec in bytes.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_MAX_INITIAL_LINE_LENGTH = 4096;
+
+    /**
+     * The default max chunk size for HTTP client codec in bytes.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_MAX_CHUNK_SIZE = 8192;
+
+    /**
      * The default follow redirects value.
      */
     @SuppressWarnings("WeakerAccess")
@@ -140,6 +158,8 @@ public abstract class HttpClientConfiguration {
     private Duration shutdownTimeout = Duration.ofMillis(DEFAULT_SHUTDOWN_TIMEOUT_MILLISECONDS);
 
     private int maxContentLength = DEFAULT_MAX_CONTENT_LENGTH;
+
+    private int maxHeaderSize = DEFAULT_MAX_HEADER_SIZE;
 
     private Proxy.Type proxyType = Proxy.Type.DIRECT;
 
@@ -218,6 +238,7 @@ public abstract class HttpClientConfiguration {
             this.logLevel = copy.logLevel;
             this.loggerName = copy.loggerName;
             this.maxContentLength = copy.maxContentLength;
+            this.maxHeaderSize = copy.maxHeaderSize;
             this.proxyAddress = copy.proxyAddress;
             this.proxyPassword = copy.proxyPassword;
             this.proxySelector = copy.proxySelector;
@@ -616,6 +637,24 @@ public abstract class HttpClientConfiguration {
      */
     public void setMaxContentLength(@ReadableBytes int maxContentLength) {
         this.maxContentLength = maxContentLength;
+    }
+
+    /**
+     * [available in the Netty HTTP client].
+     *
+     * @return The maximum header size the client can handle
+     */
+    public int getMaxHeaderSize() {
+        return maxHeaderSize;
+    }
+
+    /**
+     * Sets the maximum header size the client can handle. Default value ({@value io.micronaut.http.client.HttpClientConfiguration#DEFAULT_MAX_HEADER_SIZE}).
+     *
+     * @param maxHeaderSize The maximum header size the client can handle
+     */
+    public void setMaxHeaderSize(@ReadableBytes int maxHeaderSize) {
+        this.maxHeaderSize = maxHeaderSize;
     }
 
     /**

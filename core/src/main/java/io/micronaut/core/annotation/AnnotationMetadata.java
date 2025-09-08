@@ -354,7 +354,6 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @return True if any of the given stereotypes are present
      * @since 2.3.3
      */
-    @SuppressWarnings("unchecked")
     default boolean hasDeclaredStereotype(@Nullable String... annotations) {
         if (ArrayUtils.isEmpty(annotations)) {
             return false;

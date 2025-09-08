@@ -214,7 +214,7 @@ public class ClassPathAnnotationScanner implements AnnotationScanner {
         var annotationClassReader = new AnnotationClassReader(inputStream);
         var classVisitor = new AnnotatedTypeInfoVisitor();
         annotationClassReader.accept(classVisitor, AnnotationClassReader.SKIP_DEBUG);
-        if (classVisitor.hasAnnotation(annotation)) {
+        if (annotation.equals("*") || classVisitor.hasAnnotation(annotation)) {
             classes.add(classLoader.loadClass(classVisitor.getTypeName()));
         }
     }

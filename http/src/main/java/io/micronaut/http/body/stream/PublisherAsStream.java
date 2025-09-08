@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2023 original authors
+ * Copyright 2017-2025 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,12 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.netty;
+package io.micronaut.http.body.stream;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.http.body.stream.PublisherAsBlocking;
-import io.netty.buffer.ByteBuf;
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.io.buffer.ReadBuffer;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -28,39 +27,59 @@ import java.io.InterruptedIOException;
  * Transform a {@link PublisherAsBlocking} of buffers into a {@link InputStream}.
  *
  * @author Jonas Konrad
- * @since 4.2.0
+ * @since 4.10.0
  */
 @Internal
-public final class PublisherAsStream extends InputStream {
-    private final PublisherAsBlocking<ByteBuf> publisherAsBlocking;
-    private ByteBuf buffer;
+public final class PublisherAsStream extends ExtendedInputStream {
+    private final PublisherAsBlocking publisherAsBlocking;
+    private ReadBuffer buffer;
 
-    public PublisherAsStream(PublisherAsBlocking<ByteBuf> publisherAsBlocking) {
+    public PublisherAsStream(PublisherAsBlocking publisherAsBlocking) {
         this.publisherAsBlocking = publisherAsBlocking;
     }
 
     @Override
-    public int read() throws IOException {
-        byte[] arr = new byte[1];
-        int n = read(arr);
-        return n == -1 ? -1 : arr[0] & 0xff;
+    public int read(byte[] b, int off, int len) throws IOException {
+        if (!populateBuffer()) {
+            return -1;
+        }
+
+        int readable = buffer.readable();
+        if (len >= readable) {
+            buffer.toArray(b, off);
+            buffer = null;
+            return readable;
+        } else {
+            ReadBuffer piece = buffer.split(len);
+            piece.toArray(b, off);
+            return len;
+        }
     }
 
     @Override
-    public int read(byte @NonNull [] b, int off, int len) throws IOException {
+    public byte @Nullable [] readSome() throws IOException {
+        if (!populateBuffer()) {
+            return null;
+        }
+        byte[] array = buffer.toArray();
+        buffer = null;
+        return array;
+    }
+
+    private boolean populateBuffer() throws IOException {
         while (buffer == null) {
             try {
-                ByteBuf o = publisherAsBlocking.take();
+                ReadBuffer o = publisherAsBlocking.take();
                 if (o == null) {
                     Throwable failure = publisherAsBlocking.getFailure();
                     if (failure == null) {
-                        return -1;
+                        return false;
                     } else {
                         throw new IOException(failure);
                     }
                 }
-                if (o.readableBytes() == 0) {
-                    o.release();
+                if (o.readable() == 0) {
+                    o.close();
                     continue;
                 }
                 buffer = o;
@@ -68,20 +87,17 @@ public final class PublisherAsStream extends InputStream {
                 throw new InterruptedIOException();
             }
         }
-
-        int toRead = Math.min(len, buffer.readableBytes());
-        buffer.readBytes(b, off, toRead);
-        if (buffer.readableBytes() == 0) {
-            buffer.release();
-            buffer = null;
-        }
-        return toRead;
+        return true;
     }
 
     @Override
-    public void close() throws IOException {
+    public void allowDiscard() {
+    }
+
+    @Override
+    public void cancelInput() {
         if (buffer != null) {
-            buffer.release();
+            buffer.close();
             buffer = null;
         }
         publisherAsBlocking.close();

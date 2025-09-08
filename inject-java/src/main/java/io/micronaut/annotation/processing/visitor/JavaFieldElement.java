@@ -38,7 +38,7 @@ import java.util.Map;
  * @since 1.0
  */
 @Internal
-class JavaFieldElement extends AbstractJavaElement implements FieldElement {
+class JavaFieldElement extends AbstractJavaMemberElement implements FieldElement {
 
     private final VariableElement variableElement;
     private JavaClassElement owningType;
@@ -72,6 +72,11 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
         this.owningType = owningType;
     }
 
+    @Override
+    protected AnnotationMetadata getTypeAnnotationMetadata() {
+        return getType().getTypeAnnotationMetadata();
+    }
+
     @NonNull
     @Override
     public JavaNativeElement.Variable getNativeType() {
@@ -98,6 +103,9 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
     public ClassElement getType() {
         if (type == null) {
             type = newClassElement(getNativeType(), variableElement.asType(), Collections.emptyMap());
+            if (canBeMarkedWithNonNull(type)) {
+                type.getTypeAnnotationMetadata().annotate(NonNull.class);
+            }
         }
         return type;
     }
@@ -107,6 +115,9 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
     public ClassElement getGenericType() {
         if (genericType == null) {
             genericType = newClassElement(getNativeType(), variableElement.asType(), getDeclaringType().getTypeArguments());
+            if (canBeMarkedWithNonNull(genericType)) {
+                genericType.getTypeAnnotationMetadata().annotate(NonNull.class);
+            }
         }
         return this.genericType;
     }

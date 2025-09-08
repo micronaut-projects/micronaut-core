@@ -5810,6 +5810,151 @@ class MyMessage extends Message {
         noExceptionThrown()
     }
 
+    void "test package"() {
+        given:
+            ApplicationContext applicationContext = buildContext('''
+@Introspected
+@AccessorsStyle(readPrefixes = "", writePrefixes = "")
+package test;
+
+
+import io.micronaut.core.annotation.AccessorsStyle;
+import io.micronaut.core.annotation.Introspected;
+
+''','test.FoobarPerson', '''
+package test;
+
+class FoobarPerson {
+
+    private String name;
+    private int age;
+
+    public FoobarPerson(String name, int age) {
+        this.name = name;
+        this.age = age;
+    }
+
+    public String name() { // <2>
+        return name;
+    }
+
+    public void name(String name) { // <2>
+        this.name = name;
+    }
+
+    public int age() { // <2>
+        return age;
+    }
+
+    public void age(int age) { // <2>
+        this.age = age;
+    }
+}
+''')
+
+        when:"the reference is loaded"
+            def clazz = applicationContext.classLoader.loadClass('test.$FoobarPerson$Introspection')
+            BeanIntrospectionReference reference = clazz.newInstance()
+
+        then:"The reference is valid"
+            reference != null
+
+        cleanup:
+            applicationContext.close()
+    }
+
+    void "test sub package"() {
+        given:
+            ApplicationContext applicationContext = buildContext(
+                    new Files()
+.add("package-info", '''
+@Introspected
+@AccessorsStyle(readPrefixes = "", writePrefixes = "")
+package test;
+
+
+import io.micronaut.core.annotation.AccessorsStyle;
+import io.micronaut.core.annotation.Introspected;
+
+''')
+.add('test.FoobarPerson', '''
+package test;
+
+class FoobarPerson {
+
+    private String name;
+    private int age;
+
+    public FoobarPerson(String name, int age) {
+        this.name = name;
+        this.age = age;
+    }
+
+    public String name() { // <2>
+        return name;
+    }
+
+    public void name(String name) { // <2>
+        this.name = name;
+    }
+
+    public int age() { // <2>
+        return age;
+    }
+
+    public void age(int age) { // <2>
+        this.age = age;
+    }
+}
+''')
+.add('test.test.AbcPerson', '''
+package test.test;
+
+class AbcPerson {
+
+    private String name;
+    private int age;
+
+    public AbcPerson(String name, int age) {
+        this.name = name;
+        this.age = age;
+    }
+
+    public String name() { // <2>
+        return name;
+    }
+
+    public void name(String name) { // <2>
+        this.name = name;
+    }
+
+    public int age() { // <2>
+        return age;
+    }
+
+    public void age(int age) { // <2>
+        this.age = age;
+    }
+}
+''')
+            )
+
+        when: "the reference is loaded"
+            def clazz = applicationContext.classLoader.loadClass('test.$FoobarPerson$Introspection')
+
+        then: "The reference is valid"
+            clazz.newInstance()
+
+        when: "the reference is not loaded"
+            applicationContext.classLoader.loadClass('test.test.$AbcPerson$Introspection')
+
+        then: "The reference is valid"
+            thrown(ClassNotFoundException)
+
+        cleanup:
+            applicationContext.close()
+    }
+
     @Override
     protected JavaParser newJavaParser() {
         return new JavaParser() {

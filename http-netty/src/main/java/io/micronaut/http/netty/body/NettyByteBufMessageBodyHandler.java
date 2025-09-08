@@ -16,6 +16,7 @@
 package io.micronaut.http.netty.body;
 
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
+import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
@@ -35,6 +36,7 @@ import io.micronaut.http.body.ResponseBodyWriter;
 import io.micronaut.http.body.TypedMessageBodyHandler;
 import io.micronaut.http.codec.CodecException;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.Unpooled;
 import jakarta.inject.Singleton;
@@ -99,6 +101,12 @@ public final class NettyByteBufMessageBodyHandler implements TypedMessageBodyHan
 
     @Override
     public @NonNull CloseableByteBody writePiece(@NonNull ByteBodyFactory bodyFactory, @NonNull HttpRequest<?> request, @NonNull HttpResponse<?> response, @NonNull Argument<ByteBuf> type, @NonNull MediaType mediaType, ByteBuf object) throws CodecException {
-        return new AvailableNettyByteBody(object);
+        NettyReadBufferFactory readBufferFactory;
+        if (bodyFactory.readBufferFactory() instanceof NettyReadBufferFactory nrbf) {
+            readBufferFactory = nrbf;
+        } else {
+            readBufferFactory = NettyReadBufferFactory.of(ByteBufAllocator.DEFAULT);
+        }
+        return bodyFactory.adapt(readBufferFactory.adapt(object));
     }
 }

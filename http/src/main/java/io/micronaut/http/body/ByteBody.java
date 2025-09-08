@@ -18,8 +18,11 @@ package io.micronaut.http.body;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.core.io.buffer.ReadBufferFactory;
 import org.jetbrains.annotations.Contract;
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -119,6 +122,19 @@ public interface ByteBody {
     Publisher<byte[]> toByteArrayPublisher();
 
     /**
+     * Get this body as a reactive stream of {@link ReadBuffer}s. Note that the caller must take
+     * care to release the returned buffers.
+     * <p>This is a primary operation. After this operation, no other primary operation or
+     * {@link #split()} may be done.
+     *
+     * @return The streamed bytes
+     */
+    @NonNull
+    default Publisher<ReadBuffer> toReadBufferPublisher() {
+        return Flux.from(toByteArrayPublisher()).map(ReadBufferFactory.getJdkFactory()::adapt);
+    }
+
+    /**
      * Get this body as a reactive stream of {@link ByteBuffer}s. Note that the buffers may be
      * {@link io.micronaut.core.io.buffer.ReferenceCounted reference counted}, and the caller must
      * take care of releasing them.
@@ -128,7 +144,13 @@ public interface ByteBody {
      * @return The streamed bytes
      */
     @NonNull
-    Publisher<ByteBuffer<?>> toByteBufferPublisher();
+    default Publisher<ByteBuffer<?>> toByteBufferPublisher() {
+        return Flux.from(toReadBufferPublisher()).doOnDiscard(ReadBuffer.class, ReadBuffer::close).map(rb -> {
+            try (rb) {
+                return rb.toByteBuffer();
+            }
+        });
+    }
 
     /**
      * Buffer the full body and return an {@link CompletableFuture} that will complete when all
