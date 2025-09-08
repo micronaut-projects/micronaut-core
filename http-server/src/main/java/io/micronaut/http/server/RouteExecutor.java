@@ -41,6 +41,7 @@ import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
 import io.micronaut.http.body.MessageBodyWriter;
+import io.micronaut.http.body.stream.BaseSharedBuffer;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.context.ServerHttpRequestContext;
 import io.micronaut.http.context.ServerRequestContext;
@@ -275,7 +276,7 @@ public final class RouteExecutor {
     }
 
     static boolean isIgnorable(Throwable cause) {
-        if (cause instanceof ClosedChannelException) {
+        if (cause instanceof ClosedChannelException || cause instanceof BaseSharedBuffer.IncorrectContentLengthException) {
             return true;
         }
         String message = cause.getMessage();

@@ -229,4 +229,8 @@ final class GroovyPropertyElement extends AbstractGroovyElement implements Prope
         return owningElement;
     }
 
+    @Override
+    public Optional<String> getDocumentation() {
+        return PropertyElement.super.getDocumentation();
+    }
 }

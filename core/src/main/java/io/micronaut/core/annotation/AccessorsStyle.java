@@ -65,7 +65,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  */
 @Documented
 @Retention(RUNTIME)
-@Target({ElementType.TYPE, ElementType.ANNOTATION_TYPE, ElementType.FIELD})
+@Target({ElementType.TYPE, ElementType.ANNOTATION_TYPE, ElementType.FIELD, ElementType.PACKAGE})
 @Inherited
 @Experimental
 public @interface AccessorsStyle {

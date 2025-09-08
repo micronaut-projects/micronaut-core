@@ -45,11 +45,13 @@ class JavaEnumElement extends JavaClassElement implements EnumElement {
      * @param nativeElement The native element
      * @param annotationMetadataFactory The annotation metadata factory
      * @param visitorContext The visitor context
+     * @param doc The optional documentation
      */
     JavaEnumElement(JavaNativeElement.Class nativeElement,
                     ElementAnnotationMetadataFactory annotationMetadataFactory,
-                    JavaVisitorContext visitorContext) {
-        this(nativeElement, annotationMetadataFactory, visitorContext, 0);
+                    JavaVisitorContext visitorContext,
+                    String doc) {
+        this(nativeElement, annotationMetadataFactory, visitorContext, 0, doc);
     }
 
     /**
@@ -57,17 +59,19 @@ class JavaEnumElement extends JavaClassElement implements EnumElement {
      * @param annotationMetadataFactory The annotation metadata factory
      * @param visitorContext The visitor context
      * @param arrayDimensions The number of array dimensions
+     * @param doc The optional documentation
      */
     JavaEnumElement(JavaNativeElement.Class nativeElement,
                     ElementAnnotationMetadataFactory annotationMetadataFactory,
                     JavaVisitorContext visitorContext,
-                    int arrayDimensions) {
-        super(nativeElement, annotationMetadataFactory, visitorContext, Collections.emptyList(), Collections.emptyMap(), arrayDimensions, false);
+                    int arrayDimensions,
+                    String doc) {
+        super(nativeElement, annotationMetadataFactory, visitorContext, Collections.emptyList(), Collections.emptyMap(), arrayDimensions, false, doc);
     }
 
     @Override
     protected JavaClassElement copyThis() {
-        return new JavaEnumElement(getNativeType(), elementAnnotationMetadataFactory, visitorContext, arrayDimensions);
+        return new JavaEnumElement(getNativeType(), elementAnnotationMetadataFactory, visitorContext, arrayDimensions, doc);
     }
 
     @Override
@@ -110,7 +114,7 @@ class JavaEnumElement extends JavaClassElement implements EnumElement {
 
     @Override
     public ClassElement withArrayDimensions(int arrayDimensions) {
-        return new JavaEnumElement(getNativeType(), elementAnnotationMetadataFactory, visitorContext, arrayDimensions);
+        return new JavaEnumElement(getNativeType(), elementAnnotationMetadataFactory, visitorContext, arrayDimensions, doc);
     }
 
 }

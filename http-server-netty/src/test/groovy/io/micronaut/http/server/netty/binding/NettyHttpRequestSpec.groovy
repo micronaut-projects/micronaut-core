@@ -19,9 +19,9 @@ import io.micronaut.core.convert.DefaultMutableConversionService
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpMethod
 import io.micronaut.http.MutableHttpRequest
+import io.micronaut.http.netty.body.NettyByteBodyFactory
 import io.micronaut.http.server.HttpServerConfiguration
 import io.micronaut.http.server.netty.NettyHttpRequest
-import io.micronaut.http.netty.body.AvailableNettyByteBody
 import io.netty.channel.ChannelHandlerContext
 import io.netty.handler.codec.http.DefaultFullHttpRequest
 import io.netty.handler.codec.http.HttpVersion
@@ -38,7 +38,7 @@ class NettyHttpRequestSpec extends Specification {
     void "test mutate request"() {
         given:
         DefaultFullHttpRequest nettyRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, GET, "/foo/bar")
-        NettyHttpRequest request = new NettyHttpRequest(nettyRequest, AvailableNettyByteBody.empty(), Mock(ChannelHandlerContext), new DefaultMutableConversionService(), new HttpServerConfiguration())
+        NettyHttpRequest request = new NettyHttpRequest(nettyRequest, NettyByteBodyFactory.empty(), Mock(ChannelHandlerContext), new DefaultMutableConversionService(), new HttpServerConfiguration())
 
         when:
         def altered = request.mutate()
@@ -53,7 +53,7 @@ class NettyHttpRequestSpec extends Specification {
     void "test mutating a mutable request"() {
         given:
         DefaultFullHttpRequest nettyRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, GET, "/foo/bar")
-        def request = new NettyHttpRequest(nettyRequest, AvailableNettyByteBody.empty(), Mock(ChannelHandlerContext), new DefaultMutableConversionService(), new HttpServerConfiguration())
+        def request = new NettyHttpRequest(nettyRequest, NettyByteBodyFactory.empty(), Mock(ChannelHandlerContext), new DefaultMutableConversionService(), new HttpServerConfiguration())
 
         when:
         request = request.mutate()
@@ -71,7 +71,7 @@ class NettyHttpRequestSpec extends Specification {
     void "test netty http request parameters"() {
         given:
         DefaultFullHttpRequest nettyRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, uri)
-        NettyHttpRequest request = new NettyHttpRequest(nettyRequest, AvailableNettyByteBody.empty(), Mock(ChannelHandlerContext), new DefaultMutableConversionService(), new HttpServerConfiguration())
+        NettyHttpRequest request = new NettyHttpRequest(nettyRequest, NettyByteBodyFactory.empty(), Mock(ChannelHandlerContext), new DefaultMutableConversionService(), new HttpServerConfiguration())
         String fullURI = request.uri.toString()
         String expectedPath = fullURI.indexOf('?') > -1 ? fullURI.substring(0, fullURI.indexOf('?')) : fullURI
 
@@ -94,7 +94,7 @@ class NettyHttpRequestSpec extends Specification {
             nettyRequest.headers().add(header.key.toString(), header.value)
         }
 
-        NettyHttpRequest request = new NettyHttpRequest(nettyRequest, AvailableNettyByteBody.empty(), Mock(ChannelHandlerContext), new DefaultMutableConversionService(), new HttpServerConfiguration())
+        NettyHttpRequest request = new NettyHttpRequest(nettyRequest, NettyByteBodyFactory.empty(), Mock(ChannelHandlerContext), new DefaultMutableConversionService(), new HttpServerConfiguration())
         String fullURI = request.uri.toString()
         String expectedPath = fullURI.indexOf('?') > -1 ? fullURI.substring(0, fullURI.indexOf('?')) : fullURI
 
@@ -116,7 +116,7 @@ class NettyHttpRequestSpec extends Specification {
             nettyRequest.headers().add(header.key.toString(), header.value)
         }
 
-        NettyHttpRequest request = new NettyHttpRequest(nettyRequest, AvailableNettyByteBody.empty(), Mock(ChannelHandlerContext), new DefaultMutableConversionService(), new HttpServerConfiguration())
+        NettyHttpRequest request = new NettyHttpRequest(nettyRequest, NettyByteBodyFactory.empty(), Mock(ChannelHandlerContext), new DefaultMutableConversionService(), new HttpServerConfiguration())
         String fullURI = request.uri.toString()
         String expectedPath = fullURI.indexOf('?') > -1 ? fullURI.substring(0, fullURI.indexOf('?')) : fullURI
 
@@ -141,7 +141,7 @@ class NettyHttpRequestSpec extends Specification {
             nettyRequest.headers().add(header.key.toString(), header.value)
         }
 
-        NettyHttpRequest request = new NettyHttpRequest(nettyRequest, AvailableNettyByteBody.empty(), Mock(ChannelHandlerContext), new DefaultMutableConversionService(), new HttpServerConfiguration())
+        NettyHttpRequest request = new NettyHttpRequest(nettyRequest, NettyByteBodyFactory.empty(), Mock(ChannelHandlerContext), new DefaultMutableConversionService(), new HttpServerConfiguration())
         String fullURI = request.uri.toString()
         String expectedPath = fullURI.indexOf('?') > -1 ? fullURI.substring(0, fullURI.indexOf('?')) : fullURI
 

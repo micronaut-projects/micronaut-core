@@ -25,6 +25,7 @@ import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementFactory;
+import io.micronaut.inject.ast.PackageElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import io.micronaut.inject.writer.GeneratedFile;
@@ -34,6 +35,7 @@ import java.net.URL;
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -280,6 +282,17 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     }
 
     /**
+     * Find all the classes within the given package.
+     *
+     * @param packageElement    The package
+     * @return The class elements
+     * @see 4.10
+     */
+    default @NonNull List<ClassElement> getClassElements(@NonNull PackageElement packageElement) {
+        return List.of(getClassElements(packageElement.getName(), "*"));
+    }
+
+    /**
      * The annotation processor environment custom options.
      * <p><b>All options names MUST start with {@link VisitorContext#MICRONAUT_BASE_OPTION_NAME}</b></p>
      *
@@ -296,7 +309,9 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * The generated resources are intended to be strings paths relative to the classpath root.
      *
      * @return a possibly empty collection of resource paths
+     * @deprecated No longer used
      */
+    @Deprecated(forRemoval = true, since = "4.10")
     @Experimental
     default Collection<String> getGeneratedResources() {
         info("EXPERIMENTAL: Compile time resource contribution to the context is experimental", null);
@@ -308,7 +323,9 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * The generated resources are intended to be strings paths relative to the classpath root
      *
      * @param resource the relative path to add
+     * @deprecated No longer used
      */
+    @Deprecated(forRemoval = true, since = "4.10")
     @Experimental
     default void addGeneratedResource(String resource) {
         info("EXPERIMENTAL: Compile time resource contribution to the context is experimental", null);

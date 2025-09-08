@@ -54,7 +54,7 @@ import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.TypedElement;
-import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
+import io.micronaut.inject.configuration.builder.ConfigurationBuilderDefinition;
 import io.micronaut.inject.qualifiers.Qualified;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.ArgumentExpUtils;
@@ -1278,13 +1278,18 @@ public class AopProxyWriter implements ProxyingBeanDefinitionVisitor, ClassOutpu
     }
 
     @Override
-    public void visitConfigBuilderField(ClassElement type, String field, AnnotationMetadata annotationMetadata, ConfigurationMetadataBuilder metadataBuilder, boolean isInterface) {
-        proxyBeanDefinitionWriter.visitConfigBuilderField(type, field, annotationMetadata, metadataBuilder, isInterface);
+    public void visitConfigBuilder(ConfigurationBuilderDefinition builderDefinition) {
+        proxyBeanDefinitionWriter.visitConfigBuilder(builderDefinition);
     }
 
     @Override
-    public void visitConfigBuilderMethod(ClassElement type, String methodName, AnnotationMetadata annotationMetadata, ConfigurationMetadataBuilder metadataBuilder, boolean isInterface) {
-        proxyBeanDefinitionWriter.visitConfigBuilderMethod(type, methodName, annotationMetadata, metadataBuilder, isInterface);
+    public void visitConfigBuilderField(ClassElement type, String field, AnnotationMetadata annotationMetadata, boolean isInterface) {
+        proxyBeanDefinitionWriter.visitConfigBuilderField(type, field, annotationMetadata, isInterface);
+    }
+
+    @Override
+    public void visitConfigBuilderMethod(ClassElement type, String methodName, AnnotationMetadata annotationMetadata, boolean isInterface) {
+        proxyBeanDefinitionWriter.visitConfigBuilderMethod(type, methodName, annotationMetadata, isInterface);
     }
 
     @Override

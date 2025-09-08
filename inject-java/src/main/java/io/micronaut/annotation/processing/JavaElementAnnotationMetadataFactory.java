@@ -28,6 +28,7 @@ import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.Element;
+import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.type.TypeVariable;
 import javax.lang.model.type.WildcardType;
@@ -79,7 +80,22 @@ public final class JavaElementAnnotationMetadataFactory extends AbstractElementA
         if (typeMirror == null) {
             return super.lookupTypeAnnotationsForClass(classElement);
         }
+        if (typeMirror instanceof ArrayType arrayType) {
+            if (!hasJSpecifyAnnotations(arrayType) && !hasJSpecifyAnnotations(arrayType.getComponentType())) {
+                // Backward compatibility for Micronaut type annotations support
+                typeMirror = arrayType.getComponentType();
+            }
+        }
         return metadataBuilder.lookupOrBuild(clazz, new AnnotationsElement(typeMirror));
+    }
+
+    private boolean hasJSpecifyAnnotations(TypeMirror element) {
+        for (AnnotationMirror am : element.getAnnotationMirrors()) {
+            if (am.getAnnotationType().toString().startsWith("org.jspecify.annotations")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override

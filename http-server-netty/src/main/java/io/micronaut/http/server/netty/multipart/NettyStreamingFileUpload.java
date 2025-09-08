@@ -15,16 +15,17 @@
  */
 package io.micronaut.http.server.netty.multipart;
 
+import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.AsyncSingleResultPublisher;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.functional.ThrowingSupplier;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.body.stream.PublisherAsBlocking;
+import io.micronaut.http.body.stream.PublisherAsStream;
 import io.micronaut.http.multipart.MultipartException;
 import io.micronaut.http.multipart.PartData;
 import io.micronaut.http.multipart.StreamingFileUpload;
-import io.micronaut.http.netty.PublisherAsStream;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
@@ -131,13 +132,11 @@ public final class NettyStreamingFileUpload implements StreamingFileUpload {
 
     @Override
     public InputStream asInputStream() {
-        PublisherAsBlocking<ByteBuf> publisherAsBlocking = new PublisherAsBlocking<>() {
-            @Override
-            protected void release(ByteBuf item) {
-                item.release();
-            }
-        };
-        subject.map(pd -> ((NettyPartData) pd).getByteBuf()).subscribe(publisherAsBlocking);
+        PublisherAsBlocking publisherAsBlocking = new PublisherAsBlocking();
+        subject.map(pd -> {
+            ByteBuf byteBuf = ((NettyPartData) pd).getByteBuf();
+            return NettyReadBufferFactory.of(byteBuf.alloc()).adapt(byteBuf);
+        }).subscribe(publisherAsBlocking);
         return new PublisherAsStream(publisherAsBlocking);
     }
 
@@ -145,7 +144,7 @@ public final class NettyStreamingFileUpload implements StreamingFileUpload {
      * @param location The location for the temp file
      * @return The temporal file
      */
-    protected File createTemp(String location) {
+    private File createTemp(String location) {
         try {
             return Files.createTempFile(DiskFileUpload.prefix, DiskFileUpload.postfix + '_' + location).toFile();
         } catch (IOException e) {
@@ -169,9 +168,10 @@ public final class NettyStreamingFileUpload implements StreamingFileUpload {
         return Mono.<Boolean>create(emitter ->
 
                 subject.publishOn(Schedulers.fromExecutorService(ioExecutor))
-                        .subscribe(new Subscriber<PartData>() {
+                        .subscribe(new Subscriber<>() {
                             Subscription subscription;
                             OutputStream outputStream;
+
                             @Override
                             public void onSubscribe(Subscription s) {
                                 subscription = s;

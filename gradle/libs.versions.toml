@@ -1,9 +1,9 @@
 [versions]
 awaitility = "4.3.0"
 bcpkix = "1.70"
-blaze = "1.6.16"
+blaze = "1.6.17"
 brotli4j = "1.18.0"
-bytebuddy = "1.17.6"
+bytebuddy = "1.17.7"
 caffeine = "2.9.3"
 classgraph = "4.8.181"
 compile-testing = "0.21.0"
@@ -23,7 +23,7 @@ javax-inject = "1"
 javax-persistence = "2.2"
 jakarta-persistence = "3.2.0"
 jetbrains-annotations = "23.1.0"
-jetty = "9.4.57.v20241219"
+jetty = "9.4.58.v20250814"
 jmh = "1.37"
 jsr107 = "1.1.1"
 jsr305 = "3.0.2"
@@ -38,8 +38,8 @@ logback = "1.5.18"
 lombok = "1.18.38"
 logbook-netty = "3.12.2"
 log4j = "2.24.3"
-micronaut-aws = "4.10.0"
-micronaut-build-plugins="7.4.0"
+micronaut-aws = "4.11.0"
+micronaut-build-plugins="7.6.4"
 micronaut-groovy = "4.7.0"
 micronaut-session = "4.6.0"
 micronaut-sql = "5.3.0"
@@ -80,15 +80,16 @@ managed-kotlin = "1.9.25"
 managed-kotlin2 = "2.1.21"
 managed-kotlin-coroutines = "1.8.1"
 managed-methvin-directory-watcher = "0.19.1"
-managed-netty = "4.2.3.Final"
-managed-netty-tcnative = "2.0.72.Final"
+managed-netty = "4.2.4.Final"
+managed-netty-tcnative = "2.0.73.Final"
 managed-reactive-streams = "1.0.4"
 # This should be kept aligned with https://github.com/micronaut-projects/micronaut-reactor/blob/master/gradle.properties from the BOM
-managed-reactor = "3.7.8"
+managed-reactor = "3.7.9"
 managed-snakeyaml = "2.4"
 managed-java-parser-core = "3.26.4"
 managed-ksp = "1.9.25-1.0.20"
 managed-ksp2 = "2.1.21-2.0.2"
+managed-jspecify = "1.0.0"
 sonatype-scan = "3.0.0"
 micronaut-docs = "2.0.0"
 
@@ -174,6 +175,7 @@ managed-reactor = { module = "io.projectreactor:reactor-core", version.ref = "ma
 managed-reactor-test = { module = "io.projectreactor:reactor-test", version.ref = "managed-reactor" }
 
 managed-snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "managed-snakeyaml" }
+managed-jspecify = { module = "org.jspecify:jspecify", version.ref = "managed-jspecify" }
 
 sonatype-scan = { module = "org.sonatype.gradle.plugins:scan-gradle-plugin", version.ref = "sonatype-scan" }
 #

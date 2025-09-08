@@ -16,20 +16,27 @@
 package io.micronaut.http.body.stream;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.body.ByteBody;
 
 /**
  * This is a reactor-like API for streaming bytes. It's a bit better than reactor because it's more
  * explicit about reference counting semantics, has more fine-grained controls for cancelling, and
- * has more relaxed concurrency semantics.<br>
- * This interface is buffer type agnostic. For specific buffer types (e.g. netty {@code ByteBuf})
- * there is a specific subinterface.
+ * has more relaxed concurrency semantics.
  *
  * @since 4.8.0
  * @author Jonas Konrad
  */
 @Internal
 public interface BufferConsumer {
+    /**
+     * Send a buffer to this consumer. Ownership of the buffer transfers to the consumer.
+     *
+     * @param rb The buffer
+     */
+    void add(@NonNull ReadBuffer rb);
+
     /**
      * Signal normal completion of the stream.
      */

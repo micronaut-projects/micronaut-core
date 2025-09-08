@@ -16,22 +16,26 @@
 package io.micronaut.http.netty.body;
 
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
+import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.body.AvailableByteBody;
 import io.micronaut.http.body.CloseableAvailableByteBody;
 import io.micronaut.http.body.CloseableByteBody;
+import io.micronaut.http.body.InternalByteBody;
+import io.micronaut.http.body.stream.AvailableByteArrayBody;
 import io.micronaut.http.body.stream.BaseSharedBuffer;
 import io.micronaut.http.body.stream.BodySizeLimits;
-import io.micronaut.http.body.stream.BufferConsumer;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.ByteBufUtil;
-import io.netty.buffer.Unpooled;
 import io.netty.channel.EventLoop;
+import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
 import java.io.InputStream;
@@ -43,9 +47,11 @@ import java.util.Objects;
  *
  * @since 4.5.0
  * @author Jonas Konrad
+ * @deprecated Use {@link NettyByteBodyFactory}
  */
 @Internal
-public final class AvailableNettyByteBody extends NettyByteBody implements CloseableAvailableByteBody {
+@Deprecated(since = "4.10.0", forRemoval = true) // still used by micronaut-oracle-cloud
+public final class AvailableNettyByteBody extends InternalByteBody implements CloseableAvailableByteBody {
     private final long length;
     @Nullable
     private ByteBuf buffer;
@@ -56,16 +62,13 @@ public final class AvailableNettyByteBody extends NettyByteBody implements Close
     }
 
     public static CloseableAvailableByteBody empty() {
-        return new AvailableNettyByteBody(Unpooled.EMPTY_BUFFER);
+        return AvailableByteArrayBody.create(
+            NettyReadBufferFactory.of(ByteBufAllocator.DEFAULT).createEmpty());
     }
 
     @NonNull
     public static ByteBuf toByteBuf(@NonNull AvailableByteBody body) {
-        if (body instanceof AvailableNettyByteBody net) {
-            return net.claim();
-        } else {
-            return Unpooled.wrappedBuffer(body.toByteArray());
-        }
+        return NettyByteBodyFactory.toByteBuf(body);
     }
 
     /**
@@ -80,18 +83,7 @@ public final class AvailableNettyByteBody extends NettyByteBody implements Close
      */
     @NonNull
     public static CloseableByteBody createChecked(@NonNull EventLoop loop, @NonNull BodySizeLimits bodySizeLimits, @NonNull ByteBuf buf) {
-        // AvailableNettyByteBody does not support exceptions, so if we hit one of the configured
-        // limits, we return a StreamingNettyByteBody instead.
-        int readable = buf.readableBytes();
-        if (readable > bodySizeLimits.maxBodySize() || readable > bodySizeLimits.maxBufferSize()) {
-            BufferConsumer.Upstream upstream = bytesConsumed -> {
-            };
-            StreamingNettyByteBody.SharedBuffer mockBuffer = new StreamingNettyByteBody.SharedBuffer(loop, bodySizeLimits, upstream);
-            mockBuffer.add(buf); // this will trigger the exception for exceeded body or buffer size
-            return new StreamingNettyByteBody(mockBuffer);
-        } else {
-            return new AvailableNettyByteBody(buf);
-        }
+        return new NettyByteBodyFactory(buf.alloc(), loop).createChecked(bodySizeLimits, buf);
     }
 
     public ByteBuf peek() {
@@ -137,9 +129,10 @@ public final class AvailableNettyByteBody extends NettyByteBody implements Close
         }
     }
 
+    @SuppressWarnings("deprecation")
     @Override
-    protected Flux<ByteBuf> toByteBufPublisher() {
-        return Flux.just(claim());
+    public @NonNull Publisher<ReadBuffer> toReadBufferPublisher() {
+        return Flux.just(NettyReadBufferFactory.of(ByteBufAllocator.DEFAULT).adapt(claim()));
     }
 
     @Override
