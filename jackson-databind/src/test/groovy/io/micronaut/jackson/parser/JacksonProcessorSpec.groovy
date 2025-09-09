@@ -27,7 +27,6 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize
 import com.fasterxml.jackson.databind.node.ArrayNode
 import com.fasterxml.jackson.databind.node.JsonNodeFactory
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
 import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
 import spock.lang.AutoCleanup
@@ -40,7 +39,7 @@ import spock.lang.Specification
  */
 class JacksonProcessorSpec extends Specification {
     @Shared @AutoCleanup
-    ApplicationContext applicationContext = new DefaultApplicationContext("test").start()
+    ApplicationContext applicationContext = ApplicationContext.builder("test").build().start()
 
     void "test big decimal"() {
 

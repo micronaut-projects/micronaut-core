@@ -1,8 +1,6 @@
 package io.micronaut.inject.qualifiers.replaces.defaultimpl
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.exceptions.NonUniqueBeanException
 import spock.lang.Specification
 

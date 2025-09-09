@@ -226,4 +226,5 @@ public interface PropertyResolver extends ValueResolver<String> {
      */
     @NonNull
     Collection<List<String>> getPropertyPathMatches(@NonNull String pathPattern);
+
 }

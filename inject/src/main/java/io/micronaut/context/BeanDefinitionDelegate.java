@@ -176,7 +176,7 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
         try {
             if (this.definition instanceof ParametrizedInstantiatableBeanDefinition<T> parametrizedInstantiatableBeanDefinition) {
                 Argument<Object>[] requiredArguments = parametrizedInstantiatableBeanDefinition.getRequiredArguments();
-                Map<String, Object> fulfilled = getParametersValues(resolutionContext, (DefaultBeanContext) context, definition, requiredArguments);
+                Map<String, Object> fulfilled = getParametersValues(resolutionContext, definition, requiredArguments);
                 return parametrizedInstantiatableBeanDefinition.instantiate(resolutionContext, context, fulfilled);
             }
             if (this.definition instanceof InstantiatableBeanDefinition<T> instantiatableBeanDefinition) {
@@ -190,7 +190,6 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
 
     @Nullable
     private Map<String, Object> getParametersValues(BeanResolutionContext resolutionContext,
-                                                    DefaultBeanContext context,
                                                     BeanDefinition<T> definition,
                                                     Argument<Object>[] requiredArguments) {
         if (requiredArguments.length == 0) {
@@ -206,17 +205,17 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
                 if (CharSequence.class.isAssignableFrom(type) || isEnum) {
                     String simpleName = configurationPath.simpleName();
                     if (simpleName != null) {
-                        Object value = isEnum ? context.getConversionService().convertRequired(simpleName, type) : simpleName;
+                        Object value = isEnum ? resolutionContext.getConversionService().convertRequired(simpleName, type) : simpleName;
                         fulfilled.put(argumentName, value);
                     } else {
                         String name = findName(resolutionContext.getCurrentQualifier());
                         if (name != null) {
-                            Object value = isEnum ? context.getConversionService().convertRequired(name, type) : name;
+                            Object value = isEnum ? resolutionContext.getConversionService().convertRequired(name, type) : name;
                             fulfilled.put(argumentName, value);
                         }
                     }
                 } else if (Number.class.isAssignableFrom(type)) {
-                    fulfilled.put(argumentName, context.getConversionService().convertRequired(configurationPath.index(), argument));
+                    fulfilled.put(argumentName, resolutionContext.getConversionService().convertRequired(configurationPath.index(), argument));
                 } else if (qualifier != null && hasDeclaredAnnotation(EachBean.class) && String.class.equals(type) && "name".equals(argumentName)) {
                     String name = findName(qualifier);
                     if (name != null) {
@@ -232,13 +231,13 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
 
                     try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushConstructorResolve(definition, argument)) {
                         if (type.equals(configurationPath.configurationType())) {
-                            Object bean = context.findBean(resolutionContext, argument, configurationPath.beanQualifier()).orElse(null);
+                            Object bean = resolutionContext.findBean(argument, configurationPath.beanQualifier()).orElse(null);
                             fulfilled.put(argumentName, bean);
                         } else {
                             ConfigurationPath old = resolutionContext.setConfigurationPath(null);// reset
                             try {
                                 Qualifier<Object> q = qualifier != null ? (Qualifier<Object>) qualifier : configurationPath.beanQualifier();
-                                Object bean = context.findBean(resolutionContext, argument, q).orElse(null);
+                                Object bean = resolutionContext.findBean(argument, q).orElse(null);
                                 fulfilled.put(argumentName, bean);
                             } finally {
                                 resolutionContext.setConfigurationPath(old);

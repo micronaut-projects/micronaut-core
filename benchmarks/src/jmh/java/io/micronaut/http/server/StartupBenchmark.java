@@ -23,15 +23,46 @@ import org.openjdk.jmh.annotations.Mode;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.infra.Blackhole;
+import org.openjdk.jmh.runner.Runner;
+import org.openjdk.jmh.runner.RunnerException;
+import org.openjdk.jmh.runner.options.Options;
+import org.openjdk.jmh.runner.options.OptionsBuilder;
+
+import java.util.concurrent.TimeUnit;
 
 @State(Scope.Benchmark)
 @BenchmarkMode(Mode.Throughput)
 public class StartupBenchmark {
+
+    public static void main(String[] args) throws RunnerException {
+        Options opt = new OptionsBuilder()
+            .include(StartupBenchmark.class.getName() + ".*")
+            .warmupIterations(0)
+            .measurementIterations(1)
+            .mode(Mode.AverageTime)
+            .timeUnit(TimeUnit.NANOSECONDS)
+//            .addProfiler(AsyncProfiler.class, "libPath=/Users/denisstepanov/Downloads/async-profiler-4.1-macos/lib/libasyncProfiler.dylib;output=flamegraph")
+            .forks(1)
+            .build();
+
+        new Runner(opt).run();
+    }
 
     @Benchmark
     public void startup(Blackhole blackhole) {
         ApplicationContext context = ApplicationContext.run();
         final TestController controller = context.getBean(TestController.class);
         blackhole.consume(controller);
+    }
+
+    @Benchmark
+    public void limited(Blackhole blackhole) {
+        ApplicationContext context = ApplicationContext.builder()
+            .enableDefaultPropertySources(false)
+            .bootstrapEnvironment(false)
+            .deduceEnvironment(false)
+            .deducePackage(false)
+            .start();
+        blackhole.consume(context.getBean(TestController.class));
     }
 }

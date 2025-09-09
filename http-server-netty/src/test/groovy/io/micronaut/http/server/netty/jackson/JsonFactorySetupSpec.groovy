@@ -18,11 +18,9 @@ package io.micronaut.http.server.netty.jackson
 import com.fasterxml.jackson.core.JsonFactory
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.MapPropertySource
 import io.micronaut.context.env.PropertySource
 import spock.lang.Specification
-
 /**
  * @author Vladislav Chernogorov
  * @since 1.0
@@ -31,7 +29,7 @@ class JsonFactorySetupSpec extends Specification {
 
     void "verify default jackson setup with JsonFactory bean"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test").start()
+        ApplicationContext applicationContext = ApplicationContext.builder("test").start()
 
         expect:
         applicationContext.containsBean(JsonFactory)
@@ -43,7 +41,7 @@ class JsonFactorySetupSpec extends Specification {
 
     void "verify JsonFactory properties are injected into the bean"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build()
         applicationContext.environment.addPropertySource((MapPropertySource) PropertySource.of(
                 'jackson.factory.use-thread-local-for-buffer-recycling': false
         ))

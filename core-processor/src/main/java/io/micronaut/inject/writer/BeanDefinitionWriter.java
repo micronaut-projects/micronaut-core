@@ -23,9 +23,9 @@ import io.micronaut.context.AbstractExecutableMethod;
 import io.micronaut.context.AbstractInitializableBeanDefinition;
 import io.micronaut.context.AbstractInitializableBeanDefinitionAndReference;
 import io.micronaut.context.BeanContext;
+import io.micronaut.context.BeanLocator;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
-import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.context.Qualifier;
 import io.micronaut.context.RequiresCondition;
 import io.micronaut.context.annotation.Any;
@@ -415,7 +415,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
         Object[].class
     );
 
-    private static final Method METHOD_GET_BEAN = ReflectionUtils.getRequiredInternalMethod(DefaultBeanContext.class, "getBean", BeanResolutionContext.class, Class.class, Qualifier.class);
+    private static final Method BEAN_LOCATOR_METHOD_GET_BEAN = ReflectionUtils.getRequiredInternalMethod(BeanLocator.class, "getBean", Class.class, Qualifier.class);
     private static final Method COLLECTION_TO_ARRAY = ReflectionUtils.getRequiredInternalMethod(Collection.class, "toArray", Object[].class);
 
     private static final Method DISPOSE_INTERCEPTOR_METHOD =
@@ -1828,13 +1828,11 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
         );
 
         return StatementDef.multi(
-            parameters.get(1).cast(DefaultBeanContext.class)
-                .invoke(METHOD_GET_BEAN,
-                    // load the first argument of the method (the BeanResolutionContext) to be passed to the method
-                    parameters.get(0),
-                    // second argument is the bean type
+            parameters.get(0)
+                .invoke(BEAN_LOCATOR_METHOD_GET_BEAN,
+                    // first argument is the bean type
                     ExpressionDef.constant(factoryTypeDef),
-                    // third argument is the qualifier for the factory if any
+                    // second argument is the qualifier for the factory if any
                     getQualifier(factoryBuildMethodDefinition.factoryClass, argumentExpression)
                 ).cast(factoryTypeDef).newLocal("factoryBean", factoryBeanVar -> StatementDef.multi(
                     parameters.get(0).invoke(METHOD_BEAN_RESOLUTION_CONTEXT_MARK_FACTORY),

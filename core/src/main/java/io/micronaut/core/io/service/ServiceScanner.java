@@ -21,9 +21,12 @@ import org.graalvm.nativeimage.ImageSingletons;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
 import java.net.URL;
+import java.net.URLConnection;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Enumeration;
@@ -81,7 +84,9 @@ final class ServiceScanner<S> {
     private Set<String> computeStandardServiceTypeNames(URL url) {
         Set<String> typeNames = new HashSet<>();
         try {
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(url.openStream()))) {
+            URLConnection uc = url.openConnection();
+            uc.setUseCaches(false);
+            try (InputStream is = uc.getInputStream(); BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
                 while (true) {
                     String line = reader.readLine();
                     if (line == null) {

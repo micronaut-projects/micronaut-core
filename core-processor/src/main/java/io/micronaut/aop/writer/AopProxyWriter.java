@@ -30,7 +30,6 @@ import io.micronaut.context.BeanDefinitionRegistry;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
-import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
@@ -115,9 +114,8 @@ public class AopProxyWriter implements ProxyingBeanDefinitionVisitor, ClassOutpu
     public static final int ADDITIONAL_PARAMETERS_COUNT = 5;
 
     private static final Method METHOD_GET_PROXY_TARGET_BEAN_WITH_BEAN_DEFINITION_AND_CONTEXT = ReflectionUtils.getRequiredInternalMethod(
-        DefaultBeanContext.class,
-        "getProxyTargetBean",
         BeanResolutionContext.class,
+        "getProxyTargetBean",
         BeanDefinition.class,
         Argument.class,
         Qualifier.class
@@ -879,7 +877,6 @@ public class AopProxyWriter implements ProxyingBeanDefinitionVisitor, ClassOutpu
             if (cacheLazyTarget) {
                 interceptedTargetMethod = getCacheLazyTargetInterceptedTargetMethod(
                     targetField,
-                    beanLocatorField,
                     beanResolutionContextField,
                     proxyBeanDefinitionField,
                     beanQualifierField
@@ -889,7 +886,6 @@ public class AopProxyWriter implements ProxyingBeanDefinitionVisitor, ClassOutpu
                 );
             } else {
                 interceptedTargetMethod = getLazyInterceptedTargetMethod(
-                    beanLocatorField,
                     beanResolutionContextField,
                     proxyBeanDefinitionField,
                     beanQualifierField
@@ -941,17 +937,14 @@ public class AopProxyWriter implements ProxyingBeanDefinitionVisitor, ClassOutpu
 
             // Non-lazy target
             bodyBuilders.add((aThis, methodParameters) -> aThis.field(targetField).assign(
-                    methodParameters.get(beanContextArgumentIndex)
-                        .cast(DefaultBeanContext.class).invoke(
+                    methodParameters.get(beanResolutionContextArgumentIndex)
+                        .invoke(
                             METHOD_GET_PROXY_TARGET_BEAN_WITH_BEAN_DEFINITION_AND_CONTEXT,
-
-                            // 1st argument: the bean resolution context
-                            methodParameters.get(beanResolutionContextArgumentIndex),
-                            // 2nd argument: this.$proxyBeanDefinition
+                            // 1st argument: this.$proxyBeanDefinition
                             aThis.field(proxyBeanDefinitionField),
-                            // 3rd argument: the type
+                            // 2nd argument: the type
                             pushTargetArgument(targetType),
-                            // 4th argument: the qualifier
+                            // 3th argument: the qualifier
                             methodParameters.get(qualifierIndex)
                         ).cast(targetType)
                 )
@@ -1081,21 +1074,17 @@ public class AopProxyWriter implements ProxyingBeanDefinitionVisitor, ClassOutpu
     }
 
     private ExpressionDef.InvokeInstanceMethod pushResolveLazyProxyTargetBean(VariableDef.This aThis,
-                                                                              List<VariableDef.MethodParameter> parameters,
-                                                                              FieldDef beanLocatorField,
                                                                               FieldDef beanResolutionContextField,
                                                                               FieldDef proxyBeanDefinitionField,
                                                                               FieldDef beanQualifierField) {
-        return aThis.field(beanLocatorField).cast(DefaultBeanContext.class).invoke(
+        return aThis.field(beanResolutionContextField).invoke(
             METHOD_GET_PROXY_TARGET_BEAN_WITH_BEAN_DEFINITION_AND_CONTEXT,
 
-            // 1st argument: the bean resolution context
-            aThis.field(beanResolutionContextField),
-            // 2nd argument: this.$proxyBeanDefinition
+            // 1st argument: this.$proxyBeanDefinition
             aThis.field(proxyBeanDefinitionField),
-            // 3rd argument: the type
+            // 2nd argument: the type
             pushTargetArgument(ClassTypeDef.of(targetClassFullName)),
-            // 4th argument: the qualifier
+            // 3rd argument: the qualifier
             aThis.field(beanQualifierField)
         );
     }
@@ -1374,16 +1363,13 @@ public class AopProxyWriter implements ProxyingBeanDefinitionVisitor, ClassOutpu
             });
     }
 
-    private MethodDef getLazyInterceptedTargetMethod(FieldDef beanLocatorField,
-                                                     FieldDef beanResolutionContextField,
+    private MethodDef getLazyInterceptedTargetMethod(FieldDef beanResolutionContextField,
                                                      FieldDef proxyBeanDefinitionField,
                                                      FieldDef beanQualifierField) {
 
         return MethodDef.override(METHOD_INTERCEPTED_TARGET)
             .build((aThis, methodParameters) -> pushResolveLazyProxyTargetBean(
                 aThis,
-                methodParameters,
-                beanLocatorField,
                 beanResolutionContextField,
                 proxyBeanDefinitionField,
                 beanQualifierField
@@ -1391,7 +1377,6 @@ public class AopProxyWriter implements ProxyingBeanDefinitionVisitor, ClassOutpu
     }
 
     private MethodDef getCacheLazyTargetInterceptedTargetMethod(FieldDef targetField,
-                                                                FieldDef beanLocatorField,
                                                                 FieldDef beanResolutionContextField,
                                                                 FieldDef proxyBeanDefinitionField,
                                                                 FieldDef beanQualifierField) {
@@ -1422,8 +1407,6 @@ public class AopProxyWriter implements ProxyingBeanDefinitionVisitor, ClassOutpu
                                             targetFieldAccess.assign(
                                                 pushResolveLazyProxyTargetBean(
                                                     aThis,
-                                                    methodParameters,
-                                                    beanLocatorField,
                                                     beanResolutionContextField,
                                                     proxyBeanDefinitionField,
                                                     beanQualifierField)

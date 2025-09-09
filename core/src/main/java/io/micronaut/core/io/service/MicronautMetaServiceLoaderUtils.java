@@ -189,7 +189,7 @@ public final class MicronautMetaServiceLoaderUtils {
             // MethodHandler should more performant than the basic reflection
             return (S) LOOKUP.findConstructor(loadedClass, VOID_TYPE).invoke();
         } catch (NoClassDefFoundError | ClassNotFoundException | NoSuchMethodException |
-                 IllegalAccessException e) {
+                 IllegalAccessException | IllegalAccessError e) {
             // Ignore
             return null;
         } catch (Throwable e) {

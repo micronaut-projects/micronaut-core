@@ -17,7 +17,6 @@ package io.micronaut.inject.provider;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
-import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
@@ -51,7 +50,6 @@ public final class JavaxProviderBeanDefinition extends AbstractProviderDefinitio
 
     @Override
     protected Provider<Object> buildProvider(BeanResolutionContext resolutionContext, BeanContext context, Argument<Object> argument, Qualifier<Object> qualifier, boolean singleton) {
-        DefaultBeanContext defaultBeanContext = (DefaultBeanContext) context;
         if (singleton) {
             return new Provider<>() {
                 Object bean;
@@ -59,13 +57,13 @@ public final class JavaxProviderBeanDefinition extends AbstractProviderDefinitio
                 @Override
                 public Object get() {
                     if (bean == null) {
-                        bean = defaultBeanContext.getBean(resolutionContext.copy(), argument, qualifier);
+                        bean = resolutionContext.copy().getBean(argument, qualifier);
                     }
                     return bean;
                 }
             };
         }
-        return () -> defaultBeanContext.getBean(resolutionContext.copy(), argument, qualifier);
+        return () -> resolutionContext.copy().getBean(argument, qualifier);
     }
 
     private static boolean isTypePresent() {

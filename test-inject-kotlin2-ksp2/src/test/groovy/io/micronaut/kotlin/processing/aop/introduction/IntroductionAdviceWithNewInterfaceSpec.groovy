@@ -1,7 +1,6 @@
 package io.micronaut.kotlin.processing.aop.introduction
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.InstantiatableBeanDefinition

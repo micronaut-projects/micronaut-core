@@ -23,10 +23,9 @@ import io.micronaut.annotation.processing.test.support.KspKt;
 import io.micronaut.annotation.processing.test.support.SourceFile;
 import io.micronaut.aop.internal.InterceptorRegistryBean;
 import io.micronaut.context.ApplicationContext;
-import io.micronaut.context.ApplicationContextConfiguration;
 import io.micronaut.context.BeanContext;
-import io.micronaut.context.DefaultApplicationContext;
-import io.micronaut.context.env.Environment;
+import io.micronaut.context.BeanDefinitionsProvider;
+import io.micronaut.context.DefaultBeanDefinitionsProvider;
 import io.micronaut.context.event.ApplicationEventPublisherFactory;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanIntrospector;
@@ -273,16 +272,9 @@ public class KotlinCompiler {
         builder.classLoader(classLoader);
         builder.environments("test");
         builder.properties(config);
-        Environment environment = builder.build().getEnvironment();
-        return new DefaultApplicationContext((ApplicationContextConfiguration) builder) {
-
+        builder.beanDefinitionsProvider(new BeanDefinitionsProvider() {
             @Override
-            public Environment getEnvironment() {
-                return environment;
-            }
-
-            @Override
-            protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
+            public List<BeanDefinitionReference<?>> provide(ClassLoader classLoader) {
                 List<String> beanDefinitionNames = pair.component2().component1().
                     getClasspaths().stream().filter(f -> f.toURI().toString().contains("/ksp/sources/resources"))
                     .flatMap(dir -> {
@@ -293,7 +285,7 @@ public class KotlinCompiler {
                         return Stream.of(files).filter(f -> f.isFile());
                     }).map(f -> f.getName()).toList();
 
-                List<BeanDefinitionReference> beanDefinitions = new ArrayList<>(beanDefinitionNames.size());
+                List<BeanDefinitionReference<?>> beanDefinitions = new ArrayList<>(beanDefinitionNames.size());
                 for (String name : beanDefinitionNames) {
                     try {
                         BeanDefinitionReference br = (BeanDefinitionReference) loadDefinition(classLoader, name);
@@ -304,7 +296,7 @@ public class KotlinCompiler {
                     }
                 }
                 if (includeAllBeans) {
-                    beanDefinitions.addAll(super.resolveBeanDefinitionReferences());
+                    beanDefinitions.addAll(new DefaultBeanDefinitionsProvider().provide(classLoader));
                 } else {
                     beanDefinitions.add(new InterceptorRegistryBean());
                     beanDefinitions.add(new BeanProviderDefinition());
@@ -312,7 +304,8 @@ public class KotlinCompiler {
                 }
                 return beanDefinitions;
             }
-        }.start();
+        });
+        return builder.build().start();
     }
 
     public static Object getBean(BeanContext beanContext, String className) throws ClassNotFoundException {

@@ -16,7 +16,6 @@
 package io.micronaut.kotlin.processing.beans.configproperties
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.PropertySource
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.util.CollectionUtils
@@ -64,7 +63,7 @@ class ConfigurationPropertiesSpec extends Specification {
 
     void "test configuration properties binding"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build()
         applicationContext.environment.addPropertySource(PropertySource.of(
             'test',
             ['foo.bar.innerVals': [
@@ -108,7 +107,7 @@ class ConfigurationPropertiesSpec extends Specification {
 
     void "test configuration inner class properties binding"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build()
         applicationContext.environment.addPropertySource(PropertySource.of(
             'foo.bar.inner.enabled':'true',
         ))

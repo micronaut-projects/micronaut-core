@@ -16,13 +16,9 @@
 package io.micronaut.inject.env
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
-import io.micronaut.context.env.DefaultEnvironment
 import io.micronaut.context.env.Environment
-import spock.lang.Specification
-
 import jakarta.inject.Inject
-
+import spock.lang.Specification
 /**
  * Created by graemerocher on 12/06/2017.
  */
@@ -30,7 +26,7 @@ class EnvironmentInjectSpec extends Specification {
 
     void "test inject the environment object"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build()
                                                         .start()
 
         when:
@@ -38,12 +34,9 @@ class EnvironmentInjectSpec extends Specification {
 
         then:
         a.environment != null
-        a.defaultEnvironment != null
     }
 
     static class A {
         @Inject Environment environment
-
-        @Inject DefaultEnvironment defaultEnvironment
     }
 }

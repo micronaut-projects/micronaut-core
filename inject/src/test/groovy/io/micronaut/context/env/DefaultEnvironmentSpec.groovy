@@ -18,32 +18,46 @@ package io.micronaut.context.env
 import com.github.stefanbirkner.systemlambda.SystemLambda
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.ApplicationContextConfiguration
-import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.exceptions.ConfigurationException
 import io.micronaut.core.naming.NameUtils
+import io.micronaut.core.order.OrderUtil
 import io.micronaut.core.util.StringUtils
-import io.micronaut.core.version.SemanticVersion
 import spock.lang.Issue
-import spock.lang.Requires
 import spock.lang.Specification
-import spock.util.environment.Jvm
 import spock.util.environment.RestoreSystemProperties
+
+import java.util.function.Function
 
 /**
  * Created by graemerocher on 12/06/2017.
  */
 @RestoreSystemProperties
-// fails due to https://issues.apache.org/jira/browse/GROOVY-10145
-@Requires({
-    SemanticVersion.isAtLeastMajorMinor(GroovySystem.version, 4, 0) ||
-            !Jvm.current.isJava16Compatible()
-})
 class DefaultEnvironmentSpec extends Specification {
 
-    private static final String GOOGLE_APPENGINE_ENVIRONMENT = "GAE_ENV";
-    private static final String PCF_ENV = "VCAP_SERVICES";
-    private static final String HEROKU_DYNO = "DYNO";
-    private static final String K8S_ENV = "KUBERNETES_SERVICE_HOST";
+    private static final String GOOGLE_APPENGINE_ENVIRONMENT = "GAE_ENV"
+    private static final String PCF_ENV = "VCAP_SERVICES"
+    private static final String HEROKU_DYNO = "DYNO"
+    private static final String K8S_ENV = "KUBERNETES_SERVICE_HOST"
+
+    void "mapper not reset on refresh"() {
+        given:
+        Environment environment = new DefaultEnvironment({ ["test"] })
+        environment.getConversionService().addConverter(Foo.class, Bar.class, new Function<Foo, Bar>() {
+            @Override
+            Bar apply(Foo foo) {
+                return new Bar(foo.val())
+            }
+        })
+        when:
+        environment.start()
+        then:
+        environment.getConversionService().convert(new Foo("abc"), Bar.class).get().val() == "abc"
+
+        when:
+        environment.refresh()
+        then:
+        environment.getConversionService().convert(new Foo("abc"), Bar.class).get().val() == "abc"
+    }
 
     void "test environment system property resolve"() {
         given:
@@ -72,7 +86,7 @@ class DefaultEnvironmentSpec extends Specification {
         given:
         System.setProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY, StringUtils.TRUE)
         System.setProperty("micronaut.bootstrap.name", "custom-bootstrap")
-        DefaultApplicationContext context = new DefaultApplicationContext("test")
+        ApplicationContext context = ApplicationContext.builder("test").build()
         context.start()
 
         when:
@@ -229,8 +243,8 @@ class DefaultEnvironmentSpec extends Specification {
 
         then: "should throw exception"
         def e = thrown(ConfigurationException)
-        String extension = NameUtils.extension(unsupportedFile.absolutePath);
-        String fileName = NameUtils.filename(unsupportedFile.absolutePath);
+        String extension = NameUtils.extension(unsupportedFile.absolutePath)
+        String fileName = NameUtils.filename(unsupportedFile.absolutePath)
         e.message == "Unsupported properties file format while reading " + fileName + "." + extension + " from " + unsupportedFile.absolutePath
 
         when: "file from system property source loader does not override the key"
@@ -527,8 +541,13 @@ class DefaultEnvironmentSpec extends Specification {
                 .build()
                 .start()
 
+        List<PropertySource> sources = new ArrayList(applicationContext.getEnvironment().getPropertySources())
+        OrderUtil.sort(sources)
         then:
         applicationContext.getRequiredProperty("custom-bootstrap-value", String.class) == "test"
+        sources.collect { [it.name, it.order] } == [
+                ['application', -300], ['bootstrap', -290], ['env', -190], ['system', -90]
+        ]
 
         cleanup:
         applicationContext.stop()
@@ -886,12 +905,15 @@ class DefaultEnvironmentSpec extends Specification {
         then: 'the environment is deduced'
         env.activeNames == ["test", Environment.KUBERNETES, Environment.CLOUD] as Set
     }
+
+    static record Foo(String val) {}
+
+    static record Bar(String val) {}
+
     private static Environment startEnv(String files) {
-        new DefaultEnvironment({["test"]}) {
-            @Override
-            protected String readPropertySourceListKeyFromEnvironment() {
-                files
-            }
-        }.start()
+        return SystemLambda.withEnvironmentVariable(StringUtils.convertDotToUnderscore(Environment.PROPERTY_SOURCES_KEY), files)
+                .execute(() -> {
+                    new DefaultEnvironment({ ["test"] }).start()
+                })
     }
 }

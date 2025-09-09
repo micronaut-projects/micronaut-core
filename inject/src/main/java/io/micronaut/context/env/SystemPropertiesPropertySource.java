@@ -15,6 +15,8 @@
  */
 package io.micronaut.context.env;
 
+import java.util.Map;
+
 /**
  * Loads properties from system properties.
  *
@@ -37,7 +39,7 @@ public class SystemPropertiesPropertySource extends MapPropertySource {
      * Default constructor.
      */
     public SystemPropertiesPropertySource() {
-        super(NAME, System.getProperties());
+        super(NAME, (Map) System.getProperties());
     }
 
     @Override

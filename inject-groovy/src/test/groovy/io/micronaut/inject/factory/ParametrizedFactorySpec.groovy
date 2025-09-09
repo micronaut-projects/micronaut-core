@@ -16,8 +16,6 @@
 package io.micronaut.inject.factory
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.annotation.Factory
 import io.micronaut.context.annotation.Parameter
 import io.micronaut.context.annotation.Prototype

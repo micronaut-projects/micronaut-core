@@ -83,10 +83,11 @@ public abstract class AbstractInitializableBeanDefinitionAndReference<T> extends
      */
     public final boolean isEnabled(BeanContext context, BeanResolutionContext resolutionContext, boolean preCheck) {
         if (preLoadConditions != null && postLoadConditions != null) {
-            DefaultBeanContext defaultBeanContext = (DefaultBeanContext) context;
             DefaultConditionContext<AbstractBeanContextConditional> conditionContext = new DefaultConditionContext<>(
-                defaultBeanContext,
-                this, resolutionContext);
+                context,
+                this,
+                resolutionContext
+            );
             boolean matches;
             if (preCheck) {
                 matches = matches(conditionContext, preLoadConditions);
@@ -96,7 +97,7 @@ public abstract class AbstractInitializableBeanDefinitionAndReference<T> extends
             if (matches) {
                 return true;
             }
-            onFail(conditionContext, defaultBeanContext);
+            onFail(conditionContext, context);
             return false;
         }
         if (preCheck) {

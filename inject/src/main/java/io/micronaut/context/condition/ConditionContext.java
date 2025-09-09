@@ -21,8 +21,11 @@ import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.value.PropertyResolver;
+import io.micronaut.inject.BeanDefinition;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
@@ -50,7 +53,19 @@ public interface ConditionContext<T extends AnnotationMetadataProvider> extends 
     /**
      * @return The resolution context
      */
+    @Nullable
     BeanResolutionContext getBeanResolutionContext();
+
+    /**
+     * Finds and returns all bean definitions of the specified type.
+     *
+     * @param <K>      The type of the beans.
+     * @param beanType The class type of the beans to find.
+     * @return A collection of {@link BeanDefinition} instances corresponding to the specified type.
+     * @since 5.0
+     */
+    @NonNull
+    <K> Collection<BeanDefinition<K>> findBeanDefinitions(@NonNull Class<K> beanType);
 
     /**
      * Fail the condition with the given message.

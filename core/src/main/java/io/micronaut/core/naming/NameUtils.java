@@ -23,7 +23,6 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.StringUtils;
 
 import java.util.Locale;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -36,7 +35,6 @@ public class NameUtils {
 
     private static final int IS_LENGTH = 2;
 
-    private static final Pattern DOT_UPPER = Pattern.compile("\\.[A-Z\\$]");
     private static final String PREFIX_GET = "get";
     private static final String PREFIX_SET = "set";
     private static final String PREFIX_IS = "is";
@@ -161,10 +159,11 @@ public class NameUtils {
      * @return The package name
      */
     public static @NonNull String getPackageName(@NonNull String className) {
-        Matcher matcher = DOT_UPPER.matcher(className);
-        if (matcher.find()) {
-            int position = matcher.start();
-            return className.substring(0, position);
+        int len = className.length();
+        for (int i = len - 1; i != 0; i--) {
+            if (className.charAt(i) == '.') {
+                return className.substring(0, i);
+            }
         }
         return "";
     }
@@ -208,10 +207,11 @@ public class NameUtils {
      * @return The simple name of the class
      */
     public static @NonNull String getSimpleName(@NonNull String className) {
-        Matcher matcher = DOT_UPPER.matcher(className);
-        if (matcher.find()) {
-            int position = matcher.start();
-            return className.substring(position + 1);
+        int len = className.length();
+        for (int i = len - 1; i >= 0; i--) {
+            if (className.charAt(i) == '.') {
+                return className.substring(i + 1);
+            }
         }
         return className;
     }

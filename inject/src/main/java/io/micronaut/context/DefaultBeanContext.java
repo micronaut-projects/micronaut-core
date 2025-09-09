@@ -15,7 +15,16 @@
  */
 package io.micronaut.context;
 
-import io.micronaut.context.annotation.*;
+import io.micronaut.context.annotation.ConfigurationReader;
+import io.micronaut.context.annotation.Context;
+import io.micronaut.context.annotation.DefaultImplementation;
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.context.annotation.Infrastructure;
+import io.micronaut.context.annotation.Parallel;
+import io.micronaut.context.annotation.Primary;
+import io.micronaut.context.annotation.Prototype;
+import io.micronaut.context.annotation.Replaces;
+import io.micronaut.context.annotation.Secondary;
 import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.context.condition.Failure;
 import io.micronaut.context.env.CachedEnvironment;
@@ -54,9 +63,11 @@ import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Indexes;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
+import io.micronaut.core.convert.DefaultMutableConversionService;
 import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
@@ -131,6 +142,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ForkJoinPool;
@@ -149,8 +161,10 @@ import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
+@NextMajorVersion("Remove public")
 @SuppressWarnings("MagicNumber")
-public class DefaultBeanContext implements InitializableBeanContext, ConfigurableBeanContext {
+public sealed class DefaultBeanContext implements ConfigurableBeanContext permits DefaultApplicationContext {
 
     protected static final Logger LOG = LoggerFactory.getLogger(DefaultBeanContext.class);
     protected static final Logger LOG_LIFECYCLE = LoggerFactory.getLogger(DefaultBeanContext.class.getPackage().getName() + ".lifecycle");
@@ -236,8 +250,13 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
     private List<Map.Entry<Class<?>, ListenersSupplier<BeanPreDestroyEventListener>>> beanPreDestroyEventListeners;
     private List<Map.Entry<Class<?>, ListenersSupplier<BeanDestroyedEventListener>>> beanDestroyedEventListeners;
 
+    private final BeanDefinitionsProvider beanDefinitionReferencesProvider;
     @Nullable
-    private MutableConversionService conversionService;
+    private final Predicate<QualifiedBeanType<?>> beansPredicate;
+    private final boolean eventsEnabled;
+    private final boolean eagerBeansEnabled;
+
+    protected MutableConversionService conversionService;
 
     /**
      * Construct a new bean context using the same classloader that loaded this DefaultBeanContext class.
@@ -302,6 +321,11 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
             .getTraceConfiguration();
         this.traceMode = traceConfiguration.mode();
         this.tracePatterns = traceConfiguration.classPatterns();
+        this.beansPredicate = contextConfiguration.beansPredicate();
+        this.eventsEnabled = contextConfiguration.eventsEnabled();
+        this.eagerBeansEnabled = contextConfiguration.eagerBeansEnabled();
+        this.beanDefinitionReferencesProvider = contextConfiguration.getBeanDefinitionsProvider();
+        this.conversionService = new DefaultMutableConversionService();
     }
 
     /**
@@ -369,7 +393,6 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
      * Registers conversion service.
      */
     protected void registerConversionService() {
-        conversionService = MutableConversionService.create();
         //noinspection resource
         registerSingleton(MutableConversionService.class, conversionService,  null, false);
     }
@@ -472,7 +495,6 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
             beanCreationEventListeners = null;
             beanPreDestroyEventListeners = null;
             beanDestroyedEventListeners = null;
-            conversionService = null;
             startupBeans = null;
             terminating.set(false);
             running.set(false);
@@ -1868,7 +1890,8 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
     @SuppressWarnings("unchecked")
     @Override
     public void publishEvent(@NonNull Object event) {
-        if (event != null) {
+        if (eventsEnabled) {
+            Objects.requireNonNull(event, "Event cannot be null");
             getBean(Argument.of(ApplicationEventPublisher.class, event.getClass())).publishEvent(event);
         }
     }
@@ -1876,8 +1899,11 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
     @Override
     public @NonNull
     Future<Void> publishEventAsync(@NonNull Object event) {
-        Objects.requireNonNull(event, "Event cannot be null");
-        return getBean(Argument.of(ApplicationEventPublisher.class, event.getClass())).publishEventAsync(event);
+        if (eventsEnabled) {
+            Objects.requireNonNull(event, "Event cannot be null");
+            return getBean(Argument.of(ApplicationEventPublisher.class, event.getClass())).publishEventAsync(event);
+        }
+        return CompletableFuture.completedFuture(null);
     }
 
     @NonNull
@@ -1917,35 +1943,19 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
     @NonNull
     protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
         if (beanDefinitionReferences == null) {
-            beanDefinitionReferences = MicronautMetaServiceLoaderUtils.findMetaMicronautServiceEntries(
-                classLoader,
-                BeanDefinitionReference.class,
-                BeanDefinitionReference::isPresent
-            );
+            List<BeanDefinitionReference<?>> refs = beanDefinitionReferencesProvider.provide(classLoader);
+            if (beansPredicate != null) {
+                List<BeanDefinitionReference<?>> list = new ArrayList<>(refs.size());
+                for (BeanDefinitionReference<?> ref : refs) {
+                    if (beansPredicate.test(ref)) {
+                        list.add(ref);
+                    }
+                }
+                refs = list;
+            }
+            beanDefinitionReferences = (List) refs;
         }
         return beanDefinitionReferences;
-    }
-
-    /**
-     * Resolves the {@link BeanDefinitionReference} class instances. Default implementation uses ServiceLoader pattern.
-     *
-     * @param predicate The filter predicate, can be null
-     * @return The bean definition classes
-     */
-    @NonNull
-    @Deprecated
-    protected List<BeanDefinitionReference> resolveBeanDefinitionReferences(@Nullable Predicate<BeanDefinitionReference> predicate) {
-        if (predicate != null) {
-            List<BeanDefinitionReference> allRefs = resolveBeanDefinitionReferences();
-            List<BeanDefinitionReference> newRefs = new ArrayList<>(allRefs.size());
-            for (BeanDefinitionReference reference : allRefs) {
-                if (predicate.test(reference)) {
-                    newRefs.add(reference);
-                }
-            }
-            return newRefs;
-        }
-        return resolveBeanDefinitionReferences();
     }
 
     /**
@@ -1965,13 +1975,12 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
         return beanConfigurationsList;
     }
 
-    /**
-     * Initialize the event listeners.
-     */
-    protected void initializeEventListeners() {
-        this.beanCreationEventListeners = loadBeanEventListeners(BeanCreatedEventListener.class);
-        this.beanCreationEventListeners.add(new AbstractMap.SimpleEntry<>(AnnotationProcessor.class, new AnnotationProcessorListenersSupplier()));
-        this.beanInitializedEventListeners = loadBeanEventListeners(BeanInitializedEventListener.class);
+    private void initializeEventListeners() {
+        if (eventsEnabled) {
+            this.beanCreationEventListeners = loadBeanEventListeners(BeanCreatedEventListener.class);
+            this.beanCreationEventListeners.add(new AbstractMap.SimpleEntry<>(AnnotationProcessor.class, new AnnotationProcessorListenersSupplier()));
+            this.beanInitializedEventListeners = loadBeanEventListeners(BeanInitializedEventListener.class);
+        }
     }
 
     @NonNull
@@ -2009,19 +2018,13 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
         return typeToListener;
     }
 
-    /**
-     * Initialize the context with the given {@link io.micronaut.context.annotation.Context} scope beans.
-     *
-     * @param eagerInitBeans The context scope beans
-     * @param processedBeans    The beans that require {@link ExecutableMethodProcessor} handling
-     * @param parallelBeans     The parallel bean definitions
-     */
-    @Internal
-    protected void initializeContext(
+    private void initializeContext(
             @NonNull List<BeanDefinitionProducer> eagerInitBeans,
             @NonNull List<BeanDefinitionProducer> processedBeans,
             @NonNull List<BeanDefinitionProducer> parallelBeans) {
-
+        if (!eagerBeansEnabled) {
+            return;
+        }
         if (CollectionUtils.isNotEmpty(eagerInitBeans)) {
             final List<BeanDefinition<Object>> eagerInit = new ArrayList<>(eagerInitBeans.size());
             for (BeanDefinitionProducer contextScopeBean : eagerInitBeans) {
@@ -2471,51 +2474,46 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
         }
     }
 
-    /**
-     * Processes parallel bean definitions.
-     *
-     * @param parallelBeans The parallel beans
-     */
-    @Internal
-    protected void processParallelBeans(List<BeanDefinitionProducer> parallelBeans) {
-        if (!parallelBeans.isEmpty()) {
-            List<BeanDefinitionProducer> finalParallelBeans = parallelBeans.stream()
-                    .filter(p -> p.getReferenceIfEnabled(this) != null)
-                    .toList();
-            if (!finalParallelBeans.isEmpty()) {
-                new Thread(() -> {
-                    Collection<BeanDefinition<Object>> parallelDefinitions = new ArrayList<>();
-                    finalParallelBeans.forEach(producer -> {
-                        try {
-                            loadEagerBeans(producer, parallelDefinitions);
-                        } catch (Throwable e) {
-                            BeanDefinitionReference<?> beanDefinitionReference = producer.getReferenceBestEffort();
-                            LOG.error("Parallel Bean definition [{}{}{}]", beanDefinitionReference == null ? "<ref discarded>" : beanDefinitionReference.getName(), MSG_COULD_NOT_BE_LOADED, e.getMessage(), e);
-                            boolean shutdownOnError = beanDefinitionReference != null &&
-                                beanDefinitionReference.getAnnotationMetadata().booleanValue(Parallel.class, "shutdownOnError").orElse(true);
-                            if (shutdownOnError) {
-                                stop();
-                            }
+    private void processParallelBeans(List<BeanDefinitionProducer> parallelBeans) {
+        if (!eagerBeansEnabled || parallelBeans.isEmpty()) {
+            return;
+        }
+        List<BeanDefinitionProducer> finalParallelBeans = parallelBeans.stream()
+                .filter(p -> p.getReferenceIfEnabled(this) != null)
+                .toList();
+        if (!finalParallelBeans.isEmpty()) {
+            new Thread(() -> {
+                Collection<BeanDefinition<Object>> parallelDefinitions = new ArrayList<>();
+                finalParallelBeans.forEach(producer -> {
+                    try {
+                        loadEagerBeans(producer, parallelDefinitions);
+                    } catch (Throwable e) {
+                        BeanDefinitionReference<?> beanDefinitionReference = producer.getReferenceBestEffort();
+                        LOG.error("Parallel Bean definition [{}{}{}]", beanDefinitionReference == null ? "<ref discarded>" : beanDefinitionReference.getName(), MSG_COULD_NOT_BE_LOADED, e.getMessage(), e);
+                        boolean shutdownOnError = beanDefinitionReference != null &&
+                            beanDefinitionReference.getAnnotationMetadata().booleanValue(Parallel.class, "shutdownOnError").orElse(true);
+                        if (shutdownOnError) {
+                            stop();
                         }
-                    });
+                    }
+                });
 
-                    filterReplacedBeans(null, parallelDefinitions);
+                filterReplacedBeans(null, parallelDefinitions);
 
-                    parallelDefinitions.forEach(beanDefinition -> ForkJoinPool.commonPool().execute(() -> {
-                        try {
-                            initializeEagerBean(beanDefinition);
-                        } catch (Throwable e) {
-                            LOG.error("Parallel Bean definition [{}{}{}]", beanDefinition.getName(), MSG_COULD_NOT_BE_LOADED, e.getMessage(), e);
-                            Boolean shutdownOnError = beanDefinition.getAnnotationMetadata().booleanValue(Parallel.class, "shutdownOnError").orElse(true);
-                            if (shutdownOnError) {
-                                stop();
-                            }
+                parallelDefinitions.forEach(beanDefinition -> ForkJoinPool.commonPool().execute(() -> {
+                    try {
+                        initializeEagerBean(beanDefinition);
+                    } catch (Throwable e) {
+                        LOG.error("Parallel Bean definition [{}{}{}]", beanDefinition.getName(), MSG_COULD_NOT_BE_LOADED, e.getMessage(), e);
+                        Boolean shutdownOnError = beanDefinition.getAnnotationMetadata().booleanValue(Parallel.class, "shutdownOnError").orElse(true);
+                        if (shutdownOnError) {
+                            stop();
                         }
-                    }));
-                    parallelDefinitions.clear();
+                    }
+                }));
+                parallelDefinitions.clear();
 
-                }).start();
-            }
+            }).start();
         }
     }
 
@@ -3359,11 +3357,15 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
     private void configureAndStartContext() {
         configureContextInternal();
         initializeEventListeners();
+        initializeTypeConverters();
         initializeContext(
             startupBeans.eagerInitBeans,
             startupBeans.processedBeans,
             startupBeans.parallelBeans
         );
+    }
+
+    protected void initializeTypeConverters() {
     }
 
     @NonNull
@@ -3793,11 +3795,6 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
             return Optional.of((T) o);
         }
         return Optional.empty();
-    }
-
-    @Override
-    public void finalizeConfiguration() {
-        configureAndStartContext();
     }
 
     @Override

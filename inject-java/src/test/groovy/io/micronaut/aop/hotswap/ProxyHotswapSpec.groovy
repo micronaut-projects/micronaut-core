@@ -17,8 +17,6 @@ package io.micronaut.aop.hotswap
 
 import io.micronaut.aop.HotSwappableInterceptedProxy
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
 import spock.lang.Specification
 
 /**

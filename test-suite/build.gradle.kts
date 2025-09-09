@@ -115,6 +115,9 @@ dependencies {
     testImplementation("io.micronaut.rxjava3:micronaut-rxjava3") {
         exclude(group = "io.micronaut")
     }
+    testImplementation("io.micronaut.rxjava3:micronaut-rxjava3-http-client") {
+        exclude(group = "io.micronaut")
+    }
 }
 
 tasks {

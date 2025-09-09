@@ -1,6 +1,43 @@
 
 This section documents breaking changes between Micronaut versions
 
+== 5.0
+
+=== Core Changes
+
+==== Bean context changes
+
+The default implementations of api:context.BeanContext[BeanContext], api:context.ApplicationContext[ApplicationContext] and api:context.env.Environment[Environment] are no longer public and non-final.
+
+There are new options added to api:context.ApplicationContextBuilder[ApplicationContextBuilder] which allow to modify the behavior of the bean context without overring it:
+
+[source,java]
+----
+ApplicationContext myBootstrapContext = ApplicationContext.builder()
+    .deducePackage(false)
+    .deduceEnvironment(false)
+    .eventsEnabled(false)
+    .eagerBeansEnabled(false)
+    .beansPredicate(reference -> reference.isAnnotationPresent(BootstrapContextCompatible.class))
+    .build();
+----
+
+Alternatively there is a new way how to create api:context.env.Environment[Environment]:
+
+[source,java]
+----
+Environment myEnv = Environment.create(new ApplicationContextConfiguration() {
+    @Override
+    public List<String> getEnvironments() {
+        return List.of("foobar");
+    }
+});
+
+ApplicationContext customApplicationContext = ApplicationContext.create(myEnv);
+
+----
+
+
 == 4.0.0
 
 === Core Changes
@@ -221,4 +258,4 @@ In Micronaut Framework 4, users need to extend the <<contextPropagation, propaga
 
 ==== Micronaut 3 libraries not compatible with Micronaut 4 applications
 
-In order for Micronaut 3 library beans to be discoverable in an application running Micronaut 4, the library must be recompiled with Micronaut 4 - https://github.com/micronaut-projects/micronaut-core/discussions/9758 
+In order for Micronaut 3 library beans to be discoverable in an application running Micronaut 4, the library must be recompiled with Micronaut 4 - https://github.com/micronaut-projects/micronaut-core/discussions/9758

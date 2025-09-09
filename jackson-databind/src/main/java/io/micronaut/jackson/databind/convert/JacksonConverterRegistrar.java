@@ -68,7 +68,7 @@ public class JacksonConverterRegistrar implements TypeConverterRegistrar {
      * @param conversionService The conversion service
      */
     @Inject
-    protected JacksonConverterRegistrar(
+    public JacksonConverterRegistrar(
         BeanProvider<ObjectMapper> objectMapper,
         ConversionService conversionService) {
         this.objectMapper = objectMapper;

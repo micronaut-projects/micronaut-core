@@ -2002,36 +2002,39 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     @Internal
     @UsedByGeneratedCode
     protected final boolean containsPropertiesValue(BeanResolutionContext resolutionContext, BeanContext context, String value) {
-        if (!(context instanceof ApplicationContext applicationContext)) {
+        PropertyResolver propertyResolver = resolutionContext.getPropertyResolver();
+        if (propertyResolver == null) {
             return false;
         }
         value = substituteWildCards(resolutionContext, value);
 
-        return applicationContext.containsProperties(value);
+        return propertyResolver.containsProperties(value);
     }
 
     @Internal
     @UsedByGeneratedCode
     protected final boolean containsPropertyValue(BeanResolutionContext resolutionContext, BeanContext context, String value) {
-        if (!(context instanceof ApplicationContext applicationContext)) {
+        PropertyResolver propertyResolver = resolutionContext.getPropertyResolver();
+        if (propertyResolver == null) {
             return false;
         }
         value = substituteWildCards(resolutionContext, value);
 
-        return applicationContext.containsProperty(value);
+        return propertyResolver.containsProperty(value);
     }
 
     private boolean resolveContainsValue(BeanResolutionContext resolutionContext, BeanContext context, AnnotationMetadata parentAnnotationMetadata, Argument argument, boolean isValuePrefix) {
-        if (!(context instanceof ApplicationContext applicationContext)) {
+        PropertyResolver propertyResolver = resolutionContext.getPropertyResolver();
+        if (propertyResolver == null) {
             return false;
         }
         String valueAnnStr = argument.getAnnotationMetadata().stringValue(Value.class).orElse(null);
         String valString = resolvePropertyValueName(resolutionContext, parentAnnotationMetadata, argument, valueAnnStr);
-        boolean result = isValuePrefix ? applicationContext.containsProperties(valString) : applicationContext.containsProperty(valString);
+        boolean result = isValuePrefix ? propertyResolver.containsProperties(valString) : propertyResolver.containsProperty(valString);
         if (!result && precalculatedInfo.isConfigurationProperties) {
             String cliOption = resolveCliOption(argument.getName());
             if (cliOption != null) {
-                result = applicationContext.containsProperty(cliOption);
+                result = propertyResolver.containsProperty(cliOption);
             }
         }
         return result;

@@ -1,24 +1,27 @@
 package io.micronaut.context.env
 
+import io.micronaut.core.optim.StaticOptimizations
 import io.micronaut.runtime.Micronaut
 import spock.lang.Specification
 
 class ConstantPropertySourceSpec extends Specification {
     def "constant property sources are loaded conditionally based on the active environments"() {
-        def env = new DefaultEnvironment(Micronaut.build().environments(name)) {
-            @Override
-            protected List<PropertySource> getConstantPropertySources() {
+        given:
+        StaticOptimizations.reset()
+        StaticOptimizations.set(new ConstantPropertySources(
                 [
                         propertySource('application'),
                         propertySource('application-dev'),
                         propertySource('application-cloud'),
                         propertySource('application-other', ['other':'value'])
                 ]
-            }
-        }
+        ))
+
+        when:
+        def env = new DefaultEnvironment(Micronaut.build().environments(name))
         env.start()
 
-        expect:
+        then:
         def property = env.getProperty("some.conf", String)
         property.present
         property.get() == expectedValue
@@ -26,6 +29,7 @@ class ConstantPropertySourceSpec extends Specification {
 
         cleanup:
         env.stop()
+        StaticOptimizations.reset()
 
         where:
         name      | expectedValue

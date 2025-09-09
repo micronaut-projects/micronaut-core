@@ -16,7 +16,6 @@
 package io.micronaut.context.router
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.annotation.Executable
 import io.micronaut.http.HttpMethod
 import io.micronaut.http.HttpRequest
@@ -43,7 +42,7 @@ class GroovyRouteBuilderSpec extends Specification {
     void "Test uri #method #uri matches route for routes #routeBean.name"() {
 
         when:
-        def context = new DefaultApplicationContext("test").start()
+        def context = ApplicationContext.builder("test").build().start()
         Router router = context.getBean(Router)
 
         Optional<RouteMatch> route = router."${method}"(uri)
@@ -74,7 +73,7 @@ class GroovyRouteBuilderSpec extends Specification {
 
     void "test the correct local error route is returned"() {
         given:
-        def context = new DefaultApplicationContext("test").start()
+        def context = ApplicationContext.builder("test").build().start()
         Router router = context.getBean(Router)
         RequestBinderRegistry requestBinderRegistry = context.getBean(RequestBinderRegistry)
 

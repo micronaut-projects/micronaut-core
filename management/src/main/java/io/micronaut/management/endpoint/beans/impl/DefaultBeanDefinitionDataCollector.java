@@ -18,6 +18,7 @@ package io.micronaut.management.endpoint.beans.impl;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.DisabledBean;
 import io.micronaut.context.Qualifier;
+import io.micronaut.context.RuntimeBeanDefinition;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.management.endpoint.beans.BeanDefinitionData;
@@ -30,6 +31,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 /**
@@ -73,8 +75,14 @@ public class DefaultBeanDefinitionDataCollector implements BeanDefinitionDataCol
      * @return A map of bean information.
      */
     protected Map<String, Map<String, Object>> getBeans(Collection<BeanDefinition<?>> definitions) {
+        AtomicInteger atomicInteger = new AtomicInteger();
         return definitions.stream()
-            .collect(Collectors.toMap(definition -> definition.getClass().getName(), beanDefinitionData::getData));
+            .collect(Collectors.toMap(definition -> {
+                if (definition instanceof RuntimeBeanDefinition<?> runtimeBeanDefinition) {
+                    return  RuntimeBeanDefinition.class.getName() + "#" + atomicInteger.getAndIncrement();
+                }
+                return definition.getClass().getName();
+            }, beanDefinitionData::getData));
     }
 
     /**

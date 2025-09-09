@@ -1,7 +1,6 @@
 package io.micronaut.docs.config.value
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.PropertySource
 import spock.lang.Specification
 
@@ -10,7 +9,7 @@ class VehicleSpec extends Specification {
     void "test start vehicle with configuration"() {
         when:
         // tag::start[]
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build()
         applicationContext.environment.addPropertySource(PropertySource.of('test',['my.engine.cylinders':'8']))
         applicationContext.start()
 
@@ -29,7 +28,7 @@ class VehicleSpec extends Specification {
     void "test start vehicle without configuration"() {
         when:
         // tag::start[]
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build()
         applicationContext.start()
 
         Vehicle vehicle = applicationContext

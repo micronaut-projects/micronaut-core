@@ -16,7 +16,6 @@
 package io.micronaut.context.router;
 
 import io.micronaut.context.ApplicationContext;
-import io.micronaut.context.DefaultApplicationContext;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpStatus;
@@ -44,7 +43,7 @@ public class RouteBuilderTests {
 
     @Test
     public void testRouterBuilder() {
-        ApplicationContext beanContext = new DefaultApplicationContext("test").start();
+        ApplicationContext beanContext = ApplicationContext.builder("test").build().start();
         beanContext.registerSingleton(new BookController())
                     .registerSingleton(new AuthorController());
         MyRouteBuilder routeBuilder = new MyRouteBuilder(beanContext);

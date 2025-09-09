@@ -18,8 +18,6 @@ package io.micronaut.inject.env
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.PropertySource
 import io.micronaut.context.env.Environment
-import io.micronaut.context.event.ApplicationEventPublisher
-import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.inject.BeanDefinition
 import spock.lang.Specification
 
@@ -36,8 +34,6 @@ class EnvironmentInjectSpec extends Specification {
         a.environment != null
         a.environment.activeNames.contains("foo")
         a.environment.activeNames.contains(Environment.TEST)
-        a.defaultEnvironment != null
-        a.defaultEnvironment.activeNames.contains("foo")
         a.resourceLoader != null
     }
 

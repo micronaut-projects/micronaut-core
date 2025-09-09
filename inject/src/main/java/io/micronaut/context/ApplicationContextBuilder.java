@@ -17,10 +17,10 @@ package io.micronaut.context;
 
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.env.PropertySource;
-import io.micronaut.core.util.ArgumentUtils;
-
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.io.scan.ClassPathResourceLoader;
+import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.BeanConfiguration;
 import jakarta.inject.Singleton;
 
@@ -169,6 +169,15 @@ public interface ApplicationContextBuilder {
      * @return This builder
      */
     @NonNull ApplicationContextBuilder deduceEnvironment(@Nullable Boolean deduceEnvironment);
+
+    /**
+     * If the package should be deduced from the stack trace. (default is {@code true})
+     *
+     * @param deducePackage The boolean
+     * @return This builder
+     * @since 5.0
+     */
+    @NonNull ApplicationContextBuilder deducePackage(@Nullable boolean deducePackage);
 
     /**
      * If set to {@code true} (the default value is {@code false}) Micronaut will attempt to automatically deduce the Cloud environment it is running within.
@@ -324,6 +333,53 @@ public interface ApplicationContextBuilder {
     }
 
     /**
+     * Override the default {@link BeanDefinitionsProvider}.
+     *
+     * @param provider The bean definitions provider to be used.
+     * @return This builder instance for method chaining.
+     * @since 5.0
+     */
+    default @NonNull ApplicationContextBuilder beanDefinitionsProvider(@NonNull BeanDefinitionsProvider provider) {
+        return this;
+    }
+
+    /**
+     * Disable eager beans functionality.
+     *
+     * @param enabled True to enable eager beans; false to disable
+     * @return This builder
+     * @since 5.0
+     */
+    @NonNull ApplicationContextBuilder eagerBeansEnabled(boolean enabled);
+
+    /**
+     * Enable or disable application events publishing.
+     *
+     * @param enabled True to enable events; false to disable
+     * @return This builder
+     * @since 5.0
+     */
+    @NonNull ApplicationContextBuilder eventsEnabled(boolean enabled);
+
+    /**
+     * Set a predicate to filter beans considered by the context.
+     *
+     * @param predicate The predicate to apply, or null to clear it
+     * @return This builder
+     * @since 5.0
+     */
+    @NonNull ApplicationContextBuilder beansPredicate(@Nullable java.util.function.Predicate<io.micronaut.inject.QualifiedBeanType<?>> predicate);
+
+    /**
+     * Sets the class path resource resolver for the application context builder.
+     *
+     * @param resourceResolver the class path resource resolver
+     * @return This builder
+     * @since 5.0
+     */
+    @NonNull ApplicationContextBuilder resourceResolver(@Nullable ClassPathResourceLoader resourceResolver);
+
+    /**
      * Starts the {@link ApplicationContext}.
      *
      * @return The running {@link ApplicationContext}
@@ -343,7 +399,7 @@ public interface ApplicationContextBuilder {
         ArgumentUtils.requireNonNull("type", type);
         ApplicationContext applicationContext = start();
         T bean = applicationContext.getBean(type);
-        if (bean instanceof LifeCycle lifeCycle) {
+        if (bean instanceof LifeCycle<?> lifeCycle) {
             if (!lifeCycle.isRunning()) {
                 lifeCycle.start();
             }

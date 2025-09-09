@@ -16,6 +16,7 @@
 package io.micronaut.context.env;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -62,6 +63,7 @@ import java.util.regex.Pattern;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 public class PropertySourcePropertyResolver implements PropertyResolver, AutoCloseable {
 
     public static final DefaultPropertyEntry NULL_ENTRY = new DefaultPropertyEntry(
@@ -74,17 +76,16 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     private static final Object NO_VALUE = new Object();
     private static final PropertyCatalog[] CONVENTIONS = {PropertyCatalog.GENERATED, PropertyCatalog.RAW};
     private static final String WILD_CARD_SUFFIX = ".*";
-    protected final ConversionService conversionService;
+    private final ConversionService conversionService;
     protected final PropertyPlaceholderResolver propertyPlaceholderResolver;
-    protected final Map<String, PropertySource> propertySources = new ConcurrentHashMap<>(10);
     // properties are stored in an array of maps organized by character in the alphabet
     // this allows optimization of searches by prefix
     @SuppressWarnings("MagicNumber")
-    protected final Map<String, DefaultPropertyEntry>[] catalog = new Map[58];
-    protected final Map<String, DefaultPropertyEntry>[] rawCatalog = new Map[58];
-    protected final Map<String, DefaultPropertyEntry>[] nonGenerated = new Map[58];
+    private final Map<String, DefaultPropertyEntry>[] catalog = new Map[58];
+    private final Map<String, DefaultPropertyEntry>[] rawCatalog = new Map[58];
+    private final Map<String, DefaultPropertyEntry>[] nonGenerated = new Map[58];
 
-    protected Logger log;
+    private final Logger log;
 
     private final Map<String, Boolean> containsCache = new ConcurrentHashMap<>(20);
     /**
@@ -138,6 +139,102 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                 addPropertySource(propertySource);
             }
         }
+    }
+
+    void reset() {
+        synchronized (catalog) {
+            Arrays.fill(catalog, null);
+            resetCaches();
+        }
+    }
+
+    public Map<String, Object> diff(Runnable change) {
+        Map<String, DefaultPropertyEntry>[] copiedCatalog = copyCatalog(catalog);
+        change.run();
+        return diffCatalog(copiedCatalog, catalog);
+    }
+
+
+    private Map<String, Object> diffCatalog(Map<String, DefaultPropertyEntry>[] original, Map<String, DefaultPropertyEntry>[] newCatalog) {
+        Map<String, Object> changes = new LinkedHashMap<>();
+        for (int i = 0; i < original.length; i++) {
+            Map<String, DefaultPropertyEntry> map = original[i];
+            Map<String, DefaultPropertyEntry> newMap = newCatalog[i];
+            boolean hasNew = newMap != null;
+            boolean hasOld = map != null;
+            if (!hasOld && hasNew) {
+                changes.putAll(newMap);
+            } else {
+                if (!hasNew && hasOld) {
+                    changes.putAll(map);
+                } else if (hasOld && hasNew) {
+                    diffMap(map, newMap, changes);
+                }
+            }
+        }
+        if (!changes.isEmpty()) {
+            Map<String, Object> placeholdersAltered = new LinkedHashMap<>();
+            for (Map<String, DefaultPropertyEntry> map :
+                newCatalog) {
+                if (map != null) {
+                    map.forEach((key, v) -> {
+                        if (v.value() instanceof String val) {
+                            for (String changed : changes.keySet()) {
+                                if (val.contains(changed)) {
+                                    placeholdersAltered.put(key, v.value());
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+            changes.putAll(placeholdersAltered);
+        }
+        return changes;
+    }
+
+    private void diffMap(
+        Map<String, DefaultPropertyEntry> map,
+        Map<String, DefaultPropertyEntry> newMap,
+        Map<String, Object> changes) {
+        Map<String, DefaultPropertyEntry> remainingMap = new LinkedHashMap<>(map);
+        for (Map.Entry<String, DefaultPropertyEntry> entry : newMap.entrySet()) {
+            String key = entry.getKey();
+            Object newValue = entry.getValue().value();
+            if (!map.containsKey(key)) {
+                changes.put(key, newValue);
+            } else {
+                Object oldValue = map.getOrDefault(key, PropertySourcePropertyResolver.NULL_ENTRY).value();
+                boolean hasNew = newValue != null;
+                boolean hasOld = oldValue != null;
+                if (hasNew && !hasOld) {
+                    changes.put(key, null);
+                } else if (hasOld && !hasNew) {
+                    changes.put(key, oldValue);
+                } else if (hasNew && hasOld && hasChanged(newValue, oldValue)) {
+                    changes.put(key, oldValue);
+                }
+                remainingMap.remove(key);
+            }
+        }
+        remainingMap.forEach((key, value) -> {
+            changes.put(key, value.value());
+        });
+    }
+
+    private static boolean hasChanged(Object newValue, Object oldValue) {
+        return !Objects.deepEquals(newValue, oldValue);
+    }
+
+    private Map<String, DefaultPropertyEntry>[] copyCatalog(Map<String, DefaultPropertyEntry>[] catalog) {
+        Map<String, DefaultPropertyEntry>[] newCatalog = new Map[catalog.length];
+        for (int i = 0; i < catalog.length; i++) {
+            Map<String, DefaultPropertyEntry> entry = catalog[i];
+            if (entry != null) {
+                newCatalog[i] = new LinkedHashMap<>(entry);
+            }
+        }
+        return newCatalog;
     }
 
     /**
@@ -594,7 +691,6 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      */
     @SuppressWarnings("MagicNumber")
     protected void processPropertySource(PropertySource properties, PropertySource.PropertyConvention convention) {
-        this.propertySources.put(properties.getName(), properties);
         synchronized (catalog) {
             for (String property : properties) {
 

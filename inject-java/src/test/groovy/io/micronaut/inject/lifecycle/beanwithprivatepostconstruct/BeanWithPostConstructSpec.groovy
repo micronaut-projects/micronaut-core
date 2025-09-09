@@ -17,8 +17,6 @@ package io.micronaut.inject.lifecycle.beanwithprivatepostconstruct
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
 import io.micronaut.inject.BeanDefinition
 
 class BeanWithPostConstructSpec extends AbstractTypeElementSpec {
@@ -36,16 +34,16 @@ import io.micronaut.context.annotation.*;
 
 @Executable
 class MyBean {
-    
+
     Foo foo;
-    
+
     public Foo getFoo() { return this.foo; }
-    
+
     @PostConstruct
     public void init(Foo foo) {
         this.foo = foo;
     }
-    
+
     @PreDestroy
     public void setFoo(Foo foo) {
         this.foo = null;

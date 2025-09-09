@@ -15,9 +15,10 @@
  */
 package io.micronaut.context.router
 
+import io.micronaut.context.ApplicationContext
+
 import static io.micronaut.http.HttpMethod.GET
 
-import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.web.router.Router
@@ -35,7 +36,7 @@ class AnnotationRouteBuilderAbsoluteAndRelativePathsSpec extends Specification {
     @Unroll
     void "Test annotation matches #route"() {
         given:
-        Router router = new DefaultApplicationContext("test")
+        Router router = ApplicationContext.builder("test").build()
             .start()
             .getBean(Router)
 

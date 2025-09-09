@@ -16,10 +16,7 @@
 package org.atinject.javaxtck.auto
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
 import org.atinject.javaxtck.auto.accessories.Cupholder
-import org.atinject.javaxtck.auto.accessories.RoundThing
 import org.atinject.javaxtck.auto.accessories.SpareTire
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test

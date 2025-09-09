@@ -19,7 +19,6 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.PropertyNamingStrategies
 import com.fasterxml.jackson.databind.SerializationFeature
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.MapPropertySource
 import io.micronaut.context.env.PropertySource
 import spock.lang.Specification
@@ -33,7 +32,7 @@ class JacksonSetupSpec extends Specification {
     void "verify default jackson setup"() {
 
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test").start()
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build().start()
 
         expect:
         applicationContext.containsBean(ObjectMapper.class)
@@ -48,7 +47,7 @@ class JacksonSetupSpec extends Specification {
 
     void "verify json object mapper is primary"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test").start()
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build().start()
         ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper.class)
 
         expect:
@@ -61,7 +60,7 @@ class JacksonSetupSpec extends Specification {
     void "verify custom jackson setup"() {
 
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build()
         applicationContext.environment.addPropertySource((MapPropertySource) PropertySource.of(
                 'jackson.dateFormat': 'yyMMdd',
                 'jackson.serialization.indentOutput': true,
@@ -83,7 +82,7 @@ class JacksonSetupSpec extends Specification {
 
     void "verify that the defaultTyping configuration option is correctly converted and set on the object mapper"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build()
         applicationContext.environment.addPropertySource((MapPropertySource) PropertySource.of(
                 'jackson.dateFormat': 'yyMMdd',
                 'jackson.defaultTyping': 'NON_FINAL'
@@ -137,7 +136,7 @@ class JacksonSetupSpec extends Specification {
 
     void "verify trim strings with custom property enabled"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build()
         applicationContext.environment.addPropertySource((MapPropertySource) PropertySource.of(
                 'jackson.trim-strings': true
         ))
@@ -152,7 +151,7 @@ class JacksonSetupSpec extends Specification {
 
     void "verify strings are not trimmed by default"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build()
         applicationContext.start()
 
         expect:

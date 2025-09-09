@@ -38,11 +38,11 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 @Internal
-class DefaultConditionContext<B extends AnnotationMetadataProvider> implements ConditionContext<B> {
+final class DefaultConditionContext<B extends AnnotationMetadataProvider> implements ConditionContext<B> {
 
-    private final DefaultBeanContext beanContext;
     private final B component;
-    private final List<Failure> failures = new ArrayList<>(2);
+    private final List<Failure> failures = new ArrayList<>(0);
+    private final BeanResolutionContext originalResolutionContext;
     private final BeanResolutionContext resolutionContext;
 
     /**
@@ -50,10 +50,12 @@ class DefaultConditionContext<B extends AnnotationMetadataProvider> implements C
      * @param component   The component type
      * @param resolutionContext The resolution context
      */
-    DefaultConditionContext(DefaultBeanContext beanContext, B component, BeanResolutionContext resolutionContext) {
-        this.beanContext = beanContext;
+    DefaultConditionContext(@NonNull BeanContext beanContext, @NonNull B component, @Nullable BeanResolutionContext resolutionContext) {
         this.component = component;
-        this.resolutionContext = resolutionContext;
+        this.originalResolutionContext = resolutionContext;
+        this.resolutionContext = resolutionContext == null ? new DefaultBeanResolutionContext(beanContext, null) : resolutionContext;
+        // Note: The behavior of the conditions is to skip the check if the resolutionContext is null.
+        // This is because the conditions are evaluated before the context is initialized.
     }
 
     @Override
@@ -63,12 +65,12 @@ class DefaultConditionContext<B extends AnnotationMetadataProvider> implements C
 
     @Override
     public BeanContext getBeanContext() {
-        return beanContext;
+        return resolutionContext.getContext();
     }
 
     @Override
     public BeanResolutionContext getBeanResolutionContext() {
-        return resolutionContext;
+        return originalResolutionContext;
     }
 
     @Override
@@ -87,78 +89,95 @@ class DefaultConditionContext<B extends AnnotationMetadataProvider> implements C
         return Collections.unmodifiableList(failures);
     }
 
+    @Override
+    public <K> Collection<BeanDefinition<K>> findBeanDefinitions(Class<K> beanType) {
+        if (resolutionContext instanceof AbstractBeanResolutionContext abstractBeanResolutionContext) {
+            if (component instanceof BeanDefinition<?> beanDefinition) {
+                return abstractBeanResolutionContext.findBeanDefinitions(Argument.of(beanType), beanDefinition);
+            }
+            return abstractBeanResolutionContext.findBeanDefinitions(Argument.of(beanType), null);
+        }
+        return List.of();
+    }
+
     @NonNull
     @Override
     public <T> T getBean(@NonNull BeanDefinition<T> definition) {
-        return beanContext.getBean(definition);
+        return resolutionContext.getBean(definition);
     }
 
     @NonNull
     @Override
     public <T> T getBean(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier) {
-        return beanContext.getBean(resolutionContext, beanType, qualifier);
+        return resolutionContext.getBean(beanType, qualifier);
     }
 
     @NonNull
     @Override
     public <T> T getBean(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
-        return beanContext.getBean(resolutionContext, beanType, qualifier);
+        return resolutionContext.getBean(beanType, qualifier);
     }
 
     @NonNull
     @Override
     public <T> Optional<T> findBean(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier) {
-        return beanContext.findBean(resolutionContext, beanType, qualifier);
+        return resolutionContext.findBean(Argument.of(beanType), qualifier);
     }
 
     @NonNull
     @Override
     public <T> Collection<T> getBeansOfType(@NonNull Class<T> beanType) {
-        return getBeansOfType(beanType, null);
+        return resolutionContext.getBeansOfType(beanType);
     }
 
     @NonNull
     @Override
     public <T> Collection<T> getBeansOfType(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier) {
-        return beanContext.getBeansOfType(resolutionContext, Argument.of(beanType), qualifier);
+        return resolutionContext.getBeansOfType(Argument.of(beanType), qualifier);
     }
 
     @NonNull
     @Override
     public <T> Collection<T> getBeansOfType(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
-        return beanContext.getBeansOfType(resolutionContext, beanType, qualifier);
+        return resolutionContext.getBeansOfType(beanType, qualifier);
     }
 
     @NonNull
     @Override
     public <T> Stream<T> streamOfType(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier) {
-        return beanContext.streamOfType(resolutionContext, beanType, qualifier);
+        return resolutionContext.streamOfType(Argument.of(beanType), qualifier);
     }
 
     @NonNull
     @Override
     public <T> Stream<T> streamOfType(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
-        return beanContext.streamOfType(resolutionContext, beanType, qualifier);
+        return resolutionContext.streamOfType(beanType, qualifier);
     }
 
     @NonNull
     @Override
     public <T> T getProxyTargetBean(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier) {
-        return beanContext.getProxyTargetBean(beanType, qualifier);
+        return resolutionContext.getProxyTargetBean(beanType, qualifier);
+    }
+
+    @Override
+    public <T> Optional<T> findBean(Argument<T> beanType, Qualifier<T> qualifier) {
+        return resolutionContext.findBean(beanType, qualifier);
     }
 
     @Override
     public boolean containsProperty(@NonNull String name) {
-        if (beanContext instanceof PropertyResolver resolver) {
-            return resolver.containsProperty(name);
+        PropertyResolver propertyResolver = resolutionContext.getPropertyResolver();
+        if (propertyResolver != null) {
+            return propertyResolver.containsProperty(name);
         }
-        return false;
-    }
+        return false;    }
 
     @Override
     public boolean containsProperties(@NonNull String name) {
-        if (beanContext instanceof PropertyResolver resolver) {
-            return resolver.containsProperties(name);
+        PropertyResolver propertyResolver = resolutionContext.getPropertyResolver();
+        if (propertyResolver != null) {
+            return propertyResolver.containsProperties(name);
         }
         return false;
     }
@@ -166,22 +185,20 @@ class DefaultConditionContext<B extends AnnotationMetadataProvider> implements C
     @NonNull
     @Override
     public <T> Optional<T> getProperty(@NonNull String name, @NonNull ArgumentConversionContext<T> conversionContext) {
-        if (beanContext instanceof PropertyResolver resolver) {
-            return resolver.getProperty(name, conversionContext);
+        PropertyResolver propertyResolver = resolutionContext.getPropertyResolver();
+        if (propertyResolver != null) {
+            return propertyResolver.getProperty(name, conversionContext);
         }
         return Optional.empty();
     }
 
     @Override
     public Collection<List<String>> getPropertyPathMatches(String pathPattern) {
-        if (beanContext instanceof PropertyResolver resolver) {
-            return resolver.getPropertyPathMatches(pathPattern);
+        PropertyResolver propertyResolver = resolutionContext.getPropertyResolver();
+        if (propertyResolver != null) {
+            return propertyResolver.getPropertyPathMatches(pathPattern);
         }
         return Collections.emptyList();
     }
 
-    @Override
-    public <T> Optional<T> findBean(Argument<T> beanType, Qualifier<T> qualifier) {
-        return beanContext.findBean(beanType, qualifier);
-    }
 }

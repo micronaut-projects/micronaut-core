@@ -28,7 +28,7 @@ import java.io.Closeable;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface LifeCycle<T extends LifeCycle> extends Closeable, AutoCloseable {
+public interface LifeCycle<T extends LifeCycle<T>> extends Closeable, AutoCloseable {
 
     /**
      * @return Whether the component is running

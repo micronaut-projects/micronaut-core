@@ -16,7 +16,6 @@
 package io.micronaut.inject.foreach
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.MapPropertySource
 import io.micronaut.context.env.PropertySource
 import io.micronaut.context.exceptions.NoSuchBeanException
@@ -92,7 +91,7 @@ class EachPropertySpec extends Specification {
 
     void "test configuration properties binding"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build()
         applicationContext.environment.addPropertySource(MapPropertySource.of(
                 'test',
                 ['foo.bar.one.port':'8080',
@@ -172,7 +171,7 @@ class EachPropertySpec extends Specification {
 
     void "test configuration properties binding by bean type"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build()
         applicationContext.environment.addPropertySource(new MapPropertySource(
                 'test',
                 ['foo.bar.one.port':'8080',
@@ -251,7 +250,7 @@ class EachPropertySpec extends Specification {
 
     void "test configuration properties binding by a non bean type"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build()
         applicationContext.environment.addPropertySource(PropertySource.of(
                 'test',
                 ['foo.bar.one.port':'8080',
@@ -281,7 +280,7 @@ class EachPropertySpec extends Specification {
 
     void "test configuration properties binding by bean type with primary"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build()
         applicationContext.environment.addPropertySource(PropertySource.of(
                 'test',
                 ['foo.bar.one.port':'8080',
@@ -359,7 +358,7 @@ class EachPropertySpec extends Specification {
 
     void "test configuration properties binding by non bean type with primary"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build()
         applicationContext.environment.addPropertySource(PropertySource.of(
                 'test',
                 ['foo.bar.one.port':'8080',
@@ -381,7 +380,7 @@ class EachPropertySpec extends Specification {
 
     void "test resolve for empty configuration"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build()
 
 
         applicationContext.start()
@@ -400,7 +399,7 @@ class EachPropertySpec extends Specification {
 
     void "test eachbean with providers"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build()
         applicationContext.environment.addPropertySource(PropertySource.of(
                 'test',
                 ['foo.bar.one.port':'8080',
@@ -422,7 +421,7 @@ class EachPropertySpec extends Specification {
 
     void "test eachbean with parameter providers"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build()
         applicationContext.environment.addPropertySource(PropertySource.of(
                 'test',
                 ['foo.bar.one.port':'8080',
@@ -444,7 +443,7 @@ class EachPropertySpec extends Specification {
 
     void "test configuration properties array"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build()
         applicationContext.environment.addPropertySource(PropertySource.of('test', [
                 'array': [['name': 'Sally'], ['name': 'John']]
         ]))
@@ -461,7 +460,7 @@ class EachPropertySpec extends Specification {
 
     void "test config array with missing indexes"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build()
         applicationContext.environment.addPropertySource(PropertySource.of('test', [
                 'array[0].name': 'Sally',
                 'array[4].name': 'John'
@@ -480,7 +479,7 @@ class EachPropertySpec extends Specification {
     }
 
     void "test array config overridden with smaller set"() {
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build()
         applicationContext.environment.addPropertySource(PropertySource.of('test', [
                 'array': [['name': 'Sally'], ['name': 'John']]
         ], 100))
@@ -500,7 +499,7 @@ class EachPropertySpec extends Specification {
 
     void "test eachproperty inner class of config props"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build()
         applicationContext.environment.addPropertySource(PropertySource.of('test', [
                 'outer.name': 'Outer',
                 'outer.inner.sally.age': 20,
@@ -520,7 +519,7 @@ class EachPropertySpec extends Specification {
 
     void "test field injection eachproperty inner class of config props"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build()
         applicationContext.environment.addPropertySource(PropertySource.of('test', [
                 'outer-field.name': 'Outer',
                 'outer-field.inner.sally.age': 20,
@@ -540,7 +539,7 @@ class EachPropertySpec extends Specification {
 
     void "test constructor injection eachproperty inner class of config props"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build()
         applicationContext.environment.addPropertySource(PropertySource.of('test', [
                 'outer-constructor.name': 'Outer',
                 'outer-constructor.inner.sally.age': 20,
@@ -560,7 +559,7 @@ class EachPropertySpec extends Specification {
 
     void "test eachproperty list inner class of config props"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build()
         applicationContext.environment.addPropertySource(PropertySource.of('test', [
                 'outer-list.name': 'Outer',
                 'outer-list.inner-list': [['age': 20], ['age': 30]]

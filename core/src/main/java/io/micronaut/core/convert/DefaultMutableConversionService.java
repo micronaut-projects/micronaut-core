@@ -1273,6 +1273,16 @@ public class DefaultMutableConversionService implements MutableConversionService
     }
 
     /**
+     * Reset the internal state.
+     */
+    public final void reset() {
+        internalConverters.clear();
+        customConverters.clear();
+        converterCache.clear();
+        registerDefaultConverters();
+    }
+
+    /**
      * Binds the source and target.
      */
     private static final class ConvertiblePair {
