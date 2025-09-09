@@ -300,4 +300,94 @@ interface MyConfig {
         def e = thrown(RuntimeException)
         e.message.contains('Getter methods must return a value @ConfigurationProperties interfaces')
     }
+
+    void "test default method"() {
+
+        when:
+        BeanDefinition beanDefinition =  buildBeanDefinition('test.MyConfig$Intercepted', '''
+package test;
+
+import io.micronaut.context.annotation.*;
+import java.time.Duration;
+
+@ConfigurationProperties("foo.bar")
+interface MyConfig {
+    int getServerPort();
+
+    default boolean isMagic() {
+        return true;
+    }
+}
+
+''')
+            def context = ApplicationContext.run('foo.bar.host': 'test', 'foo.bar.server-port': '9999', 'foo.bar.magic': 'false')
+            def config = ((InstantiatableBeanDefinition) beanDefinition).instantiate(context)
+
+        then:
+            config.serverPort == 9999
+            config.magic == true
+
+        cleanup:
+            context.close()
+    }
+
+    void "test default method - defined"() {
+
+        when:
+        BeanDefinition beanDefinition =  buildBeanDefinition('test.MyConfig$Intercepted', '''
+package test;
+
+import io.micronaut.context.annotation.*;
+import java.time.Duration;
+
+@ConfigurationProperties("foo.bar")
+interface MyConfig {
+    int getServerPort();
+
+    default boolean isMagic() {
+        return true;
+    }
+}
+
+''')
+            def context = ApplicationContext.run('foo.bar.host': 'test', 'foo.bar.server-port': '9999')
+            def config = ((InstantiatableBeanDefinition) beanDefinition).instantiate(context)
+
+        then:
+            config.serverPort == 9999
+            config.magic == true
+
+        cleanup:
+            context.close()
+    }
+
+    void "test default method - bad format"() {
+
+        when:
+        BeanDefinition beanDefinition =  buildBeanDefinition('test.MyConfig$Intercepted', '''
+package test;
+
+import io.micronaut.context.annotation.*;
+import java.time.Duration;
+
+@ConfigurationProperties("foo.bar")
+interface MyConfig {
+    int getServerPort();
+
+    default boolean magic() {
+        return true;
+    }
+}
+
+''')
+            def context = ApplicationContext.run('foo.bar.host': 'test', 'foo.bar.server-port': '9999')
+            def config = ((InstantiatableBeanDefinition) beanDefinition).instantiate(context)
+
+        then:
+            config.serverPort == 9999
+            config.magic() == true
+
+        cleanup:
+            context.close()
+    }
 }
