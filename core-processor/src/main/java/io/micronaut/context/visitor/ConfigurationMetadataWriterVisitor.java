@@ -189,6 +189,9 @@ public class ConfigurationMetadataWriterVisitor implements TypeElementVisitor<Co
             if (!methodElement.isStatic() && isInjectPointMethod(methodElement)) {
                 applyConfigurationInjectionIfNecessary(classElement, methodElement, context);
             } else if (anInterface && !processed.contains(methodElement)) {
+                if (methodElement.isDefault()) {
+                    return;
+                }
                 if (methodElement.hasParameters()) {
                     context.fail("Only getter methods are allowed on @ConfigurationProperties interfaces: " + methodElement + ". You can change the accessors using @AccessorsStyle annotation", methodElement.getOwningType());
                     return;
