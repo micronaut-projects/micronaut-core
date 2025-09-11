@@ -190,6 +190,7 @@ public class ConfigurationMetadataWriterVisitor implements TypeElementVisitor<Co
                 applyConfigurationInjectionIfNecessary(classElement, methodElement, context);
             } else if (anInterface && !processed.contains(methodElement)) {
                 if (methodElement.isDefault()) {
+                    context.warn("Default methods are skipped on @ConfigurationProperties interfaces: " + methodElement, methodElement);
                     return;
                 }
                 if (methodElement.hasParameters()) {
