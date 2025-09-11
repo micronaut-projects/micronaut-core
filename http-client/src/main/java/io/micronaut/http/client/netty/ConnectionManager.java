@@ -675,12 +675,14 @@ public class ConnectionManager {
     private void initHttp1(Channel ch) {
         addLogHandler(ch);
 
-        ch.pipeline()
-            .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC, new HttpClientCodec(
-                HttpClientConfiguration.DEFAULT_MAX_INITIAL_LINE_LENGTH,
-                configuration.getMaxHeaderSize(),
-                HttpClientConfiguration.DEFAULT_MAX_CHUNK_SIZE))
-            .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECODER, new HttpContentDecompressor());
+        ChannelPipeline pipeline = ch.pipeline();
+        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC, new HttpClientCodec(
+            HttpClientConfiguration.DEFAULT_MAX_INITIAL_LINE_LENGTH,
+            configuration.getMaxHeaderSize(),
+            HttpClientConfiguration.DEFAULT_MAX_CHUNK_SIZE));
+        if (configuration.isDecompressionEnabled()) {
+            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECODER, new HttpContentDecompressor());
+        }
     }
 
     private void addLogHandler(Channel ch) {
@@ -1619,7 +1621,8 @@ public class ConnectionManager {
                 withPropagation(openStreamChannel(), (Future<Channel> future) -> {
                     if (future.isSuccess()) {
                         Channel streamChannel = future.get();
-                        streamChannel.pipeline()
+                        ChannelPipeline streamPipeline = streamChannel.pipeline();
+                        streamPipeline
                             .addLast(new ChannelOutboundHandlerAdapter() {
                                 @Override
                                 public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
@@ -1627,8 +1630,10 @@ public class ConnectionManager {
                                     super.write(ctx, msg, promise);
                                 }
                             })
-                            .addLast(createFrameToHttpObjectCodec())
-                            .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECOMPRESSOR, new HttpContentDecompressor());
+                            .addLast(createFrameToHttpObjectCodec());
+                        if (configuration.isDecompressionEnabled()) {
+                            streamPipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECOMPRESSOR, new HttpContentDecompressor());
+                        }
                         NettyClientCustomizer streamCustomizer = connectionCustomizer.specializeForChannel(streamChannel, NettyClientCustomizer.ChannelRole.HTTP2_STREAM);
                         PoolHandle ph = new PoolHandle(true, streamChannel) {
                             @Override

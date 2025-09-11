@@ -176,6 +176,7 @@ public abstract class HttpClientConfiguration {
     private boolean followRedirects = DEFAULT_FOLLOW_REDIRECTS;
 
     private boolean exceptionOnErrorStatus = DEFAULT_EXCEPTION_ON_ERROR_STATUS;
+    private boolean decompressionEnabled = true;
 
     private SslConfiguration sslConfiguration = new ClientSslConfiguration();
 
@@ -371,6 +372,29 @@ public abstract class HttpClientConfiguration {
      */
     public void setExceptionOnErrorStatus(boolean exceptionOnErrorStatus) {
         this.exceptionOnErrorStatus = exceptionOnErrorStatus;
+    }
+
+    /**
+     * Whether response content decompression is enabled in the Netty HTTP client.
+     * When disabled, the client will not add the HttpContentDecompressor to the pipeline
+     * and will receive the raw compressed response body and headers (e.g. Content-Encoding).
+     * Default: true.
+     *
+     * @return true if automatic content decompression is enabled
+     */
+    public boolean isDecompressionEnabled() {
+        return decompressionEnabled;
+    }
+
+    /**
+     * Enable or disable automatic response content decompression in the Netty HTTP client.
+     * Disabling this can be useful for proxy or testing scenarios where the compressed payload
+     * and Content-Encoding header need to be observed.
+     *
+     * @param decompressionEnabled true to enable decompression, false to disable it
+     */
+    public void setDecompressionEnabled(boolean decompressionEnabled) {
+        this.decompressionEnabled = decompressionEnabled;
     }
 
     /**
