@@ -26,11 +26,9 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.context.scope.Refreshable
 import io.micronaut.runtime.server.EmbeddedServer
-import reactor.core.publisher.Flux
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 import spock.util.environment.RestoreSystemProperties
-
 /**
  * @author Graeme Rocher
  * @since 1.0
@@ -83,7 +81,10 @@ class RefreshEndpointSpec extends Specification {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['endpoints.refresh.sensitive': false], Environment.TEST)
         HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
-        when:
+        when: "Refresh the context just in case somebody added something from the system properties"
+        rxClient.toBlocking().exchange(HttpRequest.POST("/refresh", new byte[0]), String)
+
+        and:
         def response = rxClient.toBlocking().exchange("/refreshTest/external", String)
 
         then:
@@ -124,7 +125,7 @@ class RefreshEndpointSpec extends Specification {
         rxClient.close()
         embeddedServer.close()
     }
-    
+
     @Controller("/refreshTest")
     static class TestController {
         private final RefreshBean refreshBean
