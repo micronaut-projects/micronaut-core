@@ -24,6 +24,7 @@ micronautBom {
         acceptedLibraryRegressions.add("kotlin2-annotation-processing-embeddable")
         acceptedLibraryRegressions.add("kotlin2-compiler-embeddable")
         acceptedLibraryRegressions.add("kotlin2-stdlib-jdk8")
+        acceptedVersionRegressions.add("jackson-databind") // version is already defined with jackson
     }
     propertyName = "core"
 }
