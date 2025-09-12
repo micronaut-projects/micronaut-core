@@ -38,6 +38,7 @@ import io.micronaut.context.annotation.DefaultScope;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.InjectScope;
+import io.micronaut.context.annotation.Parallel;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Property;
@@ -73,6 +74,7 @@ import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Generated;
+import io.micronaut.core.annotation.Indexed;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.core.annotation.NonNull;
@@ -602,6 +604,8 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
     private static final Constructor<AbstractExecutableMethod> ABSTRACT_EXECUTABLE_METHOD_CONSTRUCTOR = ReflectionUtils.getRequiredInternalConstructor(AbstractExecutableMethod.class, Class.class, String.class);
     private static final Method GET_TYPE_PARAMETERS_METHOD = ReflectionUtils.getRequiredInternalMethod(TypeVariableResolver.class, "getTypeParameters");
     private static final Method ARGUMENT_OF_METHOD = ReflectionUtils.getRequiredInternalMethod(Argument.class, "of", Class.class);
+    private static final Method GET_INDEXES_METHOD = ReflectionUtils.getRequiredMethod(BeanDefinitionReference.class, "getIndexes");
+    private static final Method IS_PARALLEL_METHOD = ReflectionUtils.getRequiredMethod(BeanDefinitionReference.class, "isParallel");
 
     private final String beanFullClassName;
     private final String beanDefinitionName;
@@ -1256,6 +1260,12 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
 
         addConstructor(staticBlock);
 
+        boolean isParallel = annotationMetadata.hasStereotype(Parallel.class);
+        // In v6 we can assume everything was recompiled with v5 so we can modify the default method to return false and only add this one on true
+        classDefBuilder.addMethod(
+            MethodDef.override(IS_PARALLEL_METHOD).build((aThis, methodParameters) -> ExpressionDef.constant(isParallel).returning())
+        );
+
         loadTypeMethods.values().forEach(classDefBuilder::addMethod);
 
         output = new LinkedHashMap<>();
@@ -1883,7 +1893,6 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
             .superclass(ClassTypeDef.of(AbstractBeanDefinitionBeanConstructor.class))
             .addAnnotation(Generated.class);
 
-
         // for factory methods we have to store the factory instance in a field and modify the constructor pass the factory instance
         ClassTypeDef factoryType = ClassTypeDef.of(factoryBuildMethodDefinition.factoryClass);
 
@@ -2069,6 +2078,29 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                     )
                 )
         );
+
+        List<AnnotationValue<Indexed>> indexes = annotationMetadata.getAnnotationValuesByType(Indexed.class);
+        if (!indexes.isEmpty()) {
+            TypeDef.Array arrayOfClasses = TypeDef.Primitive.CLASS.array();
+            FieldDef indexesField = FieldDef.builder("$INDEXES")
+                .ofType(arrayOfClasses)
+                .addModifiers(Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC)
+                .build();
+            initStatements.add(
+                beanDefinitionTypeDef.getStaticField(indexesField).put(
+                    arrayOfClasses.instantiate(
+                        indexes.stream().map(av -> asClassExpression(av.stringValue().orElseThrow())).toArray(ExpressionDef[]::new)
+                    )
+                )
+            );
+
+            classDefBuilder.addField(indexesField);
+            classDefBuilder.addMethod(
+                MethodDef.override(GET_INDEXES_METHOD).build((aThis, methodParameters) -> aThis.type().getStaticField(indexesField).returning())
+            );
+
+            failStatements.add(beanDefinitionTypeDef.getStaticField(indexesField).put(arrayOfClasses.instantiate()));
+        }
 
         statements.add(
             StatementDef.doTry(

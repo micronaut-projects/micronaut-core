@@ -107,6 +107,7 @@ interface Parser {
         expect:
         beanDef.getBeanDescription(TypeInformation.TypeFormat.SHORTENED) == '@j.i.Singleton i.AsciiParser.parseAsAscii()'
         result == 'test'
+        (beanDef as io.micronaut.inject.BeanDefinitionReference<?>).getIndexes() == [adaptedType]
     }
 
     void "test method adapter inherits metadata"() {
