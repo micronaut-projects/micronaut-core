@@ -293,23 +293,37 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
     @Override
     @NonNull
     public synchronized ApplicationContext start() {
-        startEnvironment();
+        environment.start();
         return (ApplicationContext) super.start();
     }
 
     @Override
     protected void registerConversionService() {
-        // Conversion service is represented by the environment
+        RuntimeBeanDefinition.Builder<? extends Environment> definition = RuntimeBeanDefinition
+            .builder(Environment.class, () -> environment);
+
+        //noinspection unchecked
+        definition = definition
+            .singleton(true)
+            .qualifier(PrimaryQualifier.INSTANCE);
+
+        RuntimeBeanDefinition<? extends Environment> beanDefinition = definition.build();
+        BeanDefinition<? extends Environment> existing = findBeanDefinition(beanDefinition.getBeanType()).orElse(null);
+        if (existing instanceof RuntimeBeanDefinition<?> runtimeBeanDefinition) {
+            removeBeanDefinition(runtimeBeanDefinition);
+        }
+        registerBeanDefinition(beanDefinition);
+        registerSingleton(MutableConversionService.class, environment.getConversionService());
     }
 
     @Override
     @NonNull
     public synchronized ApplicationContext stop() {
-        ApplicationContext stop = (ApplicationContext) super.stop();
+        super.stop();
         if (environmentManaged) {
             environment.stop();
         }
-        return stop;
+        return this;
     }
 
     @Override
@@ -327,29 +341,6 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
         if (getEnvironment().isActive(configuration)) {
             super.registerConfiguration(configuration);
         }
-    }
-
-    /**
-     * Start the environment.
-     */
-    private void startEnvironment() {
-        environment.start();
-
-        RuntimeBeanDefinition.Builder<? extends Environment> definition = RuntimeBeanDefinition
-                .builder(Environment.class, () -> environment);
-
-        //noinspection unchecked
-        definition = definition
-                        .singleton(true)
-                        .qualifier(PrimaryQualifier.INSTANCE);
-
-        RuntimeBeanDefinition<? extends Environment> beanDefinition = definition.build();
-        BeanDefinition<? extends Environment> existing = findBeanDefinition(beanDefinition.getBeanType()).orElse(null);
-        if (existing instanceof RuntimeBeanDefinition<?> runtimeBeanDefinition) {
-            removeBeanDefinition(runtimeBeanDefinition);
-        }
-        registerBeanDefinition(beanDefinition);
-        registerSingleton(MutableConversionService.class, environment.getConversionService());
     }
 
     @Override

@@ -170,8 +170,15 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     protected static final Logger LOG_LIFECYCLE = LoggerFactory.getLogger(DefaultBeanContext.class.getPackage().getName() + ".lifecycle");
     private static final String SCOPED_PROXY_ANN = "io.micronaut.runtime.context.scope.ScopedProxy";
     private static final String INTRODUCTION_TYPE = "io.micronaut.aop.Introduction";
-    private static final String PARALLEL_TYPE = Parallel.class.getName();
     private static final String REPLACES_ANN = Replaces.class.getName();
+    private static final List<Class<?>> KNOWN_INDEX_TYPE = List.of(
+        ResourceLoader.class,
+        TypeConverter.class,
+        TypeConverterRegistrar.class,
+        ApplicationEventListener.class,
+        BeanCreatedEventListener.class,
+        BeanInitializedEventListener.class
+    );
 
     private static final String MSG_COULD_NOT_BE_LOADED = "] could not be loaded: ";
     public static final String MSG_BEAN_DEFINITION = "Bean definition [";
@@ -224,19 +231,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             ValueResolver.class,
             PropertyPlaceholderResolver.class
     );
-    private final Set<Class<?>> indexedTypes = CollectionUtils.setOf(
-            ResourceLoader.class,
-            TypeConverter.class,
-            TypeConverterRegistrar.class,
-            ApplicationEventListener.class,
-            BeanCreatedEventListener.class,
-            BeanInitializedEventListener.class
-    );
     private final Function<Class<?>, Collection<BeanDefinitionProducer>> COMPUTE_INDEXES_FN = new Function<Class<?>, Collection<BeanDefinitionProducer>>() {
         // Keep an anonymous class for performance
         @Override
         public Collection<BeanDefinitionProducer> apply(Class<?> indexedType) {
-            indexedTypes.add(indexedType);
             return new ArrayList<>(20);
         }
     };
@@ -371,7 +369,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Starting BeanContext");
                 }
-                registerConversionService();
                 configureAndStartContext();
                 if (LOG.isDebugEnabled()) {
                     String activeConfigurations = beanConfigurations
@@ -1722,7 +1719,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         Class<B> beanType = definition.getBeanType();
         BeanDefinitionProducer producer = new BeanDefinitionProducer(definition);
         this.beanDefinitionsClasses.add(producer);
-        for (Class<?> indexedType : indexedTypes) {
+        for (Class<?> indexedType : beanIndex.keySet()) {
             if (indexedType == beanType || indexedType.isAssignableFrom(beanType)) {
                 final Collection<BeanDefinitionProducer> indexed = resolveTypeIndex(indexedType);
                 indexed.add(producer);
@@ -1748,7 +1745,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     @Internal
     <B> void removeBeanDefinition(RuntimeBeanDefinition<B> definition) {
         Class<B> beanType = definition.getBeanType();
-        for (Class<?> indexedType : indexedTypes) {
+        for (Class<?> indexedType : beanIndex.keySet()) {
             if (indexedType == beanType || indexedType.isAssignableFrom(beanType)) {
                 resolveTypeIndex(indexedType).forEach(p -> p.disableIfMatch(definition));
                 break;
@@ -2169,21 +2166,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                                                                    boolean collectIterables,
                                                                    Predicate<BeanDefinition<T>> predicate) {
         ArgumentUtils.requireNonNull("beanType", beanType);
-        final Class<T> beanClass = beanType.getType();
         if (LOG.isDebugEnabled()) {
             LOG.debug("Finding candidate beans for type: {}", beanType);
-        }
-        // first traverse component definition classes and load candidates
-
-        Collection<BeanDefinitionProducer> beanDefinitionsClasses;
-
-        if (indexedTypes.contains(beanClass)) {
-            beanDefinitionsClasses = beanIndex.get(beanClass);
-            if (beanDefinitionsClasses == null) {
-                beanDefinitionsClasses = Collections.emptyList();
-            }
-        } else {
-            beanDefinitionsClasses = this.beanDefinitionsClasses;
         }
 
         return collectBeanCandidates(
@@ -2191,7 +2175,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             beanType,
             collectIterables,
             predicate,
-            beanDefinitionsClasses
+            beanIndex.getOrDefault(beanType.getType(), beanDefinitionsClasses)
         );
     }
 
@@ -3362,6 +3346,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
     private void configureAndStartContext() {
         configureContextInternal();
+        registerConversionService();
         initializeEventListeners();
         initializeTypeConverters();
         initializeContext(
@@ -3812,6 +3797,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         if (configured.compareAndSet(false, true)) {
             readAllBeanConfigurations();
             readBeanDefinitionReferences();
+        }
+        for (Class<?> indexType : KNOWN_INDEX_TYPE) {
+            resolveTypeIndex(indexType);
         }
     }
 
