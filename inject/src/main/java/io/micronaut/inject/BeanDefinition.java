@@ -15,9 +15,6 @@
  */
 package io.micronaut.inject;
 
-import static io.micronaut.core.annotation.AnnotationUtil.ANN_ADAPTER;
-import static io.micronaut.core.type.TypeInformation.TypeFormat.getBeanTypeString;
-
 import io.micronaut.context.Qualifier;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.DefaultScope;
@@ -45,6 +42,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
+
+import static io.micronaut.core.annotation.AnnotationUtil.ANN_ADAPTER;
+import static io.micronaut.core.type.TypeInformation.TypeFormat.getBeanTypeString;
 
 /**
  * Defines a bean definition and its requirements. A bean definition must have a singled injectable constructor or a
@@ -481,14 +481,6 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
     @Override
     default @Nullable Qualifier<T> getDeclaredQualifier() {
         return QualifiedBeanType.super.getDeclaredQualifier();
-    }
-
-    /**
-     * @return Method that can be overridden to resolve a dynamic qualifier
-     */
-    @Override
-    default @Nullable Qualifier<T> resolveDynamicQualifier() {
-        return QualifiedBeanType.super.resolveDynamicQualifier();
     }
 
     /**

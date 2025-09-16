@@ -76,7 +76,9 @@ public interface QualifiedBeanType<T> extends BeanType<T>, AnnotationMetadataDel
 
     /**
      * @return Method that can be overridden to resolve a dynamic qualifier
+     * @deprecated No longer used.
      */
+    @Deprecated(since = "5.0", forRemoval = true)
     default @Nullable Qualifier<T> resolveDynamicQualifier() {
         return null;
     }

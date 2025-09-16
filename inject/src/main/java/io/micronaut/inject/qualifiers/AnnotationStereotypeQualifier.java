@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2021 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,39 +15,46 @@
  */
 package io.micronaut.inject.qualifiers;
 
-import io.micronaut.context.Qualifier;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.inject.BeanType;
 
-import java.lang.annotation.Annotation;
+import java.util.Objects;
+import java.util.Optional;
 
 /**
- * A {@link Qualifier} that qualifies based on a bean stereotype.
- *
- * @param <T> The type
- * @author Graeme Rocher
- * @since 1.0
+ * Qualifiers for a stereotype.
+ * @param <T> The generic type
+ * @since 3.0.0
+ * @author graemerocher
  */
 @Internal
 final class AnnotationStereotypeQualifier<T> extends FilteringQualifier<T> {
 
-    final Class<? extends Annotation> stereotype;
+    final String stereotype;
 
     /**
      * @param stereotype The stereotype
      */
-    AnnotationStereotypeQualifier(Class<? extends Annotation> stereotype) {
-        this.stereotype = stereotype;
+    AnnotationStereotypeQualifier(@NonNull String stereotype) {
+        this.stereotype = Objects.requireNonNull(stereotype, "Stereotype cannot be null");
     }
 
     @Override
     public boolean doesQualify(Class<T> beanType, BeanType<T> candidate) {
-        return candidate.getAnnotationMetadata().hasStereotype(stereotype);
+        AnnotationMetadata annotationMetadata = candidate.getAnnotationMetadata();
+        Optional<String> repeatableAnnotation = annotationMetadata.findRepeatableAnnotation(stereotype);
+        if (repeatableAnnotation.isPresent()) {
+            return annotationMetadata.hasStereotype(repeatableAnnotation.get());
+        }
+        return annotationMetadata.hasStereotype(stereotype);
     }
 
     @Override
     public String toString() {
-        return "@" + stereotype.getSimpleName();
+        return "@" + NameUtils.getSimpleName(stereotype);
     }
 
     @Override
@@ -63,6 +70,6 @@ final class AnnotationStereotypeQualifier<T> extends FilteringQualifier<T> {
 
     @Override
     public int hashCode() {
-        return stereotype.getName().hashCode();
+        return stereotype.hashCode();
     }
 }

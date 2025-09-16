@@ -136,7 +136,7 @@ public class Qualifiers {
      */
     @UsedByGeneratedCode
     public static <T> Qualifier<T> byName(String name) {
-        return new NameQualifier<>(null, name);
+        return new NameQualifier<>(name);
     }
 
     /**
@@ -297,7 +297,7 @@ public class Qualifiers {
         if (instance != null) {
             return instance;
         }
-        return new AnnotationStereotypeQualifier<>(stereotype);
+        return new AnnotationStereotypeQualifier<>(stereotype.getName());
     }
 
     /**
@@ -313,7 +313,7 @@ public class Qualifiers {
         if (qualifier != null) {
             return qualifier;
         }
-        return new NamedAnnotationStereotypeQualifier<>(stereotype);
+        return new AnnotationStereotypeQualifier<>(stereotype);
     }
 
     /**
@@ -435,10 +435,7 @@ public class Qualifiers {
         @Override
         public <B extends BeanType<T>> Stream<B> reduce(Class<T> beanType, Stream<B> candidates) {
             return candidates.filter(candidate -> {
-                if (!QualifierUtils.matchType(beanType, candidate)) {
-                    return false;
-                }
-                if (QualifierUtils.matchAny(beanType, candidate)) {
+                if (QualifierUtils.match(candidate, this)) {
                     return true;
                 }
 

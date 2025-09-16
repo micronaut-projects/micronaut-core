@@ -702,7 +702,7 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
         BeanDefinition<T> possibleCandidate = null;
         for (BeanDefinition<T> candidate : candidates) {
             if (candidate instanceof BeanDefinitionDelegate) {
-                Qualifier<T> delegateQualifier = candidate.resolveDynamicQualifier();
+                Qualifier<T> delegateQualifier = candidate.getDeclaredQualifier();
                 if (delegateQualifier != null && delegateQualifier.equals(qualifier)) {
                     if (possibleCandidate == null) {
                         possibleCandidate = candidate;

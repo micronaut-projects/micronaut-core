@@ -73,6 +73,17 @@ public abstract class AbstractProviderDefinition<T> implements InstantiatableBea
     }
 
     @Override
+    @NonNull
+    public Class<?>[] getIndexes() {
+        try {
+            return new Class<?>[]{getBeanType()};
+        } catch (NoClassDefFoundError e) {
+            // ignore, might happen if jakarta.inject is not the classpath
+        }
+        return new Class<?>[]{};
+    }
+
+    @Override
     public boolean isContainerType() {
         return false;
     }
@@ -219,7 +230,7 @@ public abstract class AbstractProviderDefinition<T> implements InstantiatableBea
 
     @Override
     public Qualifier<T> getDeclaredQualifier() {
-        return null;
+        return AnyQualifier.INSTANCE;
     }
 
     @Override

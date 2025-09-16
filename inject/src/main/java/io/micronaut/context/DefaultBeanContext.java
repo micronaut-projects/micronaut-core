@@ -96,7 +96,6 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionMethodReference;
 import io.micronaut.inject.BeanDefinitionReference;
 import io.micronaut.inject.BeanIdentifier;
-import io.micronaut.inject.BeanType;
 import io.micronaut.inject.DisposableBeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.InitializingBeanDefinition;
@@ -825,7 +824,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         Objects.requireNonNull(beanType, "Bean type cannot be null");
         Collection<BeanDefinition<T>> candidates = findBeanCandidatesInternal(null, beanType);
         if (qualifier != null) {
-            candidates = qualifier.filter(beanType.getType(), candidates);
+            candidates = qualifier.filterQualified(beanType.getType(), candidates);
         }
         return Collections.unmodifiableCollection(candidates);
     }
@@ -2627,7 +2626,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
     }
 
-    private <T> boolean qualifiedByNamed(BeanType<T> definitionToBeReplaced, Class<T> replacedBeanType, String named) {
+    private <T> boolean qualifiedByNamed(BeanDefinition<T> definitionToBeReplaced, Class<T> replacedBeanType, String named) {
         return Qualifiers.<T>byName(named).doesQualify(replacedBeanType, definitionToBeReplaced);
     }
 
@@ -2873,7 +2872,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             .sorted(Comparator.comparing(BeanDefinition::getName))
             .toList();
         if (qualifier != null) {
-            beanDefinitions = qualifier.filter(beanType.getType(), beanDefinitions);
+            beanDefinitions = qualifier.filterQualified(beanType.getType(), beanDefinitions);
         }
 
         if (!beanDefinitions.isEmpty()) {
@@ -3239,7 +3238,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Qualifying bean [{}] for qualifier: {} ", beanType.getName(), qualifier);
             }
-            candidates = qualifier.filter(beanType.getType(), candidates);
+            candidates = qualifier.filterQualified(beanType.getType(), candidates);
             if (candidates.isEmpty()) {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("No qualifying beans of type [{}] found for qualifier: {} ", beanType.getName(), qualifier);
@@ -3505,7 +3504,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         if (!beanDefinitions.isEmpty()) {
             beanDefinitions = applyBeanResolutionFilters(resolutionContext, beanDefinitions);
             if (qualifier != null) {
-                beanDefinitions = qualifier.filter(beanType.getType(), beanDefinitions);
+                beanDefinitions = qualifier.filterQualified(beanType.getType(), beanDefinitions);
             }
         }
 
@@ -3643,7 +3642,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         if (!candidates.isEmpty()) {
             filterReplacedBeans(null, candidates);
             if (qualifier != null) {
-                return qualifier.doesQualify(beanType.getType(), candidates);
+                return qualifier.doesQualifyQualified(beanType.getType(), candidates);
             }
             return true;
         }

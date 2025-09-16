@@ -296,8 +296,19 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
 
     @Override
     public String toString() {
-        Class<?> declaringType = constructor == null ? type : constructor.declaringType;
-        return "Definition: " + declaringType.getName();
+        if (constructor == null) {
+            return "Definition: " + type.getName();
+        }
+        if (constructor.declaringType.equals(type)) {
+            return "Definition: " + type.getName();
+        }
+        if (constructor instanceof MethodReference methodConstructor) {
+            return "Definition: " + type.getName() + " Factory: " + constructor.declaringType.getName() + "#" + methodConstructor.methodName;
+        }
+        if (constructor instanceof FieldReference fieldReference) {
+            return "Definition: " + type.getName() + " Factory: " + constructor.declaringType.getName() + "." + fieldReference.argument.getName();
+        }
+        return "Definition: " + type.getName() + " Factory: " + constructor.declaringType.getName();
     }
 
     @Override

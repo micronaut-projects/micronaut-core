@@ -51,9 +51,6 @@ public final class TypeArgumentQualifier<T> extends FilteringQualifier<T> {
 
     @Override
     public boolean doesQualify(Class<T> beanType, BeanType<T> candidate) {
-        if (!beanType.isAssignableFrom(candidate.getBeanType())) {
-            return false;
-        }
         List<Class<?>> typeArguments = getTypeArguments(beanType, candidate);
 
         boolean result = areTypesCompatible(typeArguments);
