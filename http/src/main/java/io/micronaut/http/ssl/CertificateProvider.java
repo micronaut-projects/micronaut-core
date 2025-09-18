@@ -21,12 +21,31 @@ import org.reactivestreams.Publisher;
 
 import java.security.KeyStore;
 
+/**
+ * Provides access to certificate material as {@link KeyStore} instances that can be
+ * consumed by SSL context builders. Implementations may actively refresh and emit
+ * new keystores when underlying sources change.
+ *
+ * @author Jonas Konrad
+ * @since 4.10.0
+ */
 public interface CertificateProvider extends Named {
     String CONFIG_PREFIX = "micronaut.certificate";
 
+    /**
+     * Publisher that emits the key store containing private key and/or certificates.
+     *
+     * @return a publisher of {@link KeyStore} updates
+     */
     @NonNull
     Publisher<@NonNull KeyStore> getKeyStore();
 
+    /**
+     * Publisher that emits the trust store with trusted certificates. By default,
+     * this returns {@link #getKeyStore()}.
+     *
+     * @return a publisher of {@link KeyStore} updates for trust material
+     */
     @NonNull
     default Publisher<@NonNull KeyStore> getTrustStore() {
         return getKeyStore();

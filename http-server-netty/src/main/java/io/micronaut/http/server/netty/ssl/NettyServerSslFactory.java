@@ -21,14 +21,34 @@ import io.micronaut.http.netty.NettySslContextBuilder;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import jakarta.inject.Singleton;
 
+/**
+ * Factory for creating server-side Netty SSL context builders.
+ * Used by the Netty HTTP server to construct TCP/HTTP and QUIC/HTTP/3
+ * SSL contexts based on Micronaut configuration.
+ *
+ * @author Jonas Konrad
+ * @since 4.10.0
+ */
 @Singleton
 public class NettyServerSslFactory {
+    /**
+     * Create a server-side SSL context builder for the given listener configuration.
+     * Current implementation delegates to {@link #serverBuilder()}.
+     *
+     * @param listenerConfiguration the listener configuration for which to create the builder
+     * @return a server-mode {@link NettySslContextBuilder}
+     */
     @Experimental
     @NonNull
     public NettySslContextBuilder serverBuilder(@NonNull NettyHttpServerConfiguration.NettyListenerConfiguration listenerConfiguration) {
         return serverBuilder();
     }
 
+    /**
+     * Create a server-side SSL context builder.
+     *
+     * @return a server-mode {@link NettySslContextBuilder}
+     */
     @NonNull
     public NettySslContextBuilder serverBuilder() {
         return new NettySslContextBuilder(true);

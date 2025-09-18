@@ -19,6 +19,13 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.Named;
 
+/**
+ * Base configuration for certificate material loaded from files.
+ * Holds common options shared by concrete file-backed providers.
+ *
+ * @author Jonas Konrad
+ * @since 4.10.0
+ */
 abstract class AbstractCertificateFileConfig implements Named {
     final String name;
 
@@ -27,6 +34,9 @@ abstract class AbstractCertificateFileConfig implements Named {
     @Nullable
     String password;
 
+    /**
+     * @param name the configuration name that is used to look up the provider
+     */
     AbstractCertificateFileConfig(@NonNull String name) {
         this.name = name;
     }

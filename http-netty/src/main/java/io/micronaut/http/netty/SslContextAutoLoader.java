@@ -30,6 +30,15 @@ import reactor.util.function.Tuples;
 import java.security.KeyStore;
 import java.util.List;
 
+/**
+ * Automatically loads and refreshes Netty SSL contexts from configured {@link CertificateProvider}s.
+ * Subclasses supply the configuration, transport (TCP vs QUIC), and builder factory. This class
+ * subscribes to keystore/truststore publishers and swaps the active {@link SslContextHolder}
+ * when updates arrive, taking care of Netty reference counting.
+ *
+ * @author Jonas Konrad
+ * @since 4.10.0
+ */
 @Internal
 public abstract class SslContextAutoLoader {
     private final Logger log;
@@ -39,6 +48,11 @@ public abstract class SslContextAutoLoader {
     private Disposable refreshSslDisposable;
     private long generation;
 
+    /**
+     * Create a new auto-loader.
+     *
+     * @param log logger used to report initialization failures
+     */
     protected SslContextAutoLoader(Logger log) {
         this.log = log;
     }
@@ -58,6 +72,11 @@ public abstract class SslContextAutoLoader {
         current = holder;
     }
 
+    /**
+     * Obtain the current SSL context holder and retain the underlying Netty contexts.
+     *
+     * @return the retained holder, or {@code null} if no context is currently available
+     */
     @Nullable
     public final synchronized SslContextHolder takeRetained() {
         if (current != null) {
@@ -66,6 +85,10 @@ public abstract class SslContextAutoLoader {
         return current;
     }
 
+    /**
+     * Stop watching for updates and release the current SSL context holder.
+     * Safe to call multiple times.
+     */
     public final void clear() {
         Disposable d;
         synchronized (this) {
@@ -82,18 +105,49 @@ public abstract class SslContextAutoLoader {
         }
     }
 
+    /**
+     * Access to named {@link CertificateProvider} beans used to resolve key/trust material.
+     *
+     * @return a provider of {@link CertificateProvider} beans
+     */
     protected abstract @NonNull BeanProvider<CertificateProvider> certificateProviders();
 
+    /**
+     * The SSL configuration used to derive defaults like protocols, ciphers and client auth.
+     *
+     * @return the SSL configuration
+     */
     protected abstract @NonNull SslConfiguration sslConfiguration();
 
+    /**
+     * Whether the target transport is QUIC/HTTP3 (true) or TCP (false).
+     *
+     * @return {@code true} for QUIC, {@code false} for TCP
+     */
     protected abstract boolean quic();
 
+    /**
+     * Create the legacy SSL context holder when no certificate providers are configured.
+     * Implementations should read from legacy configuration and build fixed contexts.
+     *
+     * @return a holder for legacy contexts
+     */
     protected abstract @NonNull SslContextHolder createLegacy();
 
+    /**
+     * Start auto-loading using names from {@link SslConfiguration}
+     * ({@link SslConfiguration#getKeyName()} and {@link SslConfiguration#getTrustName()}).
+     */
     public final void autoLoad() {
         autoLoad(sslConfiguration().getKeyName(), sslConfiguration().getTrustName());
     }
 
+    /**
+     * Start auto-loading using the given provider names.
+     *
+     * @param keyName   optional name of the {@link CertificateProvider} for the key store
+     * @param trustName optional name of the {@link CertificateProvider} for the trust store
+     */
     public final void autoLoad(@Nullable String keyName, @Nullable String trustName) {
         long gen;
         Disposable d;
@@ -135,8 +189,20 @@ public abstract class SslContextAutoLoader {
         }
     }
 
+    /**
+     * Create a new {@link NettySslContextBuilder} in server or client mode depending on the subclass.
+     *
+     * @return the builder to construct Netty SSL contexts
+     */
     protected abstract @NonNull NettySslContextBuilder builder();
 
+    /**
+     * Build fresh SSL contexts from the supplied key/trust stores and swap the active holder.
+     *
+     * @param ks  the key store, or {@code null}
+     * @param ts  the trust store, or {@code null}
+     * @param gen generation stamp ensuring only the latest update wins
+     */
     private void refreshSsl(@Nullable KeyStore ks, @Nullable KeyStore ts, long gen) {
         try {
             NettySslContextBuilder builder = builder()

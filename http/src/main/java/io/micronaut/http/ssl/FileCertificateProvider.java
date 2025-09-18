@@ -51,6 +51,13 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Certificate provider that loads certificate material from files on disk and can
+ * refresh the material when the underlying files change using a file watcher or scheduler.
+ *
+ * @author Jonas Konrad
+ * @since 4.10.0
+ */
 @EachBean(FileCertificateProvider.Config.class)
 @BootstrapContextCompatible
 public final class FileCertificateProvider implements CertificateProvider {
@@ -60,6 +67,14 @@ public final class FileCertificateProvider implements CertificateProvider {
     private final Flux<KeyStore> flux;
     private final WatchService watchService;
 
+    /**
+     * Create a provider that loads and optionally refreshes certificate material from disk.
+     *
+     * @param config file configuration
+     * @param scheduler scheduled executor for periodic refresh
+     * @param blockingExecutor executor used for blocking file watching
+     * @throws Exception if the initial load fails or watcher setup fails
+     */
     FileCertificateProvider(
         @NonNull Config config,
         @NonNull @jakarta.inject.Named(TaskExecutors.SCHEDULED) ExecutorService scheduler,
@@ -135,6 +150,11 @@ public final class FileCertificateProvider implements CertificateProvider {
         name = config.name;
     }
 
+    /**
+     * Stop watching files and release resources.
+     *
+     * @throws IOException if closing the watch service fails
+     */
     @PreDestroy
     void close() throws IOException {
         watchService.close();
@@ -224,8 +244,9 @@ public final class FileCertificateProvider implements CertificateProvider {
         return ks;
     }
 
+    @NonNull
     @Override
-    public @NonNull Publisher<@NonNull KeyStore> getKeyStore() {
+    public Publisher<@NonNull KeyStore> getKeyStore() {
         return flux;
     }
 
@@ -234,6 +255,13 @@ public final class FileCertificateProvider implements CertificateProvider {
         return name;
     }
 
+    /**
+     * Configuration for file-based certificate material. Supports JKS/PKCS12 and PEM,
+     * with optional automatic reloading.
+     *
+     * @author Jonas Konrad
+     * @since 4.10.0
+     */
     @EachProperty(CONFIG_PREFIX + ".file")
     @BootstrapContextCompatible
     public static class Config extends AbstractCertificateFileConfig {
@@ -325,6 +353,9 @@ public final class FileCertificateProvider implements CertificateProvider {
         }
     }
 
+    /**
+     * Strategy for reloading certificate files.
+     */
     public enum RefreshMode {
         NONE,
         FILE_WATCHER,
@@ -332,6 +363,9 @@ public final class FileCertificateProvider implements CertificateProvider {
         FILE_WATCHER_OR_SCHEDULER,
     }
 
+    /**
+     * Supported on-disk formats for certificate material.
+     */
     public enum Format {
         JKS,
         PKCS12,

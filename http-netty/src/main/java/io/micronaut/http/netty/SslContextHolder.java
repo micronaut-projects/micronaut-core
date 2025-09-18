@@ -21,11 +21,24 @@ import io.netty.handler.codec.quic.QuicSslContext;
 import io.netty.handler.ssl.SslContext;
 import io.netty.util.ReferenceCountUtil;
 
+/**
+ * Holder for Netty SSL context instances for TCP ({@link SslContext}) and QUIC/HTTP3
+ * ({@link QuicSslContext}). Manages Netty reference counting via {@link #retain()} and
+ * {@link #release()} to ensure contexts are safely shared and swapped.
+ *
+ * @param sslContext TCP ssl context
+ * @param quicSslContext QUIC ssl context
+ * @author Jonas Konrad
+ * @since 4.10.0
+ */
 @Internal
 public record SslContextHolder(
     @Nullable SslContext sslContext,
     @Nullable QuicSslContext quicSslContext
 ) {
+    /**
+     * Retain the underlying Netty contexts for safe reuse.
+     */
     public void retain() {
         if (sslContext != null) {
             ReferenceCountUtil.retain(sslContext);
@@ -35,6 +48,9 @@ public record SslContextHolder(
         }
     }
 
+    /**
+     * Release the underlying Netty contexts when no longer needed.
+     */
     public void release() {
         if (sslContext != null) {
             ReferenceCountUtil.release(sslContext);
