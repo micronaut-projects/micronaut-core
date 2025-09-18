@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.BeanProvider;
 import io.micronaut.context.DefaultApplicationContext;
 import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.context.env.Environment;
@@ -28,8 +29,12 @@ import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.io.socket.SocketUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.SupplierUtil;
+import io.micronaut.http.HttpVersion;
 import io.micronaut.http.context.event.HttpRequestReceivedEvent;
 import io.micronaut.http.context.event.HttpRequestTerminatedEvent;
+import io.micronaut.http.netty.NettySslContextBuilder;
+import io.micronaut.http.netty.SslContextAutoLoader;
+import io.micronaut.http.netty.SslContextHolder;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
 import io.micronaut.http.netty.channel.DefaultEventLoopGroupConfiguration;
 import io.micronaut.http.netty.channel.DefaultEventLoopGroupRegistry;
@@ -43,6 +48,7 @@ import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration
 import io.micronaut.http.server.netty.ssl.ServerSslBuilder;
 import io.micronaut.http.server.util.DefaultHttpHostResolver;
 import io.micronaut.http.server.util.HttpHostResolver;
+import io.micronaut.http.ssl.CertificateProvider;
 import io.micronaut.http.ssl.ServerSslConfiguration;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -76,6 +82,8 @@ import io.netty.channel.socket.DatagramChannel;
 import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.unix.DomainSocketAddress;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
+import io.netty.handler.codec.quic.QuicSslContext;
+import io.netty.handler.ssl.SslContext;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 import io.netty.util.concurrent.GlobalEventExecutor;
@@ -209,19 +217,19 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             List<NettyHttpServerConfiguration.NettyListenerConfiguration> implicit = new ArrayList<>(2);
             final ServerSslBuilder serverSslBuilder = nettyEmbeddedServices.getServerSslBuilder();
             if (serverSslBuilder != null && this.sslConfiguration.isEnabled()) {
-                implicit.add(NettyHttpServerConfiguration.NettyListenerConfiguration.createTcp(configuredHost, sslConfiguration.getPort(), true));
+                implicit.add(NettyHttpServerConfiguration.NettyListenerConfiguration.createTcp(configuredHost, sslConfiguration.getPort(), true, sslConfiguration.getKeyName(), sslConfiguration.getTrustName()));
             } else {
-                implicit.add(NettyHttpServerConfiguration.NettyListenerConfiguration.createTcp(configuredHost, getHttpPort(serverConfiguration), false));
+                implicit.add(NettyHttpServerConfiguration.NettyListenerConfiguration.createTcp(configuredHost, getHttpPort(serverConfiguration), false, null, null));
             }
             if (isDefault) {
                 if (serverConfiguration.isDualProtocol()) {
-                    implicit.add(NettyHttpServerConfiguration.NettyListenerConfiguration.createTcp(configuredHost, getHttpPort(serverConfiguration), false));
+                    implicit.add(NettyHttpServerConfiguration.NettyListenerConfiguration.createTcp(configuredHost, getHttpPort(serverConfiguration), false, null, null));
                 }
                 final Router router = this.nettyEmbeddedServices.getRouter();
                 final Set<Integer> exposedPorts = router.getExposedPorts();
                 for (int exposedPort : exposedPorts) {
                     if (exposedPort == -1 || exposedPort == 0 || implicit.stream().noneMatch(cfg -> cfg.getPort() == exposedPort)) {
-                        NettyHttpServerConfiguration.NettyListenerConfiguration mgmt = NettyHttpServerConfiguration.NettyListenerConfiguration.createTcp(configuredHost, exposedPort, false);
+                        NettyHttpServerConfiguration.NettyListenerConfiguration mgmt = NettyHttpServerConfiguration.NettyListenerConfiguration.createTcp(configuredHost, exposedPort, false, null, null);
                         mgmt.setExposeDefaultRoutes(false);
                         mgmt.setSupportGracefulShutdown(false);
                         implicit.add(mgmt);
@@ -758,15 +766,13 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 applicationContext.stop();
             }
             serverConfiguration.getMultipart().getLocation().ifPresent(dir -> DiskFileUpload.baseDirectory = null);
+            List<Listener> activeListeners = this.activeListeners;
             if (activeListeners != null) {
                 for (Listener listener : activeListeners) {
-                    if (listener.httpPipelineBuilder != null) {
-                        listener.httpPipelineBuilder.close();
-                        listener.httpPipelineBuilder = null;
-                    }
+                    listener.clean();
                 }
+                this.activeListeners = null;
             }
-            this.activeListeners = null;
 
             // If we are only stopping the server, we need to wait for the futures to complete otherwise
             // when CRaC is trying to take a snapshot it will capture objects in flow of shutting down.
@@ -943,9 +949,9 @@ public class NettyHttpServer implements NettyEmbeddedServer {
      */
     @Internal
     public void buildEmbeddedChannel(EmbeddedChannel prototype, boolean ssl) {
-        try (HttpPipelineBuilder builder = createPipelineBuilder(rootCustomizer, false)) {
-            builder.new ConnectionPipeline(prototype, ssl).initChannel();
-        }
+        HttpPipelineBuilder builder = createPipelineBuilder(rootCustomizer, false);
+        SslContextHolder sslContextHolder = ssl ? createLegacySslContextHolder(false) : null;
+        builder.new ConnectionPipeline(prototype, sslContextHolder).initChannel();
     }
 
     static Predicate<String> inclusionPredicate(NettyHttpServerConfiguration.AccessLogger config) {
@@ -959,10 +965,46 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         }
     }
 
+    private SslContextHolder createLegacySslContextHolder(boolean quic) {
+        SslContext sslContext = nettyEmbeddedServices.getServerSslBuilder() != null && !quic ? nettyEmbeddedServices.getServerSslBuilder().build().orElse(null) : null;
+        QuicSslContext quicSslContext = quic ? nettyEmbeddedServices.getServerSslBuilder().buildQuic().orElse(null) : null;
+        return new SslContextHolder(sslContext, quicSslContext);
+    }
+
     private class Listener extends ChannelInitializer<Channel> implements GracefulShutdownCapable {
         Channel serverChannel;
         NettyServerCustomizer listenerCustomizer;
         NettyHttpServerConfiguration.NettyListenerConfiguration config;
+        final SslContextAutoLoader contextWrapper = new SslContextAutoLoader(LOG) {
+            @Override
+            protected BeanProvider<CertificateProvider> certificateProviders() {
+                return nettyEmbeddedServices.getCertificateProviders();
+            }
+
+            @Override
+            protected SslConfiguration sslConfiguration() {
+                return sslConfiguration;
+            }
+
+            @Override
+            protected boolean quic() {
+                return config.getFamily() == NettyHttpServerConfiguration.NettyListenerConfiguration.Family.QUIC;
+            }
+
+            @Override
+            protected SslContextHolder createLegacy() {
+                return createLegacySslContextHolder(quic());
+            }
+
+            @Override
+            protected NettySslContextBuilder builder() {
+                NettySslContextBuilder builder = nettyEmbeddedServices.getSslFactory().serverBuilder(config);
+                if (serverConfiguration.getHttpVersion() == HttpVersion.HTTP_2_0) {
+                    builder.http2();
+                }
+                return builder;
+            }
+        };
 
         volatile HttpPipelineBuilder httpPipelineBuilder;
 
@@ -972,14 +1014,15 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             this.config = config;
         }
 
+        void clean() {
+            contextWrapper.clear();
+        }
+
         void refresh() {
-            HttpPipelineBuilder oldBuilder = httpPipelineBuilder;
-            httpPipelineBuilder = createPipelineBuilder(listenerCustomizer, config.getFamily() == NettyHttpServerConfiguration.NettyListenerConfiguration.Family.QUIC);
-            if (oldBuilder != null) {
-                oldBuilder.close();
-            }
-            if (config.isSsl() && !httpPipelineBuilder.supportsSsl()) {
-                throw new IllegalStateException("Listener configured for SSL, but no SSL context available");
+            boolean quic = config.getFamily() == NettyHttpServerConfiguration.NettyListenerConfiguration.Family.QUIC;
+            httpPipelineBuilder = createPipelineBuilder(listenerCustomizer, quic);
+            if (config.isSsl() || quic) {
+                contextWrapper.autoLoad(config.getKeyName(), config.getTrustName());
             }
         }
 
@@ -991,7 +1034,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
         @Override
         protected void initChannel(@NonNull Channel ch) throws Exception {
-            HttpPipelineBuilder.ConnectionPipeline cp = httpPipelineBuilder.new ConnectionPipeline(ch, config.isSsl());
+            HttpPipelineBuilder.ConnectionPipeline cp = httpPipelineBuilder.new ConnectionPipeline(ch, contextWrapper.takeRetained());
             activeConnections.add(cp);
             ch.closeFuture().addListener((ChannelFutureListener) future -> activeConnections.remove(cp));
             cp.initChannel();
@@ -1035,7 +1078,11 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         protected void initChannel(Channel ch) throws Exception {
             // udp does not have connection channels
             setServerChannel(ch);
-            HttpPipelineBuilder.ConnectionPipeline cp = httpPipelineBuilder.new ConnectionPipeline(ch, true);
+            SslContextHolder contextHolder = contextWrapper.takeRetained();
+            if (contextHolder == null) {
+                throw new IllegalStateException("SSL context not available, but required for HTTP/3");
+            }
+            HttpPipelineBuilder.ConnectionPipeline cp = httpPipelineBuilder.new ConnectionPipeline(ch, contextHolder);
             activeConnections.add(cp);
             ch.closeFuture().addListener((ChannelFutureListener) future -> activeConnections.remove(cp));
             cp.initHttp3Channel();

@@ -71,6 +71,8 @@ public class SslConfiguration implements Toggleable {
     private KeyConfiguration key = new KeyConfiguration();
     private KeyStoreConfiguration keyStore = new KeyStoreConfiguration();
     private TrustStoreConfiguration trustStore = new TrustStoreConfiguration();
+    private String keyName;
+    private String trustName;
     private ClientAuthentication clientAuthentication;
     private String[] ciphers;
     private String[] protocols;
@@ -149,6 +151,22 @@ public class SslConfiguration implements Toggleable {
      */
     public TrustStoreConfiguration getTrustStore() {
         return trustStore;
+    }
+
+    public String getKeyName() {
+        return keyName;
+    }
+
+    public void setKeyName(String keyName) {
+        this.keyName = keyName;
+    }
+
+    public String getTrustName() {
+        return trustName;
+    }
+
+    public void setTrustName(String trustName) {
+        this.trustName = trustName;
     }
 
     /**

@@ -25,20 +25,15 @@ import io.micronaut.http.ssl.ServerSslConfiguration;
 import io.micronaut.http.ssl.SslBuilder;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.http.ssl.SslConfigurationException;
-import io.netty.handler.codec.http2.Http2SecurityUtil;
 import io.netty.handler.codec.http3.Http3;
 import io.netty.handler.codec.quic.QuicSslContext;
 import io.netty.handler.codec.quic.QuicSslContextBuilder;
-import io.netty.handler.ssl.ApplicationProtocolConfig;
-import io.netty.handler.ssl.ApplicationProtocolNames;
 import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
-import io.netty.handler.ssl.SupportedCipherSuiteFilter;
 
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLException;
-import java.util.Arrays;
 import java.util.Optional;
 
 /**
@@ -82,7 +77,7 @@ public abstract class AbstractServerSslBuilder extends SslBuilder<SslContext> im
             .forServer(getKeyManagerFactory(ssl))
             .trustManager(getTrustManagerFactory(ssl));
 
-        setupSslBuilder(sslBuilder, ssl, httpVersion);
+        NettyTlsUtils.setupServerBuilder(sslBuilder, ssl, httpVersion);
         processBuilder(sslBuilder, ssl, httpVersion);
         try {
             return Optional.of(sslBuilder.build());
@@ -101,40 +96,6 @@ public abstract class AbstractServerSslBuilder extends SslBuilder<SslContext> im
      */
     protected void processBuilder(@NonNull SslContextBuilder sslBuilder, @NonNull SslConfiguration ssl, @NonNull HttpVersion httpVersion) {
         // no additional processing by default
-    }
-
-    private static void setupSslBuilder(SslContextBuilder sslBuilder, SslConfiguration ssl, HttpVersion httpVersion) {
-        sslBuilder.sslProvider(NettyTlsUtils.sslProvider(ssl));
-        Optional<String[]> protocols = ssl.getProtocols();
-        if (protocols.isPresent()) {
-            sslBuilder.protocols(protocols.get());
-        }
-        final boolean isHttp2 = httpVersion == HttpVersion.HTTP_2_0;
-        Optional<String[]> ciphers = ssl.getCiphers();
-        if (ciphers.isPresent()) {
-            sslBuilder = sslBuilder.ciphers(Arrays.asList(ciphers.get()));
-        } else if (isHttp2) {
-            sslBuilder.ciphers(Http2SecurityUtil.CIPHERS, SupportedCipherSuiteFilter.INSTANCE);
-        }
-        Optional<ClientAuthentication> clientAuthentication = ssl.getClientAuthentication();
-        if (clientAuthentication.isPresent()) {
-            ClientAuthentication clientAuth = clientAuthentication.get();
-            if (clientAuth == ClientAuthentication.NEED) {
-                sslBuilder.clientAuth(ClientAuth.REQUIRE);
-            } else if (clientAuth == ClientAuthentication.WANT) {
-                sslBuilder.clientAuth(ClientAuth.OPTIONAL);
-            }
-        }
-
-        if (isHttp2) {
-            sslBuilder.applicationProtocolConfig(new ApplicationProtocolConfig(
-                ApplicationProtocolConfig.Protocol.ALPN,
-                ApplicationProtocolConfig.SelectorFailureBehavior.NO_ADVERTISE,
-                ApplicationProtocolConfig.SelectedListenerFailureBehavior.ACCEPT,
-                ApplicationProtocolNames.HTTP_2,
-                ApplicationProtocolNames.HTTP_1_1
-            ));
-        }
     }
 
     @Override

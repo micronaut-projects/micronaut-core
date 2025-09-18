@@ -25,6 +25,7 @@ import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.KeyFactory;
 import java.security.cert.CertificateFactory;
@@ -52,6 +53,16 @@ record PemParser(
 
     private static final String OID_RSA = "1.2.840.113549.1.1.1";
     private static final String OID_EC = "1.2.840.10045.2.1";
+
+    List<Object> loadPem(byte[] pem) throws GeneralSecurityException, IllegalArgumentException, NotPemException {
+        String s;
+        try {
+            s = new String(pem, StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            throw new NotPemException("Invalid UTF-8");
+        }
+        return loadPem(s);
+    }
 
     /**
      * Load the given PEM file.

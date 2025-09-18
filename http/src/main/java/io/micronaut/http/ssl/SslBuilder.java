@@ -306,7 +306,7 @@ public abstract class SslBuilder<T> {
         }
     }
 
-    private static List<X509Certificate> certificates(List<Object> pemObjects) {
+    static List<X509Certificate> certificates(List<Object> pemObjects) {
         for (Object pemObject : pemObjects) {
             if (!(pemObject instanceof X509Certificate)) {
                 throw new SslConfigurationException("PEM must only contain the private key and a certificate chain");

@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.BeanProvider;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
@@ -26,8 +27,10 @@ import io.micronaut.http.netty.channel.EventLoopGroupRegistry;
 import io.micronaut.http.netty.channel.NettyChannelType;
 import io.micronaut.http.netty.channel.converters.ChannelOptionFactory;
 import io.micronaut.http.server.RouteExecutor;
+import io.micronaut.http.server.netty.ssl.NettyServerSslFactory;
 import io.micronaut.http.server.netty.ssl.ServerSslBuilder;
 import io.micronaut.http.server.netty.websocket.NettyServerWebSocketUpgradeHandler;
+import io.micronaut.http.ssl.CertificateProvider;
 import io.micronaut.web.router.resource.StaticResourceResolver;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelOutboundHandler;
@@ -130,5 +133,15 @@ interface DelegateNettyEmbeddedServices extends NettyEmbeddedServices {
     @NonNull
     default Channel getChannelInstance(NettyChannelType type, @NonNull EventLoopGroupConfiguration workerConfig) {
         return getDelegate().getChannelInstance(type, workerConfig);
+    }
+
+    @Override
+    default NettyServerSslFactory getSslFactory() {
+        return getDelegate().getSslFactory();
+    }
+
+    @Override
+    default @NonNull BeanProvider<CertificateProvider> getCertificateProviders() {
+        return getDelegate().getCertificateProviders();
     }
 }

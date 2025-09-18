@@ -21,6 +21,7 @@ import io.micronaut.core.naming.Named;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.body.stream.BodySizeLimits;
+import io.micronaut.http.netty.SslContextHolder;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.handler.Http2ServerHandler;
@@ -44,14 +45,6 @@ import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOutboundHandler;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.SimpleChannelInboundHandler;
-import io.netty.handler.codec.http3.DefaultHttp3GoAwayFrame;
-import io.netty.handler.codec.http3.Http3;
-import io.netty.handler.codec.http3.Http3FrameToHttpObjectCodec;
-import io.netty.handler.codec.http3.Http3ServerConnectionHandler;
-import io.netty.handler.codec.quic.QuicChannel;
-import io.netty.handler.codec.quic.QuicSslContext;
-import io.netty.handler.codec.quic.QuicSslEngine;
-import io.netty.handler.codec.quic.QuicStreamChannel;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpMessage;
 import io.netty.handler.codec.http.HttpObjectAggregator;
@@ -69,13 +62,19 @@ import io.netty.handler.codec.http2.Http2MultiplexHandler;
 import io.netty.handler.codec.http2.Http2ServerUpgradeCodec;
 import io.netty.handler.codec.http2.Http2StreamChannel;
 import io.netty.handler.codec.http2.Http2StreamFrameToHttpObjectCodec;
+import io.netty.handler.codec.http3.DefaultHttp3GoAwayFrame;
+import io.netty.handler.codec.http3.Http3;
+import io.netty.handler.codec.http3.Http3FrameToHttpObjectCodec;
+import io.netty.handler.codec.http3.Http3ServerConnectionHandler;
+import io.netty.handler.codec.quic.QuicChannel;
+import io.netty.handler.codec.quic.QuicSslEngine;
+import io.netty.handler.codec.quic.QuicStreamChannel;
 import io.netty.handler.flow.FlowControlHandler;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.pcap.PcapWriteHandler;
 import io.netty.handler.ssl.ApplicationProtocolNames;
 import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler;
-import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.ssl.SslHandshakeCompletionEvent;
 import io.netty.handler.timeout.IdleStateHandler;
@@ -87,7 +86,6 @@ import org.slf4j.LoggerFactory;
 
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLSession;
-import java.io.Closeable;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.net.InetSocketAddress;
@@ -116,7 +114,7 @@ import java.util.function.Supplier;
  * @since 3.4
  * @author ywkat
  */
-final class HttpPipelineBuilder implements Closeable {
+final class HttpPipelineBuilder {
     static final Supplier<AttributeKey<StreamPipeline>> STREAM_PIPELINE_ATTRIBUTE =
         SupplierUtil.memoized(() -> AttributeKey.newInstance("stream-pipeline"));
     static final Supplier<AttributeKey<Supplier<SSLSession>>> SSL_SESSION_ATTRIBUTE =
@@ -131,8 +129,6 @@ final class HttpPipelineBuilder implements Closeable {
     private final HttpHostResolver hostResolver;
 
     private final LoggingHandler loggingHandler;
-    private final SslContext sslContext;
-    private final QuicSslContext quicSslContext;
     private final HttpAccessLogHandler accessLogHandler;
     private final Http2AccessLogManager.Factory accessLogManagerFactory;
 
@@ -151,8 +147,6 @@ final class HttpPipelineBuilder implements Closeable {
 
         Optional<LogLevel> logLevel = server.getServerConfiguration().getLogLevel();
         loggingHandler = logLevel.map(level -> new LoggingHandler(NettyHttpServer.class, level)).orElse(null);
-        sslContext = embeddedServices.getServerSslBuilder() != null && !quic ? embeddedServices.getServerSslBuilder().build().orElse(null) : null;
-        quicSslContext = quic ? embeddedServices.getServerSslBuilder().buildQuic().orElse(null) : null;
 
         NettyHttpServerConfiguration.AccessLogger accessLogger = server.getServerConfiguration().getAccessLogger();
         if (accessLogger != null && accessLogger.isEnabled()) {
@@ -165,15 +159,6 @@ final class HttpPipelineBuilder implements Closeable {
             accessLogHandler = null;
             accessLogManagerFactory = null;
         }
-    }
-
-    boolean supportsSsl() {
-        return sslContext != null || quicSslContext != null;
-    }
-
-    @Override
-    public void close() {
-        ReferenceCountUtil.release(sslContext);
     }
 
     private RequestHandler makeRequestHandler(Optional<NettyServerWebSocketUpgradeHandler> webSocketUpgradeHandler, boolean ssl) {
@@ -196,8 +181,13 @@ final class HttpPipelineBuilder implements Closeable {
      * Holder class for normal or QUIC ssl handler.
      */
     private final class SslHandlerHolder {
+        private final SslContextHolder contextHolder;
         private SslHandler sslHandler;
         private SSLEngine quicSslEngine;
+
+        SslHandlerHolder(SslContextHolder contextHolder) {
+            this.contextHolder = contextHolder;
+        }
 
         /**
          * Make a normal (non-quic) ssl handler. Note that this may be reference counted.
@@ -206,17 +196,13 @@ final class HttpPipelineBuilder implements Closeable {
          * @return The handler
          */
         SslHandler makeNormal(ByteBufAllocator alloc) {
-            sslHandler = sslContext.newHandler(alloc);
+            sslHandler = contextHolder.sslContext().newHandler(alloc);
             sslHandler.setHandshakeTimeoutMillis(sslConfiguration.getHandshakeTimeout().toMillis());
             return sslHandler;
         }
 
         Supplier<SSLSession> findSslSession() {
             return SupplierUtil.memoized(() -> (quicSslEngine == null ? sslHandler.engine() : quicSslEngine).getSession());
-        }
-
-        HttpPipelineBuilder pipelineBuilder() {
-            return HttpPipelineBuilder.this;
         }
     }
 
@@ -232,8 +218,7 @@ final class HttpPipelineBuilder implements Closeable {
          */
         static Function<QuicChannel, ? extends QuicSslEngine> quicEngineFactory(SslHandlerHolder sslHandlerHolder) {
             return q -> {
-                @SuppressWarnings("resource")
-                QuicSslEngine e = sslHandlerHolder.pipelineBuilder().quicSslContext.newEngine(q.alloc());
+                QuicSslEngine e = sslHandlerHolder.contextHolder.quicSslContext().newEngine(q.alloc());
                 sslHandlerHolder.quicSslEngine = e;
                 return e;
             };
@@ -255,10 +240,10 @@ final class HttpPipelineBuilder implements Closeable {
          * @param channel The channel of this connection
          * @param https   Whether this connection is HTTPS
          */
-        ConnectionPipeline(Channel channel, boolean https) {
+        ConnectionPipeline(Channel channel, SslContextHolder contextHolder) {
             this.channel = channel;
             this.pipeline = channel.pipeline();
-            this.sslHandler = https ? new SslHandlerHolder() : null;
+            this.sslHandler = contextHolder == null ? null : new SslHandlerHolder(contextHolder);
             this.connectionCustomizer = serverCustomizer.specializeForChannel(channel, NettyServerCustomizer.ChannelRole.CONNECTION);
         }
 
@@ -339,12 +324,12 @@ final class HttpPipelineBuilder implements Closeable {
 
         void initHttp3Channel() {
             insertPcapLoggingHandler(channel, "udp-encapsulated");
+            channel.closeFuture().addListener((ChannelFutureListener) future -> sslHandler.contextHolder.release());
 
             Set<Http3GracefulShutdown> activeChannels = ConcurrentHashMap.newKeySet();
             AtomicBoolean shuttingDown = new AtomicBoolean(false);
             pipeline.addLast(Http3.newQuicServerCodecBuilder()
                 .sslEngineProvider(QuicFactory.quicEngineFactory(sslHandler))
-                    //.sslEngineProvider(q -> quicSslContext.newEngine(q.alloc()))
                 .initialMaxData(server.getServerConfiguration().getHttp3().getInitialMaxData())
                 .initialMaxStreamDataBidirectionalLocal(server.getServerConfiguration().getHttp3().getInitialMaxStreamDataBidirectionalLocal())
                 .initialMaxStreamDataBidirectionalRemote(server.getServerConfiguration().getHttp3().getInitialMaxStreamDataBidirectionalRemote())
@@ -409,6 +394,7 @@ final class HttpPipelineBuilder implements Closeable {
 
             if (sslHandler != null) {
                 pipeline.addLast(ChannelPipelineCustomizer.HANDLER_SSL, sslHandler.makeNormal(channel.alloc()));
+                sslHandler.contextHolder.release();
 
                 insertPcapLoggingHandler(channel, "ssl-decapsulated");
             }

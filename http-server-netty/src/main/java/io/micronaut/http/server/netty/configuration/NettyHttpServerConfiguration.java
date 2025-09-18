@@ -1474,6 +1474,8 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         private final String name;
         private Family family = Family.TCP;
         private boolean ssl;
+        private String keyName;
+        private String trustName;
         @Nullable
         private String host;
         private int port;
@@ -1511,15 +1513,18 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          * @param host The host to bind to
          * @param port The port to bind to
          * @param ssl Whether to enable SSL
+         * @param keyName Optional certificate name to use
          * @return The configuration with the given settings
          */
         @Internal
-        public static NettyListenerConfiguration createTcp(@Nullable String host, int port, boolean ssl) {
+        public static NettyListenerConfiguration createTcp(@Nullable String host, int port, boolean ssl, @Nullable String keyName, @Nullable String trustName) {
             NettyListenerConfiguration configuration = new NettyListenerConfiguration(host + ":" + port);
             configuration.setFamily(Family.TCP);
             configuration.setHost(host);
             configuration.setPort(port);
             configuration.setSsl(ssl);
+            configuration.setKeyName(keyName);
+            configuration.setTrustName(trustName);
             return configuration;
         }
 
@@ -1565,6 +1570,23 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          */
         public void setSsl(boolean ssl) {
             this.ssl = ssl;
+        }
+
+        @Nullable
+        public String getKeyName() {
+            return keyName;
+        }
+
+        public void setKeyName(@Nullable String keyName) {
+            this.keyName = keyName;
+        }
+
+        public String getTrustName() {
+            return trustName;
+        }
+
+        public void setTrustName(String trustName) {
+            this.trustName = trustName;
         }
 
         /**
