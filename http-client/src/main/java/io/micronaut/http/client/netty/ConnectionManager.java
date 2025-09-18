@@ -1807,12 +1807,12 @@ public class ConnectionManager {
         }
 
         @Override
-        protected BeanProvider<CertificateProvider> certificateProviders() {
+        protected @NonNull BeanProvider<CertificateProvider> certificateProviders() {
             return certificateProviders;
         }
 
         @Override
-        protected SslConfiguration sslConfiguration() {
+        protected @NonNull SslConfiguration sslConfiguration() {
             return configuration.getSslConfiguration();
         }
 
@@ -1822,7 +1822,7 @@ public class ConnectionManager {
         }
 
         @Override
-        protected SslContextHolder createLegacy() {
+        protected @NonNull SslContextHolder createLegacy() {
             if (quic()) {
                 return new SslContextHolder(null, nettyClientSslBuilder.buildHttp3(configuration.getSslConfiguration()));
             } else {
@@ -1831,7 +1831,7 @@ public class ConnectionManager {
         }
 
         @Override
-        protected NettySslContextBuilder builder() {
+        protected @NonNull NettySslContextBuilder builder() {
             NettySslContextBuilder builder = sslFactory.builder(configuration);
             if (httpVersion.isHttp2CipherSuites()) {
                 builder.http2();

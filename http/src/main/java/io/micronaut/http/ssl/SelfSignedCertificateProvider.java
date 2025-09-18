@@ -65,7 +65,7 @@ public class SelfSignedCertificateProvider implements CertificateProvider {
         bundleFlux = sink.asFlux();
     }
 
-    private static void update(@NonNull Config config, Sinks.Many<KeyStore> sink) throws Exception {
+    private static void update(@NonNull Config config, @NonNull Sinks.Many<KeyStore> sink) throws Exception {
         X509Bundle bundle = new CertificateBuilder()
             .algorithm(config.algorithm)
             .subject(config.subject)
@@ -76,7 +76,7 @@ public class SelfSignedCertificateProvider implements CertificateProvider {
     }
 
     @Override
-    public Publisher<KeyStore> getKeyStore() {
+    public @NonNull Publisher<@NonNull KeyStore> getKeyStore() {
         return bundleFlux;
     }
 
@@ -95,7 +95,7 @@ public class SelfSignedCertificateProvider implements CertificateProvider {
         private Duration updateInterval = Duration.ofDays(1);
         private Duration lifetime = Duration.ofDays(7);
 
-        public Config(@Parameter String name) {
+        public Config(@Parameter @NonNull String name) {
             this.name = name;
         }
 
@@ -104,35 +104,35 @@ public class SelfSignedCertificateProvider implements CertificateProvider {
             return name;
         }
 
-        public CertificateBuilder.Algorithm getAlgorithm() {
+        public @NonNull CertificateBuilder.Algorithm getAlgorithm() {
             return algorithm;
         }
 
-        public void setAlgorithm(CertificateBuilder.Algorithm algorithm) {
+        public void setAlgorithm(@NonNull CertificateBuilder.Algorithm algorithm) {
             this.algorithm = algorithm;
         }
 
-        public String getSubject() {
+        public @NonNull String getSubject() {
             return subject;
         }
 
-        public void setSubject(String subject) {
+        public void setSubject(@NonNull String subject) {
             this.subject = subject;
         }
 
-        public Duration getUpdateInterval() {
+        public @NonNull Duration getUpdateInterval() {
             return updateInterval;
         }
 
-        public void setUpdateInterval(Duration updateInterval) {
+        public void setUpdateInterval(@NonNull Duration updateInterval) {
             this.updateInterval = updateInterval;
         }
 
-        public Duration getLifetime() {
+        public @NonNull Duration getLifetime() {
             return lifetime;
         }
 
-        public void setLifetime(Duration lifetime) {
+        public void setLifetime(@NonNull Duration lifetime) {
             this.lifetime = lifetime;
         }
     }

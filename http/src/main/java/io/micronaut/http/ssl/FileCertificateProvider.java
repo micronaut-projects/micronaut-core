@@ -225,7 +225,7 @@ public final class FileCertificateProvider implements CertificateProvider {
     }
 
     @Override
-    public Publisher<KeyStore> getKeyStore() {
+    public @NonNull Publisher<@NonNull KeyStore> getKeyStore() {
         return flux;
     }
 
@@ -246,39 +246,39 @@ public final class FileCertificateProvider implements CertificateProvider {
         @NonNull
         private Duration refreshInterval = Duration.ofHours(1);
 
-        public Config(@Parameter String name) {
+        public Config(@Parameter @NonNull String name) {
             super(name);
         }
 
-        public Path getPath() {
+        public @NonNull Path getPath() {
             return path;
         }
 
-        public void setPath(Path path) {
+        public void setPath(@NonNull Path path) {
             this.path = path;
         }
 
-        public Path getCertificatePath() {
+        public @Nullable Path getCertificatePath() {
             return certificatePath;
         }
 
-        public void setCertificatePath(Path certificatePath) {
+        public void setCertificatePath(@Nullable Path certificatePath) {
             this.certificatePath = certificatePath;
         }
 
-        public RefreshMode getRefreshMode() {
+        public @NonNull RefreshMode getRefreshMode() {
             return refreshMode;
         }
 
-        public void setRefreshMode(RefreshMode refreshMode) {
+        public void setRefreshMode(@NonNull RefreshMode refreshMode) {
             this.refreshMode = refreshMode;
         }
 
-        public Duration getRefreshInterval() {
+        public @NonNull Duration getRefreshInterval() {
             return refreshInterval;
         }
 
-        public void setRefreshInterval(Duration refreshInterval) {
+        public void setRefreshInterval(@NonNull Duration refreshInterval) {
             this.refreshInterval = refreshInterval;
         }
     }

@@ -153,19 +153,19 @@ public class SslConfiguration implements Toggleable {
         return trustStore;
     }
 
-    public String getKeyName() {
+    public @Nullable String getKeyName() {
         return keyName;
     }
 
-    public void setKeyName(String keyName) {
+    public void setKeyName(@Nullable String keyName) {
         this.keyName = keyName;
     }
 
-    public String getTrustName() {
+    public @Nullable String getTrustName() {
         return trustName;
     }
 
-    public void setTrustName(String trustName) {
+    public void setTrustName(@Nullable String trustName) {
         this.trustName = trustName;
     }
 

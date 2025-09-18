@@ -61,15 +61,15 @@ public final class ResourceCertificateProvider implements CertificateProvider {
     public static class Config extends AbstractCertificateFileConfig {
         private String resource;
 
-        public Config(@Parameter String name) {
+        public Config(@Parameter @NonNull String name) {
             super(name);
         }
 
-        public String getResource() {
+        public @NonNull String getResource() {
             return resource;
         }
 
-        public void setResource(String resource) {
+        public void setResource(@NonNull String resource) {
             this.resource = resource;
         }
     }

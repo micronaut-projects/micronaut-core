@@ -27,7 +27,7 @@ abstract class AbstractCertificateFileConfig implements Named {
     @Nullable
     String password;
 
-    AbstractCertificateFileConfig(String name) {
+    AbstractCertificateFileConfig(@NonNull String name) {
         this.name = name;
     }
 
@@ -36,19 +36,19 @@ abstract class AbstractCertificateFileConfig implements Named {
         return name;
     }
 
-    public FileCertificateProvider.Format getFormat() {
+    public @Nullable FileCertificateProvider.Format getFormat() {
         return format;
     }
 
-    public void setFormat(FileCertificateProvider.Format format) {
+    public void setFormat(@Nullable FileCertificateProvider.Format format) {
         this.format = format;
     }
 
-    public String getPassword() {
+    public @Nullable String getPassword() {
         return password;
     }
 
-    public void setPassword(String password) {
+    public void setPassword(@Nullable String password) {
         this.password = password;
     }
 }

@@ -17,6 +17,7 @@ package io.micronaut.http.netty;
 
 import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.ssl.CertificateProvider;
 import io.micronaut.http.ssl.SslConfiguration;
@@ -81,13 +82,13 @@ public abstract class SslContextAutoLoader {
         }
     }
 
-    protected abstract BeanProvider<CertificateProvider> certificateProviders();
+    protected abstract @NonNull BeanProvider<CertificateProvider> certificateProviders();
 
-    protected abstract SslConfiguration sslConfiguration();
+    protected abstract @NonNull SslConfiguration sslConfiguration();
 
     protected abstract boolean quic();
 
-    protected abstract SslContextHolder createLegacy();
+    protected abstract @NonNull SslContextHolder createLegacy();
 
     public final void autoLoad() {
         autoLoad(sslConfiguration().getKeyName(), sslConfiguration().getTrustName());
@@ -134,7 +135,7 @@ public abstract class SslContextAutoLoader {
         }
     }
 
-    protected abstract NettySslContextBuilder builder();
+    protected abstract @NonNull NettySslContextBuilder builder();
 
     private void refreshSsl(@Nullable KeyStore ks, @Nullable KeyStore ts, long gen) {
         try {

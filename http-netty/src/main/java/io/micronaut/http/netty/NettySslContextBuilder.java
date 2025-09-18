@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.netty;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.ssl.ClientAuthentication;
 import io.netty.handler.codec.http2.Http2SecurityUtil;
@@ -62,7 +63,7 @@ public class NettySslContextBuilder {
         this.server = server;
     }
 
-    public final NettySslContextBuilder openssl(boolean openssl) {
+    public final @NonNull NettySslContextBuilder openssl(boolean openssl) {
         this.openssl = openssl;
         return this;
     }
@@ -75,7 +76,7 @@ public class NettySslContextBuilder {
         return keyStore;
     }
 
-    public final NettySslContextBuilder keyStore(@Nullable KeyStore keyStore) {
+    public final @NonNull NettySslContextBuilder keyStore(@Nullable KeyStore keyStore) {
         this.keyStore = keyStore;
         return this;
     }
@@ -84,7 +85,7 @@ public class NettySslContextBuilder {
         return keyPassword;
     }
 
-    public final NettySslContextBuilder keyPassword(@Nullable String keyPassword) {
+    public final @NonNull NettySslContextBuilder keyPassword(@Nullable String keyPassword) {
         this.keyPassword = keyPassword;
         return this;
     }
@@ -93,7 +94,7 @@ public class NettySslContextBuilder {
         return trustStore;
     }
 
-    public final NettySslContextBuilder trustStore(@Nullable KeyStore trustStore) {
+    public final @NonNull NettySslContextBuilder trustStore(@Nullable KeyStore trustStore) {
         this.trustStore = trustStore;
         return this;
     }
@@ -102,7 +103,7 @@ public class NettySslContextBuilder {
         return protocols;
     }
 
-    public final NettySslContextBuilder protocols(@Nullable List<String> protocols) {
+    public final @NonNull NettySslContextBuilder protocols(@Nullable List<String> protocols) {
         this.protocols = protocols;
         return this;
     }
@@ -111,7 +112,7 @@ public class NettySslContextBuilder {
         return ciphers;
     }
 
-    public final NettySslContextBuilder ciphers(@Nullable List<String> ciphers, boolean ignoreUnsupportedCiphers) {
+    public final @NonNull NettySslContextBuilder ciphers(@Nullable List<String> ciphers, boolean ignoreUnsupportedCiphers) {
         this.ciphers = ciphers;
         this.ignoreUnsupportedCiphers = ignoreUnsupportedCiphers;
         return this;
@@ -121,12 +122,12 @@ public class NettySslContextBuilder {
         return alpnProtocols;
     }
 
-    public final NettySslContextBuilder alpnProtocols(@Nullable List<String> alpnProtocols) {
+    public final @NonNull NettySslContextBuilder alpnProtocols(@Nullable List<String> alpnProtocols) {
         this.alpnProtocols = alpnProtocols;
         return this;
     }
 
-    public final NettySslContextBuilder http2() {
+    public final @NonNull NettySslContextBuilder http2() {
         if (ciphers == null) {
             ciphers(Http2SecurityUtil.CIPHERS, true);
         }
@@ -140,19 +141,19 @@ public class NettySslContextBuilder {
         return clientAuthentication;
     }
 
-    public final NettySslContextBuilder clientAuthentication(@Nullable ClientAuthentication clientAuthentication) {
+    public final @NonNull NettySslContextBuilder clientAuthentication(@Nullable ClientAuthentication clientAuthentication) {
         this.clientAuthentication = clientAuthentication;
         return this;
     }
 
-    protected TrustManagerFactory createTrustManagerFactory() throws Exception {
+    protected @NonNull TrustManagerFactory createTrustManagerFactory() throws Exception {
         TrustManagerFactory trustManagerFactory = TrustManagerFactory
             .getInstance(TrustManagerFactory.getDefaultAlgorithm());
         trustManagerFactory.init(trustStore);
         return trustManagerFactory;
     }
 
-    protected KeyManagerFactory createKeyManagerFactory() throws Exception {
+    protected @NonNull KeyManagerFactory createKeyManagerFactory() throws Exception {
         KeyManagerFactory keyManagerFactory;
         if (openssl && keyStore != null) {
             // I don't understand why, but netty uses this logic, so we will too.
@@ -168,7 +169,7 @@ public class NettySslContextBuilder {
         return keyManagerFactory;
     }
 
-    public SslContext buildTcp() throws Exception {
+    public @NonNull SslContext buildTcp() throws Exception {
         SslContextBuilder sslBuilder;
         if (server) {
             sslBuilder = SslContextBuilder.forServer(createKeyManagerFactory());
@@ -200,7 +201,7 @@ public class NettySslContextBuilder {
         return sslBuilder.build();
     }
 
-    public QuicSslContext buildHttp3() throws Exception {
+    public @NonNull QuicSslContext buildHttp3() throws Exception {
         QuicSslContextBuilder sslBuilder;
         if (server) {
             sslBuilder = QuicSslContextBuilder.forServer(createKeyManagerFactory(), keyPassword);
