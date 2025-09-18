@@ -104,34 +104,74 @@ public class SelfSignedCertificateProvider implements CertificateProvider {
             return name;
         }
 
+        /**
+         * Algorithm used to generate the self-signed key pair and certificate (e.g. RSA, EC). Controls the cryptographic
+         * parameters used by {@link io.netty.pkitesting.CertificateBuilder}. Defaults to {@code rsa4096}.
+         * @return the certificate generation algorithm
+         */
         public @NonNull CertificateBuilder.Algorithm getAlgorithm() {
             return algorithm;
         }
 
+        /**
+         * Algorithm used to generate the self-signed key pair and certificate (e.g. RSA, EC). Controls the cryptographic
+         * parameters used by {@link io.netty.pkitesting.CertificateBuilder}. Defaults to {@code rsa4096}.
+         * @param algorithm the certificate generation algorithm
+         */
         public void setAlgorithm(@NonNull CertificateBuilder.Algorithm algorithm) {
             this.algorithm = algorithm;
         }
 
+        /**
+         * X.500 subject distinguished name for the generated certificate, for example {@code CN=localhost}.
+         * This value is passed to the certificate builder and becomes the certificate's subject. Defaults to {@code CN=localhost}.
+         * @return the subject DN for the certificate
+         */
         public @NonNull String getSubject() {
             return subject;
         }
 
+        /**
+         * X.500 subject distinguished name for the generated certificate, for example {@code CN=localhost}.
+         * This value is passed to the certificate builder and becomes the certificate's subject. Defaults to {@code CN=localhost}.
+         * @param subject the subject DN for the certificate
+         */
         public void setSubject(@NonNull String subject) {
             this.subject = subject;
         }
 
+        /**
+         * Interval at which a new self-signed certificate is generated and emitted. Used to schedule periodic
+         * regeneration via a fixed-rate task so updated material is picked up automatically. Defaults to 1 day.
+         * @return the certificate regeneration interval
+         */
         public @NonNull Duration getUpdateInterval() {
             return updateInterval;
         }
 
+        /**
+         * Interval at which a new self-signed certificate is generated and emitted. Used to schedule periodic
+         * regeneration via a fixed-rate task so updated material is picked up automatically. Defaults to 1 day.
+         * @param updateInterval the certificate regeneration interval
+         */
         public void setUpdateInterval(@NonNull Duration updateInterval) {
             this.updateInterval = updateInterval;
         }
 
+        /**
+         * Validity period of the generated certificate. The certificate's {@code notAfter} is set to now plus this
+         * duration when building the self-signed certificate. Defaults to 7 days.
+         * @return the certificate lifetime
+         */
         public @NonNull Duration getLifetime() {
             return lifetime;
         }
 
+        /**
+         * Validity period of the generated certificate. The certificate's {@code notAfter} is set to now plus this
+         * duration when building the self-signed certificate. Defaults to 7 days.
+         * @param lifetime the certificate lifetime
+         */
         public void setLifetime(@NonNull Duration lifetime) {
             this.lifetime = lifetime;
         }

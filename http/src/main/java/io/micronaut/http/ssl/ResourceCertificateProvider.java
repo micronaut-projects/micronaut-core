@@ -65,10 +65,22 @@ public final class ResourceCertificateProvider implements CertificateProvider {
             super(name);
         }
 
+        /**
+         * Micronaut resource location of the certificate material to load, for example {@code classpath:certs/server.p12}
+         * or {@code file:/etc/ssl/server.pem}. The actual format and password handling are controlled by the common
+         * properties in {@link AbstractCertificateFileConfig} (e.g. {@code format}, {@code password}).
+         * @return the resource location of the certificate material
+         */
         public @NonNull String getResource() {
             return resource;
         }
 
+        /**
+         * Micronaut resource location of the certificate material to load, for example {@code classpath:certs/server.p12}
+         * or {@code file:/etc/ssl/server.pem}. The actual format and password handling are controlled by the common
+         * properties in {@link AbstractCertificateFileConfig} (e.g. {@code format}, {@code password}).
+         * @param resource the resource location of the certificate material
+         */
         public void setResource(@NonNull String resource) {
             this.resource = resource;
         }

@@ -1572,20 +1572,49 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
             this.ssl = ssl;
         }
 
+        /**
+         * Name of a {@link io.micronaut.http.ssl.CertificateProvider} bean that supplies the private key and certificate chain
+         * for this listener's SSL context. When set, Micronaut resolves the named provider and subscribes to its keystore updates.
+         * If not set, the global SSL configuration (e.g. {@link io.micronaut.http.ssl.SslConfiguration#getKeyName()}) or legacy
+         * keystore properties may be used instead.
+         * @return the name of the certificate provider for key material on this listener or {@code null}
+         */
         @Nullable
         public String getKeyName() {
             return keyName;
         }
 
+        /**
+         * Name of a {@link io.micronaut.http.ssl.CertificateProvider} bean that supplies the private key and certificate chain
+         * for this listener's SSL context. When set, Micronaut resolves the named provider and subscribes to its keystore updates.
+         * If not set, the global SSL configuration (e.g. {@link io.micronaut.http.ssl.SslConfiguration#getKeyName()}) or legacy
+         * keystore properties may be used instead.
+         * @param keyName the name of the certificate provider for key material on this listener or {@code null}
+         */
         public void setKeyName(@Nullable String keyName) {
             this.keyName = keyName;
         }
 
+        /**
+         * Name of a {@link io.micronaut.http.ssl.CertificateProvider} bean that supplies the trust material (trusted certificates)
+         * for this listener's SSL context. When set, Micronaut resolves the named provider and subscribes to its keystore updates.
+         * If not set, the global SSL configuration (e.g. {@link io.micronaut.http.ssl.SslConfiguration#getTrustName()}) or legacy
+         * trust store properties may be used instead.
+         * @return the name of the certificate provider for trust material on this listener or {@code null}
+         */
+        @Nullable
         public String getTrustName() {
             return trustName;
         }
 
-        public void setTrustName(String trustName) {
+        /**
+         * Name of a {@link io.micronaut.http.ssl.CertificateProvider} bean that supplies the trust material (trusted certificates)
+         * for this listener's SSL context. When set, Micronaut resolves the named provider and subscribes to its keystore updates.
+         * If not set, the global SSL configuration (e.g. {@link io.micronaut.http.ssl.SslConfiguration#getTrustName()}) or legacy
+         * trust store properties may be used instead.
+         * @param trustName the name of the certificate provider for trust material on this listener or {@code null}
+         */
+        public void setTrustName(@Nullable String trustName) {
             this.trustName = trustName;
         }
 

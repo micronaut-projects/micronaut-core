@@ -36,18 +36,40 @@ abstract class AbstractCertificateFileConfig implements Named {
         return name;
     }
 
+    /**
+     * Explicit format of the certificate material. If not set, Micronaut will first try to load
+     * the file as a key store (JKS/PKCS12) and, if that fails, as PEM. A separate
+     * {@code certificatePath} can only be used with PEM.
+     *
+     * @return the certificate file format or {@code null} to auto-detect
+     */
     public @Nullable FileCertificateProvider.Format getFormat() {
         return format;
     }
 
+    /**
+     * Explicit format of the certificate material. If not set, Micronaut will first try to load
+     * the file as a key store (JKS/PKCS12) and, if that fails, as PEM. A separate
+     * {@code certificatePath} can only be used with PEM.
+     *
+     * @param format the certificate file format or {@code null} to auto-detect
+     */
     public void setFormat(@Nullable FileCertificateProvider.Format format) {
         this.format = format;
     }
 
+    /**
+     * Password used to open the key store (JKS/PKCS12) or decrypt PEM private keys, if required.
+     * @return the password or {@code null} if not required
+     */
     public @Nullable String getPassword() {
         return password;
     }
 
+    /**
+     * Password used to open the key store (JKS/PKCS12) or decrypt PEM private keys, if required.
+     * @param password the password or {@code null} if not required
+     */
     public void setPassword(@Nullable String password) {
         this.password = password;
     }

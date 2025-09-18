@@ -250,34 +250,76 @@ public final class FileCertificateProvider implements CertificateProvider {
             super(name);
         }
 
+        /**
+         * Path to the main certificate file to load. For JKS/PKCS12 this is a key store (optionally protected by {@code password}).
+         * For PEM this file may contain a private key and optionally certificates; when it only contains a private key, the certificate
+         * chain can be supplied via {@code certificatePath}. Reload behavior is controlled by {@code refreshMode}/{@code refreshInterval}.
+         * @return the path to the certificate file
+         */
         public @NonNull Path getPath() {
             return path;
         }
 
+        /**
+         * Path to the main certificate file to load. For JKS/PKCS12 this is a key store (optionally protected by {@code password}).
+         * For PEM this file may contain a private key and optionally certificates; when it only contains a private key, the certificate
+         * chain can be supplied via {@code certificatePath}. Reload behavior is controlled by {@code refreshMode}/{@code refreshInterval}.
+         * @param path the path to the certificate file
+         */
         public void setPath(@NonNull Path path) {
             this.path = path;
         }
 
+        /**
+         * Optional path to a separate PEM-encoded certificate chain. Only supported when the {@code format} is {@code PEM}.
+         * When set, the main file at {@code path} must contain only the private key.
+         * @return the path to the PEM certificate chain or {@code null}
+         */
         public @Nullable Path getCertificatePath() {
             return certificatePath;
         }
 
+        /**
+         * Optional path to a separate PEM-encoded certificate chain. Only supported when the {@code format} is {@code PEM}.
+         * When set, the main file at {@code path} must contain only the private key.
+         * @param certificatePath the path to the PEM certificate chain or {@code null}
+         */
         public void setCertificatePath(@Nullable Path certificatePath) {
             this.certificatePath = certificatePath;
         }
 
+        /**
+         * Strategy for reloading the certificate file. {@code NONE}: load once. {@code FILE_WATCHER}: watch the directory and reload on changes.
+         * {@code SCHEDULER}: periodically reload. {@code FILE_WATCHER_OR_SCHEDULER}: use a watcher when supported, otherwise fall back to scheduled reloads.
+         * @return the refresh strategy
+         */
         public @NonNull RefreshMode getRefreshMode() {
             return refreshMode;
         }
 
+        /**
+         * Strategy for reloading the certificate file. {@code NONE}: load once. {@code FILE_WATCHER}: watch the directory and reload on changes.
+         * {@code SCHEDULER}: periodically reload. {@code FILE_WATCHER_OR_SCHEDULER}: use a watcher when supported, otherwise fall back to scheduled reloads.
+         * @param refreshMode the refresh strategy
+         */
         public void setRefreshMode(@NonNull RefreshMode refreshMode) {
             this.refreshMode = refreshMode;
         }
 
+        /**
+         * Interval used for scheduled reloads when the refresh mode uses a scheduler or when file watching is not available and a scheduled
+         * fallback is used.
+         * @return the refresh interval
+         */
         public @NonNull Duration getRefreshInterval() {
             return refreshInterval;
         }
 
+        /**
+         * Interval used for scheduled reloads when the refresh mode uses a scheduler or when file watching is not available and a scheduled
+         * fallback is used.
+         * @param refreshInterval the refresh interval
+         */
         public void setRefreshInterval(@NonNull Duration refreshInterval) {
             this.refreshInterval = refreshInterval;
         }
