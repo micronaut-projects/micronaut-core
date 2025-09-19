@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.netty;
 
+import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.ssl.ClientAuthentication;
@@ -32,6 +33,7 @@ import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslProvider;
 import io.netty.handler.ssl.SupportedCipherSuiteFilter;
+import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.TrustManagerFactory;
@@ -55,6 +57,7 @@ public class NettySslContextBuilder {
     private String keyPassword;
     @Nullable
     private KeyStore trustStore;
+    private boolean trustAll;
 
     private boolean openssl = false;
     @Nullable
@@ -153,6 +156,28 @@ public class NettySslContextBuilder {
      */
     public final @NonNull NettySslContextBuilder trustStore(@Nullable KeyStore trustStore) {
         this.trustStore = trustStore;
+        return this;
+    }
+
+    /**
+     * Whether to trust all certificates instead of relying on the trust store.
+     *
+     * @return {@code true} to trust all certificates
+     */
+    protected final boolean trustAll() {
+        return trustAll;
+    }
+
+    /**
+     * Whether to trust all certificates instead of relying on the trust store.
+     * <b>This is insecure, so handle with care.</b>
+     *
+     * @param trustAll {@code true} to trust all certificates
+     * @return this builder
+     */
+    @NonNull
+    public final NettySslContextBuilder trustAll(boolean trustAll) {
+        this.trustAll = trustAll;
         return this;
     }
 
@@ -259,6 +284,12 @@ public class NettySslContextBuilder {
      * @return initialized trust manager factory
      */
     protected @NonNull TrustManagerFactory createTrustManagerFactory() throws Exception {
+        if (trustAll) {
+            if (trustStore != null) {
+                throw new ConfigurationException("If you want to trust all certificates, please don't also specify a trust store");
+            }
+            return InsecureTrustManagerFactory.INSTANCE;
+        }
         TrustManagerFactory trustManagerFactory = TrustManagerFactory
             .getInstance(TrustManagerFactory.getDefaultAlgorithm());
         trustManagerFactory.init(trustStore);

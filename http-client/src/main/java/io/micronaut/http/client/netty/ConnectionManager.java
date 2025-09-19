@@ -38,6 +38,7 @@ import io.micronaut.http.netty.NettySslContextBuilder;
 import io.micronaut.http.netty.SslContextAutoLoader;
 import io.micronaut.http.netty.SslContextHolder;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
+import io.micronaut.http.ssl.AbstractClientSslConfiguration;
 import io.micronaut.http.ssl.CertificateProvider;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.websocket.exceptions.WebSocketSessionException;
@@ -1840,6 +1841,12 @@ public class ConnectionManager {
                 builder.alpnProtocols(List.of(httpVersion.getAlpnSupportedProtocols()));
             } else {
                 builder.alpnProtocols(null);
+            }
+            if (sslConfiguration() instanceof AbstractClientSslConfiguration acsc && acsc.isInsecureTrustAllCertificates()) {
+                if (log.isWarnEnabled()) {
+                    log.warn("HTTP Client is configured to trust all certificates ('insecure-trust-all-certificates' is set to true). Trusting all certificates is not secure and should not be used in production.");
+                }
+                builder.trustAll(true);
             }
             return builder;
         }

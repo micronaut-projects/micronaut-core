@@ -51,6 +51,26 @@ public class SelfSignedCertificateProviderTest {
         }
     }
 
+    @Test
+    public void mtlsInsecure() {
+        try (EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class, Map.of(
+            "spec.name", "SelfSignedCertificateProviderTest",
+            "micronaut.certificate.self-signed.cert-a", "",
+            "micronaut.certificate.self-signed.cert-b.subject", "CN=foo",
+            "micronaut.ssl.enabled", true,
+            "micronaut.server.ssl.port", 0,
+            "micronaut.server.ssl.key-name", "cert-a",
+            "micronaut.server.ssl.trust-name", "cert-b",
+            "micronaut.server.ssl.client-authentication", "need",
+            "micronaut.http.client.ssl.key-name", "cert-b",
+            "micronaut.http.client.ssl.insecure-trust-all-certificates", true
+        ));
+             HttpClient client = server.getApplicationContext().createBean(HttpClient.class, server.getURI())) {
+
+            assertEquals("CN=foo", client.toBlocking().retrieve("/mtls"));
+        }
+    }
+
     @Controller
     @Requires(property = "spec.name", value = "SelfSignedCertificateProviderTest")
     static class MyCtrl {
