@@ -1514,6 +1514,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          * @param port The port to bind to
          * @param ssl Whether to enable SSL
          * @param keyName Optional certificate name to use
+         * @param trustName Optional trust store name to use
          * @return The configuration with the given settings
          */
         @Internal

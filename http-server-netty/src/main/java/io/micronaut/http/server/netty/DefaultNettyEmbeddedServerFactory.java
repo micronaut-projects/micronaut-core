@@ -110,6 +110,8 @@ public class DefaultNettyEmbeddedServerFactory
      * @param eventLoopGroupFactory The event loop group factory
      * @param eventLoopGroupRegistry The event loop group registry
      * @param webSocketUpgradeHandlerFactory An optional websocket integration
+     * @param sslFactory The factory for the server SSL builder
+     * @param certificateProviders The certificate provider bean for named lookup
      */
     protected DefaultNettyEmbeddedServerFactory(ApplicationContext applicationContext,
                                                 RouteExecutor routeExecutor,
@@ -120,7 +122,9 @@ public class DefaultNettyEmbeddedServerFactory
                                                 HttpCompressionStrategy httpCompressionStrategy,
                                                 EventLoopGroupFactory eventLoopGroupFactory,
                                                 EventLoopGroupRegistry eventLoopGroupRegistry,
-                                                @Nullable WebSocketUpgradeHandlerFactory webSocketUpgradeHandlerFactory, NettyServerSslFactory sslFactory, BeanProvider<CertificateProvider> certificateProviders) {
+                                                @Nullable WebSocketUpgradeHandlerFactory webSocketUpgradeHandlerFactory,
+                                                NettyServerSslFactory sslFactory,
+                                                BeanProvider<CertificateProvider> certificateProviders) {
         this.applicationContext = applicationContext;
         this.messageBodyHandlerRegistry = messageBodyHandlerRegistry;
         this.requestArgumentSatisfier = routeExecutor.getRequestArgumentSatisfier();
