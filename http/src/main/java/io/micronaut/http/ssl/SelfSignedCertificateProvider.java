@@ -38,10 +38,16 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Certificate provider that creates self-signed certificates using netty-pkitesting.
+ *
+ * @author Jonas Konrad
+ * @since 4.10.0
+ */
 @EachBean(SelfSignedCertificateProvider.Config.class)
 @Requires(classes = X509Bundle.class)
 @BootstrapContextCompatible
-public class SelfSignedCertificateProvider implements CertificateProvider {
+public final class SelfSignedCertificateProvider implements CertificateProvider {
     private static final Logger LOG = LoggerFactory.getLogger(SelfSignedCertificateProvider.class);
 
     private final String name;
@@ -85,9 +91,12 @@ public class SelfSignedCertificateProvider implements CertificateProvider {
         return name;
     }
 
+    /**
+     * Certificate provider that creates self-signed certificates using netty-pkitesting.
+     */
     @EachProperty(CONFIG_PREFIX + ".self-signed")
     @BootstrapContextCompatible
-    public static class Config implements Named {
+    public static final class Config implements Named {
         private final String name;
 
         private CertificateBuilder.Algorithm algorithm = CertificateBuilder.Algorithm.rsa4096;

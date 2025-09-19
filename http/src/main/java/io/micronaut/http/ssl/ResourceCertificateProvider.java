@@ -28,6 +28,12 @@ import org.reactivestreams.Publisher;
 import java.io.InputStream;
 import java.security.KeyStore;
 
+/**
+ * Certificate provider that loads certificate material from a resource loader.
+ *
+ * @author Jonas Konrad
+ * @since 4.10.0
+ */
 @EachBean(ResourceCertificateProvider.Config.class)
 @BootstrapContextCompatible
 public final class ResourceCertificateProvider implements CertificateProvider {
@@ -56,9 +62,12 @@ public final class ResourceCertificateProvider implements CertificateProvider {
         return name;
     }
 
+    /**
+     * Configuration for resource-based certificate material. Supports JKS/PKCS12 and PEM.
+     */
     @EachProperty(CONFIG_PREFIX + ".resource")
     @BootstrapContextCompatible
-    public static class Config extends AbstractCertificateFileConfig {
+    public static final class Config extends AbstractCertificateFileConfig {
         private String resource;
 
         public Config(@Parameter @NonNull String name) {

@@ -258,13 +258,10 @@ public final class FileCertificateProvider implements CertificateProvider {
     /**
      * Configuration for file-based certificate material. Supports JKS/PKCS12 and PEM,
      * with optional automatic reloading.
-     *
-     * @author Jonas Konrad
-     * @since 4.10.0
      */
     @EachProperty(CONFIG_PREFIX + ".file")
     @BootstrapContextCompatible
-    public static class Config extends AbstractCertificateFileConfig {
+    public static final class Config extends AbstractCertificateFileConfig {
         @NonNull
         private Path path;
         @Nullable

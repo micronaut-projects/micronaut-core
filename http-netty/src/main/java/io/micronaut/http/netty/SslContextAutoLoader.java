@@ -29,6 +29,8 @@ import reactor.util.function.Tuples;
 
 import java.security.KeyStore;
 import java.util.List;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * Automatically loads and refreshes Netty SSL contexts from configured {@link CertificateProvider}s.
@@ -42,6 +44,7 @@ import java.util.List;
 @Internal
 public abstract class SslContextAutoLoader {
     private final Logger log;
+    private final ReadWriteLock rwLock = new ReentrantReadWriteLock();
 
     @Nullable
     private SslContextHolder current;
@@ -57,19 +60,24 @@ public abstract class SslContextAutoLoader {
         this.log = log;
     }
 
-    private synchronized void replace(@Nullable SslContextHolder holder, long gen) {
-        if (gen < this.generation) {
-            if (holder != null) {
-                holder.release();
+    private void replace(@Nullable SslContextHolder holder, long gen) {
+        rwLock.writeLock().lock();
+        try {
+            if (gen < this.generation) {
+                if (holder != null) {
+                    holder.release();
+                }
+                return;
             }
-            return;
-        }
-        assert gen == this.generation;
+            assert gen == this.generation;
 
-        if (current != null) {
-            current.release();
+            if (current != null) {
+                current.release();
+            }
+            current = holder;
+        } finally {
+            rwLock.writeLock().unlock();
         }
-        current = holder;
     }
 
     /**
@@ -78,11 +86,16 @@ public abstract class SslContextAutoLoader {
      * @return the retained holder, or {@code null} if no context is currently available
      */
     @Nullable
-    public final synchronized SslContextHolder takeRetained() {
-        if (current != null) {
-            current.retain();
+    public final SslContextHolder takeRetained() {
+        rwLock.readLock().lock();
+        try {
+            if (current != null) {
+                current.retain();
+            }
+            return current;
+        } finally {
+            rwLock.readLock().unlock();
         }
-        return current;
     }
 
     /**
@@ -91,7 +104,8 @@ public abstract class SslContextAutoLoader {
      */
     public final void clear() {
         Disposable d;
-        synchronized (this) {
+        rwLock.writeLock().lock();
+        try {
             d = refreshSslDisposable;
             refreshSslDisposable = null;
             if (current != null) {
@@ -99,6 +113,8 @@ public abstract class SslContextAutoLoader {
                 current = null;
             }
             generation++;
+        } finally {
+            rwLock.writeLock().unlock();
         }
         if (d != null) {
             d.dispose();
@@ -151,10 +167,13 @@ public abstract class SslContextAutoLoader {
     public final void autoLoad(@Nullable String keyName, @Nullable String trustName) {
         long gen;
         Disposable d;
-        synchronized (this) {
+        rwLock.writeLock().lock();
+        try {
             gen = ++generation;
             d = refreshSslDisposable;
             refreshSslDisposable = null;
+        } finally {
+            rwLock.writeLock().unlock();
         }
         if (d != null) {
             d.dispose();
@@ -179,12 +198,15 @@ public abstract class SslContextAutoLoader {
                 .subscribe(ts -> refreshSsl(null, ts, gen));
         }
         if (nextDisposable != null) {
-            synchronized (this) {
+            rwLock.writeLock().lock();
+            try {
                 if (generation == gen) {
                     refreshSslDisposable = nextDisposable;
                 } else {
                     nextDisposable.dispose();
                 }
+            } finally {
+                rwLock.writeLock().unlock();
             }
         }
     }

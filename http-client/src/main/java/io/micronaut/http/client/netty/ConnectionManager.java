@@ -1799,7 +1799,7 @@ public class ConnectionManager {
         }
     }
 
-    private class ClientContextWrapper extends SslContextAutoLoader {
+    private final class ClientContextWrapper extends SslContextAutoLoader {
         private final boolean ws;
 
         ClientContextWrapper(boolean ws) {

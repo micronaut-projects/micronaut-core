@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.ssl;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.Named;
@@ -26,7 +27,8 @@ import io.micronaut.core.naming.Named;
  * @author Jonas Konrad
  * @since 4.10.0
  */
-abstract class AbstractCertificateFileConfig implements Named {
+@Internal
+abstract sealed class AbstractCertificateFileConfig implements Named permits FileCertificateProvider.Config, ResourceCertificateProvider.Config {
     final String name;
 
     @Nullable
