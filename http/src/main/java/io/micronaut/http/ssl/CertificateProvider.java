@@ -34,6 +34,10 @@ public interface CertificateProvider extends Named {
 
     /**
      * Publisher that emits the key store containing private key and/or certificates.
+     * <b>To avoid weird initialization issues, it is highly recommended to return a publisher here
+     * that produces a key store immediately upon subscription, on the subscribing thread. This
+     * avoids race conditions where e.g. a server starts up before a key store is available, and
+     * there is a short interval where SSL connections will fail.</b>
      *
      * @return a publisher of {@link KeyStore} updates
      */
