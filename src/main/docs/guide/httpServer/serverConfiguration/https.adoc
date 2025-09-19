@@ -19,6 +19,10 @@ micronaut:
 
 TIP: By default, a Micronaut application with HTTPS support starts on port `8443` but you can change the port with the property `micronaut.server.ssl.port`.
 
+For generating self-signed certificates, the Micronaut HTTP server will use netty-pkitesting, which requires this dependency:
+
+dependency:io.netty:netty-pkitesting[scope="runtimeOnly"]
+
 WARNING: This configuration will generate a warning in the browser.
 
 == Using a valid X.509 certificate (PEM)

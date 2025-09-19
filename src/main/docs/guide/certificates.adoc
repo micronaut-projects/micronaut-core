@@ -68,7 +68,9 @@ For JKS/PKCS12, you can embed binary content via base64:.... For example: resour
 
 == Self-signed provider
 
-The self-signed provider generates temporary certificates.
+The self-signed provider generates temporary certificates. It requires the netty-pkitesting dependency:
+
+dependency:io.netty:netty-pkitesting[scope="runtimeOnly"]
 
 [configuration]
 ----
@@ -77,22 +79,22 @@ micronaut:
     enabled: true
   server:
     ssl:
-      key-name: cert-a
-      trust-name: cert-b
+      key-name: cert-server
+      trust-name: cert-client
       client-authentication: need
   http:
     client:
       ssl:
-        key-name: cert-b
-        trust-name: cert-a
+        key-name: cert-client
+        trust-name: cert-server
 
   certificate:
     self-signed:
-      # Enable provider "cert-a" with defaults (as in tests)
-      cert-a: {}
+      cert-server: {}
       # Second provider with a custom subject
-      cert-b:
+      cert-client:
         subject: "CN=foo"
 ----
 
 For per-listener SSL in Netty server, you can also set `key-name` and `trust-name` under `micronaut.server.netty.listeners.<listener>.ssl`.
+
