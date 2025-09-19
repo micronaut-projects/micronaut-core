@@ -27,14 +27,15 @@ import io.netty.util.ReferenceCountUtil;
  * {@link #release()} to ensure contexts are safely shared and swapped.
  *
  * @param sslContext TCP ssl context
- * @param quicSslContext QUIC ssl context
+ * @param quicSslContextObject QUIC ssl context. Type Object to avoid native-image issues when the
+ *                             class is missing
  * @author Jonas Konrad
  * @since 4.10.0
  */
 @Internal
 public record SslContextHolder(
     @Nullable SslContext sslContext,
-    @Nullable QuicSslContext quicSslContext
+    @Nullable Object quicSslContextObject
 ) {
     /**
      * Retain the underlying Netty contexts for safe reuse.
@@ -43,8 +44,8 @@ public record SslContextHolder(
         if (sslContext != null) {
             ReferenceCountUtil.retain(sslContext);
         }
-        if (quicSslContext != null) {
-            ReferenceCountUtil.retain(quicSslContext);
+        if (quicSslContextObject != null) {
+            ReferenceCountUtil.retain(quicSslContextObject);
         }
     }
 
@@ -55,8 +56,12 @@ public record SslContextHolder(
         if (sslContext != null) {
             ReferenceCountUtil.release(sslContext);
         }
-        if (quicSslContext != null) {
-            ReferenceCountUtil.release(quicSslContext);
+        if (quicSslContextObject != null) {
+            ReferenceCountUtil.release(quicSslContextObject);
         }
+    }
+
+    public QuicSslContext quicSslContext() {
+        return (QuicSslContext) quicSslContextObject;
     }
 }
