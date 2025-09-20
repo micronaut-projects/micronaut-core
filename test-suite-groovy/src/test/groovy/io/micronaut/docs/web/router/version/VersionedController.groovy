@@ -36,6 +36,11 @@ class VersionedController {
     String helloV2() {
         "helloV2"
     }
+
+    @Get(value = "/hello", version = "3") // <3>
+    String helloV3() {
+        "helloV3"
+    }
 // end::clazz[]
 
     @Version("2")

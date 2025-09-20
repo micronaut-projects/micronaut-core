@@ -17,6 +17,7 @@ package io.micronaut.http.annotation;
 
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.core.async.annotation.SingleResult;
+import io.micronaut.core.version.annotation.Version;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -82,6 +83,14 @@ public @interface Patch {
     @AliasFor(annotation = Produces.class, member = "value")
     @AliasFor(annotation = Consumes.class, member = "value")
     String[] processes() default {};
+
+    /**
+     * The version of method.
+     *
+     * @return version value
+     */
+    @AliasFor(annotation = Version.class, member = "value")
+    String[] version() default {};
 
     /**
      * Shortcut that allows setting both the {@link Consumes} and {@link Produces} single settings.

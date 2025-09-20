@@ -16,6 +16,7 @@
 package io.micronaut.http.annotation;
 
 import io.micronaut.context.annotation.AliasFor;
+import io.micronaut.core.version.annotation.Version;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -60,4 +61,12 @@ public @interface Trace {
     @AliasFor(annotation = HttpMethodMapping.class, member = "uris")
     @AliasFor(annotation = UriMapping.class, member = "uris")
     String[] uris() default {UriMapping.DEFAULT_URI};
+
+    /**
+     * The version of method.
+     *
+     * @return version value
+     */
+    @AliasFor(annotation = Version.class, member = "value")
+    String[] version() default {};
 }

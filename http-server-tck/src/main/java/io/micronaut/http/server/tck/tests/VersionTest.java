@@ -65,5 +65,10 @@ public class VersionTest {
         String pingV2() {
             return "pong v2";
         }
+
+        @Get(value = "/ping", version = "3")
+        String pingV3() {
+            return "pong v3";
+        }
     }
 }

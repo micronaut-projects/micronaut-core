@@ -16,6 +16,7 @@
 package io.micronaut.http.annotation;
 
 import io.micronaut.context.annotation.AliasFor;
+import io.micronaut.core.version.annotation.Version;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -68,4 +69,11 @@ public @interface Options {
     @AliasFor(annotation = Consumes.class, member = "value")
     String[] consumes() default {};
 
+    /**
+     * The version of method.
+     *
+     * @return version value
+     */
+    @AliasFor(annotation = Version.class, member = "value")
+    String[] version() default {};
 }

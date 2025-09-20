@@ -36,12 +36,11 @@ import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.server.cors.CrossOrigin;
 import io.micronaut.http.server.tck.CorsUtils;
 import io.micronaut.http.server.util.HttpHostResolver;
+import io.micronaut.http.tck.HttpResponseAssertion;
+import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.http.uri.UriBuilder;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
-import io.micronaut.http.tck.ServerUnderTest;
-import io.micronaut.http.tck.AssertionUtils;
-import io.micronaut.http.tck.HttpResponseAssertion;
 
 import java.io.IOException;
 import java.net.URI;
@@ -49,8 +48,10 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.function.BiConsumer;
 
+import static io.micronaut.http.server.tck.CorsUtils.assertCorsHeaders;
+import static io.micronaut.http.tck.AssertionUtils.assertDoesNotThrow;
+import static io.micronaut.http.tck.AssertionUtils.assertThrows;
 import static io.micronaut.http.tck.TestScenario.asserts;
-import static io.micronaut.http.server.tck.CorsUtils.*;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -70,7 +71,7 @@ public class CrossOriginTest {
     void crossOriginAnnotationWithMatchingOrigin() throws IOException {
         asserts(SPECNAME,
             preflight(UriBuilder.of("/foo").path("bar"), "https://foo.com", HttpMethod.GET),
-            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+            (server, request) -> assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .assertResponse(response -> {
                     assertCorsHeaders(response, "https://foo.com", HttpMethod.GET);
@@ -83,7 +84,7 @@ public class CrossOriginTest {
     void crossOriginAnnotationWithNoMatchingOrigin() throws IOException {
         asserts(SPECNAME,
             preflight(UriBuilder.of("/foo").path("bar"), "https://bar.com", HttpMethod.GET),
-            (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
+            (server, request) -> assertThrows(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.METHOD_NOT_ALLOWED)
                 .assertResponse(CorsUtils::assertCorsHeadersNotPresent)
                 .build()));
@@ -94,7 +95,7 @@ public class CrossOriginTest {
         asserts(SPECNAME,
             preflight(UriBuilder.of("/foo").path("all"), "https://foo.com", HttpMethod.GET)
                 .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, "foo"),
-            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+            (server, request) -> assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .assertResponse(response -> {
                     assertCorsHeaders(response, "https://foo.com", HttpMethod.GET);
@@ -108,7 +109,7 @@ public class CrossOriginTest {
         assertAll(
             () -> asserts(SPECNAME,
                 preflight(UriBuilder.of("/methods").path("getit"), "https://www.google.com", HttpMethod.GET),
-                (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                (server, request) -> assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                     .status(HttpStatus.OK)
                     .assertResponse(response -> {
                         assertCorsHeaders(response, "https://www.google.com", HttpMethod.GET);
@@ -117,7 +118,7 @@ public class CrossOriginTest {
                     .build())),
             () -> asserts(SPECNAME,
                 preflight(UriBuilder.of("/methods").path("postit").path("id"), "https://www.google.com", HttpMethod.POST),
-                (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                (server, request) -> assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                     .status(HttpStatus.OK)
                     .assertResponse(response -> {
                         assertCorsHeaders(response, "https://www.google.com", HttpMethod.POST);
@@ -126,7 +127,7 @@ public class CrossOriginTest {
                     .build())),
             () -> asserts(SPECNAME,
                 preflight(UriBuilder.of("/methods").path("deleteit").path("id"), "https://www.google.com", HttpMethod.DELETE),
-                (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
+                (server, request) -> assertThrows(server, request, HttpResponseAssertion.builder()
                     .status(HttpStatus.FORBIDDEN)
                     .assertResponse(CorsUtils::assertCorsHeadersNotPresent)
                     .build()))
@@ -154,7 +155,7 @@ public class CrossOriginTest {
     }
 
     private static BiConsumer<ServerUnderTest, HttpRequest<?>> happyPathAssertion(String origin) {
-        return (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+        return (server, request) -> assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
             .status(HttpStatus.OK)
             .assertResponse(response -> {
                 assertCorsHeaders(response, origin, HttpMethod.GET);
@@ -167,7 +168,7 @@ public class CrossOriginTest {
     void allowedOriginsRegexFailure() throws IOException {
         asserts(SPECNAME,
             preflight(UriBuilder.of("/allowedoriginsregex").path("foobar"), "https://foo.com", HttpMethod.GET),
-            (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
+            (server, request) -> assertThrows(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.METHOD_NOT_ALLOWED)
                 .assertResponse(CorsUtils::assertCorsHeadersNotPresent)
                 .build()));
@@ -178,7 +179,7 @@ public class CrossOriginTest {
         asserts(SPECNAME,
             preflight(UriBuilder.of("/allowedheaders").path("bar"), "https://foo.com", HttpMethod.GET)
                 .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, HttpHeaders.AUTHORIZATION + "," + HttpHeaders.CONTENT_TYPE),
-            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+            (server, request) -> assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .assertResponse(response -> {
                     assertCorsHeaders(response, "https://foo.com", HttpMethod.GET);
@@ -196,7 +197,7 @@ public class CrossOriginTest {
         asserts(SPECNAME,
             preflight(UriBuilder.of("/allowedheaders").path("bar"), "https://foo.com", HttpMethod.GET)
                 .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, "foo"),
-            (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
+            (server, request) -> assertThrows(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.FORBIDDEN)
                 .assertResponse(CorsUtils::assertCorsHeadersNotPresent)
                 .build()));
@@ -210,7 +211,7 @@ public class CrossOriginTest {
     void defaultAccessControlExposeHeaderValueIsNotSet() throws IOException {
         asserts(SPECNAME,
             preflight(UriBuilder.of("/exposedheaders").path("foo"), "https://foo.com", HttpMethod.GET),
-            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+            (server, request) -> assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .assertResponse(response -> {
                     assertCorsHeaders(response, "https://foo.com", HttpMethod.GET);
@@ -229,7 +230,7 @@ public class CrossOriginTest {
             Map.of("micronaut.server.cors.single-header", StringUtils.TRUE),
             preflight(UriBuilder.of("/exposedheaders").path("bar"), "https://foo.com", HttpMethod.GET)
                 .header(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS, "foo"),
-            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+            (server, request) -> assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .assertResponse(response -> {
                     assertCorsHeaders(response, "https://foo.com", HttpMethod.GET);
@@ -247,7 +248,7 @@ public class CrossOriginTest {
     void defaultAccessControlAllowCredentialsValueIsNotSet() throws IOException {
         asserts(SPECNAME,
             preflight(UriBuilder.of("/credentials").path("foo"), "https://foo.com", HttpMethod.GET),
-            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+            (server, request) -> assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .assertResponse(response -> {
                     assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, false);
@@ -264,7 +265,7 @@ public class CrossOriginTest {
     void defaultAccessControlAllowCredentialsValueIsSet() throws IOException {
         asserts(SPECNAME,
             preflight(UriBuilder.of("/credentials").path("bar"), "https://foo.com", HttpMethod.GET),
-            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+            (server, request) -> assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .assertResponse(response -> {
                     assertCorsHeaders(response, "https://foo.com", HttpMethod.GET);
@@ -281,14 +282,14 @@ public class CrossOriginTest {
     @Test
     void defaultAccessControlAllowPrivateNetworkValueIsSet() throws IOException {
         asserts(SPECNAME,
-                preflight(UriBuilder.of("/privateNetwork").path("foo"), "https://foo.com", HttpMethod.GET),
-                (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
-                        .status(HttpStatus.OK)
-                        .assertResponse(response -> {
-                            assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, false, false);
-                            assertFalse(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK));
-                        })
-                        .build()));
+            preflight(UriBuilder.of("/privateNetwork").path("foo"), "https://foo.com", HttpMethod.GET),
+            (server, request) -> assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .assertResponse(response -> {
+                    assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, false, false);
+                    assertFalse(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK));
+                })
+                .build()));
     }
 
     /**
@@ -298,15 +299,15 @@ public class CrossOriginTest {
     @Test
     void accessControlAllowPrivateNetworkValueIsSet() throws IOException {
         asserts(SPECNAME,
-                preflight(UriBuilder.of("/privateNetwork").path("bar"), "https://foo.com", HttpMethod.GET, true),
-                (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
-                        .status(HttpStatus.OK)
-                        .assertResponse(response -> {
-                            assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, false, true);
-                            assertTrue(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK));
-                            assertEquals("true", response.getHeaders().get(HttpHeaders.ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK));
-                        })
-                        .build()));
+            preflight(UriBuilder.of("/privateNetwork").path("bar"), "https://foo.com", HttpMethod.GET, true),
+            (server, request) -> assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .assertResponse(response -> {
+                    assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, false, true);
+                    assertTrue(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK));
+                    assertEquals("true", response.getHeaders().get(HttpHeaders.ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK));
+                })
+                .build()));
     }
 
     /**
@@ -317,7 +318,7 @@ public class CrossOriginTest {
     void defaultAccessControlMaxAgeValueIsSet() throws IOException {
         asserts(SPECNAME,
             preflight(UriBuilder.of("/maxage").path("foo"), "https://foo.com", HttpMethod.GET),
-            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+            (server, request) -> assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .assertResponse(response -> {
                     assertCorsHeaders(response, "https://foo.com", HttpMethod.GET);
@@ -335,7 +336,7 @@ public class CrossOriginTest {
     void accessControlMaxAgeValueIsSet() throws IOException {
         asserts(SPECNAME,
             preflight(UriBuilder.of("/maxage").path("bar"), "https://foo.com", HttpMethod.GET),
-            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+            (server, request) -> assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .assertResponse(response -> {
                     assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, "1000");
@@ -353,18 +354,28 @@ public class CrossOriginTest {
                 // V1 version/common
                 config.put("micronaut.router.versioning.default-version", 1);
                 asserts(SPECNAME, config,
-                preflight(UriBuilder.of("/version").path("common"), "https://foo.com", HttpMethod.GET),
-                (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
-                    .status(HttpStatus.OK)
-                    .assertResponse(response -> assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, false))
-                    .build()));
+                    preflight(UriBuilder.of("/version").path("common"), "https://foo.com", HttpMethod.GET),
+                    (server, request) -> assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                        .status(HttpStatus.OK)
+                        .assertResponse(response -> assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, false))
+                        .build()));
             },
             () -> {
                 // V2 version/common
                 config.put("micronaut.router.versioning.default-version", 2);
                 asserts(SPECNAME, config,
                     preflight(UriBuilder.of("/version").path("common"), "https://foo.com", HttpMethod.GET),
-                    (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                    (server, request) -> assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                        .status(HttpStatus.OK)
+                        .assertResponse(response -> assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, false))
+                        .build()));
+            },
+            () -> {
+                // V3 version/common
+                config.put("micronaut.router.versioning.default-version", 3);
+                asserts(SPECNAME, config,
+                    preflight(UriBuilder.of("/version").path("common"), "https://foo.com", HttpMethod.GET),
+                    (server, request) -> assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                         .status(HttpStatus.OK)
                         .assertResponse(response -> assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, false))
                         .build()));
@@ -374,7 +385,17 @@ public class CrossOriginTest {
                 config.put("micronaut.router.versioning.default-version", 2);
                 asserts(SPECNAME, config,
                     preflight(UriBuilder.of("/version").path("new"), "https://foo.com", HttpMethod.GET),
-                    (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                    (server, request) -> assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                        .status(HttpStatus.OK)
+                        .assertResponse(response -> assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, false))
+                        .build()));
+            },
+            () -> {
+                // V3 version/new
+                config.put("micronaut.router.versioning.default-version", 3);
+                asserts(SPECNAME, config,
+                    preflight(UriBuilder.of("/version").path("new"), "https://foo.com", HttpMethod.GET),
+                    (server, request) -> assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                         .status(HttpStatus.OK)
                         .assertResponse(response -> assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, false))
                         .build()));
@@ -388,7 +409,7 @@ public class CrossOriginTest {
         asserts(SPECNAME, config,
             preflight(UriBuilder.of("/version").path("new"), "https://foo.com", HttpMethod.GET)
                 .header("Access-Control-Request-Headers", "x-api-version"),
-            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+            (server, request) -> assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .assertResponse(response -> assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, false))
                 .build()));
@@ -401,7 +422,7 @@ public class CrossOriginTest {
         asserts(SPECNAME, config,
             preflight(UriBuilder.of("/version").path("new"), "https://foo.com", HttpMethod.GET)
                 .header("Access-Control-Request-Headers", "x-api-version"),
-            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+            (server, request) -> assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .assertResponse(response -> assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, false))
                 .build()));
@@ -413,7 +434,7 @@ public class CrossOriginTest {
         config.put("micronaut.router.versioning.default-version", 1);
         asserts(SPECNAME, config,
             preflight(UriBuilder.of("/version").path("new"), "https://foo.com", HttpMethod.GET),
-            (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
+            (server, request) -> assertThrows(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.NOT_FOUND)
                 .assertResponse(CorsUtils::assertCorsHeadersNotPresent)
                 .build()));
@@ -507,7 +528,7 @@ public class CrossOriginTest {
     @Controller("/methods")
     @CrossOrigin(
         allowedOrigins = "https://www.google.com",
-        allowedMethods = { HttpMethod.GET, HttpMethod.POST }
+        allowedMethods = {HttpMethod.GET, HttpMethod.POST}
     )
     static class AllowedMethods {
         @Produces(MediaType.TEXT_PLAIN)
@@ -532,7 +553,7 @@ public class CrossOriginTest {
     @Controller("/allowedheaders")
     @CrossOrigin(
         value = "https://foo.com",
-        allowedHeaders = { HttpHeaders.CONTENT_TYPE, HttpHeaders.AUTHORIZATION }
+        allowedHeaders = {HttpHeaders.CONTENT_TYPE, HttpHeaders.AUTHORIZATION}
     )
     static class AllowedHeaders {
         @Produces(MediaType.TEXT_PLAIN)
@@ -547,7 +568,7 @@ public class CrossOriginTest {
     static class ExposedHeaders {
         @CrossOrigin(
             value = "https://foo.com",
-            exposedHeaders = { "Content-Encoding", "Kuma-Revision" }
+            exposedHeaders = {"Content-Encoding", "Kuma-Revision"}
         )
         @Produces(MediaType.TEXT_PLAIN)
         @Get("/bar")
@@ -592,8 +613,8 @@ public class CrossOriginTest {
     @Controller("/privateNetwork")
     static class PrivateNetwork {
         @CrossOrigin(
-                value = "https://foo.com",
-                allowPrivateNetwork = false
+            value = "https://foo.com",
+            allowPrivateNetwork = false
         )
         @Produces(MediaType.TEXT_PLAIN)
         @Get("/foo")
@@ -602,7 +623,7 @@ public class CrossOriginTest {
         }
 
         @CrossOrigin(
-                value = "https://foo.com"
+            value = "https://foo.com"
         )
         @Produces(MediaType.TEXT_PLAIN)
         @Get("/bar")
@@ -640,23 +661,35 @@ public class CrossOriginTest {
     static class ApiVersionController {
         @Version("1")
         @Produces(MediaType.TEXT_PLAIN)
-        @Get(value = "common")
+        @Get("common")
         public String commonV1() {
-            return "This endpoint exists both in V1 and V2";
+            return "This endpoint exists both in V1 and V2 and V3";
         }
 
         @Version("2")
         @Produces(MediaType.TEXT_PLAIN)
-        @Get(value = "common")
+        @Get("common")
         public String commonV2() {
-            return "This endpoint exists both in V1 and V2";
+            return "This endpoint exists both in V1 and V2 and V3";
+        }
+
+        @Produces(MediaType.TEXT_PLAIN)
+        @Get(value = "common", version = "3")
+        public String commonV3() {
+            return "This endpoint exists both in V1 and V2 and V3";
         }
 
         @Version("2")
         @Produces(MediaType.TEXT_PLAIN)
-        @Get(value = "new")
+        @Get("new")
         public String newV2() {
             return "This is a new endpoint in V2 of the API";
+        }
+
+        @Produces(MediaType.TEXT_PLAIN)
+        @Get(value = "new", version = "3")
+        public String newV3() {
+            return "This is a new endpoint in V3 of the API";
         }
     }
 
