@@ -17,10 +17,10 @@ package io.micronaut.http.netty.channel.loom;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.scheduling.LoomSupport;
 import io.netty.util.AttributeMap;
 import io.netty.util.concurrent.EventExecutor;
-
-import java.util.concurrent.Executor;
 
 /**
  * Scheduler for a virtual thread, with metadata. Does not change throughout a virtual thread's
@@ -31,8 +31,8 @@ import java.util.concurrent.Executor;
  * @author Jonas Konrad
  */
 @Internal
-public sealed interface EventLoopVirtualThreadScheduler extends Executor
-    permits LoomCarrierGroup.Runner, LoomCarrierGroup.StickyScheduler {
+public sealed interface EventLoopVirtualThreadScheduler
+    permits LoomCarrierGroup.IoScheduler, LoomCarrierGroup.Runner, LoomCarrierGroup.StickyScheduler {
 
     /**
      * Get a shared {@link AttributeMap} for this scheduler.
@@ -49,4 +49,35 @@ public sealed interface EventLoopVirtualThreadScheduler extends Executor
      */
     @NonNull
     EventExecutor eventLoop();
+
+    /**
+     * Get the virtual thread scheduler of the current thread, if available.
+     *
+     * @return The current scheduler or {@code null}
+     */
+    @Nullable
+    static EventLoopVirtualThreadScheduler current() {
+        if (LoomBranchSupport.isSupported()) {
+            if (!LoomSupport.isVirtual(Thread.currentThread())) {
+                return null;
+            }
+            if (LoomBranchSupport.currentScheduler() instanceof EventLoopVirtualThreadScheduler elvts) {
+                return elvts;
+            } else {
+                return null;
+            }
+        } else if (PrivateLoomSupport.isSupported()) {
+            Thread thread = Thread.currentThread();
+            if (!LoomSupport.isVirtual(thread)) {
+                return null;
+            }
+            if (PrivateLoomSupport.getScheduler(thread) instanceof EventLoopVirtualThreadScheduler elvts) {
+                return elvts;
+            } else {
+                return null;
+            }
+        } else {
+            return null;
+        }
+    }
 }

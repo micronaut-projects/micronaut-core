@@ -94,7 +94,7 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
         }
     }
 
-    final class Runner implements Runnable, EventLoopVirtualThreadScheduler, ThreadFactory {
+    final class Runner implements Runnable, EventLoopVirtualThreadScheduler, ThreadFactory, Executor, LoomBranchSupport.VirtualThreadSchedulerProxy {
         final int id;
         final Factory factory;
         final ManualIoEventLoop delegate;
@@ -106,6 +106,7 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
          * The continuation of the virtual thread responsible for running the event loop.
          */
         Runnable ioContinuation;
+        Thread ioThread;
         /**
          * {@code true} when the {@link #ioContinuation} has been scheduled but has not run yet.
          */
@@ -210,7 +211,15 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
         }
 
         private boolean isOnRunner(Thread thread) {
-            return LoomSupport.isVirtual(thread) && PrivateLoomSupport.getScheduler(thread) == Runner.this;
+            if (!LoomSupport.isVirtual(thread)) {
+                return false;
+            }
+            if (LoomBranchSupport.isSupported()) {
+                assert thread == Thread.currentThread();
+                return LoomBranchSupport.currentScheduler() == this;
+            } else {
+                return PrivateLoomSupport.getScheduler(thread) == Runner.this;
+            }
         }
 
         /**
@@ -227,7 +236,9 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
             return LoomSupport.unstarted("loom-on-netty-" + id + "-" + Long.toHexString(ThreadLocalRandom.current().nextLong()), b -> {
                 if (warmupTasks > 0) {
                     warmupTasks--;
-                    PrivateLoomSupport.setScheduler(b, PrivateLoomSupport.getDefaultScheduler());
+                    if (!LoomBranchSupport.isSupported()) {
+                        PrivateLoomSupport.setScheduler(b, PrivateLoomSupport.getDefaultScheduler());
+                    }
                     return;
                 }
 
@@ -243,7 +254,11 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
                         }
                     }
                 }
-                PrivateLoomSupport.setScheduler(b, new StickyScheduler(dst));
+                if (LoomBranchSupport.isSupported()) {
+                    LoomBranchSupport.setScheduler(b, new StickyScheduler(dst));
+                } else {
+                    PrivateLoomSupport.setScheduler(b, new StickyScheduler(dst));
+                }
             }, r);
         }
 
@@ -251,11 +266,18 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
         public void run() {
             carrier = Thread.currentThread();
 
-            LoomSupport.unstarted(
+            ioThread = LoomSupport.unstarted(
                 "loom-on-netty-" + id + "-io",
-                b -> PrivateLoomSupport.setScheduler(b, this::executeIo),
+                b -> {
+                    if (LoomBranchSupport.isSupported()) {
+                        LoomBranchSupport.setScheduler(b, new IoScheduler(this));
+                    } else {
+                        PrivateLoomSupport.setScheduler(b, new IoScheduler(this));
+                    }
+                },
                 () -> FastThreadLocalThread.runWithFastThreadLocal(this::runIo)
-            ).start();
+            );
+            ioThread.start();
             assert ioContinuationScheduled;
 
             while (!delegate.isTerminated()) {
@@ -380,6 +402,19 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
             return ranAny;
         }
 
+        private void executeIo(Thread thread, Runnable command) {
+            if (thread == ioThread) {
+                Thread t = Thread.currentThread();
+                ioContinuation = command;
+                ioContinuationScheduled = true;
+                if (t != carrier && !isOnRunner(t)) {
+                    LockSupport.unpark(carrier);
+                }
+            } else {
+                LoomBranchSupport.runOnDefaultScheduler(command);
+            }
+        }
+
         private void executeIo(Runnable command) {
             // special handling for the continuation of the IO thread.
             Runnable ioContinuation = this.ioContinuation;
@@ -400,9 +435,18 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
         }
 
         @Override
-        public void execute(Runnable command) {
+        public void execute(Runnable task) {
+            execute(null, task);
+        }
+
+        @Override
+        public void execute(Thread thread, Runnable command) {
             if (delegate.isShuttingDown()) {
-                PrivateLoomSupport.getDefaultScheduler().execute(command);
+                if (LoomBranchSupport.isSupported()) {
+                    LoomBranchSupport.runOnDefaultScheduler(command);
+                } else {
+                    PrivateLoomSupport.getDefaultScheduler().execute(command);
+                }
                 return;
             }
 
@@ -412,6 +456,7 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
                 scheduled = new ContinuationScheduled();
                 long hash = System.identityHashCode(command);
                 scheduled.hashCode = hash;
+                scheduled.virtualThreadName = thread == null ? null : thread.getName();
 
                 Runnable r = command;
                 command = () -> {
@@ -422,7 +467,7 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
 
                     started.end();
                     started.hashCode = hash;
-                    //started.taskQueueDepth = delegate.taskQueue.size();
+                    started.virtualThreadName = thread == null ? null : thread.getName();
                     started.commit();
                 };
             } else {
@@ -478,7 +523,29 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
         }
     }
 
-    record StickyScheduler(Runner io) implements Executor, EventLoopVirtualThreadScheduler {
+    record IoScheduler(Runner runner) implements Executor, EventLoopVirtualThreadScheduler, LoomBranchSupport.VirtualThreadSchedulerProxy {
+        @Override
+        public @NonNull AttributeMap attributeMap() {
+            return runner.attributeMap();
+        }
+
+        @Override
+        public @NonNull EventExecutor eventLoop() {
+            return runner.eventLoop();
+        }
+
+        @Override
+        public void execute(Thread thread, Runnable task) {
+            runner.executeIo(thread, task);
+        }
+
+        @Override
+        public void execute(Runnable command) {
+            runner.executeIo(command);
+        }
+    }
+
+    record StickyScheduler(Runner io) implements Executor, EventLoopVirtualThreadScheduler, LoomBranchSupport.VirtualThreadSchedulerProxy {
         @Override
         public void execute(Runnable command) {
             Thread currentThread = Thread.currentThread();
@@ -492,6 +559,26 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
                 dst = io;
             }
             dst.execute(command);
+        }
+
+        @Override
+        public void execute(Thread thread, Runnable task) {
+            LoomBranchSupport.VirtualThreadSchedulerProxy dst;
+            if (LoomSupport.isVirtual(Thread.currentThread())) {
+                dst = LoomBranchSupport.currentScheduler();
+                if (dst instanceof EventLoopVirtualThreadScheduler) {
+                    if (dst instanceof IoScheduler s) {
+                        dst = s.runner;
+                    } else if (dst instanceof StickyScheduler s) {
+                        dst = s.io;
+                    }
+                } else {
+                    dst = (t, r) -> LoomBranchSupport.runOnDefaultScheduler(r);
+                }
+            } else {
+                dst = io;
+            }
+            dst.execute(thread, task);
         }
 
         @Override
@@ -517,6 +604,7 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
         static final ContinuationScheduled INSTANCE = new ContinuationScheduled();
 
         long hashCode;
+        String virtualThreadName;
         int scheduleMode;
         int queueDepth;
     }
@@ -525,7 +613,7 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
     @Enabled(false)
     static class ContinuationStarted extends Event {
         long hashCode;
-        int taskQueueDepth;
+        String virtualThreadName;
     }
 
     @StackTrace(false)

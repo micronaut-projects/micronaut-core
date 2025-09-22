@@ -47,14 +47,13 @@ public final class PrivateLoomSupport {
     private static final Throwable FAILURE;
 
     static {
+        MethodHandles.Lookup lookup = MethodHandles.lookup();
+
         MethodHandle defaultScheduler;
         MethodHandle builderScheduler;
         MethodHandle threadScheduler;
-        MethodHandle carrierThread;
         Throwable failure;
         try {
-            MethodHandles.Lookup lookup = MethodHandles.lookup();
-
             Field defaultSchedulerField = Class.forName("java.lang.VirtualThread")
                 .getDeclaredField("DEFAULT_SCHEDULER");
             defaultSchedulerField.setAccessible(true);
@@ -72,25 +71,30 @@ public final class PrivateLoomSupport {
             threadScheduler = lookup.unreflectGetter(threadSchedulerField)
                     .asType(MethodType.methodType(Executor.class, Thread.class));
 
-            Field carrierThreadField = Class.forName("java.lang.VirtualThread")
-                .getDeclaredField("carrierThread");
-            carrierThreadField.setAccessible(true);
-            carrierThread = lookup.unreflectGetter(carrierThreadField)
-                    .asType(MethodType.methodType(Thread.class, Thread.class));
-
             failure = null;
         } catch (ReflectiveOperationException | InaccessibleObjectException roe) {
             defaultScheduler = null;
             builderScheduler = null;
             threadScheduler = null;
-            carrierThread = null;
             failure = roe;
         }
         DEFAULT_SCHEDULER = defaultScheduler;
         BUILDER_SCHEDULER = builderScheduler;
         THREAD_SCHEDULER = threadScheduler;
-        CARRIER_THREAD = carrierThread;
         FAILURE = failure;
+
+        // carrierThread is also used for some LoomBranchSupport debugging, so let's initialize it separately
+        MethodHandle carrierThread;
+        try {
+            Field carrierThreadField = Class.forName("java.lang.VirtualThread")
+                .getDeclaredField("carrierThread");
+            carrierThreadField.setAccessible(true);
+            carrierThread = lookup.unreflectGetter(carrierThreadField)
+                .asType(MethodType.methodType(Thread.class, Thread.class));
+        } catch (Exception e) {
+            carrierThread = null;
+        }
+        CARRIER_THREAD = carrierThread;
     }
 
     @NonNull
@@ -130,13 +134,13 @@ public final class PrivateLoomSupport {
     }
 
     public static boolean isSupported() {
-        return CARRIER_THREAD != null;
+        return THREAD_SCHEDULER != null;
     }
 
     static final class PrivateLoomCondition implements Condition {
         @Override
         public boolean matches(ConditionContext context) {
-            if (BUILDER_SCHEDULER == null) {
+            if (!isSupported() && !LoomBranchSupport.isSupported()) {
                 context.fail("Failed to access loom internals. Please make sure to add the `--add-opens=java.base/java.lang=ALL-UNNAMED` JVM argument. (" + FAILURE + ")");
                 return false;
             } else {
