@@ -15,6 +15,7 @@
  */
 package io.micronaut.context.env;
 
+import io.micronaut.context.env.exp.RandomPropertyExpressionResolver;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
@@ -50,6 +51,9 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
     public static final String SUFFIX = "}";
 
     private static final Pattern ESCAPE_SEQUENCE = Pattern.compile("(.+)?:`([^`]+?)`");
+    private static final List<PropertyExpressionResolver> DEFAULT_EXPRESSION_RESOLVERS = List.of(
+        new RandomPropertyExpressionResolver()
+    );
     private static final char COLON = ':';
 
     private final PropertyResolver environment;
@@ -73,7 +77,7 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
             synchronized (this) { // double check
                 exResolvers = this.expressionResolvers;
                 if (exResolvers == null) {
-                    exResolvers = new ArrayList<>();
+                    exResolvers = new ArrayList<>(DEFAULT_EXPRESSION_RESOLVERS);
                     ClassLoader classLoader = (environment instanceof Environment e) ? e.getClassLoader() : environment.getClass().getClassLoader();
                     SoftServiceLoader.load(PropertyExpressionResolver.class, classLoader).collectAll(exResolvers);
                     this.expressionResolvers = exResolvers;

@@ -16,6 +16,7 @@
 package io.micronaut.inject.provider;
 
 import io.micronaut.context.BeanProvider;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.TypeInformationProvider;
 import jakarta.inject.Provider;
 
@@ -25,6 +26,7 @@ import jakarta.inject.Provider;
  * @author graemerocher
  * @since 3.0.0
  */
+@Internal
 public final class ProviderTypeInformationProvider implements TypeInformationProvider {
 
     @Override
