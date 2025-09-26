@@ -59,7 +59,7 @@ context.registerBeanDefinition(
         .exposedTypes(FooBar.class, Abc.class, Resolver.class)
         .typeArguments(Resolver, Argument.of(String))
         .build()
-)
+);
 ----
 
 == 4.0.0
