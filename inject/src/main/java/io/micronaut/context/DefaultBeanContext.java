@@ -77,6 +77,7 @@ import io.micronaut.core.naming.Named;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.type.UnsafeExecutable;
@@ -652,28 +653,28 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             beanDefinition = null;
         }
         if (beanDefinition != null && !(beanDefinition instanceof RuntimeBeanDefinition<T>) && beanDefinition.getBeanType().isInstance(singleton)) {
-            try (BeanResolutionContext context = newResolutionContext(beanDefinition, null)) {
-                if (inject) {
+            if (inject) {
+                try (BeanResolutionContext context = newResolutionContext(beanDefinition, null)) {
                     doInjectAndInitialize(context, singleton, beanDefinition);
                 }
-                BeanKey<T> key = new BeanKey<>(beanDefinition.asArgument(), qualifier);
-                singletonScope.registerSingletonBean(BeanRegistration.of(this, key, beanDefinition, singleton), qualifier);
             }
         } else {
             RuntimeBeanDefinition<T> runtimeBeanDefinition = RuntimeBeanDefinition.builder(type, () -> singleton)
                 .singleton(true)
+                .exposedTypes(ReflectionUtils.getAllClassesInHierarchy(type).toArray(Class<?>[]::new))
                 .qualifier(qualifier)
                 .build();
 
-            var registration = BeanRegistration.of(
-                this,
-                new BeanKey<>(runtimeBeanDefinition, qualifier),
-                runtimeBeanDefinition,
-                singleton
-            );
-            singletonScope.registerSingletonBean(registration, qualifier);
             registerBeanDefinition(runtimeBeanDefinition);
+            beanDefinition = runtimeBeanDefinition;
         }
+        var registration = BeanRegistration.of(
+            this,
+            new BeanKey<>(beanDefinition, qualifier),
+            beanDefinition,
+            singleton
+        );
+        singletonScope.registerSingletonBean(registration, qualifier);
         return this;
     }
 

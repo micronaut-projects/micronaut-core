@@ -31,6 +31,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -84,6 +85,34 @@ public class ReflectionUtils {
         m.put(Short.class, short.class);
         m.put(Void.class, void.class);
         WRAPPER_TO_PRIMITIVE = Collections.unmodifiableMap(m);
+    }
+
+    /**
+     * Retrieves all classes, interfaces, and superclasses in the hierarchy of the given class.
+     *
+     * @param aClass The class whose hierarchy is to be retrieved. Must not be null.
+     * @return A set of classes and interfaces representing the entire hierarchy of the given class,
+     *         including the provided class itself.
+     * @since 5.0
+     */
+    public static Set<Class<?>> getAllClassesInHierarchy(Class<?> aClass) {
+        ClassUtils.REFLECTION_LOGGER.debug("Reflectively retrieving hierarchy for class: {}", aClass);
+        Set<Class<?>> set = new LinkedHashSet<>();
+        collectAllClassesInHierarchy(set, aClass);
+        return set;
+    }
+
+    private static void collectAllClassesInHierarchy(Set<Class<?>> classes, Class<?> aClass) {
+        if (!classes.add(aClass)) {
+            return;
+        }
+        Class<?> superclass = aClass.getSuperclass();
+        if (superclass != null && superclass != Object.class && superclass != Record.class && superclass != Enum.class) {
+            collectAllClassesInHierarchy(classes, superclass);
+        }
+        for (Class<?> interfaceClass : aClass.getInterfaces()) {
+            collectAllClassesInHierarchy(classes, interfaceClass);
+        }
     }
 
     /**

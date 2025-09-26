@@ -35,6 +35,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.io.ResourceLoader;
+import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
@@ -47,7 +48,6 @@ import jakarta.inject.Singleton;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -529,29 +529,10 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
         Set<Class<?>> exposedTypes = reference.getExposedTypes();
         if (exposedTypes.isEmpty()) {
             // The reference must be compiled prior to v5, use reflection to find exposed types till it's recompiled
-            exposedTypes = findExposedClassesUsingReflection(reference.getBeanType());
+            exposedTypes = ReflectionUtils.getAllClassesInHierarchy(reference.getBeanType());
         }
         for (Class<?> indexedType : exposedTypes) {
             indexByType.computeIfAbsent(indexedType, COMPUTE_INDEXES_FN).add(beanDefinitionProducer);
-        }
-    }
-
-    private static Set<Class<?>> findExposedClassesUsingReflection(Class<?> aClass) {
-        Set<Class<?>> set = new HashSet<>();
-        collectExposedClassesUsingReflection(set, aClass);
-        return set;
-    }
-
-    private static void collectExposedClassesUsingReflection(Set<Class<?>> classes, Class<?> aClass) {
-        if (!classes.add(aClass)) {
-            return;
-        }
-        Class<?> superclass = aClass.getSuperclass();
-        if (superclass != null && superclass != Object.class && superclass != Record.class && superclass != Enum.class) {
-            collectExposedClassesUsingReflection(classes, superclass);
-        }
-        for (Class<?> interfaceClass : aClass.getInterfaces()) {
-            collectExposedClassesUsingReflection(classes, interfaceClass);
         }
     }
 
