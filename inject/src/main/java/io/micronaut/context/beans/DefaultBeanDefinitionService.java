@@ -62,13 +62,13 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /**
- * The default implementation of {@link BeanDefinitionProvider}.
+ * The default implementation of {@link BeanDefinitionService}.
  *
  * @author Denis Stepanov
  * @since 5.0
  */
 @Internal
-public final class DefaultBeanDefinitionProvider implements BeanDefinitionProvider {
+public final class DefaultBeanDefinitionService implements BeanDefinitionService {
 
     private static final List<Class<?>> KNOWN_INDEX_TYPES = List.of(
         ResourceLoader.class,
@@ -114,7 +114,7 @@ public final class DefaultBeanDefinitionProvider implements BeanDefinitionProvid
      *
      * @param contextConfiguration The context configuration
      */
-    public DefaultBeanDefinitionProvider(@NonNull BeanContextConfiguration contextConfiguration) {
+    public DefaultBeanDefinitionService(@NonNull BeanContextConfiguration contextConfiguration) {
         Set<Class<? extends Annotation>> eagerInitAnnotated = contextConfiguration.getEagerInitAnnotated();
         List<String> configuredEagerSingletonAnnotations = new ArrayList<>(eagerInitAnnotated.size());
         for (Class<? extends Annotation> ann : eagerInitAnnotated) {

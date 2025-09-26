@@ -19,6 +19,7 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.DisabledBean;
 import io.micronaut.context.RuntimeBeanDefinition;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
@@ -37,7 +38,8 @@ import java.util.function.Predicate;
  * @author Denis Stepanov
  * @since 5.0
  */
-public interface BeanDefinitionProvider {
+@Internal
+public sealed interface BeanDefinitionService permits DefaultBeanDefinitionService {
 
     /**
      * Registers a runtime bean definition so it becomes visible to the provider alongside precompiled definitions.

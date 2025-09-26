@@ -1,16 +1,16 @@
 package io.micronaut.kotlin.processing.aop.introduction
 
+import io.micronaut.aop.Interceptor
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.RuntimeBeanDefinition
 import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.context.event.StartupEvent
-import spock.lang.PendingFeature
 import spock.lang.Specification
 
 import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class MappedIntroductionOnConcreteClassSpec extends Specification {
 
-    @PendingFeature(reason = "This test should fail because ListenerAdviceMarker convert the class to be an Application listener which should fail on startup because if the missing interceptor")
     void "test mapped introduction of new interface on concrete class"() {
         given:
             ApplicationContext applicationContext = buildContext('''
@@ -22,7 +22,11 @@ import jakarta.inject.Singleton
 @Singleton
 open class MyBeanWithMappedIntroduction
 ''')
-        applicationContext.registerSingleton(new ListenerAdviceInterceptor())
+        applicationContext.registerBeanDefinition(
+                RuntimeBeanDefinition.builder(new ListenerAdviceInterceptor())
+                .exposedTypes(ListenerAdviceInterceptor.class, Interceptor.class)
+                .build()
+        )
 
         when:
         def beanClass = applicationContext.classLoader.loadClass('test.MyBeanWithMappedIntroduction')

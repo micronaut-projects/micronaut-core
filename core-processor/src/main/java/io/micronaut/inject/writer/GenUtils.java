@@ -143,7 +143,8 @@ public final class GenUtils {
      * @param strings The strings
      * @return the expression
      */
-    public static ExpressionDef listOfString(List<String> strings) {
+    @NonNull
+    public static ExpressionDef listOfString(@NonNull List<String> strings) {
         return listOf(strings.stream().<ExpressionDef>map(ExpressionDef::constant).toList());
     }
 
@@ -152,7 +153,8 @@ public final class GenUtils {
      * @param values The values
      * @return the expression
      */
-    public static ExpressionDef listOf(List<ExpressionDef> values) {
+    @NonNull
+    public static ExpressionDef listOf(@NonNull List<ExpressionDef> values) {
         if (values != null) {
             values = values.stream().filter(Objects::nonNull).toList();
         }
@@ -177,7 +179,8 @@ public final class GenUtils {
      * @param values The values
      * @return the expression
      */
-    public static ExpressionDef setOf(List<ExpressionDef> values) {
+    @NonNull
+    public static ExpressionDef setOf(@NonNull List<ExpressionDef> values) {
         if (values != null) {
             values = values.stream().filter(Objects::nonNull).toList();
         }
@@ -200,7 +203,8 @@ public final class GenUtils {
      * @param array The array
      * @return the expression
      */
-    public static ExpressionDef setOfArray(ExpressionDef array) {
+    @NonNull
+    public static ExpressionDef setOfArray(@NonNull ExpressionDef array) {
         if (!array.type().isArray()) {
             throw new IllegalArgumentException("Argument must be an array");
         }

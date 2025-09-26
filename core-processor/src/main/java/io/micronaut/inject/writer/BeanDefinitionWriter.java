@@ -165,6 +165,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -2407,7 +2408,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
         if (exposedTypes.length != 0) {
             exposedTypeNames = Set.of(exposedTypes);
         } else {
-            exposedTypeNames = new HashSet<>();
+            exposedTypeNames = new LinkedHashSet<>();
             if (interceptedType != null) {
                 collectExposedTypes(exposedTypeNames, visitorContext.getClassElement(interceptedType).orElseThrow(() -> new IllegalStateException("Intercepted type not found: " + interceptedType)));
                 exposedTypeNames.add(beanProducingElement.getName()); // Allow finding the proxy by it's name

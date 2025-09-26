@@ -24,20 +24,23 @@ import io.micronaut.inject.qualifiers.Qualifiers
 import jakarta.inject.Named
 import jakarta.inject.Singleton
 import spock.lang.Issue
-import spock.lang.PendingFeature
 import spock.lang.Specification
 
 import java.lang.reflect.Proxy
 
 class RegisterSingletonSpec extends Specification {
 
-    @PendingFeature
     void "test register singleton with generic types"() {
         given:
         ApplicationContext context = ApplicationContext.run()
 
         when:
-        context.registerSingleton(new TestReporter())
+        context.registerBeanDefinition(
+                RuntimeBeanDefinition.builder(new TestReporter())
+                        .exposedTypes(TestReporter.class, Reporter.class)
+                        .typeArguments(Reporter, Argument.of(Span))
+                        .build()
+        )
 
         then:
         context.containsBean(Argument.of(Reporter, Span))
@@ -46,7 +49,6 @@ class RegisterSingletonSpec extends Specification {
         context.close()
     }
 
-    @PendingFeature
     void "test register singleton and exposed type"() {
         given:
         ApplicationContext context = ApplicationContext.run()
@@ -61,7 +63,9 @@ class RegisterSingletonSpec extends Specification {
         ) // replaces ToBeReplacedCodec
         context.registerSingleton(Codec, {  } as Codec) // adds a new codec
         context.registerSingleton(Codec, new FooCodec()) // adds another codec
-        context.registerSingleton(new BarCodec()) // should be registered with bean type BarCodec
+            context.registerBeanDefinition(RuntimeBeanDefinition.builder(new BarCodec())
+                    .exposedTypes(BarCodec.class, Codec.class)
+                    .build()) // should be registered with bean type BarCodec
         context.registerSingleton(Codec, new BazCodec(), Qualifiers.byName("baz"))
 
         then:

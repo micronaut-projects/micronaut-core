@@ -1,12 +1,12 @@
 package io.micronaut.aop.factory.mapped
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.aop.Interceptor
 import io.micronaut.context.ApplicationContext
-import spock.lang.PendingFeature
+import io.micronaut.context.RuntimeBeanDefinition
 
 class FactoryMappedAdviceSpec extends AbstractTypeElementSpec {
 
-    @PendingFeature
     void "test configuration mapping"() {
         given:
         ApplicationContext applicationContext = buildContext('test.MyConfiguration', '''
@@ -36,7 +36,12 @@ class MyBean {
     }
 ''')
 
-        applicationContext.registerSingleton(new TestSingletonInterceptor())
+        applicationContext.registerBeanDefinition(
+                RuntimeBeanDefinition.builder(new TestSingletonInterceptor())
+                    .singleton(true)
+                    .exposedTypes(Interceptor.class, TestSingletonInterceptor.class)
+                    .build()
+        )
         def type = applicationContext.classLoader.loadClass('test.MyBean')
         def config = applicationContext.classLoader.loadClass('test.MyConfiguration')
 

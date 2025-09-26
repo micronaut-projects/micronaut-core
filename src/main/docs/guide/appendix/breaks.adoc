@@ -41,9 +41,26 @@ ApplicationContext customApplicationContext = ApplicationContext.create(myEnv);
 
 The bean context in v5 tries to avoid scanning all available beans as much as possible.
 The bean definitions are now generated with all posible exposed types (if not explicitly defined by `@Bean(typed=..)`).
-Beans added at the runtime require all the exposed types (supertypes and interfaces) explicitly defined.
 
-TODO: Example with the new API
+Beans added at the runtime require all the exposed types (supertypes and interfaces) explicitly defined:
+
+[source,java]
+----
+class FooBar extends Abc implements Resolver<String> {
+}
+
+// In v4 this registration will resolve beans by class FooBar, Abc and Resolver
+beanContext.registerSingleton(new FooBar());
+
+// In v5 it is necessary to register it in the following way:
+context.registerBeanDefinition(
+    RuntimeBeanDefinition.builder(new FooBar())
+        .singleton(true)
+        .exposedTypes(FooBar.class, Abc.class, Resolver.class)
+        .typeArguments(Resolver, Argument.of(String))
+        .build()
+)
+----
 
 == 4.0.0
 

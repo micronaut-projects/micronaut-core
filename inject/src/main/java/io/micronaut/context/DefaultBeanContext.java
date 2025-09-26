@@ -25,8 +25,8 @@ import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Secondary;
-import io.micronaut.context.beans.BeanDefinitionProvider;
-import io.micronaut.context.beans.DefaultBeanDefinitionProvider;
+import io.micronaut.context.beans.BeanDefinitionService;
+import io.micronaut.context.beans.DefaultBeanDefinitionService;
 import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.context.condition.Failure;
 import io.micronaut.context.env.CachedEnvironment;
@@ -226,7 +226,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
     protected MutableConversionService conversionService;
 
-    protected final BeanDefinitionProvider beanDefinitionProvider;
+    protected final BeanDefinitionService beanDefinitionProvider;
 
     /**
      * Construct a new bean context using the same classloader that loaded this DefaultBeanContext class.
@@ -291,7 +291,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         this.eventsEnabled = contextConfiguration.eventsEnabled();
         this.eagerBeansEnabled = contextConfiguration.eagerBeansEnabled();
         this.conversionService = new DefaultMutableConversionService();
-        beanDefinitionProvider = new DefaultBeanDefinitionProvider(beanContextConfiguration);
+        beanDefinitionProvider = new DefaultBeanDefinitionService(beanContextConfiguration);
     }
 
     /**
