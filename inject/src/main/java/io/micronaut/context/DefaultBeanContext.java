@@ -1782,13 +1782,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
     @NonNull
     @Override
-    public <T> Optional<BeanDefinition<T>> findProxyBeanDefinition(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier) {
-        ArgumentUtils.requireNonNull("beanType", beanType);
-        return findProxyBeanDefinition(Argument.of(beanType), qualifier);
-    }
-
-    @NonNull
-    @Override
     public <T> Optional<BeanDefinition<T>> findProxyBeanDefinition(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         ArgumentUtils.requireNonNull("beanType", beanType);
         for (BeanDefinition<T> beanDefinition : getBeanDefinitions(beanType, qualifier)) {
