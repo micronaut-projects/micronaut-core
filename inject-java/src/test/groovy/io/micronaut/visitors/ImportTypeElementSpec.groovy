@@ -14,6 +14,29 @@ import io.micronaut.inject.visitor.VisitorContext
 
 class ImportTypeElementSpec extends AbstractTypeElementSpec {
 
+    void "test bean introspection annotate interface"() {
+        given:
+            ApplicationContext context = buildContext('test.Test', '''
+package test;
+
+import io.micronaut.context.annotation.ClassImport;
+import io.micronaut.core.annotation.Introspected;
+
+@ClassImport(classes = io.micronaut.visitors.MySimpleInterface.class, annotate = Introspected.class)
+class Test {}
+''')
+
+        when:"the reference is loaded"
+            def clazz = context.classLoader.loadClass('test.$io_micronaut_visitors_MySimpleInterface$Introspection')
+            BeanIntrospectionReference reference = clazz.newInstance()
+
+        then:"The reference is generated"
+            reference != null
+
+        cleanup:
+            context?.close()
+    }
+
     void "test bean introspection annotate"() {
         given:
             ApplicationContext context = buildContext('test.Test', '''

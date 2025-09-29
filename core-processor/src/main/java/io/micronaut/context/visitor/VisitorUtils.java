@@ -61,7 +61,8 @@ public class VisitorUtils {
         if (ArrayUtils.isNotEmpty(classNames)) {
             for (String className : classNames) {
                 ClassElement classElement = context.getClassElement(className).orElse(null);
-                if (classElement == null || classElement.isAbstract()) {
+                if (classElement == null) {
+                    context.fail("Cannot access class [" + className + "]", element);
                     continue;
                 }
                 importedElements.add(classElement);
@@ -74,9 +75,6 @@ public class VisitorUtils {
                 final ClassElement[] classElements = context.getClassElements(aPackage, includedAnnotations);
                 classes:
                 for (ClassElement classElement : classElements) {
-                    if (classElement.isAbstract()) {
-                        continue;
-                    }
                     for (String excludedAnnotation : excludedAnnotations) {
                         if (classElement.hasAnnotation(excludedAnnotation)) {
                             continue classes;
@@ -107,8 +105,9 @@ public class VisitorUtils {
      * @param mixinAnnotation The {@code AnnotationValue} representing the {@code @Mixin} annotation applied to the mixin class, used to retrieve filter settings.
      * @param mixin           The {@code ClassElement} representing the mixin class, which contains the annotations, methods, fields, and properties to be applied.
      * @param mixinTarget     The {@code ClassElement} representing the target class to which the mixin is applied, which will be augmented with elements from the mixin class.
+     * @param visitorContext  The visitorContext
      */
-    public static void applyMixin(AnnotationValue<Mixin> mixinAnnotation, ClassElement mixin, ClassElement mixinTarget) {
+    public static void applyMixin(AnnotationValue<Mixin> mixinAnnotation, ClassElement mixin, ClassElement mixinTarget, VisitorContext visitorContext) {
         copyAnnotations(mixin, mixinTarget, createPredicate(mixin), findAnnotationsToRemove(mixin));
 
         final Map<String, FieldElement> mixinFields = mixin.getEnclosedElements(
@@ -204,6 +203,9 @@ public class VisitorUtils {
             ).ifPresent(targetMethod -> copyAnnotations(mixinMethod, targetMethod, createPredicate(new AnnotationMetadataHierarchy(mixinMethod, mixin))));
         }
 
+        if (mixin.hasAnnotation(ClassImport.class)) {
+            visitorContext.warn("Mixin shouldn't be used with @ClassImport", mixin);
+        }
         mixin.removeAnnotationIf(annotationValue -> true);
         mixin.annotate(Vetoed.class);
     }
