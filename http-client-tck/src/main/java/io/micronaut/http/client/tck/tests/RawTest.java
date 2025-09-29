@@ -27,10 +27,13 @@ import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.RequestFilter;
 import io.micronaut.http.annotation.ResponseFilter;
+import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.stream.AvailableByteArrayBody;
+import io.micronaut.http.body.stream.InputStreamByteBody;
 import io.micronaut.http.client.RawHttpClient;
 import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.http.tck.ServerUnderTestProviderUtils;
+import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
 import org.junit.jupiter.api.Assertions;
@@ -42,6 +45,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.OptionalLong;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadLocalRandom;
 
 @SuppressWarnings({
@@ -98,6 +103,30 @@ class RawTest {
              ByteBodyHttpResponse<?> response = Mono.from(client.exchange(
                      HttpRequest.POST(server.getURL().get() + "/raw/echo", null),
                      AvailableByteArrayBody.create(ByteArrayBufferFactory.INSTANCE, LONG_PAYLOAD),
+                     null
+                 ))
+                 .cast(ByteBodyHttpResponse.class)
+                 .block()) {
+
+            Assertions.assertArrayEquals(
+                LONG_PAYLOAD,
+                response.byteBody().buffer().get().toByteArray()
+            );
+        }
+    }
+
+    @Test
+    public void echoLongInputStream() throws Exception {
+        try (ServerUnderTest server = ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME);
+             RawHttpClient client = server.getApplicationContext().createBean(RawHttpClient.class);
+             ByteBodyHttpResponse<?> response = Mono.from(client.exchange(
+                     HttpRequest.POST(server.getURL().get() + "/raw/echo", null),
+                     InputStreamByteBody.create(
+                         new ByteArrayInputStream(LONG_PAYLOAD),
+                         OptionalLong.of(LONG_PAYLOAD.length),
+                         server.getApplicationContext().getBean(Executor.class, Qualifiers.byName(TaskExecutors.BLOCKING)),
+                         ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE)
+                     ),
                      null
                  ))
                  .cast(ByteBodyHttpResponse.class)

@@ -104,7 +104,6 @@ import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.netty.body.NettyByteBufMessageBodyHandler;
 import io.micronaut.http.netty.body.NettyJsonHandler;
 import io.micronaut.http.netty.body.NettyJsonStreamHandler;
-import io.micronaut.http.netty.body.StreamingNettyByteBody;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.stream.DefaultStreamedHttpResponse;
 import io.micronaut.http.netty.stream.JsonSubscriber;
@@ -1714,7 +1713,7 @@ public class DefaultHttpClient implements
             byteBuf = NettyByteBodyFactory.toByteBuf(available);
             streamWriter = null;
         } else {
-            streamWriter = new StreamWriter((StreamingNettyByteBody) byteBody, e -> {
+            streamWriter = new StreamWriter(new NettyByteBodyFactory(poolHandle.channel()).toStreaming(byteBody), e -> {
                 poolHandle.taint();
                 completeExceptionallySafe(sink, e);
             });
