@@ -221,6 +221,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private boolean legacyMultiplexHandlers = false;
     private int formMaxFields = DEFAULT_FORM_MAX_FIELDS;
     private int formMaxBufferedBytes = DEFAULT_FORM_MAX_BUFFERED_BYTES;
+    private boolean requestDecompressionEnabled = true;
 
     /**
      * Default empty constructor.
@@ -772,6 +773,29 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     public void setJsonBufferMaxComponents(int jsonBufferMaxComponents) {
         this.jsonBufferMaxComponents = jsonBufferMaxComponents;
+    }
+
+    /**
+     * Whether request content decompression is enabled in the Netty HTTP server.
+     * When disabled, the server will not decode Content-Encoding or Transfer-Encoding on requests
+     * and will pass the compressed body and headers through unchanged.
+     * Default: true.
+     *
+     * @return true if automatic request content decompression is enabled
+     */
+    public boolean isRequestDecompressionEnabled() {
+        return requestDecompressionEnabled;
+    }
+
+    /**
+     * Enable or disable automatic request content decompression in the Netty HTTP server.
+     * Disabling this can be useful for proxy or testing scenarios where the compressed payload
+     * and Content-Encoding header need to be observed.
+     *
+     * @param requestDecompressionEnabled true to enable decompression, false to disable it
+     */
+    public void setRequestDecompressionEnabled(boolean requestDecompressionEnabled) {
+        this.requestDecompressionEnabled = requestDecompressionEnabled;
     }
 
     /**

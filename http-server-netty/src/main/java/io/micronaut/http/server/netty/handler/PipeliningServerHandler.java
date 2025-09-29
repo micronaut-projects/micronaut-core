@@ -101,6 +101,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
     private Compressor compressor;
     private BodySizeLimits bodySizeLimits = BodySizeLimits.UNLIMITED;
+    private boolean requestDecompressionEnabled = true;
 
     /**
      * Current handler for inbound messages.
@@ -154,6 +155,18 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
     public void setBodySizeLimits(BodySizeLimits bodySizeLimits) {
         this.bodySizeLimits = bodySizeLimits;
+    }
+
+    /**
+     * Enable or disable automatic request content decompression in the Netty HTTP server.
+     * When disabled, the server will not decode Content-Encoding or Transfer-Encoding on requests
+     * and will pass the compressed body and headers through unchanged.
+     * Default: true.
+     *
+     * @param requestDecompressionEnabled true to enable decompression, false to disable it
+     */
+    public void setRequestDecompressionEnabled(boolean requestDecompressionEnabled) {
+        this.requestDecompressionEnabled = requestDecompressionEnabled;
     }
 
     public static boolean canHaveBody(HttpResponseStatus status) {
@@ -407,32 +420,36 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             OutboundAccessImpl outboundAccess = new OutboundAccessImpl(request);
             outboundQueue.add(outboundAccess);
 
-            HttpHeaders headers = request.headers();
-            String contentEncoding = getContentEncoding(headers);
             EmbeddedChannel decompressionChannel;
-            if (contentEncoding == null) {
-                decompressionChannel = null;
-            } else if (HttpHeaderValues.GZIP.contentEqualsIgnoreCase(contentEncoding) ||
-                HttpHeaderValues.X_GZIP.contentEqualsIgnoreCase(contentEncoding)) {
-                decompressionChannel = new EmbeddedChannel(ctx.channel().id(), ctx.channel().metadata().hasDisconnect(),
-                    ctx.channel().config(), ZlibCodecFactory.newZlibDecoder(ZlibWrapper.GZIP));
-            } else if (HttpHeaderValues.DEFLATE.contentEqualsIgnoreCase(contentEncoding) ||
-                HttpHeaderValues.X_DEFLATE.contentEqualsIgnoreCase(contentEncoding)) {
-                decompressionChannel = new EmbeddedChannel(ctx.channel().id(), ctx.channel().metadata().hasDisconnect(),
-                    ctx.channel().config(), ZlibCodecFactory.newZlibDecoder(ZlibWrapper.ZLIB_OR_NONE));
-            } else if (Brotli.isAvailable() && HttpHeaderValues.BR.contentEqualsIgnoreCase(contentEncoding)) {
-                decompressionChannel = new EmbeddedChannel(ctx.channel().id(), ctx.channel().metadata().hasDisconnect(),
-                    ctx.channel().config(), new BrotliDecoder());
-            } else if (HttpHeaderValues.SNAPPY.contentEqualsIgnoreCase(contentEncoding)) {
-                decompressionChannel = new EmbeddedChannel(ctx.channel().id(), ctx.channel().metadata().hasDisconnect(),
-                    ctx.channel().config(), new SnappyFrameDecoder());
+            if (requestDecompressionEnabled) {
+                HttpHeaders headers = request.headers();
+                String contentEncoding = getContentEncoding(headers);
+                if (contentEncoding == null) {
+                    decompressionChannel = null;
+                } else if (HttpHeaderValues.GZIP.contentEqualsIgnoreCase(contentEncoding) ||
+                    HttpHeaderValues.X_GZIP.contentEqualsIgnoreCase(contentEncoding)) {
+                    decompressionChannel = new EmbeddedChannel(ctx.channel().id(), ctx.channel().metadata().hasDisconnect(),
+                        ctx.channel().config(), ZlibCodecFactory.newZlibDecoder(ZlibWrapper.GZIP));
+                } else if (HttpHeaderValues.DEFLATE.contentEqualsIgnoreCase(contentEncoding) ||
+                    HttpHeaderValues.X_DEFLATE.contentEqualsIgnoreCase(contentEncoding)) {
+                    decompressionChannel = new EmbeddedChannel(ctx.channel().id(), ctx.channel().metadata().hasDisconnect(),
+                        ctx.channel().config(), ZlibCodecFactory.newZlibDecoder(ZlibWrapper.ZLIB_OR_NONE));
+                } else if (Brotli.isAvailable() && HttpHeaderValues.BR.contentEqualsIgnoreCase(contentEncoding)) {
+                    decompressionChannel = new EmbeddedChannel(ctx.channel().id(), ctx.channel().metadata().hasDisconnect(),
+                        ctx.channel().config(), new BrotliDecoder());
+                } else if (HttpHeaderValues.SNAPPY.contentEqualsIgnoreCase(contentEncoding)) {
+                    decompressionChannel = new EmbeddedChannel(ctx.channel().id(), ctx.channel().metadata().hasDisconnect(),
+                        ctx.channel().config(), new SnappyFrameDecoder());
+                } else {
+                    decompressionChannel = null;
+                }
+                if (decompressionChannel != null) {
+                    headers.remove(HttpHeaderNames.CONTENT_LENGTH);
+                    headers.remove(HttpHeaderNames.CONTENT_ENCODING);
+                    headers.add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
+                }
             } else {
                 decompressionChannel = null;
-            }
-            if (decompressionChannel != null) {
-                headers.remove(HttpHeaderNames.CONTENT_LENGTH);
-                headers.remove(HttpHeaderNames.CONTENT_ENCODING);
-                headers.add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
             }
 
             // getClass for performance
