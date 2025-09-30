@@ -1,0 +1,29 @@
+# .clineignore - Cline AI ignore file for Micronaut projects
+# This file tells Cline which files/directories to ignore for code intelligence and automation
+
+# === Build outputs ===
+build/
+*/build/
+!build/docs/
+!build/docs/**
+
+# === Dependency/Cache directories ===
+.gradle/
+*/.gradle/
+
+# === IDE/Editor/OS Metadata ===
+.vscode/
+.idea/
+.DS_Store
+*.swp
+*.swo
+*.bak
+*.tmp
+*.orig
+
+# === Tool-specific/Config artifacts ===
+*.log
+
+# === Gradle Wrappers/Binaries ===
+gradlew
+gradlew.bat
