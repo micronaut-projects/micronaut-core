@@ -92,6 +92,24 @@ public abstract class HttpClientConfiguration {
     public static final int DEFAULT_MAX_CONTENT_LENGTH = 1024 * 1024 * 10; // 10MiB;
 
     /**
+     * The default max header size in bytes.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_MAX_HEADER_SIZE = 8192;
+
+    /**
+     * The default max initial line length for HTTP client codec in bytes.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_MAX_INITIAL_LINE_LENGTH = 4096;
+
+    /**
+     * The default max chunk size for HTTP client codec in bytes.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_MAX_CHUNK_SIZE = 8192;
+
+    /**
      * The default follow redirects value.
      */
     @SuppressWarnings("WeakerAccess")
@@ -141,6 +159,8 @@ public abstract class HttpClientConfiguration {
 
     private int maxContentLength = DEFAULT_MAX_CONTENT_LENGTH;
 
+    private int maxHeaderSize = DEFAULT_MAX_HEADER_SIZE;
+
     private Proxy.Type proxyType = Proxy.Type.DIRECT;
 
     private SocketAddress proxyAddress;
@@ -156,6 +176,7 @@ public abstract class HttpClientConfiguration {
     private boolean followRedirects = DEFAULT_FOLLOW_REDIRECTS;
 
     private boolean exceptionOnErrorStatus = DEFAULT_EXCEPTION_ON_ERROR_STATUS;
+    private boolean decompressionEnabled = true;
 
     private SslConfiguration sslConfiguration = new ClientSslConfiguration();
 
@@ -218,6 +239,7 @@ public abstract class HttpClientConfiguration {
             this.logLevel = copy.logLevel;
             this.loggerName = copy.loggerName;
             this.maxContentLength = copy.maxContentLength;
+            this.maxHeaderSize = copy.maxHeaderSize;
             this.proxyAddress = copy.proxyAddress;
             this.proxyPassword = copy.proxyPassword;
             this.proxySelector = copy.proxySelector;
@@ -350,6 +372,29 @@ public abstract class HttpClientConfiguration {
      */
     public void setExceptionOnErrorStatus(boolean exceptionOnErrorStatus) {
         this.exceptionOnErrorStatus = exceptionOnErrorStatus;
+    }
+
+    /**
+     * Whether response content decompression is enabled in the Netty HTTP client.
+     * When disabled, the client will not add the HttpContentDecompressor to the pipeline
+     * and will receive the raw compressed response body and headers (e.g. Content-Encoding).
+     * Default: true.
+     *
+     * @return true if automatic content decompression is enabled
+     */
+    public boolean isDecompressionEnabled() {
+        return decompressionEnabled;
+    }
+
+    /**
+     * Enable or disable automatic response content decompression in the Netty HTTP client.
+     * Disabling this can be useful for proxy or testing scenarios where the compressed payload
+     * and Content-Encoding header need to be observed.
+     *
+     * @param decompressionEnabled true to enable decompression, false to disable it
+     */
+    public void setDecompressionEnabled(boolean decompressionEnabled) {
+        this.decompressionEnabled = decompressionEnabled;
     }
 
     /**
@@ -616,6 +661,24 @@ public abstract class HttpClientConfiguration {
      */
     public void setMaxContentLength(@ReadableBytes int maxContentLength) {
         this.maxContentLength = maxContentLength;
+    }
+
+    /**
+     * [available in the Netty HTTP client].
+     *
+     * @return The maximum header size the client can handle
+     */
+    public int getMaxHeaderSize() {
+        return maxHeaderSize;
+    }
+
+    /**
+     * Sets the maximum header size the client can handle. Default value ({@value io.micronaut.http.client.HttpClientConfiguration#DEFAULT_MAX_HEADER_SIZE}).
+     *
+     * @param maxHeaderSize The maximum header size the client can handle
+     */
+    public void setMaxHeaderSize(@ReadableBytes int maxHeaderSize) {
+        this.maxHeaderSize = maxHeaderSize;
     }
 
     /**

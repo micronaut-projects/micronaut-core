@@ -18,15 +18,24 @@ package io.micronaut.http.netty;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.http.HttpVersion;
+import io.micronaut.http.ssl.ClientAuthentication;
 import io.micronaut.http.ssl.SslConfiguration;
+import io.netty.handler.codec.http2.Http2SecurityUtil;
+import io.netty.handler.ssl.ApplicationProtocolConfig;
+import io.netty.handler.ssl.ApplicationProtocolNames;
+import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.OpenSslCachingX509KeyManagerFactory;
 import io.netty.handler.ssl.OpenSslX509KeyManagerFactory;
+import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslProvider;
+import io.netty.handler.ssl.SupportedCipherSuiteFilter;
 
 import javax.net.ssl.KeyManagerFactory;
 import java.security.Key;
 import java.security.KeyStore;
 import java.security.cert.Certificate;
+import java.util.Arrays;
 import java.util.Optional;
 
 /**
@@ -37,7 +46,7 @@ import java.util.Optional;
  */
 @Internal
 public final class NettyTlsUtils {
-    private static boolean useOpenssl(SslConfiguration sslConfiguration) {
+    public static boolean useOpenssl(SslConfiguration sslConfiguration) {
         return sslConfiguration.isPreferOpenssl() && SslProvider.isAlpnSupported(SslProvider.OPENSSL_REFCNT);
     }
 
@@ -110,5 +119,39 @@ public final class NettyTlsUtils {
         aliasKeystore.load(null, null);
         aliasKeystore.setKeyEntry(alias, key, password, certChain);
         return aliasKeystore;
+    }
+
+    public static void setupServerBuilder(SslContextBuilder sslBuilder, SslConfiguration ssl, HttpVersion httpVersion) {
+        sslBuilder.sslProvider(sslProvider(ssl));
+        Optional<String[]> protocols = ssl.getProtocols();
+        if (protocols.isPresent()) {
+            sslBuilder.protocols(protocols.get());
+        }
+        final boolean isHttp2 = httpVersion == HttpVersion.HTTP_2_0;
+        Optional<String[]> ciphers = ssl.getCiphers();
+        if (ciphers.isPresent()) {
+            sslBuilder = sslBuilder.ciphers(Arrays.asList(ciphers.get()));
+        } else if (isHttp2) {
+            sslBuilder.ciphers(Http2SecurityUtil.CIPHERS, SupportedCipherSuiteFilter.INSTANCE);
+        }
+        Optional<ClientAuthentication> clientAuthentication = ssl.getClientAuthentication();
+        if (clientAuthentication.isPresent()) {
+            ClientAuthentication clientAuth = clientAuthentication.get();
+            if (clientAuth == ClientAuthentication.NEED) {
+                sslBuilder.clientAuth(ClientAuth.REQUIRE);
+            } else if (clientAuth == ClientAuthentication.WANT) {
+                sslBuilder.clientAuth(ClientAuth.OPTIONAL);
+            }
+        }
+
+        if (isHttp2) {
+            sslBuilder.applicationProtocolConfig(new ApplicationProtocolConfig(
+                ApplicationProtocolConfig.Protocol.ALPN,
+                ApplicationProtocolConfig.SelectorFailureBehavior.NO_ADVERTISE,
+                ApplicationProtocolConfig.SelectedListenerFailureBehavior.ACCEPT,
+                ApplicationProtocolNames.HTTP_2,
+                ApplicationProtocolNames.HTTP_1_1
+            ));
+        }
     }
 }

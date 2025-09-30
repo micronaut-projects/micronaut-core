@@ -15,6 +15,7 @@ dependencies {
     compileOnly(libs.managed.netty.transport.native.epoll)
     compileOnly(libs.managed.netty.transport.native.kqueue)
     compileOnly(libs.managed.netty.transport.native.iouring)
+    compileOnly(libs.managed.netty.codec.http3)
     compileOnly(projects.micronautWebsocket)
     api(projects.micronautHttp)
     api(projects.micronautBufferNetty)

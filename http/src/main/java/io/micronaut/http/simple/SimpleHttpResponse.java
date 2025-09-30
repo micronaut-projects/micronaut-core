@@ -25,10 +25,9 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.cookie.Cookie;
+import io.micronaut.http.cookie.CookieUtils;
 import io.micronaut.http.cookie.Cookies;
-import io.micronaut.http.cookie.ServerCookieEncoder;
 import io.micronaut.http.simple.cookies.SimpleCookies;
-
 import java.util.Optional;
 import java.util.Set;
 
@@ -42,7 +41,6 @@ import java.util.Set;
  */
 @TypeHint(value = SimpleHttpResponse.class)
 class SimpleHttpResponse<B> implements MutableHttpResponse<B> {
-
     private final MutableHttpHeaders headers = new SimpleHttpHeaders(ConversionService.SHARED);
     private final SimpleCookies cookies = new SimpleCookies(ConversionService.SHARED);
     private final MutableConvertibleValues<Object> attributes = new MutableConvertibleValuesMap<>();
@@ -62,7 +60,7 @@ class SimpleHttpResponse<B> implements MutableHttpResponse<B> {
     private void updateCookies() {
         headers.remove(HttpHeaders.SET_COOKIE);
         for (Cookie cookie : cookies.getAll()) {
-            ServerCookieEncoder.INSTANCE.encode(cookie).forEach(c -> headers.add(HttpHeaders.SET_COOKIE, c));
+            CookieUtils.setCookieHeader(headers, cookie);
         }
     }
 

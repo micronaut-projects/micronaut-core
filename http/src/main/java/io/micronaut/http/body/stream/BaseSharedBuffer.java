@@ -20,6 +20,8 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.core.io.buffer.ReadBufferFactory;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.exceptions.BufferLengthExceededException;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
@@ -38,18 +40,14 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * Base type for a shared buffer that distributes a single {@link BufferConsumer} input to multiple
  * streaming {@link io.micronaut.http.body.ByteBody}s.<br>
- * The subclass handles concurrency (for netty, event loop) and the specific buffer type
- * (for netty, ByteBuf).
- *
- * @param <C> The {@link BufferConsumer} type for the specific buffer type
- * @param <F> The type returned to {@link #subscribeFull0} subscribers. This is usually just the
- *           buffer type
+ * The subclass handles concurrency (for netty, event loop).
  */
 @Internal
-public abstract class BaseSharedBuffer<C extends BufferConsumer, F> {
+public abstract class BaseSharedBuffer implements BufferConsumer {
     private static final Class<ByteBody> SPLIT_LOG_CLASS = ByteBody.class;
     private static final Logger SPLIT_LOG = LoggerFactory.getLogger(SPLIT_LOG_CLASS);
 
+    private final ReadBufferFactory readBufferFactory;
     private final BodySizeLimits limits;
     /**
      * Upstream of all subscribers. This is only used to cancel incoming data if the max
@@ -72,11 +70,11 @@ public abstract class BaseSharedBuffer<C extends BufferConsumer, F> {
     /**
      * Active subscribers.
      */
-    private List<@NonNull C> subscribers;
+    private List<@NonNull BufferConsumer> subscribers;
     /**
      * Active subscribers that need the fully buffered body.
      */
-    private List<@NonNull DelayedExecutionFlow<F>> fullSubscribers;
+    private List<@NonNull DelayedExecutionFlow<ReadBuffer>> fullSubscribers;
     /**
      * This flag is only used in tests, to verify that the BufferConsumer methods arent called
      * in a reentrant fashion.
@@ -92,8 +90,16 @@ public abstract class BaseSharedBuffer<C extends BufferConsumer, F> {
      * body has been received.
      */
     private volatile long expectedLength = -1;
+    /**
+     * If not all {@link #subscribers} are ready or there are {@link #fullSubscribers}, this list
+     * buffers input data.
+     */
+    private List<ReadBuffer> buffer;
 
-    public BaseSharedBuffer(BodySizeLimits limits, BufferConsumer.Upstream rootUpstream) {
+    private BufferLengthExceededException bufferLimitsExceeded = null;
+
+    public BaseSharedBuffer(ReadBufferFactory readBufferFactory, BodySizeLimits limits, BufferConsumer.Upstream rootUpstream) {
+        this.readBufferFactory = readBufferFactory;
         this.limits = limits;
         this.rootUpstream = rootUpstream;
     }
@@ -173,7 +179,17 @@ public abstract class BaseSharedBuffer<C extends BufferConsumer, F> {
      * @param last {@code true} iff this was the last reservation and the buffer can be discarded
      *                         after this call
      */
-    protected abstract void forwardInitialBuffer(@Nullable C subscriber, boolean last);
+    private void forwardInitialBuffer(@Nullable BufferConsumer subscriber, boolean last) {
+        if (subscriber != null) {
+            if (buffer != null) {
+                subscriber.add(getBufferedData(last));
+            }
+        } else {
+            if (last) {
+                discardBuffer();
+            }
+        }
+    }
 
     /**
      * Called after a subscribe operation. Used for leak detection.
@@ -184,15 +200,26 @@ public abstract class BaseSharedBuffer<C extends BufferConsumer, F> {
     }
 
     /**
-     * Called after {@link BufferConsumer#complete() completion} to get the data that should be
-     * forwarded to a {@link #subscribeFull0} subscriber.
+     * Get all data buffered so far.
      *
-     * @param last {@code true} iff this was the last reservation and the buffer can be discarded
-     *                         after this call
-     * @return The full result that should be returned from the {@link #subscribeFull0} execution
-     * flow
+     * @param discardBuffer {@code true} iff the buffer can and should be discarded after this call
+     * @return The buffered data
      */
-    protected abstract F subscribeFullResult(boolean last);
+    private ReadBuffer getBufferedData(boolean discardBuffer) {
+        if (buffer == null) {
+            return readBufferFactory.createEmpty();
+        } else if (discardBuffer) {
+            List<ReadBuffer> pieces = buffer;
+            buffer = null;
+            return readBufferFactory.compose(pieces);
+        } else {
+            List<ReadBuffer> pieces = new ArrayList<>(buffer.size());
+            for (ReadBuffer buffer : buffer) {
+                pieces.add(buffer.duplicate());
+            }
+            return readBufferFactory.compose(pieces);
+        }
+    }
 
     /**
      * Add a subscriber. Must be preceded by a reservation.<br>
@@ -201,7 +228,7 @@ public abstract class BaseSharedBuffer<C extends BufferConsumer, F> {
      * @param subscriber       The subscriber to add. Can be {@code null}, then the bytes will just be discarded
      * @param specificUpstream The upstream for the subscriber. This is used to call allowDiscard if there was an error
      */
-    protected final void subscribe0(@Nullable C subscriber, BufferConsumer.Upstream specificUpstream) {
+    protected final void subscribe0(@Nullable BufferConsumer subscriber, BufferConsumer.Upstream specificUpstream) {
         assert !working;
 
         if (reserved == 0) {
@@ -218,8 +245,8 @@ public abstract class BaseSharedBuffer<C extends BufferConsumer, F> {
             forwardInitialBuffer(subscriber, last);
             if (error != null) {
                 subscriber.error(error);
-            } else if (lengthSoFar > limits.maxBufferSize()) {
-                subscriber.error(new BufferLengthExceededException(limits.maxBufferSize(), lengthSoFar));
+            } else if (bufferLimitsExceeded != null) {
+                subscriber.error(bufferLimitsExceeded);
                 specificUpstream.allowDiscard();
             }
             if (complete) {
@@ -246,14 +273,14 @@ public abstract class BaseSharedBuffer<C extends BufferConsumer, F> {
      *                  {@code targetFlow}, when appropriate
      * @return A flow that will complete when all data has arrived, with a buffer containing that data
      */
-    protected final ExecutionFlow<F> subscribeFull0(DelayedExecutionFlow<F> targetFlow, BufferConsumer.Upstream specificUpstream, boolean canReturnImmediate) {
+    protected final ExecutionFlow<ReadBuffer> subscribeFull0(DelayedExecutionFlow<ReadBuffer> targetFlow, BufferConsumer.Upstream specificUpstream, boolean canReturnImmediate) {
         assert !working;
 
         if (reserved <= 0) {
             throw new IllegalStateException("Need to reserve a spot first. This should not happen, StreamingNettyByteBody should guard against it");
         }
 
-        ExecutionFlow<F> ret = targetFlow;
+        ExecutionFlow<ReadBuffer> ret = targetFlow;
 
         working = true;
         boolean last = --reserved == 0;
@@ -268,8 +295,14 @@ public abstract class BaseSharedBuffer<C extends BufferConsumer, F> {
             } else {
                 targetFlow.completeExceptionally(error);
             }
+        } else if (bufferLimitsExceeded != null) {
+            if (canReturnImmediate) {
+                ret = ExecutionFlow.error(bufferLimitsExceeded);
+            } else {
+                targetFlow.completeExceptionally(bufferLimitsExceeded);
+            }
         } else if (complete) {
-            F buf = subscribeFullResult(last);
+            ReadBuffer buf = getBufferedData(last);
             if (canReturnImmediate) {
                 ret = ExecutionFlow.just(buf);
             } else {
@@ -288,111 +321,74 @@ public abstract class BaseSharedBuffer<C extends BufferConsumer, F> {
     }
 
     /**
-     * Forward the input buffer to the given list of consumers.
-     *
-     * @param consumers The consumers to forward the data to
-     * @see #add(int)
+     * Discard the previously buffered bytes.
      */
-    protected abstract void addForward(List<C> consumers);
-
-    /**
-     * Do not buffer the input buffer.
-     *
-     * @see #add(int)
-     */
-    protected void addDoNotBuffer() {
+    private void discardBuffer() {
+        if (buffer != null) {
+            for (ReadBuffer rb : buffer) {
+                rb.close();
+            }
+            buffer = null;
+        }
     }
 
     /**
-     * Buffer the input buffer.
-     *
-     * @see #add(int)
+     * Add a given buffer to this {@link BaseSharedBuffer}.<br>
+     * Not thread safe, caller must handle concurrency.
      */
-    protected abstract void addBuffer();
+    @Override
+    public void add(ReadBuffer rb) {
+        try (rb) {
+            assert !working;
 
-    /**
-     * Discard the previously buffered bytes.
-     *
-     * @see #add(int)
-     */
-    protected abstract void discardBuffer();
-
-    /**
-     * This method implements the {@link BufferConsumer} {@code add} logic in a
-     * buffer-type-independent way. It is not thread-safe: The subclass must take care of
-     * concurrency. The caller should store the actual buffer to be added in a field, then call
-     * this method, and use the stored buffer in the calls this method makes to
-     * {@link #addBuffer()}, {@link #addDoNotBuffer()} and {@link #addBuffer()}. After this method
-     * completes, the field can be cleared and those methods will not be called again. Example:
-     *
-     * <pre>
-     * {@code
-     *   ByteBuf adding;
-     *
-     *   public void add(ByteBuf buf) {
-     *       this.adding = buf;
-     *       add(buf.readableBytes());
-     *       this.adding = null;
-     *   }
-     *
-     *   @Override
-     *   protected void addForward(List<ByteBufConsumer> consumers) {
-     *      for (ByteBufConsumer c : consumers) {
-     *          c.add(this.adding);
-     *      }
-     *   }
-     * }
-     * </pre>
-     *
-     * @param n The number of bytes to add
-     */
-    protected final void add(int n) {
-        assert !working;
-
-        // calculate the new total length
-        long newLength = lengthSoFar + n;
-        long expectedLength = this.expectedLength;
-        if (expectedLength != -1 && newLength > expectedLength) {
-            throw new IllegalStateException("Received more bytes than specified by Content-Length");
-        }
-        lengthSoFar = newLength;
-
-        // drop messages if we're done with all subscribers
-        if (complete || error != null) {
-            addDoNotBuffer();
-            return;
-        }
-        if (newLength > limits.maxBodySize()) {
-            // for maxBodySize, all subscribers get the error
-            addDoNotBuffer();
-            error(new ContentLengthExceededException(limits.maxBodySize(), newLength));
-            rootUpstream.allowDiscard();
-            return;
-        }
-
-        working = true;
-        if (subscribers != null) {
-            addForward(subscribers);
-        }
-        if (reserved > 0 || fullSubscribers != null) {
-            if (newLength > limits.maxBufferSize()) {
-                // new subscribers will recognize that the limit has been exceeded. Streaming
-                // subscribers can proceed normally. Need to notify buffering subscribers
-                addDoNotBuffer();
-                discardBuffer();
-                if (fullSubscribers != null) {
-                    Exception e = new BufferLengthExceededException(limits.maxBufferSize(), lengthSoFar);
-                    for (DelayedExecutionFlow<?> fullSubscriber : fullSubscribers) {
-                        fullSubscriber.completeExceptionally(e);
-                    }
-                }
-            } else {
-                addBuffer();
+            // calculate the new total length
+            long newLength = lengthSoFar + rb.readable();
+            long expectedLength = this.expectedLength;
+            if (expectedLength != -1 && newLength > expectedLength) {
+                throw new IncorrectContentLengthException("Received more bytes than specified by Content-Length");
             }
-        } else {
-            addDoNotBuffer();
+            lengthSoFar = newLength;
+
+            // drop messages if we're done with all subscribers
+            if (complete || error != null) {
+                return;
+            }
+            if (newLength > limits.maxBodySize()) {
+                // for maxBodySize, all subscribers get the error
+                error(new ContentLengthExceededException(limits.maxBodySize(), newLength));
+                rootUpstream.allowDiscard();
+                return;
+            }
+
+            working = true;
+            if (subscribers != null) {
+                for (BufferConsumer consumer : subscribers) {
+                    consumer.add(rb.duplicate());
+                }
+            }
+            if (reserved > 0 || fullSubscribers != null) {
+                if (newLength > limits.maxBufferSize()|| bufferLimitsExceeded != null) {
+                    // new subscribers will recognize that the limit has been exceeded. Streaming
+                    // subscribers can proceed normally. Need to notify buffering subscribers
+                    discardBuffer();
+                    if (bufferLimitsExceeded == null) {
+                        bufferLimitsExceeded = new BufferLengthExceededException(limits.maxBufferSize(), lengthSoFar);
+                    if (fullSubscribers != null) {
+                        for (DelayedExecutionFlow<?> fullSubscriber : fullSubscribers) {
+                            fullSubscriber.completeExceptionally(bufferLimitsExceeded);
+                        }
+                        fullSubscribers = null;
+                        }
+                    }
+                } else {
+                    if (buffer == null) {
+                        buffer = new ArrayList<>();
+                    }
+                    buffer.add(rb.move());
+                }
+            }
+            working = false;
         }
-        working = false;
     }
 
     /**
@@ -401,7 +397,7 @@ public abstract class BaseSharedBuffer<C extends BufferConsumer, F> {
      */
     public void complete() {
         if (expectedLength > lengthSoFar) {
-            throw new IllegalStateException("Received fewer bytes than specified by Content-Length");
+            throw new IncorrectContentLengthException("Received fewer bytes than specified by Content-Length");
         }
         complete = true;
         expectedLength = lengthSoFar;
@@ -410,12 +406,13 @@ public abstract class BaseSharedBuffer<C extends BufferConsumer, F> {
                 subscriber.complete();
             }
         }
-        if (fullSubscribers != null) {
+        if (fullSubscribers != null && bufferLimitsExceeded == null) {
             boolean last = reserved <= 0;
-            for (Iterator<DelayedExecutionFlow<F>> iterator = fullSubscribers.iterator(); iterator.hasNext(); ) {
-                DelayedExecutionFlow<F> fullSubscriber = iterator.next();
-                fullSubscriber.complete(subscribeFullResult(last && !iterator.hasNext()));
+            for (Iterator<DelayedExecutionFlow<ReadBuffer>> iterator = fullSubscribers.iterator(); iterator.hasNext(); ) {
+                DelayedExecutionFlow<ReadBuffer> fullSubscriber = iterator.next();
+                fullSubscriber.complete(getBufferedData(last && !iterator.hasNext()));
             }
+            fullSubscribers = null;
         }
     }
 
@@ -438,65 +435,72 @@ public abstract class BaseSharedBuffer<C extends BufferConsumer, F> {
                 subscriber.error(e);
             }
         }
-        if (fullSubscribers != null) {
+        if (fullSubscribers != null && bufferLimitsExceeded == null) {
             for (DelayedExecutionFlow<?> fullSubscriber : fullSubscribers) {
                 fullSubscriber.completeExceptionally(e);
             }
+            fullSubscribers = null;
         }
     }
 
     /**
      * {@link BufferConsumer} that can subscribe to a {@link BaseSharedBuffer} and return the
-     * buffer as a {@link Flux}. Used to implement {@link ByteBody#toByteBufferPublisher()} and
-     * similar methods.<br>
-     * Subclass implements the specific {@link BufferConsumer} {@code add} method and
-     * {@link #size(Object)}.
-     *
-     * @param <B> The buffer type
+     * buffer as a {@link Flux}. Used to implement {@link ByteBody#toReadBufferPublisher()} and
+     * similar methods.
      */
-    public abstract static class AsFlux<B> implements BufferConsumer {
-        private final BaseSharedBuffer<?, ?> sharedBuffer;
+    public static final class AsFlux implements BufferConsumer {
+        private final BaseSharedBuffer sharedBuffer;
         private final AtomicLong unconsumed = new AtomicLong(0);
-        private final Sinks.Many<B> sink = Sinks.many().unicast().onBackpressureBuffer();
+        private final Sinks.Many<ReadBuffer> sink = Sinks.many().unicast().onBackpressureBuffer();
 
-        public AsFlux(BaseSharedBuffer<?, ?> sharedBuffer) {
+        public AsFlux(BaseSharedBuffer sharedBuffer) {
             this.sharedBuffer = sharedBuffer;
         }
 
-        protected abstract int size(B buf);
-
-        public final boolean add0(B buf) {
-            long newLength = unconsumed.addAndGet(size(buf));
+        @Override
+        public void add(ReadBuffer buf) {
+            long newLength = unconsumed.addAndGet(buf.readable());
             if (newLength > sharedBuffer.getLimits().maxBufferSize()) {
                 sink.tryEmitError(new BufferLengthExceededException(sharedBuffer.getLimits().maxBufferSize(), newLength));
-                return false;
-            } else {
-                return sink.tryEmitNext(buf) == Sinks.EmitResult.OK;
+                buf.close();
+            } else if (sink.tryEmitNext(buf) != Sinks.EmitResult.OK) {
+                buf.close();
             }
         }
 
         @Override
-        public final void complete() {
+        public void complete() {
             sink.tryEmitComplete();
         }
 
         @Override
-        public final void error(Throwable e) {
+        public void error(Throwable e) {
             sink.tryEmitError(e);
         }
 
-        public final Flux<B> asFlux(Upstream upstream) {
+        public Flux<ReadBuffer> asFlux(Upstream upstream) {
             return sink.asFlux()
                 .doOnSubscribe(s -> upstream.start())
                 .doOnNext(bb -> {
-                    int size = size(bb);
+                    int size = bb.readable();
                     unconsumed.addAndGet(-size);
                     upstream.onBytesConsumed(size);
                 })
                 .doOnCancel(() -> {
                     upstream.allowDiscard();
                     upstream.disregardBackpressure();
-                });
+                })
+                .doOnDiscard(ReadBuffer.class, ReadBuffer::close);
+        }
+    }
+
+    /**
+     * Thrown when {@link #complete()} is called before {@link #getExpectedLength()} bytes are
+     * received.
+     */
+    public static final class IncorrectContentLengthException extends IllegalStateException {
+        IncorrectContentLengthException(String msg) {
+            super(msg);
         }
     }
 }

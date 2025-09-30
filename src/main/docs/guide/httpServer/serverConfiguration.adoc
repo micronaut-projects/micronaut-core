@@ -41,9 +41,17 @@ For Linux on x86:
 
 dependency:netty-transport-native-epoll[groupId="io.netty",scope="runtimeOnly",classifier="linux-x86_64"]
 
+or
+
+dependency:netty-transport-native-io_uring[groupId="io.netty",scope="runtimeOnly",classifier="linux-x86_64"]
+
 For Linux on ARM64:
 
 dependency:netty-transport-native-epoll[groupId="io.netty",scope="runtimeOnly",classifier="linux-aarch_64"]
+
+or
+
+dependency:netty-transport-native-io_uring[groupId="io.netty",scope="runtimeOnly",classifier="linux-aarch_64"]
 
 Then configure the default event loop group to prefer native transports:
 
@@ -54,15 +62,9 @@ micronaut:
   netty:
     event-loops:
       default:
-        prefer-native-transport: true
+        transport: io_uring,epoll,kqueue,nio
 ----
 
-On Linux, Netty also offers an io_uring-based transport in incubator status. On x86_64:
-
-dependency:netty-transport-native-io_uring[groupId="io.netty",scope="runtimeOnly",classifier="linux-x86_64"]
-
-On ARM64:
-
-dependency:netty-transport-native-io_uring[groupId="io.netty",scope="runtimeOnly",classifier="linux-aarch_64"]
+The first available transport out of those listed will be used. If you want to make sure native transports will be used in all environments, remove the `nio` entry. An exception will be thrown if no native transport is available.
 
 NOTE: Netty enables simplistic sampling resource leak detection which reports there is a leak or not, at the cost of small overhead. You can enable it by setting property `netty.resource-leak-detector-level` to one of: `DISABLED` (default), `SIMPLE`, `PARANOID` or `ADVANCED`.

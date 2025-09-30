@@ -16,18 +16,22 @@
 package io.micronaut.http.client.jdk;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.async.publisher.DelayedSubscriber;
+import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
+import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.ReactiveByteBufferByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
-import io.micronaut.http.body.stream.BufferConsumer;
+import org.reactivestreams.Subscription;
 
 import java.net.http.HttpResponse;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * {@link HttpResponse.BodySubscriber} implementation that pushes data into a
@@ -37,99 +41,58 @@ import java.util.concurrent.atomic.AtomicLong;
  * @author Jonas Konrad
  */
 @Internal
-final class ByteBodySubscriber implements HttpResponse.BodySubscriber<CloseableByteBody>, BufferConsumer.Upstream {
-    private final ReactiveByteBufferByteBody.SharedBuffer sharedBuffer;
-    private final CloseableByteBody root;
-    private final AtomicLong demand = new AtomicLong(0);
-    private Flow.Subscription subscription;
-    private boolean cancelled;
-    private volatile boolean disregardBackpressure;
+final class ByteBodySubscriber implements HttpResponse.BodySubscriber<CloseableByteBody> {
+    private static final ByteBodyFactory BODY_FACTORY = ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE);
+
+    private final DelayedSubscriber<ReadBuffer> defer = new DelayedSubscriber<>();
+    private final CloseableByteBody mapped;
 
     public ByteBodySubscriber(BodySizeLimits limits) {
-        sharedBuffer = new ReactiveByteBufferByteBody.SharedBuffer(limits, this);
-        root = new ReactiveByteBufferByteBody(sharedBuffer);
+        this.mapped = BODY_FACTORY.adapt(defer, limits, null, null);
     }
 
     @Override
     public CompletionStage<CloseableByteBody> getBody() {
-        return CompletableFuture.completedFuture(root);
+        return CompletableFuture.completedFuture(mapped);
     }
 
     @Override
     public void onSubscribe(Flow.Subscription subscription) {
-        boolean initialDemand;
-        boolean cancelled;
-        synchronized (this) {
-            this.subscription = subscription;
-            cancelled = this.cancelled;
-            initialDemand = demand.get() > 0;
-        }
-        if (cancelled) {
-            subscription.cancel();
-        } else if (initialDemand) {
-            subscription.request(disregardBackpressure ? Long.MAX_VALUE : 1);
-        }
+        defer.onSubscribe(new Subscription() {
+            @Override
+            public void request(long n) {
+                subscription.request(n);
+            }
+
+            @Override
+            public void cancel() {
+                subscription.cancel();
+            }
+        });
     }
 
     @Override
     public void onNext(List<ByteBuffer> item) {
-        for (ByteBuffer buffer : item) {
-            int n = buffer.remaining();
-            demand.addAndGet(-n);
-            sharedBuffer.add(buffer);
-        }
-        if (demand.get() > 0) {
-            subscription.request(1);
+        if (item.isEmpty()) {
+            defer.onNext(BODY_FACTORY.readBufferFactory().createEmpty());
+        } else if (item.size() == 1) {
+            defer.onNext(BODY_FACTORY.readBufferFactory().adapt(item.get(0)));
+        } else {
+            List<ReadBuffer> buffers = new ArrayList<>(item.size());
+            for (ByteBuffer byteBuffer : item) {
+                buffers.add(BODY_FACTORY.readBufferFactory().adapt(byteBuffer));
+            }
+            defer.onNext(BODY_FACTORY.readBufferFactory().compose(buffers));
         }
     }
 
     @Override
     public void onError(Throwable throwable) {
-        sharedBuffer.error(throwable);
+        defer.onError(throwable);
     }
 
     @Override
     public void onComplete() {
-        sharedBuffer.complete();
-    }
-
-    @Override
-    public void start() {
-        Flow.Subscription initialDemand;
-        synchronized (this) {
-            initialDemand = subscription;
-            demand.set(1);
-        }
-        if (initialDemand != null) {
-            initialDemand.request(1);
-        }
-    }
-
-    @Override
-    public void onBytesConsumed(long bytesConsumed) {
-        long prev = demand.getAndAdd(bytesConsumed);
-        if (prev <= 0 && prev + bytesConsumed > 0) {
-            subscription.request(1);
-        }
-    }
-
-    @Override
-    public void allowDiscard() {
-        Flow.Subscription subscription;
-        synchronized (this) {
-            cancelled = true;
-            subscription = this.subscription;
-        }
-        if (subscription != null) {
-            subscription.cancel();
-        }
-    }
-
-    @Override
-    public void disregardBackpressure() {
-        disregardBackpressure = true;
-        if (subscription != null) {
-            subscription.request(Long.MAX_VALUE);
-        }
+        defer.onComplete();
     }
 }

@@ -23,6 +23,7 @@ import io.micronaut.context.visitor.VisitorUtils;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Generated;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
+import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.ElementPostponedToNextRoundException;
 import io.micronaut.inject.visitor.VisitorContext;
@@ -92,12 +93,12 @@ public class MixinVisitorProcessor extends AbstractInjectAnnotationProcessor {
                     if (target == null || Object.class.getName().equals(target)) {
                         continue;
                     }
-                    TypeElement targetTypeElement = elementUtils.getTypeElement(target);
-                    if (targetTypeElement == null) {
+                    ClassElement mixinTarget = javaVisitorContext.getClassElement(target, elementAnnotationMetadataFactory).orElse(null);
+                    if (mixinTarget == null) {
+                        javaVisitorContext.warn("Cannot access class: " + target, mixin);
                         continue;
                     }
-                    JavaClassElement mixinTarget = elementFactory.newSourceClassElement(targetTypeElement, elementAnnotationMetadataFactory);
-                    VisitorUtils.applyMixin(mixinAnnotation, mixin, mixinTarget);
+                    VisitorUtils.applyMixin(mixinAnnotation, mixin, mixinTarget, javaVisitorContext);
                 } catch (ProcessingException e) {
                     var originatingElement = (JavaNativeElement) e.getOriginatingElement();
                     if (originatingElement == null) {

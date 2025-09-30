@@ -13,8 +13,8 @@ import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.StreamingHttpClient
 import io.micronaut.http.client.exceptions.ReadTimeoutException
 import io.micronaut.http.client.multipart.MultipartBody
+import io.micronaut.http.netty.NettyTlsUtils
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer
-import io.micronaut.http.server.netty.ssl.CertificateProvidedSslBuilder
 import io.micronaut.http.ssl.SslConfiguration
 import io.micronaut.websocket.WebSocketSession
 import io.micronaut.websocket.annotation.ClientWebSocket
@@ -1270,7 +1270,7 @@ class ConnectionManagerSpec extends Specification {
         void setupHttp1Tls() {
             def certificate = new SelfSignedCertificate()
             def builder = SslContextBuilder.forServer(certificate.key(), certificate.cert())
-            CertificateProvidedSslBuilder.setupSslBuilder(builder, new SslConfiguration(), HttpVersion.HTTP_1_1);
+            NettyTlsUtils.setupServerBuilder(builder, new SslConfiguration(), HttpVersion.HTTP_1_1);
             def tlsHandler = builder.build().newHandler(ByteBufAllocator.DEFAULT)
 
             scheme = 'https'
@@ -1355,7 +1355,7 @@ class ConnectionManagerSpec extends Specification {
 
             def certificate = new SelfSignedCertificate()
             def builder = SslContextBuilder.forServer(certificate.key(), certificate.cert())
-            CertificateProvidedSslBuilder.setupSslBuilder(builder, new SslConfiguration(), HttpVersion.HTTP_2_0);
+            NettyTlsUtils.setupServerBuilder(builder, new SslConfiguration(), HttpVersion.HTTP_2_0);
             def tlsHandler = builder.build().newHandler(ByteBufAllocator.DEFAULT)
 
             serverChannel.pipeline()

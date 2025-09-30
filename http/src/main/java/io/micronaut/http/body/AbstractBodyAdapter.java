@@ -18,6 +18,7 @@ package io.micronaut.http.body;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.body.stream.BaseSharedBuffer;
 import io.micronaut.http.body.stream.BufferConsumer;
 import org.reactivestreams.Publisher;
@@ -28,29 +29,31 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.LongUnaryOperator;
 
 /**
- * Base implementation for an adapter that transforms a {@link Publisher} of buffers to a
- * {@link ByteBody}.
+ * An adapter that transforms a {@link Publisher} of buffers to a {@link ByteBody}. Called
+ * {@link AbstractBodyAdapter} for historical reasons, but can be used as-is.
  *
- * @param <B> The input buffer type
- * @param <S> The output {@link BaseSharedBuffer} the buffers are forwarded to
  * @since 4.8.0
  * @author Jonas Konrad
  */
 @Internal
-public abstract class AbstractBodyAdapter<B, S extends BaseSharedBuffer<?, ?>> implements BufferConsumer.Upstream, Subscriber<B> {
-    protected S sharedBuffer;
+public class AbstractBodyAdapter implements BufferConsumer.Upstream, Subscriber<ReadBuffer> {
+    private BaseSharedBuffer sharedBuffer;
 
-    protected volatile Subscription subscription;
-    protected final AtomicLong demand = new AtomicLong(1);
+    private volatile Subscription subscription;
+    private final AtomicLong demand = new AtomicLong(1);
 
-    private final Publisher<B> source;
+    private final Publisher<ReadBuffer> source;
     @Nullable
     private final Runnable onDiscard;
     private volatile boolean cancelled;
 
-    public AbstractBodyAdapter(@NonNull Publisher<B> source, @Nullable Runnable onDiscard) {
+    public AbstractBodyAdapter(@NonNull Publisher<ReadBuffer> source, @Nullable Runnable onDiscard) {
         this.source = source;
         this.onDiscard = onDiscard;
+    }
+
+    public final void setSharedBuffer(BaseSharedBuffer sharedBuffer) {
+        this.sharedBuffer = sharedBuffer;
     }
 
     @Override
@@ -103,6 +106,15 @@ public abstract class AbstractBodyAdapter<B, S extends BaseSharedBuffer<?, ?>> i
     }
 
     @Override
+    public void onNext(ReadBuffer buffer) {
+        long newDemand = demand.addAndGet(-buffer.readable());
+        sharedBuffer.add(buffer);
+        if (newDemand > 0) {
+            subscription.request(1);
+        }
+    }
+
+    @Override
     public void onError(Throwable t) {
         sharedBuffer.error(t);
     }
@@ -111,5 +123,4 @@ public abstract class AbstractBodyAdapter<B, S extends BaseSharedBuffer<?, ?>> i
     public void onComplete() {
         sharedBuffer.complete();
     }
-
 }

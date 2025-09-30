@@ -47,4 +47,11 @@ public @interface Parameter {
      */
     @AliasFor(annotation = Bindable.class, member = "value")
     String value() default "";
+
+    /**
+     * @see Bindable#defaultValue()
+     * @return The default value
+     */
+    @AliasFor(annotation = Bindable.class, member = "defaultValue")
+    String defaultValue() default "";
 }

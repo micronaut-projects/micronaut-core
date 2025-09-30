@@ -71,6 +71,8 @@ public class SslConfiguration implements Toggleable {
     private KeyConfiguration key = new KeyConfiguration();
     private KeyStoreConfiguration keyStore = new KeyStoreConfiguration();
     private TrustStoreConfiguration trustStore = new TrustStoreConfiguration();
+    private String keyName;
+    private String trustName;
     private ClientAuthentication clientAuthentication;
     private String[] ciphers;
     private String[] protocols;
@@ -149,6 +151,50 @@ public class SslConfiguration implements Toggleable {
      */
     public TrustStoreConfiguration getTrustStore() {
         return trustStore;
+    }
+
+    /**
+     * Name of a {@link io.micronaut.http.ssl.CertificateProvider} bean that supplies the private key and certificate chain
+     * for the SSL context. When set, Micronaut resolves the named provider and subscribes to its keystore updates; when
+     * not set, the legacy {@code key}/{@code key-store} configuration is used instead. May be combined with {@code trustName}
+     * to also source the trust store from a provider.
+     * @return the name of the certificate provider for key material or {@code null}
+     */
+    public @Nullable String getKeyName() {
+        return keyName;
+    }
+
+    /**
+     * Name of a {@link io.micronaut.http.ssl.CertificateProvider} bean that supplies the private key and certificate chain
+     * for the SSL context. When set, Micronaut resolves the named provider and subscribes to its keystore updates; when
+     * not set, the legacy {@code key}/{@code key-store} configuration is used instead. May be combined with {@code trustName}
+     * to also source the trust store from a provider.
+     * @param keyName the name of the certificate provider for key material or {@code null}
+     */
+    public void setKeyName(@Nullable String keyName) {
+        this.keyName = keyName;
+    }
+
+    /**
+     * Name of a {@link io.micronaut.http.ssl.CertificateProvider} bean that supplies the trust material (trusted certificates)
+     * for the SSL context. When set, Micronaut resolves the named provider and subscribes to its keystore updates; when
+     * not set, the legacy {@code trust-store} configuration is used instead. May be combined with {@code keyName} to also
+     * source the key material from a provider.
+     * @return the name of the certificate provider for trust material or {@code null}
+     */
+    public @Nullable String getTrustName() {
+        return trustName;
+    }
+
+    /**
+     * Name of a {@link io.micronaut.http.ssl.CertificateProvider} bean that supplies the trust material (trusted certificates)
+     * for the SSL context. When set, Micronaut resolves the named provider and subscribes to its keystore updates; when
+     * not set, the legacy {@code trust-store} configuration is used instead. May be combined with {@code keyName} to also
+     * source the key material from a provider.
+     * @param trustName the name of the certificate provider for trust material or {@code null}
+     */
+    public void setTrustName(@Nullable String trustName) {
+        this.trustName = trustName;
     }
 
     /**

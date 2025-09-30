@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.BeanProvider;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
@@ -28,8 +29,10 @@ import io.micronaut.http.netty.channel.NettyChannelType;
 import io.micronaut.http.netty.channel.converters.ChannelOptionFactory;
 import io.micronaut.http.server.RouteExecutor;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
+import io.micronaut.http.server.netty.ssl.NettyServerSslFactory;
 import io.micronaut.http.server.netty.ssl.ServerSslBuilder;
 import io.micronaut.http.server.netty.websocket.NettyServerWebSocketUpgradeHandler;
+import io.micronaut.http.ssl.CertificateProvider;
 import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.resource.StaticResourceResolver;
@@ -221,4 +224,9 @@ public interface NettyEmbeddedServices {
      * @return The event publisher
      */
     @NonNull <E> ApplicationEventPublisher<E> getEventPublisher(@NonNull Class<E> eventClass);
+
+    NettyServerSslFactory getSslFactory();
+
+    @NonNull
+    BeanProvider<CertificateProvider> getCertificateProviders();
 }

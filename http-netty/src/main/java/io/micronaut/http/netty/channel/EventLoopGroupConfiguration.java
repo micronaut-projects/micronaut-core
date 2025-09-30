@@ -16,9 +16,12 @@
 package io.micronaut.http.netty.channel;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.NextMajorVersion;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.naming.Named;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -87,7 +90,25 @@ public interface EventLoopGroupConfiguration extends Named {
     /**
      * @return Whether to prefer the native transport
      */
+    @Deprecated(since = "4.10.0", forRemoval = true)
     boolean isPreferNativeTransport();
+
+    /**
+     * The transports to use for this event loop, in order of preference. Supported values are
+     * {@code io_uring,epoll,kqueue,nio}. The first available transport out of those listed will
+     * be used (nio is always available). If no listed transport is available, an exception will be
+     * thrown.
+     * <p>By default, only {@code nio} is used, even if native transports are available. If the
+     * legacy {@link #isPreferNativeTransport() prefer-native-transport} property is set to
+     * {@code true}, this defaults to {@code io_uring,epoll,kqueue,nio}.
+     *
+     * @return The available transports, in order of preference
+     */
+    @NonNull
+    @NextMajorVersion("Change default to all transports")
+    default List<String> getTransport() {
+        return isPreferNativeTransport() ? DefaultEventLoopGroupFactory.FACTORY_PRIORITY : List.of(NioEventLoopGroupFactory.NAME);
+    }
 
     /**
      * @return The shutdown quiet period

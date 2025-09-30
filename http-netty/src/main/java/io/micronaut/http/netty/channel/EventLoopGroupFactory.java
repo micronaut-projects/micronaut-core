@@ -57,8 +57,10 @@ public interface EventLoopGroupFactory {
      *
      * @return The handler factory
      * @since 4.9
+     * @deprecated Please {@link #createIoHandlerFactory(EventLoopGroupConfiguration) pass a configuration}
      */
     @NonNull
+    @Deprecated(forRemoval = true)
     default IoHandlerFactory createIoHandlerFactory() {
         throw new UnsupportedOperationException();
     }

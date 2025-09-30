@@ -73,6 +73,7 @@ public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
      *
      * @param eventLoopGroupFactory The event loop group factory
      * @param beanLocator           The bean locator
+     * @param loomCarrierGroupFactory Factory for the loom carrier group
      */
     public DefaultEventLoopGroupRegistry(EventLoopGroupFactory eventLoopGroupFactory, BeanLocator beanLocator, BeanProvider<LoomCarrierGroup.Factory> loomCarrierGroupFactory) {
         this.eventLoopGroupFactory = eventLoopGroupFactory;

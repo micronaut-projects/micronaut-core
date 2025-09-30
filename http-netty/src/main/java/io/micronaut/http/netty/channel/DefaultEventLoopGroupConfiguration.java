@@ -24,6 +24,7 @@ import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.util.StringUtils;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -39,6 +40,7 @@ public class DefaultEventLoopGroupConfiguration implements EventLoopGroupConfigu
     private final double threadCoreRatio;
     private final Integer ioRatio;
     private final boolean preferNativeTransport;
+    private final List<String> transport;
     private final String name;
     private final String executor;
     private final Duration shutdownQuietPeriod;
@@ -54,6 +56,17 @@ public class DefaultEventLoopGroupConfiguration implements EventLoopGroupConfigu
      *                              {@link #getNumThreads()} is set to 0.
      * @param ioRatio               The IO ratio (optional)
      * @param preferNativeTransport Whether native transport is to be preferred
+     * @param transport             The transports to use for this event loop, in order of
+     *                              preference. Supported values are
+     *                              {@code io_uring,epoll,kqueue,nio}. The first available
+     *                              transport out of those listed will be used (nio is always
+     *                              available). If no listed transport is available, an exception
+     *                              will be thrown.
+     *                              <p>By default, only {@code nio} is used, even if native
+     *                              transports are available. If the legacy
+     *                              {@link #isPreferNativeTransport() prefer-native-transport}
+     *                              property is set to {@code true}, this defaults to
+     *                              {@code io_uring,epoll,kqueue,nio}.
      * @param executor              A named executor service to use for event loop threads
      *                              (optional). This property is very specialized. In particular,
      *                              it will <i>not</i> solve read timeouts or fix blocking
@@ -72,6 +85,7 @@ public class DefaultEventLoopGroupConfiguration implements EventLoopGroupConfigu
             @Bindable(defaultValue = DEFAULT_THREAD_CORE_RATIO + "") double threadCoreRatio,
             @Nullable Integer ioRatio,
             @Bindable(defaultValue = StringUtils.FALSE) boolean preferNativeTransport,
+            @Nullable List<String> transport,
             @Nullable String executor,
             @Nullable Duration shutdownQuietPeriod,
             @Nullable Duration shutdownTimeout,
@@ -82,12 +96,28 @@ public class DefaultEventLoopGroupConfiguration implements EventLoopGroupConfigu
         this.threadCoreRatio = threadCoreRatio;
         this.ioRatio = ioRatio;
         this.preferNativeTransport = preferNativeTransport;
+        this.transport = transport;
         this.executor = executor;
         this.shutdownQuietPeriod = Optional.ofNullable(shutdownQuietPeriod)
             .orElse(Duration.ofSeconds(DEFAULT_SHUTDOWN_QUIET_PERIOD));
         this.shutdownTimeout = Optional.ofNullable(shutdownTimeout)
             .orElse(Duration.ofSeconds(DEFAULT_SHUTDOWN_TIMEOUT));
         this.loomCarrier = loomCarrier;
+    }
+
+    @Deprecated
+    public DefaultEventLoopGroupConfiguration(
+        String name,
+        int numThreads,
+        double threadCoreRatio,
+        Integer ioRatio,
+        boolean preferNativeTransport,
+        String executor,
+        Duration shutdownQuietPeriod,
+        Duration shutdownTimeout,
+        boolean loomCarrier
+    ) {
+        this(name, numThreads, threadCoreRatio, ioRatio, preferNativeTransport, null, executor, shutdownQuietPeriod, shutdownTimeout, loomCarrier);
     }
 
     @Deprecated
@@ -112,6 +142,7 @@ public class DefaultEventLoopGroupConfiguration implements EventLoopGroupConfigu
         this.threadCoreRatio = DEFAULT_THREAD_CORE_RATIO;
         this.ioRatio = null;
         this.preferNativeTransport = false;
+        this.transport = null;
         this.executor = null;
         this.shutdownQuietPeriod = Duration.ofSeconds(DEFAULT_SHUTDOWN_QUIET_PERIOD);
         this.shutdownTimeout = Duration.ofSeconds(DEFAULT_SHUTDOWN_TIMEOUT);
@@ -144,12 +175,14 @@ public class DefaultEventLoopGroupConfiguration implements EventLoopGroupConfigu
         return Optional.ofNullable(executor);
     }
 
-    /**
-     * @return Whether to prefer the native transport
-     */
     @Override
     public boolean isPreferNativeTransport() {
         return preferNativeTransport;
+    }
+
+    @Override
+    public @NonNull List<String> getTransport() {
+        return transport == null ? EventLoopGroupConfiguration.super.getTransport() : transport;
     }
 
     @NonNull

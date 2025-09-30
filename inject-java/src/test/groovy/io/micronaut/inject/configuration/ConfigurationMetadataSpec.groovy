@@ -1,29 +1,19 @@
 package io.micronaut.inject.configuration
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import io.micronaut.annotation.processing.ConfigurationMetadataProcessor
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.annotation.processing.test.JavaParser
 import org.intellij.lang.annotations.Language
-
-import javax.annotation.processing.Processor
 
 class ConfigurationMetadataSpec extends AbstractTypeElementSpec {
 
     @Override
     protected JavaParser newJavaParser() {
         return new JavaParser() {
-
-            @Override
-            protected List<Processor> getAnnotationProcessors() {
-                def processors = super.getAnnotationProcessors()
-                processors.add(new ConfigurationMetadataProcessor())
-                return processors
-            }
         }
     }
 
-    private boolean jsonEquals(@Language("json") String provided, @Language("json") String expected) {
+    private static boolean jsonEquals(@Language("json") String provided, @Language("json") String expected) {
         ObjectMapper mapper = new ObjectMapper()
         def providedMap = mapper.readValue(provided, Map.class)
         def expectedMap = mapper.readValue(expected, Map.class)
@@ -33,7 +23,7 @@ class ConfigurationMetadataSpec extends AbstractTypeElementSpec {
         true
     }
 
-    private boolean jsonEquals(@Language("json") String provided, Map expected) {
+    private static boolean jsonEquals(@Language("json") String provided, Map expected) {
         ObjectMapper mapper = new ObjectMapper()
         def providedMap = mapper.readValue(provided, Map.class)
         def providedJson = mapper.writeValueAsString(providedMap)
@@ -47,7 +37,6 @@ class ConfigurationMetadataSpec extends AbstractTypeElementSpec {
     }
 
     def setup() {
-        ConfigurationMetadataBuilder.reset()
     }
 
     void "test configuration metadata and records"() {
@@ -293,7 +282,7 @@ class Test {
 
         then:
             jsonEquals(metadataJson, '''
-{"groups":[{"name":"test","type":"test.MyProperties"}],"properties":[{"name":"test.foo","type":"java.lang.String","sourceType":"test.MyProperties"}]}
+{"groups":[{"name":"test","type":"test.Test"}],"properties":[{"name":"test.foo","type":"java.lang.String","sourceType":"test.Test"}]}
 ''')
     }
 
@@ -336,7 +325,7 @@ class Test {
 ''')
         then:
             jsonEquals(metadataJson, '''
-{"groups":[{"name":"test","type":"test.MyProperties"}],"properties":[{"name":"test.foo","type":"java.lang.String","sourceType":"test.MyProperties"}]}
+{"groups":[{"name":"test","type":"test.Test"}],"properties":[{"name":"test.foo","type":"java.lang.String","sourceType":"test.Test"}]}
 ''')
     }
 
@@ -372,7 +361,7 @@ class Test {
 ''')
         then:
             jsonEquals(metadataJson, '''
-{"groups":[{"name":"test","type":"test.MyProperties"}],"properties":[{"name":"test.foo","type":"java.lang.String","sourceType":"test.MyProperties"}]}
+{"groups":[{"name":"test","type":"test.Test"}],"properties":[{"name":"test.foo","type":"java.lang.String","sourceType":"test.Test"}]}
 ''')
     }
 
@@ -414,19 +403,19 @@ class Test {
   "groups": [
     {
       "name": "test",
-      "type": "test.MyProperties"
+      "type": "test.Test"
     }
   ],
   "properties": [
     {
       "name": "test.foo",
       "type": "java.lang.String",
-      "sourceType": "test.MyProperties"
+      "sourceType": "test.Test"
     },
     {
       "name": "test.bar",
       "type": "int",
-      "sourceType": "test.MyProperties"
+      "sourceType": "test.Test"
     }
   ]
 }
@@ -461,7 +450,11 @@ class Neo4jProperties {
 		{
 			"name": "neo4j.test",
 			"type": "test.Neo4jProperties"
-		}
+		},
+        {
+          "name": "neo4j.test",
+          "type": "org.neo4j.driver.Config$ConfigBuilder"
+        }
 	],
 	"properties": [
 		{
@@ -472,12 +465,12 @@ class Neo4jProperties {
 		{
 			"name": "neo4j.test.logging",
 			"type": "org.neo4j.driver.Logging",
-			"sourceType": "test.Neo4jProperties"
+			"sourceType": "org.neo4j.driver.Config$ConfigBuilder"
 		},
 		{
 			"name": "neo4j.test.leaked-sessions-logging",
 			"type": "boolean",
-			"sourceType": "test.Neo4jProperties"
+			"sourceType": "org.neo4j.driver.Config$ConfigBuilder"
 		},
 		{
 			"name": "neo4j.test.connection-liveness-check-timeout",
@@ -492,7 +485,7 @@ class Neo4jProperties {
 		{
 			"name": "neo4j.test.max-connection-pool-size",
 			"type": "int",
-			"sourceType": "test.Neo4jProperties"
+			"sourceType": "org.neo4j.driver.Config$ConfigBuilder"
 		},
 		{
 			"name": "neo4j.test.connection-acquisition-timeout",
@@ -502,12 +495,12 @@ class Neo4jProperties {
 		{
 			"name": "neo4j.test.encryption",
 			"type": "boolean",
-			"sourceType": "test.Neo4jProperties"
+			"sourceType": "org.neo4j.driver.Config$ConfigBuilder"
 		},
 		{
 			"name": "neo4j.test.trust-strategy",
 			"type": "org.neo4j.driver.Config$TrustStrategy",
-			"sourceType": "test.Neo4jProperties"
+			"sourceType": "org.neo4j.driver.Config$ConfigBuilder"
 		},
 		{
 			"name": "neo4j.test.routing-table-purge-delay",
@@ -517,7 +510,7 @@ class Neo4jProperties {
 		{
 			"name": "neo4j.test.fetch-size",
 			"type": "long",
-			"sourceType": "test.Neo4jProperties"
+			"sourceType": "org.neo4j.driver.Config$ConfigBuilder"
 		},
 		{
 			"name": "neo4j.test.connection-timeout",
@@ -532,37 +525,37 @@ class Neo4jProperties {
 		{
 			"name": "neo4j.test.resolver",
 			"type": "org.neo4j.driver.net.ServerAddressResolver",
-			"sourceType": "test.Neo4jProperties"
+			"sourceType": "org.neo4j.driver.Config$ConfigBuilder"
 		},
 		{
 			"name": "neo4j.test.driver-metrics",
 			"type": "boolean",
-			"sourceType": "test.Neo4jProperties"
+			"sourceType": "org.neo4j.driver.Config$ConfigBuilder"
 		},
 		{
 			"name": "neo4j.test.metrics-adapter",
 			"type": "org.neo4j.driver.MetricsAdapter",
-			"sourceType": "test.Neo4jProperties"
+			"sourceType": "org.neo4j.driver.Config$ConfigBuilder"
 		},
 		{
 			"name": "neo4j.test.event-loop-threads",
 			"type": "int",
-			"sourceType": "test.Neo4jProperties"
+			"sourceType": "org.neo4j.driver.Config$ConfigBuilder"
 		},
 		{
 			"name": "neo4j.test.user-agent",
 			"type": "java.lang.String",
-			"sourceType": "test.Neo4jProperties"
+			"sourceType": "org.neo4j.driver.Config$ConfigBuilder"
 		},
 		{
 			"name": "neo4j.test.notification-config",
 			"type": "org.neo4j.driver.NotificationConfig",
-			"sourceType": "test.Neo4jProperties"
+			"sourceType": "org.neo4j.driver.Config$ConfigBuilder"
 		},
 		{
 			"name": "neo4j.test.telemetry-disabled",
 			"type": "boolean",
-			"sourceType": "test.Neo4jProperties"
+			"sourceType": "org.neo4j.driver.Config$ConfigBuilder"
 		}
 	]
 }''')
@@ -597,6 +590,10 @@ class Neo4jProperties {
 		{
 			"name": "neo4j.test",
 			"type": "test.Neo4jProperties"
+		},
+		{
+		    "name":"neo4j.test.options",
+		    "type":"org.neo4j.driver.Config$ConfigBuilder"
 		}
 	],
 	"properties": [
@@ -608,12 +605,12 @@ class Neo4jProperties {
 		{
 			"name": "neo4j.test.options.logging",
 			"type": "org.neo4j.driver.Logging",
-			"sourceType": "test.Neo4jProperties"
+			"sourceType": "org.neo4j.driver.Config$ConfigBuilder"
 		},
 		{
 			"name": "neo4j.test.options.leaked-sessions-logging",
 			"type": "boolean",
-			"sourceType": "test.Neo4jProperties"
+			"sourceType": "org.neo4j.driver.Config$ConfigBuilder"
 		},
 		{
 			"name": "neo4j.test.options.connection-liveness-check-timeout",
@@ -628,7 +625,7 @@ class Neo4jProperties {
 		{
 			"name": "neo4j.test.options.max-connection-pool-size",
 			"type": "int",
-			"sourceType": "test.Neo4jProperties"
+			"sourceType": "org.neo4j.driver.Config$ConfigBuilder"
 		},
 		{
 			"name": "neo4j.test.options.connection-acquisition-timeout",
@@ -638,12 +635,12 @@ class Neo4jProperties {
 		{
 			"name": "neo4j.test.options.encryption",
 			"type": "boolean",
-			"sourceType": "test.Neo4jProperties"
+			"sourceType": "org.neo4j.driver.Config$ConfigBuilder"
 		},
 		{
 			"name": "neo4j.test.options.trust-strategy",
 			"type": "org.neo4j.driver.Config$TrustStrategy",
-			"sourceType": "test.Neo4jProperties"
+			"sourceType": "org.neo4j.driver.Config$ConfigBuilder"
 		},
 		{
 			"name": "neo4j.test.options.routing-table-purge-delay",
@@ -653,7 +650,7 @@ class Neo4jProperties {
 		{
 			"name": "neo4j.test.options.fetch-size",
 			"type": "long",
-			"sourceType": "test.Neo4jProperties"
+			"sourceType": "org.neo4j.driver.Config$ConfigBuilder"
 		},
 		{
 			"name": "neo4j.test.options.connection-timeout",
@@ -668,37 +665,37 @@ class Neo4jProperties {
 		{
 			"name": "neo4j.test.options.resolver",
 			"type": "org.neo4j.driver.net.ServerAddressResolver",
-			"sourceType": "test.Neo4jProperties"
+			"sourceType": "org.neo4j.driver.Config$ConfigBuilder"
 		},
 		{
 			"name": "neo4j.test.options.driver-metrics",
 			"type": "boolean",
-			"sourceType": "test.Neo4jProperties"
+			"sourceType": "org.neo4j.driver.Config$ConfigBuilder"
 		},
 		{
 			"name": "neo4j.test.options.metrics-adapter",
 			"type": "org.neo4j.driver.MetricsAdapter",
-			"sourceType": "test.Neo4jProperties"
+			"sourceType": "org.neo4j.driver.Config$ConfigBuilder"
 		},
 		{
 			"name": "neo4j.test.options.event-loop-threads",
 			"type": "int",
-			"sourceType": "test.Neo4jProperties"
+			"sourceType": "org.neo4j.driver.Config$ConfigBuilder"
 		},
 		{
 			"name": "neo4j.test.options.user-agent",
 			"type": "java.lang.String",
-			"sourceType": "test.Neo4jProperties"
+			"sourceType": "org.neo4j.driver.Config$ConfigBuilder"
 		},
 		{
 			"name": "neo4j.test.options.notification-config",
 			"type": "org.neo4j.driver.NotificationConfig",
-			"sourceType": "test.Neo4jProperties"
+			"sourceType": "org.neo4j.driver.Config$ConfigBuilder"
 		},
 		{
 			"name": "neo4j.test.options.telemetry-disabled",
 			"type": "boolean",
-			"sourceType": "test.Neo4jProperties"
+			"sourceType": "org.neo4j.driver.Config$ConfigBuilder"
 		}
 	]
 }''')
@@ -798,10 +795,6 @@ class ParentConfig {
     {
       "name": "parent.foo.bar.baz",
       "type": "test.MyConfig$ChildConfig"
-    },
-    {
-      "name": "parent",
-      "type": "test.ParentConfig"
     }
   ],
   "properties": [

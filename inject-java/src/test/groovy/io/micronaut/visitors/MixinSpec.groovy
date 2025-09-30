@@ -6,6 +6,38 @@ import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 
 class MixinSpec extends AbstractTypeElementSpec {
 
+    void 'test inner class'() {
+        when:
+            def myBean = buildBeanIntrospection('mixin.$mixin_MyBean$Inner', '''
+package mixin;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.micronaut.context.annotation.ClassImport;
+import io.micronaut.context.annotation.Mixin;
+import io.micronaut.core.annotation.Introspected;
+
+class MyBean {
+    static final class Inner {
+        String name;
+    }
+}
+
+@Mixin(MyBean.Inner.class)
+@Introspected(accessKind = Introspected.AccessKind.FIELD)
+class MyBeanMixin {
+    @JsonProperty("hello")
+    String name;
+}
+
+@ClassImport(classes = MyBean.Inner.class)
+class Import {
+}
+
+''')
+        then:
+            myBean.getProperty("name").get().stringValue(JsonProperty).get() == "hello"
+    }
+
     void 'test field'() {
         when:
             def myBean = buildBeanIntrospection('mixin.MyBean', '''

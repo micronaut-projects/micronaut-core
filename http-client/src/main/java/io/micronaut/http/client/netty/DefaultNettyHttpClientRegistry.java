@@ -16,6 +16,7 @@
 package io.micronaut.http.client.netty;
 
 import io.micronaut.context.BeanContext;
+import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Factory;
@@ -52,6 +53,7 @@ import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
 import io.micronaut.http.client.netty.ssl.ClientSslBuilder;
+import io.micronaut.http.client.netty.ssl.NettyClientSslFactory;
 import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.http.client.sse.SseClientRegistry;
 import io.micronaut.http.codec.MediaTypeCodec;
@@ -64,6 +66,7 @@ import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
 import io.micronaut.http.netty.channel.EventLoopGroupFactory;
 import io.micronaut.http.netty.channel.EventLoopGroupRegistry;
 import io.micronaut.http.netty.channel.NettyChannelType;
+import io.micronaut.http.ssl.CertificateProvider;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.inject.InjectionPoint;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -124,6 +127,8 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     private final List<DefaultHttpClient> balancedClients = Collections.synchronizedList(new ArrayList<>());
     private final LoadBalancerResolver loadBalancerResolver;
     private final ClientSslBuilder nettyClientSslBuilder;
+    private final NettyClientSslFactory sslFactory;
+    private final BeanProvider<CertificateProvider> certificateProviders;
     private final ThreadFactory threadFactory;
     private final MediaTypeCodecRegistry codecRegistry;
     private final MessageBodyHandlerRegistry handlerRegistry;
@@ -144,6 +149,8 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
      * @param httpClientFilterResolver        The HTTP client filter resolver
      * @param loadBalancerResolver            The load balancer resolver
      * @param nettyClientSslBuilder           The client SSL builder
+     * @param sslFactory                      The client SSL builder factory
+     * @param certificateProviders            Certificate provider bean for named lookup
      * @param threadFactory                   The thread factory
      * @param codecRegistry                   The codec registry
      * @param handlerRegistry                 The handler registry
@@ -154,24 +161,26 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
      * @param blockingExecutor                Optional executor for blocking operations
      */
     public DefaultNettyHttpClientRegistry(
-            HttpClientConfiguration defaultHttpClientConfiguration,
-            HttpClientFilterResolver<ClientFilterResolutionContext> httpClientFilterResolver,
-            LoadBalancerResolver loadBalancerResolver,
-            ClientSslBuilder nettyClientSslBuilder,
-            ThreadFactory threadFactory,
-            MediaTypeCodecRegistry codecRegistry,
-            MessageBodyHandlerRegistry handlerRegistry,
-            EventLoopGroupRegistry eventLoopGroupRegistry,
-            EventLoopGroupFactory eventLoopGroupFactory,
-            BeanContext beanContext,
-            JsonMapper jsonMapper,
-            @Nullable
-            @Named(TaskExecutors.BLOCKING)
-            ExecutorService blockingExecutor) {
+        HttpClientConfiguration defaultHttpClientConfiguration,
+        HttpClientFilterResolver<ClientFilterResolutionContext> httpClientFilterResolver,
+        LoadBalancerResolver loadBalancerResolver,
+        ClientSslBuilder nettyClientSslBuilder,
+        NettyClientSslFactory sslFactory,
+        BeanProvider<CertificateProvider> certificateProviders,
+        ThreadFactory threadFactory,
+        MediaTypeCodecRegistry codecRegistry,
+        MessageBodyHandlerRegistry handlerRegistry,
+        EventLoopGroupRegistry eventLoopGroupRegistry,
+        EventLoopGroupFactory eventLoopGroupFactory,
+        BeanContext beanContext,
+        JsonMapper jsonMapper,
+        @Nullable @Named(TaskExecutors.BLOCKING) ExecutorService blockingExecutor) {
         this.clientFilterResolver = httpClientFilterResolver;
         this.defaultHttpClientConfiguration = defaultHttpClientConfiguration;
         this.loadBalancerResolver = loadBalancerResolver;
         this.nettyClientSslBuilder = nettyClientSslBuilder;
+        this.sslFactory = sslFactory;
+        this.certificateProviders = certificateProviders;
         this.threadFactory = threadFactory;
         this.codecRegistry = codecRegistry;
         this.handlerRegistry = handlerRegistry;
@@ -460,6 +469,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             )))
             .threadFactory(threadFactory)
             .nettyClientSslBuilder(nettyClientSslBuilder)
+            .sslFactory(sslFactory, certificateProviders)
             .codecRegistry(codecRegistry)
             .handlerRegistry(handlerRegistry)
             .webSocketBeanRegistry(WebSocketBeanRegistry.forClient(beanContext))

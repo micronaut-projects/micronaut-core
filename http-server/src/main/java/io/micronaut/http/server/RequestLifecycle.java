@@ -254,7 +254,8 @@ public class RequestLifecycle {
             }
             if (RouteExecutor.isIgnorable(cause)) {
                 RouteExecutor.logIgnoredException(cause);
-                return ExecutionFlow.empty();
+                // the client won't see this response, but we need one for filters and such
+                return ExecutionFlow.just(HttpResponse.badRequest("Stream closed"));
             }
             return createDefaultErrorResponseFlow(request, cause);
         }

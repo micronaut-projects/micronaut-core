@@ -603,7 +603,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
 
     @Override
     public String getPackageName() {
-        return classNode.getPackageName();
+        return Objects.requireNonNullElse(classNode.getPackageName(), "");
     }
 
     @Override

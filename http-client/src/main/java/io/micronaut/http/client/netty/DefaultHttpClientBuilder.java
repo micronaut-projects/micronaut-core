@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.netty;
 
+import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
@@ -29,10 +30,12 @@ import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
 import io.micronaut.http.client.filter.DefaultHttpClientFilterResolver;
 import io.micronaut.http.client.netty.ssl.ClientSslBuilder;
+import io.micronaut.http.client.netty.ssl.NettyClientSslFactory;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.filter.HttpClientFilter;
 import io.micronaut.http.filter.HttpClientFilterResolver;
 import io.micronaut.http.filter.HttpFilterResolver;
+import io.micronaut.http.ssl.CertificateProvider;
 import io.micronaut.websocket.context.WebSocketBeanRegistry;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFactory;
@@ -73,6 +76,8 @@ public final class DefaultHttpClientBuilder {
     @Nullable
     ThreadFactory threadFactory;
     ClientSslBuilder nettyClientSslBuilder;
+    NettyClientSslFactory sslFactory;
+    BeanProvider<CertificateProvider> certificateProviders;
     MediaTypeCodecRegistry codecRegistry;
     MessageBodyHandlerRegistry handlerRegistry;
     @NonNull
@@ -182,6 +187,15 @@ public final class DefaultHttpClientBuilder {
     public DefaultHttpClientBuilder nettyClientSslBuilder(@NonNull ClientSslBuilder nettyClientSslBuilder) {
         ArgumentUtils.requireNonNull("nettyClientSslBuilder", nettyClientSslBuilder);
         this.nettyClientSslBuilder = nettyClientSslBuilder;
+        return this;
+    }
+
+    @NonNull
+    public DefaultHttpClientBuilder sslFactory(@NonNull NettyClientSslFactory sslFactory, @NonNull BeanProvider<CertificateProvider> certificateProviders) {
+        ArgumentUtils.requireNonNull("sslFactory", sslFactory);
+        ArgumentUtils.requireNonNull("certificateProviders", certificateProviders);
+        this.sslFactory = sslFactory;
+        this.certificateProviders = certificateProviders;
         return this;
     }
 

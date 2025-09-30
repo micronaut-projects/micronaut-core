@@ -6,10 +6,9 @@ import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.body.CloseableAvailableByteBody;
 import io.micronaut.http.client.RawHttpClient;
-import io.micronaut.http.netty.body.AvailableNettyByteBody;
+import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
@@ -144,9 +143,7 @@ public class RawClientBenchmark {
                 .bind().syncUninterruptibly().channel();
 
             request = HttpRequest.POST("http://127.0.0.1:" + server.localAddress().getPort() + "/foo", null);
-            ByteBuf req = ByteBufAllocator.DEFAULT.buffer();
-            ByteBufUtil.writeUtf8(req, "foo");
-            requestBody = new AvailableNettyByteBody(req);
+            requestBody = new NettyByteBodyFactory(server).copyOf("foo", StandardCharsets.UTF_8);
 
             try (ByteBodyHttpResponse<?> response = (ByteBodyHttpResponse<?>) Mono.from(client.exchange(request, requestBody.split(), null)).block()) {
                 Assertions.assertEquals("bar", response.byteBody().buffer().get().toString(StandardCharsets.UTF_8));

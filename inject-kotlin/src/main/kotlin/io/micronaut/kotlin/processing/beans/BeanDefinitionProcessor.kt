@@ -18,11 +18,14 @@ package io.micronaut.kotlin.processing.beans
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
-import com.google.devtools.ksp.symbol.*
+import com.google.devtools.ksp.symbol.ClassKind
+import com.google.devtools.ksp.symbol.KSAnnotated
+import com.google.devtools.ksp.symbol.KSAnnotation
+import com.google.devtools.ksp.symbol.KSClassDeclaration
+import com.google.devtools.ksp.symbol.KSFile
+import com.google.devtools.ksp.symbol.Modifier
 import io.micronaut.core.annotation.Generated
 import io.micronaut.core.annotation.Vetoed
-import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.processing.BeanDefinitionCreator
 import io.micronaut.inject.processing.BeanDefinitionCreatorFactory
 import io.micronaut.inject.processing.ProcessingException
 import io.micronaut.inject.writer.BeanDefinitionVisitor
@@ -35,12 +38,10 @@ import java.io.IOException
 
 internal class BeanDefinitionProcessor(private val environment: SymbolProcessorEnvironment): SymbolProcessor {
 
-    private val beanDefinitionMap = mutableMapOf<String, List<BeanDefinitionVisitor>>()
-    private var visitorContext : KotlinVisitorContext? = null
     private val processed = HashSet<String>()
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
-        visitorContext = KotlinVisitorContext(environment, resolver)
+        val visitorContext = KotlinVisitorContext(environment, resolver)
 
         val elements = resolver.getAllFiles()
             .flatMap { file: KSFile ->
@@ -55,7 +56,7 @@ internal class BeanDefinitionProcessor(private val environment: SymbolProcessorE
             .toList()
 
         try {
-            processClassDeclarations(elements, visitorContext!!)
+            processClassDeclarations(elements, visitorContext)
         } catch (e: ProcessingException) {
             handleProcessingException(environment, e)
         }
@@ -87,40 +88,27 @@ internal class BeanDefinitionProcessor(private val environment: SymbolProcessorE
                 if (innerClasses.isNotEmpty()) {
                     processClassDeclarations(innerClasses, visitorContext)
                 }
-                beanDefinitionMap.computeIfAbsent(classElement.name) {
+                try {
+                    val outputVisitor = KotlinOutputVisitor(environment, visitorContext)
                     val produce = BeanDefinitionCreatorFactory.produce(classElement, visitorContext)
-                    val list = ArrayList<BeanDefinitionVisitor>()
                     for (writer in produce.build()) {
                         if (processed.add(writer.beanDefinitionName)) {
                             writer.visitBeanDefinitionEnd()
-                            list.add(writer)
+                            processBeanDefinitions(writer, outputVisitor)
                         }
                     }
-                    list
+                } catch (e: ProcessingException) {
+                    handleProcessingException(environment, e)
                 }
             }
         }
     }
 
     override fun finish() {
-        try {
-            val outputVisitor = KotlinOutputVisitor(environment, visitorContext!!)
-            var count = 0
-            for (writers in beanDefinitionMap.values) {
-                for (writer in writers) {
-                    processBeanDefinitions(writer, outputVisitor)
-                    count++
-                }
-            }
-            if (count > 0) {
-                environment.logger.info("Created $count bean definitions")
-            }
-        } catch (e: ProcessingException) {
-            handleProcessingException(environment, e)
-        } finally {
-            BeanDefinitionWriter.finish()
-            beanDefinitionMap.clear()
+        if (processed.isNotEmpty()) {
+            environment.logger.info("Created ${processed.size} bean definitions")
         }
+        BeanDefinitionWriter.finish()
     }
 
     companion object Helper {

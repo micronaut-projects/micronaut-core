@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.qualifiers;
 
+import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
@@ -45,9 +46,9 @@ import java.util.stream.Collectors;
 @Internal
 public final class InterceptorBindingQualifier<T> extends FilteringQualifier<T> {
     public static final String META_BINDING_VALUES = "$bindingValues";
-    private static final String META_MEMBER_INTERCEPTOR_TYPE = "interceptorType";
+    public static final String META_MEMBER_INTERCEPTOR_TYPE = "interceptorType";
     private final Map<String, List<AnnotationValue<?>>> supportedAnnotationNames;
-    private final Set<Class<?>> supportedInterceptorTypes;
+    private final Set<String> supportedInterceptorTypes;
 
     InterceptorBindingQualifier(AnnotationMetadata annotationMetadata) {
         final Collection<AnnotationValue<?>> annotationValues;
@@ -58,9 +59,9 @@ public final class InterceptorBindingQualifier<T> extends FilteringQualifier<T> 
             annotationValues = (Collection) av.getAnnotations(AnnotationMetadata.VALUE_MEMBER);
         }
         supportedAnnotationNames = findSupportedAnnotations(annotationValues);
-        Set<Class<?>> supportedInterceptorTypes = CollectionUtils.newHashSet(annotationValues.size());
+        Set<String> supportedInterceptorTypes = CollectionUtils.newHashSet(annotationValues.size());
         for (AnnotationValue<?> annotationValue : annotationValues) {
-            annotationValue.classValue(META_MEMBER_INTERCEPTOR_TYPE).ifPresent(supportedInterceptorTypes::add);
+            annotationValue.annotationClassValue(META_MEMBER_INTERCEPTOR_TYPE).map(AnnotationClassValue::getName).ifPresent(supportedInterceptorTypes::add);
         }
         this.supportedInterceptorTypes = supportedInterceptorTypes;
     }
@@ -99,8 +100,11 @@ public final class InterceptorBindingQualifier<T> extends FilteringQualifier<T> 
 
     @Override
     public boolean doesQualify(Class<T> beanType, BeanType<T> candidate) {
-        if (supportedInterceptorTypes.contains(candidate.getBeanType())) {
+        if (supportedInterceptorTypes.contains(candidate.getBeanType().getName())) {
             return true;
+        }
+        if (supportedAnnotationNames.isEmpty()) {
+            return false;
         }
         final AnnotationMetadata annotationMetadata = candidate.getAnnotationMetadata();
         Collection<AnnotationValue<Annotation>> interceptorValues = resolveInterceptorAnnotationValues(annotationMetadata, null);
@@ -123,9 +127,8 @@ public final class InterceptorBindingQualifier<T> extends FilteringQualifier<T> 
                     matched = matched && (!binding.isPresent(META_BINDING_VALUES) || binding.equals(otherBinding));
                 }
                 return matched;
-            } else {
-                return supportedAnnotationNames.containsKey(annotationName);
             }
+            return supportedAnnotationNames.containsKey(annotationName);
         } else {
             // multiple binding case
             boolean matched = false;
@@ -179,7 +182,7 @@ public final class InterceptorBindingQualifier<T> extends FilteringQualifier<T> 
             return "@InterceptorBinding(NONE)";
         } else {
             return supportedAnnotationNames.keySet().stream().map((name) -> "@InterceptorBinding(" + NameUtils.getShortenedName(name) + ")").collect(Collectors.joining(" ")) +
-                    supportedInterceptorTypes.stream().map((type) -> "@InterceptorBinding(interceptorType = " + NameUtils.getShortenedName(type.getTypeName()) + ")").collect(Collectors.joining(" "));
+                    supportedInterceptorTypes.stream().map((type) -> "@InterceptorBinding(interceptorType = " + NameUtils.getShortenedName(type) + ")").collect(Collectors.joining(" "));
         }
     }
 

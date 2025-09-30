@@ -16,7 +16,6 @@
 package io.micronaut.core.util;
 
 import io.micronaut.core.annotation.Nullable;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -498,6 +497,80 @@ public final class StringUtils {
     public static Iterator<String> splitOmitEmptyStringsIterator(final CharSequence sequence, final char splitCharacter) {
         Objects.requireNonNull(sequence);
         return new SplitOmitEmptyIterator(sequence, splitCharacter);
+    }
+
+    /**
+     * Port from Netty StringUtil.
+     * @see <a href="https://github.com/netty/netty/blob/4.2/common/src/main/java/io/netty/util/internal/StringUtil.java">Netty StringUtil</a>
+     * @param seq String for which you wish to calculate the number of bytes for UTF-8
+     * @return  the exact bytes length of UTF8 character sequence.
+     */
+    public static int utf8Bytes(final CharSequence seq) {
+        return utf8ByteCount(seq, 0, seq.length());
+    }
+
+    /**
+     * Port from Netty StringUtil.
+     * @see <a href="https://github.com/netty/netty/blob/4.2/common/src/main/java/io/netty/util/internal/StringUtil.java">Netty StringUtil</a>
+     */
+    private static int utf8ByteCount(final CharSequence seq, int start, int end) {
+        int i = start;
+        // ASCII fast path
+        while (i < end && seq.charAt(i) < 0x80) {
+            ++i;
+        }
+        // !ASCII is packed in a separate method to let the ASCII case be smaller
+        return i < end ? (i - start) + utf8BytesNonAscii(seq, i, end) : i - start;
+    }
+
+    /**
+     * Determine if {@code c} lies within the range of values defined for.
+     * <a href="https://unicode.org/glossary/#surrogate_code_point">Surrogate Code Point</a>.
+     * Port from Netty https://github.com/netty/netty/blob/4.2/common/src/main/java/io/netty/util/internal/StringUtil.java
+     * @param c the character to check.
+     * @return {@code true} if {@code c} lies within the range of values defined for
+     * <a href="https://unicode.org/glossary/#surrogate_code_point">Surrogate Code Point</a>. {@code false} otherwise.
+     */
+    private static boolean isSurrogate(char c) {
+        return c >= '\uD800' && c <= '\uDFFF';
+    }
+
+    /**
+     * Port from Netty StringUtil.
+     * @see <a href="https://github.com/netty/netty/blob/4.2/common/src/main/java/io/netty/util/internal/StringUtil.java">Netty StringUtil</a>
+     */
+    private static int utf8BytesNonAscii(final CharSequence seq, final int start, final int end) {
+        int encodedLength = 0;
+        for (int i = start; i < end; i++) {
+            final char c = seq.charAt(i);
+            // making it 100% branchless isn't rewarding due to the many bit operations necessary!
+            if (c < 0x800) {
+                // branchless version of: (c <= 127 ? 0:1) + 1
+                encodedLength += ((0x7f - c) >>> 31) + 1;
+            } else if (isSurrogate(c)) {
+                if (!Character.isHighSurrogate(c)) {
+                    encodedLength++;
+                    // WRITE_UTF_UNKNOWN
+                    continue;
+                }
+                // Surrogate Pair consumes 2 characters.
+                if (++i == end) {
+                    encodedLength++;
+                    // WRITE_UTF_UNKNOWN
+                    break;
+                }
+                if (!Character.isLowSurrogate(seq.charAt(i))) {
+                    // WRITE_UTF_UNKNOWN + (Character.isHighSurrogate(c2) ? WRITE_UTF_UNKNOWN : c2)
+                    encodedLength += 2;
+                    continue;
+                }
+                // See https://www.unicode.org/versions/Unicode7.0.0/ch03.pdf#G2630.
+                encodedLength += 4;
+            } else {
+                encodedLength += 3;
+            }
+        }
+        return encodedLength;
     }
 
     /**

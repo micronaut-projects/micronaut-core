@@ -169,8 +169,8 @@ class ListenerConfigurationSpec extends Specification {
         def server = (NettyEmbeddedServer) ApplicationContext.run(
                 EmbeddedServer,
                 [
-                        'micronaut.netty.event-loops.default.prefer-native-transport': true,
-                        'micronaut.netty.event-loops.parent.prefer-native-transport': true,
+                        'micronaut.netty.event-loops.default.transport': 'epoll',
+                        'micronaut.netty.event-loops.parent.transport': 'epoll',
                         'micronaut.server.netty.listeners.a.family': 'UNIX',
                         'micronaut.server.netty.listeners.a.path': bindPath,
                 ])
@@ -229,8 +229,8 @@ class ListenerConfigurationSpec extends Specification {
         def server = (NettyEmbeddedServer) ApplicationContext.run(
                 EmbeddedServer,
                 [
-                        'micronaut.netty.event-loops.default.prefer-native-transport': false,
-                        'micronaut.netty.event-loops.parent.prefer-native-transport': false,
+                        'micronaut.netty.event-loops.default.transport': 'epoll',
+                        'micronaut.netty.event-loops.parent.transport': 'epoll',
                         'micronaut.server.netty.listeners.a.family': 'UNIX',
                         'micronaut.server.netty.listeners.a.path': bindPath,
                 ])
@@ -295,8 +295,8 @@ class ListenerConfigurationSpec extends Specification {
         def server = (NettyEmbeddedServer) ApplicationContext.run(
                 EmbeddedServer,
                 [
-                        'micronaut.netty.event-loops.default.prefer-native-transport': true,
-                        'micronaut.netty.event-loops.parent.prefer-native-transport': true,
+                        'micronaut.netty.event-loops.default.transport': 'epoll',
+                        'micronaut.netty.event-loops.parent.transport': 'epoll',
                         'micronaut.server.netty.listeners.a.bind': false,
                         'micronaut.server.netty.listeners.a.fd': sock.intValue(),
                 ])

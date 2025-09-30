@@ -42,12 +42,12 @@ jobs:
          df -h
 
       - name: "📥 Checkout repository"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - name: "🔧 Setup GraalVM CE"
-        uses: graalvm/setup-graalvm@v1.3.5
+        uses: graalvm/setup-graalvm@v1.3.6
         with:
           distribution: 'graalvm'
           java-version: ${{ matrix.java }}

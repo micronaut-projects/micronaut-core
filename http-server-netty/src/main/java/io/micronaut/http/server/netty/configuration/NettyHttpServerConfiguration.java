@@ -221,6 +221,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private boolean legacyMultiplexHandlers = false;
     private int formMaxFields = DEFAULT_FORM_MAX_FIELDS;
     private int formMaxBufferedBytes = DEFAULT_FORM_MAX_BUFFERED_BYTES;
+    private boolean requestDecompressionEnabled = true;
 
     /**
      * Default empty constructor.
@@ -775,6 +776,29 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     }
 
     /**
+     * Whether request content decompression is enabled in the Netty HTTP server.
+     * When disabled, the server will not decode Content-Encoding or Transfer-Encoding on requests
+     * and will pass the compressed body and headers through unchanged.
+     * Default: true.
+     *
+     * @return true if automatic request content decompression is enabled
+     */
+    public boolean isRequestDecompressionEnabled() {
+        return requestDecompressionEnabled;
+    }
+
+    /**
+     * Enable or disable automatic request content decompression in the Netty HTTP server.
+     * Disabling this can be useful for proxy or testing scenarios where the compressed payload
+     * and Content-Encoding header need to be observed.
+     *
+     * @param requestDecompressionEnabled true to enable decompression, false to disable it
+     */
+    public void setRequestDecompressionEnabled(boolean requestDecompressionEnabled) {
+        this.requestDecompressionEnabled = requestDecompressionEnabled;
+    }
+
+    /**
      * Prior to 4.4.0, the Micronaut HTTP server used a multi-pipeline approach for handling HTTP/2
      * connections where every request got its own netty pipeline with HTTP/2 to HTTP/1.1
      * converters on the pipeline. This allowed for using mostly unchanged HTTP/1.1 in the request
@@ -1302,6 +1326,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         private Integer ioRatio;
         private String executor;
         private boolean preferNativeTransport = false;
+        private List<String> transport;
         private Duration shutdownQuietPeriod = Duration.ofSeconds(DEFAULT_SHUTDOWN_QUIET_PERIOD);
         private Duration shutdownTimeout = Duration.ofSeconds(DEFAULT_SHUTDOWN_TIMEOUT);
         private String name;
@@ -1439,6 +1464,26 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         }
 
         @Override
+        public @NonNull List<String> getTransport() {
+            return transport == null ? EventLoopGroupConfiguration.super.getTransport() : transport;
+        }
+
+        /**
+         * The transports to use for this event loop, in order of preference. Supported values are
+         * {@code io_uring,epoll,kqueue,nio}. The first available transport out of those listed will
+         * be used (nio is always available). If no listed transport is available, an exception will be
+         * thrown.
+         * <p>By default, only {@code nio} is used, even if native transports are available. If the
+         * legacy {@link #isPreferNativeTransport() prefer-native-transport} property is set to
+         * {@code true}, this defaults to {@code io_uring,epoll,kqueue,nio}.
+         *
+         * @param transport The available transports, in order of preference
+         */
+        public void setTransport(@NonNull List<String> transport) {
+            this.transport = transport;
+        }
+
+        @Override
         public Duration getShutdownQuietPeriod() {
             return shutdownQuietPeriod;
         }
@@ -1474,6 +1519,8 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         private final String name;
         private Family family = Family.TCP;
         private boolean ssl;
+        private String keyName;
+        private String trustName;
         @Nullable
         private String host;
         private int port;
@@ -1511,15 +1558,19 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          * @param host The host to bind to
          * @param port The port to bind to
          * @param ssl Whether to enable SSL
+         * @param keyName Optional certificate name to use
+         * @param trustName Optional trust store name to use
          * @return The configuration with the given settings
          */
         @Internal
-        public static NettyListenerConfiguration createTcp(@Nullable String host, int port, boolean ssl) {
+        public static NettyListenerConfiguration createTcp(@Nullable String host, int port, boolean ssl, @Nullable String keyName, @Nullable String trustName) {
             NettyListenerConfiguration configuration = new NettyListenerConfiguration(host + ":" + port);
             configuration.setFamily(Family.TCP);
             configuration.setHost(host);
             configuration.setPort(port);
             configuration.setSsl(ssl);
+            configuration.setKeyName(keyName);
+            configuration.setTrustName(trustName);
             return configuration;
         }
 
@@ -1565,6 +1616,52 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          */
         public void setSsl(boolean ssl) {
             this.ssl = ssl;
+        }
+
+        /**
+         * Name of a {@link io.micronaut.http.ssl.CertificateProvider} bean that supplies the private key and certificate chain
+         * for this listener's SSL context. When set, Micronaut resolves the named provider and subscribes to its keystore updates.
+         * If not set, the global SSL configuration (e.g. {@link io.micronaut.http.ssl.SslConfiguration#getKeyName()}) or legacy
+         * keystore properties may be used instead.
+         * @return the name of the certificate provider for key material on this listener or {@code null}
+         */
+        @Nullable
+        public String getKeyName() {
+            return keyName;
+        }
+
+        /**
+         * Name of a {@link io.micronaut.http.ssl.CertificateProvider} bean that supplies the private key and certificate chain
+         * for this listener's SSL context. When set, Micronaut resolves the named provider and subscribes to its keystore updates.
+         * If not set, the global SSL configuration (e.g. {@link io.micronaut.http.ssl.SslConfiguration#getKeyName()}) or legacy
+         * keystore properties may be used instead.
+         * @param keyName the name of the certificate provider for key material on this listener or {@code null}
+         */
+        public void setKeyName(@Nullable String keyName) {
+            this.keyName = keyName;
+        }
+
+        /**
+         * Name of a {@link io.micronaut.http.ssl.CertificateProvider} bean that supplies the trust material (trusted certificates)
+         * for this listener's SSL context. When set, Micronaut resolves the named provider and subscribes to its keystore updates.
+         * If not set, the global SSL configuration (e.g. {@link io.micronaut.http.ssl.SslConfiguration#getTrustName()}) or legacy
+         * trust store properties may be used instead.
+         * @return the name of the certificate provider for trust material on this listener or {@code null}
+         */
+        @Nullable
+        public String getTrustName() {
+            return trustName;
+        }
+
+        /**
+         * Name of a {@link io.micronaut.http.ssl.CertificateProvider} bean that supplies the trust material (trusted certificates)
+         * for this listener's SSL context. When set, Micronaut resolves the named provider and subscribes to its keystore updates.
+         * If not set, the global SSL configuration (e.g. {@link io.micronaut.http.ssl.SslConfiguration#getTrustName()}) or legacy
+         * trust store properties may be used instead.
+         * @param trustName the name of the certificate provider for trust material on this listener or {@code null}
+         */
+        public void setTrustName(@Nullable String trustName) {
+            this.trustName = trustName;
         }
 
         /**

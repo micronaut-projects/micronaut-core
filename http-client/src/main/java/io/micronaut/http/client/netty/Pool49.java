@@ -23,8 +23,6 @@ import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.netty.channel.loom.EventLoopVirtualThreadScheduler;
-import io.micronaut.http.netty.channel.loom.PrivateLoomSupport;
-import io.micronaut.scheduling.LoomSupport;
 import io.netty.channel.EventLoop;
 import io.netty.channel.SingleThreadIoEventLoop;
 import io.netty.util.concurrent.EventExecutor;
@@ -189,10 +187,9 @@ final class Pool49 implements Pool {
 
             EventExecutor currentExecutor = null;
 
-            if (PrivateLoomSupport.isSupported() &&
-                LoomSupport.isVirtual(Thread.currentThread()) &&
-                PrivateLoomSupport.getScheduler(Thread.currentThread()) instanceof EventLoopVirtualThreadScheduler el) {
-                currentExecutor = el.eventLoop();
+            EventLoopVirtualThreadScheduler elvts = EventLoopVirtualThreadScheduler.current();
+            if (elvts != null) {
+                currentExecutor = elvts.eventLoop();
             }
 
             if (currentExecutor == null) {

@@ -15,10 +15,13 @@
  */
 package io.micronaut.http.client.netty;
 
+import io.micronaut.context.BeanProvider;
+import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.reflect.InstantiationUtils;
@@ -29,7 +32,15 @@ import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.HttpClientExceptionUtils;
 import io.micronaut.http.client.netty.ssl.ClientSslBuilder;
+import io.micronaut.http.client.netty.ssl.NettyClientSslBuilder;
+import io.micronaut.http.client.netty.ssl.NettyClientSslFactory;
+import io.micronaut.http.netty.NettySslContextBuilder;
+import io.micronaut.http.netty.SslContextAutoLoader;
+import io.micronaut.http.netty.SslContextHolder;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
+import io.micronaut.http.ssl.AbstractClientSslConfiguration;
+import io.micronaut.http.ssl.CertificateProvider;
+import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.websocket.exceptions.WebSocketSessionException;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBufAllocator;
@@ -48,16 +59,8 @@ import io.netty.channel.ChannelPromise;
 import io.netty.channel.EventLoop;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.MultiThreadIoEventLoopGroup;
+import io.netty.channel.MultithreadEventLoopGroup;
 import io.netty.channel.nio.NioIoHandler;
-import io.netty.handler.codec.http3.Http3;
-import io.netty.handler.codec.http3.Http3ClientConnectionHandler;
-import io.netty.handler.codec.http3.Http3FrameToHttpObjectCodec;
-import io.netty.handler.codec.http3.Http3HeadersFrame;
-import io.netty.handler.codec.http3.Http3RequestStreamInitializer;
-import io.netty.handler.codec.http3.Http3SettingsFrame;
-import io.netty.handler.codec.quic.QuicChannel;
-import io.netty.handler.codec.quic.QuicSslContext;
-import io.netty.handler.codec.quic.QuicStreamChannel;
 import io.netty.handler.codec.DecoderException;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.HttpClientCodec;
@@ -83,6 +86,15 @@ import io.netty.handler.codec.http2.Http2SettingsFrame;
 import io.netty.handler.codec.http2.Http2StreamChannel;
 import io.netty.handler.codec.http2.Http2StreamChannelBootstrap;
 import io.netty.handler.codec.http2.Http2StreamFrameToHttpObjectCodec;
+import io.netty.handler.codec.http3.Http3;
+import io.netty.handler.codec.http3.Http3ClientConnectionHandler;
+import io.netty.handler.codec.http3.Http3FrameToHttpObjectCodec;
+import io.netty.handler.codec.http3.Http3HeadersFrame;
+import io.netty.handler.codec.http3.Http3RequestStreamInitializer;
+import io.netty.handler.codec.http3.Http3SettingsFrame;
+import io.netty.handler.codec.quic.QuicChannel;
+import io.netty.handler.codec.quic.QuicSslContext;
+import io.netty.handler.codec.quic.QuicStreamChannel;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.pcap.PcapWriteHandler;
@@ -108,6 +120,7 @@ import io.netty.util.ReferenceCountUtil;
 import io.netty.util.ResourceLeakDetector;
 import io.netty.util.ResourceLeakDetectorFactory;
 import io.netty.util.ResourceLeakTracker;
+import io.netty.util.concurrent.DefaultThreadFactory;
 import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
@@ -156,6 +169,8 @@ public class ConnectionManager {
     private final Logger log;
     private final Map<DefaultHttpClient.RequestKey, PoolHolder> pools = new ConcurrentHashMap<>();
     private final ClientSslBuilder nettyClientSslBuilder;
+    private final NettyClientSslFactory sslFactory;
+    private final BeanProvider<CertificateProvider> certificateProviders;
 
     private EventLoopGroup group;
     private final boolean shutdownGroup;
@@ -169,9 +184,9 @@ public class ConnectionManager {
     private Bootstrap bootstrap;
     private Bootstrap udpBootstrap;
     private final HttpClientConfiguration configuration;
-    private volatile SslContext sslContext;
-    private volatile /* QuicSslContext */ Object http3SslContext;
-    private volatile SslContext websocketSslContext;
+    private SslContextAutoLoader sslContextWrapper;
+    private SslContextAutoLoader sslContextWrapperWs;
+    private volatile boolean wsContextLoaded;
     private final String informationalServiceId;
 
     /**
@@ -191,76 +206,71 @@ public class ConnectionManager {
         this.bootstrap = from.bootstrap;
         this.udpBootstrap = from.udpBootstrap;
         this.configuration = from.configuration;
-        this.sslContext = from.sslContext;
-        this.http3SslContext = from.http3SslContext;
-        this.websocketSslContext = from.websocketSslContext;
         this.clientCustomizer = from.clientCustomizer;
         this.informationalServiceId = from.informationalServiceId;
         this.nettyClientSslBuilder = from.nettyClientSslBuilder;
+        this.sslFactory = from.sslFactory;
+        this.certificateProviders = from.certificateProviders;
+        this.sslContextWrapper = from.sslContextWrapper;
+        this.sslContextWrapperWs = from.sslContextWrapperWs;
         this.running.set(from.running.get());
     }
 
     ConnectionManager(
         Logger log,
-        @Nullable EventLoopGroup eventLoopGroup,
-        @Nullable ThreadFactory threadFactory,
         HttpClientConfiguration configuration,
-        @Nullable HttpVersionSelection httpVersion,
-        ChannelFactory<? extends Channel> socketChannelFactory,
-        ChannelFactory<? extends Channel> udpChannelFactory,
-        ClientSslBuilder nettyClientSslBuilder,
-        NettyClientCustomizer clientCustomizer,
-        String informationalServiceId,
-        @Nullable AddressResolverGroup<?> resolverGroup) {
+        DefaultHttpClientBuilder builder) {
 
-        if (httpVersion == null) {
-            httpVersion = HttpVersionSelection.forClientConfiguration(configuration);
-        }
-
+        this.httpVersion = builder.explicitHttpVersion == null ? HttpVersionSelection.forClientConfiguration(configuration) : builder.explicitHttpVersion;
         this.log = log;
-        this.httpVersion = httpVersion;
-        this.threadFactory = threadFactory;
-        this.socketChannelFactory = socketChannelFactory;
-        this.udpChannelFactory = udpChannelFactory;
+        this.threadFactory = builder.threadFactory == null ? new DefaultThreadFactory(MultithreadEventLoopGroup.class) : builder.threadFactory;
+        this.socketChannelFactory = builder.socketChannelFactory;
+        this.udpChannelFactory = builder.udpChannelFactory;
         this.configuration = configuration;
-        this.clientCustomizer = clientCustomizer;
-        this.informationalServiceId = informationalServiceId;
-        this.nettyClientSslBuilder = nettyClientSslBuilder;
+        this.clientCustomizer = builder.clientCustomizer;
+        this.informationalServiceId = builder.informationalServiceId;
+        this.nettyClientSslBuilder = builder.nettyClientSslBuilder == null ? new NettyClientSslBuilder(new ResourceResolver()) : builder.nettyClientSslBuilder;
+        this.sslFactory = builder.sslFactory == null ? new NettyClientSslFactory() : builder.sslFactory;
+        this.certificateProviders = builder.certificateProviders == null ? new BeanProvider<>() {
+            @Override
+            public @NonNull CertificateProvider get() {
+                throw new NoSuchBeanException(CertificateProvider.class);
+            }
 
-        if (eventLoopGroup != null) {
-            group = eventLoopGroup;
+            @Override
+            public boolean isPresent() {
+                return false;
+            }
+        } : builder.certificateProviders;
+        this.sslContextWrapper = new ClientContextWrapper(false);
+        this.sslContextWrapperWs = new ClientContextWrapper(true);
+
+        if (builder.eventLoopGroup != null) {
+            group = builder.eventLoopGroup;
             shutdownGroup = false;
         } else {
             group = createEventLoopGroup(configuration, threadFactory);
             shutdownGroup = true;
         }
 
-        this.resolverGroup = resolverGroup == null ? getResolver(configuration.getDnsResolutionMode()) : resolverGroup;
+        this.resolverGroup = builder.resolverGroup == null ? getResolver(configuration.getDnsResolutionMode()) : builder.resolverGroup;
 
         refresh();
     }
 
     final void refresh() {
-        SslContext oldSslContext = sslContext;
-        SslContext oldWebsocketSslContext = websocketSslContext;
-        websocketSslContext = null;
-        if (configuration.getSslConfiguration().isEnabled()) {
-            sslContext = nettyClientSslBuilder.build(configuration.getSslConfiguration(), httpVersion);
+        if (httpVersion.isHttp3() || configuration.getSslConfiguration().isEnabled()) {
+            sslContextWrapper.autoLoad();
         } else {
-            sslContext = null;
+            sslContextWrapper.clear();
         }
-        if (httpVersion.isHttp3()) {
-            http3SslContext = nettyClientSslBuilder.buildHttp3(configuration.getSslConfiguration());
-        } else {
-            http3SslContext = null;
-        }
+        sslContextWrapperWs.clear();
+        wsContextLoaded = false;
         initBootstrap();
         running.set(true);
         for (PoolHolder pool : pools.values()) {
             pool.pool.forEachConnection(c -> ((PoolHolder.ConnectionHolder) c).windDownConnection());
         }
-        ReferenceCountUtil.release(oldSslContext);
-        ReferenceCountUtil.release(oldWebsocketSslContext);
     }
 
     /**
@@ -418,11 +428,9 @@ public class ConnectionManager {
                     Thread.currentThread().interrupt();
                 }
             }
-            ReferenceCountUtil.release(sslContext);
-            ReferenceCountUtil.release(websocketSslContext);
+            sslContextWrapper.clear();
+            sslContextWrapperWs.clear();
             resolverGroup.close();
-            sslContext = null;
-            websocketSslContext = null;
         }
     }
 
@@ -468,7 +476,8 @@ public class ConnectionManager {
     private SslContext buildSslContext(DefaultHttpClient.RequestKey requestKey) {
         final SslContext sslCtx;
         if (requestKey.isSecure()) {
-            sslCtx = sslContext;
+            SslContextHolder holder = sslContextWrapper.takeRetained();
+            sslCtx = holder == null ? null : holder.sslContext();
             //Allow https requests to be sent if SSL is disabled but a proxy is present
             if (sslCtx == null && !configuration.getProxyAddress().isPresent()) {
                 throw decorate(new HttpClientException("Cannot send HTTPS request. SSL is disabled"));
@@ -512,23 +521,19 @@ public class ConnectionManager {
      */
     @Nullable
     private SslContext buildWebsocketSslContext(DefaultHttpClient.RequestKey requestKey) {
-        SslContext sslCtx = websocketSslContext;
         if (requestKey.isSecure()) {
             if (configuration.getSslConfiguration().isEnabled()) {
-                if (sslCtx == null) {
-                    synchronized (this) {
-                        sslCtx = websocketSslContext;
-                        if (sslCtx == null) {
-                            sslCtx = nettyClientSslBuilder.build(configuration.getSslConfiguration(), HttpVersionSelection.forWebsocket());
-                            websocketSslContext = sslCtx;
-                        }
-                    }
+                if (!wsContextLoaded) {
+                    sslContextWrapperWs.autoLoad();
+                    wsContextLoaded = true;
                 }
+                SslContextHolder holder = sslContextWrapperWs.takeRetained();
+                return holder == null ? null : holder.sslContext();
             } else if (configuration.getProxyAddress().isEmpty()) {
                 throw decorate(new HttpClientException("Cannot send WSS request. SSL is disabled"));
             }
         }
-        return sslCtx;
+        return null;
     }
 
     /**
@@ -549,11 +554,18 @@ public class ConnectionManager {
 
                 SslContext sslContext = buildWebsocketSslContext(requestKey);
                 if (sslContext != null) {
-                    ch.pipeline().addLast(configureSslHandler(sslContext.newHandler(ch.alloc(), requestKey.getHost(), requestKey.getPort())));
+                    try {
+                        ch.pipeline().addLast(configureSslHandler(sslContext.newHandler(ch.alloc(), requestKey.getHost(), requestKey.getPort())));
+                    } finally {
+                        ReferenceCountUtil.release(sslContext);
+                    }
                 }
 
                 ch.pipeline()
-                    .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC, new HttpClientCodec())
+                    .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC, new HttpClientCodec(
+                        HttpClientConfiguration.DEFAULT_MAX_INITIAL_LINE_LENGTH,
+                        configuration.getMaxHeaderSize(),
+                        HttpClientConfiguration.DEFAULT_MAX_CHUNK_SIZE))
                     .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_AGGREGATOR, new HttpObjectAggregator(configuration.getMaxContentLength()));
 
                 Optional<Duration> readIdleTime = configuration.getReadIdleTimeout();
@@ -672,9 +684,14 @@ public class ConnectionManager {
     private void initHttp1(Channel ch) {
         addLogHandler(ch);
 
-        ch.pipeline()
-            .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC, new HttpClientCodec())
-            .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECODER, new HttpContentDecompressor());
+        ChannelPipeline pipeline = ch.pipeline();
+        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC, new HttpClientCodec(
+            HttpClientConfiguration.DEFAULT_MAX_INITIAL_LINE_LENGTH,
+            configuration.getMaxHeaderSize(),
+            HttpClientConfiguration.DEFAULT_MAX_CHUNK_SIZE));
+        if (configuration.isDecompressionEnabled()) {
+            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECODER, new HttpContentDecompressor());
+        }
     }
 
     private void addLogHandler(Channel ch) {
@@ -870,12 +887,12 @@ public class ConnectionManager {
     private final class AdaptiveAlpnChannelInitializer extends CustomizerAwareInitializer {
         private final PoolHolder pool;
 
-        private final SslContext sslContext;
+        private final Supplier<SslContext> sslContext;
         private final String host;
         private final int port;
 
         AdaptiveAlpnChannelInitializer(PoolHolder pool,
-                                       SslContext sslContext,
+                                       Supplier<SslContext> sslContext,
                                        String host,
                                        int port) {
             this.pool = pool;
@@ -895,7 +912,12 @@ public class ConnectionManager {
 
             configureProxy(ch.pipeline(), true, host, port);
 
-            ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_SSL, configureSslHandler(sslContext.newHandler(ch.alloc(), host, port)));
+            SslContext sslContext = this.sslContext.get();
+            try {
+                ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_SSL, configureSslHandler(sslContext.newHandler(ch.alloc(), host, port)));
+            } finally {
+                ReferenceCountUtil.release(sslContext);
+            }
 
             insertPcapLoggingHandlerLazy(ch, "tls-unwrapped");
 
@@ -964,7 +986,10 @@ public class ConnectionManager {
 
             Http2FrameCodec frameCodec = makeFrameCodec();
 
-            HttpClientCodec sourceCodec = new HttpClientCodec();
+            HttpClientCodec sourceCodec = new HttpClientCodec(
+                HttpClientConfiguration.DEFAULT_MAX_INITIAL_LINE_LENGTH,
+                configuration.getMaxHeaderSize(),
+                HttpClientConfiguration.DEFAULT_MAX_CHUNK_SIZE);
             Http2ClientUpgradeCodec upgradeCodec = new Http2ClientUpgradeCodec(frameCodec,
                 new ChannelInitializer<Channel>() {
                     @Override
@@ -1038,13 +1063,18 @@ public class ConnectionManager {
 
             insertPcapLoggingHandlerLazy(ch, "outer");
 
-            ch.pipeline()
-                .addLast(Http3.newQuicClientCodecBuilder()
-                    .sslEngineProvider(c -> ((QuicSslContext) http3SslContext).newEngine(c.alloc(), host, port))
-                    .initialMaxData(10000000)
-                    .initialMaxStreamDataBidirectionalLocal(1000000)
-                    .build())
-                .addLast(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR, pool.initialErrorHandler);
+            QuicSslContext quicSslContext = sslContextWrapper.takeRetained().quicSslContext();
+            try {
+                ch.pipeline()
+                    .addLast(Http3.newQuicClientCodecBuilder()
+                        .sslEngineProvider(c -> quicSslContext.newEngine(c.alloc(), host, port))
+                        .initialMaxData(10000000)
+                        .initialMaxStreamDataBidirectionalLocal(1000000)
+                        .build())
+                    .addLast(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR, pool.initialErrorHandler);
+            } finally {
+                ReferenceCountUtil.release(quicSslContext);
+            }
 
             channelCustomizer.onInitialPipelineBuilt();
 
@@ -1151,6 +1181,12 @@ public class ConnectionManager {
          * Notify any {@link NettyClientCustomizer} that the request pipeline has been built.
          */
         public abstract void notifyRequestPipelineBuilt();
+
+        public final void touch() {
+            if (tracker != null) {
+                tracker.record();
+            }
+        }
     }
 
     /**
@@ -1244,7 +1280,7 @@ public class ConnectionManager {
 
                 initializer = new AdaptiveAlpnChannelInitializer(
                     this,
-                    buildSslContext(requestKey),
+                    () -> buildSslContext(requestKey),
                     requestKey.getHost(),
                     requestKey.getPort()
                 );
@@ -1610,7 +1646,8 @@ public class ConnectionManager {
                 withPropagation(openStreamChannel(), (Future<Channel> future) -> {
                     if (future.isSuccess()) {
                         Channel streamChannel = future.get();
-                        streamChannel.pipeline()
+                        ChannelPipeline streamPipeline = streamChannel.pipeline();
+                        streamPipeline
                             .addLast(new ChannelOutboundHandlerAdapter() {
                                 @Override
                                 public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
@@ -1618,13 +1655,16 @@ public class ConnectionManager {
                                     super.write(ctx, msg, promise);
                                 }
                             })
-                            .addLast(createFrameToHttpObjectCodec())
-                            .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECOMPRESSOR, new HttpContentDecompressor());
+                            .addLast(createFrameToHttpObjectCodec());
+                        if (configuration.isDecompressionEnabled()) {
+                            streamPipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECOMPRESSOR, new HttpContentDecompressor());
+                        }
                         NettyClientCustomizer streamCustomizer = connectionCustomizer.specializeForChannel(streamChannel, NettyClientCustomizer.ChannelRole.HTTP2_STREAM);
                         PoolHandle ph = new PoolHandle(true, streamChannel) {
                             @Override
                             public void taint() {
                                 // do nothing, we don't reuse stream channels
+                                touch();
                             }
 
                             @Override
@@ -1768,6 +1808,59 @@ public class ConnectionManager {
             if (ctx.channel().isActive()) {
                 channelActive0(ctx);
             }
+        }
+    }
+
+    private final class ClientContextWrapper extends SslContextAutoLoader {
+        private final boolean ws;
+
+        ClientContextWrapper(boolean ws) {
+            super(log);
+            this.ws = ws;
+        }
+
+        @Override
+        protected @NonNull BeanProvider<CertificateProvider> certificateProviders() {
+            return certificateProviders;
+        }
+
+        @Override
+        protected @NonNull SslConfiguration sslConfiguration() {
+            return configuration.getSslConfiguration();
+        }
+
+        @Override
+        protected boolean quic() {
+            return !ws && httpVersion.isHttp3();
+        }
+
+        @Override
+        protected @NonNull SslContextHolder createLegacy() {
+            if (quic()) {
+                return new SslContextHolder(null, nettyClientSslBuilder.buildHttp3(configuration.getSslConfiguration()));
+            } else {
+                return new SslContextHolder(nettyClientSslBuilder.build(configuration.getSslConfiguration(), ws ? HttpVersionSelection.forLegacyVersion(io.micronaut.http.HttpVersion.HTTP_1_1) : httpVersion), null);
+            }
+        }
+
+        @Override
+        protected @NonNull NettySslContextBuilder builder() {
+            NettySslContextBuilder builder = sslFactory.builder(configuration);
+            if (httpVersion.isHttp2CipherSuites()) {
+                builder.http2();
+            }
+            if (httpVersion.isAlpn()) {
+                builder.alpnProtocols(List.of(httpVersion.getAlpnSupportedProtocols()));
+            } else {
+                builder.alpnProtocols(null);
+            }
+            if (sslConfiguration() instanceof AbstractClientSslConfiguration acsc && acsc.isInsecureTrustAllCertificates()) {
+                if (log.isWarnEnabled()) {
+                    log.warn("HTTP Client is configured to trust all certificates ('insecure-trust-all-certificates' is set to true). Trusting all certificates is not secure and should not be used in production.");
+                }
+                builder.trustAll(true);
+            }
+            return builder;
         }
     }
 }

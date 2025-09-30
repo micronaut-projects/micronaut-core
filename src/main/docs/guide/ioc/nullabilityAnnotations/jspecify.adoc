@@ -1,0 +1,41 @@
+Micronaut supports https://jspecify.dev/[JSpecify] annotations as an alternative to its own. Internally they are simply remapped to the Micronaut ones.
+
+- `org.jspecify.annotations.Nullable` — the annotated value may be null.
+- `org.jspecify.annotations.NonNull` — expresses a not-null contract for the annotated element.
+- `org.jspecify.annotations.NullMarked` — sets a default non-null policy within the annotated scope (package, type, or method), unless overridden.
+
+WARNING: There is a difference how the annotations should be put on an array field. Micronaut supports `@io.micronaut.core.annotation.Nullable String[] myField` but for JSpecify the correct syntax is `String @org.jspecify.annotations.Nullable [] myField`, the opposite will only mark the array component as nullable.
+
+NOTE: You may mix JSpecify with Micronaut’s nullability annotations; however, prefer a single, consistent approach within a module or package to keep intent clear and reduce ambiguity.
+
+TIP: Adopt `@NullMarked` on a package or type to make non-null the default, then annotate only the exceptional cases with `@Nullable`.
+
+The following class uses JSpecify to declare non-null by default with `@NullMarked`, and annotates only the few nullable cases:
+
+[source,java]
+----
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
+import jakarta.inject.Singleton;
+
+@Singleton
+@NullMarked
+final class AccountService {
+
+    // Non-null by default due to @NullMarked
+    String greet(String name) {
+        return "Hello, " + name;
+    }
+
+    // Nullable return and parameter explicitly marked
+    @Nullable
+    String findNickname(@Nullable String userId) {
+        if (userId == null) {
+            return null;
+        }
+        // Lookup may return null if not found
+        return null;
+    }
+}
+----
