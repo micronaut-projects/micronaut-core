@@ -16,9 +16,11 @@
 package io.micronaut.inject.qualifiers.replaces;
 
 import io.micronaut.aop.simple.Mutating;
+import io.micronaut.context.annotation.Requires;
 
 import jakarta.inject.Singleton;
 
+@Requires(property = "spec.name", value = "ReplacesSpec")
 @Mutating("name")
 @Singleton
 public class AroundA implements AroundOps {

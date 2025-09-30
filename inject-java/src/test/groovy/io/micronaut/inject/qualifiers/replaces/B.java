@@ -15,9 +15,11 @@
  */
 package io.micronaut.inject.qualifiers.replaces;
 
+import io.micronaut.context.annotation.Requires;
 import jakarta.inject.Inject;
 import java.util.List;
 
+@Requires(property = "spec.name", value = "ReplacesSpec")
 public class B {
     @Inject
     private List<A> all;

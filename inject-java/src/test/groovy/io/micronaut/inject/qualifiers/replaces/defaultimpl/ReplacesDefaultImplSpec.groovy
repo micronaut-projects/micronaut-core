@@ -8,7 +8,7 @@ class ReplacesDefaultImplSpec extends Specification {
 
     void "test A replacement"() {
         given:
-        ApplicationContext context = ApplicationContext.run()
+        ApplicationContext context = ApplicationContext.run(['spec.name':'ReplacesDefaultImplSpec'])
 
         when:"retrieve the interface"
         A a = context.getBean(A)
@@ -23,7 +23,7 @@ class ReplacesDefaultImplSpec extends Specification {
 
     void "test B replacement"() {
         given:
-        ApplicationContext context = ApplicationContext.run()
+        ApplicationContext context = ApplicationContext.run(['spec.name':'ReplacesDefaultImplSpec'])
 
         when:"retrieve the interface"
         List<B> bs = context.getBeansOfType(B).toList()
@@ -39,7 +39,7 @@ class ReplacesDefaultImplSpec extends Specification {
 
     void "test nested default impls"() {
         given:
-        ApplicationContext context = ApplicationContext.run()
+        ApplicationContext context = ApplicationContext.run(['spec.name':'ReplacesDefaultImplSpec'])
 
         when:
         F f = context.getBean(F)
@@ -68,7 +68,7 @@ class ReplacesDefaultImplSpec extends Specification {
 
     void "test normal replacement still works"() {
         given:
-        ApplicationContext context = ApplicationContext.run()
+        ApplicationContext context = ApplicationContext.run(['spec.name':'ReplacesDefaultImplSpec'])
 
         when:"retrieve the interface"
         List<C> cs = context.getBeansOfType(C).toList()

@@ -17,9 +17,9 @@ package io.micronaut.inject.qualifiers.replaces;
 
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Replaces;
-
 import jakarta.inject.Singleton;
 
+@Replaces(value = D.class, factory = DFactory.class)
 @Factory
 public class DFactoryMethodReplacement {
 

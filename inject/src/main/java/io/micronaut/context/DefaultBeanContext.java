@@ -165,6 +165,13 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     private static final String INTRODUCTION_TYPE = "io.micronaut.aop.Introduction";
     private static final String REPLACES_ANN = Replaces.class.getName();
 
+    private static final Predicate<BeanDefinition<?>> FILTER_OUT_ANY_PROVIDERS = new Predicate<BeanDefinition<?>>() { // Keep anonymous for hot path
+        @Override
+        public boolean test(BeanDefinition<?> candidate) {
+            return candidate.getDeclaredQualifier() == null || !candidate.getDeclaredQualifier().equals(AnyQualifier.INSTANCE);
+        }
+    };
+
     private static final String MSG_COULD_NOT_BE_LOADED = "] could not be loaded: ";
     public static final String MSG_BEAN_DEFINITION = "Bean definition [";
 
@@ -2021,6 +2028,14 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         ArgumentUtils.requireNonNull("beanType", beanType);
         if (LOG.isDebugEnabled()) {
             LOG.debug("Finding candidate beans for type: {}", beanType);
+        }
+        if (beanType.getType() == Object.class) {
+            // Don't include @Any providers when looking up all beans - otherwise we will add bean providers
+            if (predicate == null) {
+                predicate = (Predicate) FILTER_OUT_ANY_PROVIDERS;
+            } else {
+                predicate = predicate.and(FILTER_OUT_ANY_PROVIDERS);
+            }
         }
         Iterable<BeanDefinition<T>> beanDefinitions;
         if (resolutionContext == null) {

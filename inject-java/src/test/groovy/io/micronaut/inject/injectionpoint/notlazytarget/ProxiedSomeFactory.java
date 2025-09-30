@@ -19,8 +19,10 @@ import io.micronaut.context.annotation.Any;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.inject.InjectionPoint;
 import io.micronaut.inject.injectionpoint.SomeAnn;
+import io.micronaut.context.annotation.Requires;
 
 @Factory
+@Requires(property = "spec.name", value = "InjectionPointSpec")
 public class ProxiedSomeFactory {
 
     @Any
