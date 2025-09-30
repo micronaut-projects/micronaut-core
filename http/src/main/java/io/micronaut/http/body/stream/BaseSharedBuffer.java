@@ -367,7 +367,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                 }
             }
             if (reserved > 0 || fullSubscribers != null) {
-                if (newLength > limits.maxBufferSize()|| bufferLimitsExceeded != null) {
+                if (newLength > limits.maxBufferSize() || bufferLimitsExceeded != null) {
                     // new subscribers will recognize that the limit has been exceeded. Streaming
                     // subscribers can proceed normally. Need to notify buffering subscribers
                     discardBuffer();
