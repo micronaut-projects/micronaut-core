@@ -19,14 +19,22 @@ import io.micronaut.context.BeanLocator;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.inject.qualifiers.Qualifiers;
+import io.micronaut.runtime.graceful.GracefulShutdownCapable;
 import io.micronaut.scheduling.LoomSupport;
 import jakarta.inject.Inject;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.OptionalLong;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Constructs {@link ExecutorService} instances based on {@link UserExecutorConfiguration} instances.
@@ -35,10 +43,11 @@ import java.util.concurrent.ThreadFactory;
  * @since 1.0
  */
 @Factory
-public class ExecutorFactory {
+public class ExecutorFactory implements GracefulShutdownCapable {
 
     private final BeanLocator beanLocator;
     private final ThreadFactory threadFactory;
+    private List<GracefulShutdownCapable> gracefulShutdownCapable;
 
     /**
      *
@@ -65,7 +74,8 @@ public class ExecutorFactory {
             if (name == null) {
                 name = "virtual";
             }
-            return LoomSupport.newVirtualThreadFactory(name + "-executor");
+            String prefix = name + "-executor-";
+            return r -> LoomSupport.unstarted(prefix + ThreadLocalRandom.current().nextInt(), null, r);
         }
         if (name != null) {
             return new NamedThreadFactory(name + "-executor");
@@ -89,12 +99,22 @@ public class ExecutorFactory {
             case CACHED:
                 return Executors.newCachedThreadPool(getThreadFactory(executorConfiguration));
             case SCHEDULED:
-                return Executors.newScheduledThreadPool(executorConfiguration.getCorePoolSize(), getThreadFactory(executorConfiguration));
+                var exec = new GracefulShutdownCapableScheduledThreadPoolExecutor(executorConfiguration.getCorePoolSize(), getThreadFactory(executorConfiguration));
+                synchronized (this) {
+                    if (gracefulShutdownCapable == null) {
+                        gracefulShutdownCapable = new ArrayList<>();
+                    }
+                    gracefulShutdownCapable.add(exec);
+                }
+                return exec;
             case WORK_STEALING:
                 return Executors.newWorkStealingPool(executorConfiguration.getParallelism());
             case THREAD_PER_TASK:
-                return LoomSupport.newThreadPerTaskExecutor(getThreadFactory(executorConfiguration));
-
+                if ("false".equals(System.getProperty("jdk.trackAllThreads"))) {
+                    return new FastThreadPerTaskExecutor(getThreadFactory(executorConfiguration));
+                } else {
+                    return LoomSupport.newThreadPerTaskExecutor(getThreadFactory(executorConfiguration));
+                }
             default:
                 throw new IllegalStateException("Could not create Executor service for enum value: " + executorType);
         }
@@ -117,4 +137,27 @@ public class ExecutorFactory {
                 });
     }
 
+    @Override
+    public @NonNull CompletionStage<?> shutdownGracefully() {
+        List<GracefulShutdownCapable> copy;
+        synchronized (this) {
+            if (gracefulShutdownCapable == null) {
+                return CompletableFuture.completedFuture(null);
+            }
+            copy = new ArrayList<>(gracefulShutdownCapable);
+        }
+        return GracefulShutdownCapable.shutdownAll(copy.stream());
+    }
+
+    @Override
+    public OptionalLong reportActiveTasks() {
+        List<GracefulShutdownCapable> copy;
+        synchronized (this) {
+            if (gracefulShutdownCapable == null) {
+                return OptionalLong.empty();
+            }
+            copy = new ArrayList<>(gracefulShutdownCapable);
+        }
+        return GracefulShutdownCapable.combineActiveTasks(copy);
+    }
 }

@@ -16,6 +16,25 @@ import test.another.BeanWithPackagePrivate
 
 class BeanDefinitionSpec extends AbstractTypeElementSpec {
 
+    void "test bean with unresolved type"() {
+        when:
+        buildBeanDefinition('test.Unresolved', '''
+package test;
+
+import jakarta.inject.Singleton;
+
+@Singleton
+class Test {
+    Test(Unresolved unresolved) {}
+}
+''')
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains('cannot find symbol')
+
+    }
+
     void "test getTypeString for format #format"() {
         given:
         def definition = buildBeanDefinition('typestring.Test', '''

@@ -1,0 +1,47 @@
+As an alternative to the ann:context.annotation.Import[] annotation the ann:context.annotation.ClassImport[] annotation allows to process already compiled classes as if they were ordinary non-compiled classes. Internally all the type visitors will be run, allowing to create necessary metadata.
+
+NOTE: Class import is currently only supported in the Java language as other languages have limitations on classpath scanning during source code processing.
+
+For example, to import the JSR-330 TCK into an application, add a dependency on the TCK:
+
+dependency::jakarta.inject-tck[groupId="jakarta.inject", version="2.0.1"]
+
+Then define the `@ClassImport` annotation on your `Application` class:
+
+[source,java]
+----
+package example;
+
+import io.micronaut.context.annotation.ClassImport;
+import io.micronaut.context.annotation.Bean;
+
+@ClassImport( // <1>
+        packages = { // <2>
+                "org.atinject.tck.auto",
+                "org.atinject.tck.auto.accessories"},
+        annotate = Bean.class) // <3>
+public class Application {
+}
+----
+
+<1> The ann:context.annotation.ClassImport[] is defined
+<2> The `packages` to import are defined. Note that the Micronaut framework will not recurse through sub-packages so sub-packages need to be listed explicitly
+<3> The `annotate` allows to specify which annotation should be added to all the classes in the packages.
+
+In the same way, it's possible to import classes required for Micronaut Serialization or Micronaut Validation.
+
+[source,java]
+----
+package example;
+
+import io.micronaut.context.annotation.ClassImport;
+import io.micronaut.serde.annotation.Serdeable;
+
+@ClassImport(
+        packages = "my.external.library",
+        annotate = Serdeable.class)
+public class Application {
+}
+----
+
+NOTE: At this moment, Micronaut doesn't support reimporting classes already processed by the Micronaut annotation processor.

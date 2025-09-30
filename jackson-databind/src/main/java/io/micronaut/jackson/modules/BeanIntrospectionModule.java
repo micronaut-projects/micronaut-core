@@ -344,6 +344,25 @@ public class BeanIntrospectionModule extends SimpleModule {
                         UnsafeBeanProperty<Object, Object> beanProperty = (UnsafeBeanProperty<Object, Object>) bp;
                         final String propertyName = getName(config, namingStrategy, beanProperty);
                         JsonSerializer<?> serializerFromAnnotation = findSerializerFromAnnotation(beanProperty, JsonSerialize.class);
+                        // normal property
+
+                        BeanPropertyWriter writer = new BeanIntrospectionPropertyWriter(
+                            new IntrospectionVirtualAnnotatedMember(
+                                typeResolutionContext,
+                                beanProperty.getDeclaringType(),
+                                propertyName,
+                                newType(beanProperty.asArgument(), config.getTypeFactory()),
+                                beanProperty
+                            ),
+                            config,
+                            propertyName,
+                            beanProperty,
+                            config.getTypeFactory(),
+                            serializerFromAnnotation
+                            // would be nice to add the TypeSerializer here too, but we don't have access to the
+                            // SerializerFactory for findPropertyTypeSerializer
+                        );
+
                         if (bp.hasAnnotation(JsonAnyGetter.class)) {
                             AnnotatedMember virtualMember = new IntrospectionVirtualAnnotatedMember(
                                 typeResolutionContext,
@@ -363,7 +382,8 @@ public class BeanIntrospectionModule extends SimpleModule {
                                     anyType, config.isEnabled(MapperFeature.USE_STATIC_TYPING),
                                     null, null, null, /*filterId*/ null);
                             }
-                            newBuilder.setAnyGetter(new AnyGetterWriter(
+                            AnyGetterWriter anyGetter = new AnyGetterWriter(
+                                writer,
                                 new com.fasterxml.jackson.databind.BeanProperty.Std(
                                     new PropertyName(bp.getName()),
                                     anyType.getContentType(),
@@ -373,31 +393,17 @@ public class BeanIntrospectionModule extends SimpleModule {
                                 ),
                                 virtualMember,
                                 serializerFromAnnotation
-                            ));
-                        } else {
-                            // normal property
-
-                            BeanPropertyWriter writer = new BeanIntrospectionPropertyWriter(
-                                new IntrospectionVirtualAnnotatedMember(
-                                    typeResolutionContext,
-                                    beanProperty.getDeclaringType(),
-                                    propertyName,
-                                    newType(beanProperty.asArgument(), config.getTypeFactory()),
-                                    beanProperty
-                                ),
-                                config,
-                                propertyName,
-                                beanProperty,
-                                config.getTypeFactory(),
-                                serializerFromAnnotation
-                                // would be nice to add the TypeSerializer here too, but we don't have access to the
-                                // SerializerFactory for findPropertyTypeSerializer
                             );
-
+                            newBuilder.setAnyGetter(anyGetter);
+                        } else {
                             newProperties.add(writer);
                         }
                     }
 
+                    if (newBuilder.getAnyGetter() != null) {
+                        // place it last
+                        newProperties.add(newBuilder.getAnyGetter());
+                    }
                     newBuilder.setProperties(newProperties);
                 } else {
                     if (LOG.isDebugEnabled()) {
@@ -420,7 +426,8 @@ public class BeanIntrospectionModule extends SimpleModule {
                         if (property.isPresent() &&
                             !property.get().isAnnotationPresent(JsonIgnore.class) &&
                             // we can't support XmlBeanPropertyWriter easily https://github.com/micronaut-projects/micronaut-core/issues/5907
-                            !existing.getClass().getName().equals("com.fasterxml.jackson.dataformat.xml.ser.XmlBeanPropertyWriter")) { // NOSONAR
+                            !existing.getClass().getName().equals("com.fasterxml.jackson.dataformat.xml.ser.XmlBeanPropertyWriter")
+                            && !(existing instanceof AnyGetterWriter)) { // NOSONAR
                             final UnsafeBeanProperty<Object, Object> beanProperty = (UnsafeBeanProperty<Object, Object>) property.get();
                             newProperties.set(i, new BeanIntrospectionPropertyWriter(
                                     existing,
@@ -931,15 +938,16 @@ public class BeanIntrospectionModule extends SimpleModule {
                 SimpleBeanPropertyDefinition.construct(config, virtualMember),
                 virtualMember,
                 AnnotationCollector.emptyAnnotations(),
-                null, ser, null, null,
+                JacksonConfiguration.constructType(beanProperty.asArgument(), typeFactory),
+                ser, null, null,
                 suppressNulls(config.getDefaultPropertyInclusion()),
                 suppressableValue(config.getDefaultPropertyInclusion()),
                 null
             );
+            this.type = super.getType();
             this.beanProperty = beanProperty;
             fastName = new SerializedString(name);
             _views = null;
-            this.type = JacksonConfiguration.constructType(this.beanProperty.asArgument(), typeFactory);
             _dynamicSerializers = PropertySerializerMap
                 .emptyForProperties();
             this.unwrapping = beanProperty.hasAnnotation(JsonUnwrapped.class);

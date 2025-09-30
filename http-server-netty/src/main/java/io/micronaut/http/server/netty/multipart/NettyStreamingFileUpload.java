@@ -44,6 +44,7 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * An implementation of the {@link StreamingFileUpload} interface for Netty.
@@ -55,7 +56,8 @@ import java.util.concurrent.ExecutorService;
 public final class NettyStreamingFileUpload implements StreamingFileUpload {
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyStreamingFileUpload.class);
-    private io.netty.handler.codec.http.multipart.FileUpload fileUpload;
+    private final io.netty.handler.codec.http.multipart.FileUpload fileUpload;
+    private final AtomicBoolean released = new AtomicBoolean(false);
     private final ExecutorService ioExecutor;
     private final HttpServerConfiguration.MultipartConfiguration configuration;
     private final Flux<PartData> subject;
@@ -69,7 +71,7 @@ public final class NettyStreamingFileUpload implements StreamingFileUpload {
         this.configuration = multipartConfiguration;
         this.fileUpload = httpData;
         this.ioExecutor = ioExecutor;
-        this.subject = subject;
+        this.subject = subject.doOnTerminate(this::discard);
     }
 
     @Override
@@ -158,7 +160,9 @@ public final class NettyStreamingFileUpload implements StreamingFileUpload {
 
     @Override
     public void discard() {
-        fileUpload.release();
+        if (released.compareAndSet(false, true)) {
+            fileUpload.release();
+        }
     }
 
     private Publisher<Boolean> transferTo(ThrowingSupplier<OutputStream, IOException> outputStreamSupplier) {

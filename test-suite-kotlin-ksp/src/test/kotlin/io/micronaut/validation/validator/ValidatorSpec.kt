@@ -9,14 +9,23 @@ import jakarta.validation.ConstraintViolationException
 class ValidatorSpec {
 
     @Test
+    fun propertiesWithValidation() {
+        val context = ApplicationContext.run()
+        val conf = context.getBean(ControllerCfg::class.java)
+        assertEquals("https://api.example.com/", conf.apiBase)
+        assertEquals(true, conf.enabled)
+        assertEquals("some-value", conf.something)
+        context.close()
+    }
+
+    @Test
     fun testValidateInstance() {
         val context = ApplicationContext.run()
         val validator = context.getBean(Validator::class.java)
 
         val person = Person("", 10)
         val violations = validator.validate(person)
-//      TODO: currently fails because bean introspection API does not handle data classes
-//        assertEquals(2, violations.size)
+        assertEquals(2, violations.size)
         context.close()
     }
 

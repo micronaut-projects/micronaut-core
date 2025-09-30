@@ -21,7 +21,6 @@ import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableHeaders;
-import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
@@ -122,11 +121,9 @@ final class TextStreamBodyWriter<T> implements MessageBodyWriter<T> {
                 }
             }
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            messageBodyWriter.writeTo(bodyType, MediaType.APPLICATION_JSON_TYPE, data, outgoingHeaders, baos);
+            messageBodyWriter.writeTo(bodyType, mediaType, data, outgoingHeaders, baos);
             body = baos.toByteArray();
         }
-
-        outgoingHeaders.set(HttpHeaders.CONTENT_TYPE, mediaType != null ? mediaType : MediaType.TEXT_EVENT_STREAM_TYPE);
 
         writeAttribute(output, COMMENT_PREFIX, event.getComment());
         writeAttribute(output, ID_PREFIX, event.getId());

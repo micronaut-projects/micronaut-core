@@ -1,0 +1,15 @@
+io.micronaut.kotlin.processing.visitor.AllElementsVisitor
+io.micronaut.kotlin.processing.annotations.AnnotateFieldSpec$AnnotationFieldVisitor
+io.micronaut.kotlin.processing.annotations.AnnotateFieldTypeSpec$AnnotateFieldTypeVisitor
+io.micronaut.kotlin.processing.annotations.AnnotateMethodParameterSpec$AnnotateMethodParameterVisitor
+io.micronaut.kotlin.processing.annotations.AnnotateMethodReturnSpec$AnnotateMethodReturnVisitor
+io.micronaut.kotlin.processing.annotations.AnnotateMethodSpec$AnnotationMethodVisitor
+io.micronaut.kotlin.processing.annotations.AnnotatePropertySpec$AnnotatePropertyVisitor
+io.micronaut.kotlin.processing.visitor.order.MyVisitor1
+io.micronaut.kotlin.processing.visitor.order.MyVisitor2
+io.micronaut.kotlin.processing.visitor.order.MyVisitor3
+io.micronaut.kotlin.processing.annotations.AddsRepeatableAnnotationSpec$AddRepeatableTypeElementVisitor
+io.micronaut.kotlin.processing.annotations.AddsUnseenInnerRepeatableAnnotationSpec$AddUnseenRepeatableTypeElementVisitor
+io.micronaut.kotlin.processing.annotations.AddsUnseenRepeatableAnnotationSpec$AddUnseenRepeatableTypeElementVisitor
+io.micronaut.kotlin.processing.aop.introduction.MyRepo3Spec$MyRepositoryVisitor
+io.micronaut.kotlin.processing.aop.introduction.MyIsEnumInTypeArgumentSpec$MyControllerVisitor

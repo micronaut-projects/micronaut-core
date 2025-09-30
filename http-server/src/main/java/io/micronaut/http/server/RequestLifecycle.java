@@ -254,7 +254,8 @@ public class RequestLifecycle {
             }
             if (RouteExecutor.isIgnorable(cause)) {
                 RouteExecutor.logIgnoredException(cause);
-                return ExecutionFlow.empty();
+                // the client won't see this response, but we need one for filters and such
+                return ExecutionFlow.just(HttpResponse.badRequest("Stream closed"));
             }
             return createDefaultErrorResponseFlow(request, cause);
         }
@@ -310,8 +311,10 @@ public class RequestLifecycle {
                 if (routeExecutor.serverConfiguration.isLogHandledExceptions()) {
                     routeExecutor.logException(cause);
                 }
-                Object result = handler.handle(request, cause);
-                return routeExecutor.createResponseForBody(propagatedContext, request, result, routeInfo, null);
+                try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
+                    Object result = handler.handle(request, cause);
+                    return routeExecutor.createResponseForBody(propagatedContext, request, result, routeInfo, null);
+                }
             } catch (Throwable e) {
                 return createDefaultErrorResponseFlow(request, e);
             }
@@ -484,12 +487,13 @@ public class RequestLifecycle {
             final String routeMethod = anyRoute.getRouteInfo().getHttpMethodName();
             if (!requestMethodName.equals(routeMethod)) {
                 allowedMethods.add(routeMethod);
-            }
-            if (contentType != null && !anyRoute.getRouteInfo().doesConsume(contentType)) {
-                acceptableContentTypes.addAll(anyRoute.getRouteInfo().getConsumes());
-            }
-            if (hasAcceptHeader && !anyRoute.getRouteInfo().doesProduce(acceptedTypes)) {
-                produceableContentTypes.addAll(anyRoute.getRouteInfo().getProduces());
+            } else {
+                if (contentType != null && !anyRoute.getRouteInfo().doesConsume(contentType)) {
+                    acceptableContentTypes.addAll(anyRoute.getRouteInfo().getConsumes());
+                }
+                if (hasAcceptHeader && !anyRoute.getRouteInfo().doesProduce(acceptedTypes)) {
+                    produceableContentTypes.addAll(anyRoute.getRouteInfo().getProduces());
+                }
             }
             declaringType = anyRoute.getDeclaringType();
         }

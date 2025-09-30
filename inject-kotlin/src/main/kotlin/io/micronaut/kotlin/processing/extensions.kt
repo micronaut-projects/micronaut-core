@@ -23,6 +23,17 @@ import io.micronaut.kotlin.processing.visitor.KotlinVisitorContext
 import org.objectweb.asm.Type
 
 @OptIn(KspExperimental::class)
+internal fun KSFunctionDeclaration.getBinaryName(resolver: Resolver): String {
+    return resolver.getJvmName(this)!!
+}
+
+@OptIn(KspExperimental::class)
+internal fun KSPropertyAccessor.getBinaryName(resolver: Resolver): String {
+    return resolver.getJvmName(this)!!
+}
+
+
+@OptIn(KspExperimental::class)
 internal fun KSDeclaration.getBinaryName(resolver: Resolver, visitorContext: KotlinVisitorContext): String {
     var declaration = this
     if (declaration is KSFunctionDeclaration) {
@@ -43,14 +54,21 @@ internal fun KSDeclaration.getBinaryName(resolver: Resolver, visitorContext: Kot
     if (qn != null) {
         val asString = resolver.mapKotlinNameToJava(qn)?.asString()
         if (asString != null) {
-            return asString;
+            return asString
         }
     }
-    if (declaration is KSClassDeclaration && declaration.origin != Origin.SYNTHETIC) {
+    if (declaration is KSClassDeclaration) {
+        val qualifiedName = declaration.qualifiedName
+        if (qualifiedName != null && qualifiedName.asString() == "kotlin.Unit") {
+            return "kotlin.Unit"
+        }
         val signature = resolver.mapToJvmSignature(declaration)
         if (signature != null) {
             return Type.getType(signature).className
         }
+    }
+    if (declaration is KSTypeAlias) {
+        return declaration.name.asString()
     }
     return if (declaration.origin != Origin.SYNTHETIC) {
         computeName(declaration)

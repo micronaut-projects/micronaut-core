@@ -37,6 +37,7 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.visitor.TypeElementQuery;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.web.router.RouteInfo;
@@ -84,6 +85,11 @@ public final class FilterVisitor implements TypeElementVisitor<Object, Object> {
             RequestFilter.class.getName(),
             ResponseFilter.class.getName()
         );
+    }
+
+    @Override
+    public TypeElementQuery query() {
+        return TypeElementQuery.onlyMethods();
     }
 
     @Override

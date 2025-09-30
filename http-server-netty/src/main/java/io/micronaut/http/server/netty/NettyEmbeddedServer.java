@@ -15,14 +15,17 @@
  */
 package io.micronaut.http.server.netty;
 
-import java.util.Collections;
-import java.util.Set;
-
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
 import io.micronaut.runtime.context.scope.refresh.RefreshEventListener;
+import io.micronaut.runtime.graceful.GracefulShutdownCapable;
 import io.micronaut.runtime.server.EmbeddedServer;
+
+import java.util.Collections;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 /**
  * Extended {@link io.micronaut.runtime.server.EmbeddedServer} interface that represents a
@@ -36,7 +39,8 @@ public interface NettyEmbeddedServer
                 WebSocketSessionRepository,
                 ChannelPipelineCustomizer,
                 RefreshEventListener,
-                NettyServerCustomizer.Registry {
+                NettyServerCustomizer.Registry,
+                GracefulShutdownCapable {
     /**
      * Gets the set of all ports this Netty server is bound to.
      * @return An immutable set of bound ports if the server has been started with {@link #start()} an empty set otherwise.
@@ -71,5 +75,11 @@ public interface NettyEmbeddedServer
     @Override
     default void register(@NonNull NettyServerCustomizer customizer) {
         throw new UnsupportedOperationException();
+    }
+
+    @Override
+    default CompletionStage<?> shutdownGracefully() {
+        // default implementation for compatibility
+        return CompletableFuture.completedStage(null);
     }
 }

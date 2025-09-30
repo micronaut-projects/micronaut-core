@@ -27,6 +27,9 @@ import io.micronaut.http.ssl.ClientAuthentication;
 import io.micronaut.http.ssl.SslBuilder;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.http.ssl.SslConfigurationException;
+import io.netty.handler.codec.http3.Http3;
+import io.netty.handler.codec.quic.QuicSslContext;
+import io.netty.handler.codec.quic.QuicSslContextBuilder;
 import io.netty.handler.codec.http2.Http2SecurityUtil;
 import io.netty.handler.ssl.ApplicationProtocolConfig;
 import io.netty.handler.ssl.ClientAuth;
@@ -35,9 +38,6 @@ import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslProvider;
 import io.netty.handler.ssl.SupportedCipherSuiteFilter;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
-import io.netty.incubator.codec.http3.Http3;
-import io.netty.incubator.codec.quic.QuicSslContext;
-import io.netty.incubator.codec.quic.QuicSslContextBuilder;
 import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -88,6 +88,14 @@ public class NettyClientSslBuilder extends SslBuilder<SslContext> implements Cli
     @NonNull
     @Override
     public final SslContext build(SslConfiguration ssl, HttpVersionSelection versionSelection) {
+        try {
+            return createSslContextBuilder(ssl, versionSelection).build();
+        } catch (SSLException ex) {
+            throw new SslConfigurationException("An error occurred while setting up SSL", ex);
+        }
+    }
+
+    protected SslContextBuilder createSslContextBuilder(SslConfiguration ssl, HttpVersionSelection versionSelection) {
         SslContextBuilder sslBuilder = SslContextBuilder
             .forClient()
             .keyManager(getKeyManagerFactory(ssl))
@@ -122,12 +130,7 @@ public class NettyClientSslBuilder extends SslBuilder<SslContext> implements Cli
                 versionSelection.getAlpnSupportedProtocols()
             ));
         }
-
-        try {
-            return sslBuilder.build();
-        } catch (SSLException ex) {
-            throw new SslConfigurationException("An error occurred while setting up SSL", ex);
-        }
+        return sslBuilder;
     }
 
     @Override

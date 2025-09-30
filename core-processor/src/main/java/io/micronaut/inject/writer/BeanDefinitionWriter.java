@@ -129,7 +129,6 @@ import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.inject.visitor.BeanElementVisitor;
 import io.micronaut.inject.visitor.BeanElementVisitorContext;
 import io.micronaut.inject.visitor.VisitorContext;
-import io.micronaut.sourcegen.bytecode.ByteCodeWriter;
 import io.micronaut.sourcegen.model.AnnotationDef;
 import io.micronaut.sourcegen.model.ClassDef;
 import io.micronaut.sourcegen.model.ClassTypeDef;
@@ -617,7 +616,6 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
     private final List<String> beanTypeInnerClasses;
     private final EvaluatedExpressionProcessor evaluatedExpressionProcessor;
 
-    private boolean beanFinalized = false;
     private ClassTypeDef superType = TYPE_ABSTRACT_BEAN_DEFINITION_AND_REFERENCE;
     private boolean superBeanDefinition = false;
     private boolean isSuperFactory = false;
@@ -647,7 +645,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
 
     private final OriginatingElements originatingElements;
 
-    private final ClassDef.ClassDefBuilder classDefBuilder;
+    private ClassDef.ClassDefBuilder classDefBuilder;
 
     private BuildMethodDefinition buildMethodDefinition;
     private final List<InjectMethodCommand> injectCommands = new ArrayList<>();
@@ -655,6 +653,8 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
     private boolean validated;
 
     private final Function<String, ExpressionDef> loadClassValueExpressionFn;
+
+    private Map<String, byte[]> output;
 
     /**
      * Creates a bean definition writer.
@@ -1256,7 +1256,17 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
 
         loadTypeMethods.values().forEach(classDefBuilder::addMethod);
 
-        this.beanFinalized = true;
+        output = new LinkedHashMap<>();
+        // Generate the bytecode in the round it's being invoked
+        generateFiles(classDefBuilder.build());
+        evaluatedExpressionProcessor.finish();
+    }
+
+    private void generateFiles(ObjectDef objectDef) {
+        output.put(objectDef.getName(), ByteCodeWriterUtils.writeByteCode(objectDef, visitorContext));
+        for (ObjectDef innerType : objectDef.getInnerTypes()) {
+            generateFiles(innerType);
+        }
     }
 
     private MethodDef getGetInterceptedType(TypeDef interceptedType) {
@@ -1369,7 +1379,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
             if (StringUtils.isNotEmpty(factoryMethod)) {
                 return builderType.invokeStatic(factoryMethod, builderType).newLocal("builder" + NameUtils.capitalize(configBuilderMethodInjectPoint.methodName), builderVar -> {
                     List<StatementDef> statements =
-                        getBuilderMethodStatements(injectMethodSignature, configBuilderMethodInjectPoint.builderPoints, builderVar);
+                        getBuilderMethodStatements(injectMethodSignature, configBuilderMethodInjectPoint.builderPoints, (VariableDef.Local) builderVar);
 
                     String propertyName = NameUtils.getPropertyNameForGetter(configBuilderMethodInjectPoint.methodName);
                     String setterName = NameUtils.setterNameFor(propertyName);
@@ -1383,7 +1393,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                 return injectMethodSignature.instanceVar
                     .invoke(configBuilderMethodInjectPoint.methodName, builderType)
                     .newLocal("builder" + NameUtils.capitalize(configBuilderMethodInjectPoint.methodName), builderVar -> StatementDef.multi(
-                        getBuilderMethodStatements(injectMethodSignature, configBuilderMethodInjectPoint.builderPoints, builderVar)
+                        getBuilderMethodStatements(injectMethodSignature, configBuilderMethodInjectPoint.builderPoints, (VariableDef.Local) builderVar)
                     ));
             }
         }
@@ -1393,7 +1403,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
             ClassTypeDef builderType = ClassTypeDef.of(configBuilderFieldInjectPoint.type);
             if (StringUtils.isNotEmpty(factoryMethod)) {
                 return builderType.invokeStatic(factoryMethod, builderType).newLocal("builder" + NameUtils.capitalize(configBuilderFieldInjectPoint.field), builderVar -> {
-                    List<StatementDef> statements = getBuilderMethodStatements(injectMethodSignature, configBuilderFieldInjectPoint.builderPoints, builderVar);
+                    List<StatementDef> statements = getBuilderMethodStatements(injectMethodSignature, configBuilderFieldInjectPoint.builderPoints, (VariableDef.Local) builderVar);
 
                     statements.add(injectMethodSignature.instanceVar
                         .field(configBuilderFieldInjectPoint.field, builderType)
@@ -1405,14 +1415,14 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                 return injectMethodSignature.instanceVar
                     .field(configBuilderFieldInjectPoint.field, builderType)
                     .newLocal("builder" + NameUtils.capitalize(configBuilderFieldInjectPoint.field), builderVar -> StatementDef.multi(
-                        getBuilderMethodStatements(injectMethodSignature, configBuilderFieldInjectPoint.builderPoints, builderVar)
+                        getBuilderMethodStatements(injectMethodSignature, configBuilderFieldInjectPoint.builderPoints, (VariableDef.Local) builderVar)
                     ));
             }
         }
         throw new IllegalStateException();
     }
 
-    private List<StatementDef> getBuilderMethodStatements(InjectMethodSignature injectMethodSignature, List<ConfigBuilderPointInjectCommand> points, VariableDef builderVar) {
+    private List<StatementDef> getBuilderMethodStatements(InjectMethodSignature injectMethodSignature, List<ConfigBuilderPointInjectCommand> points, VariableDef.Local builderVar) {
         List<StatementDef> statements = new ArrayList<>();
         for (ConfigBuilderPointInjectCommand builderPoint : points) {
             statements.add(
@@ -1423,7 +1433,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
     }
 
     private StatementDef getConfigBuilderPointStatement(InjectMethodSignature injectMethodSignature,
-                                                        VariableDef builderVar,
+                                                        VariableDef.Local builderVar,
                                                         ConfigBuilderPointInjectCommand builderPoint) {
         if (builderPoint instanceof ConfigBuilderMethodInjectCommand configBuilderMethodInjectPoint) {
             return visitConfigBuilderMethodInternal(
@@ -1832,7 +1842,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                     List<ExpressionDef> values = IntStream.range(0, parameters.length)
                         .<ExpressionDef>mapToObj(index -> methodParameters.get(0).arrayElement(index).cast(TypeDef.erasure(parameters[index].getType())))
                         .toList();
-                    return MethodGenUtils.invokeBeanConstructor(constructorBuildMethodDefinition.constructor, true, values)
+                    return MethodGenUtils.invokeBeanConstructor(ClassElement.of(beanDefinitionName), constructorBuildMethodDefinition.constructor, true, values)
                         .returning();
                 })
         );
@@ -2388,10 +2398,10 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
      * @return The bytes of the class
      */
     public byte[] toByteArray() {
-        if (!beanFinalized) {
+        if (output == null) {
             throw new IllegalStateException("Bean definition not finalized. Call visitBeanDefinitionEnd() first.");
         }
-        return new ByteCodeWriter().write(classDefBuilder.build());
+        return ByteCodeWriterUtils.writeByteCode(classDefBuilder.build(), visitorContext);
     }
 
     @Override
@@ -2404,7 +2414,11 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
             beanDefinitionName,
             getOriginatingElement()
         );
-        write(visitor, classDefBuilder.build());
+        for (Map.Entry<String, byte[]> e1 : output.entrySet()) {
+            try (OutputStream out = visitor.visitClass(e1.getKey(), getOriginatingElements())) {
+                out.write(e1.getValue());
+            }
+        }
         try {
             if (executableMethodsDefinitionWriter != null) {
                 executableMethodsDefinitionWriter.accept(visitor);
@@ -2418,15 +2432,6 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
             }
         }
         evaluatedExpressionProcessor.writeEvaluatedExpressions(visitor);
-    }
-
-    private void write(ClassWriterOutputVisitor visitor, ObjectDef objectDef) throws IOException {
-        try (OutputStream out = visitor.visitClass(objectDef.getName(), getOriginatingElements())) {
-            out.write(new ByteCodeWriter().write(objectDef));
-        }
-        for (ObjectDef innerType : objectDef.getInnerTypes()) {
-            write(visitor, innerType);
-        }
     }
 
     @Override
@@ -2621,14 +2626,14 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
      * @param declaringType                    The declaring type of the method. Either a Class or a string representing the
      *                                         name of the type
      * @param methodElement                    The method element
-     * @param interceptedProxyClassName        The intercepted proxy class name
-     * @param interceptedProxyBridgeMethodName The intercepted proxy bridge method name
+     * @param interceptedProxyType             The intercepted proxy type
+     * @param interceptedProxyBridgeMethod     The intercepted proxy bridge method name
      * @return The index of a new method.
      */
     public int visitExecutableMethod(TypedElement declaringType,
                                      MethodElement methodElement,
-                                     String interceptedProxyClassName,
-                                     String interceptedProxyBridgeMethodName) {
+                                     ClassTypeDef interceptedProxyType,
+                                     MethodDef interceptedProxyBridgeMethod) {
 
         if (executableMethodsDefinitionWriter == null) {
             executableMethodsDefinitionWriter = new ExecutableMethodsDefinitionWriter(
@@ -2636,10 +2641,11 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                 annotationMetadata,
                 beanDefinitionName,
                 getBeanDefinitionName(),
-                originatingElements
+                originatingElements,
+                visitorContext
             );
         }
-        return executableMethodsDefinitionWriter.visitExecutableMethod(declaringType, methodElement, interceptedProxyClassName, interceptedProxyBridgeMethodName);
+        return executableMethodsDefinitionWriter.visitExecutableMethod(declaringType, methodElement, interceptedProxyType, interceptedProxyBridgeMethod);
     }
 
     @Override
@@ -2912,16 +2918,17 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
         Map<String, ClassElement> generics,
         boolean isDurationWithTimeUnit,
         String propertyPath,
-        VariableDef builderVar) {
+        VariableDef.Local builderVar) {
 
         boolean zeroArgs = paramType == null;
 
         // Optional optional = AbstractBeanDefinition.getValueForPath(...)
+        String localName = builderVar.name() + "_optional" + NameUtils.capitalize(propertyPath.replace("[*]", "__all__").replace('.', '_').replace('-', '_'));
         return getGetValueForPathCall(injectMethodSignature, paramType, propertyName, propertyPath, zeroArgs, generics)
-            .newLocal("optional" + NameUtils.capitalize(propertyPath.replace('.', '_')), optionalVar -> {
+            .newLocal(localName, optionalVar -> {
                 return optionalVar.invoke(OPTIONAL_IS_PRESENT_METHOD)
                     .ifTrue(
-                        optionalVar.invoke(OPTIONAL_GET_METHOD).newLocal("value", valueVar -> {
+                        optionalVar.invoke(OPTIONAL_GET_METHOD).newLocal(localName + "_value", valueVar -> {
                             if (zeroArgs) {
                                 return valueVar.cast(boolean.class).ifTrue(
                                     StatementDef.doTry(
@@ -3050,7 +3057,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
         }
 
         if (!isRequired) {
-            return valueExpression.newLocal("value", valueVar ->
+            return valueExpression.newLocal(fieldElement.getName() + "Value", valueVar ->
                 valueVar.ifNonNull(
                     putField(fieldElement, requiresReflection, injectMethodSignature, valueVar, fieldIndex)
                 ));

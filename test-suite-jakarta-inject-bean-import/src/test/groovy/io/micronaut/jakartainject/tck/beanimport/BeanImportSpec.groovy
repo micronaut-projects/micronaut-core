@@ -2,8 +2,6 @@ package io.micronaut.jakartainject.tck.beanimport
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.visitor.BeanImportVisitor
-import io.micronaut.inject.visitor.TypeElementVisitor
 import junit.framework.Test
 import junit.framework.TestResult
 import org.atinject.tck.Tck

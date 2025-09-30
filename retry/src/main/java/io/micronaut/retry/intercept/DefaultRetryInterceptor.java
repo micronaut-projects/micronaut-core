@@ -250,7 +250,7 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
                         if (LOG.isDebugEnabled()) {
                             LOG.debug("Retrying execution for method [{}] after delay of {}ms for exception: {}", context, delayMillis, e.getMessage());
                         }
-                        Thread.sleep(delayMillis);
+                        sleep(delayMillis);
                     } catch (InterruptedException e1) {
                         Thread.currentThread().interrupt();
                         throw e;
@@ -260,4 +260,11 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
         }
     }
 
+    /**
+     * Performs the sleep between retries, can be overridden to customize the sleep behavior.
+     * The default implementation just calls {@link Thread#sleep(long)}.
+     */
+    protected void sleep(long delayMillis) throws InterruptedException {
+        Thread.sleep(delayMillis);
+    }
 }

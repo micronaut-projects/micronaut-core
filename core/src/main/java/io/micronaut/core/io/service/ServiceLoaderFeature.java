@@ -78,7 +78,7 @@ class ServiceLoaderFeature implements Feature {
                                     initializeAtBuildTime(buildInitClass);
                                 }
                             }
-                            initializeAtBuildTime(c);
+
                             BeanInfo<?> beanInfo;
                             try {
                                 beanInfo = (BeanInfo<?>) c.getDeclaredConstructor().newInstance();
@@ -120,14 +120,14 @@ class ServiceLoaderFeature implements Feature {
                             }
                         }
 
+                        initializeAtBuildTime(c);
                         registerForReflectiveInstantiation(c);
                         registerRuntimeReflection(c);
+                        final Class<?> exec = access.findClassByName(typeName + "$Exec");
+                        if (exec != null) {
+                            initializeAtBuildTime(exec);
+                        }
                     }
-                    final Class<?> exec = access.findClassByName(typeName + "$Exec");
-                    if (exec != null) {
-                        initializeAtBuildTime(exec);
-                    }
-
 
                 } catch (NoClassDefFoundError | InstantiationException e) {
                     i.remove();

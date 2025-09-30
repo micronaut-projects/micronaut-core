@@ -65,7 +65,6 @@ public final class LogbackUtils {
                 try {
                     resource = file.toURI().toURL();
                 } catch (MalformedURLException e) {
-
                     throw new LoggingSystemException("Error creating URL for off-classpath resource", e);
                 }
             }
@@ -88,8 +87,8 @@ public final class LogbackUtils {
         @NonNull LoggerContext context,
         @NonNull String logbackXmlLocation,
         Supplier<URL> resourceSupplier,
-        ClassLoader classLoader
-    ) {
+        ClassLoader classLoader) {
+
         List<Configurator> configuratorList = loadFromServiceLoader(Configurator.class, classLoader);
         Configurator configurator = CollectionUtils.isNotEmpty(configuratorList) ? configuratorList.get(0) : null;
         if (configurator != null && !(configurator instanceof DefaultJoranConfigurator)) {
@@ -106,6 +105,7 @@ public final class LogbackUtils {
                     throw new LoggingSystemException("Error while refreshing Logback", e);
                 }
             } else {
+                System.err.println("ERROR: Logback configuration file " + logbackXmlLocation + " not found");
                 throw new LoggingSystemException("Resource " + logbackXmlLocation + " not found");
             }
         }

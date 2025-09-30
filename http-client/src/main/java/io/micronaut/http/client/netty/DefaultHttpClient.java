@@ -38,6 +38,7 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.functional.ThrowingFunction;
+import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpResponseWrapper;
@@ -58,6 +59,7 @@ import io.micronaut.http.body.ContextlessMessageBodyHandlerRegistry;
 import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
+import io.micronaut.http.body.WritableBodyWriter;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.ClientAttributes;
@@ -78,6 +80,7 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.client.exceptions.NoHostException;
 import io.micronaut.http.client.exceptions.ReadTimeoutException;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
+import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
 import io.micronaut.http.client.multipart.MultipartBody;
 import io.micronaut.http.client.multipart.MultipartDataFactory;
 import io.micronaut.http.client.netty.ssl.ClientSslBuilder;
@@ -101,7 +104,6 @@ import io.micronaut.http.netty.body.NettyByteBody;
 import io.micronaut.http.netty.body.NettyByteBufMessageBodyHandler;
 import io.micronaut.http.netty.body.NettyJsonHandler;
 import io.micronaut.http.netty.body.NettyJsonStreamHandler;
-import io.micronaut.http.netty.body.NettyWritableBodyWriter;
 import io.micronaut.http.netty.body.StreamingNettyByteBody;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.stream.DefaultStreamedHttpResponse;
@@ -823,15 +825,27 @@ public class DefaultHttpClient implements
         setupConversionService(request);
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
         return new MicronautFlux<>(toMono(resolveRequestURI(request), propagatedContext)
-                .flatMapMany(requestURI -> dataStreamImpl(toMutableRequest(request), errorType, propagatedContext, requestURI)))
-                .doAfterNext(buffer -> {
-                    Object o = buffer.asNativeBuffer();
-                    if (o instanceof ByteBuf byteBuf) {
-                        if (byteBuf.refCnt() > 0) {
-                            ReferenceCountUtil.safeRelease(byteBuf);
-                        }
+            .flatMapMany(requestURI -> dataStreamImpl(toMutableRequest(request), errorType, propagatedContext, requestURI))
+            .map(bb -> {
+                if (bb.asNativeBuffer() instanceof ByteBuf byteBuf && byteBuf.refCnt() > 1) {
+                    // if we aren't the exclusive owner of this buffer, we need to detect whether
+                    // the downstream consumer releases it or not. For that, we need our own
+                    // refCnt. A composite buffer provides that.
+                    CompositeByteBuf composite = byteBuf.alloc().compositeBuffer(1);
+                    composite.addComponent(true, byteBuf);
+                    return byteBufferFactory.wrap(composite);
+                } else {
+                    return bb;
+                }
+            }))
+            .doAfterNext(buffer -> {
+                Object o = buffer.asNativeBuffer();
+                if (o instanceof ByteBuf byteBuf) {
+                    if (byteBuf.refCnt() > 0) {
+                        ReferenceCountUtil.safeRelease(byteBuf);
                     }
-                });
+                }
+            });
     }
 
     @Override
@@ -1400,6 +1414,12 @@ public class DefaultHttpClient implements
         );
     }
 
+    private void completeExceptionallySafe(DelayedExecutionFlow<?> flow, Throwable exc) {
+        if (!flow.tryCompleteExceptionally(exc)) {
+            log.debug("Client exception suppressed because response flow already completed", exc);
+        }
+    }
+
     private ExecutionFlow<HttpResponse<?>> readBodyOnError(@Nullable Argument<?> errorType, @NonNull ExecutionFlow<HttpResponse<?>> publisher) {
         if (errorType != null && errorType != HttpClient.DEFAULT_ERROR_TYPE) {
             return publisher.onErrorResume(clientException -> {
@@ -1426,7 +1446,7 @@ public class DefaultHttpClient implements
                             @Override
                             public void onError(Throwable t) {
                                 buffer.release();
-                                delayed.completeExceptionally(t);
+                                completeExceptionallySafe(delayed, t);
                             }
 
                             @Override
@@ -1434,7 +1454,7 @@ public class DefaultHttpClient implements
                                 try {
                                     FullHttpResponse fullHttpResponse = new DefaultFullHttpResponse(nettyResponse.protocolVersion(), nettyResponse.status(), buffer, nettyResponse.headers(), new DefaultHttpHeaders(true));
                                     final FullNettyClientHttpResponse<Object> fullNettyClientHttpResponse = new FullNettyClientHttpResponse<>(fullHttpResponse, handlerRegistry, (Argument<Object>) errorType, true, conversionService);
-                                    delayed.completeExceptionally(decorate(new HttpClientResponseException(
+                                    completeExceptionallySafe(delayed, decorate(new HttpClientResponseException(
                                         fullHttpResponse.status().reasonPhrase(),
                                         null,
                                         fullNettyClientHttpResponse,
@@ -1464,8 +1484,14 @@ public class DefaultHttpClient implements
         if (loadBalancer == null) {
             return ExecutionFlow.error(decorate(new NoHostException("Request URI specifies no host to connect to")));
         }
+        ExecutionFlow<ServiceInstance> selected;
+        if (loadBalancer instanceof FixedLoadBalancer fixed) {
+            selected = ExecutionFlow.just(fixed.getServiceInstance());
+        } else {
+            selected = ReactiveExecutionFlow.fromPublisher(loadBalancer.select(getLoadBalancerDiscriminator()));
+        }
 
-        return ReactiveExecutionFlow.fromPublisher(loadBalancer.select(getLoadBalancerDiscriminator())).map(server -> {
+        return selected.map(server -> {
                     Optional<String> authInfo = server.getMetadata().get(io.micronaut.http.HttpHeaders.AUTHORIZATION_INFO, String.class);
                     if (request instanceof MutableHttpRequest<?> httpRequest && authInfo.isPresent()) {
                         httpRequest.getHeaders().auth(authInfo.get());
@@ -1596,8 +1622,9 @@ public class DefaultHttpClient implements
         }
 
         // first: connect
-        return connectionManager.connect(requestKey, blockHint)
+        return connectionManager.connect(requestKey, blockHint, preferredScheduler)
             .flatMap(poolHandle -> {
+                poolHandle.touch();
                 preferredScheduler.set(poolHandle.channel.eventLoop());
 
                 // build the raw request
@@ -1668,6 +1695,7 @@ public class DefaultHttpClient implements
         io.micronaut.http.HttpRequest<?> request,
         NettyByteBody byteBody
     ) {
+        poolHandle.touch();
         URI uri = request.getUri();
         String uriWithoutHost = uri.getRawPath();
         if (uri.getRawQuery() != null) {
@@ -1704,7 +1732,7 @@ public class DefaultHttpClient implements
         } else {
             streamWriter = new StreamWriter((StreamingNettyByteBody) byteBody, e -> {
                 poolHandle.taint();
-                sink.completeExceptionally(e);
+                completeExceptionallySafe(sink, e);
             });
             pipeline.addLast(streamWriter);
             byteBuf = null;
@@ -1723,7 +1751,7 @@ public class DefaultHttpClient implements
             @Override
             public void fail(ChannelHandlerContext ctx, Throwable cause) {
                 poolHandle.taint();
-                sink.completeExceptionally(handleResponseError(request, cause));
+                completeExceptionallySafe(sink, handleResponseError(request, cause));
             }
 
             @Override
@@ -2009,7 +2037,7 @@ public class DefaultHttpClient implements
             applicationConfiguration,
             NettyByteBufferFactory.DEFAULT,
             new NettyByteBufMessageBodyHandler(),
-            new NettyWritableBodyWriter(applicationConfiguration)
+            new WritableBodyWriter(applicationConfiguration)
         );
         JsonMapper mapper = JsonMapper.createDefault();
         registry.add(MediaType.APPLICATION_JSON_TYPE, new NettyJsonHandler<>(mapper));

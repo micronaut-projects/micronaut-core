@@ -79,7 +79,14 @@ internal class KotlinVisitorContext(
             val resolverImplClass = ClassUtils.forName("com.google.devtools.ksp.processing.impl.ResolverImpl", javaClass.classLoader).orElseThrow()
             val kotlinTypeMapperClass = ClassUtils.forName("org.jetbrains.kotlin.codegen.state.KotlinTypeMapper", javaClass.classLoader).orElseThrow()
             val kotlinTypeMapperInstance = ReflectionUtils.getFieldValue(resolverImplClass, "typeMapper", resolver).orElseThrow()
-            ReflectionUtils.setField(kotlinTypeMapperClass, "useOldManglingRulesForFunctionAcceptingInlineClass", kotlinTypeMapperInstance, false)
+            try {
+                // Pre-2.1.20 field name
+                ReflectionUtils.setField(kotlinTypeMapperClass, "useOldManglingRulesForFunctionAcceptingInlineClass", kotlinTypeMapperInstance, false)
+            } catch (e: Exception) {
+                // Ignore
+            }
+            // 2.1.20+ field name
+            ReflectionUtils.setField(kotlinTypeMapperClass, "useOldInlineClassesManglingScheme", kotlinTypeMapperInstance, false)
         } catch (e: Exception) {
             // Ignore
         }
@@ -127,7 +134,10 @@ internal class KotlinVisitorContext(
     override fun getClassElement(name: String): Optional<ClassElement> {
         var declaration = resolver.getClassDeclarationByName(name)
         if (declaration == null) {
-            declaration = resolver.getClassDeclarationByName(name.replace('$', '.'))
+            declaration = resolver.getClassDeclarationByName(
+                name.replace(".$", ".")
+                    .replace('$', '.')
+            )
         }
         return Optional.ofNullable(declaration)
             .map(elementFactory::newClassElement)

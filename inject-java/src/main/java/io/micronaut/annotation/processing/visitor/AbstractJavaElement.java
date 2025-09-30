@@ -448,7 +448,7 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement {
         if (this == o) {
             return true;
         }
-        if (o == null) {
+        if (!(o instanceof io.micronaut.inject.ast.Element)) {
             return false;
         }
         io.micronaut.inject.ast.Element that = (io.micronaut.inject.ast.Element) o;

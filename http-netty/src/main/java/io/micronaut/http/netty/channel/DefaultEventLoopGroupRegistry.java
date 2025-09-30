@@ -16,6 +16,7 @@
 package io.micronaut.http.netty.channel;
 
 import io.micronaut.context.BeanLocator;
+import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.EachBean;
@@ -26,10 +27,15 @@ import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.ArgumentUtils;
+import io.micronaut.http.netty.channel.loom.LoomCarrierGroup;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.IoHandlerFactory;
+import io.netty.channel.MultiThreadIoEventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.util.NettyRuntime;
 import io.netty.util.concurrent.DefaultThreadFactory;
+import io.netty.util.concurrent.ThreadPerTaskExecutor;
 import jakarta.annotation.PreDestroy;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
@@ -60,15 +66,18 @@ public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
 
     private final Map<EventLoopGroup, EventLoopGroupConfiguration> eventLoopGroups = new ConcurrentHashMap<>();
 
+    private final BeanProvider<LoomCarrierGroup.Factory> loomCarrierGroupFactory;
+
     /**
      * Default constructor.
      *
      * @param eventLoopGroupFactory The event loop group factory
      * @param beanLocator           The bean locator
      */
-    public DefaultEventLoopGroupRegistry(EventLoopGroupFactory eventLoopGroupFactory, BeanLocator beanLocator) {
+    public DefaultEventLoopGroupRegistry(EventLoopGroupFactory eventLoopGroupFactory, BeanLocator beanLocator, BeanProvider<LoomCarrierGroup.Factory> loomCarrierGroupFactory) {
         this.eventLoopGroupFactory = eventLoopGroupFactory;
         this.beanLocator = beanLocator;
+        this.loomCarrierGroupFactory = loomCarrierGroupFactory;
     }
 
     /**
@@ -90,6 +99,19 @@ public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
         eventLoopGroups.clear();
     }
 
+    private EventLoopGroup createGroup(EventLoopGroupConfiguration configuration, Executor executor) {
+        IoHandlerFactory ioHandlerFactory = eventLoopGroupFactory.createIoHandlerFactory(configuration);
+        int nThreads = numThreads(configuration);
+        EventLoopGroup eventLoopGroup;
+        if (configuration.isLoomCarrier()) {
+            eventLoopGroup = loomCarrierGroupFactory.get().create(nThreads, executor, ioHandlerFactory);
+        } else {
+            eventLoopGroup = new MultiThreadIoEventLoopGroup(nThreads, executor, ioHandlerFactory);
+        }
+        eventLoopGroups.put(eventLoopGroup, configuration);
+        return eventLoopGroup;
+    }
+
     /**
      * Constructs an event loop group for each configuration.
      *
@@ -100,22 +122,18 @@ public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
     @Bean
     @BootstrapContextCompatible
     protected EventLoopGroup eventLoopGroup(EventLoopGroupConfiguration configuration) {
-        final String executor = configuration.getExecutorName().orElse(null);
-        EventLoopGroup eventLoopGroup;
-        if (executor != null) {
-            eventLoopGroup = beanLocator.findBean(Executor.class, Qualifiers.byName(executor))
-                .map(executorService -> eventLoopGroupFactory.createEventLoopGroup(
-                    configuration.getNumThreads(),
-                    executorService,
-                    configuration.getIoRatio().orElse(null)
-                )).orElseThrow(() -> new ConfigurationException("No executor service configured for name: " + executor));
+        String executorName = configuration.getExecutorName().orElse(null);
+        Executor executor;
+        if (executorName != null) {
+            executor = beanLocator.findBean(Executor.class, Qualifiers.byName(executorName))
+                .orElseThrow(() -> new ConfigurationException("No executor service configured for name: " + executorName));
         } else {
             ThreadFactory threadFactory = beanLocator.findBean(ThreadFactory.class, Qualifiers.byName(configuration.getName()))
                     .orElseGet(() ->  new DefaultThreadFactory(configuration.getName() + "-" + DefaultThreadFactory.toPoolName(NioEventLoopGroup.class)));
-            eventLoopGroup = eventLoopGroupFactory.createEventLoopGroup(configuration, threadFactory);
+            executor = new ThreadPerTaskExecutor(threadFactory);
         }
-        eventLoopGroups.put(eventLoopGroup, configuration);
-        return eventLoopGroup;
+
+        return createGroup(configuration, executor);
     }
 
     /**
@@ -130,10 +148,7 @@ public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
     @BootstrapContextCompatible
     @Bean(typed = { EventLoopGroup.class })
     protected EventLoopGroup defaultEventLoopGroup(@Named(NettyThreadFactory.NAME) ThreadFactory threadFactory) {
-        EventLoopGroupConfiguration configuration = new DefaultEventLoopGroupConfiguration();
-        EventLoopGroup eventLoopGroup = eventLoopGroupFactory.createEventLoopGroup(configuration, threadFactory);
-        eventLoopGroups.put(eventLoopGroup, configuration);
-        return eventLoopGroup;
+        return createGroup(new DefaultEventLoopGroupConfiguration(), new ThreadPerTaskExecutor(threadFactory));
     }
 
     @NonNull
@@ -156,5 +171,20 @@ public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
     public Optional<EventLoopGroupConfiguration> getEventLoopGroupConfiguration(@NonNull String name) {
         ArgumentUtils.requireNonNull("name", name);
         return beanLocator.findBean(EventLoopGroupConfiguration.class, Qualifiers.byName(name));
+    }
+
+    /**
+     * Calculate the number of threads from {@link EventLoopGroupConfiguration#getNumThreads()} and
+     * {@link EventLoopGroupConfiguration#getThreadCoreRatio()}.
+     *
+     * @param configuration The configuration
+     * @return The actual number of threads to use
+     */
+    public static int numThreads(EventLoopGroupConfiguration configuration) {
+        int explicit = configuration.getNumThreads();
+        if (explicit != 0) {
+            return explicit;
+        }
+        return Math.toIntExact(Math.round(configuration.getThreadCoreRatio() * NettyRuntime.availableProcessors()));
     }
 }

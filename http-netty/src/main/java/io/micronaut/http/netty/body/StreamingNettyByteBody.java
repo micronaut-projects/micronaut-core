@@ -83,6 +83,7 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
     }
 
     public BufferConsumer.Upstream primary(ByteBufConsumer primary) {
+        touch();
         BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {
             BaseSharedBuffer.failClaim();
@@ -95,6 +96,7 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
 
     @Override
     public @NonNull CloseableByteBody split(@NonNull SplitBackpressureMode backpressureMode) {
+        touch();
         BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {
             BaseSharedBuffer.failClaim();
@@ -165,6 +167,7 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
 
     @Override
     public void close() {
+        touch();
         BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {
             return;
@@ -175,6 +178,14 @@ public final class StreamingNettyByteBody extends NettyByteBody implements Close
         upstream.disregardBackpressure();
         upstream.start();
         sharedBuffer.subscribe(null, upstream, forceDelaySubscribe);
+    }
+
+    @Override
+    public void touch() {
+        ResourceLeakTracker<SharedBuffer> tracker = sharedBuffer.tracker;
+        if (tracker != null) {
+            tracker.record();
+        }
     }
 
     private static final class AsFlux extends BaseSharedBuffer.AsFlux<ByteBuf> implements ByteBufConsumer {

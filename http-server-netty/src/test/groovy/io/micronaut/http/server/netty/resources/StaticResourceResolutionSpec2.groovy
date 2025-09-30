@@ -9,7 +9,6 @@ import io.micronaut.http.annotation.Filter
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.filter.FilterChain
 import io.micronaut.http.filter.HttpFilter
-import io.micronaut.http.server.netty.fuzzing.BufferLeakDetection
 import io.micronaut.runtime.server.EmbeddedServer
 import jakarta.inject.Singleton
 import org.reactivestreams.Publisher
@@ -22,8 +21,6 @@ class StaticResourceResolutionSpec2 extends Specification {
 
     void 'filter does not cause resource leak when used for file system resource'() {
         given:
-        BufferLeakDetection.startTracking()
-
         def context = ApplicationContext.run(
                 [
                         'micronaut.router.static-resources.default.paths': [
@@ -51,9 +48,6 @@ class StaticResourceResolutionSpec2 extends Specification {
         cleanup:
         client.close()
         server.stop()
-
-        BufferLeakDetection.stopTrackingAndReportLeaks()
-
     }
 
     @Requires(property = 'spec.name', value = 'StaticResourceResolutionSpec2')

@@ -20,9 +20,14 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.HttpHeaders;
+import io.micronaut.http.MediaType;
 import org.slf4j.Logger;
 
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.nio.charset.UnsupportedCharsetException;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -34,6 +39,7 @@ import java.util.regex.Pattern;
  * @since 3.8.0
  */
 public final class HttpHeadersUtil {
+    private static final Charset DEFAULT_CHARSET = StandardCharsets.UTF_8;
     private static final Supplier<Pattern> HEADER_MASK_PATTERNS = SupplierUtil.memoized(() ->
         Pattern.compile(".*(password|cred|cert|key|secret|token|auth|signat).*", Pattern.CASE_INSENSITIVE)
     );
@@ -134,5 +140,67 @@ public final class HttpHeadersUtil {
             text = text.split(",")[0];
         }
         return text;
+    }
+
+    /**
+     * Resolve the {@link Charset} to use for request identified by the Content-Type HTTP Header value and the Accept-Charset HTTP Header value.
+     *
+     * @param contentTypeHeaderValue Content-Type HTTP Header Value
+     * @param acceptCharsetHeaderValue Accept-Charset HTTP Header Value
+     * @return A {@link Charset}
+     * @since 4.8.8
+     */
+    @NonNull
+    public static Charset parseCharacterEncoding(@Nullable String contentTypeHeaderValue, @Nullable String acceptCharsetHeaderValue) {
+        MediaType contentType = contentTypeHeaderValue == null ? null : MediaType.of(contentTypeHeaderValue);
+        Charset charset = acceptCharsetHeaderValue != null ? parseAcceptCharset(acceptCharsetHeaderValue) : StandardCharsets.UTF_8;
+        return parseCharacterEncoding(contentType, charset);
+    }
+
+    /**
+     * Resolve the {@link Charset} to use for the request.
+     *
+     * @param contentType ContenType
+     * @param acceptCharset Accept Charset
+     * @return An {@link Optional} of {@link Charset}
+     * @since 4.8.8
+     */
+    @NonNull
+    public static Charset parseCharacterEncoding(@Nullable MediaType contentType,
+                                                 @NonNull Charset acceptCharset) {
+        try {
+
+            if (contentType != null) {
+                String charset = contentType.getParametersMap().get(MediaType.CHARSET_PARAMETER);
+                if (charset != null) {
+                    try {
+                        return Charset.forName(charset);
+                    } catch (Exception e) {
+                        return DEFAULT_CHARSET;
+                    }
+                }
+            }
+        } catch (UnsupportedCharsetException e) {
+            return DEFAULT_CHARSET;
+        }
+        return acceptCharset;
+    }
+
+    /**
+     *
+     * @param acceptCharsetHeaderValue Accept-Charset HeaderValue
+     * @return Accept Charset
+     * @since 4.8.8
+     */
+    @NonNull
+    public static Charset parseAcceptCharset(@NonNull String acceptCharsetHeaderValue) {
+        String text = HttpHeadersUtil.splitAcceptHeader(acceptCharsetHeaderValue);
+        if (text != null) {
+            try {
+                return Charset.forName(text);
+            } catch (Exception ignored) {
+            }
+        }
+        return DEFAULT_CHARSET;
     }
 }

@@ -13,6 +13,7 @@ micronaut:
 
 vault:
   client:
+    uri: http://localhost:8200
     config:
       enabled: true
 ----
@@ -23,7 +24,7 @@ The Micronaut framework uses the configured `micronaut.application.name` to look
 
 .Configuration Resolution Precedence
 |===
-|Directory|Description
+|Secret Path|Description
 
 |`/application`
 |Configuration shared by all applications

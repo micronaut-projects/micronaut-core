@@ -2,6 +2,8 @@
 
 Check https://micronaut-projects.github.io/micronaut-upgrade/snapshot/[Micronaut Upgrade] documentation to help you upgrade your Micronaut applications.
 
+To learn what's new, check the GitHub Release notes for each module you're interested in. They contain a summary of all changes broken down by type.
+
 === Breaking Changes
 
 Review the section on <<breaks, Breaking Changes>> and update your affected application code.

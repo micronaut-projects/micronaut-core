@@ -25,12 +25,22 @@ if (System.getenv("SONAR_TOKEN") != null) {
         "**/graal/ServiceLoaderInitialization.java",
         "**/DirectoryClassWriterOutputVisitor.java",
         "**/GroovyClassWriterOutputVisitor.java",
+        "**/MutableHttpRequestWrapper.java",
         "**/tck/**",
-        "**/test/support/**"
+        "**/test/support/**",
+        "**/micronaut/annotation/processing/test/**"
     ]
     sonarqube {
+        skipProject = project.name.contains("test")
         properties {
             property "sonar.exclusions", coverageExcludes.join(",")
         }
     }
+}
+
+configurations.jacocoAggregation.dependencies.removeIf {
+    it instanceof ProjectDependency && it.path.startsWith(":test-")
+}
+configurations.javadocAggregatorBase.dependencies.removeIf {
+    it instanceof ProjectDependency && it.path.startsWith(":test-")
 }

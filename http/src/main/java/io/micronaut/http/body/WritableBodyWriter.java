@@ -17,6 +17,7 @@ package io.micronaut.http.body;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.Writable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ReferenceCounted;
@@ -24,6 +25,8 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
 import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.HttpHeaders;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.runtime.ApplicationConfiguration;
@@ -44,7 +47,7 @@ import java.io.OutputStream;
 @Singleton
 @Experimental
 @BootstrapContextCompatible
-public final class WritableBodyWriter implements TypedMessageBodyHandler<Writable>, ChunkedMessageBodyReader<Writable> {
+public final class WritableBodyWriter implements TypedMessageBodyHandler<Writable>, ChunkedMessageBodyReader<Writable>, ResponseBodyWriter<Writable> {
 
     private final ApplicationConfiguration applicationConfiguration;
 
@@ -102,5 +105,14 @@ public final class WritableBodyWriter implements TypedMessageBodyHandler<Writabl
             throw new CodecException("Failed to read InputStream", e);
         }
         return w -> w.write(s);
+    }
+
+    @Override
+    public @NonNull CloseableByteBody writePiece(@NonNull ByteBodyFactory bodyFactory, @NonNull HttpRequest<?> request, @NonNull HttpResponse<?> response, @NonNull Argument<Writable> type, @NonNull MediaType mediaType, Writable object) throws CodecException {
+        try {
+            return bodyFactory.buffer(o -> object.writeTo(o, MessageBodyWriter.getCharset(mediaType, response.getHeaders())));
+        } catch (IOException e) {
+            throw new CodecException("Failed to buffer Writable", e);
+        }
     }
 }

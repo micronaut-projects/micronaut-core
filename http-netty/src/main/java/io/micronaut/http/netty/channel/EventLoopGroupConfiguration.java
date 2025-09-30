@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.netty.channel;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.naming.Named;
 
 import java.time.Duration;
@@ -39,6 +40,10 @@ public interface EventLoopGroupConfiguration extends Named {
      * The default.
      */
     String DEFAULT_LOOP = EVENT_LOOPS + "." + DEFAULT;
+    /**
+     * Default {@link #getThreadCoreRatio()}.
+     */
+    double DEFAULT_THREAD_CORE_RATIO = 1.0;
 
     /**
      * The default shutdown quiet period in seconds.
@@ -55,9 +60,19 @@ public interface EventLoopGroupConfiguration extends Named {
     long DEFAULT_SHUTDOWN_TIMEOUT = 15;
 
     /**
-     * @return The number of threads for the event loop
+     * @return The number of threads for the event loop, or 0 to use {@link #getThreadCoreRatio()}
      */
     int getNumThreads();
+
+    /**
+     * The number of threads per core to use if {@link #getNumThreads()} is set to 0.
+     *
+     * @return The thread-to-core ratio
+     * @since 4.8.0
+     */
+    default double getThreadCoreRatio() {
+        return DEFAULT_THREAD_CORE_RATIO;
+    }
 
     /**
      * @return The I/O ratio.
@@ -86,5 +101,14 @@ public interface EventLoopGroupConfiguration extends Named {
      */
     default Duration getShutdownTimeout() {
         return Duration.ofSeconds(DEFAULT_SHUTDOWN_TIMEOUT);
+    }
+
+    /**
+     * @return When set to {@code true}, use a special <i>experimental</i> event loop that can also
+     * execute virtual threads, in order to improve virtual thread performance.
+     */
+    @Experimental
+    default boolean isLoomCarrier() {
+        return false;
     }
 }

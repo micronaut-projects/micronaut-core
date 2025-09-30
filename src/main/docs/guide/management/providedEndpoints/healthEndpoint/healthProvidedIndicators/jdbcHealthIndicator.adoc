@@ -1,0 +1,1 @@
+The JDBC health indicator determines the health of your application based on the ability to successfully create connections to datasources in the application context. The only configuration option supported is to enable or disable the indicator by the `endpoints.health.jdbc.enabled` key.

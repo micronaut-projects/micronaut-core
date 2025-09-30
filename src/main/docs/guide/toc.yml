@@ -1,6 +1,5 @@
 introduction:
   title: Introduction
-  whatsNew: What's New?
   upgrading: Upgrading your Micronaut Application
 quickStart:
   title: Quick Start
@@ -41,6 +40,7 @@ ioc:
   replaces: Bean Replacement
   beanConfigurations: Bean Configurations
   lifecycle: Life-Cycle Methods
+  gracefulShutdown: Graceful Shutdown
   contextEvents: Context Events
   events: Bean Events
   introspection:
@@ -58,16 +58,27 @@ ioc:
     beanWrapperApi: The BeanWrapper API
     jacksonAndBeanIntrospection: Jackson and Bean Introspection
     kotlinAndBeanIntrospection: Kotlin and Bean Introspection
-  beanMappers: Bean Mappers
+  beanMappers:
+    title: Bean Mappers
+    beanMappersMerging:
+      title: Bean Mappers Merging
+      beanMappersMergingStrategy: Merging Strategy
   beanValidation: Bean Validation
   annotationMetadata: Bean Annotation Metadata
   beanImport: Importing Beans from Libraries
+  classImport: Importing Classes from Libraries
+  mixin: Modifying Class Annotations With A Mixin
   nullabilityAnnotations: Nullability Annotations
   springBeans: Micronaut Beans And Spring
   android: Android Support
 config:
   title: Application Configuration
-  environments: The Environment
+  environments:
+    title: The Environment
+    environmentPriority: Environment Priority
+    disablingEnvironmentDetection: Disabling Environment Detection
+    defaultEnvironment: Default Environment
+  banner: Micronaut Banner
   propertySource: Externalized Configuration with PropertySources
   valueAnnotation: Configuration Injection
   evaluatedExpressions: Expression Language
@@ -349,7 +360,16 @@ management:
     infoEndpoint: The Info Endpoint
     healthEndpoint:
       title: The Health Endpoint
-      deadlockedThreads: Deadlocked Threads
+      healthEndpointConfiguration: Health Endpoint Configuration
+      healthEndpointStatusCode: Health Status Codes
+      healthLogging: Health Logging
+      healthEndpointCustomization: Custom Health Indicator
+      healthMonitoringTask: Health Monitor Task
+      healthProvidedIndicators:
+        title: Provided Indicators
+        diskSpaceHealthIndicator: Disk Space Health Indicator
+        jdbcHealthIndicator: JDBC Health Indicator
+        deadlockedThreads: Deadlocked Threads
     metricsEndpoint: The Metrics Endpoint
     refreshEndpoint: The Refresh Endpoint
     routesEndpoint: The Routes Endpoint

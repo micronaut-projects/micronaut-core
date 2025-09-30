@@ -16,6 +16,7 @@
 package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.ReflectiveAccess;
 
@@ -107,9 +108,13 @@ public interface MemberElement extends Element {
      * @return Will return {@code true} if is accessible.
      * @since 4.3.0
      */
+    @NextMajorVersion("The ReflectiveAccess should not be checked here and accessibility should fail if ReflectiveAccess is not present")
     default boolean isAccessible(@NonNull ClassElement callingType, boolean allowReflection) {
         if (isPublic()) {
             return true;
+        }
+        if (getOwningType().hasAnnotation(ImportedClass.class)) {
+            return allowReflection && hasAnnotation(ReflectiveAccess.class);
         }
         boolean packagePrivate = isPackagePrivate();
         if (isProtected() || packagePrivate) {

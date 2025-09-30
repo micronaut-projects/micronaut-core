@@ -17,7 +17,9 @@ package io.micronaut.context.visitor;
 
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Import;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.order.OrderUtil;
@@ -25,6 +27,7 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
+import io.micronaut.inject.visitor.TypeElementQuery;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 
@@ -60,6 +63,11 @@ public class BeanImportVisitor implements TypeElementVisitor<Import, Object> {
     }
 
     @Override
+    public TypeElementQuery query() {
+        return TypeElementQuery.onlyClass();
+    }
+
+    @Override
     public void visitClass(ClassElement element, VisitorContext context) {
         List<ClassElement> beanElements = collectInjectableElements(element, context);
 
@@ -74,16 +82,20 @@ public class BeanImportVisitor implements TypeElementVisitor<Import, Object> {
     }
 
     @NonNull
-    public static List<ClassElement> collectInjectableElements(ClassElement element, VisitorContext context) {
+    public static List<ClassElement> collectInjectableElements(AnnotationMetadata element, VisitorContext context) {
         List<ClassElement> beanElements = new ArrayList<>();
-        final String[] classNames = element.getAnnotationMetadata().stringValues(Import.class, "classes");
+        AnnotationValue<Import> annotation = element.getAnnotation(Import.class);
+        if (annotation == null ) {
+            return beanElements;
+        }
+        final String[] classNames = annotation.stringValues("classes");
         if (ArrayUtils.isNotEmpty(classNames)) {
             for (String className : classNames) {
                 context.getClassElement(className).ifPresent(beanElements::add);
             }
         }
 
-        String[] annotations = element.getAnnotationMetadata().stringValues(Import.class, "annotated");
+        String[] annotations = annotation.stringValues("annotated");
         Set<String> annotationSet;
         if (ArrayUtils.isEmpty(annotations)) {
             annotationSet = CollectionUtils.setOf(AnnotationUtil.SCOPE, Bean.class.getName(), AnnotationUtil.QUALIFIER);
@@ -95,7 +107,7 @@ public class BeanImportVisitor implements TypeElementVisitor<Import, Object> {
                 annotationSet.addAll(beanImportHandler.getSupportedAnnotationNames());
             }
         }
-        final String[] packages = element.getAnnotationMetadata().stringValues(Import.class, "packages");
+        final String[] packages = annotation.stringValues("packages");
 
         if (ArrayUtils.isNotEmpty(packages)) {
             for (String aPackage : packages) {

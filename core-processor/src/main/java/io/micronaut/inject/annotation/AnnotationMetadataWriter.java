@@ -19,7 +19,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ReflectionUtils;
-import io.micronaut.sourcegen.bytecode.ByteCodeWriter;
+import io.micronaut.inject.writer.ByteCodeWriterUtils;
 import io.micronaut.sourcegen.model.ClassDef;
 import io.micronaut.sourcegen.model.ClassTypeDef;
 import io.micronaut.sourcegen.model.ExpressionDef;
@@ -73,6 +73,6 @@ public class AnnotationMetadataWriter {
             );
         loadTypeMethods.values().forEach(classDefBuilder::addMethod);
         ClassDef classDef = classDefBuilder.build();
-        return new ByteCodeWriter().write(classDef);
+        return ByteCodeWriterUtils.writeByteCode(classDef, null);
     }
 }

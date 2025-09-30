@@ -45,6 +45,14 @@ public abstract class NativeElementsHelper<C, M> {
     private final Map<MethodCacheKey, Collection<M>> overridesCache = new HashMap<>();
 
     /**
+     * @param nativeClassType The native class type to cleanup
+     */
+    public void cleanupForClass(Object nativeClassType) {
+        processedClasses.remove(nativeClassType);
+        overridesCache.entrySet().removeIf(e -> e.getKey().classKey.equals(nativeClassType));
+    }
+
+    /**
      * Check if one method overrides another.
      *
      * @param m1    The override method

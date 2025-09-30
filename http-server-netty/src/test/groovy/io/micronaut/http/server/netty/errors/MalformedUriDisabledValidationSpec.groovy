@@ -28,7 +28,7 @@ class MalformedUriDisabledValidationSpec extends Specification {
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
             'spec.name': 'MalformedUriDisabledValidationSpec',
-            'micronaut.server.validate-url': 'false'
+            'micronaut.server.escape-html-url': 'true'
     ])
     @Shared @AutoCleanup HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
@@ -59,7 +59,8 @@ class MalformedUriDisabledValidationSpec extends Specification {
     @Controller('/malformed')
     static class SomeController {
         @Get(uri="/{some}", produces = MediaType.TEXT_PLAIN)
-        String some(String some) throws Exception{
+        String some(HttpRequest<?> request, String some) throws Exception {
+            assert request.uri.path.contains(some)
             return some
         }
 

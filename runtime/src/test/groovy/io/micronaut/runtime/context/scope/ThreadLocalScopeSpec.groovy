@@ -16,12 +16,14 @@
 package io.micronaut.runtime.context.scope
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.LifeCycle
 import io.micronaut.context.annotation.Factory
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.support.AbstractBeanDefinitionSpec
-import jakarta.inject.Scope
+import jakarta.inject.Inject
 import jakarta.inject.Singleton
+import spock.util.concurrent.PollingConditions
 
 import java.lang.annotation.ElementType
 import java.lang.annotation.Retention
@@ -150,7 +152,66 @@ class ThreadLocalBean {
         then:
         b.a.total() == 2
         isolated
+    }
 
+    void "cleaned up on context close"() {
+        given:
+        def ctx = ApplicationContext.run("test")
+        def listener = ctx.getBean(CleanupListener)
+
+        def t1 = new Thread(() -> {
+            ctx.getBean(LifecycleBean).someMethod()
+        })
+        t1.start()
+        t1.join()
+
+        def t2 = new Thread(() -> {
+            ctx.getBean(LifecycleBean).someMethod()
+        })
+        t2.start()
+        t2.join()
+
+        when:
+        ctx.close()
+        then:
+        synchronized (listener) { listener.numCleaned == 2 }
+    }
+
+    void "cleaned up on thread termination"() {
+        given:
+        def ctx = ApplicationContext.run("test")
+        def listener = ctx.getBean(CleanupListener)
+
+        when:
+        def t1 = new Thread(() -> {
+            ctx.getBean(LifecycleBean).someMethod()
+        })
+        t1.start()
+        t1.join()
+
+        def t2 = new Thread(() -> {
+            ctx.getBean(LifecycleBean).someMethod()
+        })
+        t2.start()
+        t2.join()
+
+        then:
+        new PollingConditions().eventually {
+            triggerGc()
+            synchronized (listener) { listener.numCleaned == 2 }
+        }
+
+        cleanup:
+        ctx.close()
+    }
+
+    private static volatile long sink
+
+    private static void triggerGc() {
+        System.gc()
+        for (int i = 0; i < 1000; i++) {
+            sink = System.identityHashCode(new byte[10000]);
+        }
     }
 }
 
@@ -268,4 +329,30 @@ class BAndFactory {
 @Retention(RUNTIME)
 @Target([ ElementType.TYPE, ElementType.METHOD])
 public @interface MyAnn {
+}
+
+@Singleton
+class CleanupListener {
+    int numCleaned = 0
+}
+
+@ThreadLocal(lifecycle = true)
+class LifecycleBean implements LifeCycle<LifecycleBean> {
+    @Inject
+    CleanupListener cleanupListener
+
+    void someMethod() {}
+
+    @Override
+    boolean isRunning() {
+        return true
+    }
+
+    @Override
+    LifecycleBean stop() {
+        synchronized (cleanupListener) {
+            cleanupListener.numCleaned++
+        }
+        return this
+    }
 }

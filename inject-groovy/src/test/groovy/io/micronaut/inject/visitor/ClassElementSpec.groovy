@@ -54,6 +54,19 @@ class ClassElementSpec extends AbstractBeanDefinitionSpec {
         AllElementsVisitor.clearVisited()
     }
 
+    void "test no package"() {
+        given:
+            def element = buildClassElement("""
+
+class Test {
+}
+""")
+
+        expect:
+            element.getPackage().getName() == ""
+            element.getPackageName() == ""
+    }
+
     void "test equals with primitive"() {
         given:
             def element = buildClassElement("""

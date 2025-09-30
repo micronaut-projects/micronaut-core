@@ -17,8 +17,8 @@ package io.micronaut.http.server.netty.ssl;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.ssl.ServerSslConfiguration;
+import io.netty.handler.codec.quic.QuicSslContext;
 import io.netty.handler.ssl.SslContext;
-import io.netty.incubator.codec.quic.QuicSslContext;
 
 import java.util.Optional;
 

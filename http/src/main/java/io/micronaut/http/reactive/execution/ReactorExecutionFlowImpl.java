@@ -212,8 +212,10 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
             stc = subscriptionsToCancel;
             subscriptionsToCancel = null;
         }
-        for (Subscription subscription : stc) {
-            subscription.cancel();
+        if (stc != null) {
+            for (Subscription subscription : stc) {
+                subscription.cancel();
+            }
         }
     }
 

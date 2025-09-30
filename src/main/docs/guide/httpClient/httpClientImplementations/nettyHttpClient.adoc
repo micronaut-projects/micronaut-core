@@ -1,3 +1,15 @@
 To use an implementation based on https://netty.io[Netty], add the following dependency to your build:
 
 dependency:micronaut-http-client[]
+
+== Disable hostname verification in ssl config
+
+It may be necessary in a testing or development environment to disable hostname verification.
+
+To disable hostname verification in your test classpath, you could create a <<replaces, Bean Replacement>> in `src/test/java`:
+
+[source,java]
+----
+include::http-client/src/test/java/io/micronaut/http/client/netty/ssl/NettyClientSslBuilderReplacement.java[indent=0]
+----
+WARNING: Disabling host name verification leaves your application potentially vulnerable to Man-in-the-Middle attacks and should only be done with the utmost care typically only in a development / testing environment. Never disable host name verification in production or in a scenario where you are making remote calls over the internet.

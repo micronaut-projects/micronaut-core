@@ -21,7 +21,7 @@ import io.netty.channel.Channel;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.unix.DomainSocketAddress;
 import io.netty.channel.unix.DomainSocketChannel;
-import io.netty.incubator.codec.quic.QuicChannel;
+import io.netty.handler.codec.quic.QuicChannel;
 
 import java.net.SocketAddress;
 import java.util.Optional;

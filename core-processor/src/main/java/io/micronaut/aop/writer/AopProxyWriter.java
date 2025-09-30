@@ -59,13 +59,13 @@ import io.micronaut.inject.qualifiers.Qualified;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.ArgumentExpUtils;
 import io.micronaut.inject.writer.BeanDefinitionWriter;
+import io.micronaut.inject.writer.ByteCodeWriterUtils;
 import io.micronaut.inject.writer.ClassOutputWriter;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import io.micronaut.inject.writer.ExecutableMethodsDefinitionWriter;
 import io.micronaut.inject.writer.MethodGenUtils;
 import io.micronaut.inject.writer.OriginatingElements;
 import io.micronaut.inject.writer.ProxyingBeanDefinitionVisitor;
-import io.micronaut.sourcegen.bytecode.ByteCodeWriter;
 import io.micronaut.sourcegen.model.ClassDef;
 import io.micronaut.sourcegen.model.ClassTypeDef;
 import io.micronaut.sourcegen.model.ExpressionDef;
@@ -246,10 +246,12 @@ public class AopProxyWriter implements ProxyingBeanDefinitionVisitor, ClassOutpu
 
     private final OriginatingElements originatingElements;
 
-    private final ClassDef.ClassDefBuilder proxyBuilder;
+    private ClassDef.ClassDefBuilder proxyBuilder;
     private final FieldDef interceptorsField;
     private final FieldDef proxyMethodsField;
     private FieldDef targetField;
+
+    private byte[] output;
 
     /**
      * <p>Constructs a new {@link AopProxyWriter} for the given parent {@link BeanDefinitionWriter} and starting interceptors types.</p>
@@ -655,7 +657,7 @@ public class AopProxyWriter implements ProxyingBeanDefinitionVisitor, ClassOutpu
 
             if (!methodElementKey.equals(overriddenByKey)) {
                 proxyBuilder.addMethod(MethodDef.override(methodElement)
-                    .build((aThis, methodParameters) -> aThis.superRef().invoke(overriddenBy, methodParameters).returning())
+                    .build((aThis, methodParameters) -> aThis.invoke(overriddenBy, methodParameters).returning())
                 );
                 return;
             }
@@ -664,28 +666,30 @@ public class AopProxyWriter implements ProxyingBeanDefinitionVisitor, ClassOutpu
         String methodName = methodElement.getName();
         List<ParameterElement> argumentTypeList = Arrays.asList(methodElement.getSuspendParameters());
         ClassElement returnType = methodElement.isSuspend() ? ClassElement.of(Object.class) : methodElement.getReturnType();
-        MethodRef methodKey = new MethodRef(methodName, argumentTypeList, TypeDef.erasure(returnType));
+        MethodRef methodKey = new MethodRef(methodName, argumentTypeList, returnType);
 
         if (!proxiedMethodsRefSet.contains(methodKey)) {
 
-            String interceptedProxyClassName = null;
-            String interceptedProxyBridgeMethodName = null;
+            ClassTypeDef interceptedProxyDef = null;
+            MethodDef interceptedProxyBridgeMethod = null;
 
             if (!isProxyTarget) {
                 // if the target is not being proxied then we need to generate a bridge method and executable method that knows about it
 
                 if (!methodElement.isAbstract() || methodElement.isDefault()) {
-                    interceptedProxyClassName = proxyFullName;
-                    interceptedProxyBridgeMethodName = "$$access$$" + methodName;
+                    interceptedProxyDef = ClassTypeDef.of(proxyFullName);
+                    interceptedProxyBridgeMethod = MethodDef.builder("$$access$$" + methodName)
+                        .addModifiers(Modifier.PUBLIC)
+                        .addParameters(argumentTypeList.stream().map(p -> ParameterDef.of(p.getName(), TypeDef.erasure(p.getType()))).toList())
+                        .returns(TypeDef.erasure(returnType))
+                        .build((aThis, methodParameters) -> aThis.superRef((ClassTypeDef) TypeDef.erasure(methodElement.getOwningType()))
+                            .invoke(methodElement, methodParameters)
+                            .returning()
+                        );
 
                     // now build a bridge to invoke the original method
                     proxyBuilder.addMethod(
-                        MethodDef.builder(interceptedProxyBridgeMethodName)
-                            .addModifiers(Modifier.PUBLIC)
-                            .addParameters(argumentTypeList.stream().map(p -> ParameterDef.of(p.getName(), TypeDef.erasure(p.getType()))).toList())
-                            .returns(TypeDef.erasure(returnType))
-                            .build((aThis, methodParameters) -> aThis.superRef((ClassTypeDef) TypeDef.erasure(methodElement.getOwningType()))
-                                .invoke(methodElement, methodParameters).returning())
+                        interceptedProxyBridgeMethod
                     );
                 }
             }
@@ -694,8 +698,8 @@ public class AopProxyWriter implements ProxyingBeanDefinitionVisitor, ClassOutpu
             int methodIndex = beanDefinitionWriter.visitExecutableMethod(
                 beanType,
                 methodElement,
-                interceptedProxyClassName,
-                interceptedProxyBridgeMethodName
+                interceptedProxyDef,
+                interceptedProxyBridgeMethod
             );
             int index = proxyMethodCount++;
 
@@ -825,6 +829,9 @@ public class AopProxyWriter implements ProxyingBeanDefinitionVisitor, ClassOutpu
         }
 
         proxyBeanDefinitionWriter.visitBeanDefinitionEnd();
+
+        output = ByteCodeWriterUtils.writeByteCode(proxyBuilder.build(), visitorContext);
+        proxyBuilder = null;
     }
 
     private void generateProxyTarget(ClassTypeDef targetType) {
@@ -1125,7 +1132,7 @@ public class AopProxyWriter implements ProxyingBeanDefinitionVisitor, ClassOutpu
     public void accept(ClassWriterOutputVisitor visitor) throws IOException {
         proxyBeanDefinitionWriter.accept(visitor);
         try (OutputStream out = visitor.visitClass(proxyFullName, getOriginatingElements())) {
-            out.write(new ByteCodeWriter().write(proxyBuilder.build()));
+            out.write(output);
         }
     }
 
@@ -1508,15 +1515,15 @@ public class AopProxyWriter implements ProxyingBeanDefinitionVisitor, ClassOutpu
         private final String name;
         private final List<ClassElement> argumentTypes;
         private final List<ClassElement> genericArgumentTypes;
-        private final TypeDef returnType;
+        private final String returnType;
         private final List<String> rawTypes;
 
-        public MethodRef(String name, List<ParameterElement> parameterElements, TypeDef returnType) {
+        public MethodRef(String name, List<ParameterElement> parameterElements, ClassElement returnType) {
             this.name = name;
             this.argumentTypes = parameterElements.stream().map(ParameterElement::getType).toList();
             this.genericArgumentTypes = parameterElements.stream().map(ParameterElement::getGenericType).toList();
             this.rawTypes = this.argumentTypes.stream().map(AopProxyWriter::toTypeString).toList();
-            this.returnType = returnType;
+            this.returnType = toTypeString(returnType);
         }
 
         @Override

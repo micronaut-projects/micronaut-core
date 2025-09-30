@@ -59,10 +59,10 @@ micronaut:
 
 On Linux, Netty also offers an io_uring-based transport in incubator status. On x86_64:
 
-dependency:netty-incubator-transport-native-io_uring[groupId="io.netty.incubator",scope="runtimeOnly",classifier="linux-x86_64"]
+dependency:netty-transport-native-io_uring[groupId="io.netty",scope="runtimeOnly",classifier="linux-x86_64"]
 
 On ARM64:
 
-dependency:netty-incubator-transport-native-io_uring[groupId="io.netty.incubator",scope="runtimeOnly",classifier="linux-aarch_64"]
+dependency:netty-transport-native-io_uring[groupId="io.netty",scope="runtimeOnly",classifier="linux-aarch_64"]
 
 NOTE: Netty enables simplistic sampling resource leak detection which reports there is a leak or not, at the cost of small overhead. You can enable it by setting property `netty.resource-leak-detector-level` to one of: `DISABLED` (default), `SIMPLE`, `PARANOID` or `ADVANCED`.

@@ -52,10 +52,18 @@ dependencies {
     testImplementation(libs.kotlin.kotest.junit5)
 }
 
-tasks {
-    sourcesJar {
-        from("$projectDir/src/main/kotlin")
+
+configurations.all {
+    resolutionStrategy.eachDependency {
+        if (requested.group == "org.jetbrains.kotlin") {
+            useVersion(libs.versions.managed.kotlin.asProvider().get())
+        } else if (requested.group == "com.google.devtools.ksp") {
+            useVersion(libs.versions.managed.ksp.get())
+        }
     }
+}
+
+tasks {
     withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
         compilerOptions {
             freeCompilerArgs = listOf("-Xjvm-default=all")

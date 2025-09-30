@@ -32,31 +32,36 @@ import static io.micronaut.core.util.StringUtils.SPACE;
  * Splits an HTTP query string into a path string and key-value parameter pairs.
  * This decoder is for one time use only.  Create a new instance for each URI:
  * <pre>
- * {@link QueryStringDecoder} decoder = new {@link QueryStringDecoder}("/hello?recipient=world&x=1;y=2");
+ * {@code
+ * QueryStringDecoder decoder = new QueryStringDecoder("/hello?recipient=world&x=1;y=2");
  * assert decoder.path().equals("/hello");
  * assert decoder.parameters().get("recipient").get(0).equals("world");
  * assert decoder.parameters().get("x").get(0).equals("1");
  * assert decoder.parameters().get("y").get(0).equals("2");
+ * }
  * </pre>
  *
  * This decoder can also decode the content of an HTTP POST request whose
  * content type is {@code application/x-www-form-urlencoded}:
  * <pre>
- * {@link QueryStringDecoder} decoder = new {@link QueryStringDecoder}("recipient=world&x=1;y=2", false);
+ * {@code
+ * QueryStringDecoder decoder = new QueryStringDecoder("recipient=world&x=1;y=2", false);
  * ...
+ * }
  * </pre>
  *
- * <h3>HashDOS vulnerability fix</h3>
+ * HashDOS vulnerability fix
  *
  * As a workaround to the <a href="https://netty.io/s/hashdos">HashDOS</a> vulnerability, the decoder
  * limits the maximum number of decoded key-value parameter pairs, up to {@literal 1024} by
  * default, and you can configure it when you construct the decoder by passing an additional
  * integer parameter.
- * <p>
+ *
  * Note: Forked from Netty core.
+ * This class is used internally by other Micronaut Modules. Don't reduce visibility.
  */
 @Internal
-final class QueryStringDecoder {
+public final class QueryStringDecoder {
 
     private static final int DEFAULT_MAX_PARAMS = 1024;
 
@@ -74,7 +79,7 @@ final class QueryStringDecoder {
      *
      * @param uri The URI
      */
-    QueryStringDecoder(String uri) {
+    public QueryStringDecoder(String uri) {
         this(uri, StandardCharsets.UTF_8);
     }
 
@@ -85,7 +90,7 @@ final class QueryStringDecoder {
      * @param uri The URI
      * @param hasPath whether a path is present
      */
-    QueryStringDecoder(String uri, boolean hasPath) {
+    public QueryStringDecoder(String uri, boolean hasPath) {
         this(uri, StandardCharsets.UTF_8, hasPath);
     }
 
@@ -96,7 +101,7 @@ final class QueryStringDecoder {
      * @param uri The URI
      * @param charset The charset to use
      */
-    QueryStringDecoder(String uri, Charset charset) {
+    public QueryStringDecoder(String uri, Charset charset) {
         this(uri, charset, true);
     }
 
@@ -108,7 +113,7 @@ final class QueryStringDecoder {
      * @param charset The charset to use
      * @param hasPath whether a path is present
      */
-    QueryStringDecoder(String uri, Charset charset, boolean hasPath) {
+    public QueryStringDecoder(String uri, Charset charset, boolean hasPath) {
         this(uri, charset, hasPath, DEFAULT_MAX_PARAMS);
     }
 
@@ -121,11 +126,11 @@ final class QueryStringDecoder {
      * @param hasPath whether a path is present
      * @param maxParams The maximum number of params
      */
-    QueryStringDecoder(String uri, Charset charset, boolean hasPath, int maxParams) {
+    public QueryStringDecoder(String uri, Charset charset, boolean hasPath, int maxParams) {
         this(uri, charset, hasPath, maxParams, false);
     }
 
-    QueryStringDecoder(String uri, Charset charset, boolean hasPath, int maxParams, boolean semicolonIsNormalChar) {
+    public QueryStringDecoder(String uri, Charset charset, boolean hasPath, int maxParams, boolean semicolonIsNormalChar) {
         this.uri = Objects.requireNonNull(uri, "uri");
         this.charset = Objects.requireNonNull(charset, "charset");
         this.maxParams = maxParams;
@@ -141,7 +146,7 @@ final class QueryStringDecoder {
      *
      * @param uri The URI
      */
-    QueryStringDecoder(URI uri) {
+    public QueryStringDecoder(URI uri) {
         this(uri, StandardCharsets.UTF_8);
     }
 
@@ -152,7 +157,7 @@ final class QueryStringDecoder {
      * @param uri The URI
      * @param charset The charset to use
      */
-    QueryStringDecoder(URI uri, Charset charset) {
+    public QueryStringDecoder(URI uri, Charset charset) {
         this(uri, charset, DEFAULT_MAX_PARAMS);
     }
 
@@ -164,11 +169,11 @@ final class QueryStringDecoder {
      * @param charset The charset to use
      * @param maxParams The maximum number of params
      */
-    QueryStringDecoder(URI uri, Charset charset, int maxParams) {
+    public QueryStringDecoder(URI uri, Charset charset, int maxParams) {
         this(uri, charset, maxParams, false);
     }
 
-    QueryStringDecoder(URI uri, Charset charset, int maxParams, boolean semicolonIsNormalChar) {
+    public QueryStringDecoder(URI uri, Charset charset, int maxParams, boolean semicolonIsNormalChar) {
         String rawPath = uri.getRawPath();
         if (rawPath == null) {
             rawPath = EMPTY_STRING;

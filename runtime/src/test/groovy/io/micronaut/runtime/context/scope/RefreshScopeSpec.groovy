@@ -2,6 +2,7 @@ package io.micronaut.runtime.context.scope
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.ConfigurationProperties
+import io.micronaut.context.annotation.EachProperty
 import io.micronaut.context.annotation.Value
 import io.micronaut.context.env.Environment
 import io.micronaut.core.util.StringUtils
@@ -118,6 +119,8 @@ class RefreshScopeSpec extends Specification {
     void "test fire refresh event that refreshes environment diff"() {
         given:
         System.setProperty("foo.bar", "test")
+        System.setProperty("foos.test.bar", "test")
+        System.setProperty("foo-list[0].bar", "test")
         ApplicationContext beanContext = ApplicationContext.builder().start()
 
         // override IO executor with synchronous impl
@@ -135,9 +138,14 @@ class RefreshScopeSpec extends Specification {
         bean.hashCode() == bean.hashCode()
         bean.testValue() == 'test'
         bean.testConfigProps() == 'test'
+        bean.testEachProps() == 'test'
+        bean.testListEachProps() == 'test'
+
 
         when:
         System.setProperty("foo.bar", "bar")
+        System.setProperty("foos.test.bar", "bar")
+        System.setProperty("foo-list[0].bar", "bar")
         Environment environment = beanContext.getEnvironment()
         Map<String, Object> previousValues = environment.refreshAndDiff()
         beanContext.publishEvent(new RefreshEvent(previousValues))
@@ -145,6 +153,8 @@ class RefreshScopeSpec extends Specification {
         then:
         bean.testValue() == 'bar'
         bean.testConfigProps() == 'bar'
+        bean.testEachProps() == 'bar'
+        bean.testListEachProps() == 'bar'
 
         cleanup:
         beanContext?.stop()
@@ -229,12 +239,16 @@ class RefreshScopeSpec extends Specification {
     static class RefreshBean {
 
         final MyConfig config
+        final List<EachConfig> configs
+        final List<EachConfig> moreConfigs
 
         @Value('${foo.bar}')
         String foo
 
-        RefreshBean(MyConfig config) {
+        RefreshBean(MyConfig config, List<EachConfig> configs, List<EachListConfig> moreConfigs) {
             this.config = config
+            this.configs = configs
+            this.moreConfigs = moreConfigs
         }
 
         String testValue() {
@@ -243,6 +257,14 @@ class RefreshScopeSpec extends Specification {
 
         String testConfigProps() {
             return config.bar
+        }
+
+        String testEachProps() {
+            return configs[0].bar
+        }
+
+        String testListEachProps() {
+            return moreConfigs[0].bar
         }
     }
 
@@ -285,5 +307,15 @@ class RefreshScopeSpec extends Specification {
     @ConfigurationProperties('second')
     static class SecondConfig {
         String bar = "default"
+    }
+
+    @EachProperty('foos')
+    static class EachConfig {
+        String bar
+    }
+
+    @EachProperty(value = 'foo-list', list = true)
+    static class EachListConfig {
+        String bar
     }
 }

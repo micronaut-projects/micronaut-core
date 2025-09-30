@@ -47,7 +47,7 @@ public final class MethodGenUtils {
 
     private static final java.lang.reflect.Method INSTANTIATE_METHOD = ReflectionUtils.getRequiredInternalMethod(
             InstantiationUtils.class,
-            "instantiate",
+            "instantiateReflectively",
             Class.class,
             Class[].class,
             Object[].class
@@ -85,11 +85,12 @@ public final class MethodGenUtils {
         return invokeKotlinDefaultMethod(declaringType, methodElement, target, values, values.stream().map(ExpressionDef::isNonNull).toList());
     }
 
-    public static ExpressionDef invokeBeanConstructor(MethodElement constructor,
+    public static ExpressionDef invokeBeanConstructor(ClassElement callingType,
+                                                      MethodElement constructor,
                                                       boolean allowKotlinDefaults,
                                                       @Nullable
                                                       List<? extends ExpressionDef> values) {
-        return invokeBeanConstructor(constructor, constructor.isReflectionRequired(), allowKotlinDefaults, values, values == null ? null : values.stream().map(ExpressionDef::isNonNull).toList());
+        return invokeBeanConstructor(constructor, constructor.isReflectionRequired(callingType), allowKotlinDefaults, values, values == null ? null : values.stream().map(ExpressionDef::isNonNull).toList());
     }
 
     public static ExpressionDef invokeBeanConstructor(MethodElement constructor,
@@ -106,7 +107,7 @@ public final class MethodGenUtils {
         List<ParameterElement> constructorArguments = Arrays.asList(constructor.getParameters());
         allowKotlinDefaults = allowKotlinDefaults && hasKotlinDefaultsParameters(constructorArguments);
 
-        List<ExpressionDef> constructorValues = constructorValues(constructor.getParameters(), values, allowKotlinDefaults);
+        List<ExpressionDef> constructorValues = constructorValues(constructor.getParameters(), values, hasValuesExpressions, allowKotlinDefaults);
 
         if (requiresReflection && !isCompanion) { // Companion and reflection not implemented
             return ClassTypeDef.of(InstantiationUtils.class).invokeStatic(
@@ -166,7 +167,7 @@ public final class MethodGenUtils {
         newValues.addAll(List.of(masks)); // Bit mask of defaults
         newValues.add(ExpressionDef.nullValue()); // Last parameter is just a marker and is always null
 
-        MethodDef defaultKotlinMethod = MethodGenUtils.asDefaultKotlinMethod(TypeDef.of(declaringType), methodElement, numberOfMasks);
+        MethodDef defaultKotlinMethod = MethodGenUtils.asDefaultKotlinMethod(TypeDef.erasure(declaringType), methodElement, numberOfMasks);
 
         return ClassTypeDef.of(declaringType).invokeStatic(defaultKotlinMethod, newValues);
     }
@@ -174,13 +175,22 @@ public final class MethodGenUtils {
     private static List<ExpressionDef> constructorValues(ParameterElement[] constructorArguments,
                                                          @Nullable
                                                          List<? extends ExpressionDef> values,
+                                                         @Nullable
+                                                         List<? extends ExpressionDef> hasValuesExpressions,
                                                          boolean addKotlinDefaults) {
         List<ExpressionDef> expressions = new ArrayList<>(constructorArguments.length);
         for (int i = 0; i < constructorArguments.length; i++) {
             ParameterElement constructorArgument = constructorArguments[i];
             ExpressionDef value = values == null ? null : values.get(i);
             if (value != null) {
-                if (!addKotlinDefaults || value instanceof ExpressionDef.Constant constant && constant.value() != null || !constructorArgument.isPrimitive()) {
+                if (!addKotlinDefaults || value instanceof ExpressionDef.Constant constant && constant.value() != null) {
+                    expressions.add(value);
+                } else if (hasValuesExpressions != null) {
+                    // There should be a better way to check if the value exists only once
+                    expressions.add(
+                        hasValuesExpressions.get(i).isTrue().doIfElse(value, getDefaultValue(constructorArgument))
+                    );
+                } else if (!constructorArgument.isPrimitive()) {
                     expressions.add(value);
                 } else {
                     expressions.add(
