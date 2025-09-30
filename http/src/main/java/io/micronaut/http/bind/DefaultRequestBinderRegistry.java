@@ -19,7 +19,6 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ArgumentConversionContext;
-import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
@@ -33,8 +32,8 @@ import io.micronaut.http.PushCapableHttpRequest;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.bind.binders.AnnotatedRequestArgumentBinder;
 import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
-import io.micronaut.http.bind.binders.CookieObjectArgumentBinder;
 import io.micronaut.http.bind.binders.CookieAnnotationBinder;
+import io.micronaut.http.bind.binders.CookieObjectArgumentBinder;
 import io.micronaut.http.bind.binders.DefaultBodyAnnotationBinder;
 import io.micronaut.http.bind.binders.DefaultUnmatchedRequestArgumentBinder;
 import io.micronaut.http.bind.binders.HeaderAnnotationBinder;
@@ -71,7 +70,6 @@ import static io.micronaut.core.util.KotlinUtils.KOTLIN_COROUTINES_SUPPORTED;
 public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
 
     private static final long CACHE_MAX_SIZE = 30;
-
     private final Map<Class<? extends Annotation>, RequestArgumentBinder> byAnnotation = new LinkedHashMap<>();
     private final Map<TypeAndAnnotation, RequestArgumentBinder> byTypeAndAnnotation = new LinkedHashMap<>();
     private final Map<Integer, RequestArgumentBinder> byType = new LinkedHashMap<>();
@@ -80,6 +78,7 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
         new ConcurrentLinkedHashMap.Builder<TypeAndAnnotation, Optional<RequestArgumentBinder>>().maximumWeightedCapacity(CACHE_MAX_SIZE).build();
     private final List<RequestArgumentBinder<Object>> unmatchedBinders = new ArrayList<>();
     private final DefaultUnmatchedRequestArgumentBinder defaultUnmatchedRequestArgumentBinder;
+
 
     /**
      * @param conversionService The conversion service
@@ -267,9 +266,7 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
                 .filter(arg -> arg.getType() != Object.class)
                 .filter(arg -> arg.getType() != Void.class);
             if (typeVariable.isPresent()) {
-                @SuppressWarnings("unchecked")
-                ArgumentConversionContext<Object> unwrappedConversionContext = ConversionContext.of((Argument<Object>) typeVariable.get());
-                ArgumentBinder.BindingResult<Object> bodyBound = bodyAnnotationBinder.bindFullBody(unwrappedConversionContext, source);
+                ArgumentBinder.BindingResult<Object> bodyBound = bodyAnnotationBinder.bindFullBodyNullable((Argument<Object>) typeVariable.get(), source);
                 // can't use flatMap here because we return a present optional even when the body conversion failed
                 return new PendingRequestBindingResult<>() {
                     @Override
@@ -286,14 +283,14 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
                     public Optional<HttpRequest<?>> getValue() {
                         Optional<Object> body = bodyBound.getValue();
                         if (pushCapable) {
-                            return Optional.of(new PushCapableRequestWrapper<Object>((HttpRequest<Object>) source, (PushCapableHttpRequest<?>) source) {
+                            return Optional.of(new PushCapableRequestWrapper<>((HttpRequest<Object>) source, (PushCapableHttpRequest<?>) source) {
                                 @Override
                                 public Optional<Object> getBody() {
                                     return body;
                                 }
                             });
                         } else {
-                            return Optional.of(new HttpRequestWrapper<Object>((HttpRequest<Object>) source) {
+                            return Optional.of(new HttpRequestWrapper<>((HttpRequest<Object>) source) {
                                 @Override
                                 public Optional<Object> getBody() {
                                     return body;

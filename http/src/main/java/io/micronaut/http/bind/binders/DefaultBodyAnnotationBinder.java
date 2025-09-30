@@ -15,14 +15,21 @@
  */
 package io.micronaut.http.bind.binders;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.bind.annotation.AbstractArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
+import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.annotation.Body;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
+import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import jakarta.inject.Singleton;
 
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -35,7 +42,15 @@ import java.util.Optional;
 @Singleton
 public class DefaultBodyAnnotationBinder<T> extends AbstractArgumentBinder<T> implements BodyArgumentBinder<T> {
 
+    private static final AnnotationMetadata NULLABLE_ANNOTATION_METADATA;
+
     protected final ConversionService conversionService;
+
+    static {
+        MutableAnnotationMetadata nullable = new MutableAnnotationMetadata();
+        nullable.addAnnotation(AnnotationUtil.NULLABLE, Map.of());
+        NULLABLE_ANNOTATION_METADATA = nullable;
+    }
 
     /**
      * @param conversionService The conversion service
@@ -107,5 +122,22 @@ public class DefaultBodyAnnotationBinder<T> extends AbstractArgumentBinder<T> im
     public BindingResult<T> bindFullBody(ArgumentConversionContext<T> context, HttpRequest<?> source) {
         Optional<?> body = source.getBody();
         return body.isPresent() ? doConvert(body.get(), context) : BindingResult.empty();
+    }
+
+    /**
+     * Alternative to {@link #bindFullBody(ArgumentConversionContext, HttpRequest)} where the argument is marked as nullable.
+     *
+     * @param argument The argument
+     * @param source  The request
+     * @return The binding result
+     */
+    public BindingResult<T> bindFullBodyNullable(Argument<T> argument, HttpRequest<?> source) {
+        ArgumentConversionContext<T> context = ConversionContext.of(argument.withAnnotationMetadata(
+            new AnnotationMetadataHierarchy(
+                argument.getAnnotationMetadata(),
+                NULLABLE_ANNOTATION_METADATA
+            )
+        ));
+        return bindFullBody(context, source);
     }
 }

@@ -17,7 +17,6 @@ package io.micronaut.http.server.netty.binders;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
-import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
@@ -25,6 +24,7 @@ import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.propagation.PropagatedContext;
+import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
@@ -61,12 +61,13 @@ import java.util.Optional;
 
 @Internal
 final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> {
+
     final NettyHttpServerConfiguration httpServerConfiguration;
     final MessageBodyHandlerRegistry bodyHandlerRegistry;
 
     NettyBodyAnnotationBinder(ConversionService conversionService,
                               NettyHttpServerConfiguration httpServerConfiguration,
-                                     MessageBodyHandlerRegistry bodyHandlerRegistry) {
+                              MessageBodyHandlerRegistry bodyHandlerRegistry) {
         super(conversionService);
         this.httpServerConfiguration = httpServerConfiguration;
         this.bodyHandlerRegistry = bodyHandlerRegistry;
@@ -91,10 +92,10 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
         if (existing != null) {
             return existing;
         } else {
-            //noinspection unchecked
-            BindingResult<ConvertibleValues<?>> result = (BindingResult<ConvertibleValues<?>>) bindFullBody((ArgumentConversionContext<T>) ConversionContext.of(ConvertibleValues.class), nhr);
-            nhr.convertibleBody = result;
-            return result;
+            Argument<T> objectArgument = (Argument) Argument.of(ConvertibleValues.class);
+            BindingResult<T> result = bindFullBodyNullable(objectArgument, nhr);
+            nhr.convertibleBody = (BindingResult<ConvertibleValues<?>>) result;
+            return (BindingResult<ConvertibleValues<?>>) result;
         }
     }
 
@@ -103,7 +104,7 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
         if (!(source instanceof NettyHttpRequest<?> nhr)) {
             return super.bindFullBody(context, source);
         }
-        if (nhr.byteBody().expectedLength().orElse(-1) == 0) {
+        if (context.getArgument().isNullable() && nhr.byteBody().expectedLength().orElse(-1) == 0) {
             return BindingResult.empty();
         }
 
