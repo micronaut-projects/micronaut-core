@@ -1,5 +1,4 @@
 plugins {
-    id "io.micronaut.build.internal.quality-reporting"
     id 'test-report-aggregation'
     id "org.aim42.htmlSanityCheck"
 }
