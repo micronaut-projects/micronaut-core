@@ -56,6 +56,44 @@ import java.util.stream.IntStream
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
 
+    void "test record with multiple constructors"() {
+        when:
+        def introspection = buildBeanIntrospection('test.MyRecord', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.Nullable;
+
+import java.time.Instant;
+import java.util.Date;
+
+@Introspected
+record MyRecord(String fooBar, int abcXyz, @Nullable Date theDate, @Nullable String otherStr) {
+
+    MyRecord {
+        if (theDate == null) {
+            theDate = Date.from(Instant.now());
+        }
+    }
+
+    public MyRecord(String fooBar, int abcXyz, Date theDate) {
+        this(fooBar, abcXyz, theDate, "random");
+    }
+
+    public MyRecord(String fooBar, int abcXyz) {
+        this(fooBar, abcXyz, Date.from(Instant.now()), "random");
+    }
+
+}
+
+
+    ''' )
+
+        then:
+        introspection != null
+        introspection.getConstructorArguments().length == 4
+    }
+
     void "test import field introspection"() {
         when:
         def introspection = buildBeanIntrospection('test.$io_micronaut_inject_visitor_beans_MuxedEvent1', '''

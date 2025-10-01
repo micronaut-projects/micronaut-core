@@ -710,10 +710,11 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
                     for (int i = 0; i < parameters.length; i++) {
                         ParameterElement parameter = parameters[i];
                         RecordComponentElement rce = recordComponents.get(i);
-                        VariableElement ve = ((JavaNativeElement.Variable) parameter.getNativeType()).element();
-                        TypeMirror leftType = visitorContext.getTypes().erasure(ve.asType());
-                        TypeMirror rightType = visitorContext.getTypes().erasure(rce.asType());
-                        if (!leftType.equals(rightType)) {
+                        String parameterTypeString = parameter.getType().getName();
+                        TypeMirror recordType = rce.asType();
+                        Element element = visitorContext.getTypes().asElement(recordType);
+                        String recordTypeString = element == null ? recordType.toString() : element.toString();
+                        if (!parameterTypeString.equals(recordTypeString)) {
                             // types don't match, continue searching constructors
                             continue constructorSearch;
                         }
