@@ -86,8 +86,9 @@ public abstract class BaseStreamingByteBody<SB extends BaseSharedBuffer> extends
     public final @NonNull CloseableByteBody move() {
         BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {
-            BaseSharedBuffer.failClaim();
+            failClaim();
         }
+        recordPrimaryOp();
         this.upstream = null;
         return derive(upstream);
     }
@@ -96,7 +97,7 @@ public abstract class BaseStreamingByteBody<SB extends BaseSharedBuffer> extends
     public final @NonNull CloseableByteBody allowDiscard() {
         BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {
-            BaseSharedBuffer.failClaim();
+            failClaim();
         }
         upstream.allowDiscard();
         return this;

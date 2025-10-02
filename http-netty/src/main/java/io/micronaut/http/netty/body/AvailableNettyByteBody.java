@@ -89,7 +89,7 @@ public final class AvailableNettyByteBody extends InternalByteBody implements Cl
     public ByteBuf peek() {
         ByteBuf b = buffer;
         if (b == null) {
-            throw new IllegalStateException("Body already claimed.");
+            failClaim();
         }
         return b;
     }
@@ -108,8 +108,9 @@ public final class AvailableNettyByteBody extends InternalByteBody implements Cl
     private ByteBuf claim() {
         ByteBuf b = buffer;
         if (b == null) {
-            BaseSharedBuffer.failClaim();
+            failClaim();
         }
+        recordPrimaryOp();
         this.buffer = null;
         BaseSharedBuffer.logClaim();
         return b;
@@ -125,6 +126,7 @@ public final class AvailableNettyByteBody extends InternalByteBody implements Cl
         ByteBuf b = buffer;
         this.buffer = null;
         if (b != null) {
+            recordClosed();
             b.release();
         }
     }
@@ -169,7 +171,7 @@ public final class AvailableNettyByteBody extends InternalByteBody implements Cl
     public @NonNull CloseableAvailableByteBody split() {
         ByteBuf b = buffer;
         if (b == null) {
-            BaseSharedBuffer.failClaim();
+            failClaim();
         }
         return new AvailableNettyByteBody(b.retainedSlice());
     }

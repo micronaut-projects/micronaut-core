@@ -94,7 +94,7 @@ public final class InputStreamByteBody extends InternalByteBody implements Close
     @Override
     public @NonNull CloseableByteBody allowDiscard() {
         if (stream == null) {
-            BaseSharedBuffer.failClaim();
+            failClaim();
         }
         stream.allowDiscard();
         return this;
@@ -103,6 +103,7 @@ public final class InputStreamByteBody extends InternalByteBody implements Close
     @Override
     public void close() {
         if (stream != null) {
+            recordClosed();
             stream.close();
             stream = null;
         }
@@ -111,7 +112,7 @@ public final class InputStreamByteBody extends InternalByteBody implements Close
     @Override
     public @NonNull CloseableByteBody split(SplitBackpressureMode backpressureMode) {
         if (stream == null) {
-            BaseSharedBuffer.failClaim();
+            failClaim();
         }
         StreamPair.Pair pair = StreamPair.createStreamPair(stream, backpressureMode);
         stream = pair.left();
@@ -127,8 +128,9 @@ public final class InputStreamByteBody extends InternalByteBody implements Close
     public @NonNull ExtendedInputStream toInputStream() {
         ExtendedInputStream s = stream;
         if (s == null) {
-            BaseSharedBuffer.failClaim();
+            failClaim();
         }
+        recordPrimaryOp();
         stream = null;
         BaseSharedBuffer.logClaim();
         return s;

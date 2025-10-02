@@ -68,7 +68,7 @@ public final class AvailableByteArrayBody extends InternalByteBody implements Cl
     @Override
     public @NonNull CloseableAvailableByteBody split() {
         if (readBuffer == null) {
-            BaseSharedBuffer.failClaim();
+            failClaim();
         }
         return new AvailableByteArrayBody(readBuffer.duplicate());
     }
@@ -76,7 +76,7 @@ public final class AvailableByteArrayBody extends InternalByteBody implements Cl
     @Override
     public long length() {
         if (readBuffer == null) {
-            BaseSharedBuffer.failClaim();
+            failClaim();
         }
         return readBuffer.readable();
     }
@@ -92,8 +92,9 @@ public final class AvailableByteArrayBody extends InternalByteBody implements Cl
     public @NonNull ReadBuffer toReadBuffer() {
         ReadBuffer a = readBuffer;
         if (a == null) {
-            BaseSharedBuffer.failClaim();
+            failClaim();
         }
+        recordPrimaryOp();
         readBuffer = null;
         BaseSharedBuffer.logClaim();
         return a;
@@ -114,6 +115,7 @@ public final class AvailableByteArrayBody extends InternalByteBody implements Cl
     public void close() {
         ReadBuffer rb = readBuffer;
         if (rb != null) {
+            recordClosed();
             rb.close();
             readBuffer = null;
         }
@@ -128,7 +130,7 @@ public final class AvailableByteArrayBody extends InternalByteBody implements Cl
     public ReadBuffer peek() {
         ReadBuffer b = readBuffer;
         if (b == null) {
-            BaseSharedBuffer.failClaim();
+            failClaim();
         }
         return b;
     }

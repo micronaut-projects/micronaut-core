@@ -76,8 +76,9 @@ public final class StreamingNettyByteBody extends BaseStreamingByteBody<Streamin
         touch();
         BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {
-            BaseSharedBuffer.failClaim();
+            failClaim();
         }
+        recordPrimaryOp();
         this.upstream = null;
         BaseSharedBuffer.logClaim();
         sharedBuffer.subscribe(primary, upstream, forceDelaySubscribe);
@@ -94,7 +95,7 @@ public final class StreamingNettyByteBody extends BaseStreamingByteBody<Streamin
         touch();
         BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {
-            BaseSharedBuffer.failClaim();
+            failClaim();
         }
         UpstreamBalancer.UpstreamPair pair = UpstreamBalancer.balancer(upstream, backpressureMode);
         this.upstream = pair.left();
@@ -106,8 +107,9 @@ public final class StreamingNettyByteBody extends BaseStreamingByteBody<Streamin
     public @NonNull ExecutionFlow<? extends CloseableAvailableByteBody> bufferFlow() {
         BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {
-            BaseSharedBuffer.failClaim();
+            failClaim();
         }
+        recordPrimaryOp();
         this.upstream = null;
         BaseSharedBuffer.logClaim();
         upstream.start();
@@ -122,6 +124,7 @@ public final class StreamingNettyByteBody extends BaseStreamingByteBody<Streamin
         if (upstream == null) {
             return;
         }
+        recordClosed();
         this.upstream = null;
         BaseSharedBuffer.logClaim();
         upstream.allowDiscard();

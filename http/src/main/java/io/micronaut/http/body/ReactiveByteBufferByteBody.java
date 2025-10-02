@@ -55,8 +55,9 @@ public final class ReactiveByteBufferByteBody extends BaseStreamingByteBody<Reac
     public BufferConsumer.Upstream primary(BufferConsumer primary) {
         BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {
-            BaseSharedBuffer.failClaim();
+            failClaim();
         }
+        recordPrimaryOp();
         this.upstream = null;
         BaseSharedBuffer.logClaim();
         sharedBuffer.subscribe(primary, upstream);
@@ -72,7 +73,7 @@ public final class ReactiveByteBufferByteBody extends BaseStreamingByteBody<Reac
     public @NonNull CloseableByteBody split(@NonNull SplitBackpressureMode backpressureMode) {
         BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {
-            BaseSharedBuffer.failClaim();
+            failClaim();
         }
         UpstreamBalancer.UpstreamPair pair = UpstreamBalancer.balancer(upstream, backpressureMode);
         this.upstream = pair.left();
@@ -84,8 +85,9 @@ public final class ReactiveByteBufferByteBody extends BaseStreamingByteBody<Reac
     public @NonNull ExecutionFlow<? extends CloseableAvailableByteBody> bufferFlow() {
         BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {
-            BaseSharedBuffer.failClaim();
+            failClaim();
         }
+        recordPrimaryOp();
         this.upstream = null;
         BaseSharedBuffer.logClaim();
         upstream.start();
@@ -99,6 +101,7 @@ public final class ReactiveByteBufferByteBody extends BaseStreamingByteBody<Reac
         if (upstream == null) {
             return;
         }
+        recordClosed();
         this.upstream = null;
         BaseSharedBuffer.logClaim();
         upstream.allowDiscard();
