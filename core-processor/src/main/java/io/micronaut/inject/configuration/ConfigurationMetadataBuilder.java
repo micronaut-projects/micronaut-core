@@ -196,10 +196,9 @@ public class ConfigurationMetadataBuilder {
                                           @Nullable String description,
                                           @Nullable String defaultValue) {
         originatingElements.addOriginatingElement(owningType);
-        originatingElements.addOriginatingElement(declaringType);
 
         PropertyMetadata metadata = new PropertyMetadata();
-        metadata.declaringType = declaringType.getName();
+        metadata.declaringType = owningType.getName();
         metadata.name = name;
         metadata.path = path;
         metadata.type = propertyType.getType().getName();
@@ -207,19 +206,6 @@ public class ConfigurationMetadataBuilder {
         metadata.defaultValue = defaultValue;
         properties.add(metadata);
         return metadata;
-    }
-
-    /**
-     * Finalizes the building process by removing configurations from the list
-     * of configurations that have no associated properties.
-     *
-     * This method iterates over the configurations list and removes any configuration
-     * for which none of the properties in the properties list have a matching
-     * declaring type.
-     */
-    public void finish() {
-        configurations.removeIf(configuration -> properties.stream()
-            .noneMatch(p -> p.getDeclaringType().equals(configuration.getType())));
     }
 
     /**

@@ -282,7 +282,7 @@ class Test {
 
         then:
             jsonEquals(metadataJson, '''
-{"groups":[{"name":"test","type":"test.Test"}],"properties":[{"name":"test.foo","type":"java.lang.String","sourceType":"test.Test"}]}
+{"groups":[{"name":"test","type":"test.MyProperties"},{"name":"test","type":"test.Test"}],"properties":[{"name":"test.foo","type":"java.lang.String","sourceType":"test.Test"}]}
 ''')
     }
 
@@ -325,7 +325,7 @@ class Test {
 ''')
         then:
             jsonEquals(metadataJson, '''
-{"groups":[{"name":"test","type":"test.Test"}],"properties":[{"name":"test.foo","type":"java.lang.String","sourceType":"test.Test"}]}
+{"groups":[{"name":"test","type":"test.MyProperties"},{"name":"test","type":"test.Test"}],"properties":[{"name":"test.foo","type":"java.lang.String","sourceType":"test.Test"}]}
 ''')
     }
 
@@ -361,7 +361,7 @@ class Test {
 ''')
         then:
             jsonEquals(metadataJson, '''
-{"groups":[{"name":"test","type":"test.Test"}],"properties":[{"name":"test.foo","type":"java.lang.String","sourceType":"test.Test"}]}
+{"groups":[{"name":"test","type":"test.MyProperties"},{"name":"test","type":"test.Test"}],"properties":[{"name":"test.foo","type":"java.lang.String","sourceType":"test.Test"}]}
 ''')
     }
 
@@ -401,6 +401,7 @@ class Test {
             jsonEquals(metadataJson, '''
 {
   "groups": [
+  {"name":"test","type":"test.MyProperties"},
     {
       "name": "test",
       "type": "test.Test"
@@ -795,7 +796,8 @@ class ParentConfig {
     {
       "name": "parent.foo.bar.baz",
       "type": "test.MyConfig$ChildConfig"
-    }
+    },
+    {"name":"parent","type":"test.ParentConfig"}
   ],
   "properties": [
     {
@@ -811,6 +813,71 @@ class ParentConfig {
   ]
 }
 ''')
+    }
+
+    void "test inheritance empty"() {
+        when:
+            String metadataJson = buildConfigurationMetadata('''
+package test;
+
+import io.micronaut.context.annotation.*;
+import java.time.Duration;
+
+@ConfigurationProperties("foo.bar")
+class MyConfig {
+    String host;
+
+    public String getHost() {
+        return host;
+    }
+
+    public void setHost(String host) {
+        this.host = host;
+    }
+
+    @ConfigurationProperties("abc")
+    class Abc extends SuperAbc {
+    }
+
+    static class SuperAbc {
+        String stuff;
+
+        public String getStuff() {
+            return stuff;
+        }
+
+        public void setStuff(String stuff) {
+            this.stuff = stuff;
+        }
+    }
+}
+
+''')
+        then:
+            jsonEquals(metadataJson, '''{
+  "groups": [
+    {
+      "name": "foo.bar",
+      "type": "test.MyConfig"
+    },
+    {
+      "name": "foo.bar.abc",
+      "type": "test.MyConfig$Abc"
+    }
+  ],
+  "properties": [
+    {
+      "name": "foo.bar.host",
+      "type": "java.lang.String",
+      "sourceType": "test.MyConfig"
+    },
+    {
+      "name": "foo.bar.abc.stuff",
+      "type": "java.lang.String",
+      "sourceType": "test.MyConfig$Abc"
+    }
+  ]
+}''')
     }
 
 }
