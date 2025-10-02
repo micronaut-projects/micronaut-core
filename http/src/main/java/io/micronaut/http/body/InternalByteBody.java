@@ -35,7 +35,8 @@ import java.util.concurrent.CompletableFuture;
  */
 @Internal
 public abstract class InternalByteBody implements ByteBody {
-    private static final boolean TRACK_OPERATIONS = Boolean.getBoolean(ByteBody.class.getName() + ".trackOperations");
+    private static final String TRACK_OPERATIONS_PROPERTY = ByteBody.class.getName() + ".trackOperations";
+    private static final boolean TRACK_OPERATIONS = Boolean.getBoolean(TRACK_OPERATIONS_PROPERTY);
 
     private @Nullable Throwable primaryOpTrace;
     private @Nullable Throwable closeTrace;
@@ -87,7 +88,9 @@ public abstract class InternalByteBody implements ByteBody {
     @Contract("-> fail")
     protected final void failClaim() {
         IllegalStateException e = new IllegalStateException(
-            "Request body has already been claimed: Two conflicting sites are trying to access the request body. If this is intentional, the first user must ByteBody#split the body. To find out where the body was claimed, turn on TRACE logging for " + ByteBody.class.getName() + "."
+            "Request body has already been claimed: Two conflicting sites are trying to access the request body. " +
+                "If this is intentional, the first user must ByteBody#split the body. " +
+                "To find out where the body was claimed, enable the -D" + TRACK_OPERATIONS_PROPERTY + "=true system property."
         );
         if (TRACK_OPERATIONS) {
             if (primaryOpTrace != null) {
