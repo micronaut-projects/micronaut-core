@@ -82,7 +82,6 @@ public class ConfigurationMetadataWriterVisitor implements TypeElementVisitor<Co
     @Override
     public void finish(VisitorContext visitorContext) {
         if (metadataBuilder.hasMetadata()) {
-            metadataBuilder.finish();
             ServiceLoader<ConfigurationMetadataWriter> writers = ServiceLoader.load(ConfigurationMetadataWriter.class, getClass().getClassLoader());
             try {
                 for (ConfigurationMetadataWriter writer : writers) {
