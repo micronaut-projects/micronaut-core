@@ -25,7 +25,6 @@ import io.micronaut.core.io.buffer.ReadBufferFactory;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.exceptions.BufferLengthExceededException;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
-import org.jetbrains.annotations.Contract;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
@@ -102,11 +101,6 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         this.readBufferFactory = readBufferFactory;
         this.limits = limits;
         this.rootUpstream = rootUpstream;
-    }
-
-    @Contract("-> fail")
-    public static void failClaim() {
-        throw new IllegalStateException("Request body has already been claimed: Two conflicting sites are trying to access the request body. If this is intentional, the first user must ByteBody#split the body. To find out where the body was claimed, turn on TRACE logging for " + SPLIT_LOG_CLASS.getName() + ".");
     }
 
     public static void logClaim() {
