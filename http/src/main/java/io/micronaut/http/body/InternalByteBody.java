@@ -62,9 +62,9 @@ public abstract class InternalByteBody implements ByteBody {
      * Variant of {@link #buffer()} that uses the {@link ExecutionFlow} API for extra efficiency.
      *
      * @return A flow that completes when all bytes are available
-      */
-     @NonNull
-     public abstract ExecutionFlow<? extends CloseableAvailableByteBody> bufferFlow();
+     */
+    @NonNull
+    public abstract ExecutionFlow<? extends CloseableAvailableByteBody> bufferFlow();
 
     @Override
     public final CompletableFuture<? extends CloseableAvailableByteBody> buffer() {
