@@ -27,7 +27,6 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.ReflectionConfig;
 import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.core.annotation.TypeHint;
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementModifier;
@@ -156,20 +155,18 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
             }
 
             if (element.hasAnnotation(TypeHint.class)) {
-                final String[] introspectedClasses = element.stringValues(TypeHint.class);
-                final TypeHint typeHint = element.synthesize(TypeHint.class);
-                TypeHint.AccessType[] accessTypes = DEFAULT_ACCESS_TYPE;
-
-                if (typeHint != null) {
-                    accessTypes = typeHint.accessType();
+                String[] introspectedClasses = element.stringValues(TypeHint.class);
+                String[] typeNames = element.stringValues(TypeHint.class, "typeNames");
+                TypeHint.AccessType[] accessTypes = element.enumValues(TypeHint.class, "accessType", TypeHint.AccessType.class);
+                if (accessTypes.length == 0) {
+                    accessTypes = DEFAULT_ACCESS_TYPE;
                 }
-                processClasses(accessTypes, reflectiveClasses, introspectedClasses);
-                processClasses(accessTypes, reflectiveClasses, element.getValue(
-                        TypeHint.class,
-                        "typeNames",
-                        String[].class).orElse(StringUtils.EMPTY_STRING_ARRAY
-                    )
-                );
+                if (introspectedClasses.length == 0 && typeNames.length == 0) {
+                    processClasses(accessTypes, reflectiveClasses, element.getName());
+                } else {
+                    processClasses(accessTypes, reflectiveClasses, introspectedClasses);
+                    processClasses(accessTypes, reflectiveClasses, typeNames);
+                }
             }
 
             if (element.hasAnnotation(Import.class)) {

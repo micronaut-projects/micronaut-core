@@ -28,6 +28,7 @@ import io.micronaut.core.util.ArrayUtils;
 import org.graalvm.nativeimage.ImageSingletons;
 import org.graalvm.nativeimage.hosted.Feature;
 import org.graalvm.nativeimage.hosted.RuntimeClassInitialization;
+import org.graalvm.nativeimage.hosted.RuntimeProxyCreation;
 import org.graalvm.nativeimage.hosted.RuntimeReflection;
 
 import java.io.IOException;
@@ -232,6 +233,11 @@ class ServiceLoaderFeature implements Feature {
             @Override
             public void register(Constructor<?>... constructors) {
                 RuntimeReflection.register(constructors);
+            }
+
+            @Override
+            public void registerDynamicProxy(Class<?> proxyClass) {
+                RuntimeProxyCreation.register(proxyClass);
             }
         };
         for (GraalReflectionConfigurer configurer : configurers) {

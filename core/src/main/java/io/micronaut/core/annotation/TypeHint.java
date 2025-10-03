@@ -78,6 +78,10 @@ public @interface TypeHint {
         /**
          * All public fields require access.
          */
-        ALL_PUBLIC_FIELDS
+        ALL_PUBLIC_FIELDS,
+        /**
+         * The type is a dynamic proxy.
+         */
+        DYNAMIC_PROXY
     }
 }
