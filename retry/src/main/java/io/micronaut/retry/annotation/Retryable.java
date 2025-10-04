@@ -47,12 +47,12 @@ public @interface Retryable {
      * @return The exception types to include (defaults to all)
      */
     @AliasFor(member = "includes")
-    Class<? extends Throwable>[] value() default {};
+    Class<? extends Throwable>[] value() default { Exception.class };
 
     /**
      * @return The exception types to include (defaults to all)
      */
-    Class<? extends Throwable>[] includes() default {};
+    Class<? extends Throwable>[] includes() default { Exception.class };
 
     /**
      * @return The exception types to exclude (defaults to none)
