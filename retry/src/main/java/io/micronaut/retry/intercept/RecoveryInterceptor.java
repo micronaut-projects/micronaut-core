@@ -119,22 +119,29 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
                     LOG.debug("Type [{}] resolved fallback: {}", context.getTarget().getClass(), fallbackHandle);
                 }
 
-                Object fallbackResult;
-                try {
-                    fallbackResult = fallbackHandle.invoke(context.getParameterValues());
-                } catch (Exception e) {
-                    return Flux.error(throwable);
-                }
-                if (fallbackResult == null) {
-                    return Flux.error(new FallbackException("Fallback handler [" + fallbackHandle + "] returned null value"));
-                } else {
-                    return beanContext.getConversionService().convert(fallbackResult, Publisher.class)
-                        .orElseThrow(() -> new FallbackException("Unsupported Reactive type: " + fallbackResult));
-                }
-            }
-            return Flux.error(throwable);
-        });
-    }
+               Class<?>[] includes = fallbackHandle.getExecutableMethod().getAnnotationMetadata().classValues(Fallback.class, "includes");
+               Class<?>[] excludes = fallbackHandle.getExecutableMethod().getAnnotationMetadata().classValues(Fallback.class, "excludes");
+
+               if (!shouldApplyFallback(throwable, includes, excludes)) {
+                   return Flux.error(throwable);
+               }
+
+               Object fallbackResult;
+               try {
+                   fallbackResult = fallbackHandle.invoke(context.getParameterValues());
+               } catch (Exception e) {
+                   return Flux.error(throwable);
+               }
+               if (fallbackResult == null) {
+                   return Flux.error(new FallbackException("Fallback handler [" + fallbackHandle + "] returned null value"));
+               } else {
+                   return beanContext.getConversionService().convert(fallbackResult, Publisher.class)
+                       .orElseThrow(() -> new FallbackException("Unsupported Reactive type: " + fallbackResult));
+               }
+           }
+           return Flux.error(throwable);
+       });
+   }
 
     /**
      * Finds a fallback method for the given context.
@@ -169,6 +176,14 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
                     MethodExecutionHandle<?, Object> fallbackHandle = fallbackMethod.get();
                     if (LOG.isDebugEnabled()) {
                         LOG.debug("Type [{}] resolved fallback: {}", context.getTarget().getClass(), fallbackHandle);
+                    }
+
+                    Class<?>[] includes = fallbackHandle.getExecutableMethod().getAnnotationMetadata().classValues(Fallback.class, "includes");
+                    Class<?>[] excludes = fallbackHandle.getExecutableMethod().getAnnotationMetadata().classValues(Fallback.class, "excludes");
+
+                    if (!shouldApplyFallback(throwable, includes, excludes)) {
+                        newFuture.completeExceptionally(throwable);
+                        return;
                     }
 
                     try {
@@ -213,6 +228,15 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
                     if (LOG.isDebugEnabled()) {
                         LOG.debug("Type [{}] resolved fallback: {}", context.getTarget().getClass(), fallbackHandle);
                     }
+
+                    Class<?>[] includes = fallbackHandle.getExecutableMethod().getAnnotationMetadata().classValues(Fallback.class, "includes");
+                    Class<?>[] excludes = fallbackHandle.getExecutableMethod().getAnnotationMetadata().classValues(Fallback.class, "excludes");
+
+                    if (!shouldApplyFallback(throwable, includes, excludes)) {
+                        newFuture.completeExceptionally(throwable);
+                        return;
+                    }
+
                     try {
                         newFuture.complete(fallbackHandle.invoke(context.getParameterValues()));
                     } catch (Throwable t) {
@@ -241,17 +265,52 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
 
         Optional<? extends MethodExecutionHandle<?, Object>> fallback = findFallbackMethod(context);
         if (fallback.isPresent()) {
-            MethodExecutionHandle<?, Object> fallbackMethod = fallback.get();
+            MethodExecutionHandle<?, Object> fallbackHandle = fallback.get();
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Type [{}] resolved fallback: {}", context.getTarget().getClass().getName(), fallbackHandle);
+            }
+
+            Class<?>[] includes = fallbackHandle.getExecutableMethod().getAnnotationMetadata().classValues(Fallback.class, "includes");
+            Class<?>[] excludes = fallbackHandle.getExecutableMethod().getAnnotationMetadata().classValues(Fallback.class, "excludes");
+
+            if (!shouldApplyFallback(exception, includes, excludes)) {
+                throw exception;
+            }
+
             try {
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Type [{}] resolved fallback: {}", context.getTarget().getClass().getName(), fallbackMethod);
-                }
-                return fallbackMethod.invoke(context.getParameterValues());
+                return fallbackHandle.invoke(context.getParameterValues());
             } catch (Exception e) {
                 throw new FallbackException("Error invoking fallback for type [" + context.getTarget().getClass().getName() + "]: " + e.getMessage(), e);
             }
         } else {
             throw exception;
         }
+    }
+
+    /**
+     * Determines whether the fallback should be applied based on the thrown exception and the include/exclude lists.
+     *
+     * @param throwable The exception that was thrown.
+     * @param includes  Array of exception classes to include.
+     * @param excludes  Array of exception classes to exclude.
+     * @return True if the fallback should be applied, false otherwise.
+     */
+    private boolean shouldApplyFallback(Throwable throwable, Class<?>[] includes, Class<?>[] excludes) {
+        if (excludes.length > 0) {
+            for (Class<?> exclude : excludes) {
+                if (exclude.isInstance(throwable)) {
+                    return false; // Excluded, so don't apply fallback
+                }
+            }
+        }
+        if (includes.length > 0) {
+            for (Class<?> include : includes) {
+                if (include.isInstance(throwable)) {
+                    return true; // Included, so apply fallback
+                }
+            }
+            return false; // Includes specified, but throwable not in includes, so don't apply
+        }
+        return true; // No includes or excludes specified, apply fallback
     }
 }
