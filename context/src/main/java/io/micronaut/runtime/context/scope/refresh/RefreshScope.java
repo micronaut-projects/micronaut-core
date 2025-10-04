@@ -176,7 +176,7 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
             BeanDefinition<?> definition = registration.getBeanDefinition();
             Optional<String> value = definition.stringValue(ConfigurationReader.class, "prefix");
             if (value.isPresent()) {
-                String configPrefix = value.get();
+                String configPrefix = io.micronaut.core.naming.NameUtils.hyphenate(value.get());
                 if (keySet.stream().anyMatch(key -> key.startsWith(configPrefix))) {
                     beanContext.refreshBean(registration);
                 }
@@ -198,8 +198,9 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
             String[] strings = definition.stringValues(Refreshable.class);
             if (!ArrayUtils.isEmpty(strings)) {
                 for (String prefix : strings) {
+                    String normalizedPrefix = io.micronaut.core.naming.NameUtils.hyphenate(prefix);
                     for (String k : keys) {
-                        if (k.startsWith(prefix)) {
+                        if (k.startsWith(normalizedPrefix)) {
                             disposeOfBean(entry.getKey());
                         }
                     }
