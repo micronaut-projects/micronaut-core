@@ -918,7 +918,7 @@ public class DefaultHttpClient implements
                 mono = mono.timeout(requestTimeout, scheduler.get(), null)
                     .onErrorResume(throwable -> {
                         if (throwable instanceof TimeoutException) {
-                            return ExecutionFlow.error(ReadTimeoutException.TIMEOUT_EXCEPTION);
+                            return ExecutionFlow.error(new ReadTimeoutException("Read Timeout", informationalServiceId));
                         }
                         return ExecutionFlow.error(throwable);
                     });
@@ -2050,7 +2050,7 @@ public class DefaultHttpClient implements
         } else if (cause instanceof io.micronaut.http.exceptions.BufferLengthExceededException blee) {
             result = decorate(new ContentLengthExceededException(blee.getAdvertisedLength(), blee.getReceivedLength()));
         } else if (cause instanceof io.netty.handler.timeout.ReadTimeoutException) {
-            result = ReadTimeoutException.TIMEOUT_EXCEPTION;
+            result = new ReadTimeoutException("Read Timeout", informationalServiceId);
         } else if (cause instanceof HttpClientException hce) {
             result = decorate(hce);
         } else {

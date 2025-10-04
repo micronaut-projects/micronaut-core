@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.client.exceptions;
 
+import io.micronaut.core.annotation.Nullable;
+
 /**
  * An exception thrown when a read timeout occurs.
  *
@@ -23,9 +25,14 @@ package io.micronaut.http.client.exceptions;
  */
 public final class ReadTimeoutException extends HttpClientException {
 
-    public static final ReadTimeoutException TIMEOUT_EXCEPTION = new ReadTimeoutException();
+    public static final ReadTimeoutException TIMEOUT_EXCEPTION = new ReadTimeoutException("Read Timeout");
 
-    private ReadTimeoutException() {
-        super("Read Timeout", null, true);
+    public ReadTimeoutException(String message) {
+        super(message);
+    }
+
+    public ReadTimeoutException(String message, @Nullable String serviceId) {
+        super(message);
+        setServiceId(serviceId);
     }
 }
