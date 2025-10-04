@@ -2680,6 +2680,9 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
     }
 
     private void initializeEagerBean(BeanDefinition<Object> beanDefinition) {
+        if (!beanDefinition.isEnabled(this)) {
+            return;
+        }
         if (beanDefinition.isIterable() || beanDefinition.hasStereotype(ConfigurationReader.class.getName())) {
             Set<BeanDefinition<Object>> beanCandidates = new HashSet<>(5);
 
@@ -2690,6 +2693,9 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
                 Argument.OBJECT_ARGUMENT
             );
             for (BeanDefinition beanCandidate : beanCandidates) {
+                if (!beanCandidate.isEnabled(this)) {
+                    continue;
+                }
                 findOrCreateSingletonBeanRegistration(
                         null,
                         beanCandidate,
