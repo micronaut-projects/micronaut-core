@@ -653,7 +653,7 @@ public final class RouteExecutor {
                     if (isCompletable || routeInfo.isVoid()) {
                         singleResponse = voidResponse(routeInfo);
                     } else if (serverConfiguration.isNotFoundOnMissingBody()) {
-                        singleResponse = notFoundErrorResponse(request);
+                        singleResponse = forStatus(routeInfo, HttpStatus.NOT_FOUND);
                     } else {
                         singleResponse = noContentResponse(routeInfo);
                     }
