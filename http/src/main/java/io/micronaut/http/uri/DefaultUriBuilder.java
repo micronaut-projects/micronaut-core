@@ -385,11 +385,14 @@ class DefaultUriBuilder implements UriBuilder {
             while (nameIterator.hasNext()) {
                 Map.Entry<String, List<String>> entry = nameIterator.next();
                 String rawName = entry.getKey();
-                String name = expandOrEncode(rawName, values);
+                // Query parameter names should be encoded using RFC3986 rules (spaces as %20)
+                String name = isTemplate(rawName, values) ? UriTemplate.of(rawName).expand(values) : encodeQueryParam(rawName);
 
                 final Iterator<String> i = entry.getValue().iterator();
                 while (i.hasNext()) {
-                    String v = expandOrEncode(i.next(), values);
+                    String rawValue = i.next();
+                    // Query parameter values should be encoded using RFC3986 rules (spaces as %20)
+                    String v = isTemplate(rawValue, values) ? UriTemplate.of(rawValue).expand(values) : encodeQueryParam(rawValue);
                     builder.append(name).append('=').append(v);
                     if (i.hasNext()) {
                         builder.append('&');
@@ -414,7 +417,24 @@ class DefaultUriBuilder implements UriBuilder {
         return value;
     }
 
-    private String encode(String userInfo) {
-        return URLEncoder.encode(userInfo, StandardCharsets.UTF_8);
+    private String encode(String value) {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Encodes a URI component for use in a query string, adhering to RFC3986.
+     * Spaces are encoded as '%20', not '+'.
+     *
+     * @param value The value to encode.
+     * @return The encoded value.
+     */
+    private String encodeQueryParam(String value) {
+        // URLEncoder.encode encodes spaces as '+', which is not RFC3986 compliant for query parameters.
+        // We need to replace '+' with '%20' after encoding.
+        // Also, URLEncoder.encode doesn't encode '~', which is unreserved in RFC3986 but often encoded.
+        // However, for query parameters, it's generally safe to leave '~' unencoded.
+        // The primary concern here is space encoding.
+        String encoded = URLEncoder.encode(value, StandardCharsets.UTF_8);
+        return encoded.replace("+", "%20");
     }
 }
