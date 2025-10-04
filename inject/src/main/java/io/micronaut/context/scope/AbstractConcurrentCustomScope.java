@@ -221,18 +221,20 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
             } catch (Exception e) {
                 return Optional.empty();
             }
-            for (CreatedBean<?> createdBean : scopeMap.values()) {
-                if (createdBean.bean() == bean) {
-                    if (createdBean instanceof BeanRegistration) {
-                        return Optional.of((BeanRegistration<T>) createdBean);
+            if (CollectionUtils.isNotEmpty(scopeMap)) {
+                for (CreatedBean<?> createdBean : scopeMap.values()) {
+                    if (createdBean.bean() == bean) {
+                        if (createdBean instanceof BeanRegistration) {
+                            return Optional.of((BeanRegistration<T>) createdBean);
+                        }
+                        return Optional.of(
+                                new BeanRegistration<>(
+                                        createdBean.id(),
+                                        (BeanDefinition<T>) createdBean.definition(),
+                                        bean
+                                )
+                        );
                     }
-                    return Optional.of(
-                            new BeanRegistration<>(
-                                    createdBean.id(),
-                                    (BeanDefinition<T>) createdBean.definition(),
-                                    bean
-                            )
-                    );
                 }
             }
             return Optional.empty();
