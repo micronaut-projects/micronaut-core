@@ -34,7 +34,7 @@ import java.util.Optional;
 @Internal
 public class NettyCookie implements Cookie {
 
-    private final io.netty.handler.codec.http.cookie.Cookie nettyCookie;
+    private transient io.netty.handler.codec.http.cookie.Cookie nettyCookie;
 
     /**
      * @param nettyCookie The Netty cookie
@@ -169,5 +169,65 @@ public class NettyCookie implements Cookie {
     public int compareTo(Cookie o) {
         NettyCookie nettyCookie = (NettyCookie) o;
         return nettyCookie.nettyCookie.compareTo(this.nettyCookie);
+    }
+
+    private void writeObject(java.io.ObjectOutputStream out) throws java.io.IOException {
+        out.writeUTF(nettyCookie.name());
+        out.writeUTF(nettyCookie.value());
+        out.writeLong(nettyCookie.maxAge());
+        out.writeBoolean(nettyCookie.isHttpOnly());
+        out.writeBoolean(nettyCookie.isSecure());
+
+        out.writeBoolean(nettyCookie.domain() != null);
+        if (nettyCookie.domain() != null) {
+            out.writeUTF(nettyCookie.domain());
+        }
+
+        out.writeBoolean(nettyCookie.path() != null);
+        if (nettyCookie.path() != null) {
+            out.writeUTF(nettyCookie.path());
+        }
+
+        io.netty.handler.codec.http.cookie.CookieHeaderNames.SameSite sameSite = null;
+        if (nettyCookie instanceof DefaultCookie defaultCookie) {
+            sameSite = defaultCookie.sameSite();
+        }
+        out.writeBoolean(sameSite != null);
+        if (sameSite != null) {
+            out.writeUTF(sameSite.name());
+        }
+    }
+
+    private void readObject(java.io.ObjectInputStream in) throws java.io.IOException, ClassNotFoundException {
+        String name = in.readUTF();
+        String value = in.readUTF();
+        long maxAge = in.readLong();
+        boolean httpOnly = in.readBoolean();
+        boolean secure = in.readBoolean();
+
+        String domain = null;
+        if (in.readBoolean()) {
+            domain = in.readUTF();
+        }
+
+        String path = null;
+        if (in.readBoolean()) {
+            path = in.readUTF();
+        }
+
+        io.netty.handler.codec.http.cookie.CookieHeaderNames.SameSite sameSite = null;
+        if (in.readBoolean()) {
+            sameSite = io.netty.handler.codec.http.cookie.CookieHeaderNames.SameSite.valueOf(in.readUTF());
+        }
+
+        DefaultCookie newNettyCookie = new DefaultCookie(name, value);
+        newNettyCookie.setMaxAge(maxAge);
+        newNettyCookie.setHttpOnly(httpOnly);
+        newNettyCookie.setSecure(secure);
+        newNettyCookie.setDomain(domain);
+        newNettyCookie.setPath(path);
+        newNettyCookie.setSameSite(sameSite);
+
+        this.nettyCookie = newNettyCookie;
     }
 }
