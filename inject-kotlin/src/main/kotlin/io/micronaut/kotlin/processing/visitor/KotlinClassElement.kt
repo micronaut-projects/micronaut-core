@@ -844,7 +844,7 @@ internal open class KotlinClassElement(
                 }
 
                 FieldElement::class.java -> {
-                    classNode.getDeclaredProperties()
+                    classNode.getAllProperties()
                         .filter {
                             it.hasBackingField && it.origin != Origin.SYNTHETIC
                         }
