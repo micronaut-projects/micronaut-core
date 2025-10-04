@@ -185,16 +185,20 @@ public abstract class HttpClientConfiguration {
 
     private String pcapLoggingPathPattern = null;
 
+    private ConnectionPoolConfiguration connectionPoolConfiguration;
+
     /**
      * Default constructor.
      */
     public HttpClientConfiguration() {
+        this.connectionPoolConfiguration = new ConnectionPoolConfiguration();
     }
 
     /**
      * @param applicationConfiguration The application configuration
      */
     public HttpClientConfiguration(ApplicationConfiguration applicationConfiguration) {
+        this();
         if (applicationConfiguration != null) {
             this.defaultCharset = applicationConfiguration.getDefaultCharset();
         }
@@ -206,6 +210,7 @@ public abstract class HttpClientConfiguration {
      * @param copy The client configuration to copy settings from
      */
     public HttpClientConfiguration(HttpClientConfiguration copy) {
+        this(); // Initialize default first
         if (copy != null) {
             this.channelOptions = copy.channelOptions;
             this.numOfThreads = copy.numOfThreads;
@@ -231,6 +236,7 @@ public abstract class HttpClientConfiguration {
             this.sslConfiguration = copy.sslConfiguration;
             this.threadFactory = copy.threadFactory;
             this.httpVersion = copy.httpVersion;
+            this.connectionPoolConfiguration = copy.connectionPoolConfiguration;
         }
     }
 
@@ -300,7 +306,18 @@ public abstract class HttpClientConfiguration {
      *
      * @return The connection pool configuration.
      */
-    public abstract ConnectionPoolConfiguration getConnectionPoolConfiguration();
+    public ConnectionPoolConfiguration getConnectionPoolConfiguration() {
+        return connectionPoolConfiguration;
+    }
+
+    /**
+     * Sets the connection pool configuration.
+     *
+     * @param connectionPoolConfiguration The connection pool configuration.
+     */
+    public void setConnectionPoolConfiguration(ConnectionPoolConfiguration connectionPoolConfiguration) {
+        this.connectionPoolConfiguration = connectionPoolConfiguration;
+    }
 
     /**
      * @return The {@link SslConfiguration} for the client

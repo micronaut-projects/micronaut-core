@@ -38,7 +38,6 @@ public class DefaultHttpClientConfiguration extends HttpClientConfiguration {
      * Prefix for HTTP Client settings.
      */
     public static final String PREFIX = "micronaut.http.client";
-    private final DefaultConnectionPoolConfiguration connectionPoolConfiguration;
     private final DefaultWebSocketCompressionConfiguration webSocketCompressionConfiguration;
     private final DefaultHttp2ClientConfiguration http2Configuration;
 
@@ -46,7 +45,8 @@ public class DefaultHttpClientConfiguration extends HttpClientConfiguration {
      * Default constructor.
      */
     public DefaultHttpClientConfiguration() {
-        this.connectionPoolConfiguration = new DefaultConnectionPoolConfiguration();
+        super();
+        setConnectionPoolConfiguration(new DefaultConnectionPoolConfiguration());
         this.webSocketCompressionConfiguration = new DefaultWebSocketCompressionConfiguration();
         this.http2Configuration = new DefaultHttp2ClientConfiguration();
     }
@@ -86,14 +86,9 @@ public class DefaultHttpClientConfiguration extends HttpClientConfiguration {
                                           DefaultHttp2ClientConfiguration http2Configuration,
                                           ApplicationConfiguration applicationConfiguration) {
         super(applicationConfiguration);
-        this.connectionPoolConfiguration = connectionPoolConfiguration;
+        setConnectionPoolConfiguration(connectionPoolConfiguration);
         this.webSocketCompressionConfiguration = webSocketCompressionConfiguration;
         this.http2Configuration = http2Configuration;
-    }
-
-    @Override
-    public ConnectionPoolConfiguration getConnectionPoolConfiguration() {
-        return connectionPoolConfiguration;
     }
 
     @Override

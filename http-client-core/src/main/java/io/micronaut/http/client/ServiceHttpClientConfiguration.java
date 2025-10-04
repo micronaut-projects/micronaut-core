@@ -68,7 +68,6 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
     public static final long DEFAULT_HEALTHCHECKINTERVAL_SECONDS = 30;
 
     private final String serviceId;
-    private final ServiceConnectionPoolConfiguration connectionPoolConfiguration;
     private final ServiceWebSocketCompressionConfiguration webSocketCompressionConfiguration;
     private final ServiceHttp2ClientConfiguration http2Configuration;
     private List<URI> urls = Collections.emptyList();
@@ -95,11 +94,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
         if (sslConfiguration != null) {
             setSslConfiguration(sslConfiguration);
         }
-        if (connectionPoolConfiguration != null) {
-            this.connectionPoolConfiguration = connectionPoolConfiguration;
-        } else {
-            this.connectionPoolConfiguration = new ServiceConnectionPoolConfiguration();
-        }
+        setConnectionPoolConfiguration(Objects.requireNonNullElseGet(connectionPoolConfiguration, ServiceConnectionPoolConfiguration::new));
         this.webSocketCompressionConfiguration = new ServiceWebSocketCompressionConfiguration();
         this.http2Configuration = new ServiceHttp2ClientConfiguration();
     }
@@ -165,7 +160,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
         if (sslConfiguration != null) {
             setSslConfiguration(sslConfiguration);
         }
-        this.connectionPoolConfiguration = Objects.requireNonNullElseGet(connectionPoolConfiguration, ServiceConnectionPoolConfiguration::new);
+        setConnectionPoolConfiguration(Objects.requireNonNullElseGet(connectionPoolConfiguration, ServiceConnectionPoolConfiguration::new));
         this.webSocketCompressionConfiguration = Objects.requireNonNullElseGet(webSocketCompressionConfiguration, ServiceWebSocketCompressionConfiguration::new);
         this.http2Configuration = Objects.requireNonNullElseGet(http2Configuration, ServiceHttp2ClientConfiguration::new);
     }
@@ -288,10 +283,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
         }
     }
 
-    @Override
-    public ConnectionPoolConfiguration getConnectionPoolConfiguration() {
-        return connectionPoolConfiguration;
-    }
+
 
     @Override
     public WebSocketCompressionConfiguration getWebSocketCompressionConfiguration() {
