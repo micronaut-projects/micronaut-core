@@ -36,6 +36,7 @@ import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.filter.FilterOrder;
 import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.http.filter.HttpFilter;
+import io.micronaut.http.uri.URLEncodingKind;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
@@ -85,6 +86,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     protected final ConversionService conversionService;
     protected final Charset defaultCharset;
     private final ExecutorSelector executorSelector;
+    protected final RouterConfiguration routerConfiguration;
 
     private final MessageBodyHandlerRegistry messageBodyHandlerRegistry;
 
@@ -121,13 +123,15 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         this.conversionService = conversionService;
         if (executionHandleLocator instanceof ApplicationContext applicationContext) {
             Environment environment = applicationContext.getEnvironment();
-            defaultCharset = environment.get("micronaut.application.default-charset", Charset.class, StandardCharsets.UTF_8);
+            this.defaultCharset = environment.get("micronaut.application.default-charset", Charset.class, StandardCharsets.UTF_8);
             this.executorSelector = applicationContext.findBean(ExecutorSelector.class).orElse(null);
+            this.routerConfiguration = applicationContext.findBean(RouterConfiguration.class).orElse(new RouterConfiguration(URLEncodingKind.RFC_1866));
             this.messageBodyHandlerRegistry = applicationContext.findBean(MessageBodyHandlerRegistry.class).orElse(MessageBodyHandlerRegistry.EMPTY);
         } else {
-            defaultCharset = StandardCharsets.UTF_8;
+            this.defaultCharset = StandardCharsets.UTF_8;
             this.executorSelector = null;
             this.messageBodyHandlerRegistry = MessageBodyHandlerRegistry.EMPTY;
+            this.routerConfiguration = new RouterConfiguration(URLEncodingKind.RFC_1866);
         }
     }
 
@@ -882,7 +886,8 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
                 port,
                 conversionService,
                 executorSelector,
-                messageBodyHandlerRegistry
+                messageBodyHandlerRegistry,
+                routerConfiguration
             );
         }
 

@@ -56,6 +56,7 @@ import io.micronaut.http.client.jdk.cookie.DefaultCookieDecoder;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.filter.HttpClientFilterResolver;
+import io.micronaut.http.uri.URLEncodingKind;
 import io.micronaut.inject.InjectionPoint;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.json.JsonFeatures;
@@ -331,6 +332,9 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
         AnnotationMetadata annotationMetadata
     ) {
         ConversionService conversionService = beanContext.getBean(ConversionService.class);
+        URLEncodingKind urlEncodingKind = annotationMetadata.
+            enumValue(Client.class, "uriEncoding", URLEncodingKind.class)
+            .orElse(configuration.getUrlEncoding());
         return new DefaultJdkHttpClient(
             loadBalancer,
             httpVersion,
@@ -347,7 +351,8 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
             clientId,
             conversionService,
             jdkClientSslBuilder,
-            cookieDecoder
+            cookieDecoder,
+            urlEncodingKind
         );
     }
 

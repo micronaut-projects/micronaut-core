@@ -280,6 +280,8 @@ class HttpGetSpec extends Specification {
         myGetClient.queryParam('{"service":["test"]}') == '{"service":["test"]}'
         myGetClient.queryParam('foo', 'bar') == 'foo-bar'
         myGetClient.queryParam('foo%', 'bar') == 'foo%-bar'
+        myGetClient.queryParam('Hello World') == 'Hello World'
+        myGetClient.queryParam2('Hello World') == '/get/queryParam2?foo=Hello+World'
     }
 
     void "test body availability"() {
@@ -686,6 +688,11 @@ class HttpGetSpec extends Specification {
             return foo
         }
 
+        @Get("/queryParam2")
+        String queryParam2(HttpRequest<?> request) {
+            return request.uri.toString()
+        }
+
         @Get("/queryParamExploded{?bar*}")
         String queryParamExploded(@QueryValue("bar") List<String> foo, HttpRequest<?> request) {
             return request.getUri().toString()
@@ -906,6 +913,9 @@ class HttpGetSpec extends Specification {
 
         @Get("/queryParam")
         String queryParam(@QueryValue String foo)
+
+        @Get("/queryParam2")
+        String queryParam2(@QueryValue String foo)
 
         @Get("/queryParamExploded{?bar*}")
         String queryParamExploded(@QueryValue("bar") List<String> foo)

@@ -65,6 +65,7 @@ import io.micronaut.http.netty.channel.EventLoopGroupFactory;
 import io.micronaut.http.netty.channel.EventLoopGroupRegistry;
 import io.micronaut.http.netty.channel.NettyChannelType;
 import io.micronaut.http.ssl.SslConfiguration;
+import io.micronaut.http.uri.URLEncodingKind;
 import io.micronaut.inject.InjectionPoint;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.json.JsonFeatures;
@@ -398,6 +399,11 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                     beanContext,
                     annotationMetadata
             )
+                .urlEncodingKind(
+                    annotationMetadata
+                        .enumValue(Client.class, "uriEncoding", URLEncodingKind.class)
+                        .orElse(configuration.getUrlEncoding())
+                )
                 .loadBalancer(loadBalancer)
                 .explicitHttpVersion(clientKey.httpVersion)
                 .contextPath(contextPath);

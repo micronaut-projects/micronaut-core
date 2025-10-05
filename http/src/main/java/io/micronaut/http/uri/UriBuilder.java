@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.uri;
 
+import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -136,10 +137,38 @@ public interface UriBuilder {
      * Create a {@link UriBuilder} with the given base URI as a starting point.
      *
      * @param uri The URI
+     * @param encodingMethod The encoding method
+     * @return The builder
+     * @since 4.8.0
+     */
+    @NextMajorVersion("Change default to RFC_3986")
+    static @NonNull UriBuilder of(@NonNull URI uri, @Nullable URLEncodingKind encodingMethod) {
+        ArgumentUtils.requireNonNull("uri", uri);
+        return new DefaultUriBuilder(uri, encodingMethod == null ? URLEncodingKind.RFC_1866 : encodingMethod);
+    }
+
+    /**
+     * Create a {@link UriBuilder} with the given base URI as a starting point.
+     *
+     * @param uri The URI
      * @return The builder
      */
     static @NonNull UriBuilder of(@NonNull CharSequence uri) {
         ArgumentUtils.requireNonNull("uri", uri);
         return new DefaultUriBuilder(uri);
+    }
+
+    /**
+     * Create a {@link UriBuilder} with the given base URI as a starting point.
+     *
+     * @param uri The URI
+     * @param encodingMethod The encoding method
+     * @return The builder
+     * @since 4.8.0
+     */
+    @NextMajorVersion("Change default to RFC_3986")
+    static @NonNull UriBuilder of(@NonNull CharSequence uri, @Nullable URLEncodingKind encodingMethod) {
+        ArgumentUtils.requireNonNull("uri", uri);
+        return new DefaultUriBuilder(uri, encodingMethod == null ? URLEncodingKind.RFC_1866 : encodingMethod);
     }
 }

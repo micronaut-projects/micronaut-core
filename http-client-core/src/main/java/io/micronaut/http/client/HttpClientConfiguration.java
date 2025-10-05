@@ -26,6 +26,7 @@ import io.micronaut.core.util.Toggleable;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.ssl.ClientSslConfiguration;
 import io.micronaut.http.ssl.SslConfiguration;
+import io.micronaut.http.uri.URLEncodingKind;
 import io.micronaut.logging.LogLevel;
 import io.micronaut.runtime.ApplicationConfiguration;
 
@@ -184,6 +185,7 @@ public abstract class HttpClientConfiguration {
     private String addressResolverGroupName = null;
 
     private String pcapLoggingPathPattern = null;
+    private @Nullable URLEncodingKind urlEncodingKind;
 
     /**
      * Default constructor.
@@ -231,6 +233,29 @@ public abstract class HttpClientConfiguration {
             this.sslConfiguration = copy.sslConfiguration;
             this.threadFactory = copy.threadFactory;
             this.httpVersion = copy.httpVersion;
+            this.urlEncodingKind = copy.urlEncodingKind;
+        }
+    }
+
+    /**
+     * The method to use to encode URLs.
+     * @return The method to use.
+     *
+     * @since 4.8.0
+     */
+    public @Nullable URLEncodingKind getUrlEncoding() {
+        return urlEncodingKind;
+    }
+
+    /**
+     * Sets the URL encoding method to use when encoding paths
+     *
+     * @param urlEncodingKind The URL encoding method.
+     * @since 4.8.0
+     */
+    public void setUrlEncoding(URLEncodingKind urlEncodingKind) {
+        if (urlEncodingKind != null) {
+            this.urlEncodingKind = urlEncodingKind;
         }
     }
 

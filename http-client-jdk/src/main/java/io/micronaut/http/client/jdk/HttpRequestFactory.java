@@ -156,6 +156,7 @@ public final class HttpRequestFactory {
             .entrySet()
             .stream()
             .filter(entry -> entry.getKey() != null && entry.getValue() != null)
+            // here we use application/x-www-form-urlencoded not RFC-3986
             .map(entry -> URLEncoder.encode(entry.getKey().toString(), characterEncoding) + "=" + URLEncoder.encode(entry.getValue().toString(), characterEncoding))
             .collect(Collectors.joining("&"));
     }

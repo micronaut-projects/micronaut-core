@@ -21,6 +21,7 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.uri.UriBuilder;
 
+import io.micronaut.http.uri.URLEncodingKind;
 import java.net.URI;
 import java.util.Map;
 import java.util.Objects;
@@ -83,7 +84,7 @@ public interface MutableHttpRequest<B> extends HttpRequest<B>, MutableHttpMessag
      */
     default @NonNull MutableHttpRequest<B> uri(@NonNull Consumer<UriBuilder> consumer) {
         Objects.requireNonNull(consumer, "URI builder cannot be null");
-        UriBuilder builder = UriBuilder.of(getUri());
+        UriBuilder builder = UriBuilder.of(getUri(), URLEncodingKind.RFC_3986);
         consumer.accept(builder);
         return uri(builder.build());
     }

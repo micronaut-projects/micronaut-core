@@ -183,7 +183,7 @@ class UriBuilderSpec extends Specification {
         expect:
         uri == 'myurl?%24top=10&%24filter=xyz'
     }
-    
+
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/6246")
     void "test uri build parse query param"() {
         given:
@@ -195,5 +195,18 @@ class UriBuilderSpec extends Specification {
 
         then:
         builder.build().toString() == "https://google.com/search?q1=v1&q2=v2"
+    }
+
+    // spaces must encoded as %20 by https://www.rfc-editor.org/rfc/rfc3986
+    void "test space encoding in query parameters"() {
+        given:
+        def builder = UriBuilder.of("/parameters-test", URLEncodingKind.RFC_3986)
+        builder.queryParam("test", "hello world")
+
+        when:
+        def result = builder.build()
+
+        then:
+        result.toString() == '/parameters-test?test=hello%20world'
     }
 }

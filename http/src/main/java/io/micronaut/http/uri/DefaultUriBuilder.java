@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.uri;
 
+import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.value.MutableConvertibleMultiValues;
@@ -68,13 +69,25 @@ class DefaultUriBuilder implements UriBuilder {
     private int port = -1;
     private StringBuilder path = new StringBuilder();
     private String fragment;
+    private final URLEncodingKind encodingMethod;
 
     /**
      * Constructor to create from a URI.
      * @param uri The URI
      */
+    @NextMajorVersion("Change default to RFC_3986")
     @SuppressWarnings("unchecked")
     DefaultUriBuilder(URI uri) {
+        this(uri, URLEncodingKind.RFC_1866);
+    }
+
+    /**
+     * Constructor to create from a URI.
+     * @param uri The URI
+     * @param encodingMethod  The encoding method
+     */
+    @SuppressWarnings("unchecked")
+    DefaultUriBuilder(URI uri, URLEncodingKind encodingMethod) {
         this.scheme = uri.getScheme();
         this.userInfo = uri.getRawUserInfo();
         this.authority = uri.getRawAuthority();
@@ -93,6 +106,7 @@ class DefaultUriBuilder implements UriBuilder {
         } else {
             this.queryParams = new MutableConvertibleMultiValuesMap<>();
         }
+        this.encodingMethod = encodingMethod;
     }
 
     /**
@@ -100,7 +114,21 @@ class DefaultUriBuilder implements UriBuilder {
      *
      * @param uri The URI
      */
+    @NextMajorVersion("Change default to RFC_3986")
     DefaultUriBuilder(CharSequence uri) {
+        this(uri, URLEncodingKind.RFC_1866);
+    }
+
+    /**
+     * Constructor for char sequence.
+     *
+     * @param uri The URI
+     * @param encodingMethod The encoding method
+     */
+    DefaultUriBuilder(
+        CharSequence uri,
+        URLEncodingKind encodingMethod) {
+        this.encodingMethod = encodingMethod;
         if (PATTERN_SCHEME.matcher(uri).matches()) {
             Matcher matcher = PATTERN_FULL_URI.matcher(uri);
 
@@ -415,6 +443,10 @@ class DefaultUriBuilder implements UriBuilder {
     }
 
     private String encode(String userInfo) {
-        return URLEncoder.encode(userInfo, StandardCharsets.UTF_8);
+        if (encodingMethod == URLEncodingKind.RFC_3986) {
+            return RFC3986UrlEncoder.encode(userInfo);
+        } else {
+            return URLEncoder.encode(userInfo, StandardCharsets.UTF_8);
+        }
     }
 }

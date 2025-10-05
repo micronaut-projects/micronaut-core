@@ -113,6 +113,7 @@ import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.sse.Event;
 import io.micronaut.http.uri.UriBuilder;
 import io.micronaut.http.uri.UriTemplate;
+import io.micronaut.http.uri.URLEncodingKind;
 import io.micronaut.http.util.HttpHeadersUtil;
 import io.micronaut.json.JsonMapper;
 import io.micronaut.json.codec.JsonMediaTypeCodec;
@@ -259,6 +260,7 @@ public class DefaultHttpClient implements
     private MessageBodyHandlerRegistry handlerRegistry;
     private final List<HttpFilterResolver.FilterEntry> clientFilterEntries;
     private final LoadBalancer loadBalancer;
+    private final @Nullable URLEncodingKind urlEncodingKind;
     private final HttpClientConfiguration configuration;
     private final String contextPath;
     private final Charset defaultCharset;
@@ -384,6 +386,7 @@ public class DefaultHttpClient implements
         this.loadBalancer = builder.loadBalancer;
         this.configuration = builder.configuration == null ? new DefaultHttpClientConfiguration() : builder.configuration;
         this.defaultCharset = configuration.getDefaultCharset();
+        this.urlEncodingKind = builder.urlEncodingKind;
         if (StringUtils.isNotEmpty(builder.contextPath)) {
             if (builder.contextPath.charAt(0) != '/') {
                 builder.contextPath = '/' + builder.contextPath;
@@ -490,6 +493,7 @@ public class DefaultHttpClient implements
         );
     }
 
+
     /**
      * Create a new builder for a {@link DefaultHttpClient}.
      *
@@ -506,11 +510,9 @@ public class DefaultHttpClient implements
         return acceptHeader != null && acceptHeader.equalsIgnoreCase(MediaType.TEXT_EVENT_STREAM);
     }
 
-    /**
-     * @return The configuration used by this client
-     */
-    public HttpClientConfiguration getConfiguration() {
-        return configuration;
+    @Override
+    public Optional<URLEncodingKind> getUrlEncodingKind() {
+        return Optional.ofNullable(urlEncodingKind);
     }
 
     /**
@@ -1066,7 +1068,7 @@ public class DefaultHttpClient implements
             .map(m -> m.intValue(OnMessage.class, "maxPayloadLength")
                 .orElse(65536)).orElse(65536);
         String subprotocol = webSocketBean.getBeanDefinition().stringValue(ClientWebSocket.class, "subprotocol").orElse(StringUtils.EMPTY_STRING);
-        URI webSocketURL = UriBuilder.of(uri)
+        URI webSocketURL = UriBuilder.of(uri, configuration.getUrlEncoding())
             .scheme(!requestKey.isSecure() ? "ws" : "wss")
             .host(requestKey.getHost())
             .port(requestKey.getPort())
@@ -1292,7 +1294,7 @@ public class DefaultHttpClient implements
                 return resolveURI(request, false);
             } else {
                 URI parentURI = parentRequest.getUri();
-                UriBuilder uriBuilder = UriBuilder.of(requestURI)
+                UriBuilder uriBuilder = UriBuilder.of(requestURI, this.urlEncodingKind)
                         .scheme(parentURI.getScheme())
                         .userInfo(parentURI.getUserInfo())
                         .host(parentURI.getHost())

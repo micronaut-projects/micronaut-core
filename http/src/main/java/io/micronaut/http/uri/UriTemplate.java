@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.uri;
 
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.beans.BeanMap;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.ObjectUtils;
@@ -217,6 +218,17 @@ public class UriTemplate implements Comparable<UriTemplate> {
      * @return The expanded URI
      */
     public String expand(Map<String, Object> parameters) {
+        return expand(parameters, null);
+    }
+
+    /**
+     * Expand the string with the given parameters.
+     *
+     * @param parameters The parameters
+     * @param encodingKind  The encoding kind. Can be null.
+     * @return The expanded URI
+     */
+    public String expand(Map<String, Object> parameters, @Nullable URLEncodingKind encodingKind) {
         StringBuilder builder = new StringBuilder(templateString.length());
         boolean anyPreviousHasContent = false;
         boolean anyPreviousHasOperator = false;
@@ -583,6 +595,17 @@ public class UriTemplate implements Comparable<UriTemplate> {
          * @return The expanded string
          */
         String expand(Map<String, Object> parameters, boolean previousHasContent, boolean anyPreviousHasOperator);
+
+        /**
+         * Expands the query segment.
+         *
+         * @param parameters             The parameters
+         * @param previousHasContent     Whether there was previous content
+         * @param anyPreviousHasOperator Whether an operator is present
+         * @param encodingKind The URL encoding kind. Can be null.
+         * @return The expanded string
+         */
+        String expand(Map<String, Object> parameters, boolean previousHasContent, boolean anyPreviousHasOperator, URLEncodingKind encodingKind);
     }
 
     /**
@@ -821,6 +844,11 @@ public class UriTemplate implements Comparable<UriTemplate> {
             }
 
             @Override
+            public String expand(Map<String, Object> parameters, boolean previousHasContent, boolean anyPreviousHasOperator, URLEncodingKind encodingKind) {
+                return value;
+            }
+
+            @Override
             public boolean equals(Object o) {
                 if (this == o) {
                     return true;
@@ -908,6 +936,11 @@ public class UriTemplate implements Comparable<UriTemplate> {
 
             @Override
             public String expand(Map<String, Object> parameters, boolean previousHasContent, boolean anyPreviousHasOperator) {
+                return expand(parameters, previousHasContent, anyPreviousHasOperator, null);
+            }
+
+            @Override
+            public String expand(Map<String, Object> parameters, boolean previousHasContent, boolean anyPreviousHasOperator, URLEncodingKind encodingKind) {
                 Object found = parameters.get(variable);
                 boolean isOptional = found instanceof Optional;
                 if (found != null && !(isOptional && ((Optional<?>) found).isEmpty())) {
@@ -937,7 +970,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
                         for (Object o : iterable) {
                             if (o != null) {
                                 String v = o.toString();
-                                joiner.add(encode ? encode(v, isQuery) : escape(v));
+                                joiner.add(encode ? encode(v, isQuery, encodingKind) : escape(v));
                             }
                         }
                         result = joiner.toString();
@@ -973,8 +1006,8 @@ public class UriTemplate implements Comparable<UriTemplate> {
                                     continue;
                                 }
                                 String vs = value.toString();
-                                String ek = encode ? encode(ks, isQuery) : escape(ks);
-                                String ev = encode ? encode(vs, isQuery) : escape(vs);
+                                String ek = encode ? encode(ks, isQuery, encodingKind) : escape(ks);
+                                String ev = encode ? encode(vs, isQuery, encodingKind) : escape(vs);
                                 if (modifierChar == EXPAND_MODIFIER) {
                                     String finalValue = ek + '=' + ev;
                                     joiner.add(finalValue);
@@ -993,7 +1026,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
                     } else {
                         String str = found.toString();
                         str = applyModifier(modifierStr, modifierChar, str, str.length());
-                        result = encode ? encode(str, isQuery) : escape(str);
+                        result = encode ? encode(str, isQuery, encodingKind) : escape(str);
                     }
                     int len = result.length();
                     var finalResult = new StringBuilder(previousHasContent && previousDelimiter != null ? previousDelimiter : StringUtils.EMPTY_STRING);
@@ -1026,7 +1059,6 @@ public class UriTemplate implements Comparable<UriTemplate> {
                     }
                     return StringUtils.EMPTY_STRING;
                 }
-
             }
 
             private String applyModifier(String modifierStr, char modifierChar, String result, int len) {
@@ -1043,9 +1075,16 @@ public class UriTemplate implements Comparable<UriTemplate> {
                 return result;
             }
 
-            private String encode(String str, boolean query) {
-                String encoded = URLEncoder.encode(str, StandardCharsets.UTF_8);
-                return query ? encoded : encoded.replace("+", "%20");
+            private String encode(String str, boolean query, @Nullable URLEncodingKind encodingKind) {
+                if (encodingKind != null) {
+                    return encodingKind.encode(str);
+                } else {
+                    if (query) {
+                        return URLEncoder.encode(str, StandardCharsets.UTF_8);
+                    } else {
+                        return RFC3986UrlEncoder.encode(str);
+                    }
+                }
             }
 
             private Object expandPOJO(Object found) {

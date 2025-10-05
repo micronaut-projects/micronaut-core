@@ -25,6 +25,7 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.hateoas.JsonError;
+import io.micronaut.http.uri.URLEncodingKind;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
@@ -69,6 +70,16 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      * @return A {@link Publisher} that emits the full {@link HttpResponse} object
      */
     <I, O, E> Publisher<HttpResponse<O>> exchange(@NonNull HttpRequest<I> request, @NonNull Argument<O> bodyType, @NonNull Argument<E> errorType);
+
+    /**
+     * If configuration is defined for the client this method will return the configuration.
+     *
+     * @return The configuration used to define this client.
+     * @since 4.8.0
+     */
+    default Optional<URLEncodingKind> getUrlEncodingKind() {
+        return Optional.empty();
+    }
 
     /**
      * <p>Perform an HTTP request for the given request object emitting the full HTTP response from returned

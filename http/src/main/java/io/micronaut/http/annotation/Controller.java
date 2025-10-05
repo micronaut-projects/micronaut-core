@@ -20,7 +20,9 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.DefaultScope;
+import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.uri.URLEncodingKind;
 import jakarta.inject.Singleton;
 
 import java.lang.annotation.Documented;
@@ -72,4 +74,14 @@ public @interface Controller {
      * @return The port to use.
      */
     String port() default "";
+
+    /**
+     * The specification to use for decoding URLs in the controller.
+     *
+     * @return The URL decoding kind.
+     * @since 4.8.0
+     */
+    @NextMajorVersion("Change to RFC_3986")
+    @AliasFor(annotation = UriMapping.class, member = "urlDecoding")
+    URLEncodingKind urlDecoding() default URLEncodingKind.RFC_1866;
 }

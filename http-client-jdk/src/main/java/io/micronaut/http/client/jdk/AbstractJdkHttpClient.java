@@ -52,6 +52,7 @@ import io.micronaut.http.filter.HttpFilterResolver;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.ssl.ClientAuthentication;
 import io.micronaut.http.ssl.ClientSslConfiguration;
+import io.micronaut.http.uri.URLEncodingKind;
 import io.micronaut.http.util.HttpHeadersUtil;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
@@ -108,6 +109,7 @@ abstract class AbstractJdkHttpClient {
     protected final HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver;
     protected final List<HttpFilterResolver.FilterEntry> clientFilterEntries;
     protected final CookieDecoder cookieDecoder;
+    protected final URLEncodingKind urlEncodingKind;
     protected MediaTypeCodecRegistry mediaTypeCodecRegistry;
     protected MessageBodyHandlerRegistry messageBodyHandlerRegistry;
 
@@ -128,6 +130,7 @@ abstract class AbstractJdkHttpClient {
         this.cookieDecoder = prototype.cookieDecoder;
         this.mediaTypeCodecRegistry = prototype.mediaTypeCodecRegistry;
         this.messageBodyHandlerRegistry = prototype.messageBodyHandlerRegistry;
+        this.urlEncodingKind = prototype.urlEncodingKind;
     }
 
     /**
@@ -158,8 +161,10 @@ abstract class AbstractJdkHttpClient {
         String clientId,
         ConversionService conversionService,
         JdkClientSslBuilder sslBuilder,
-        CookieDecoder cookieDecoder
+        CookieDecoder cookieDecoder,
+        URLEncodingKind urlEncodingKind
     ) {
+        this.urlEncodingKind = urlEncodingKind != null ? urlEncodingKind : configuration.getUrlEncoding();
         this.cookieDecoder = cookieDecoder;
         this.log = configuration.getLoggerName().map(LoggerFactory::getLogger).orElse(log);
         this.loadBalancer = loadBalancer;

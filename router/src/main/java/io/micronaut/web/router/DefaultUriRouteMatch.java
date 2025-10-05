@@ -16,13 +16,14 @@
 package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpMethod;
+import io.micronaut.http.uri.URLEncodingKind;
 import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchVariable;
 
-import java.net.URLDecoder;
 import java.nio.charset.Charset;
 import java.util.List;
 import java.util.Map;
@@ -41,22 +42,26 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
     private final UriMatchInfo matchInfo;
     private final UriRouteInfo<T, R> uriRouteInfo;
     private final Charset defaultCharset;
+    private final @NonNull URLEncodingKind urlEncoding;
     private Map<String, Object> variables;
 
     /**
-     * @param matchInfo The URI match info
-     * @param routeInfo The URI route
-     * @param defaultCharset The default charset
+     * @param matchInfo         The URI match info
+     * @param routeInfo         The URI route
+     * @param defaultCharset    The default charset
      * @param conversionService The conversion service
+     * @param urlEncodingKind   The URL encoding kind
      */
     DefaultUriRouteMatch(UriMatchInfo matchInfo,
                          UriRouteInfo<T, R> routeInfo,
-                         Charset defaultCharset, ConversionService conversionService
-    ) {
+                         Charset defaultCharset,
+                         ConversionService conversionService,
+                         URLEncodingKind urlEncodingKind) {
         super(routeInfo, conversionService);
         this.matchInfo = matchInfo;
         this.uriRouteInfo = routeInfo;
         this.defaultCharset = defaultCharset;
+        this.urlEncoding = urlEncodingKind;
     }
 
     @Override
@@ -72,7 +77,7 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
                 variables = CollectionUtils.newLinkedHashMap(matchVariables.size());
                 matchVariables.forEach((k, v) -> {
                     if (v instanceof CharSequence) {
-                        v = URLDecoder.decode(v.toString(), defaultCharset);
+                        v = urlEncoding.decode(v.toString(), defaultCharset);
                     }
                     variables.put(k, v);
                 });

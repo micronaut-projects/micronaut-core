@@ -23,7 +23,9 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.annotation.UriMapping;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
+import io.micronaut.http.uri.URLEncodingKind;
 import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.http.uri.UriTemplateMatcher;
@@ -55,6 +57,7 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     private final Integer port;
     private final ConversionService conversionService;
     private final ExecutorSelector executorSelector;
+    private final URLEncodingKind urlEncodingKind;
     @Nullable
     private ExecutorService executorService;
     private boolean noExecutor;
@@ -72,7 +75,8 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
                                Integer port,
                                ConversionService conversionService,
                                ExecutorSelector executorSelector,
-                               MessageBodyHandlerRegistry messageBodyHandlerRegistry) {
+                               MessageBodyHandlerRegistry messageBodyHandlerRegistry,
+                               RouterConfiguration routerConfiguration) {
         super(targetMethod, bodyArgument, bodyArgumentName, consumesMediaTypes, producesMediaTypes, httpMethod.permitsRequestBody(), false, predicates, messageBodyHandlerRegistry);
         this.httpMethod = httpMethod;
         this.uriMatchTemplate = uriMatchTemplate;
@@ -81,6 +85,9 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
         this.port = port;
         this.conversionService = conversionService;
         this.executorSelector = executorSelector;
+        this.urlEncodingKind =
+            targetMethod.enumValue(UriMapping.class, "urlDecoding", URLEncodingKind.class)
+                    .orElse(routerConfiguration.urlDecoding());
     }
 
     @Override
@@ -102,7 +109,13 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     public UriRouteMatch<T, R> tryMatch(@NonNull String uri) {
         UriMatchInfo matchInfo = uriTemplateMatcher.tryMatch(uri);
         if (matchInfo != null) {
-            return new DefaultUriRouteMatch<>(matchInfo, this, defaultCharset, conversionService);
+            return new DefaultUriRouteMatch<>(
+                matchInfo,
+                this,
+                defaultCharset,
+                conversionService,
+                urlEncodingKind
+            );
         }
         return null;
     }
