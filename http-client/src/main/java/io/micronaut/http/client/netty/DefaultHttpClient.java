@@ -26,6 +26,7 @@ import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.beans.BeanMap;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.ConversionServiceAware;
+import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.ResourceResolver;
@@ -198,6 +199,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
@@ -908,16 +910,21 @@ public class DefaultHttpClient implements
         AtomicReference<ScheduledExecutorService> scheduler = new AtomicReference<>(connectionManager.getGroup());
         ExecutionFlow<HttpResponse<O>> mono = resolveRequestURI(request).flatMap(uri -> {
             MutableHttpRequest<?> mutableRequest = toMutableRequest(request).uri(uri);
+            Object body = mutableRequest.getBody().orElse(null);
+            if (body instanceof Publisher<?> publisher) {
+                return ReactiveExecutionFlow.fromPublisher(publisher).flatMap(resolvedBody -> {
+                    mutableRequest.body(resolvedBody);
+                    return execute(bodyType, errorType, blockHint, propagatedContext, scheduler, mutableRequest);
+                });
+            }
+            if (body instanceof CompletionStage<?> completionStage) {
+                return CompletableFutureExecutionFlow.just(completionStage).flatMap(resolvedBody -> {
+                    mutableRequest.body(resolvedBody);
+                    return execute(bodyType, errorType, blockHint, propagatedContext, scheduler, mutableRequest);
+                });
+            }
             //noinspection unchecked
-            return sendRequestWithRedirects(
-                propagatedContext,
-                scheduler,
-                blockHint,
-                mutableRequest,
-                (req, resp) -> InternalByteBody.bufferFlow(resp.byteBody())
-                    .onErrorResume(t -> ExecutionFlow.error(handleResponseError(mutableRequest, t)))
-                    .flatMap(av -> handleExchangeResponse(bodyType, errorType, resp, av))
-            ).map(r -> (HttpResponse<O>) r);
+            return execute(bodyType, errorType, blockHint, propagatedContext, scheduler, mutableRequest);
         });
 
         Duration requestTimeout = configuration.getRequestTimeout();
@@ -939,6 +946,18 @@ public class DefaultHttpClient implements
             }
         }
         return toMono(mono, propagatedContext);
+    }
+
+    private <O, E> ExecutionFlow<HttpResponse<O>> execute(Argument<O> bodyType, Argument<E> errorType, BlockHint blockHint, PropagatedContext propagatedContext, AtomicReference<ScheduledExecutorService> scheduler, MutableHttpRequest<?> mutableRequest) {
+        return sendRequestWithRedirects(
+            propagatedContext,
+            scheduler,
+            blockHint,
+            mutableRequest,
+            (req, resp) -> InternalByteBody.bufferFlow(resp.byteBody())
+                .onErrorResume(t -> ExecutionFlow.error(handleResponseError(mutableRequest, t)))
+                .flatMap(av -> handleExchangeResponse(bodyType, errorType, resp, av))
+        ).map(r -> (HttpResponse<O>) r);
     }
 
     private <O, E> @NonNull ExecutionFlow<FullNettyClientHttpResponse<O>> handleExchangeResponse(Argument<O> bodyType, Argument<E> errorType, NettyClientByteBodyResponse resp, CloseableAvailableByteBody av) {
