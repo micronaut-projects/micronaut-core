@@ -47,7 +47,7 @@ jobs:
           fetch-depth: 0
 
       - name: "🔧 Setup GraalVM CE"
-        uses: graalvm/setup-graalvm@v1.3.6
+        uses: graalvm/setup-graalvm@v1.4.1
         with:
           distribution: 'graalvm'
           java-version: ${{ matrix.java }}
@@ -61,6 +61,7 @@ jobs:
           [ -f ./setup.sh ] && ./setup.sh || [ ! -f ./setup.sh ]
 
       - name: "🚔 Sonatype Scan"
+        if: env.OSS_INDEX_PASSWORD != '' && matrix.java == '17'
         id: sonatypescan
         run: |
           ./gradlew ossIndexAudit --no-parallel --info

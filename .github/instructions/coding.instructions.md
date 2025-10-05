@@ -176,3 +176,4 @@ You MUST confirm all of the following BEFORE using `attempt_completion`:
 - Working tree is clean (no unrelated diffs)
 
 If ANY item is “no”, you MUST NOT use `attempt_completion`.
+While you SHOULD add new files using `git add`, you MUST NOT commit (`git commit`) files yourself.
