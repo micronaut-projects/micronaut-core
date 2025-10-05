@@ -82,6 +82,12 @@ public @interface Retryable {
     String multiplier() default "1.0";
 
     /**
+     * @return The random deviation percentage between retry attempts
+     */
+    @Digits(integer = 2, fraction = 2)
+    String jitter() default "0.25";
+
+    /**
      * @return The retry predicate class to use instead of {@link Retryable#includes} and {@link Retryable#excludes}
      * (defaults to none)
      */
