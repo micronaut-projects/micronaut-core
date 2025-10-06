@@ -144,26 +144,29 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement {
     }
 
     @Override
-    public Optional<String> getDocumentation() {
+    public Optional<String> getDocumentation(boolean parse) {
         String doc = visitorContext.getElements().getDocComment(getNativeType().element());
         if (doc == null) {
             return Optional.empty();
         }
-        Javadoc jd = StaticJavaParser.parseJavadoc(doc);
-        List<JavadocDescriptionElement> elements = jd.getDescription().getElements();
-        if (!elements.isEmpty()) {
-            // String any @param or @return etc
-            StringBuilder builder = new StringBuilder();
-            for (JavadocDescriptionElement jde : elements) {
-                if (jde instanceof JavadocSnippet snippet) {
-                    builder.append(snippet.toText());
-                } else if (jde instanceof JavadocInlineTag tag) {
-                    builder.append(tag.toText());
+        if (parse) {
+            Javadoc jd = StaticJavaParser.parseJavadoc(doc);
+            List<JavadocDescriptionElement> elements = jd.getDescription().getElements();
+            if (!elements.isEmpty()) {
+                // String any @param or @return etc
+                StringBuilder builder = new StringBuilder();
+                for (JavadocDescriptionElement jde : elements) {
+                    if (jde instanceof JavadocSnippet snippet) {
+                        builder.append(snippet.toText());
+                    } else if (jde instanceof JavadocInlineTag tag) {
+                        builder.append(tag.toText());
+                    }
                 }
+                return builder.toString().trim().describeConstable();
             }
-            return builder.toString().trim().describeConstable();
+            return Optional.empty();
         }
-        return Optional.empty();
+        return Optional.of(doc);
     }
 
     @Override

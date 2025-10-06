@@ -228,7 +228,7 @@ final class JavaPropertyElement extends AbstractJavaMemberElement implements Pro
     }
 
     @Override
-    public Optional<String> getDocumentation() {
-        return doc == null ? PropertyElement.super.getDocumentation() : Optional.of(doc);
+    public Optional<String> getDocumentation(boolean parse) {
+        return doc == null ? PropertyElement.super.getDocumentation(parse) : Optional.of(doc);
     }
 }

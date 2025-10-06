@@ -80,7 +80,7 @@ internal abstract class AbstractKotlinPropertyElement<T : KotlinNativeElement>(
         return false
     }
 
-    override fun getDocumentation(): Optional<String> {
+    override fun getDocumentation(parse: Boolean): Optional<String> {
         return Optional.ofNullable(declaration.docString)
     }
 

@@ -122,6 +122,15 @@ public interface Element extends MutableAnnotationMetadataDelegate<Element>, Ann
      * @return The documentation, if any.
      */
     default Optional<String> getDocumentation() {
+        return getDocumentation(true);
+    }
+
+    /**
+     * @param parseContent True if the content should be parsed to extract documentation
+     * @return The documentation, if any.
+     * @since 4.10
+     */
+    default Optional<String> getDocumentation(boolean parseContent) {
         return Optional.empty();
     }
 

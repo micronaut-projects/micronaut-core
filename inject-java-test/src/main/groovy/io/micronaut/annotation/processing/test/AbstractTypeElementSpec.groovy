@@ -110,13 +110,13 @@ abstract class AbstractTypeElementSpec extends Specification {
     }
 
     <T> T buildClassElement(@Language("java") String packageInfo, @Language("java") String cls, Closure<T> closure) {
-        return buildClassElement(new Files().add("Test", cls).add("package-info", packageInfo), closure)
+        return buildClassElement(new JavaFiles().add("Test", cls).add("package-info", packageInfo), closure)
     }
 
     <T> T buildClassElement(@Language("java") String cls, Closure<T> closure) {
-        return buildClassElement(new Files().add("", cls), closure)
+        return buildClassElement(new JavaFiles().add("", cls), closure)
     }
-    protected <T> T buildClassElement(Files files, Closure<T> closure) {
+    protected <T> T buildClassElement(JavaFiles files, Closure<T> closure) {
         buildTypeElementInfo(files) { TypeElementInfo typeElementInfo ->
             TypeElement typeElement = typeElementInfo.typeElement
             def lastTask = typeElementInfo.javaParser.lastTask.get()
@@ -282,7 +282,7 @@ class Test {
      * @return The context. Should be shutdown after use
      */
     ApplicationContext buildContext(@Nullable @Language("java") String packageJava, String className, @Language("java") String cls, boolean includeAllBeans = false, Map properties = [:]) {
-        Files files = new Files()
+        JavaFiles files = new JavaFiles()
         files.add(className, cls)
         if (packageJava != null) {
             files.add("package-info", packageJava)
@@ -297,7 +297,7 @@ class Test {
      * @param cls The class data
      * @return The context. Should be shutdown after use
      */
-    ApplicationContext buildContext(Files files, boolean includeAllBeans = false, Map properties = [:]) {
+    ApplicationContext buildContext(JavaFiles files, boolean includeAllBeans = false, Map properties = [:]) {
         try (def parser = newJavaParser()) {
             def javaFiles = parser.generate(
                     files.files.stream().map { JavaFileObjects.forSourceString(it.key, it.value) }.toArray(JavaFileObject[]::new)
@@ -427,7 +427,7 @@ class Test {
 
     }
 
-    protected <T> T buildTypeElementInfo(Files files, Closure<T> callable) {
+    protected <T> T buildTypeElementInfo(JavaFiles files, Closure<T> callable) {
         try (def parser = newJavaParser()) {
             JavaFileObject[] sources = files.files.stream()
                     .map { e -> JavaFileObjects.forSourceLines(e.key, e.value) }
@@ -716,11 +716,11 @@ class Test {
     }
 
     @CompileStatic
-    static class Files {
+    static class JavaFiles {
 
         private List<Map.Entry<String, String>> files = new ArrayList<>()
 
-        Files add(String filename, @Language("java") String code) {
+        JavaFiles add(String filename, @Language("java") String code) {
             files.add(Map.entry(filename, code))
             return this
         }

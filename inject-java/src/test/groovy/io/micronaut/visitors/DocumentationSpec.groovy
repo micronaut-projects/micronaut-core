@@ -89,6 +89,11 @@ class Test {
 
         expect:
             classElement.documentation.get() == "This is class level docs."
+            classElement.getDocumentation(false).get() == """ This is class level docs.
+
+ @author Denis Stepanov
+ @since 123
+"""
     }
 
     void "test method documentation"() {
@@ -137,6 +142,10 @@ class Test {
 
         expect:
             classElement.getMethods().stream().filter { it.name == "getTenant"} .findAny().get().documentation.get() == "This is property get."
+            classElement.getMethods().stream().filter { it.name == "getTenant"} .findAny().get().getDocumentation(false).get() == """ This is property get.
+
+ @return The get tenant
+"""
             classElement.getMethods().stream().filter { it.name == "setTenant"} .findAny().get().documentation.get() == "This is property set."
             classElement.getMethods().stream().filter { it.name == "getInt"} .findAny().get().documentation.get() == "The val."
             classElement.getMethods().stream().filter { it.name == "getInt"} .findAny().get().returnType.documentation.get() == "The 123 val"

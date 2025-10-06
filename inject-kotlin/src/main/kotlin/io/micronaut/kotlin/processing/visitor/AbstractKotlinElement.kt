@@ -180,7 +180,7 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
         return super.getModifiers()
     }
 
-    override fun getDocumentation(): Optional<String> {
+    override fun getDocumentation(parse: Boolean): Optional<String> {
         return if (annotatedInfo is KSDeclaration) {
             Optional.ofNullable(annotatedInfo.docString)
         } else {

@@ -5904,7 +5904,7 @@ class FoobarPerson {
     void "test sub package"() {
         given:
             ApplicationContext applicationContext = buildContext(
-                    new Files()
+                    new JavaFiles()
 .add("package-info", '''
 @Introspected
 @AccessorsStyle(readPrefixes = "", writePrefixes = "")

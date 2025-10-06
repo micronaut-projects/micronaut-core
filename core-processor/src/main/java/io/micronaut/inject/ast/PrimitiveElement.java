@@ -70,7 +70,7 @@ public final class PrimitiveElement implements ArrayableClassElement {
     }
 
     @Override
-    public Optional<String> getDocumentation() {
+    public Optional<String> getDocumentation(boolean parse) {
         return Optional.ofNullable(doc);
     }
 

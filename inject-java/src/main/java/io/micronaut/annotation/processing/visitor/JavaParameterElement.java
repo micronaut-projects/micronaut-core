@@ -132,7 +132,7 @@ final class JavaParameterElement extends AbstractTypeAwareJavaElement implements
     }
 
     @Override
-    public Optional<String> getDocumentation() {
+    public Optional<String> getDocumentation(boolean parse) {
         try {
             String methodDocComment = visitorContext.getElements().getDocComment(methodElement.getNativeType().element());
             if (methodDocComment != null) {

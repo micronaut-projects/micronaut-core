@@ -230,7 +230,7 @@ final class GroovyPropertyElement extends AbstractGroovyElement implements Prope
     }
 
     @Override
-    public Optional<String> getDocumentation() {
-        return PropertyElement.super.getDocumentation();
+    public Optional<String> getDocumentation(boolean parse) {
+        return PropertyElement.super.getDocumentation(parse);
     }
 }
