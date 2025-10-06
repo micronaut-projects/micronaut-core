@@ -122,7 +122,7 @@ public interface Element extends MutableAnnotationMetadataDelegate<Element>, Ann
      * @return The documentation, if any.
      */
     default Optional<String> getDocumentation() {
-        return getDocumentation(true);
+        return getDocumentation(false);
     }
 
     /**

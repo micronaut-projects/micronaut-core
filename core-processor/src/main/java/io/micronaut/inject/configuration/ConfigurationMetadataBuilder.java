@@ -100,7 +100,7 @@ public class ConfigurationMetadataBuilder {
         ConfigurationMetadata configurationMetadata = new ConfigurationMetadata();
         configurationMetadata.name = NameUtils.hyphenate(path, true);
         configurationMetadata.type = classElement.getType().getName();
-        configurationMetadata.description = classElement.getDocumentation().orElse(null);
+        configurationMetadata.description = classElement.getDocumentation(true).orElse(null);
         configurationMetadata.includes = CollectionUtils.setOf(classElement.stringValues(ConfigurationReader.class, "includes"));
         configurationMetadata.excludes = CollectionUtils.setOf(classElement.stringValues(ConfigurationReader.class, "excludes"));
         this.configurations.add(configurationMetadata);
@@ -133,7 +133,7 @@ public class ConfigurationMetadataBuilder {
         ConfigurationMetadata configurationMetadata = new ConfigurationMetadata();
         configurationMetadata.name = NameUtils.hyphenate(path, true);
         configurationMetadata.type = builderType.getName();
-        configurationMetadata.description = builderElement.getDocumentation().orElse(null);
+        configurationMetadata.description = builderElement.getDocumentation(true).orElse(null);
         configurationMetadata.includes = CollectionUtils.setOf(builderElement.stringValues(BeanProperties.class, BeanProperties.MEMBER_INCLUDES));
         configurationMetadata.excludes = CollectionUtils.setOf(builderElement.stringValues(BeanProperties.class, BeanProperties.MEMBER_EXCLUDES));
         this.configurations.add(configurationMetadata);

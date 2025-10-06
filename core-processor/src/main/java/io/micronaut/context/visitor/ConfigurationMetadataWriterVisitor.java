@@ -217,10 +217,10 @@ public class ConfigurationMetadataWriterVisitor implements TypeElementVisitor<Co
     }
 
     private String getPropertyDocs(PropertyElement propertyElement) {
-        String doc = propertyElement.getDocumentation().orElse(null);
+        String doc = propertyElement.getDocumentation(true).orElse(null);
         Optional<MethodElement> writeMethod = propertyElement.getWriteMethod();
         if (writeMethod.isPresent()) {
-            Optional<String> documentation = writeMethod.get().getDocumentation();
+            Optional<String> documentation = writeMethod.get().getDocumentation(true);
             if (documentation.isPresent()) {
                 doc = documentation.get();
             }
@@ -304,7 +304,7 @@ public class ConfigurationMetadataWriterVisitor implements TypeElementVisitor<Co
                     parameter.getMethodElement().getDeclaringType(),
                     parameter.getGenericType(),
                     parameter.getName(),
-                    parameter.getDocumentation().orElse(null),
+                    parameter.getDocumentation(true).orElse(null),
                     parameter.stringValue(Bindable.class, "defaultValue").orElse(null)
                 );
             }
@@ -354,7 +354,7 @@ public class ConfigurationMetadataWriterVisitor implements TypeElementVisitor<Co
                     method.getOwningType(), // interface methods don't inherit the prefix
                     method.getReturnType(),
                     propertyName,
-                    method.getDocumentation().orElse(method.getReturnType().getDocumentation().orElse(null)),
+                    method.getDocumentation(true).orElse(method.getReturnType().getDocumentation(true).orElse(null)),
                     method.getAnnotationMetadata().stringValue(Bindable.class, "defaultValue").orElse(null)
                 );
             }

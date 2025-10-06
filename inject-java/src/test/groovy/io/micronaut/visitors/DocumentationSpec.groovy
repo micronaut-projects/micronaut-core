@@ -43,10 +43,10 @@ class Test {
 """)
 
         expect:
-        classElement.getDocumentation().get() == 'This is class level docs'
-        classElement.getFields().get(0).getDocumentation().get() == 'This is property level docs'
-        classElement.getEnclosedElements(ElementQuery.of(MethodElement.class).named("getTenant")).get(0).getDocumentation().get() == 'This is method level docs'
-        classElement.getEnclosedElements(ElementQuery.of(MethodElement.class).named("setTenant")).get(0).getDocumentation().get() == 'This is method level docs'
+        classElement.getDocumentation(true).get() == 'This is class level docs'
+        classElement.getFields().get(0).getDocumentation(true).get() == 'This is property level docs'
+        classElement.getEnclosedElements(ElementQuery.of(MethodElement.class).named("getTenant")).get(0).getDocumentation(true).get() == 'This is method level docs'
+        classElement.getEnclosedElements(ElementQuery.of(MethodElement.class).named("setTenant")).get(0).getDocumentation(true).get() == 'This is method level docs'
     }
 
     void "test class documentation"() {
@@ -88,7 +88,7 @@ class Test {
 """)
 
         expect:
-            classElement.documentation.get() == "This is class level docs."
+            classElement.getDocumentation(true).get() == "This is class level docs."
             classElement.getDocumentation(false).get() == """ This is class level docs.
 
  @author Denis Stepanov
@@ -141,14 +141,14 @@ class Test {
 """)
 
         expect:
-            classElement.getMethods().stream().filter { it.name == "getTenant"} .findAny().get().documentation.get() == "This is property get."
+            classElement.getMethods().stream().filter { it.name == "getTenant"} .findAny().get().getDocumentation(true).get() == "This is property get."
             classElement.getMethods().stream().filter { it.name == "getTenant"} .findAny().get().getDocumentation(false).get() == """ This is property get.
 
  @return The get tenant
 """
-            classElement.getMethods().stream().filter { it.name == "setTenant"} .findAny().get().documentation.get() == "This is property set."
-            classElement.getMethods().stream().filter { it.name == "getInt"} .findAny().get().documentation.get() == "The val."
-            classElement.getMethods().stream().filter { it.name == "getInt"} .findAny().get().returnType.documentation.get() == "The 123 val"
+            classElement.getMethods().stream().filter { it.name == "setTenant"} .findAny().get().getDocumentation(true).get() == "This is property set."
+            classElement.getMethods().stream().filter { it.name == "getInt"} .findAny().get().getDocumentation(true).get() == "The val."
+            classElement.getMethods().stream().filter { it.name == "getInt"} .findAny().get().returnType.getDocumentation(true).get() == "The 123 val"
     }
 
     void "test property level documentation"() {
@@ -186,7 +186,7 @@ class Test {
 """)
 
         expect:
-        classElement.getBeanProperties(PropertyElementQuery.of(AnnotationMetadata.EMPTY_METADATA)).get(0).getDocumentation().get() == 'This is property level docs'
+        classElement.getBeanProperties(PropertyElementQuery.of(AnnotationMetadata.EMPTY_METADATA)).get(0).getDocumentation(true).get() == 'This is property level docs'
     }
 
     void "test property getter level documentation"() {
@@ -221,7 +221,7 @@ class Test {
 """)
 
         expect:
-        classElement.getBeanProperties(PropertyElementQuery.of(AnnotationMetadata.EMPTY_METADATA)).get(0).getDocumentation().get() == 'This is property get.'
+        classElement.getBeanProperties(PropertyElementQuery.of(AnnotationMetadata.EMPTY_METADATA)).get(0).getDocumentation(true).get() == 'This is property get.'
     }
 
     void "test property getter level documentation 2"() {
@@ -292,7 +292,7 @@ class Test {
 """)
 
         expect:
-        classElement.getBeanProperties(PropertyElementQuery.of(AnnotationMetadata.EMPTY_METADATA)).get(0).getDocumentation().get() == 'This is property set.'
+        classElement.getBeanProperties(PropertyElementQuery.of(AnnotationMetadata.EMPTY_METADATA)).get(0).getDocumentation(true).get() == 'This is property set.'
     }
 
     void "test property setter level documentation 2"() {
