@@ -62,7 +62,7 @@ public interface GraalReflectionConfigurer extends AnnotationMetadataProvider {
                 if (t == null) {
                     return;
                 }
-                context.registerDynamicProxy(t);
+                context.register(t);
                 TypeHint.AccessType[] accessTypes = reflectConfig.enumValues("accessType", TypeHint.AccessType.class);
                 // DO NOT change to Set.of(..) which disallows duplicates
                 final Set<TypeHint.AccessType> accessType = CollectionUtils.setOf(

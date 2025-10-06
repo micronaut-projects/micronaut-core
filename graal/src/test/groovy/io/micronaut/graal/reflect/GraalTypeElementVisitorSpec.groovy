@@ -448,10 +448,11 @@ package test;
 
 import io.micronaut.core.annotation.*;
 
-import io.micronaut.core.annotation.*;
+@TypeHint(value = Bar.class, accessType = TypeHint.AccessType.DYNAMIC_PROXY)
+class Foobar {
+}
 
-@TypeHint(value = Foobar.class, accessType = TypeHint.AccessType.DYNAMIC_PROXY)
-interface Foobar {
+interface Bar {
 }
 
 ''')
@@ -461,7 +462,7 @@ interface Foobar {
 
         then:
             config
-            config.stringValue("type").get() == 'test.Foobar'
+            config.stringValue("type").get() == 'test.Bar'
             config.enumValues("accessType", TypeHint.AccessType) == [TypeHint.AccessType.DYNAMIC_PROXY] as TypeHint.AccessType[]
     }
 
@@ -469,8 +470,6 @@ interface Foobar {
         given:
             GraalReflectionConfigurer configurer = buildReflectionConfigurer('test.Foobar', '''
 package test;
-
-import io.micronaut.core.annotation.*;
 
 import io.micronaut.core.annotation.*;
 
