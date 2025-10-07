@@ -297,9 +297,47 @@ class MyConfig {
         config.host.get() == 'bar'
     }
 
+    void "test configuration properties with sets of enum"() {
+        when:
+        def context = buildContext('''
+package test;
+
+import io.micronaut.context.annotation.*;
+import io.micronaut.core.annotation.Nullable;
+import java.time.Duration;
+import java.util.Optional;
+import java.util.Set;
+
+@ConfigurationProperties("more.stuff")
+class MyConfig {
+    java.util.Set<Foo> foos = Set.of();
+
+    public void setFoos(Set<Foo> foos) {
+        this.foos = foos;
+    }
+
+    public Set<Foo> getFoos() {
+        return foos;
+    }
+}
+
+enum Foo {
+    BAR,
+    BAZ
+}
+
+''')
+        def config = getBean(context, 'test.MyConfig')
+
+        then:
+        config.foos.size() == 1
+        config.foos.first() instanceof Enum
+    }
+
     @Override
     protected void configureContext(ApplicationContextBuilder contextBuilder) {
         contextBuilder.properties(
+                'more.stuff.foos': ["BAR"],
                 'foo.bar.host':'bar',
                 'jdbc.url':'test',
                 'jdbc.username':'foo',
