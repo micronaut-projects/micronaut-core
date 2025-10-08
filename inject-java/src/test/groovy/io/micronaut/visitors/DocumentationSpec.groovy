@@ -260,7 +260,8 @@ class Test {
 """)
 
         expect:
-        classElement.getBeanProperties(PropertyElementQuery.of(AnnotationMetadata.EMPTY_METADATA)).get(0).getDocumentation().get() == 'The get tenant'
+        classElement.getBeanProperties(PropertyElementQuery.of(AnnotationMetadata.EMPTY_METADATA)).get(0).getDocumentation(true).get() == 'The get tenant'
+        classElement.getBeanProperties(PropertyElementQuery.of(AnnotationMetadata.EMPTY_METADATA)).get(0).getDocumentation().isEmpty()
     }
 
     void "test property setter level documentation"() {
@@ -326,7 +327,8 @@ class Test {
 """)
 
         expect:
-        classElement.getBeanProperties(PropertyElementQuery.of(AnnotationMetadata.EMPTY_METADATA)).get(0).getDocumentation().get() == 'The set tenant'
+        classElement.getBeanProperties(PropertyElementQuery.of(AnnotationMetadata.EMPTY_METADATA)).get(0).getDocumentation(true).get() == 'The set tenant'
+        classElement.getBeanProperties(PropertyElementQuery.of(AnnotationMetadata.EMPTY_METADATA)).get(0).getDocumentation().isEmpty()
     }
 
     void "test parameter javadoc"() {
@@ -346,8 +348,10 @@ class MyBean {
 }
 
 ''') { ClassElement classElement ->
-                assert classElement.getMethods()[0].getParameters()[0].getDocumentation().get() == "The tstDoc"
-                assert classElement.getMethods()[0].getParameters()[1].getDocumentation().get() == "The 123abc"
+                assert classElement.getMethods()[0].getParameters()[0].getDocumentation(true).get() == "The tstDoc"
+                assert classElement.getMethods()[0].getParameters()[1].getDocumentation(true).get() == "The 123abc"
+                assert classElement.getMethods()[0].getParameters()[0].getDocumentation().isEmpty()
+                assert classElement.getMethods()[0].getParameters()[1].getDocumentation().isEmpty()
                 classElement
             }
     }
@@ -367,8 +371,10 @@ record MyBean(String test, int abc) {
 }
 
 ''') { ClassElement classElement ->
-                assert classElement.getPrimaryConstructor().get().getParameters()[0].getDocumentation().get() == "The tstDoc"
-                assert classElement.getPrimaryConstructor().get().getParameters()[1].getDocumentation().get() == "The 123abc"
+                assert classElement.getPrimaryConstructor().get().getParameters()[0].getDocumentation(true).get() == "The tstDoc"
+                assert classElement.getPrimaryConstructor().get().getParameters()[1].getDocumentation(true).get() == "The 123abc"
+                assert classElement.getPrimaryConstructor().get().getParameters()[0].getDocumentation().isEmpty()
+                assert classElement.getPrimaryConstructor().get().getParameters()[1].getDocumentation().isEmpty()
                 classElement
             }
     }
@@ -395,11 +401,15 @@ record MyBean(String test, int abc) {
 }
 
 ''') { ClassElement classElement ->
-                assert classElement.getPrimaryConstructor().get().getParameters()[0].getDocumentation().get() == "The tstDoc"
-                assert classElement.getPrimaryConstructor().get().getParameters()[1].getDocumentation().get() == "The 123abc"
+                assert classElement.getPrimaryConstructor().get().getParameters()[0].getDocumentation(true).get() == "The tstDoc"
+                assert classElement.getPrimaryConstructor().get().getParameters()[1].getDocumentation(true).get() == "The 123abc"
+                assert classElement.getPrimaryConstructor().get().getParameters()[0].getDocumentation().isEmpty()
+                assert classElement.getPrimaryConstructor().get().getParameters()[1].getDocumentation().isEmpty()
                 assert classElement.getAccessibleConstructors().size() == 2
-                assert classElement.getAccessibleConstructors()[0].getParameters()[0].getDocumentation().get() == "The foo"
-                assert classElement.getAccessibleConstructors()[1].getParameters()[0].getDocumentation().get() == "The tstDoc"
+                assert classElement.getAccessibleConstructors()[0].getParameters()[0].getDocumentation(true).get() == "The foo"
+                assert classElement.getAccessibleConstructors()[1].getParameters()[0].getDocumentation(true).get() == "The tstDoc"
+                assert classElement.getAccessibleConstructors()[0].getParameters()[0].getDocumentation().isEmpty()
+                assert classElement.getAccessibleConstructors()[1].getParameters()[0].getDocumentation().isEmpty()
                 classElement
             }
     }
@@ -429,13 +439,19 @@ record MyBean(String test, int abc) {
 }
 
 ''') { ClassElement classElement ->
-                assert classElement.getPrimaryConstructor().get().getParameters()[0].getDocumentation().get() == "The foo"
-                assert classElement.getPrimaryConstructor().get().getParameters()[1].getDocumentation().get() == "The bar"
+                assert classElement.getPrimaryConstructor().get().getParameters()[0].getDocumentation(true).get() == "The foo"
+                assert classElement.getPrimaryConstructor().get().getParameters()[1].getDocumentation(true).get() == "The bar"
+                assert classElement.getPrimaryConstructor().get().getParameters()[0].getDocumentation().isEmpty()
+                assert classElement.getPrimaryConstructor().get().getParameters()[1].getDocumentation().isEmpty()
                 assert classElement.getAccessibleConstructors().size() == 1
-                assert classElement.getAccessibleConstructors()[0].getParameters()[0].getDocumentation().get() == "The foo"
-                assert classElement.getAccessibleConstructors()[0].getParameters()[1].getDocumentation().get() == "The bar"
-                assert classElement.getBeanProperties(PropertyElementQuery.of(AnnotationMetadata.EMPTY_METADATA)).get(0).getDocumentation().get() == "The tstDoc"
-                assert classElement.getBeanProperties(PropertyElementQuery.of(AnnotationMetadata.EMPTY_METADATA)).get(1).getDocumentation().get() == "The 123abc"
+                assert classElement.getAccessibleConstructors()[0].getParameters()[0].getDocumentation(true).get() == "The foo"
+                assert classElement.getAccessibleConstructors()[0].getParameters()[1].getDocumentation(true).get() == "The bar"
+                assert classElement.getAccessibleConstructors()[0].getParameters()[0].getDocumentation().isEmpty()
+                assert classElement.getAccessibleConstructors()[0].getParameters()[1].getDocumentation().isEmpty()
+                assert classElement.getBeanProperties(PropertyElementQuery.of(AnnotationMetadata.EMPTY_METADATA)).get(0).getDocumentation(true).get() == "The tstDoc"
+                assert classElement.getBeanProperties(PropertyElementQuery.of(AnnotationMetadata.EMPTY_METADATA)).get(1).getDocumentation(true).get() == "The 123abc"
+                assert classElement.getBeanProperties(PropertyElementQuery.of(AnnotationMetadata.EMPTY_METADATA)).get(0).getDocumentation().isEmpty()
+                assert classElement.getBeanProperties(PropertyElementQuery.of(AnnotationMetadata.EMPTY_METADATA)).get(1).getDocumentation().isEmpty()
                 classElement
             }
     }

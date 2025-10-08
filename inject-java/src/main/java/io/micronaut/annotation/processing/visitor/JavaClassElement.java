@@ -236,7 +236,7 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
 
     @Override
     public Optional<String> getDocumentation(boolean parse) {
-        return doc == null ? super.getDocumentation(parse) : Optional.of(doc);
+        return !parse || doc == null ? super.getDocumentation(parse) : Optional.of(doc);
     }
 
     @Override

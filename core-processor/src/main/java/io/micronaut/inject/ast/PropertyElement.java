@@ -183,6 +183,9 @@ public interface PropertyElement extends TypedElement, MemberElement {
 
     @Override
     default Optional<String> getDocumentation(boolean parse) {
+        if (!parse) {
+            return Optional.empty();
+        }
         try {
             Optional<FieldElement> field = getField();
             if (field.isPresent()) {
