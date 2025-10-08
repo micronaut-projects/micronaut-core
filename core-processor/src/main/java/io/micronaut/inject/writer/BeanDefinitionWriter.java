@@ -1447,7 +1447,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                                                         ConfigurationBuilderPropertyDefinition builderPoint) {
         boolean isDurationWithTimeUnit = builderPoint.parameter() == null && builderPoint.type().getName().equals(Duration.class.getName());
         ClassElement paramType = builderPoint.type();
-        Map<String, ClassElement> generics = builderPoint.method().getTypeArguments();
+        Map<String, ClassElement> generics = paramType.getTypeArguments();
 
         boolean zeroArgs = builderPoint.parameter() == null && !isDurationWithTimeUnit;
 
