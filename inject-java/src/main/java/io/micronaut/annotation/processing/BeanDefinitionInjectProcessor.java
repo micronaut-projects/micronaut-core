@@ -149,30 +149,36 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         return Stream.of(typeElement);
                     })
                     .forEach(typeElement -> {
-                        if (typeElement.getKind() == ENUM) {
-                            final AnnotationMetadata am = annotationMetadataBuilder.lookupOrBuildForType(typeElement);
-                            if (BeanDefinitionCreatorFactory.isDeclaredBeanInMetadata(am)) {
-                                error(typeElement, "Enum types cannot be defined as beans");
-                            }
-                            return;
-                        }
-                        // skip Groovy code, handled by InjectTransform. Required for GroovyEclipse compiler
-                        if ((groovyObjectType != null && typeUtils.isAssignable(typeElement.asType(), groovyObjectType))) {
-                            return;
-                        }
-
                         String name = typeElement.getQualifiedName().toString();
-                        if (beanDefinitions.contains(name) || processed.contains(name) || name.endsWith(BeanDefinitionVisitor.PROXY_SUFFIX)) {
-                            return;
-                        }
-                        boolean isInterface = JavaModelUtils.resolveKind(typeElement, ElementKind.INTERFACE).isPresent();
-                        if (!isInterface) {
-                            beanDefinitions.add(name);
-                        } else {
-                            AnnotationMetadata annotationMetadata = annotationMetadataBuilder.lookupOrBuildForType(typeElement);
-                            if (BeanDefinitionCreatorFactory.isIntroduction(annotationMetadata) || annotationMetadata.hasStereotype(ConfigurationReader.class)) {
-                                beanDefinitions.add(name);
+                        try {
+                            if (typeElement.getKind() == ENUM) {
+                                final AnnotationMetadata am = annotationMetadataBuilder.lookupOrBuildForType(typeElement);
+                                if (BeanDefinitionCreatorFactory.isDeclaredBeanInMetadata(am)) {
+                                    error(typeElement, "Enum types cannot be defined as beans");
+                                }
+                                return;
                             }
+                            // skip Groovy code, handled by InjectTransform. Required for GroovyEclipse compiler
+                            if ((groovyObjectType != null && typeUtils.isAssignable(typeElement.asType(), groovyObjectType))) {
+                                return;
+                            }
+
+
+                            if (beanDefinitions.contains(name) || processed.contains(name) || name.endsWith(BeanDefinitionVisitor.PROXY_SUFFIX)) {
+                                return;
+                            }
+                            boolean isInterface = JavaModelUtils.resolveKind(typeElement, ElementKind.INTERFACE).isPresent();
+                            if (!isInterface) {
+                                beanDefinitions.add(name);
+                            } else {
+                                AnnotationMetadata annotationMetadata = annotationMetadataBuilder.lookupOrBuildForType(typeElement);
+                                if (BeanDefinitionCreatorFactory.isIntroduction(annotationMetadata) || annotationMetadata.hasStereotype(ConfigurationReader.class)) {
+                                    beanDefinitions.add(name);
+                                }
+                            }
+                        } catch (PostponeToNextRoundException e) {
+                            processed.remove(name);
+                            postponed.put(name, e);
                         }
                     }));
             }
@@ -181,6 +187,12 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             for (String name : processed) {
                 beanDefinitions.remove(name);
                 postponed.remove(name);
+            }
+
+            if (!postponed.isEmpty()) {
+                System.out.println("postponed = " + postponed);
+
+//                beanDefinitions.addAll(postponed.keySet());
             }
 
             // process remaining
