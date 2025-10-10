@@ -50,6 +50,7 @@ import io.micronaut.inject.visitor.VisitorContext;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -77,6 +78,11 @@ public class ConfigurationMetadataWriterVisitor implements TypeElementVisitor<Co
     @Override
     public VisitorKind getVisitorKind() {
         return VisitorKind.AGGREGATING;
+    }
+
+    @Override
+    public Set<String> getSupportedAnnotationNames() {
+        return Collections.singleton("*");
     }
 
     @Override
