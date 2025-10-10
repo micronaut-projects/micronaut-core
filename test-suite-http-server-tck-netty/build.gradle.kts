@@ -14,6 +14,8 @@ dependencies {
     testImplementation(libs.micronaut.validation) {
         exclude(group = "io.micronaut")
     }
+    testRuntimeOnly(libs.junit.jupiter.engine)
+    testRuntimeOnly(libs.junit.platform.launcher)
 }
 
 configurations {

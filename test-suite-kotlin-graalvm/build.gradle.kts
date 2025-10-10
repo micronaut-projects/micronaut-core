@@ -30,6 +30,7 @@ dependencies {
     testImplementation(libs.micronaut.kotlin.runtime) {
         exclude(group = "io.micronaut")
     }
+    testRuntimeOnly(libs.junit.jupiter.engine)
     testRuntimeOnly(libs.junit.platform.launcher)
 }
 
