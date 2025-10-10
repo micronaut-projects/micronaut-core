@@ -18,6 +18,7 @@ package io.micronaut.ast.groovy
 import groovy.transform.CompilationUnitAware
 import groovy.transform.CompileStatic
 import io.micronaut.ast.groovy.visitor.GroovyClassElement
+import io.micronaut.ast.groovy.visitor.GroovyNativeElement
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.ast.groovy.visitor.LoadedVisitor
 import io.micronaut.core.annotation.Generated
@@ -90,7 +91,14 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
                         def visitor = new ElementVisitor(source, compilationUnit, classNode, loadedVisitor, visitorContext, targetClassElement)
                         visitor.visitClass(classNode)
                     } catch (ProcessingException ex) {
-                        visitorContext.fail(ex.getMessage(), ex.getOriginatingElement() as ASTNode)
+                        def element = ex.getOriginatingElement()
+                        if (element instanceof ASTNode) {
+                            visitorContext.fail(ex.getMessage(), element as ASTNode)
+                        } else if (element instanceof GroovyNativeElement) {
+                            visitorContext.fail(ex.getMessage(), (element as GroovyNativeElement).annotatedNode())
+                        } else {
+                            visitorContext.fail(ex.getMessage(), null)
+                        }
                     }
                 }
             }
