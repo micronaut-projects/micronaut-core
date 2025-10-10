@@ -97,7 +97,7 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
                         } else if (element instanceof GroovyNativeElement) {
                             visitorContext.fail(ex.getMessage(), (element as GroovyNativeElement).annotatedNode())
                         } else {
-                            visitorContext.fail(ex.getMessage(), null)
+                            visitorContext.fail(ex.getMessage(), (ASTNode) null)
                         }
                     }
                 }
