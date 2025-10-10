@@ -11,6 +11,7 @@ dependencies {
     testImplementation(projects.micronautContext)
     testImplementation(libs.logback.classic)
     testImplementation(libs.junit.jupiter)
+    testRuntimeOnly(libs.junit.platform.launcher)
 }
 
 graalvmNative {

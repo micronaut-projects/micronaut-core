@@ -19,6 +19,7 @@ dependencies {
     testImplementation(libs.micronaut.test.junit5) {
         exclude(group = "io.micronaut")
     }
+    testRuntimeOnly(libs.junit.platform.launcher)
 }
 
 graalvmNative {
