@@ -190,9 +190,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             }
 
             if (!postponed.isEmpty()) {
-                System.out.println("postponed = " + postponed);
-
-//                beanDefinitions.addAll(postponed.keySet());
+                beanDefinitions.addAll(postponed.keySet());
+                postponed.clear();
             }
 
             // process remaining

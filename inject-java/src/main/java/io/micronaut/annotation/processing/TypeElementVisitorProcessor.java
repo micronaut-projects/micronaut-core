@@ -278,8 +278,10 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                         extraClasses.addAll(VisitorUtils.collectImportedElements(javaClassElement, javaVisitorContext));
                         javaClassElements.addAll((Collection) extraClasses);
                     } catch (PostponeToNextRoundException e) {
+                        javaClassElements.remove(javaClassElement);
                         postponeElement(javaClassElement, e.getNativeErrorElement(), e);
                     } catch (ElementPostponedToNextRoundException e) {
+                        javaClassElements.remove(javaClassElement);
                         Element element = PostponeToNextRoundException.resolvedFailedElement(e.getOriginatingElement());
                         postponeElement(javaClassElement, element, e);
                     }
