@@ -166,7 +166,7 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement {
             }
             return Optional.empty();
         }
-        return Optional.of(doc);
+        return Optional.of(doc.trim());
     }
 
     @Override

@@ -89,11 +89,10 @@ class Test {
 
         expect:
             classElement.getDocumentation(true).get() == "This is class level docs."
-            classElement.getDocumentation(false).get() == """ This is class level docs.
+            classElement.getDocumentation(false).get() == """This is class level docs.
 
  @author Denis Stepanov
- @since 123
-"""
+ @since 123"""
     }
 
     void "test method documentation"() {
@@ -142,10 +141,9 @@ class Test {
 
         expect:
             classElement.getMethods().stream().filter { it.name == "getTenant"} .findAny().get().getDocumentation(true).get() == "This is property get."
-            classElement.getMethods().stream().filter { it.name == "getTenant"} .findAny().get().getDocumentation(false).get() == """ This is property get.
+            classElement.getMethods().stream().filter { it.name == "getTenant"} .findAny().get().getDocumentation(false).get() == """This is property get.
 
- @return The get tenant
-"""
+ @return The get tenant"""
             classElement.getMethods().stream().filter { it.name == "setTenant"} .findAny().get().getDocumentation(true).get() == "This is property set."
             classElement.getMethods().stream().filter { it.name == "getInt"} .findAny().get().getDocumentation(true).get() == "The val."
             classElement.getMethods().stream().filter { it.name == "getInt"} .findAny().get().returnType.getDocumentation(true).get() == "The 123 val"
@@ -261,7 +259,9 @@ class Test {
 
         expect:
         classElement.getBeanProperties(PropertyElementQuery.of(AnnotationMetadata.EMPTY_METADATA)).get(0).getDocumentation(true).get() == 'The get tenant'
-        classElement.getBeanProperties(PropertyElementQuery.of(AnnotationMetadata.EMPTY_METADATA)).get(0).getDocumentation().isEmpty()
+        classElement.getBeanProperties(PropertyElementQuery.of(AnnotationMetadata.EMPTY_METADATA)).get(0).getDocumentation().get() == '''This is property get.
+
+ @return The get tenant'''
     }
 
     void "test property setter level documentation"() {
