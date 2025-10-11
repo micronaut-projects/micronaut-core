@@ -82,7 +82,7 @@ public class ConfigurationMetadataWriterVisitor implements TypeElementVisitor<Co
 
     @Override
     public Set<String> getSupportedAnnotationNames() {
-        return Collections.singleton("*");
+        return Collections.singleton("io.micronaut.context.annotation.*");
     }
 
     @Override
