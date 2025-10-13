@@ -91,7 +91,7 @@ managed-ksp = "1.9.25-1.0.20"
 managed-ksp2 = "2.1.21-2.0.2"
 managed-jspecify = "1.0.0"
 sonatype-scan = "3.0.0"
-micronaut-docs = "2.0.0"
+micronaut-docs = "3.0.0"
 
 [libraries]
 # Libraries prefixed with bom- are BOM files
