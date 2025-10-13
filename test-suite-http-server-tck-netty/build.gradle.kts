@@ -39,6 +39,7 @@ graalvmNative {
     binaries {
         all {
             buildArgs.add("-H:+ReportExceptionStackTraces")
+            buildArgs.add("--trace-class-initialization=io.micronaut.core.bind.annotation.Bindable")
             println("Java version of GraalVM: " + org.apache.tools.ant.util.JavaEnvUtils.getJavaVersion())
 
             if (System.getenv("GRAALVM_HOME")?.contains("graalvm-jdk-21") == true) {
