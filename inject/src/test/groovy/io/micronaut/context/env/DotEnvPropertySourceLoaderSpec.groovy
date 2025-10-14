@@ -493,4 +493,72 @@ KEY=prefix_\${UNDEFINED_VAR}_suffix
         env.get("key", String).get() == "prefix__suffix"
     }
 
+    void "test malformed key in variable substitution"() {
+        given:
+        def serviceDefinition = Mock(ServiceDefinition)
+        serviceDefinition.isPresent() >> true
+        serviceDefinition.load() >> new DotEnvPropertySourceLoader()
+
+        Environment env = new DefaultEnvironment({ ["test"] }) {
+            @Override
+            protected SoftServiceLoader<PropertySourceLoader> readPropertySourceLoaders() {
+                GroovyClassLoader gcl = new GroovyClassLoader()
+                gcl.addURL(DotEnvPropertySourceLoader.getResource("/META-INF/services/io.micronaut.context.env.PropertySourceLoader"))
+                return new SoftServiceLoader<PropertySourceLoader>(PropertySourceLoader, gcl)
+            }
+
+            @Override
+            Optional<InputStream> getResourceAsStream(String path) {
+                if (path.endsWith(".env.test")) {
+                    return Optional.of(new ByteArrayInputStream('''
+KEY=prefix_\${MALFORMED-KEY}_suffix
+'''.bytes))
+                }
+
+                return Optional.empty();
+            }
+        }
+
+        when:
+        env.start()
+
+        then:
+        def e = thrown(IllegalArgumentException)
+        e.message == "Line 2: Malformed variable reference starting with 'MALFORMED' - variables must contain only letters, digits, and underscores"
+    }
+
+    void "test unclosed braces in variable substitution"() {
+        given:
+        def serviceDefinition = Mock(ServiceDefinition)
+        serviceDefinition.isPresent() >> true
+        serviceDefinition.load() >> new DotEnvPropertySourceLoader()
+
+        Environment env = new DefaultEnvironment({ ["test"] }) {
+            @Override
+            protected SoftServiceLoader<PropertySourceLoader> readPropertySourceLoaders() {
+                GroovyClassLoader gcl = new GroovyClassLoader()
+                gcl.addURL(DotEnvPropertySourceLoader.getResource("/META-INF/services/io.micronaut.context.env.PropertySourceLoader"))
+                return new SoftServiceLoader<PropertySourceLoader>(PropertySourceLoader, gcl)
+            }
+
+            @Override
+            Optional<InputStream> getResourceAsStream(String path) {
+                if (path.endsWith(".env.test")) {
+                    return Optional.of(new ByteArrayInputStream('''
+KEY=prefix_\${UNCLOSED_BRACES
+'''.bytes))
+                }
+
+                return Optional.empty();
+            }
+        }
+
+        when:
+        env.start()
+
+        then:
+        def e = thrown(IllegalArgumentException)
+        e.message == "Line 2: Unclosed variable brace: \${UNCLOSED_BRACES - missing closing '}'"
+    }
+
 }
