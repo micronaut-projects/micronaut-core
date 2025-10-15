@@ -3014,6 +3014,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                                   InjectMethodSignature injectMethodSignature,
                                   ExpressionDef valueExpression,
                                   int fieldIndex) {
+        VariableDef instanceVar = injectMethodSignature.instanceVar;
         if (requiresReflection) {
             return injectMethodSignature.aThis
                 .invoke(
@@ -3022,11 +3023,14 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                     injectMethodSignature.beanResolutionContext,
                     injectMethodSignature.beanContext,
                     ExpressionDef.constant(fieldIndex),
-                    injectMethodSignature.instanceVar,
+                    instanceVar,
                     valueExpression
                 );
         }
-        return injectMethodSignature.instanceVar.field(fieldElement).put(valueExpression);
+        return instanceVar
+            .cast(TypeDef.erasure(fieldElement.getDeclaringType()))
+            .field(fieldElement)
+            .put(valueExpression);
     }
 
     private ExpressionDef getPropertyContainsCheck(InjectMethodSignature injectMethodSignature,
