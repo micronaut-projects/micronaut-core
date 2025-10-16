@@ -52,6 +52,8 @@ include "inject-java-helper"
 include "inject-java-helper2"
 include 'inject-kotlin'
 include 'inject-kotlin-test'
+include 'inject-python'
+include 'inject-python-test'
 include "inject-test-utils"
 include "jackson-core"
 include "jackson-databind"
