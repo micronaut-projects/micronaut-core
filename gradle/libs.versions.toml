@@ -78,6 +78,7 @@ managed-jackson = "3.0.1"
 managed-jackson-annotations = "2.20"
 managed-kotlin = "2.2.21"
 managed-kotlin-coroutines = "1.10.2"
+managed-graalpy = "24.2.1"
 managed-methvin-directory-watcher = "0.19.1"
 managed-netty = "4.2.7.Final"
 managed-netty-tcnative = "2.0.74.Final"
@@ -104,6 +105,8 @@ test-boms-micronaut-kotlin = { module = "io.micronaut.kotlin:micronaut-kotlin-bo
 boms-groovy = { module = "org.apache.groovy:groovy-bom", version.ref = "managed-groovy" }
 boms-kotlin = { module = "org.jetbrains.kotlin:kotlin-bom", version.ref = "managed-kotlin" }
 boms-kotlin-coroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-bom", version.ref = "managed-kotlin-coroutines" }
+managed-graalpy = { module = 'org.graalvm.python:python', version.ref = 'managed-graalpy' }
+managed-graalpy-embedding = { module = 'org.graalvm.python:python-embedding', version.ref = 'managed-graalpy' }
 boms-netty = { module = "io.netty:netty-bom", version.ref = "managed-netty" }
 boms-jackson = { module = "tools.jackson:jackson-bom", version.ref = "managed-jackson" }
 boms-micronaut-sourcegen = { module = "io.micronaut.sourcegen:micronaut-sourcegen-bom", version.ref = "micronaut-sourcegen" }
