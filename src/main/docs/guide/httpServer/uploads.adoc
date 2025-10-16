@@ -1,5 +1,16 @@
 Handling of file uploads has special treatment in Micronaut. Support is provided for streaming of uploads in a non-blocking manner through streaming uploads or completed uploads.
 
+Enable multipart support by setting `micronaut.server.multipart.enabled` to `true` in your configuration file (e.g `application.yml`):
+
+.Enabling multipart
+[configuration]
+----
+micronaut:
+  server:
+    multipart:
+      enabled: true
+----
+
 To receive data from a multipart request, set the `consumes` argument of the method annotation to api:http.MediaType#MULTIPART_FORM_DATA[]. For example:
 
 [source,java]
