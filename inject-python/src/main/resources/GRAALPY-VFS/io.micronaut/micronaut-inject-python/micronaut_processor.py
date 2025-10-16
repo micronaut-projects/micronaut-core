@@ -1,7 +1,6 @@
 import ast
 import java
 
-
 class PrintNodeVisitor(ast.NodeVisitor):
     def visit(self, node: ast.AST) -> ast.AST:
         JavaClassDef = java.type("io.micronaut.python.processing.visitor.ClassDef")

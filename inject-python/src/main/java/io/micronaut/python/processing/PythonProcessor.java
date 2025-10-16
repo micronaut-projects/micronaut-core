@@ -10,20 +10,24 @@ import org.graalvm.polyglot.HostAccess;
 import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.Value;
 import org.graalvm.python.embedding.GraalPyResources;
+import org.graalvm.python.embedding.VirtualFileSystem;
 
 import java.util.function.Function;
 
 public class PythonProcessor {
 
     public static final String PYTHON = "python";
+    public static final String INJECT_RESOURCES = "GRAALPY-VFS/io.micronaut/micronaut-inject-python";
 
     void process(String sources) {
-        try (Context context = GraalPyResources.contextBuilder()
+        try (Context context = GraalPyResources.contextBuilder(VirtualFileSystem.newBuilder()
+                .resourceDirectory(INJECT_RESOURCES)
+                .build())
             .option("python.PythonPath", "/micronaut/test")
 
             // TODO: constrain this in future
             .allowHostAccess(HostAccess.ALL)
-            .allowHostClassLookup(name -> true)
+            .allowHostClassLookup(name -> name.startsWith("io.micronaut"))
             .build()) {
 
             context.initialize(PYTHON);
@@ -47,28 +51,7 @@ public class PythonProcessor {
                 """
 import ast
 import java
-
-
-class PrintNodeVisitor(ast.NodeVisitor):
-    def visit(self, node: ast.AST) -> ast.AST:
-        JavaClassDef = java.type("io.micronaut.python.processing.visitor.ClassDef")
-        JavaFuncDef = java.type("io.micronaut.python.processing.visitor.FunctionDef")
-
-        match node:
-            case ast.ClassDef():
-                print(node.decorator_list)
-                decorators = [JavaFuncDef(d.id) for d in node.decorator_list]
-                callback.apply(JavaClassDef(node.name, decorators))
-                return super().visit(node)
-            case ast.FunctionDef():
-                decorators = [JavaFuncDef(d.id) for d in node.decorator_list]
-                callback.apply(JavaFuncDef(node.name, decorators))
-                return super().visit(node)
-            case ast.Module():
-                callback.apply(node)
-                return super().visit(node)
-            case _:
-                return node
+import micronaut_processor
 
 
 tree = ast.parse(src)
