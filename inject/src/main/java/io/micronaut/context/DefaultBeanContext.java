@@ -21,7 +21,6 @@ import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Parallel;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Prototype;
-import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Secondary;
 import io.micronaut.context.beans.BeanDefinitionService;
 import io.micronaut.context.beans.DefaultBeanDefinitionService;
@@ -158,7 +157,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     protected static final Logger LOG_LIFECYCLE = LoggerFactory.getLogger(DefaultBeanContext.class.getPackage().getName() + ".lifecycle");
     private static final String SCOPED_PROXY_ANN = "io.micronaut.runtime.context.scope.ScopedProxy";
     private static final String INTRODUCTION_TYPE = "io.micronaut.aop.Introduction";
-    private static final String REPLACES_ANN = Replaces.class.getName();
 
     private static final Predicate<BeanDefinition<?>> FILTER_OUT_ANY_PROVIDERS = new Predicate<BeanDefinition<?>>() { // Keep anonymous for hot path
         @Override
@@ -1825,6 +1823,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         if (eventsEnabled) {
             this.beanCreationEventListeners = loadBeanEventListeners(BeanCreatedEventListener.class);
             this.beanCreationEventListeners.add(new AbstractMap.SimpleEntry<>(BeanDefinitionProcessor.class, new BeanDefinitionProcessorListenerSupplier()));
+            this.beanCreationEventListeners.add(new AbstractMap.SimpleEntry<>(ExecutableMethodProcessor.class, new ExecutableMethodProcessorListenerSupplier()));
             this.beanInitializedEventListeners = loadBeanEventListeners(BeanInitializedEventListener.class);
         }
     }
@@ -1893,38 +1892,32 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             }
         }
 
-        if (!processedBeans.isEmpty()) {
-            Map<Class<? extends Annotation>, Collection<ExecutableMethodProcessor>> processorsByAnnotation = CollectionUtils.newHashMap(10);
-            for (BeanDefinitionProducer processedBeanProducer : processedBeans) {
-                BeanDefinition<Object> definition = processedBeanProducer.getDefinitionIfEnabled(this);
-                if (definition == null) {
-                    continue;
-                }
-                for (ExecutableMethod<Object, ?> method : definition.getExecutableMethodsForProcessing()) {
-                    AnnotationMetadata methodAnnotations = method.getAnnotationMetadata().getDeclaredMetadata();
-                    for (Class<? extends Annotation> annotation : methodAnnotations.getAnnotationTypesByStereotype(Executable.class)) {
-                        Collection<ExecutableMethodProcessor> processors = processorsByAnnotation.get(annotation);
-                        if (processors == null) {
-                            processors = getBeansOfType(ExecutableMethodProcessor.class, Qualifiers.byTypeArguments(annotation));
-                            processorsByAnnotation.put(annotation, processors);
-                            for (ExecutableMethodProcessor<?> processor : processors) {
-                                if (processor instanceof LifeCycle<?> cycle) {
-                                    cycle.start();
-                                }
+        Map<Class<? extends Annotation>, Collection<ExecutableMethodProcessor>> processorsByAnnotation = CollectionUtils.newLinkedHashMap(10);
+        for (BeanDefinition<Object> definition : beanDefinitionProvider.getProcessedBeans(this)) {
+            for (ExecutableMethod<Object, ?> method : definition.getExecutableMethodsForProcessing()) {
+                AnnotationMetadata methodAnnotations = method.getAnnotationMetadata().getDeclaredMetadata();
+                for (Class<? extends Annotation> annotation : methodAnnotations.getAnnotationTypesByStereotype(Executable.class)) {
+                    Collection<ExecutableMethodProcessor> processors = processorsByAnnotation.get(annotation);
+                    if (processors == null) {
+                        processors = getBeansOfType(ExecutableMethodProcessor.class, Qualifiers.byTypeArguments(annotation));
+                        processorsByAnnotation.put(annotation, processors);
+                        for (ExecutableMethodProcessor<?> processor : processors) {
+                            if (processor instanceof LifeCycle<?> cycle) {
+                                cycle.start();
                             }
                         }
-                        for (ExecutableMethodProcessor<?> processor : processors) {
-                            processor.process(definition, method);
-                        }
+                    }
+                    for (ExecutableMethodProcessor<?> processor : processors) {
+                        processor.process(definition, method);
                     }
                 }
             }
+        }
 
-            for (Collection<ExecutableMethodProcessor> processors : processorsByAnnotation.values()) {
-                for (ExecutableMethodProcessor<?> processor : processors) {
-                    if (processor instanceof LifeCycle<?> cycle) {
-                        cycle.stop();
-                    }
+        for (Collection<ExecutableMethodProcessor> processors : processorsByAnnotation.values()) {
+            for (ExecutableMethodProcessor<?> processor : processors) {
+                if (processor instanceof LifeCycle<?> cycle) {
+                    cycle.stop();
                 }
             }
         }
@@ -3805,6 +3798,15 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         @Override
         public Iterable<ListenerAndOrder<BeanCreatedEventListener>> get(BeanResolutionContext beanResolutionContext) {
             return Collections.singletonList(new ListenerAndOrder<>(new BeanDefinitionProcessorListener(), 0));
+        }
+
+    }
+
+    private static final class ExecutableMethodProcessorListenerSupplier implements ListenersSupplier<BeanCreatedEventListener> {
+
+        @Override
+        public Iterable<ListenerAndOrder<BeanCreatedEventListener>> get(BeanResolutionContext beanResolutionContext) {
+            return Collections.singletonList(new ListenerAndOrder<>(new ExecutableMethodProcessorListener(), 0));
         }
 
     }

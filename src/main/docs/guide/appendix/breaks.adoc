@@ -64,9 +64,9 @@ context.registerBeanDefinition(
 
 ==== Runtime annotation processors changes
 
-The `@Executable` methods processor api:context.processor[ExecutableMethodProcessor] should be used only for the annotations annotated with `@Executable(processOnStartup = true)` to process beans that are annotated with some annotation (executable or not) api:context.processor[BeanDefinitionProcessor] should be used.
+The `@Executable` methods processor api:context.processor[ExecutableMethodProcessor] should be used only to process the executable methods that should be processed at startup. The annotation should be annotated with `@Executable(processOnStartup = true)`. For other use-cases (executable or not) api:context.processor[BeanDefinitionProcessor] should be used.
 
-To replicate the previous behavior of api:context.processor[ExecutableMethodProcessor] for the annotations that are not supported to be processed at the startup, it's enough to implement api:context.processor[BeanDefinitionProcessor] and iterate all the executable methods on the bean definition.
+The incorrect use will result in a warning and an error in the next major version.
 
 Both interfaces are revisited to have better generics and no longer have a superclass.
 
