@@ -40,7 +40,6 @@ graalvmNative {
     binaries {
         all {
             if (System.getenv("GRAALVM_HOME")?.contains("graalvm-jdk-21") == true) {
-                println("Enabling strict image heap!")
                 buildArgs.add("--strict-image-heap")
             }
             resources.autodetect()
