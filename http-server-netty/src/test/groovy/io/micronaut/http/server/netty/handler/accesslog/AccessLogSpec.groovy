@@ -50,6 +50,7 @@ import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler
 import io.netty.handler.ssl.SslContextBuilder
 import io.netty.handler.ssl.SupportedCipherSuiteFilter
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory
+import io.netty.util.ReferenceCountUtil
 import jakarta.inject.Singleton
 import org.slf4j.LoggerFactory
 import reactor.core.publisher.Mono
@@ -129,6 +130,7 @@ class AccessLogSpec extends Specification {
         server.close()
         channel.close()
         bootstrap.config().group().shutdownGracefully()
+        ctx.close()
     }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6782')
@@ -195,6 +197,7 @@ class AccessLogSpec extends Specification {
         server.close()
         channel.close()
         bootstrap.config().group().shutdownGracefully()
+        ctx.close()
     }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6782')
@@ -387,6 +390,8 @@ class AccessLogSpec extends Specification {
         server.close()
         channel.close()
         bootstrap.config().group().shutdownGracefully()
+        ctx.close()
+        ReferenceCountUtil.release(ctx)
     }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6782')
@@ -485,6 +490,7 @@ class AccessLogSpec extends Specification {
         server.close()
         channel.close()
         bootstrap.config().group().shutdownGracefully()
+        ctx.close()
     }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6782')
@@ -581,6 +587,7 @@ class AccessLogSpec extends Specification {
         server.close()
         channel.close()
         bootstrap.config().group().shutdownGracefully()
+        ctx.close()
     }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6782')

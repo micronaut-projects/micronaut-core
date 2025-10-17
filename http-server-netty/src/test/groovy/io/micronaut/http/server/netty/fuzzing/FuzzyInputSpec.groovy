@@ -4,8 +4,8 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanProvider
 import io.micronaut.context.annotation.Replaces
 import io.micronaut.context.annotation.Requires
-import io.micronaut.http.annotation.Body
 import io.micronaut.core.annotation.Nullable
+import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
@@ -13,7 +13,6 @@ import io.micronaut.http.netty.channel.EventLoopGroupConfiguration
 import io.micronaut.http.netty.channel.EventLoopGroupRegistry
 import io.micronaut.http.server.HttpServerConfiguration
 import io.micronaut.http.server.netty.NettyHttpServer
-import io.micronaut.http.tck.netty.TestLeakDetector
 import io.micronaut.http.server.util.DefaultHttpHostResolver
 import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.bootstrap.Bootstrap
@@ -36,8 +35,6 @@ class FuzzyInputSpec extends Specification {
 
     def 'http1 cleartext buffer leaks'() {
         given:
-        TestLeakDetector.startTracking("")
-
         ApplicationContext ctx = ApplicationContext.run([
                 'spec.name': 'FuzzyInputSpec',
                 "micronaut.server.port": "-1",
@@ -67,7 +64,7 @@ class FuzzyInputSpec extends Specification {
         channel.closeFuture().sync()
 
         then:
-        TestLeakDetector.stopTrackingAndReportLeaks()
+        noExceptionThrown()
 
         cleanup:
         embeddedServer.stop()
@@ -82,7 +79,6 @@ class FuzzyInputSpec extends Specification {
     def 'http1 cleartext embedded channel'() {
         given:
         FlagAppender.clear()
-        TestLeakDetector.startTracking("")
 
         ApplicationContext ctx = ApplicationContext.run([
                 'spec.name': 'FuzzyInputSpec',
@@ -107,7 +103,6 @@ class FuzzyInputSpec extends Specification {
         then:
         embeddedChannel.checkException()
 
-        TestLeakDetector.stopTrackingAndReportLeaks()
         FlagAppender.checkTriggered()
 
         where:
@@ -131,7 +126,6 @@ class FuzzyInputSpec extends Specification {
     def 'http2 cleartext embedded channel'() {
         given:
         FlagAppender.clear()
-        TestLeakDetector.startTracking("")
 
         ApplicationContext ctx = ApplicationContext.run([
                 'spec.name': 'FuzzyInputSpec',
@@ -157,7 +151,6 @@ class FuzzyInputSpec extends Specification {
         then:
         embeddedChannel.checkException()
 
-        TestLeakDetector.stopTrackingAndReportLeaks()
         FlagAppender.checkTriggered()
 
         where:

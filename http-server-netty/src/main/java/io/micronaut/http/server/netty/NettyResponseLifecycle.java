@@ -36,6 +36,7 @@ import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.micronaut.http.server.ResponseLifecycle;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.handler.codec.http.HttpContent;
+import io.netty.util.LeakPresenceDetector;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
@@ -97,7 +98,7 @@ final class NettyResponseLifecycle extends ResponseLifecycle {
     }
 
     private static class NettyConcatenatingSubscriber extends ConcatenatingSubscriber implements BufferConsumer {
-        static final Separators JSON_NETTY = Separators.jsonSeparators(NettyReadBufferFactory.of(ByteBufAllocator.DEFAULT));
+        static final Separators JSON_NETTY = LeakPresenceDetector.staticInitializer(() -> Separators.jsonSeparators(NettyReadBufferFactory.of(ByteBufAllocator.DEFAULT)));
 
         private final EventLoopFlow flow;
 
