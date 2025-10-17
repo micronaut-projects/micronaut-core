@@ -28,6 +28,10 @@ import java.util.Map;
  * @since 1.0
  */
 public class EnvironmentPropertySource extends MapPropertySource {
+    /**
+     * Converts list elemtents defined as _0 or _0_ into names that the resolver can understand; i.e., [0].
+     */
+    private static final String LIST_CONVERTER_REGEX = "_([0-9]{1,2})(?:_|$)";
 
     /**
      * The position of the loader.
@@ -77,20 +81,20 @@ public class EnvironmentPropertySource extends MapPropertySource {
     }
 
     static Map getEnv(Map<String, String> env, @Nullable List<String> includes, @Nullable List<String> excludes) {
-        if (includes != null || excludes != null) {
-            Map<String, String> result = new HashMap<>();
-            for (Map.Entry<String, String> entry : env.entrySet()) {
-                String envVar = entry.getKey();
-                if (excludes != null && excludes.contains(envVar)) {
-                    continue;
-                }
-                if (includes != null && !includes.contains(envVar)) {
-                    continue;
-                }
-                result.put(envVar, entry.getValue());
+        Map<String, String> result = new HashMap<>();
+        for (Map.Entry<String, String> entry : env.entrySet()) {
+            String envVar = entry.getKey();
+            if (excludes != null && excludes.contains(envVar)) {
+                continue;
             }
-            return result;
+            if (includes != null && !includes.contains(envVar)) {
+                continue;
+            }
+            
+            String convertedEnvVar = envVar.replaceAll(LIST_CONVERTER_REGEX, "[$1]");
+            
+            result.put(convertedEnvVar, entry.getValue());
         }
-        return env;
+        return result;
     }
 }
