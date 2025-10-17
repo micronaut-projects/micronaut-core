@@ -88,9 +88,9 @@ public @interface Retryable {
     Class<? extends RetryPredicate> predicate() default DefaultRetryPredicate.class;
 
     /**
-     * @return The capture exception types (defaults to RuntimeException)
+     * @return The capture exception types (defaults to Exception)
      */
-    Class<? extends Throwable> capturedException() default RuntimeException.class;
+    Class<? extends Throwable> capturedException() default Exception.class;
 
     /**
      * @return The jitter factor used to apply random deviation to retry delays

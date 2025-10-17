@@ -67,9 +67,9 @@ class AnnotationRetryStateBuilder implements RetryStateBuilder {
         Class<? extends RetryPredicate> predicateClass = (Class<? extends RetryPredicate>) retry.classValue(PREDICATE).orElse(DefaultRetryPredicate.class);
         RetryPredicate predicate = createPredicate(predicateClass, retry);
         @SuppressWarnings("unchecked")
-        Class<? extends RuntimeException> capturedException = (Class<? extends RuntimeException>) retry
+        Class<? extends Exception> capturedException = (Class<? extends Exception>) retry
             .classValue(CAPTURED_EXCEPTION)
-            .orElse(RuntimeException.class);
+            .orElse(Exception.class);
 
         return new SimpleRetry(
             attempts,
