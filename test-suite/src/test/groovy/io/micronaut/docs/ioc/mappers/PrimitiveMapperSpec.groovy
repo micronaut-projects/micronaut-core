@@ -15,7 +15,6 @@ class PrimitiveMapperSpec extends Specification {
     @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run(["spec.name": "PrimitiveMapperSpec"])
 
     void 'test primitive to wrapper mapping'() {
-        // tag::primitive[]
         given:
         PrimitiveMapper mapper = context.getBean(PrimitiveMapper.class)
 
@@ -36,7 +35,6 @@ class PrimitiveMapperSpec extends Specification {
         target.getActive() == Boolean.valueOf(true)
         target.getScore() == Float.valueOf(95.5f)
         target.getValue() == Double.valueOf(3.14159)
-        // end::primitive[]
     }
 
     void 'test wrapper to primitive mapping'() {
