@@ -84,9 +84,8 @@ final class ConfigurationReaderBeanElementCreator extends DeclaredBeanElementCre
         if (propertyElement.hasStereotype(ConfigurationBuilder.class)) {
             // Exclude / ignore shouldn't affect builders
             if (readMethod.isPresent()) {
-                MethodElement methodElement = readMethod.get();
                 visitor.visitConfigBuilder(
-                    ConfigurationBuilderDefinition.of(classElement, methodElement.withAnnotationMetadata(propertyElement.getAnnotationMetadata()), visitorContext)
+                    ConfigurationBuilderDefinition.of(classElement, propertyElement, visitorContext)
                 );
                 return true;
             }
@@ -94,7 +93,7 @@ final class ConfigurationReaderBeanElementCreator extends DeclaredBeanElementCre
                 FieldElement fieldElement = field.get();
                 if (fieldElement.isAccessible(classElement)) {
                     visitor.visitConfigBuilder(
-                        ConfigurationBuilderDefinition.of(classElement, fieldElement, visitorContext)
+                        ConfigurationBuilderDefinition.of(classElement, propertyElement, visitorContext)
                     );
                     return true;
                 }

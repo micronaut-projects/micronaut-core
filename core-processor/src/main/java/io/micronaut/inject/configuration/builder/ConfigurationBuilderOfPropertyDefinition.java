@@ -18,28 +18,28 @@ package io.micronaut.inject.configuration.builder;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MemberElement;
-import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.PropertyElement;
 
 import java.util.List;
 
 /**
- * A record representing a method-based configuration builder definition.
+ * A record representing a property-based configuration builder definition.
  *
- * @param method   The method
+ * @param property   The property
  * @param elements The elements
  */
 @Internal
-public record ConfigurationBuilderOfMethodDefinition(
-    MethodElement method,
+public record ConfigurationBuilderOfPropertyDefinition(
+    PropertyElement property,
     List<ConfigurationBuilderPropertyDefinition> elements
 ) implements ConfigurationBuilderDefinition {
     @Override
     public MemberElement builderElement() {
-        return method;
+        return property;
     }
 
     @Override
     public ClassElement builderType() {
-        return method.getReturnType();
+        return property.getType();
     }
 }

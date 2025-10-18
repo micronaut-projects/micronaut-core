@@ -139,17 +139,16 @@ public class ConfigurationMetadataWriterVisitor implements TypeElementVisitor<Co
                     Optional<FieldElement> field = propertyElement.getField();
                     // Exclude / ignore shouldn't affect builders
                     if (readMethod.isPresent()) {
-                        MethodElement methodElement = readMethod.get();
                         visitConfigurationBuilder(
                             prefix,
-                            ConfigurationBuilderDefinition.of(classElement, methodElement.withAnnotationMetadata(propertyElement.getAnnotationMetadata()), context)
+                            ConfigurationBuilderDefinition.of(classElement, propertyElement, context)
                         );
                     } else if (field.isPresent()) {
                         FieldElement fieldElement = field.get();
                         if (fieldElement.isAccessible(classElement)) {
                             visitConfigurationBuilder(
                                 prefix,
-                                ConfigurationBuilderDefinition.of(classElement, fieldElement, context)
+                                ConfigurationBuilderDefinition.of(classElement, propertyElement, context)
                             );
                         }
                         processed.add(fieldElement);
