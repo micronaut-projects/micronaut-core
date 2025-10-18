@@ -304,7 +304,7 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
         ArgumentUtils.requireNonNull("type", type);
 
         final BeanProperty<T, ?> prop = getProperty(name).orElse(null);
-        if (prop != null && type.isAssignableFrom(prop.getType())) {
+        if (prop != null && isAssignableFrom(type, prop.getType())) {
             //noinspection unchecked
             return Optional.of((BeanProperty<T, P>) prop);
         }
@@ -324,7 +324,7 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
         ArgumentUtils.requireNonNull("type", type);
 
         final BeanReadProperty<T, ?> prop = getReadProperty(name).orElse(null);
-        if (prop != null && type.isAssignableFrom(prop.getType())) {
+        if (prop != null && isAssignableFrom(type, prop.getType())) {
             //noinspection unchecked
             return Optional.of((BeanReadProperty<T, P>) prop);
         }
@@ -345,7 +345,7 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
         ArgumentUtils.requireNonNull("type", type);
 
         final BeanWriteProperty<T, ?> prop = getWriteProperty(name).orElse(null);
-        if (prop != null && type.isAssignableFrom(prop.getType())) {
+        if (prop != null && isAssignableFrom(type, prop.getType())) {
             //noinspection unchecked
             return Optional.of((BeanProperty<T, P>) prop);
         }
@@ -489,5 +489,36 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
          * @throws IllegalArgumentException If one of the supplied inputs is invalid
          */
         @NonNull T build(Object... params);
+    }
+
+    /**
+     * Helper method to check if a source type is assignable to a target type,
+     * properly handling primitive types by converting them to their wrapper types.
+     *
+     * @param targetType The target type to check assignability to
+     * @param sourceType The source type to check assignability from
+     * @return true if the source type is assignable to the target type
+     */
+    static boolean isAssignableFrom(Class<?> targetType, Class<?> sourceType) {
+        Class<?> actualSourceType = sourceType.isPrimitive() ? getWrapperType(sourceType) : sourceType;
+        return targetType.isAssignableFrom(actualSourceType);
+    }
+
+    /**
+     * Helper method to get the wrapper type for a primitive type.
+     *
+     * @param primitiveType The primitive type
+     * @return The corresponding wrapper type, or the original type if not primitive
+     */
+    static Class<?> getWrapperType(Class<?> primitiveType) {
+        if (primitiveType == boolean.class) return Boolean.class;
+        if (primitiveType == byte.class) return Byte.class;
+        if (primitiveType == char.class) return Character.class;
+        if (primitiveType == short.class) return Short.class;
+        if (primitiveType == int.class) return Integer.class;
+        if (primitiveType == long.class) return Long.class;
+        if (primitiveType == float.class) return Float.class;
+        if (primitiveType == double.class) return Double.class;
+        return primitiveType; // Not a primitive, return as-is
     }
 }
