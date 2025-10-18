@@ -5,7 +5,6 @@ import io.micronaut.core.annotation.Introspected;
 
 public interface PrimitiveTypes {
 
-    // tag::primitive-beans[]
     @Introspected
     public static class SourceWithPrimitive {
         private long id;
@@ -85,9 +84,7 @@ public interface PrimitiveTypes {
         public double getValue() { return value; }
         public void setValue(double value) { this.value = value; }
     }
-    // end::primitive-beans[]
 
-    // tag::primitive-mapper[]
     public interface PrimitiveMapper {
         @Mapper.Mapping(from = "id", to = "id")
         @Mapper.Mapping(from = "count", to = "count")
@@ -103,6 +100,5 @@ public interface PrimitiveTypes {
         @Mapper.Mapping(from = "value", to = "value")
         TargetWithPrimitive convertToPrimitive(SourceWithWrapper source);
     }
-    // end::primitive-mapper[]
 
 }
