@@ -491,6 +491,4 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
          */
         @NonNull T build(Object... params);
     }
-
-
 }
