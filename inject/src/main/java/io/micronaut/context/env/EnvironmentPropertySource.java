@@ -17,9 +17,10 @@ package io.micronaut.context.env;
 
 import io.micronaut.core.annotation.Nullable;
 
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * Loads properties from environment variables via {@link System#getenv()}.
@@ -29,9 +30,9 @@ import java.util.Map;
  */
 public class EnvironmentPropertySource extends MapPropertySource {
     /**
-     * Converts list elemtents defined as _0 or _0_ into names that the resolver can understand; i.e., [0].
+     * Converts list elements defined as _0 or _0_ into names that the resolver can understand; i.e., [0].
      */
-    private static final String LIST_CONVERTER_REGEX = "_([0-9]{1,2})(?:_|$)";
+    private static final Pattern LIST_CONVERTER_REGEX = Pattern.compile("_([0-9]{1,2})(?:_|$)");
 
     /**
      * The position of the loader.
@@ -81,7 +82,7 @@ public class EnvironmentPropertySource extends MapPropertySource {
     }
 
     static Map getEnv(Map<String, String> env, @Nullable List<String> includes, @Nullable List<String> excludes) {
-        Map<String, String> result = new HashMap<>();
+        Map<String, String> result = new LinkedHashMap<>();
         for (Map.Entry<String, String> entry : env.entrySet()) {
             String envVar = entry.getKey();
             if (excludes != null && excludes.contains(envVar)) {
@@ -91,10 +92,11 @@ public class EnvironmentPropertySource extends MapPropertySource {
                 continue;
             }
             
-            String convertedEnvVar = envVar.replaceAll(LIST_CONVERTER_REGEX, "[$1]");
+            String convertedEnvVar = LIST_CONVERTER_REGEX.matcher(envVar).replaceAll("[$1]");
             
             result.put(convertedEnvVar, entry.getValue());
         }
+        
         return result;
     }
 }
