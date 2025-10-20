@@ -88,5 +88,25 @@ class EnvironmentPropertySourceSpec extends Specification {
         cleanup:
         context.close()
     }
-
+    
+    void "test environment variable list conversion scenarios"() {
+        def envs = SystemLambda.withEnvironmentVariable("A_0", "valueA")
+                .and("A_0__B", "nestedValueB")
+                .and("A_0__C_0", "multipleArraysC")
+        
+        ApplicationContext context = envs.execute(() -> ApplicationContext.builder().start())
+        
+        expect:
+        context.getProperty("a[0]", String).isPresent()
+        context.getRequiredProperty("a[0]", String) == "valueA"
+        
+        context.getProperty("a[0].b", String).isPresent()
+        context.getRequiredProperty("a[0].b", String) == "nestedValueB"
+        
+        context.getProperty("a[0].c[0]", String).isPresent()
+        context.getRequiredProperty("a[0].c[0]", String) == "multipleArraysC"
+        
+        cleanup:
+        context.close()
+    }
 }
