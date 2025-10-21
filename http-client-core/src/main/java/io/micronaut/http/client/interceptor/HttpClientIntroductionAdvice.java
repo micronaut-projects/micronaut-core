@@ -637,17 +637,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Client [{}] received HTTP error response: {}", clientName, t.getMessage(), t);
             }
-
-            if (t instanceof HttpClientResponseException exception && exception.code() == HttpStatus.NOT_FOUND.getCode()) {
-                if (returnType == Optional.class) {
-                    return Optional.empty();
-                } else if (HttpResponse.class.isAssignableFrom(returnType)) {
-                    return exception.getResponse();
-                }
-                return null;
-            } else {
-                throw t;
-            }
+            throw t;
         }
     }
 

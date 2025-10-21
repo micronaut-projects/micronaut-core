@@ -123,6 +123,11 @@ public abstract class HttpClientConfiguration {
     /**
      * The default value.
      */
+    public static final boolean DEFAULT_EXCEPTION_ON_404_STATUS = false;
+
+    /**
+     * The default value.
+     */
     @SuppressWarnings("WeakerAccess")
     public static final boolean DEFAULT_ALLOW_BLOCK_EVENT_LOOP = false;
 
@@ -176,6 +181,9 @@ public abstract class HttpClientConfiguration {
     private boolean followRedirects = DEFAULT_FOLLOW_REDIRECTS;
 
     private boolean exceptionOnErrorStatus = DEFAULT_EXCEPTION_ON_ERROR_STATUS;
+
+    private boolean exceptionOn404Status = DEFAULT_EXCEPTION_ON_404_STATUS;
+
     private boolean decompressionEnabled = true;
 
     private SslConfiguration sslConfiguration = new ClientSslConfiguration();
@@ -234,6 +242,7 @@ public abstract class HttpClientConfiguration {
             this.connectTtl = copy.connectTtl;
             this.defaultCharset = copy.defaultCharset;
             this.exceptionOnErrorStatus = copy.exceptionOnErrorStatus;
+            this.exceptionOn404Status = copy.exceptionOn404Status;
             this.eventLoopGroup = copy.eventLoopGroup;
             this.followRedirects = copy.followRedirects;
             this.logLevel = copy.logLevel;
@@ -366,12 +375,28 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
+     * @return Whether throwing an exception upon HTTP error status 404 is preferred.
+     */
+    public boolean isExceptionOn404Status() {
+        return exceptionOn404Status;
+    }
+
+    /**
      * Sets whether throwing an exception upon HTTP error status (&gt;= 400) is preferred. Default value ({@link io.micronaut.http.client.HttpClientConfiguration#DEFAULT_EXCEPTION_ON_ERROR_STATUS})
      *
      * @param exceptionOnErrorStatus Whether
      */
     public void setExceptionOnErrorStatus(boolean exceptionOnErrorStatus) {
         this.exceptionOnErrorStatus = exceptionOnErrorStatus;
+    }
+
+    /**
+     * Sets whether throwing an exception upon HTTP error status 404 is preferred. Default value ({@link io.micronaut.http.client.HttpClientConfiguration#DEFAULT_EXCEPTION_ON_404_STATUS})
+     *
+     * @param exceptionOn404Status Whether
+     */
+    public void setExceptionOn404Status(boolean exceptionOn404Status) {
+        this.exceptionOn404Status = exceptionOn404Status;
     }
 
     /**
