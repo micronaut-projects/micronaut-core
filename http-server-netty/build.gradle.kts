@@ -16,6 +16,7 @@ tasks {
         systemProperty("io.netty.leakDetection.level", "paranoid")
         systemProperty("io.netty.leakDetection.targetRecords", "100")
         systemProperty("junit.jupiter.extensions.autodetection.enabled", "true")
+        systemProperty("io.netty.util.LeakPresenceDetector.trackCreationStack", "true")
         jvmArgs("--add-opens=java.base/java.lang=ALL-UNNAMED")
         maxHeapSize = "1G"
     }
@@ -65,7 +66,6 @@ dependencies {
     testImplementation(libs.bcpkix)
     testImplementation(libs.managed.netty.pkitesting)
     testImplementation(projects.micronautJacksonDatabind)
-    testImplementation(projects.micronautHttpTck)
 // Add Micronaut Jackson XML after v4 Migration
 //    testImplementation(libs.managed.micronaut.xml) {
 //        exclude module:'micronaut-inject'
@@ -125,12 +125,14 @@ dependencies {
         exclude(group = "io.micronaut")
     }
     testImplementation(libs.junit.jupiter.api)
+    testImplementation(libs.micronaut.test.netty.leak)
 }
 
 tasks.withType<Test>().configureEach {
     forkEvery = 100
     maxParallelForks = 4
     useJUnitPlatform()
+    systemProperty("junit.jupiter.extensions.autodetection.enabled", "true")
 }
 
 //tasks.withType(Test).configureEach {

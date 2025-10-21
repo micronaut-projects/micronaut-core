@@ -43,7 +43,7 @@ micronaut-build-plugins="7.6.4"
 micronaut-groovy = "4.7.0"
 micronaut-session = "4.6.0"
 micronaut-sql = "5.3.0"
-micronaut-test = "4.6.2"
+micronaut-test = "4.10.1"
 micronaut-validation = "4.9.0"
 micronaut-rxjava2 = "2.7.0"
 micronaut-rxjava3 = "3.7.0"
@@ -264,6 +264,7 @@ micronaut-test-junit5 = { module = "io.micronaut.test:micronaut-test-junit5", ve
 micronaut-test-kotest5 = { module = "io.micronaut.test:micronaut-test-kotest5", version.ref = "micronaut-test" }
 micronaut-test-spock = { module = "io.micronaut.test:micronaut-test-spock", version.ref = "micronaut-test" }
 micronaut-test-type-pollution = { module = "io.micronaut.test:micronaut-test-type-pollution", version.ref = "micronaut-test" }
+micronaut-test-netty-leak = { module = "io.micronaut.test:micronaut-test-netty-leak", version.ref = "micronaut-test" }
 
 micronaut-sql-jdbc = { module = "io.micronaut.sql:micronaut-jdbc", version.ref = "micronaut-sql" }
 micronaut-sql-jdbc-tomcat = { module = "io.micronaut.sql:micronaut-jdbc-tomcat", version.ref = "micronaut-sql" }
