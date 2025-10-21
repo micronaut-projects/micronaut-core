@@ -24,6 +24,7 @@ import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PrimitiveElement;
+import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.PropertyElementQuery;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.visitor.VisitorContext;
@@ -45,18 +46,18 @@ import java.util.concurrent.TimeUnit;
  * @since 4.10
  */
 @Internal
-public interface ConfigurationBuilderDefinition {
+public sealed interface ConfigurationBuilderDefinition permits ConfigurationBuilderOfFieldDefinition, ConfigurationBuilderOfPropertyDefinition {
 
     static ConfigurationBuilderDefinition of(ClassElement owningType,
                                              FieldElement fieldElement,
                                              VisitorContext visitorContext) {
-        return new ConfigurationBuilderOfFieldDefinition(fieldElement, provide(owningType, fieldElement, fieldElement.getType(), visitorContext));
+        return new ConfigurationBuilderOfFieldDefinition(fieldElement, provide(owningType, fieldElement, fieldElement.getDeclaringType(), fieldElement.getType(), visitorContext));
     }
 
     static ConfigurationBuilderDefinition of(ClassElement owningType,
-                                             MethodElement methodElement,
+                                             PropertyElement propertyElement,
                                              VisitorContext visitorContext) {
-        return new ConfigurationBuilderOfMethodDefinition(methodElement, provide(owningType, methodElement, methodElement.getReturnType(), visitorContext));
+        return new ConfigurationBuilderOfPropertyDefinition(propertyElement, provide(owningType, propertyElement, propertyElement.getDeclaringType(), propertyElement.getType(), visitorContext));
     }
 
     /**
@@ -70,6 +71,7 @@ public interface ConfigurationBuilderDefinition {
      */
     private static List<ConfigurationBuilderPropertyDefinition> provide(ClassElement owningType,
                                                                        MemberElement builderElement,
+                                                                       ClassElement builderDeclaringType,
                                                                        ClassElement builderType,
                                                                        VisitorContext visitorContext) {
         List<ConfigurationBuilderPropertyDefinition> builderElementDefinitions = new ArrayList<>();
@@ -100,7 +102,7 @@ public interface ConfigurationBuilderDefinition {
 
                     String path = ConfigurationMetadataBuilder.calculatePath(
                         owningType,
-                        builderElement.getDeclaringType(),
+                        builderDeclaringType,
                         propertyElement.getType(),
                         configurationPrefix + propertyName
                     );
@@ -121,7 +123,7 @@ public interface ConfigurationBuilderDefinition {
                     if (firstParamType.getSimpleName().equals("long") && secondParamType.isAssignable(TimeUnit.class)) {
                         String path = ConfigurationMetadataBuilder.calculatePath(
                             owningType,
-                            methodElement.getDeclaringType(),
+                            builderDeclaringType,
                             visitorContext.getClassElement(Duration.class.getName()).get(),
                             configurationPrefix + propertyName
                         );

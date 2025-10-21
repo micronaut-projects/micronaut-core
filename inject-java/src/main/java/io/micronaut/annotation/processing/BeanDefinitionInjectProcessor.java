@@ -240,10 +240,13 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             }
                         } catch (ProcessingException ex) {
                             JavaNativeElement javaNativeElement = (JavaNativeElement) ex.getOriginatingElement();
-                            error(javaNativeElement != null ? javaNativeElement.element() : null, ex.getMessage());
+                            error(javaNativeElement != null ? javaNativeElement.element() : typeElement, ex.getMessage());
                         } catch (PostponeToNextRoundException e) {
                             processed.remove(className);
                             postponed.put(className, e);
+                        } catch (Exception e) {
+                            error(typeElement, e.getMessage());
+                            throw e;
                         }
                     }
                 }

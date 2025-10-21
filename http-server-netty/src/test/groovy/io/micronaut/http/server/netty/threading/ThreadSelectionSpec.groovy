@@ -38,7 +38,7 @@ class ThreadSelectionSpec extends Specification {
 
     static final String IO = "io-executor-thread-"
     static final String VIRTUAL = "virtual-executor"
-    static final String LOOP = "default-nioEventLoopGroup"
+    static final String LOOP = "default-eventLoopGroup"
 
     private String jdkSwitch(String java17, String other) {
         Runtime.version().feature() == 17 ? java17 : other

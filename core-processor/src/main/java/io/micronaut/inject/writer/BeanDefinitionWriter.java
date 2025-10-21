@@ -125,7 +125,7 @@ import io.micronaut.inject.ast.beans.BeanElement;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
 import io.micronaut.inject.configuration.builder.ConfigurationBuilderDefinition;
 import io.micronaut.inject.configuration.builder.ConfigurationBuilderOfFieldDefinition;
-import io.micronaut.inject.configuration.builder.ConfigurationBuilderOfMethodDefinition;
+import io.micronaut.inject.configuration.builder.ConfigurationBuilderOfPropertyDefinition;
 import io.micronaut.inject.configuration.builder.ConfigurationBuilderPropertyDefinition;
 import io.micronaut.inject.qualifiers.AnyQualifier;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -1375,60 +1375,78 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
         }
         if (injectionPoint instanceof ConfigBuilderInjectCommand configBuilderInjectCommand) {
             ConfigurationBuilderDefinition configurationBuilderDefinition = configBuilderInjectCommand.configurationBuilderDefinition;
-            if (configurationBuilderDefinition instanceof ConfigurationBuilderOfMethodDefinition methodDefinition) {
-                String factoryMethod = methodDefinition.builderElement().getAnnotationMetadata()
+            if (configurationBuilderDefinition instanceof ConfigurationBuilderOfPropertyDefinition definitionList) {
+                String factoryMethod = definitionList.builderElement().getAnnotationMetadata()
                     .stringValue(ConfigurationBuilder.class, "factoryMethod").orElse(null);
 
-                ClassTypeDef builderType = ClassTypeDef.of(methodDefinition.builderType());
-                MethodElement method = methodDefinition.method();
-                String methodName = method.getName();
-                if (StringUtils.isNotEmpty(factoryMethod)) {
-                    return builderType.invokeStatic(factoryMethod, builderType).newLocal("builder" + NameUtils.capitalize(methodName), builderVar -> {
-                        List<StatementDef> statements =
-                            getBuilderMethodStatements(injectMethodSignature, methodDefinition.elements(), (VariableDef.Local) builderVar);
-
-                        String propertyName = NameUtils.getPropertyNameForGetter(methodName);
-                        String setterName = NameUtils.setterNameFor(propertyName);
-
-                        statements.add(injectMethodSignature.instanceVar
-                            .invoke(setterName, TypeDef.VOID, builderVar));
-
-                        return StatementDef.multi(statements);
-                    });
-                } else {
-                    return injectMethodSignature.instanceVar
-                        .invoke(methodName, builderType)
-                        .newLocal("builder" + NameUtils.capitalize(methodName), builderVar -> StatementDef.multi(
-                            getBuilderMethodStatements(injectMethodSignature, methodDefinition.elements(), (VariableDef.Local) builderVar)
-                        ));
+                ClassTypeDef builderType = ClassTypeDef.of(definitionList.builderType());
+                PropertyElement property = definitionList.property();
+                Optional<? extends MemberElement> readMember = property.getReadMember();
+                if (readMember.isPresent()) {
+                    MemberElement memberElement = readMember.get();
+                    if (memberElement instanceof MethodElement method) {
+                        return buildMethodConfigBuilderInvocation(injectMethodSignature, factoryMethod, builderType, method.getName(), definitionList.elements());
+                    }
+                    if (memberElement instanceof FieldElement field) {
+                        return buildFieldConfigBuilderInvocation(injectMethodSignature, factoryMethod, builderType, field.getName(), definitionList.elements());
+                    }
                 }
+                throw new IllegalStateException("Unexpected configuration builder injection point: " + injectMethodSignature);
             } else if (configurationBuilderDefinition instanceof ConfigurationBuilderOfFieldDefinition fieldDefinition) {
                 String factoryMethod = fieldDefinition.fieldElement().getAnnotationMetadata()
                     .stringValue(ConfigurationBuilder.class, "factoryMethod").orElse(null);
                 String field = fieldDefinition.fieldElement().getName();
                 ClassTypeDef builderType = ClassTypeDef.of(fieldDefinition.builderType());
-                if (StringUtils.isNotEmpty(factoryMethod)) {
-                    return builderType.invokeStatic(factoryMethod, builderType).newLocal("builder" + NameUtils.capitalize(field), builderVar -> {
-                        List<StatementDef> statements = getBuilderMethodStatements(injectMethodSignature, fieldDefinition.elements(), (VariableDef.Local) builderVar);
-
-                        statements.add(injectMethodSignature.instanceVar
-                            .field(field, builderType)
-                            .put(builderVar));
-
-                        return StatementDef.multi(statements);
-                    });
-                } else {
-                    return injectMethodSignature.instanceVar
-                        .field(field, builderType)
-                        .newLocal("builder" + NameUtils.capitalize(field), builderVar -> StatementDef.multi(
-                            getBuilderMethodStatements(injectMethodSignature, fieldDefinition.elements(), (VariableDef.Local) builderVar)
-                        ));
-                }
+                List<ConfigurationBuilderPropertyDefinition> elements = fieldDefinition.elements();
+                return buildFieldConfigBuilderInvocation(injectMethodSignature, factoryMethod, builderType, field, elements);
             } else {
                 throw new IllegalStateException("Unknown configuration builder def type: " + configurationBuilderDefinition.getClass());
             }
         }
         throw new IllegalStateException();
+    }
+
+    private StatementDef buildFieldConfigBuilderInvocation(InjectMethodSignature injectMethodSignature, String factoryMethod, ClassTypeDef builderType, String field, List<ConfigurationBuilderPropertyDefinition> elements) {
+        if (StringUtils.isNotEmpty(factoryMethod)) {
+            return builderType.invokeStatic(factoryMethod, builderType).newLocal("builder" + NameUtils.capitalize(field), builderVar -> {
+                List<StatementDef> statements = getBuilderMethodStatements(injectMethodSignature, elements, (VariableDef.Local) builderVar);
+
+                statements.add(injectMethodSignature.instanceVar
+                    .field(field, builderType)
+                    .put(builderVar));
+
+                return StatementDef.multi(statements);
+            });
+        } else {
+            return injectMethodSignature.instanceVar
+                .field(field, builderType)
+                .newLocal("builder" + NameUtils.capitalize(field), builderVar -> StatementDef.multi(
+                    getBuilderMethodStatements(injectMethodSignature, elements, (VariableDef.Local) builderVar)
+                ));
+        }
+    }
+
+    private StatementDef buildMethodConfigBuilderInvocation(InjectMethodSignature injectMethodSignature, String factoryMethod, ClassTypeDef builderType, String methodName, List<ConfigurationBuilderPropertyDefinition> elements) {
+        if (StringUtils.isNotEmpty(factoryMethod)) {
+            return builderType.invokeStatic(factoryMethod, builderType).newLocal("builder" + NameUtils.capitalize(methodName), builderVar -> {
+                List<StatementDef> statements =
+                    getBuilderMethodStatements(injectMethodSignature, elements, (VariableDef.Local) builderVar);
+
+                String propertyName = NameUtils.getPropertyNameForGetter(methodName);
+                String setterName = NameUtils.setterNameFor(propertyName);
+
+                statements.add(injectMethodSignature.instanceVar
+                    .invoke(setterName, TypeDef.VOID, builderVar));
+
+                return StatementDef.multi(statements);
+            });
+        } else {
+            return injectMethodSignature.instanceVar
+                .invoke(methodName, builderType)
+                .newLocal("builder" + NameUtils.capitalize(methodName), builderVar -> StatementDef.multi(
+                    getBuilderMethodStatements(injectMethodSignature, elements, (VariableDef.Local) builderVar)
+                ));
+        }
     }
 
     private List<StatementDef> getBuilderMethodStatements(InjectMethodSignature injectMethodSignature,
@@ -1453,7 +1471,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
 
         // Optional optional = AbstractBeanDefinition.getValueForPath(...)
         String propertyPath = builderPoint.path();
-        String localName = builderVar.name() + "_optional" + NameUtils.capitalize(propertyPath.replace("[*]", "__all__").replace('.', '_').replace('-', '_'));
+        String localName = builderVar.name() + "_optional" + NameUtils.capitalize(builderPoint.name());
         return getGetValueForPathCall(injectMethodSignature, paramType, builderPoint.name(), propertyPath, zeroArgs, generics)
             .newLocal(localName, optionalVar -> {
                 return optionalVar.invoke(OPTIONAL_IS_PRESENT_METHOD)

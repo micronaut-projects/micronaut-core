@@ -30,6 +30,8 @@ dependencies {
     testImplementation(libs.micronaut.kotlin.runtime) {
         exclude(group = "io.micronaut")
     }
+    testRuntimeOnly(libs.junit.jupiter.engine)
+    testRuntimeOnly(libs.junit.platform.launcher)
 }
 
 graalvmNative {
@@ -40,6 +42,11 @@ graalvmNative {
     binaries {
         configureEach {
             resources.autodetect()
+            if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_21)) {
+                buildArgs.add("--initialize-at-build-time=org.junit.platform.suite.engine.IsSuiteClass")
+                buildArgs.add("--initialize-at-build-time=org.junit.platform.suite.engine.IsPotentialTestContainer")
+                buildArgs.add("--strict-image-heap")
+            }
         }
     }
 }

@@ -14,6 +14,8 @@ dependencies {
     testImplementation(libs.micronaut.validation) {
         exclude(group = "io.micronaut")
     }
+    testRuntimeOnly(libs.junit.jupiter.engine)
+    testRuntimeOnly(libs.junit.platform.launcher)
 }
 
 configurations {
@@ -37,10 +39,9 @@ graalvmNative {
     binaries {
         all {
             buildArgs.add("-H:+ReportExceptionStackTraces")
-            println("Java version of GraalVM: " + org.apache.tools.ant.util.JavaEnvUtils.getJavaVersion())
-
-            if (System.getenv("GRAALVM_HOME")?.contains("graalvm-jdk-21") == true) {
-                println("Enabling strict image heap!")
+            if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_21)) {
+                buildArgs.add("--initialize-at-build-time=org.junit.platform.suite.engine.IsSuiteClass")
+                buildArgs.add("--initialize-at-build-time=org.junit.platform.suite.engine.IsPotentialTestContainer")
                 buildArgs.add("--strict-image-heap")
             }
             resources.autodetect()

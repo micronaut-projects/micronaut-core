@@ -51,28 +51,28 @@ class FiltersSpec extends Specification {
             def response = client."$method"()
         then:
             response == "OK"
-            filter1.doFilterExecutedOn.startsWith "default-nioEventLoopGroup"
-            filter1.mapExecutedOn.startsWith "default-nioEventLoopGroup"
+            filter1.doFilterExecutedOn.startsWith "default-eventLoopGroup"
+            filter1.mapExecutedOn.startsWith "default-eventLoopGroup"
             filter1.filterOrder == 1
 
-            filter2.doFilterExecutedOn.startsWith "default-nioEventLoopGroup"
-            filter2.mapExecutedOn.startsWith "default-nioEventLoopGroup"
+            filter2.doFilterExecutedOn.startsWith "default-eventLoopGroup"
+            filter2.mapExecutedOn.startsWith "default-eventLoopGroup"
             filter2.filterOrder == 2
 
-            filter4.doFilterExecutedOn.startsWith "default-nioEventLoopGroup"
-            filter4.mapExecutedOn.startsWith "default-nioEventLoopGroup"
+            filter4.doFilterExecutedOn.startsWith "default-eventLoopGroup"
+            filter4.mapExecutedOn.startsWith "default-eventLoopGroup"
             filter4.filterOrder == 3
 
-            filter5.doFilterExecutedOn.startsWith "default-nioEventLoopGroup"
-            filter5.mapExecutedOn.startsWith "default-nioEventLoopGroup"
+            filter5.doFilterExecutedOn.startsWith "default-eventLoopGroup"
+            filter5.mapExecutedOn.startsWith "default-eventLoopGroup"
             filter5.filterOrder == 4
 
-            filter6.doFilterExecutedOn.startsWith "default-nioEventLoopGroup"
-            filter6.mapExecutedOn.startsWith "default-nioEventLoopGroup"
+            filter6.doFilterExecutedOn.startsWith "default-eventLoopGroup"
+            filter6.mapExecutedOn.startsWith "default-eventLoopGroup"
             filter6.filterOrder == 5
 
-            filter7.doFilterExecutedOn.startsWith "default-nioEventLoopGroup"
-            filter7.mapExecutedOn.startsWith "default-nioEventLoopGroup"
+            filter7.doFilterExecutedOn.startsWith "default-eventLoopGroup"
+            filter7.mapExecutedOn.startsWith "default-eventLoopGroup"
             filter7.filterOrder == 6
 
         cleanup:
@@ -101,31 +101,31 @@ class FiltersSpec extends Specification {
             def response = client."$method"()
         then:
             response == "OK"
-            filter1.doFilterExecutedOn.startsWith "default-nioEventLoopGroup"
+            filter1.doFilterExecutedOn.startsWith "default-eventLoopGroup"
             filter1.mapExecutedOn.startsWith "io-executor"
             filter1.filterOrder == 1
 
-            filter2.doFilterExecutedOn.startsWith "default-nioEventLoopGroup"
+            filter2.doFilterExecutedOn.startsWith "default-eventLoopGroup"
             filter2.mapExecutedOn.startsWith "io-executor"
             filter2.filterOrder == 2
 
-            filter3.doFilterExecutedOn.startsWith "default-nioEventLoopGroup"
+            filter3.doFilterExecutedOn.startsWith "default-eventLoopGroup"
             filter3.mapExecutedOn.startsWith "io-executor"
             filter3.filterOrder == 3
 
-            filter4.doFilterExecutedOn.startsWith "default-nioEventLoopGroup"
+            filter4.doFilterExecutedOn.startsWith "default-eventLoopGroup"
             filter4.mapExecutedOn.startsWith "io-executor"
             filter4.filterOrder == 4
 
-            filter5.doFilterExecutedOn.startsWith "default-nioEventLoopGroup"
+            filter5.doFilterExecutedOn.startsWith "default-eventLoopGroup"
             filter5.mapExecutedOn.startsWith "io-executor"
             filter5.filterOrder == 5
 
-            filter6.doFilterExecutedOn.startsWith "default-nioEventLoopGroup"
+            filter6.doFilterExecutedOn.startsWith "default-eventLoopGroup"
             filter6.mapExecutedOn.startsWith "io-executor"
             filter6.filterOrder == 6
 
-            filter7.doFilterExecutedOn.startsWith "default-nioEventLoopGroup"
+            filter7.doFilterExecutedOn.startsWith "default-eventLoopGroup"
             filter7.mapExecutedOn.startsWith "io-executor"
             filter7.filterOrder == 7
 

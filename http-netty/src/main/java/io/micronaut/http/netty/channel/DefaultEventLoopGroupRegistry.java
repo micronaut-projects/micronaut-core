@@ -131,6 +131,9 @@ public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
         } else {
             ThreadFactory threadFactory = beanLocator.findBean(ThreadFactory.class, Qualifiers.byName(configuration.getName()))
                     .orElseGet(() ->  new DefaultThreadFactory(configuration.getName() + "-" + DefaultThreadFactory.toPoolName(NioEventLoopGroup.class)));
+            if (threadFactory instanceof NettyThreadFactory.EventLoopCustomizableThreadFactory custom) {
+                threadFactory = custom.customizeForEventLoop();
+            }
             executor = new ThreadPerTaskExecutor(threadFactory);
         }
 
@@ -149,6 +152,9 @@ public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
     @BootstrapContextCompatible
     @Bean(typed = { EventLoopGroup.class })
     protected EventLoopGroup defaultEventLoopGroup(@Named(NettyThreadFactory.NAME) ThreadFactory threadFactory) {
+        if (threadFactory instanceof NettyThreadFactory.EventLoopCustomizableThreadFactory custom) {
+            threadFactory = custom.customizeForEventLoop();
+        }
         return createGroup(new DefaultEventLoopGroupConfiguration(), new ThreadPerTaskExecutor(threadFactory));
     }
 

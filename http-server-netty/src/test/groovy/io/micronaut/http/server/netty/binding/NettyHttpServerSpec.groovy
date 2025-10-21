@@ -33,8 +33,11 @@ import io.micronaut.http.client.DefaultHttpClientConfiguration
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.exceptions.ServerStartupException
+import io.micronaut.http.server.netty.NettyHttpServer
 import io.micronaut.runtime.event.annotation.EventListener
 import io.micronaut.runtime.server.EmbeddedServer
+import io.netty.channel.MultiThreadIoEventLoopGroup
+import io.netty.channel.nio.NioIoHandler
 import jakarta.inject.Singleton
 import spock.lang.Retry
 import spock.lang.Specification
@@ -278,6 +281,22 @@ class NettyHttpServerSpec extends Specification {
 
         cleanup:
         embeddedServer.applicationContext.stop()
+    }
+
+    def "toCompletionStage after event loop shutdown"() {
+        given:
+        def group = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory())
+        def loop = group.next()
+
+        when:
+        def promise = loop.newPromise()
+        promise.setSuccess("foo")
+        loop.shutdownGracefully().syncUninterruptibly()
+        then:
+        NettyHttpServer.toCompletionStage(promise).toCompletableFuture().get() == "foo"
+
+        cleanup:
+        group.shutdownGracefully()
     }
 
     @Requires(property = "spec.name", value = "NettyHttpServerSpec")

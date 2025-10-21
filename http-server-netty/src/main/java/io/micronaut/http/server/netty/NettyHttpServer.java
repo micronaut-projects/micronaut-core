@@ -713,13 +713,22 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
     public static <T> CompletionStage<T> toCompletionStage(Future<T> future) {
         CompletableFuture<T> cf = new CompletableFuture<>();
-        future.addListener((GenericFutureListener<Future<T>>) f -> {
-            if (f.isSuccess()) {
-                cf.complete(f.getNow());
+        if (future.isDone()) {
+            // addListener can fail when the underlying event loop is already shut down
+            if (future.isSuccess()) {
+                cf.complete(future.getNow());
             } else {
-                cf.completeExceptionally(f.cause());
+                cf.completeExceptionally(future.cause());
             }
-        });
+        } else {
+            future.addListener((GenericFutureListener<Future<T>>) f -> {
+                if (f.isSuccess()) {
+                    cf.complete(f.getNow());
+                } else {
+                    cf.completeExceptionally(f.cause());
+                }
+            });
+        }
         return cf;
     }
 

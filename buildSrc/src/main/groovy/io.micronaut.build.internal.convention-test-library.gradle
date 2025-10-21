@@ -9,3 +9,7 @@ afterEvaluate {
         }
     }
 }
+
+dependencies {
+    testRuntimeOnly(libs.junit.platform.launcher)
+}

@@ -195,7 +195,7 @@ public class MultiValuesConverterFactory {
                 startI = i + 1;
             }
         }
-        if (startI != 0) {
+        if (!value.isEmpty()) {
             result.add(value.substring(startI));
         }
 

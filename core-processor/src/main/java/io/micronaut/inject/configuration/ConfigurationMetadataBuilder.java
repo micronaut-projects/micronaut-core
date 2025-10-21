@@ -222,7 +222,6 @@ public class ConfigurationMetadataBuilder {
                                        ClassElement declaringType,
                                        ClassElement propertyType,
                                        String name) {
-
         if (propertyType.hasStereotype(ConfigurationReader.class)) {
             return ConfigurationUtils.getRequiredTypePath(propertyType);
         }
