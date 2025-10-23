@@ -1,1 +1,1 @@
-/GRAALPY-VFS/io.micronaut/micronaut-inject-python/micronaut_processor.py
+/GRAALPY-VFS/io.micronaut/micronaut-inject-python/src/micronaut_processor.py

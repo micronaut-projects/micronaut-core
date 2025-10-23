@@ -1,5 +1,7 @@
 package io.micronaut.python.processing.visitor;
 
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
+
 import java.util.Objects;
 
 /**
@@ -29,8 +31,8 @@ public final class PythonMethodElement extends AbstractPythonElement {
      * @param functionDef the function definition node; must not be {@code null}
      * @throws NullPointerException if {@code functionDef} is {@code null}
      */
-    public PythonMethodElement(FunctionDef functionDef) {
-        super(Objects.requireNonNull(functionDef, "FunctionDef cannot be null").name(), functionDef);
+    public PythonMethodElement(FunctionDef functionDef, ElementAnnotationMetadataFactory metadataFactory) {
+        super(Objects.requireNonNull(functionDef, "FunctionDef cannot be null").name(), functionDef, metadataFactory);
     }
 
     /**

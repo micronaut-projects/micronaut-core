@@ -1,0 +1,99 @@
+package io.micronaut.python.processing.visitor;
+
+import io.micronaut.core.annotation.Nullable;
+import org.graalvm.polyglot.Value;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+/**
+ * <p>
+ * Represents a Python decorator in the annotation processing pipeline.
+ * This record models a decorator instance (e.g., {@code @mydeco} or {@code @mydeco(param=42)}),
+ * typically encountered while traversing Python AST nodes from user-provided source code.
+ * </p>
+ *
+ * <p>
+ * Each {@code DecoratorDef} consists of:
+ * </p>
+ * <ul>
+ *     <li>{@code name}: The qualified name of the decorator function as a string.
+ *         For example, {@code "singleton"}, {@code "named"}, or {@code "micronaut.inject"}.</li>
+ *     <li>{@code members}: A mapping of argument names to their values, as extracted from keyword arguments
+ *         or call-time arguments (if any) in the Python decorator usage. Values are represented using GraalVM
+ *         {@link org.graalvm.polyglot.Value} to support interop between Python and Java data models.</li>
+ * </ul>
+ *
+ * <h2>Example</h2>
+ * <p>
+ * Given the Python decorator usage:
+ * <pre>
+ * &#64;named("example")
+ * def myfunc(): ...
+ * </pre>
+ * This results in a {@code DecoratorDef} with name {@code "named"} and {@code members} possibly containing
+ * {"name": Value.asString("example")} if arguments are parsed.
+ * </p>
+ *
+ * <h2>Usage in Processing Pipeline</h2>
+ * <p>
+ * {@code DecoratorDef} instances are typically produced during AST traversal
+ * (e.g., by the embedded Python {@code PrintNodeVisitor}) and are used to construct
+ * higher-level Java elements such as {@link ClassDef} and {@link FunctionDef}.
+ * </p>
+ *
+ * <h2>Null Safety</h2>
+ * <ul>
+ *     <li>Both {@code name} and {@code members} are required and validated non-null.</li>
+ *     <li>When constructing from name only, an empty member map is used.</li>
+ * </ul>
+ *
+ * @param name           The identifier of the decorator, must not be null.
+ * @param annotationName The Micronaut annotation name associated with this decorator
+ * @param members        The argument mapping for the decorator; must not be null, but may be empty.
+ * @param stereotypes    Stereotypes are decorators applied to decorators
+ */
+public record DecoratorDef(
+    String name,
+    String annotationName,
+    @Nullable Map<String, Value> members,
+    @Nullable List<DecoratorDef> stereotypes) {
+
+    /**
+     * Simplified constructor with just the name.
+     *
+     * @param name           The decorator name
+     * @param annotationName The micronaut annotation name
+     */
+    public DecoratorDef(String name, String annotationName) {
+        this(name, annotationName, Map.of(), List.of());
+    }
+
+    /**
+     * Simplified constructor with just the name and members.
+     *
+     * @param name           The decorator name
+     * @param annotationName The micronaut annotation name
+     * @param members        The members
+     */
+    public DecoratorDef(String name, String annotationName, Map<String, Value> members) {
+        this(name, annotationName, members, List.of());
+    }
+
+    public DecoratorDef {
+        Objects.requireNonNull(name, "Decorator name cannot be null");
+        Objects.requireNonNull(annotationName, "Decorator annotation name cannot be null");
+        if (members == null) {
+            members = Map.of();
+        } else {
+            members = Collections.unmodifiableMap(members);
+        }
+        if (stereotypes == null) {
+            stereotypes = List.of();
+        } else {
+            stereotypes = Collections.unmodifiableList(stereotypes);
+        }
+    }
+}
