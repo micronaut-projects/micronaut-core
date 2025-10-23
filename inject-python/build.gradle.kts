@@ -16,6 +16,7 @@ dependencies {
         }
     }
     api(libs.managed.graalpy.embedding)
+    compileOnly(libs.jetbrains.annotations)
     testImplementation(projects.micronautContext)
     testImplementation(projects.micronautAop)
 }

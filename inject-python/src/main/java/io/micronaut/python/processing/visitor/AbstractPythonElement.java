@@ -1,14 +1,17 @@
 package io.micronaut.python.processing.visitor;
 
 import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.annotation.AbstractAnnotationElement;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 
 import java.util.Objects;
 
-abstract sealed class AbstractPythonElement implements Element permits PythonClassElement, PythonMethodElement {
+abstract sealed class AbstractPythonElement extends AbstractAnnotationElement implements Element permits PythonClassElement, PythonFieldElement, PythonMethodElement {
     private final String name;
     private final Object nativeType;
 
-    protected AbstractPythonElement(String name, Object nativeType) {
+    protected AbstractPythonElement(String name, Object nativeType, ElementAnnotationMetadataFactory metadataFactory) {
+        super(metadataFactory);
         this.name = name;
         this.nativeType = nativeType;
     }

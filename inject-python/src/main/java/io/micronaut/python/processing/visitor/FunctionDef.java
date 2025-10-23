@@ -10,7 +10,7 @@ import java.util.List;
  *
  * @param name The name of the function.
  * @param args The arguments.
- * @param decoratorList The decorators.
+ * @param decorators The decorators.
  * @param returns The return annotation.
  * @param typeComment The type comment.
  * @param typeParams The type parameters.
@@ -19,11 +19,11 @@ import java.util.List;
 public record FunctionDef(
     String name,
     Object args,
-    List<FunctionDef> decoratorList,
+    List<DecoratorDef> decorators,
     Object returns,
     String typeComment,
     List<Object> typeParams
-) {
+) implements ElementDef {
 
     public FunctionDef(String name, Object args, Object returns) {
         this(name, args, List.of(), returns, "", List.of());
@@ -33,7 +33,7 @@ public record FunctionDef(
         this(name, null, List.of(), null, "", List.of());
     }
 
-    public FunctionDef(String name, List<FunctionDef> decoratorList) {
+    public FunctionDef(String name, List<DecoratorDef> decoratorList) {
         this(name, null, decoratorList, null, "", List.of());
     }
 }
