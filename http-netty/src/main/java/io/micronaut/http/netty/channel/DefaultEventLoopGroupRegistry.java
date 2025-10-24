@@ -30,8 +30,10 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.http.netty.channel.loom.LoomCarrierGroup;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.IoEventLoop;
 import io.netty.channel.IoHandlerFactory;
 import io.netty.channel.MultiThreadIoEventLoopGroup;
+import io.netty.channel.SingleThreadIoEventLoop;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.NettyRuntime;
 import io.netty.util.concurrent.DefaultThreadFactory;
@@ -42,8 +44,10 @@ import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
@@ -68,6 +72,8 @@ public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
 
     private final BeanProvider<LoomCarrierGroup.Factory> loomCarrierGroupFactory;
 
+    private final List<TaskQueueInterceptor> taskQueueInterceptors;
+
     /**
      * Default constructor.
      *
@@ -75,10 +81,11 @@ public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
      * @param beanLocator           The bean locator
      * @param loomCarrierGroupFactory Factory for the loom carrier group
      */
-    public DefaultEventLoopGroupRegistry(EventLoopGroupFactory eventLoopGroupFactory, BeanLocator beanLocator, BeanProvider<LoomCarrierGroup.Factory> loomCarrierGroupFactory) {
+    public DefaultEventLoopGroupRegistry(EventLoopGroupFactory eventLoopGroupFactory, BeanLocator beanLocator, BeanProvider<LoomCarrierGroup.Factory> loomCarrierGroupFactory, List<TaskQueueInterceptor> taskQueueInterceptors) {
         this.eventLoopGroupFactory = eventLoopGroupFactory;
         this.beanLocator = beanLocator;
         this.loomCarrierGroupFactory = loomCarrierGroupFactory;
+        this.taskQueueInterceptors = taskQueueInterceptors;
     }
 
     /**
@@ -100,14 +107,30 @@ public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
         eventLoopGroups.clear();
     }
 
-    private EventLoopGroup createGroup(EventLoopGroupConfiguration configuration, Executor executor) {
+    private EventLoopGroup createGroup(EventLoopGroupConfiguration configuration, String name, Executor executor) {
         IoHandlerFactory ioHandlerFactory = eventLoopGroupFactory.createIoHandlerFactory(configuration);
         int nThreads = numThreads(configuration);
         EventLoopGroup eventLoopGroup;
         if (configuration.isLoomCarrier()) {
             eventLoopGroup = loomCarrierGroupFactory.get().create(nThreads, executor, ioHandlerFactory);
-        } else {
+        } else if (taskQueueInterceptors.isEmpty()) {
             eventLoopGroup = new MultiThreadIoEventLoopGroup(nThreads, executor, ioHandlerFactory);
+        } else {
+            eventLoopGroup = new MultiThreadIoEventLoopGroup(nThreads, executor, ioHandlerFactory) {
+                @Override
+                protected IoEventLoop newChild(Executor executor, IoHandlerFactory ioHandlerFactory, Object... args) {
+                    return new SingleThreadIoEventLoop(this, executor, ioHandlerFactory) {
+                        @Override
+                        protected Queue<Runnable> newTaskQueue(int maxPendingTasks) {
+                            Queue<Runnable> tq = super.newTaskQueue(maxPendingTasks);
+                            for (TaskQueueInterceptor taskQueueInterceptor : taskQueueInterceptors) {
+                                tq = taskQueueInterceptor.wrapTaskQueue(name, tq);
+                            }
+                            return tq;
+                        }
+                    };
+                }
+            };
         }
         eventLoopGroups.put(eventLoopGroup, configuration);
         return eventLoopGroup;
@@ -137,7 +160,7 @@ public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
             executor = new ThreadPerTaskExecutor(threadFactory);
         }
 
-        return createGroup(configuration, executor);
+        return createGroup(configuration, configuration.getName(), executor);
     }
 
     /**
@@ -155,7 +178,7 @@ public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
         if (threadFactory instanceof NettyThreadFactory.EventLoopCustomizableThreadFactory custom) {
             threadFactory = custom.customizeForEventLoop();
         }
-        return createGroup(new DefaultEventLoopGroupConfiguration(), new ThreadPerTaskExecutor(threadFactory));
+        return createGroup(new DefaultEventLoopGroupConfiguration(), EventLoopGroupConfiguration.DEFAULT, new ThreadPerTaskExecutor(threadFactory));
     }
 
     @NonNull
