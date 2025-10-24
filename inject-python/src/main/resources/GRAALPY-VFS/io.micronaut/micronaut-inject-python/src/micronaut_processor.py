@@ -27,12 +27,24 @@ class PrintNodeVisitor(ast.NodeVisitor):
                 ]
                 self.current_class = JavaClassDef(node.name, decorators)
                 self.current_class_attributes = []
+
+                # Check if this is an enum class
+                is_enum = self._is_enum_class(node)
+                enum_values = []
+                if is_enum:
+                    enum_values = self._extract_enum_values(node)
+
                 try:
                     result = super().visit(node)
                 finally:
                     # Add collected attributes to the class before applying callback
                     for attr in self.current_class_attributes:
                         self.current_class = self.current_class.withAttribute(attr)
+
+                    # Set enum information if applicable
+                    if is_enum:
+                        self.current_class = self.current_class.withEnum(True, enum_values)
+
                     self.callback.apply(self.current_class)
                     self.current_class = None
                     self.current_class_attributes = []
@@ -147,6 +159,39 @@ class PrintNodeVisitor(ast.NodeVisitor):
 
                 attr_def = JavaAttributeDef(attr_name, annotation, value, decorators, None, is_static)
                 self.current_class_attributes.append(attr_def)
+
+    def _is_enum_class(self, node):
+        """
+        Determine if the given ClassDef node represents an enum class.
+        An enum class typically inherits from enum.Enum.
+        """
+        for base in node.bases:
+            if isinstance(base, ast.Name) and base.id == 'Enum':
+                return True
+            elif isinstance(base, ast.Attribute):
+                # Handle enum.Enum
+                if (isinstance(base.value, ast.Name) and base.value.id == 'enum' and
+                    base.attr == 'Enum'):
+                    return True
+        return False
+
+    def _extract_enum_values(self, node):
+        """
+        Extract enum values from the class body.
+        Enum values are typically uppercase assignments to names.
+        """
+        enum_values = []
+        for item in node.body:
+            if isinstance(item, ast.Assign):
+                # Check if this is a simple assignment to a name
+                if (len(item.targets) == 1 and isinstance(item.targets[0], ast.Name)):
+                    name = item.targets[0].id
+                    # Skip special/private attributes
+                    if not name.startswith('_') and not name.startswith('__'):
+                        # For enums, values are typically uppercase or specific patterns
+                        # For now, collect all non-private assignments as potential enum values
+                        enum_values.append(name)
+        return enum_values
 
 def is_property_decorator(funcdef):
     """

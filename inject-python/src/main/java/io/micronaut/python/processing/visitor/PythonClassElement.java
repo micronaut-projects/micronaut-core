@@ -9,22 +9,18 @@ import io.micronaut.python.processing.PythonProcessingEnvironment;
 import java.util.List;
 import java.util.Objects;
 
-public final class PythonClassElement extends AbstractPythonElement implements ArrayableClassElement {
-    private final int arrayDimensions;
-    private final PythonProcessingEnvironment environment;
-
+public final class PythonClassElement extends AbstractPythonClassElement {
     public PythonClassElement(ClassDef classDef, PythonProcessingEnvironment environment) {
-        this(classDef, environment, 0);
+        super(classDef, environment);
     }
 
     public PythonClassElement(ClassDef classDef, PythonProcessingEnvironment environment, int arrayDimensions) {
-        super(
-            Objects.requireNonNull(classDef, "ClassDef cannot be null").name(),
-            classDef,
-            Objects.requireNonNull(environment).metadataFactory()
-        );
-        this.environment = environment;
-        this.arrayDimensions = arrayDimensions;
+        super(classDef, environment, arrayDimensions);
+    }
+
+    @Override
+    protected ClassElement createWithArrayDimensions(int arrayDimensions) {
+        return new PythonClassElement(getNativeType(), environment, arrayDimensions);
     }
 
     @Override
@@ -51,26 +47,11 @@ public final class PythonClassElement extends AbstractPythonElement implements A
             return true;
         }
         for (String base : getNativeType().bases()) {
-            PythonClassElement baseElement = environment.classes().get(base);
+            ClassElement baseElement = environment.classes().get(base);
             if (baseElement != null && baseElement.isAssignable(type)) {
                 return true;
             }
         }
         return false;
-    }
-
-    @Override
-    public ClassElement withArrayDimensions(int arrayDimensions) {
-        return new PythonClassElement(getNativeType(), environment, arrayDimensions);
-    }
-
-    @Override
-    public boolean isArray() {
-        return arrayDimensions > 0;
-    }
-
-    @Override
-    public int getArrayDimensions() {
-        return arrayDimensions;
     }
 }
