@@ -9,6 +9,7 @@ import io.micronaut.python.processing.util.GraalPyUtil;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Represents a Python method/function as a Micronaut {@link MethodElement}.
@@ -135,5 +136,18 @@ public final class PythonMethodElement extends AbstractPythonElement implements 
         }
 
         return parameters;
+    }
+
+    @Override
+    public Optional<String> getDocumentation(boolean parseContent) {
+        String doc = getNativeType().documentation();
+        if (doc == null) {
+            return Optional.empty();
+        }
+        if (parseContent) {
+            // Parse Python docstring to extract main description
+            return Optional.of(GraalPyUtil.parsePythonDocstring(doc));
+        }
+        return Optional.of(doc);
     }
 }

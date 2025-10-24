@@ -1,6 +1,8 @@
 package io.micronaut.python.processing;
 
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ElementQuery;
+import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.python.processing.visitor.AbstractPythonClassElement;
 import io.micronaut.python.processing.visitor.ArgumentDef;
@@ -14,6 +16,7 @@ import io.micronaut.python.processing.visitor.PythonMethodElement;
 import jakarta.inject.Named;
 import jakarta.inject.Scope;
 import jakarta.inject.Singleton;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -495,5 +498,159 @@ public class PythonAstParserTest {
 
             """);
         return environment;
+    }
+
+    @Test
+    @Disabled("Need to implement getEnclosedElements first")
+    void testDocumentationParsing() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        try (PythonEnvironment environment = pythonProcessor.parse("""
+            class DocumentedClass:
+                \"\"\"This is a class with documentation.
+
+                This class demonstrates various documentation features.
+                \"\"\"
+                def __init__(self, name: str, age: int = 25):
+                    \"\"\"Initialize the documented class.
+
+                    Args:
+                        name (str): The name of the instance
+                        age (int): The age of the instance, defaults to 25
+
+                    Returns:
+                        None
+                    \"\"\"
+                    self.name = name
+                    self.age = age
+
+                def documented_method(self, param1: str, param2: int = 10) -> bool:
+                    \"\"\"A method with parameter documentation.
+
+                    This method demonstrates parameter documentation extraction.
+
+                    Parameters:
+                        param1 (str): The first parameter description
+                        param2 (int): The second parameter with default
+
+                    Returns:
+                        bool: Always returns True
+                    \"\"\"
+                    return True
+
+                undocumented_field = "no docs"
+
+                documented_field: str = "has docs"
+                \"\"\"This field has documentation.\"\"\"
+            """)) {
+
+            try (PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment)) {
+                // Test class documentation
+                ClassElement classElement = processingEnvironment.classes().get("DocumentedClass");
+                assertNotNull(classElement);
+                assertTrue(classElement instanceof PythonClassElement);
+
+                PythonClassElement pythonClass = (PythonClassElement) classElement;
+
+                // Test raw class documentation
+                Optional<String> rawClassDoc = pythonClass.getDocumentation(false);
+                assertTrue(rawClassDoc.isPresent());
+                assertTrue(rawClassDoc.get().contains("This is a class with documentation"));
+
+                // Test parsed class documentation (should exclude structured sections)
+                Optional<String> parsedClassDoc = pythonClass.getDocumentation(true);
+                assertTrue(parsedClassDoc.isPresent());
+                String parsedClass = parsedClassDoc.get();
+                assertTrue(parsedClass.contains("This is a class with documentation"));
+                assertTrue(parsedClass.contains("This class demonstrates various documentation features"));
+                // Should not contain the closing quotes
+                assertFalse(parsedClass.contains("\"\"\""));
+
+                // Test method documentation
+                Optional<MethodElement> methodOpt = pythonClass.getEnclosedElements(ElementQuery.ALL_METHODS)
+                    .stream()
+                    .filter(m -> "documented_method".equals(m.getName()))
+                    .findFirst();
+                assertTrue(methodOpt.isPresent());
+                PythonMethodElement method = (PythonMethodElement) methodOpt.get();
+
+                // Test raw method documentation
+                Optional<String> rawMethodDoc = method.getDocumentation(false);
+                assertTrue(rawMethodDoc.isPresent());
+                assertTrue(rawMethodDoc.get().contains("A method with parameter documentation"));
+
+                // Test parsed method documentation
+                Optional<String> parsedMethodDoc = method.getDocumentation(true);
+                assertTrue(parsedMethodDoc.isPresent());
+                String parsedMethod = parsedMethodDoc.get();
+                assertTrue(parsedMethod.contains("A method with parameter documentation"));
+                assertTrue(parsedMethod.contains("This method demonstrates parameter documentation extraction"));
+                // Should stop before Parameters section
+                assertFalse(parsedMethod.contains("Parameters:"));
+
+                // Test parameter documentation
+                ParameterElement[] params = method.getParameters();
+                assertEquals(2, params.length);
+
+                // Test param1 documentation
+                ParameterElement param1 = params[0];
+                Optional<String> param1Doc = param1.getDocumentation(false);
+                assertTrue(param1Doc.isPresent());
+                assertEquals("The first parameter description", param1Doc.get().trim());
+
+                // Test param2 documentation
+                ParameterElement param2 = params[1];
+                Optional<String> param2Doc = param2.getDocumentation(false);
+                assertTrue(param2Doc.isPresent());
+                assertEquals("The second parameter with default", param2Doc.get().trim());
+
+                // Test constructor parameter documentation
+                Optional<MethodElement> constructorOpt = pythonClass.getPrimaryConstructor();
+                assertTrue(constructorOpt.isPresent());
+                PythonMethodElement constructor = (PythonMethodElement) constructorOpt.get();
+
+                ParameterElement[] constructorParams = constructor.getParameters();
+                assertEquals(2, constructorParams.length);
+
+                // Test constructor param documentation
+                ParameterElement nameParam = constructorParams[0];
+                Optional<String> nameParamDoc = nameParam.getDocumentation(false);
+                assertTrue(nameParamDoc.isPresent());
+                assertEquals("The name of the instance", nameParamDoc.get().trim());
+
+                ParameterElement ageParam = constructorParams[1];
+                Optional<String> ageParamDoc = ageParam.getDocumentation(false);
+                assertTrue(ageParamDoc.isPresent());
+                assertEquals("The age of the instance, defaults to 25", ageParamDoc.get().trim());
+
+                // Test field documentation
+                Optional<FieldElement> fieldOpt = pythonClass.getEnclosedElements(ElementQuery.ALL_FIELDS)
+                    .stream()
+                    .filter(f -> "documented_field".equals(f.getName()))
+                    .findFirst();
+                assertTrue(fieldOpt.isPresent());
+                PythonFieldElement field = (PythonFieldElement) fieldOpt.get();
+
+                // Test raw field documentation
+                Optional<String> rawFieldDoc = field.getDocumentation(false);
+                assertTrue(rawFieldDoc.isPresent());
+                assertEquals("This field has documentation.", rawFieldDoc.get().trim());
+
+                // Test parsed field documentation (should be same for fields)
+                Optional<String> parsedFieldDoc = field.getDocumentation(true);
+                assertTrue(parsedFieldDoc.isPresent());
+                assertEquals("This field has documentation.", parsedFieldDoc.get().trim());
+
+                // Test field without documentation
+                Optional<FieldElement> undocumentedFieldOpt = pythonClass.getEnclosedElements(ElementQuery.ALL_FIELDS)
+                    .stream()
+                    .filter(f -> "undocumented_field".equals(f.getName()))
+                    .findFirst();
+                assertTrue(undocumentedFieldOpt.isPresent());
+                PythonFieldElement undocumentedField = (PythonFieldElement) undocumentedFieldOpt.get();
+
+                Optional<String> noDoc = undocumentedField.getDocumentation(false);
+                assertFalse(noDoc.isPresent());
+            }
+        }
     }
 }

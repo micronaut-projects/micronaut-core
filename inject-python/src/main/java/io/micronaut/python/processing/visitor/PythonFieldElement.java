@@ -126,4 +126,17 @@ public final class PythonFieldElement extends AbstractPythonElement implements F
         }
         return GraalPyUtil.convertValueToJava(pythonValue);
     }
+
+    @Override
+    public java.util.Optional<String> getDocumentation(boolean parseContent) {
+        String doc = getNativeType().documentation();
+        if (doc == null) {
+            return java.util.Optional.empty();
+        }
+        if (parseContent) {
+            // Parse Python docstring to extract main description
+            return java.util.Optional.of(GraalPyUtil.parsePythonDocstring(doc));
+        }
+        return java.util.Optional.of(doc);
+    }
 }

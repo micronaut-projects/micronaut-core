@@ -28,7 +28,9 @@ class PrintNodeVisitor(ast.NodeVisitor):
                     for d in node.decorator_list
                     if decorator_to_function(self, d) is not None
                 ]
-                self.current_class = JavaClassDef(node.name, self.package_name, [], decorators, [], [], [], None, False, [])
+                # Extract class docstring
+                class_doc = self._extract_docstring(node)
+                self.current_class = JavaClassDef(node.name, self.package_name, [], decorators, [], [], [], None, False, [], class_doc)
                 self.current_class_attributes = []
 
                 # Check if this is an enum class
@@ -79,8 +81,10 @@ class PrintNodeVisitor(ast.NodeVisitor):
                     # Parse function arguments and return type
                     arguments = parse_function_arguments(node)
                     return_type_annotation = parse_function_return_type(node)
+                    # Extract function docstring
+                    func_doc = self._extract_docstring(node)
 
-                    func_def = JavaFuncDef(node.name, arguments, decorators, return_type_annotation)
+                    func_def = JavaFuncDef(node.name, arguments, decorators, return_type_annotation, "", [], func_doc)
                     if self.current_class is not None:
                         if node.name == "__init__":
                             # Set as constructor
@@ -195,6 +199,22 @@ class PrintNodeVisitor(ast.NodeVisitor):
                         # For now, collect all non-private assignments as potential enum values
                         enum_values.append(name)
         return enum_values
+
+    def _extract_docstring(self, node):
+        """
+        Extract the docstring from a class or function node.
+        In Python AST, docstrings are the first statement if it's a string literal.
+        """
+        if hasattr(node, 'body') and node.body:
+            first_stmt = node.body[0]
+            if isinstance(first_stmt, ast.Expr) and isinstance(first_stmt.value, ast.Constant):
+                # Python 3.8+ uses ast.Constant for string literals
+                if isinstance(first_stmt.value.value, str):
+                    return first_stmt.value.value
+            elif isinstance(first_stmt, ast.Expr) and isinstance(first_stmt.value, ast.Str):
+                # Python < 3.8 uses ast.Str for string literals
+                return first_stmt.value.s
+        return None
 
 def is_property_decorator(funcdef):
     """
@@ -375,6 +395,9 @@ def parse_function_arguments(func_node):
     # Check if this is an instance method by looking for a 'self' parameter
     skip_self = (len(args_list) > 0 and args_list[0].arg == 'self')
 
+    # Extract parameter documentation from docstring
+    param_docs = extract_parameter_documentation(func_node)
+
     arguments = []
     for i, arg in enumerate(args_list):
         arg_name = arg.arg
@@ -401,7 +424,10 @@ def parse_function_arguments(func_node):
                 # For non-literal defaults, keep as is or dump
                 default_value = ast.dump(default_value)
 
-        arguments.append(ArgumentDef.of(arg_name, type_annotation, default_value))
+        # Get parameter documentation
+        param_doc = param_docs.get(arg_name, None)
+
+        arguments.append(ArgumentDef.of(arg_name, type_annotation, default_value, param_doc))
 
     return ArgumentsDef.of(arguments)
 
@@ -416,3 +442,79 @@ def parse_function_return_type(func_node):
             return ast.dump(func_node.returns)
 
     return ""
+
+def extract_parameter_documentation(func_node):
+    """
+    Extract parameter documentation from a function's docstring.
+    Returns a dictionary mapping parameter names to their documentation.
+    """
+    param_docs = {}
+
+    # Get the function docstring
+    docstring = None
+    if hasattr(func_node, 'body') and func_node.body:
+        first_stmt = func_node.body[0]
+        if isinstance(first_stmt, ast.Expr) and isinstance(first_stmt.value, ast.Constant):
+            # Python 3.8+ uses ast.Constant for string literals
+            if isinstance(first_stmt.value.value, str):
+                docstring = first_stmt.value.value
+        elif isinstance(first_stmt, ast.Expr) and isinstance(first_stmt.value, ast.Str):
+            # Python < 3.8 uses ast.Str for string literals
+            docstring = first_stmt.value.s
+
+    if not docstring:
+        return param_docs
+
+    # Parse the docstring to extract parameter documentation
+    lines = docstring.split('\n')
+    current_section = None
+    param_name = None
+    param_description = []
+
+    for line in lines:
+        stripped = line.strip()
+        lower_stripped = stripped.lower()
+
+        # Check for parameter sections
+        if lower_stripped in ['args:', 'arguments:', 'parameters:', 'param:']:
+            current_section = 'params'
+            continue
+        elif lower_stripped in ['returns:', 'return:', 'raises:', 'exceptions:', 'note:', 'notes:', 'example:', 'examples:', 'see also:']:
+            current_section = None
+            if param_name:
+                # Save previous parameter
+                param_docs[param_name] = ' '.join(param_description).strip()
+                param_name = None
+                param_description = []
+            continue
+
+        if current_section == 'params':
+            # Check if this line starts a parameter definition
+            # Common formats: "param_name : description" or "param_name (type): description"
+            if ':' in stripped:
+                parts = stripped.split(':', 1)
+                potential_param = parts[0].strip()
+
+                # Extract parameter name (handle type annotations)
+                param_name_candidate = potential_param.split('(')[0].strip() if '(' in potential_param else potential_param
+
+                # Check if it's a parameter name (should be a valid identifier)
+                if param_name_candidate and param_name_candidate.replace('_', '').isalnum() and not param_name_candidate[0].isdigit():
+                    # Save previous parameter if any
+                    if param_name:
+                        param_docs[param_name] = ' '.join(param_description).strip()
+
+                    param_name = param_name_candidate
+                    param_description = [parts[1].strip()] if len(parts) > 1 else []
+                elif param_name:
+                    # Continuation of current parameter description
+                    param_description.append(stripped)
+            elif param_name and stripped:
+                # Continuation of current parameter description
+                param_description.append(stripped)
+
+    # Save the last parameter
+    if param_name:
+        param_docs[param_name] = ' '.join(param_description).strip()
+
+    return param_docs

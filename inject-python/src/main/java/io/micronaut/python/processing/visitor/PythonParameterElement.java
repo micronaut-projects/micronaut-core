@@ -62,4 +62,9 @@ public final class PythonParameterElement extends AbstractPythonElement implemen
         // Fall back to Object when no type annotation
         return environment.visitorContext().getClassElement(Object.class).orElse(ClassElement.of(Object.class));
     }
+
+    @Override
+    public java.util.Optional<String> getDocumentation(boolean parseContent) {
+        return java.util.Optional.ofNullable(getNativeType().documentation());
+    }
 }
