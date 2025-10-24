@@ -30,6 +30,11 @@ public final class PythonEnumElement extends AbstractPythonClassElement implemen
         super(classDef, environment);
     }
 
+    @Override
+    public boolean isEnum() {
+        return true;
+    }
+
     /**
      * Creates a new PythonEnumElement for the given class definition with array dimensions.
      *
