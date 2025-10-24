@@ -1,7 +1,10 @@
 package io.micronaut.python.processing;
 
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.python.processing.visitor.AbstractPythonClassElement;
 import io.micronaut.python.processing.visitor.ClassDef;
 import io.micronaut.python.processing.visitor.PythonClassElement;
+import io.micronaut.python.processing.visitor.PythonEnumElement;
 import io.micronaut.python.processing.visitor.PythonFieldElement;
 import io.micronaut.python.processing.visitor.PythonMethodElement;
 import jakarta.inject.Named;
@@ -9,6 +12,7 @@ import jakarta.inject.Scope;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Map;
 
 import io.micronaut.inject.ast.ParameterElement;
@@ -43,11 +47,11 @@ public class PythonAstParserTest {
         try (PythonEnvironment environment = buildEnv();
              PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment)) {
 
-            Map<String, PythonClassElement> classes = processingEnvironment.classes();
+            Map<String, ClassElement> classes = processingEnvironment.classes();
             assertNotNull(classes);
             assertEquals(1, classes.size());
 
-            PythonClassElement myClass = classes.get("MyClass");
+            ClassElement myClass = classes.get("MyClass");
 
             assertNotNull(myClass);
             assertEquals("MyClass", myClass.getName());
@@ -159,8 +163,10 @@ public class PythonAstParserTest {
                 assertNotNull(testClassDef);
 
                 // Get the class element
-                PythonClassElement testClass = processingEnvironment.classes().get("TestPrimitives");
-                assertNotNull(testClass);
+                ClassElement testClassElement = processingEnvironment.classes().get("TestPrimitives");
+                assertNotNull(testClassElement);
+                assertTrue(testClassElement instanceof PythonClassElement, "TestPrimitives should be a PythonClassElement");
+                PythonClassElement testClass = (PythonClassElement) testClassElement;
 
                 // First verify the attributes are parsed with correct annotations
                 var intAttr = testClassDef.attributes().stream()
@@ -291,6 +297,63 @@ public class PythonAstParserTest {
                 PythonMethodElement returnOnlyMethod = new PythonMethodElement(returnOnlyDef.get(), processingEnvironment, testClass, processingEnvironment.metadataFactory());
                 assertEquals("int", returnOnlyMethod.getReturnType().getName(), "return type should be int");
                 assertEquals(0, returnOnlyMethod.getParameters().length, "should have no parameters");
+            }
+        }
+    }
+
+    @Test
+    void testPythonEnumParsing() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        try (PythonEnvironment environment = pythonProcessor.parse("""
+            from enum import Enum
+
+            class Color(Enum):
+                RED = 1
+                GREEN = 2
+                BLUE = 3
+
+            class Status(Enum):
+                ACTIVE = "active"
+                INACTIVE = "inactive"
+                PENDING = "pending"
+            """)) {
+
+            try (PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment)) {
+                // Verify parsing completes successfully
+                assertNotNull(environment);
+                assertEquals(2, environment.classes().size());
+
+                // Test Color enum
+                ClassDef colorClassDef = environment.classes().get("Color");
+                assertNotNull(colorClassDef);
+                assertTrue(colorClassDef.isEnum(), "Color should be identified as an enum");
+                assertEquals(List.of("RED", "GREEN", "BLUE"), colorClassDef.values(), "Color should have correct enum values");
+
+                // Test Status enum
+                ClassDef statusClassDef = environment.classes().get("Status");
+                assertNotNull(statusClassDef);
+                assertTrue(statusClassDef.isEnum(), "Status should be identified as an enum");
+                assertEquals(List.of("ACTIVE", "INACTIVE", "PENDING"), statusClassDef.values(), "Status should have correct enum values");
+
+                // Test that processing environment creates PythonEnumElement for enums
+                Map<String, ClassElement> classes = processingEnvironment.classes();
+                assertEquals(2, classes.size());
+
+                ClassElement colorElement = classes.get("Color");
+                assertNotNull(colorElement);
+                assertTrue(colorElement instanceof PythonEnumElement, "Color should be a PythonEnumElement");
+
+                PythonEnumElement colorEnum = (PythonEnumElement) colorElement;
+                assertEquals("Color", colorEnum.getName());
+                assertEquals(List.of("RED", "GREEN", "BLUE"), colorEnum.values());
+
+                ClassElement statusElement = classes.get("Status");
+                assertNotNull(statusElement);
+                assertTrue(statusElement instanceof PythonEnumElement, "Status should be a PythonEnumElement");
+
+                PythonEnumElement statusEnum = (PythonEnumElement) statusElement;
+                assertEquals("Status", statusEnum.getName());
+                assertEquals(List.of("ACTIVE", "INACTIVE", "PENDING"), statusEnum.values());
             }
         }
     }

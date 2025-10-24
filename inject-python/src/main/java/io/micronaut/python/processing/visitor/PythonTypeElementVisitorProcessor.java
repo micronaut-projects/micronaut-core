@@ -108,7 +108,7 @@ public class PythonTypeElementVisitorProcessor {
             loadedVisitor.getVisitor().start(pythonVisitorContext);
         }
 
-        Map<String, PythonClassElement> classes = environment.classes();
+        Map<String, ClassElement> classes = environment.classes();
         for (LoadedVisitor loadedVisitor : loadedVisitors) {
             TypeElementVisitor<?, ?> visitor = loadedVisitor.getVisitor();
             for (ClassElement element : classes.values()) {

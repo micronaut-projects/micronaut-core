@@ -1,9 +1,12 @@
 package io.micronaut.python.processing;
 
+import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.python.processing.annotation.PythonAnnotationMetadataBuilder;
 import io.micronaut.python.processing.annotation.PythonElementAnnotationMetadataFactory;
+import io.micronaut.python.processing.visitor.AbstractPythonClassElement;
 import io.micronaut.python.processing.visitor.ClassDef;
 import io.micronaut.python.processing.visitor.PythonClassElement;
+import io.micronaut.python.processing.visitor.PythonEnumElement;
 import io.micronaut.python.processing.visitor.PythonVisitorContext;
 
 import java.util.Map;
@@ -72,18 +75,22 @@ public record PythonProcessingEnvironment(
      *
      * @return A map of class names to Python class elements.
      */
-    public Map<String, PythonClassElement> classes() {
+    public Map<String, ClassElement> classes() {
         return toMapOfClassElement(environment.classes(), this);
     }
 
-    private static Map<String, PythonClassElement> toMapOfClassElement(Map<String, ClassDef> classes, PythonProcessingEnvironment environment) {
+    private static Map<String, ClassElement> toMapOfClassElement(Map<String, ClassDef> classes, PythonProcessingEnvironment environment) {
         return classes.entrySet().stream()
             .collect(Collectors.toMap(
                 Map.Entry::getKey,
-                entry -> new PythonClassElement(
-                    entry.getValue(),
-                    environment
-                )
+                entry -> {
+                    ClassDef classDef = entry.getValue();
+                    if (classDef.isEnum()) {
+                        return new PythonEnumElement(classDef, environment);
+                    } else {
+                        return new PythonClassElement(classDef, environment);
+                    }
+                }
             ));
     }
 }
