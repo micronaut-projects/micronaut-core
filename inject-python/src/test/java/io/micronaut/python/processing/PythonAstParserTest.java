@@ -2,6 +2,8 @@ package io.micronaut.python.processing;
 
 import io.micronaut.python.processing.visitor.ClassDef;
 import io.micronaut.python.processing.visitor.PythonClassElement;
+import io.micronaut.python.processing.visitor.PythonFieldElement;
+import io.micronaut.python.processing.visitor.PythonMethodElement;
 import jakarta.inject.Named;
 import jakarta.inject.Scope;
 import jakarta.inject.Singleton;
@@ -9,7 +11,10 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Map;
 
+import io.micronaut.inject.ast.ParameterElement;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -133,6 +138,160 @@ public class PythonAstParserTest {
             // Should still parse the regular method (properties are ignored)
             assertEquals(1, testClass.functions().size());
             assertEquals("regular_method", testClass.functions().get(0).name());
+        }
+    }
+
+    @Test
+    void testPrimitiveTypeResolution() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        try (PythonEnvironment environment = pythonProcessor.parse("""
+            class TestPrimitives:
+                int_field: int = 42
+                float_field: float = 3.14
+                str_field: str = "hello"
+                bool_field: bool = True
+                complex_field: list = []
+            """)) {
+
+            try (PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment)) {
+                // Get the class definition
+                ClassDef testClassDef = environment.classes().get("TestPrimitives");
+                assertNotNull(testClassDef);
+
+                // Get the class element
+                PythonClassElement testClass = processingEnvironment.classes().get("TestPrimitives");
+                assertNotNull(testClass);
+
+                // First verify the attributes are parsed with correct annotations
+                var intAttr = testClassDef.attributes().stream()
+                    .filter(attr -> "int_field".equals(attr.name()))
+                    .findFirst();
+                assertTrue(intAttr.isPresent(), "int_field should be present");
+                assertEquals("int", intAttr.get().annotation(), "int_field should have int annotation");
+
+                var floatAttr = testClassDef.attributes().stream()
+                    .filter(attr -> "float_field".equals(attr.name()))
+                    .findFirst();
+                assertTrue(floatAttr.isPresent(), "float_field should be present");
+                assertEquals("float", floatAttr.get().annotation(), "float_field should have float annotation");
+
+                var strAttr = testClassDef.attributes().stream()
+                    .filter(attr -> "str_field".equals(attr.name()))
+                    .findFirst();
+                assertTrue(strAttr.isPresent(), "str_field should be present");
+                assertEquals("str", strAttr.get().annotation(), "str_field should have str annotation");
+
+                var boolAttr = testClassDef.attributes().stream()
+                    .filter(attr -> "bool_field".equals(attr.name()))
+                    .findFirst();
+                assertTrue(boolAttr.isPresent(), "bool_field should be present");
+                assertEquals("bool", boolAttr.get().annotation(), "bool_field should have bool annotation");
+
+                var complexAttr = testClassDef.attributes().stream()
+                    .filter(attr -> "complex_field".equals(attr.name()))
+                    .findFirst();
+                assertTrue(complexAttr.isPresent(), "complex_field should be present");
+                assertEquals("list", complexAttr.get().annotation(), "complex_field should have list annotation");
+
+                // Now test that PythonFieldElement resolves types correctly
+                PythonFieldElement intField = new PythonFieldElement(intAttr.get(), processingEnvironment, testClass, processingEnvironment.metadataFactory());
+                assertEquals("int", intField.getType().getName(), "int field should resolve to primitive int");
+
+                PythonFieldElement floatField = new PythonFieldElement(floatAttr.get(), processingEnvironment, testClass, processingEnvironment.metadataFactory());
+                assertEquals("double", floatField.getType().getName(), "float field should resolve to primitive double");
+
+                PythonFieldElement strField = new PythonFieldElement(strAttr.get(), processingEnvironment, testClass, processingEnvironment.metadataFactory());
+                assertEquals("java.lang.String", strField.getType().getName(), "str field should resolve to String");
+
+                PythonFieldElement boolField = new PythonFieldElement(boolAttr.get(), processingEnvironment, testClass, processingEnvironment.metadataFactory());
+                assertEquals("boolean", boolField.getType().getName(), "bool field should resolve to primitive boolean");
+
+                PythonFieldElement complexField = new PythonFieldElement(complexAttr.get(), processingEnvironment, testClass, processingEnvironment.metadataFactory());
+                assertEquals("java.lang.Object", complexField.getType().getName(), "complex field should fall back to Object");
+            }
+        }
+    }
+
+    @Test
+    void testMethodElementImplementation() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        try (PythonEnvironment environment = pythonProcessor.parse("""
+            class TestMethods:
+                def public_method(self, x: int, y: str = "default") -> bool:
+                    return True
+
+                def _private_method(self, _arg: float) -> str:
+                    return "private"
+
+                def no_annotations(self, arg1, arg2):
+                    pass
+
+                def return_only(self) -> int:
+                    return 42
+            """)) {
+
+            try (PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment)) {
+                // Get the class definition
+                ClassDef testClassDef = environment.classes().get("TestMethods");
+                PythonClassElement testClass = new PythonClassElement(testClassDef, processingEnvironment);
+                assertNotNull(testClassDef);
+
+                // Test that we can create method elements directly from function definitions
+                var publicMethodDef = testClassDef.functions().stream()
+                    .filter(func -> "public_method".equals(func.name()))
+                    .findFirst();
+                assertTrue(publicMethodDef.isPresent(), "public_method should be present");
+
+                PythonMethodElement publicMethod = new PythonMethodElement(publicMethodDef.get(), processingEnvironment, testClass, processingEnvironment.metadataFactory());
+
+                // Test method properties
+                assertEquals("public_method", publicMethod.getName());
+                assertTrue(publicMethod.isPublic(), "public_method should be public");
+                assertFalse(publicMethod.isPrivate(), "public_method should not be private");
+
+                // Test return type
+                assertEquals("boolean", publicMethod.getReturnType().getName(), "return type should be boolean");
+
+                // Test parameters
+                ParameterElement[] params = publicMethod.getParameters();
+                assertEquals(2, params.length, "should have 2 parameters");
+
+                assertEquals("x", params[0].getName(), "first parameter should be x");
+                assertEquals("int", params[0].getType().getName(), "first parameter should be int");
+
+                assertEquals("y", params[1].getName(), "second parameter should be y");
+                assertEquals("java.lang.String", params[1].getType().getName(), "second parameter should be String");
+
+                // Test private method
+                var privateMethodDef = testClassDef.functions().stream()
+                    .filter(func -> "_private_method".equals(func.name()))
+                    .findFirst();
+                assertTrue(privateMethodDef.isPresent(), "_private_method should be present");
+
+                PythonMethodElement privateMethod = new PythonMethodElement(privateMethodDef.get(), processingEnvironment, testClass, processingEnvironment.metadataFactory());
+                assertFalse(privateMethod.isPublic(), "_private_method should not be public");
+                assertTrue(privateMethod.isPrivate(), "_private_method should be private");
+
+                // Test method with no annotations
+                var noAnnotationsDef = testClassDef.functions().stream()
+                    .filter(func -> "no_annotations".equals(func.name()))
+                    .findFirst();
+                assertTrue(noAnnotationsDef.isPresent(), "no_annotations should be present");
+
+                PythonMethodElement noAnnotationsMethod = new PythonMethodElement(noAnnotationsDef.get(), processingEnvironment, testClass, processingEnvironment.metadataFactory());
+                assertEquals(2, noAnnotationsMethod.getParameters().length, "should have 2 parameters");
+                assertEquals("java.lang.Object", noAnnotationsMethod.getReturnType().getName(), "return type should be Object");
+
+                // Test return-only method
+                var returnOnlyDef = testClassDef.functions().stream()
+                    .filter(func -> "return_only".equals(func.name()))
+                    .findFirst();
+                assertTrue(returnOnlyDef.isPresent(), "return_only should be present");
+
+                PythonMethodElement returnOnlyMethod = new PythonMethodElement(returnOnlyDef.get(), processingEnvironment, testClass, processingEnvironment.metadataFactory());
+                assertEquals("int", returnOnlyMethod.getReturnType().getName(), "return type should be int");
+                assertEquals(0, returnOnlyMethod.getParameters().length, "should have no parameters");
+            }
         }
     }
 

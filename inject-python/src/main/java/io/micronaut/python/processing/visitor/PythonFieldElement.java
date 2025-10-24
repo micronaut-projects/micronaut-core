@@ -91,14 +91,10 @@ public final class PythonFieldElement extends AbstractPythonElement implements F
                 int endIdx = annotation.lastIndexOf(',');
                 if (startIdx > 0 && endIdx > startIdx) {
                     String actualType = annotation.substring(startIdx + 1, endIdx).trim();
-                    return environment.visitorContext().getClassElement(actualType).orElse(
-                        environment.visitorContext().getClassElement(Object.class).orElse(ClassElement.of(Object.class))
-                    );
+                    return GraalPyUtil.resolvePythonTypeToJava(actualType, environment.visitorContext());
                 }
             }
-            return environment.visitorContext().getClassElement(annotation).orElse(
-                environment.visitorContext().getClassElement(Object.class).orElse(ClassElement.of(Object.class))
-            );
+            return GraalPyUtil.resolvePythonTypeToJava(annotation, environment.visitorContext());
         }
         // Infer from value if no annotation
         if (attributeDef.value() != null) {

@@ -64,7 +64,12 @@ class PrintNodeVisitor(ast.NodeVisitor):
                         for d in node.decorator_list
                         if decorator_to_function(self, d) is not None
                     ]
-                    func_def = JavaFuncDef(node.name, decorators)
+
+                    # Parse function arguments and return type
+                    arg_names, arg_types = parse_function_arguments(node)
+                    return_type_annotation = parse_function_return_type(node)
+
+                    func_def = JavaFuncDef(node.name, arg_names, arg_types, decorators, return_type_annotation)
                     if self.current_class is not None:
                         self.current_class = self.current_class.withFunction(func_def)
                     return super().visit(node)
@@ -306,3 +311,50 @@ def get_micronaut_annotation_name_value(funcdef):
         elif isinstance(dec, ast.Attribute) and dec.attr == 'micronaut_annotation':
             return None
     return None
+
+def parse_function_arguments(func_node):
+    """
+    Parse the arguments of an ast.FunctionDef node and return lists of names and types.
+    """
+    arg_names = []
+    arg_types = []
+
+    # Handle regular arguments
+    if hasattr(func_node.args, 'args'):
+        args_list = func_node.args.args
+
+        # Skip 'self' parameter for instance methods (methods inside classes)
+        # Check if this is an instance method by looking for a 'self' parameter
+        skip_self = (len(args_list) > 0 and args_list[0].arg == 'self')
+
+        for arg in args_list:
+            arg_name = arg.arg
+
+            # Skip self parameter for instance methods
+            if skip_self and arg_name == 'self':
+                continue
+
+            arg_names.append(arg_name)
+
+            # Extract type annotation if present
+            type_annotation = ""
+            if hasattr(arg, 'annotation') and arg.annotation is not None:
+                try:
+                    type_annotation = ast.unparse(arg.annotation)
+                except AttributeError:
+                    type_annotation = ast.dump(arg.annotation)
+            arg_types.append(type_annotation)
+
+    return arg_names, arg_types
+
+def parse_function_return_type(func_node):
+    """
+    Parse the return type annotation of an ast.FunctionDef node and return a string.
+    """
+    if hasattr(func_node, 'returns') and func_node.returns is not None:
+        try:
+            return ast.unparse(func_node.returns)
+        except AttributeError:
+            return ast.dump(func_node.returns)
+
+    return ""
