@@ -10,8 +10,7 @@ import java.util.ArrayList;
  * </p>
  *
  * @param name The name of the function.
- * @param argumentNames The raw argument names.
- * @param argumentTypes The raw argument type annotations.
+ * @param arguments The function arguments.
  * @param decorators The decorators.
  * @param returnTypeAnnotation The raw return type annotation.
  * @param typeComment The type comment.
@@ -20,8 +19,7 @@ import java.util.ArrayList;
  */
 public record FunctionDef(
     String name,
-    List<String> argumentNames,
-    List<String> argumentTypes,
+    ArgumentsDef arguments,
     List<DecoratorDef> decorators,
     String returnTypeAnnotation,
     String typeComment,
@@ -29,26 +27,32 @@ public record FunctionDef(
 ) implements ElementDef {
 
     // Simplified constructors for easier Python interop
-    public FunctionDef(String name, List<String> argumentNames, List<String> argumentTypes, List<DecoratorDef> decorators, String returnTypeAnnotation) {
-        this(name, argumentNames, argumentTypes, decorators, returnTypeAnnotation, "", List.of());
+    public FunctionDef(String name, ArgumentsDef arguments, List<DecoratorDef> decorators, String returnTypeAnnotation) {
+        this(name, arguments, decorators, returnTypeAnnotation, "", List.of());
     }
 
-    public FunctionDef(String name, List<String> argumentNames, List<String> argumentTypes, String returnTypeAnnotation) {
-        this(name, argumentNames, argumentTypes, List.of(), returnTypeAnnotation, "", List.of());
+    public FunctionDef(String name, ArgumentsDef arguments, String returnTypeAnnotation) {
+        this(name, arguments, List.of(), returnTypeAnnotation, "", List.of());
     }
 
     public FunctionDef(String name) {
-        this(name, List.of(), List.of(), List.of(), "", "", List.of());
+        this(name, ArgumentsDef.empty(), List.of(), "", "", List.of());
     }
 
     public FunctionDef(String name, List<DecoratorDef> decoratorList) {
-        this(name, List.of(), List.of(), decoratorList, "", "", List.of());
+        this(name, ArgumentsDef.empty(), decoratorList, "", "", List.of());
     }
 
-    /**
-     * Get the parsed arguments as ArgumentsDef.
-     */
-    public ArgumentsDef arguments() {
+    // Backward compatibility constructors
+    public FunctionDef(String name, List<String> argumentNames, List<String> argumentTypes, List<DecoratorDef> decorators, String returnTypeAnnotation) {
+        this(name, createArgumentsDef(argumentNames, argumentTypes), decorators, returnTypeAnnotation, "", List.of());
+    }
+
+    public FunctionDef(String name, List<String> argumentNames, List<String> argumentTypes, String returnTypeAnnotation) {
+        this(name, createArgumentsDef(argumentNames, argumentTypes), List.of(), returnTypeAnnotation, "", List.of());
+    }
+
+    private static ArgumentsDef createArgumentsDef(List<String> argumentNames, List<String> argumentTypes) {
         List<ArgumentDef> args = new ArrayList<>();
         for (int i = 0; i < argumentNames.size(); i++) {
             String argName = argumentNames.get(i);

@@ -1,8 +1,12 @@
 package io.micronaut.python.processing;
 
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.python.processing.visitor.AbstractPythonClassElement;
+import io.micronaut.python.processing.visitor.ArgumentDef;
+import io.micronaut.python.processing.visitor.ArgumentsDef;
 import io.micronaut.python.processing.visitor.ClassDef;
+import io.micronaut.python.processing.visitor.FunctionDef;
 import io.micronaut.python.processing.visitor.PythonClassElement;
 import io.micronaut.python.processing.visitor.PythonEnumElement;
 import io.micronaut.python.processing.visitor.PythonFieldElement;
@@ -14,6 +18,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import io.micronaut.inject.ast.ParameterElement;
 
@@ -354,6 +359,69 @@ public class PythonAstParserTest {
                 PythonEnumElement statusEnum = (PythonEnumElement) statusElement;
                 assertEquals("Status", statusEnum.getName());
                 assertEquals(List.of("ACTIVE", "INACTIVE", "PENDING"), statusEnum.values());
+            }
+        }
+    }
+
+    @Test
+    void testConstructorParsing() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        try (PythonEnvironment environment = pythonProcessor.parse("""
+            class TestConstructor:
+                def __init__(self, name: str, age: int = 25):
+                    self.name = name
+                    self.age = age
+
+                def method(self):
+                    pass
+            """)) {
+
+            try (PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment)) {
+                // Verify parsing completes successfully
+                assertNotNull(environment);
+                assertEquals(1, environment.classes().size());
+
+                ClassDef testClassDef = environment.classes().get("TestConstructor");
+                assertNotNull(testClassDef);
+                assertEquals("TestConstructor", testClassDef.name());
+
+                // Verify constructor is parsed
+                FunctionDef constructor = testClassDef.constructor();
+                assertNotNull(constructor, "Constructor should be parsed");
+                assertEquals("__init__", constructor.name(), "Constructor name should be __init__");
+
+                // Verify constructor arguments
+                ArgumentsDef args = constructor.arguments();
+                assertNotNull(args, "Constructor should have arguments");
+                assertEquals(2, args.arguments().size(), "Constructor should have 2 arguments");
+
+                ArgumentDef nameArg = args.arguments().get(0);
+                assertEquals("name", nameArg.name(), "First argument should be name");
+                assertEquals("str", nameArg.typeAnnotation(), "Name should have str type");
+
+                ArgumentDef ageArg = args.arguments().get(1);
+                assertEquals("age", ageArg.name(), "Second argument should be age");
+                assertEquals("int", ageArg.typeAnnotation(), "Age should have int type");
+                assertEquals(25, ageArg.defaultValue(), "Age should have default value 25");
+
+                // Test getPrimaryConstructor
+                ClassElement classElement = processingEnvironment.classes().get("TestConstructor");
+                assertNotNull(classElement);
+                assertTrue(classElement instanceof PythonClassElement, "Should be PythonClassElement");
+
+                PythonClassElement pythonClass = (PythonClassElement) classElement;
+                Optional<MethodElement> primaryConstructor = pythonClass.getPrimaryConstructor();
+                assertTrue(primaryConstructor.isPresent(), "Should have primary constructor");
+
+                MethodElement constructorElement = primaryConstructor.get();
+                assertTrue(constructorElement instanceof PythonMethodElement, "Constructor should be PythonMethodElement");
+
+                // Verify constructor method details
+                assertEquals("__init__", constructorElement.getName());
+                ParameterElement[] params = constructorElement.getParameters();
+                assertEquals(2, params.length, "Constructor should have 2 parameters");
+                assertEquals("name", params[0].getName());
+                assertEquals("age", params[1].getName());
             }
         }
     }
