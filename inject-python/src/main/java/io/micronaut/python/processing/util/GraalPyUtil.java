@@ -69,4 +69,55 @@ public final class GraalPyUtil {
                 );
         }
     }
+
+    /**
+     * Parses a Python docstring to extract the main description.
+     * Removes opening/closing quotes and stops at structured sections like Args:, Returns:, etc.
+     *
+     * @param docstring the raw Python docstring
+     * @return the parsed main description, or empty string if docstring is null/empty
+     */
+    public static String parsePythonDocstring(String docstring) {
+        if (docstring == null || docstring.trim().isEmpty()) {
+            return "";
+        }
+
+        String[] lines = docstring.split("\\n");
+        StringBuilder result = new StringBuilder();
+
+        // Skip the first line if it's just the opening quotes or empty
+        int startIndex = 0;
+        if (lines.length > 0 && (lines[0].trim().isEmpty() || lines[0].trim().startsWith("\"\"\"") || lines[0].trim().startsWith("'''"))) {
+            startIndex = 1;
+        }
+
+        // Process lines until we hit structured sections
+        for (int i = startIndex; i < lines.length; i++) {
+            String line = lines[i];
+
+            // Stop at common section headers (case-insensitive)
+            String trimmed = line.trim().toLowerCase();
+            if (trimmed.startsWith("args:") || trimmed.startsWith("arguments:") ||
+                trimmed.startsWith("parameters:") || trimmed.startsWith("param:") ||
+                trimmed.startsWith("returns:") || trimmed.startsWith("return:") ||
+                trimmed.startsWith("raises:") || trimmed.startsWith("exceptions:") ||
+                trimmed.startsWith("note:") || trimmed.startsWith("notes:") ||
+                trimmed.startsWith("example:") || trimmed.startsWith("examples:") ||
+                trimmed.startsWith("see also:")) {
+                break;
+            }
+
+            // Stop at closing docstring markers
+            if (line.trim().endsWith("\"\"\"") || line.trim().endsWith("'''")) {
+                line = line.replaceAll("\"\"\"$", "").replaceAll("'''$", "");
+            }
+
+            result.append(line);
+            if (i < lines.length - 1) {
+                result.append("\n");
+            }
+        }
+
+        return result.toString().trim();
+    }
 }

@@ -7,6 +7,7 @@ import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
+import io.micronaut.python.processing.util.GraalPyUtil;
 
 import java.util.List;
 import java.util.Objects;
@@ -70,5 +71,18 @@ public final class PythonClassElement extends AbstractPythonClassElement {
             }
         }
         return false;
+    }
+
+    @Override
+    public Optional<String> getDocumentation(boolean parseContent) {
+        String doc = getNativeType().documentation();
+        if (doc == null) {
+            return Optional.empty();
+        }
+        if (parseContent) {
+            // Parse Python docstring to extract main description
+            return Optional.of(GraalPyUtil.parsePythonDocstring(doc));
+        }
+        return Optional.of(doc);
     }
 }
