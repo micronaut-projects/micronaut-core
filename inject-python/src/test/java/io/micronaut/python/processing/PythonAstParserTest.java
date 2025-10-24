@@ -455,7 +455,9 @@ public class PythonAstParserTest {
 
                 PythonClassElement pythonClass = (PythonClassElement) classElement;
                 assertEquals("com.example.mypackage.TestClass", pythonClass.getName(), "Full qualified name should include package");
+                assertEquals("TestClass", pythonClass.getSimpleName(), "Simple name should not include the package");
                 assertEquals("com.example.mypackage", pythonClass.getPackageName(), "Package name should be correctly translated");
+
             }
         }
     }
