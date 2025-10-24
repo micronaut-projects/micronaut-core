@@ -465,6 +465,59 @@ public class PythonAstParserTest {
         }
     }
 
+    @Test
+    void testAbstractMethodDetection() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        try (PythonEnvironment environment = pythonProcessor.parse("""
+            from abc import ABC, abstractmethod
+
+            class AbstractClass(ABC):
+                @abstractmethod
+                def abstract_method(self, x: int) -> str:
+                    \"\"\"This is an abstract method.\"\"\"
+                    pass
+
+                def concrete_method(self, y: float) -> bool:
+                    \"\"\"This is a concrete method.\"\"\"
+                    return True
+
+                @abstractmethod
+                def another_abstract_method(self) -> None:
+                    pass
+            """)) {
+
+            try (PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment)) {
+                // Verify parsing completes successfully
+                assertNotNull(environment);
+                assertEquals(1, environment.classes().size());
+
+                ClassDef abstractClassDef = environment.classes().get("AbstractClass");
+                assertNotNull(abstractClassDef);
+                assertEquals("AbstractClass", abstractClassDef.name());
+
+                // Verify abstract methods are detected
+                var abstractMethodDef = abstractClassDef.functions().stream()
+                    .filter(func -> "abstract_method".equals(func.name()))
+                    .findFirst();
+                assertTrue(abstractMethodDef.isPresent(), "abstract_method should be present");
+                assertTrue(abstractMethodDef.get().isAbstract(), "abstract_method should be marked as abstract");
+
+                var anotherAbstractMethodDef = abstractClassDef.functions().stream()
+                    .filter(func -> "another_abstract_method".equals(func.name()))
+                    .findFirst();
+                assertTrue(anotherAbstractMethodDef.isPresent(), "another_abstract_method should be present");
+                assertTrue(anotherAbstractMethodDef.get().isAbstract(), "another_abstract_method should be marked as abstract");
+
+                // Verify concrete method is not abstract
+                var concreteMethodDef = abstractClassDef.functions().stream()
+                    .filter(func -> "concrete_method".equals(func.name()))
+                    .findFirst();
+                assertTrue(concreteMethodDef.isPresent(), "concrete_method should be present");
+                assertFalse(concreteMethodDef.get().isAbstract(), "concrete_method should not be marked as abstract");
+            }
+        }
+    }
+
     private static PythonEnvironment buildEnv() {
         PythonAstParser pythonProcessor = new PythonAstParser();
         PythonEnvironment environment = pythonProcessor.parse("""
