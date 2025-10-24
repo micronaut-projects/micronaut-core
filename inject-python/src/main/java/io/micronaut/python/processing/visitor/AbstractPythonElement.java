@@ -6,7 +6,7 @@ import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 
 import java.util.Objects;
 
-abstract sealed class AbstractPythonElement extends AbstractAnnotationElement implements Element permits PythonClassElement, PythonFieldElement, PythonMethodElement {
+abstract sealed class AbstractPythonElement extends AbstractAnnotationElement implements Element permits PythonClassElement, PythonFieldElement, PythonMethodElement, PythonParameterElement {
     private final String name;
     private final Object nativeType;
 
