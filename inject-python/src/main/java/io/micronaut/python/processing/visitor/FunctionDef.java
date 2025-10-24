@@ -1,3 +1,18 @@
+/*
+ * Copyright 2017-2025 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.python.processing.visitor;
 
 import java.util.List;
@@ -16,6 +31,7 @@ import java.util.ArrayList;
  * @param typeComment The type comment.
  * @param typeParams The type parameters.
  * @param documentation The function documentation string.
+ * @param isAbstract Whether the function is abstract (decorated with @abstractmethod).
  * @see <a href="https://docs.python.org/3/library/ast.html#ast.FunctionDef">Python AST FunctionDef</a>
  */
 public record FunctionDef(
@@ -25,33 +41,34 @@ public record FunctionDef(
     String returnTypeAnnotation,
     String typeComment,
     List<Object> typeParams,
-    String documentation
+    String documentation,
+    boolean isAbstract
 ) implements ElementDef {
 
     // Simplified constructors for easier Python interop
     public FunctionDef(String name, ArgumentsDef arguments, List<DecoratorDef> decorators, String returnTypeAnnotation) {
-        this(name, arguments, decorators, returnTypeAnnotation, "", java.util.List.of(), null);
+        this(name, arguments, decorators, returnTypeAnnotation, "", java.util.List.of(), null, false);
     }
 
     public FunctionDef(String name, ArgumentsDef arguments, String returnTypeAnnotation) {
-        this(name, arguments, java.util.List.of(), returnTypeAnnotation, "", java.util.List.of(), null);
+        this(name, arguments, java.util.List.of(), returnTypeAnnotation, "", java.util.List.of(), null, false);
     }
 
     public FunctionDef(String name) {
-        this(name, ArgumentsDef.empty(), java.util.List.of(), "", "", java.util.List.of(), null);
+        this(name, ArgumentsDef.empty(), java.util.List.of(), "", "", java.util.List.of(), null, false);
     }
 
     public FunctionDef(String name, List<DecoratorDef> decoratorList) {
-        this(name, ArgumentsDef.empty(), decoratorList, "", "", java.util.List.of(), null);
+        this(name, ArgumentsDef.empty(), decoratorList, "", "", java.util.List.of(), null, false);
     }
 
     // Backward compatibility constructors
     public FunctionDef(String name, List<String> argumentNames, List<String> argumentTypes, List<DecoratorDef> decorators, String returnTypeAnnotation) {
-        this(name, createArgumentsDef(argumentNames, argumentTypes), decorators, returnTypeAnnotation, "", java.util.List.of(), null);
+        this(name, createArgumentsDef(argumentNames, argumentTypes), decorators, returnTypeAnnotation, "", java.util.List.of(), null, false);
     }
 
     public FunctionDef(String name, List<String> argumentNames, List<String> argumentTypes, String returnTypeAnnotation) {
-        this(name, createArgumentsDef(argumentNames, argumentTypes), java.util.List.of(), returnTypeAnnotation, "", java.util.List.of(), null);
+        this(name, createArgumentsDef(argumentNames, argumentTypes), java.util.List.of(), returnTypeAnnotation, "", java.util.List.of(), null, false);
     }
 
     private static ArgumentsDef createArgumentsDef(List<String> argumentNames, List<String> argumentTypes) {

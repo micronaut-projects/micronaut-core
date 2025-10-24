@@ -9,6 +9,17 @@ DecoratorDef = java.type("io.micronaut.python.processing.visitor.DecoratorDef")
 ArgumentsDef = java.type("io.micronaut.python.processing.visitor.ArgumentsDef")
 ArgumentDef = java.type("io.micronaut.python.processing.visitor.ArgumentDef")
 
+def is_abstract_method(funcdef):
+    """
+    Returns True if the ast.FunctionDef has an @abstractmethod decorator.
+    """
+    for dec in funcdef.decorator_list:
+        if isinstance(dec, ast.Name) and dec.id == "abstractmethod":
+            return True
+        elif isinstance(dec, ast.Attribute) and dec.attr == "abstractmethod":
+            return True
+    return False
+
 class PrintNodeVisitor(ast.NodeVisitor):
 
     def __init__(self, callback, package_name=""):
@@ -84,7 +95,10 @@ class PrintNodeVisitor(ast.NodeVisitor):
                     # Extract function docstring
                     func_doc = self._extract_docstring(node)
 
-                    func_def = JavaFuncDef(node.name, arguments, decorators, return_type_annotation, "", [], func_doc)
+                    # Check if function is abstract
+                    is_abstract = is_abstract_method(node)
+
+                    func_def = JavaFuncDef(node.name, arguments, decorators, return_type_annotation, "", [], func_doc, is_abstract)
                     if self.current_class is not None:
                         if node.name == "__init__":
                             # Set as constructor
