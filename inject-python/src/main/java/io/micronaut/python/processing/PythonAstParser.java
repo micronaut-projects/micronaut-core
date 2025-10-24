@@ -20,6 +20,10 @@ public class PythonAstParser {
     public static final String INJECT_RESOURCES = "GRAALPY-VFS/io.micronaut/micronaut-inject-python";
 
     public PythonEnvironment parse(@Language("python") String sources) {
+        return parse(sources, "");
+    }
+
+    public PythonEnvironment parse(@Language("python") String sources, String packageName) {
         Context context = GraalPyResources.contextBuilder(VirtualFileSystem.newBuilder()
                 .resourceDirectory(INJECT_RESOURCES)
                 .build())
@@ -41,8 +45,8 @@ public class PythonAstParser {
                 }
                 return o;
             });
-            bindings
-                .putMember("src", sources);
+            bindings.putMember("src", sources);
+            bindings.putMember("package_name", packageName != null ? packageName : "");
             context.eval(Source.create(
                 PYTHON,
                 getSource()
@@ -69,7 +73,7 @@ public class PythonAstParser {
             from micronaut_processor import PrintNodeVisitor
 
             tree = ast.parse(src)
-            PrintNodeVisitor(callback).visit(tree)
+            PrintNodeVisitor(callback, package_name).visit(tree)
             """;
     }
 }

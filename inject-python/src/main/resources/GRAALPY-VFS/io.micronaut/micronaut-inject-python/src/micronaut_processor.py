@@ -11,8 +11,9 @@ ArgumentDef = java.type("io.micronaut.python.processing.visitor.ArgumentDef")
 
 class PrintNodeVisitor(ast.NodeVisitor):
 
-    def __init__(self, callback):
+    def __init__(self, callback, package_name=""):
         self.callback = callback
+        self.package_name = package_name
         # maintain insertion order
         self.known_decorators = OrderedDict()
         self.known_decorator_functions = OrderedDict()
@@ -27,7 +28,7 @@ class PrintNodeVisitor(ast.NodeVisitor):
                     for d in node.decorator_list
                     if decorator_to_function(self, d) is not None
                 ]
-                self.current_class = JavaClassDef(node.name, decorators)
+                self.current_class = JavaClassDef(node.name, self.package_name, [], decorators, [], [], [], None, False, [])
                 self.current_class_attributes = []
 
                 # Check if this is an enum class

@@ -51,6 +51,11 @@ public final class PythonClassElement extends AbstractPythonClassElement {
     }
 
     @Override
+    public String getPackageName() {
+        return getNativeType().packageName();
+    }
+
+    @Override
     public boolean isAssignable(String type) {
         if (getName().equals(type)) {
             return true;
