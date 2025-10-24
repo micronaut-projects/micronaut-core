@@ -1,5 +1,7 @@
 package io.micronaut.python.processing.visitor;
 
+import org.graalvm.polyglot.Value;
+
 import java.util.List;
 import java.util.Objects;
 
@@ -21,7 +23,7 @@ import java.util.Objects;
 public record AttributeDef(
     String name,
     String annotation,
-    Object value,
+    Value value,
     List<DecoratorDef> decorators,
     String documentation,
     boolean isStatic
@@ -31,7 +33,7 @@ public record AttributeDef(
         this(name, null, null, List.of(), null, false);
     }
 
-    public AttributeDef(String name, String annotation, Object value) {
+    public AttributeDef(String name, String annotation, Value value) {
         this(name, annotation, value, List.of(), null, false);
     }
 

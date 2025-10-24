@@ -95,9 +95,11 @@ class PrintNodeVisitor(ast.NodeVisitor):
             # Skip special dunder attributes and private attributes
             if not attr_name.startswith('__') and not attr_name.startswith('_'):
                 try:
-                    value = ast.literal_eval(node.value)
-                except (ValueError, TypeError):
-                    value = None  # Non-literal values
+                    # Evaluate the AST expression to get a Python Value
+                    code = compile(ast.Expression(body=node.value), filename='<ast>', mode='eval')
+                    value = eval(code)
+                except Exception:
+                    value = None  # Non-evaluable expressions
 
                 # Determine if it's a class variable (static) or instance variable
                 # For simplicity, assume class-level assignments are static
@@ -122,8 +124,13 @@ class PrintNodeVisitor(ast.NodeVisitor):
                     annotation = ast.dump(node.annotation)
 
                 try:
-                    value = ast.literal_eval(node.value) if node.value else None
-                except (ValueError, TypeError):
+                    # Evaluate the AST expression to get a Python Value
+                    if node.value:
+                        code = compile(ast.Expression(body=node.value), filename='<ast>', mode='eval')
+                        value = eval(code)
+                    else:
+                        value = None
+                except Exception:
                     value = None
 
                 # Check for @dataclass.field() or other decorators

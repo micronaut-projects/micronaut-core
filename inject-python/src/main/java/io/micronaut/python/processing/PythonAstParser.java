@@ -20,14 +20,15 @@ public class PythonAstParser {
     public static final String INJECT_RESOURCES = "GRAALPY-VFS/io.micronaut/micronaut-inject-python";
 
     public PythonEnvironment parse(@Language("python") String sources) {
-        try (Context context = GraalPyResources.contextBuilder(VirtualFileSystem.newBuilder()
+        Context context = GraalPyResources.contextBuilder(VirtualFileSystem.newBuilder()
                 .resourceDirectory(INJECT_RESOURCES)
                 .build())
             // TODO: constrain this in future
             .allowHostAccess(HostAccess.ALL)
             .allowHostClassLookup(name -> name.startsWith("io.micronaut"))
-            .build()) {
+            .build();
 
+        try {
             Map<String, DecoratorDef> decorators = new LinkedHashMap<>();
             Map<String, ClassDef> classes = new LinkedHashMap<>();
             context.initialize(PYTHON);
@@ -48,8 +49,15 @@ public class PythonAstParser {
             ));
             return new PythonEnvironment(
                 classes,
-                decorators
+                decorators,
+                context
             );
+        } catch (Exception e) {
+            // Close context on error
+            if (context != null) {
+                context.close();
+            }
+            throw e;
         }
     }
 

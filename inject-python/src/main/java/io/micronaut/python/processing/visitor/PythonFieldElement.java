@@ -4,6 +4,8 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
+import io.micronaut.python.processing.util.GraalPyUtil;
+import org.graalvm.polyglot.Value;
 
 import java.util.Objects;
 
@@ -90,12 +92,12 @@ public final class PythonFieldElement extends AbstractPythonElement implements F
                 if (startIdx > 0 && endIdx > startIdx) {
                     String actualType = annotation.substring(startIdx + 1, endIdx).trim();
                     return environment.visitorContext().getClassElement(actualType).orElse(
-                        environment.visitorContext().getClassElement(Object.class).orElse(null)
+                        environment.visitorContext().getClassElement(Object.class).orElse(ClassElement.of(Object.class))
                     );
                 }
             }
             return environment.visitorContext().getClassElement(annotation).orElse(
-                environment.visitorContext().getClassElement(Object.class).orElse(null)
+                environment.visitorContext().getClassElement(Object.class).orElse(ClassElement.of(Object.class))
             );
         }
         // Infer from value if no annotation
@@ -105,22 +107,27 @@ public final class PythonFieldElement extends AbstractPythonElement implements F
         return environment.visitorContext().getClassElement(Object.class).orElse(null);
     }
 
-    private ClassElement inferTypeFromValue(Object value) {
-        if (value instanceof Integer) {
+    private ClassElement inferTypeFromValue(Value value) {
+        if (value == null) {
+            return environment.visitorContext().getClassElement(Object.class).orElse(null);
+        }
+        Object javaValue = GraalPyUtil.convertValueToJava(value);
+        if (javaValue instanceof Integer) {
             return environment.visitorContext().getClassElement(int.class).orElse(null);
-        } else if (value instanceof Double || value instanceof Float) {
+        } else if (javaValue instanceof Double || javaValue instanceof Float) {
             return environment.visitorContext().getClassElement(double.class).orElse(null);
-        } else if (value instanceof String) {
+        } else if (javaValue instanceof String) {
             return environment.visitorContext().getClassElement(String.class).orElse(null);
-        } else if (value instanceof Boolean) {
+        } else if (javaValue instanceof Boolean) {
             return environment.visitorContext().getClassElement(boolean.class).orElse(null);
         }
         return environment.visitorContext().getClassElement(Object.class).orElse(null);
     }
 
-    private Object convertPythonValueToJava(Object pythonValue) {
-        // For now, return the value as-is if it's already a Java-compatible type
-        // In a full implementation, this would handle Python-specific types
-        return pythonValue;
+    private Object convertPythonValueToJava(Value pythonValue) {
+        if (pythonValue == null) {
+            return null;
+        }
+        return GraalPyUtil.convertValueToJava(pythonValue);
     }
 }

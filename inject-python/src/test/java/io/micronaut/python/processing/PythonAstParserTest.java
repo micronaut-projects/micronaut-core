@@ -18,42 +18,41 @@ public class PythonAstParserTest {
 
     @Test
     void testParse() {
-        PythonEnvironment environment = buildEnv();
+        try (PythonEnvironment environment = buildEnv()) {
+            ClassDef myClass = environment.classes().get("MyClass");
 
-        ClassDef myClass = environment.classes().get("MyClass");
+            assertNotNull(myClass);
+            assertEquals(1, myClass.functions().size());
+            assertEquals("f", myClass.functions().get(0).name());
 
-        assertNotNull(myClass);
-        assertEquals(1, myClass.functions().size());
-        assertEquals("f", myClass.functions().get(0).name());
+            assertEquals(3, environment.decorators().size());
 
-        assertEquals(3, environment.decorators().size());
-
-        assertTrue(environment.decorators().containsKey(Singleton.class.getName()));
-        assertTrue(environment.decorators().containsKey(Scope.class.getName()));
-        assertTrue(environment.decorators().containsKey(Named.class.getName()));
+            assertTrue(environment.decorators().containsKey(Singleton.class.getName()));
+            assertTrue(environment.decorators().containsKey(Scope.class.getName()));
+            assertTrue(environment.decorators().containsKey(Named.class.getName()));
+        }
     }
 
     @Test
     void testProcessingEnvironment() {
-        PythonEnvironment environment = buildEnv();
+        try (PythonEnvironment environment = buildEnv();
+             PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment)) {
 
-        PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment);
+            Map<String, PythonClassElement> classes = processingEnvironment.classes();
+            assertNotNull(classes);
+            assertEquals(1, classes.size());
 
+            PythonClassElement myClass = classes.get("MyClass");
 
-        Map<String, PythonClassElement> classes = processingEnvironment.classes();
-        assertNotNull(classes);
-        assertEquals(1, classes.size());
-
-        PythonClassElement myClass = classes.get("MyClass");
-
-        assertNotNull(myClass);
-        assertEquals("MyClass", myClass.getName());
+            assertNotNull(myClass);
+            assertEquals("MyClass", myClass.getName());
+        }
     }
 
     @Test
     void testAttributeParsing() {
         PythonAstParser pythonProcessor = new PythonAstParser();
-        PythonEnvironment environment = pythonProcessor.parse("""
+        try (PythonEnvironment environment = pythonProcessor.parse("""
             from typing import Final, Annotated
 
             class TestClass:
@@ -83,55 +82,58 @@ public class PythonAstParserTest {
 
                 def regular_method(self):
                     pass
-            """);
+            """)) {
 
-        // Verify parsing completes successfully
-        assertNotNull(environment);
-        assertEquals(1, environment.classes().size());
+            // Verify parsing completes successfully
+            assertNotNull(environment);
+            assertEquals(1, environment.classes().size());
 
-        ClassDef testClass = environment.classes().get("TestClass");
-        assertNotNull(testClass);
-        assertEquals("TestClass", testClass.name());
+            ClassDef testClass = environment.classes().get("TestClass");
+            assertNotNull(testClass);
+            assertEquals("TestClass", testClass.name());
 
-        // Verify attributes are parsed and stored
-        assertEquals(5, testClass.attributes().size(), "Should parse 5 class attributes");
+            // Verify attributes are parsed and stored
+            assertEquals(5, testClass.attributes().size(), "Should parse 5 class attributes");
 
-        // Check specific attributes
-        var simpleAttr = testClass.attributes().stream()
-            .filter(attr -> "simple_attr".equals(attr.name()))
-            .findFirst();
-        assertTrue(simpleAttr.isPresent(), "simple_attr should be parsed");
-        assertEquals(42, simpleAttr.get().value(), "simple_attr should have value 42");
-        assertNull(simpleAttr.get().annotation(), "simple_attr should have no annotation");
+            // Check specific attributes
+            var simpleAttr = testClass.attributes().stream()
+                .filter(attr -> "simple_attr".equals(attr.name()))
+                .findFirst();
+            assertTrue(simpleAttr.isPresent(), "simple_attr should be parsed");
+            assertEquals(42, simpleAttr.get().value().asInt(), "simple_attr should have value 42");
+            assertNull(simpleAttr.get().annotation(), "simple_attr should have no annotation");
 
-        var nameAttr = testClass.attributes().stream()
-            .filter(attr -> "name".equals(attr.name()))
-            .findFirst();
-        assertTrue(nameAttr.isPresent(), "name attribute should be parsed");
-        assertEquals("test", nameAttr.get().value(), "name should have value 'test'");
+            var nameAttr = testClass.attributes().stream()
+                .filter(attr -> "name".equals(attr.name()))
+                .findFirst();
+            assertTrue(nameAttr.isPresent(), "name attribute should be parsed");
+            assertEquals("test", nameAttr.get().value().asString(), "name should have value 'test'");
 
-        var annotatedAttr = testClass.attributes().stream()
-            .filter(attr -> "annotated_attr".equals(attr.name()))
-            .findFirst();
-        assertTrue(annotatedAttr.isPresent(), "annotated_attr should be parsed");
-        assertEquals("int", annotatedAttr.get().annotation(), "annotated_attr should have int annotation");
-        assertEquals(100, annotatedAttr.get().value(), "annotated_attr should have value 100");
+            var annotatedAttr = testClass.attributes().stream()
+                .filter(attr -> "annotated_attr".equals(attr.name()))
+                .findFirst();
+            assertTrue(annotatedAttr.isPresent(), "annotated_attr should be parsed");
+            assertEquals("int", annotatedAttr.get().annotation(), "annotated_attr should have int annotation");
+            assertEquals(100, annotatedAttr.get().value().asInt(), "annotated_attr should have value 100");
 
-        var finalAttr = testClass.attributes().stream()
-            .filter(attr -> "final_attr".equals(attr.name()))
-            .findFirst();
-        assertTrue(finalAttr.isPresent(), "final_attr should be parsed");
-        assertTrue(finalAttr.get().annotation().contains("Final"), "final_attr should have Final annotation");
+            var finalAttr = testClass.attributes().stream()
+                .filter(attr -> "final_attr".equals(attr.name()))
+                .findFirst();
+            assertTrue(finalAttr.isPresent(), "final_attr should be parsed");
+            assertTrue(finalAttr.get().annotation().contains("Final"), "final_attr should have Final annotation");
+            assertEquals(200, finalAttr.get().value().asInt(), "final_attr should have value 200");
 
-        var complexAttr = testClass.attributes().stream()
-            .filter(attr -> "complex_attr".equals(attr.name()))
-            .findFirst();
-        assertTrue(complexAttr.isPresent(), "complex_attr should be parsed");
-        assertTrue(complexAttr.get().annotation().contains("Annotated"), "complex_attr should have Annotated annotation");
+            var complexAttr = testClass.attributes().stream()
+                .filter(attr -> "complex_attr".equals(attr.name()))
+                .findFirst();
+            assertTrue(complexAttr.isPresent(), "complex_attr should be parsed");
+            assertTrue(complexAttr.get().annotation().contains("Annotated"), "complex_attr should have Annotated annotation");
+            assertEquals("value", complexAttr.get().value().asString(), "complex_attr should have value 'value'");
 
-        // Should still parse the regular method (properties are ignored)
-        assertEquals(1, testClass.functions().size());
-        assertEquals("regular_method", testClass.functions().get(0).name());
+            // Should still parse the regular method (properties are ignored)
+            assertEquals(1, testClass.functions().size());
+            assertEquals("regular_method", testClass.functions().get(0).name());
+        }
     }
 
     private static PythonEnvironment buildEnv() {

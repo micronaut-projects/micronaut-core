@@ -3,6 +3,7 @@ package io.micronaut.python.processing.annotation;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.visitor.VisitorContext;
+import io.micronaut.python.processing.util.GraalPyUtil;
 import io.micronaut.python.processing.visitor.AnnotationMemberDef;
 import io.micronaut.python.processing.visitor.ClassDef;
 import io.micronaut.python.processing.visitor.ElementDef;
@@ -129,27 +130,7 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
         String memberName,
         Object annotationValue) {
         if (annotationValue instanceof Value value) {
-            if (value.isBoolean()) {
-                return value.asBoolean();
-            } else if (value.isNumber()) {
-                if (value.fitsInByte()) {
-                    return value.asByte();
-                } else if (value.fitsInShort()) {
-                    return value.asShort();
-                } else if (value.fitsInInt()) {
-                    return value.asInt();
-                } else if (value.fitsInLong()) {
-                    return value.asLong();
-                } else if (value.fitsInFloat()) {
-                    return value.asFloat();
-                } else if (value.fitsInDouble()) {
-                    return value.asDouble();
-                } else {
-                    return value.asString();
-                }
-            } else if (value.isString()) {
-                return value.asString();
-            }
+            return GraalPyUtil.convertValueToJava(value);
         }
         return annotationValue;
     }
