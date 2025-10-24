@@ -17,7 +17,7 @@ public sealed abstract class AbstractPythonClassElement extends AbstractPythonEl
 
     protected AbstractPythonClassElement(ClassDef classDef, PythonProcessingEnvironment environment, int arrayDimensions) {
         super(
-            classDef.name(),
+            classDef.packageName().isEmpty() ? classDef.name() : classDef.packageName() + "." + classDef.name(),
             classDef,
             environment.metadataFactory()
         );

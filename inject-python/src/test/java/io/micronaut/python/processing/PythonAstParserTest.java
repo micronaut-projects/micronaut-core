@@ -426,6 +426,40 @@ public class PythonAstParserTest {
         }
     }
 
+    @Test
+    void testPackageTranslation() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        try (PythonEnvironment environment = pythonProcessor.parse("""
+            class TestClass:
+                def method(self):
+                    pass
+            """, "com.example.mypackage")) {
+
+            try (PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment)) {
+                // Verify parsing completes successfully
+                assertNotNull(environment);
+                assertEquals(1, environment.classes().size());
+
+                ClassDef testClassDef = environment.classes().get("TestClass");
+                assertNotNull(testClassDef);
+                assertEquals("TestClass", testClassDef.name());
+                assertEquals("com.example.mypackage", testClassDef.packageName());
+
+                // Test that processing environment creates PythonClassElement with correct package
+                Map<String, ClassElement> classes = processingEnvironment.classes();
+                assertEquals(1, classes.size());
+
+                ClassElement classElement = classes.get("TestClass");
+                assertNotNull(classElement);
+                assertTrue(classElement instanceof PythonClassElement, "Should be PythonClassElement");
+
+                PythonClassElement pythonClass = (PythonClassElement) classElement;
+                assertEquals("com.example.mypackage.TestClass", pythonClass.getName(), "Full qualified name should include package");
+                assertEquals("com.example.mypackage", pythonClass.getPackageName(), "Package name should be correctly translated");
+            }
+        }
+    }
+
     private static PythonEnvironment buildEnv() {
         PythonAstParser pythonProcessor = new PythonAstParser();
         PythonEnvironment environment = pythonProcessor.parse("""

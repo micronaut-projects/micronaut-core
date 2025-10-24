@@ -11,6 +11,7 @@ import java.util.Objects;
  * </p>
  *
  * @param name The name of the class.
+ * @param packageName The package name of the class.
  * @param bases The base class names.
  * @param decorators The decorators.
  * @param typeParams The type parameters.
@@ -23,6 +24,7 @@ import java.util.Objects;
  */
 public record ClassDef(
     String name,
+    String packageName,
     List<String> bases,
     List<DecoratorDef> decorators,
     List<TypeVar> typeParams,
@@ -34,15 +36,15 @@ public record ClassDef(
 ) implements ElementDef {
 
     public ClassDef(String name) {
-        this(name, List.of(), List.of(), List.of(), List.of(), List.of(), null, false, List.of());
+        this(name, "", List.of(), List.of(), List.of(), List.of(), List.of(), null, false, List.of());
     }
 
     public ClassDef(String name, List<DecoratorDef> decoratorList) {
-        this(name, List.of(), decoratorList, List.of(), List.of(), List.of(), null, false, List.of());
+        this(name, "", List.of(), decoratorList, List.of(), List.of(), List.of(), null, false, List.of());
     }
 
     public ClassDef withConstructor(FunctionDef constructor) {
-        return new ClassDef(name, bases, decorators, typeParams, functions, attributes, constructor, isEnum, values);
+        return new ClassDef(name, packageName, bases, decorators, typeParams, functions, attributes, constructor, isEnum, values);
     }
 
     public ClassDef {
@@ -74,17 +76,17 @@ public record ClassDef(
         Objects.requireNonNull(function, "Function cannot be null");
         List<FunctionDef> functions = new ArrayList<>(this.functions);
         functions.add(function);
-        return new ClassDef(name, bases, decorators, typeParams, functions, attributes, constructor, isEnum, values);
+        return new ClassDef(name, packageName, bases, decorators, typeParams, functions, attributes, constructor, isEnum, values);
     }
 
     public ClassDef withAttribute(AttributeDef attribute) {
         Objects.requireNonNull(attribute, "Attribute cannot be null");
         List<AttributeDef> attributes = new ArrayList<>(this.attributes);
         attributes.add(attribute);
-        return new ClassDef(name, bases, decorators, typeParams, functions, attributes, constructor, isEnum, values);
+        return new ClassDef(name, packageName, bases, decorators, typeParams, functions, attributes, constructor, isEnum, values);
     }
 
     public ClassDef withEnum(boolean isEnum, List<String> values) {
-        return new ClassDef(name, bases, decorators, typeParams, functions, attributes, constructor, isEnum, values != null ? values : List.of());
+        return new ClassDef(name, packageName, bases, decorators, typeParams, functions, attributes, constructor, isEnum, values);
     }
 }
