@@ -6,6 +6,8 @@ JavaClassDef = java.type("io.micronaut.python.processing.visitor.ClassDef")
 JavaFuncDef = java.type("io.micronaut.python.processing.visitor.FunctionDef")
 JavaAttributeDef = java.type("io.micronaut.python.processing.visitor.AttributeDef")
 DecoratorDef = java.type("io.micronaut.python.processing.visitor.DecoratorDef")
+ArgumentsDef = java.type("io.micronaut.python.processing.visitor.ArgumentsDef")
+ArgumentDef = java.type("io.micronaut.python.processing.visitor.ArgumentDef")
 
 class PrintNodeVisitor(ast.NodeVisitor):
 
@@ -67,10 +69,6 @@ class PrintNodeVisitor(ast.NodeVisitor):
                     self.callback.apply(decorator_def)
                     return node
                 else:
-                    # Skip __init__ method (constructor)
-                    if node.name == "__init__":
-                        return super().visit(node)
-
                     decorators = [
                         decorator_to_function(self, d)
                         for d in node.decorator_list
@@ -78,12 +76,16 @@ class PrintNodeVisitor(ast.NodeVisitor):
                     ]
 
                     # Parse function arguments and return type
-                    arg_names, arg_types = parse_function_arguments(node)
+                    arguments = parse_function_arguments(node)
                     return_type_annotation = parse_function_return_type(node)
 
-                    func_def = JavaFuncDef(node.name, arg_names, arg_types, decorators, return_type_annotation)
+                    func_def = JavaFuncDef(node.name, arguments, decorators, return_type_annotation)
                     if self.current_class is not None:
-                        self.current_class = self.current_class.withFunction(func_def)
+                        if node.name == "__init__":
+                            # Set as constructor
+                            self.current_class = self.current_class.withConstructor(func_def)
+                        else:
+                            self.current_class = self.current_class.withFunction(func_def)
                     return super().visit(node)
             case ast.Assign():
                 # Handle class attribute assignments
@@ -359,38 +361,48 @@ def get_micronaut_annotation_name_value(funcdef):
 
 def parse_function_arguments(func_node):
     """
-    Parse the arguments of an ast.FunctionDef node and return lists of names and types.
+    Parse the arguments of an ast.FunctionDef node and return ArgumentsDef.
     """
-    arg_names = []
-    arg_types = []
+    args_list = func_node.args.args
+    defaults = func_node.args.defaults
 
-    # Handle regular arguments
-    if hasattr(func_node.args, 'args'):
-        args_list = func_node.args.args
+    # Only the last len(defaults) arguments have defaults
+    num_no_defaults = len(args_list) - len(defaults)
+    default_values = [None] * num_no_defaults + defaults
 
-        # Skip 'self' parameter for instance methods (methods inside classes)
-        # Check if this is an instance method by looking for a 'self' parameter
-        skip_self = (len(args_list) > 0 and args_list[0].arg == 'self')
+    # Skip 'self' parameter for instance methods (methods inside classes)
+    # Check if this is an instance method by looking for a 'self' parameter
+    skip_self = (len(args_list) > 0 and args_list[0].arg == 'self')
 
-        for arg in args_list:
-            arg_name = arg.arg
+    arguments = []
+    for i, arg in enumerate(args_list):
+        arg_name = arg.arg
 
-            # Skip self parameter for instance methods
-            if skip_self and arg_name == 'self':
-                continue
+        # Skip self parameter for instance methods
+        if skip_self and arg_name == 'self':
+            continue
 
-            arg_names.append(arg_name)
+        # Extract type annotation if present
+        type_annotation = ""
+        if hasattr(arg, 'annotation') and arg.annotation is not None:
+            try:
+                type_annotation = ast.unparse(arg.annotation)
+            except AttributeError:
+                type_annotation = ast.dump(arg.annotation)
 
-            # Extract type annotation if present
-            type_annotation = ""
-            if hasattr(arg, 'annotation') and arg.annotation is not None:
-                try:
-                    type_annotation = ast.unparse(arg.annotation)
-                except AttributeError:
-                    type_annotation = ast.dump(arg.annotation)
-            arg_types.append(type_annotation)
+        # Get default value
+        default_value = default_values[i]
+        if default_value is not None:
+            try:
+                # Try to evaluate the value
+                default_value = ast.literal_eval(default_value)
+            except Exception:
+                # For non-literal defaults, keep as is or dump
+                default_value = ast.dump(default_value)
 
-    return arg_names, arg_types
+        arguments.append(ArgumentDef.of(arg_name, type_annotation, default_value))
+
+    return ArgumentsDef.of(arguments)
 
 def parse_function_return_type(func_node):
     """
