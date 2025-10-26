@@ -58,6 +58,7 @@ import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.ClientAttributes;
 import io.micronaut.http.client.HttpClient;
+import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.HttpClientRegistry;
 import io.micronaut.http.client.ReactiveClientResultTransformer;
 import io.micronaut.http.client.StreamingHttpClient;
@@ -230,17 +231,18 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             request.getHeaders().remove(HttpHeaders.ACCEPT);
         }
 
+        HttpClientConfiguration config = httpClient.getConfiguration();
         if (HttpResponse.class.isAssignableFrom(javaReturnType)) {
             return handleBlockingCall(
-                clientName, javaReturnType, () ->
+                clientName, javaReturnType, config, () ->
                     blockingHttpClient.exchange(request,
                     returnType.asArgument().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT),
                     errorType
                 ));
         } else if (void.class == javaReturnType) {
-            return handleBlockingCall(clientName, javaReturnType, () -> blockingHttpClient.exchange(request, null, errorType));
+            return handleBlockingCall(clientName, javaReturnType, config, () -> blockingHttpClient.exchange(request, null, errorType));
         } else {
-            return handleBlockingCall(clientName, javaReturnType,
+            return handleBlockingCall(clientName, javaReturnType, config,
                 () -> blockingHttpClient.retrieve(request, returnType.asArgument(), errorType));
         }
     }
@@ -288,17 +290,20 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     LOG.debug("Client [{}] received HTTP error response: {}", declaringType.getName(), t.getMessage(), t);
                 }
 
-                if (t instanceof HttpClientResponseException e) {
-                    if (e.code() == HttpStatus.NOT_FOUND.getCode()) {
-                        if (reactiveValueType == Optional.class) {
-                            future.complete(Optional.empty());
-                        } else if (HttpResponse.class.isAssignableFrom(reactiveValueType)) {
-                            future.complete(e.getResponse());
-                        } else {
-                            future.complete(null);
-                        }
-                        return;
+                if (t instanceof HttpClientResponseException e && e.code() == HttpStatus.NOT_FOUND.getCode()) {
+                    HttpClientConfiguration config = httpClient.getConfiguration();
+                    if (config.isExceptionOn404Status()) {
+                        future.completeExceptionally(t);
                     }
+
+                    if (reactiveValueType == Optional.class) {
+                        future.complete(Optional.empty());
+                    } else if (HttpResponse.class.isAssignableFrom(reactiveValueType)) {
+                        future.complete(e.getResponse());
+                    } else {
+                        future.complete(null);
+                    }
+                    return;
                 }
 
                 future.completeExceptionally(t);
@@ -625,7 +630,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         }
     }
 
-    private Object handleBlockingCall(String clientName, Class returnType, Supplier<Object> supplier) {
+    private Object handleBlockingCall(String clientName, Class returnType, HttpClientConfiguration configuration, Supplier<Object> supplier) {
         try {
             if (void.class == returnType) {
                 supplier.get();
@@ -637,7 +642,20 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Client [{}] received HTTP error response: {}", clientName, t.getMessage(), t);
             }
-            throw t;
+            if (t instanceof HttpClientResponseException exception && exception.code() == HttpStatus.NOT_FOUND.getCode()) {
+                if (configuration.isExceptionOn404Status()) {
+                    throw t;
+                }
+
+                if (returnType == Optional.class) {
+                    return Optional.empty();
+                } else if (HttpResponse.class.isAssignableFrom(returnType)) {
+                    return exception.getResponse();
+                }
+                return null;
+            } else {
+                throw t;
+            }
         }
     }
 
