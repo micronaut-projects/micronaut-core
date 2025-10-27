@@ -154,28 +154,32 @@ public class DefaultLocalFunctionRegistry implements BeanDefinitionProcessor<Fun
     @Override
     public void process(BeanDefinition<?> beanDefinition, BeanContext beanContext) {
         for (ExecutableMethod<?, ?> executableMethod : beanDefinition.getExecutableMethods()) {
-            if (executableMethod.hasAnnotation(FunctionBean.class)) {
-                String functionId = executableMethod.stringValue(FunctionBean.class).orElse(null);
-                Class<?> declaringType = executableMethod.getDeclaringType();
-                if (StringUtils.isEmpty(functionId)) {
-                    String typeName = declaringType.getSimpleName();
-                    if (typeName.contains("$")) {
-                        // generated lambda
-                        functionId = NameUtils.hyphenate(executableMethod.getMethodName());
-                    } else {
-                        functionId = NameUtils.hyphenate(typeName);
-                    }
+            if (!executableMethod.hasAnnotation(FunctionBean.class)) {
+                continue;
+            }
+            String functionId = executableMethod.stringValue(FunctionBean.class).orElse(null);
+            Class<?> declaringType = executableMethod.getDeclaringType();
+            if (StringUtils.isEmpty(functionId)) {
+                String typeName = declaringType.getSimpleName();
+                if (typeName.contains("$")) {
+                    // generated lambda
+                    functionId = NameUtils.hyphenate(executableMethod.getMethodName());
+                } else {
+                    functionId = NameUtils.hyphenate(typeName);
                 }
-
-                if (Function.class.isAssignableFrom(declaringType) && executableMethod.getMethodName().equals("apply")) {
-                    registerFunction(executableMethod, functionId);
-                } else if (Consumer.class.isAssignableFrom(declaringType) && executableMethod.getMethodName().equals("accept")) {
-                    registerConsumer(executableMethod, functionId);
-                } else if (BiFunction.class.isAssignableFrom(declaringType) && executableMethod.getMethodName().equals("apply")) {
-                    registerBiFunction(executableMethod, functionId);
-                } else if (Supplier.class.isAssignableFrom(declaringType) && executableMethod.getMethodName().equals("get")) {
-                    registerSupplier(executableMethod, functionId);
-                }
+            }
+            String methodName = executableMethod.stringValue(FunctionBean.class, "method").orElse(null);
+            if (methodName != null && !methodName.equals(executableMethod.getMethodName())) {
+                continue;
+            }
+            if (Function.class.isAssignableFrom(declaringType) && executableMethod.getMethodName().equals("apply")) {
+                registerFunction(executableMethod, functionId);
+            } else if (Consumer.class.isAssignableFrom(declaringType) && executableMethod.getMethodName().equals("accept")) {
+                registerConsumer(executableMethod, functionId);
+            } else if (BiFunction.class.isAssignableFrom(declaringType) && executableMethod.getMethodName().equals("apply")) {
+                registerBiFunction(executableMethod, functionId);
+            } else if (Supplier.class.isAssignableFrom(declaringType) && executableMethod.getMethodName().equals("get")) {
+                registerSupplier(executableMethod, functionId);
             }
         }
     }
@@ -196,7 +200,6 @@ public class DefaultLocalFunctionRegistry implements BeanDefinitionProcessor<Fun
     }
 
     private void registerSupplier(ExecutableMethod<?, ?> method, String functionId) {
-
         suppliers.put(functionId, method);
     }
 
