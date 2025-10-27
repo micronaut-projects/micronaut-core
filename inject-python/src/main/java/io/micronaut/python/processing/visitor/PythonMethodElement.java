@@ -38,7 +38,7 @@ import io.micronaut.python.processing.util.GraalPyUtil;
  * @see FunctionDef
  * @see <a href="https://docs.python.org/3/library/ast.html#ast.FunctionDef">Python AST FunctionDef</a>
  */
-public final class PythonMethodElement extends AbstractPythonElement implements MethodElement {
+public sealed class PythonMethodElement extends AbstractPythonElement implements MethodElement permits PythonConstructorElement {
     private final PythonProcessingEnvironment environment;
     private final AbstractPythonClassElement declaringType;
     private final AbstractPythonClassElement owningType;

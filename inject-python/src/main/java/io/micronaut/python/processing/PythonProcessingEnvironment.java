@@ -65,8 +65,9 @@ public record PythonProcessingEnvironment(
         Objects.requireNonNull(environment, "Python environment cannot be null");
 
         if (visitorContext == null) {
-            visitorContext = new PythonVisitorContext(environment.decorators());
+            visitorContext = new PythonVisitorContext(environment.decorators(), this);
         }
+
         if (annotationMetadataBuilder == null) {
             annotationMetadataBuilder = visitorContext.getAnnotationMetadataBuilder();
         }
