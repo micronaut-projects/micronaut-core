@@ -40,8 +40,8 @@ import io.micronaut.python.processing.util.GraalPyUtil;
  */
 public final class PythonMethodElement extends AbstractPythonElement implements MethodElement {
     private final PythonProcessingEnvironment environment;
-    private final PythonClassElement declaringType;
-    private final PythonClassElement owningType;
+    private final AbstractPythonClassElement declaringType;
+    private final AbstractPythonClassElement owningType;
     private final ClassElement returnType;
     private final ParameterElement[] parameters;
 
@@ -57,8 +57,8 @@ public final class PythonMethodElement extends AbstractPythonElement implements 
      */
     public PythonMethodElement(FunctionDef functionDef,
                                PythonProcessingEnvironment environment,
-                               PythonClassElement declaringType,
-                               PythonClassElement owningType,
+                               AbstractPythonClassElement declaringType,
+                               AbstractPythonClassElement owningType,
                                ElementAnnotationMetadataFactory metadataFactory) {
         super(Objects.requireNonNull(functionDef, "FunctionDef cannot be null").name(), functionDef, metadataFactory);
         this.environment = Objects.requireNonNull(environment, "PythonProcessingEnvironment cannot be null");

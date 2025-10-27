@@ -33,14 +33,14 @@ import io.micronaut.python.processing.util.GraalPyUtil;
  */
 public final class PythonFieldElement extends AbstractPythonElement implements FieldElement {
     private final PythonProcessingEnvironment environment;
-    private final PythonClassElement declaringType;
-    private final PythonClassElement owningType;
+    private final AbstractPythonClassElement declaringType;
+    private final AbstractPythonClassElement owningType;
     private final ClassElement type;
 
     public PythonFieldElement(AttributeDef attributeDef,
                               PythonProcessingEnvironment environment,
-                              PythonClassElement declaringType,
-                              PythonClassElement owningType,
+                              AbstractPythonClassElement declaringType,
+                              AbstractPythonClassElement owningType,
                               ElementAnnotationMetadataFactory metadataFactory) {
         super(
             Objects.requireNonNull(attributeDef, "AttributeDef cannot be null").name(),
