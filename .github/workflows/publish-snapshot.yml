@@ -10,6 +10,11 @@ jobs:
     if: github.repository != 'micronaut-projects/micronaut-project-template'
     runs-on: ubuntu-latest
     steps:
+      - name: Remove system JDKs
+        run: |
+          sudo rm -rf /usr/lib/jvm/*
+          unset JAVA_HOME
+          export PATH=$(echo "$PATH" | tr ':' '\n' | grep -v '/usr/lib/jvm' | paste -sd:)
       - uses: actions/checkout@v5
       - uses: actions/cache@v4
         with:
@@ -22,8 +27,8 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: |
-            17
             21
+            25
       - name: Publish to Sonatype Snapshots
         if: success()
         env:
