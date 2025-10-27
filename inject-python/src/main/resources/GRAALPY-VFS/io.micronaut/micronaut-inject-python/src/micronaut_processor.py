@@ -563,6 +563,127 @@ def get_micronaut_annotation_name_value(funcdef):
             return None
     return None
 
+def _parse_annotated_type_static(annotation_node):
+    """
+    Parse a typing.Annotated type annotation and extract the actual type and metadata decorators.
+    Returns (type_annotation, decorators_list)
+    Static version that can be called from functions.
+    """
+    decorators = []
+
+    # Parse the Annotated subscript arguments
+    if isinstance(annotation_node, ast.Subscript):
+        # Check if it's Annotated[...]
+        if isinstance(annotation_node.value, ast.Name) and annotation_node.value.id == 'Annotated':
+            # Extract from AST nodes
+            args = _extract_subscript_args_static(annotation_node)
+            if args:
+                try:
+                    type_annotation = _extract_type_name_static(args[0])
+                except Exception as e:
+                    type_annotation = "object"  # fallback
+                # Remaining args are metadata
+                for metadata in args[1:]:
+                    if isinstance(metadata, ast.Call):
+                        decorator = _parse_metadata_call_static(metadata)
+                        if decorator:
+                            decorators.append(decorator)
+                    # For non-call metadata, we could handle strings or other literals
+                    # but for now, focus on calls like Gt(0)
+                # Successfully parsed, return now
+                return type_annotation, decorators
+            else:
+                # Fallback to original annotation
+                try:
+                    type_annotation = ast.unparse(annotation_node) if hasattr(ast, 'unparse') else ast.dump(annotation_node)
+                except:
+                    type_annotation = "object"
+                return type_annotation, decorators
+
+    # Fallback to original annotation
+    try:
+        type_annotation = ast.unparse(annotation_node) if hasattr(ast, 'unparse') else ast.dump(annotation_node)
+    except:
+        type_annotation = "object"
+
+    return type_annotation, decorators
+
+def _extract_subscript_args_static(subscript_node):
+    """
+    Extract arguments from a subscript AST node.
+    Static version.
+    """
+    args = []
+    slice_node = subscript_node.slice
+
+    # Handle different slice formats
+    if isinstance(slice_node, ast.Index):  # Python < 3.9
+        slice_node = slice_node.value
+
+    if isinstance(slice_node, ast.Tuple):
+        args = slice_node.elts
+    elif slice_node:  # Single argument
+        args = [slice_node]
+
+    return args
+
+def _extract_type_name_static(type_node):
+    """
+    Extract a type name from an AST type node.
+    Static version.
+    """
+    if isinstance(type_node, ast.Name):
+        return type_node.id
+    elif isinstance(type_node, ast.Attribute):
+        # Handle qualified names like typing.List
+        names = []
+        current = type_node
+        while isinstance(current, ast.Attribute):
+            names.insert(0, current.attr)
+            current = current.value
+        if isinstance(current, ast.Name):
+            names.insert(0, current.id)
+        return '.'.join(names)
+    elif hasattr(ast, 'unparse'):
+        return ast.unparse(type_node)
+    else:
+        return ast.dump(type_node)
+
+def _parse_metadata_call_static(call_node):
+    """
+    Parse a metadata call like Gt(0) into a DecoratorDef.
+    Static version.
+    """
+    if isinstance(call_node, ast.Call) and isinstance(call_node.func, ast.Name):
+        decorator_name = call_node.func.id
+        # Extract arguments
+        members = {}
+        for i, arg in enumerate(call_node.args):
+            try:
+                value = ast.literal_eval(arg)
+                # For positional args, use generic names or indices
+                # For validation constraints, typically the first arg is the value
+                if i == 0:
+                    members['value'] = value
+                else:
+                    members[f'arg{i}'] = value
+            except:
+                members[f'arg{i}'] = ast.dump(arg) if hasattr(ast, 'dump') else str(arg)
+
+        # For keyword args
+        for kw in call_node.keywords:
+            if kw.arg:
+                try:
+                    value = ast.literal_eval(kw.value)
+                    members[kw.arg] = value
+                except:
+                    members[kw.arg] = ast.dump(kw.value) if hasattr(ast, 'dump') else str(kw.value)
+
+        # Create DecoratorDef with annotationName = name (assuming it's a Micronaut annotation)
+        return DecoratorDef(decorator_name, decorator_name, members, [])
+
+    return None
+
 def parse_function_arguments(func_node):
     """
     Parse the arguments of an ast.FunctionDef node and return ArgumentsDef.
@@ -590,12 +711,23 @@ def parse_function_arguments(func_node):
             continue
 
         # Extract type annotation if present
+        annotation = ""
         type_annotation = ""
+        decorators = []
         if hasattr(arg, 'annotation') and arg.annotation is not None:
             try:
-                type_annotation = ast.unparse(arg.annotation)
+                annotation = ast.unparse(arg.annotation)
             except AttributeError:
-                type_annotation = ast.dump(arg.annotation)
+                annotation = ast.dump(arg.annotation)
+
+            # Check for typing.Annotated and extract decorators from metadata
+            if isinstance(arg.annotation, ast.Subscript) and isinstance(arg.annotation.value, ast.Name) and arg.annotation.value.id == 'Annotated':
+                parsed_type, parsed_decorators = _parse_annotated_type_static(arg.annotation)
+                type_annotation = parsed_type   # Use extracted type for typeAnnotation
+                decorators = parsed_decorators  # Add any decorators found
+            else:
+                type_annotation = annotation  # Not Annotated, use full annotation
+
 
         # Get default value
         default_value = default_values[i]
@@ -610,7 +742,7 @@ def parse_function_arguments(func_node):
         # Get parameter documentation
         param_doc = param_docs.get(arg_name, None)
 
-        arguments.append(ArgumentDef.of(arg_name, type_annotation, default_value, param_doc))
+        arguments.append(ArgumentDef.of(arg_name, annotation, type_annotation, default_value, decorators, param_doc))
 
     return ArgumentsDef.of(arguments)
 

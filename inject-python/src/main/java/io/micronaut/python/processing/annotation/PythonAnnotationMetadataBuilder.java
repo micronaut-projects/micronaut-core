@@ -22,7 +22,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import io.micronaut.python.processing.visitor.AttributeDef;
 import org.graalvm.polyglot.Value;
 
 import io.micronaut.core.annotation.AnnotationValue;
@@ -30,6 +29,7 @@ import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.processing.util.GraalPyUtil;
 import io.micronaut.python.processing.visitor.AnnotationMemberDef;
+import io.micronaut.python.processing.visitor.AttributeDef;
 import io.micronaut.python.processing.visitor.ClassDef;
 import io.micronaut.python.processing.visitor.DecoratorDef;
 import io.micronaut.python.processing.visitor.ElementDef;
@@ -113,6 +113,8 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
             return List.of(functionDef);
         } else if (element instanceof AttributeDef attributeDef) {
             return List.of(attributeDef);
+        } else if (element instanceof io.micronaut.python.processing.visitor.ArgumentDef argumentDef) {
+            return List.of(argumentDef);
         }
         return List.of();
     }

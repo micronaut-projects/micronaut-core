@@ -15,28 +15,45 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import java.util.List;
+import java.util.Objects;
+
 /**
  * An ArgumentDef represents a single function parameter definition.
  * <p>
  * This record captures the details of a Python function argument including its name,
- * type annotation, default value, and documentation.
+ * type annotation, default value, decorators, and documentation.
  * </p>
  *
  * @param name The parameter name.
- * @param typeAnnotation The type annotation string (e.g., "int", "str", "List[str]").
+ * @param annotation The full type annotation string.
+ * @param typeAnnotation The extracted type name (e.g., "int" from "Annotated[int, Gt(0)]").
  * @param defaultValue The default value as a GraalPy Value, or null if no default.
+ * @param decorators The decorators applied to this parameter.
  * @param documentation The parameter documentation string.
  * @author Micronaut Team
  * @since 5.0.0
  */
 public record ArgumentDef(
     String name,
+    String annotation,
     String typeAnnotation,
     Object defaultValue,
+    List<DecoratorDef> decorators,
     String documentation
-) {
+) implements ElementDef {
+
     public ArgumentDef(String name, String typeAnnotation) {
-        this(name, typeAnnotation, null, null);
+        this(name, typeAnnotation, typeAnnotation, null, List.of(), null);
+    }
+
+    public ArgumentDef(String name, String annotation, String typeAnnotation, Object defaultValue, List<DecoratorDef> decorators, String documentation) {
+        this.name = Objects.requireNonNull(name, "Argument name cannot be null");
+        this.annotation = annotation;
+        this.typeAnnotation = typeAnnotation;
+        this.defaultValue = defaultValue;
+        this.decorators = decorators != null ? decorators : List.of();
+        this.documentation = documentation;
     }
 
     /**
@@ -47,7 +64,7 @@ public record ArgumentDef(
      * @return A new ArgumentDef
      */
     public static ArgumentDef of(String name, String typeAnnotation) {
-        return new ArgumentDef(name, typeAnnotation, null, null);
+        return new ArgumentDef(name, typeAnnotation, typeAnnotation, null, List.of(), null);
     }
 
     /**
@@ -57,7 +74,7 @@ public record ArgumentDef(
      * @return A new ArgumentDef
      */
     public static ArgumentDef of(String name) {
-        return new ArgumentDef(name, null, null, null);
+        return new ArgumentDef(name, null, null, null, List.of(), null);
     }
 
     /**
@@ -69,7 +86,7 @@ public record ArgumentDef(
      * @return A new ArgumentDef
      */
     public static ArgumentDef of(String name, String typeAnnotation, Object defaultValue) {
-        return new ArgumentDef(name, typeAnnotation, defaultValue, null);
+        return new ArgumentDef(name, typeAnnotation, typeAnnotation, defaultValue, List.of(), null);
     }
 
     /**
@@ -82,6 +99,21 @@ public record ArgumentDef(
      * @return A new ArgumentDef
      */
     public static ArgumentDef of(String name, String typeAnnotation, Object defaultValue, String documentation) {
-        return new ArgumentDef(name, typeAnnotation, defaultValue, documentation);
+        return new ArgumentDef(name, typeAnnotation, typeAnnotation, defaultValue, List.of(), documentation);
+    }
+
+    /**
+     * Creates an argument definition with annotation, type, decorators, and documentation.
+     *
+     * @param name The parameter name
+     * @param annotation The full annotation string (nullable)
+     * @param typeAnnotation The extracted type annotation (nullable)
+     * @param defaultValue The default value (nullable)
+     * @param decorators The decorators (nullable)
+     * @param documentation The parameter documentation (nullable)
+     * @return A new ArgumentDef
+     */
+    public static ArgumentDef of(String name, String annotation, String typeAnnotation, Object defaultValue, List<DecoratorDef> decorators, String documentation) {
+        return new ArgumentDef(name, annotation, typeAnnotation, defaultValue, decorators, documentation);
     }
 }

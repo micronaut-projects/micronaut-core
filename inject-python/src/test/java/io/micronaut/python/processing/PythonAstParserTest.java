@@ -26,6 +26,7 @@ import io.micronaut.python.processing.visitor.PythonClassElement;
 import io.micronaut.python.processing.visitor.PythonEnumElement;
 import io.micronaut.python.processing.visitor.PythonFieldElement;
 import io.micronaut.python.processing.visitor.PythonMethodElement;
+import io.micronaut.python.processing.visitor.PythonParameterElement;
 import jakarta.inject.Named;
 import jakarta.inject.Scope;
 import jakarta.inject.Singleton;
@@ -997,6 +998,153 @@ public class PythonAstParserTest {
                 var maxValue = countAnnotationMetadata.intValue("Max", "value");
                 assertTrue(maxValue.isPresent(), "Max annotation should have value");
                 assertEquals(100, maxValue.getAsInt(), "Max annotation should have value 100");
+            }
+        }
+    }
+
+    @Test
+    void testAnnotatedFunctionArgumentParsing() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        try (PythonEnvironment environment = pythonProcessor.parse("""
+            from typing import Annotated
+
+            class FruitService:
+                def process_fruit(self, name: str, weight: Annotated[float, Gt(0)], count: Annotated[int, Min(1), Max(100)] = 10) -> str:
+                    return f"Processed {count} {name}(s) with total weight {weight}"
+
+            # Define Gt, Min, Max as micronaut annotations for testing
+            @micronaut_annotation("Gt")
+            def Gt(value):
+                return lambda: None
+
+            @micronaut_annotation("Min")
+            def Min(value):
+                return lambda: None
+
+            @micronaut_annotation("Max")
+            def Max(value):
+                return lambda: None
+
+            def micronaut_annotation(name):
+                return lambda func: func
+            """)) {
+
+            try (PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment)) {
+                // Verify parsing completes successfully
+                assertNotNull(environment);
+                assertEquals(1, environment.classes().size());
+
+                ClassDef fruitServiceClass = environment.classes().get("FruitService");
+                assertNotNull(fruitServiceClass);
+                assertEquals("FruitService", fruitServiceClass.name());
+
+                // Verify function is parsed
+                assertEquals(1, fruitServiceClass.functions().size());
+                FunctionDef processFruit = fruitServiceClass.functions().get(0);
+                assertEquals("process_fruit", processFruit.name());
+
+                // Verify function arguments
+                ArgumentsDef args = processFruit.arguments();
+                assertNotNull(args);
+                assertEquals(3, args.arguments().size(), "Should have 3 arguments");
+
+                // Check name argument - simple type
+                ArgumentDef nameArg = args.arguments().get(0);
+                assertEquals("name", nameArg.name());
+                assertEquals("str", nameArg.annotation());
+                assertEquals("str", nameArg.typeAnnotation());
+                assertEquals(0, nameArg.decorators().size(), "name should have no decorators");
+
+                // Check weight argument - should have full Annotated type and Gt decorator
+                ArgumentDef weightArg = args.arguments().get(1);
+                assertEquals("weight", weightArg.name());
+                assertEquals("Annotated[float, Gt(0)]", weightArg.annotation(), "weight should have full annotation string");
+                assertEquals("float", weightArg.typeAnnotation(), "weight should have extracted float type");
+
+                // Check that weight has Gt decorator
+                List<DecoratorDef> weightDecorators = weightArg.decorators();
+                assertEquals(1, weightDecorators.size(), "weight should have 1 decorator");
+                DecoratorDef gtDecorator = weightDecorators.get(0);
+                assertEquals("Gt", gtDecorator.name(), "decorator should be Gt");
+                assertEquals("Gt", gtDecorator.annotationName(), "annotation name should be Gt");
+                assertTrue(gtDecorator.members().containsKey("value"), "Gt should have value member");
+                var gtMemberValue = gtDecorator.members().get("value");
+                assertTrue(gtMemberValue instanceof org.graalvm.polyglot.Value, "Gt value should be a GraalVM Value");
+                assertEquals(0, ((org.graalvm.polyglot.Value) gtMemberValue).asInt(), "Gt value should be 0");
+
+                // Check count argument - should have extracted int type and Min/Max decorators
+                ArgumentDef countArg = args.arguments().get(2);
+                assertEquals("count", countArg.name());
+                assertEquals("Annotated[int, Min(1), Max(100)]", countArg.annotation(), "count should have full annotation string");
+                assertEquals("int", countArg.typeAnnotation(), "count should have extracted int type");
+                assertEquals(10, countArg.defaultValue(), "count should have default value 10");
+
+                // Check that count has Min and Max decorators
+                List<DecoratorDef> countDecorators = countArg.decorators();
+                assertEquals(2, countDecorators.size(), "count should have 2 decorators");
+
+                // Find Min and Max decorators
+                var minDecorator = countDecorators.stream()
+                    .filter(d -> "Min".equals(d.name()))
+                    .findFirst();
+                assertTrue(minDecorator.isPresent(), "count should have Min decorator");
+                assertEquals(1, minDecorator.get().members().get("value").asInt(), "Min value should be 1");
+
+                var maxDecorator = countDecorators.stream()
+                    .filter(d -> "Max".equals(d.name()))
+                    .findFirst();
+                assertTrue(maxDecorator.isPresent(), "count should have Max decorator");
+                assertEquals(100, maxDecorator.get().members().get("value").asInt(), "Max value should be 100");
+
+                // Test that PythonParameterElement creates correct annotation metadata
+                ClassElement fruitServiceElement = processingEnvironment.classes().get("FruitService");
+                assertNotNull(fruitServiceElement);
+                assertInstanceOf(PythonClassElement.class, fruitServiceElement);
+
+                PythonClassElement fruitServicePythonClass = (PythonClassElement) fruitServiceElement;
+
+                // Get the method
+                MethodElement processFruitMethod = fruitServicePythonClass.getEnclosedElements(ElementQuery.ALL_METHODS)
+                    .stream()
+                    .filter(m -> "process_fruit".equals(m.getName()))
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError("process_fruit method should be present"));
+
+                assertInstanceOf(PythonMethodElement.class, processFruitMethod);
+                PythonMethodElement pythonMethod = (PythonMethodElement) processFruitMethod;
+
+                // Verify method parameters have annotation metadata
+                ParameterElement[] params = pythonMethod.getParameters();
+                assertEquals(3, params.length, "Should have 3 parameters");
+
+                // Test weight parameter annotations
+                ParameterElement weightParam = params[1];
+                assertInstanceOf(PythonParameterElement.class, weightParam);
+                PythonParameterElement weightPythonParam = (PythonParameterElement) weightParam;
+
+                // Verify type resolution
+                assertEquals("double", weightPythonParam.getType().getName(), "weight parameter should resolve to double");
+
+                // Verify annotation metadata is populated
+                var weightAnnotationMetadata = weightParam.getAnnotationMetadata();
+                assertTrue(weightAnnotationMetadata.hasAnnotation("Gt"), "weight parameter should have Gt annotation");
+                var weightGtValue = weightAnnotationMetadata.intValue("Gt", "value");
+                assertTrue(weightGtValue.isPresent(), "Gt annotation should have value");
+                assertEquals(0, weightGtValue.getAsInt(), "Gt annotation should have value 0");
+
+                // Test count parameter with multiple annotations
+                ParameterElement countParam = params[2];
+                var countAnnotationMetadata = countParam.getAnnotationMetadata();
+                assertTrue(countAnnotationMetadata.hasAnnotation("Min"), "count parameter should have Min annotation");
+                assertTrue(countAnnotationMetadata.hasAnnotation("Max"), "count parameter should have Max annotation");
+
+                var countMinValue = countAnnotationMetadata.intValue("Min", "value");
+                assertTrue(countMinValue.isPresent(), "Min annotation should have value");
+                assertEquals(1, countMinValue.getAsInt(), "Min annotation should have value 1");
+
+                var countMaxValue = countAnnotationMetadata.intValue("Max", "value");
+                assertTrue(countMaxValue.isPresent(), "Max annotation should have value");
+                assertEquals(100, countMaxValue.getAsInt(), "Max annotation should have value 100");
             }
         }
     }
