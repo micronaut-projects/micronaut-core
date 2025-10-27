@@ -18,6 +18,7 @@ package io.micronaut.python.processing.visitor;
 import java.util.Objects;
 
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
@@ -36,9 +37,11 @@ import io.micronaut.python.processing.util.GraalPyUtil;
 public final class PythonParameterElement extends AbstractPythonElement implements ParameterElement {
     private final PythonProcessingEnvironment environment;
     private final ClassElement type;
+    private final MethodElement methodElement;
 
     public PythonParameterElement(ArgumentDef argumentDef,
                                   PythonProcessingEnvironment environment,
+                                  MethodElement methodElement,
                                   ElementAnnotationMetadataFactory metadataFactory) {
         super(
             Objects.requireNonNull(argumentDef, "ArgumentDef cannot be null").name(),
@@ -46,6 +49,7 @@ public final class PythonParameterElement extends AbstractPythonElement implemen
             Objects.requireNonNull(metadataFactory, "ElementAnnotationMetadataFactory cannot be null")
         );
         this.environment = Objects.requireNonNull(environment, "PythonProcessingEnvironment cannot be null");
+        this.methodElement = Objects.requireNonNull(methodElement, "MethodElement cannot be null");
 
         // Resolve parameter type
         this.type = resolveType(argumentDef);
@@ -74,6 +78,11 @@ public final class PythonParameterElement extends AbstractPythonElement implemen
 
         // Fall back to Object when no type annotation
         return environment.visitorContext().getClassElement(Object.class).orElse(ClassElement.of(Object.class));
+    }
+
+    @Override
+    public MethodElement getMethodElement() {
+        return methodElement;
     }
 
     @Override

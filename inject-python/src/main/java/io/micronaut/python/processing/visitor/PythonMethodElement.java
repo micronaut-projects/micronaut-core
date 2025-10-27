@@ -15,16 +15,16 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.python.processing.util.GraalPyUtil;
-
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
 
 /**
  * Represents a Python method/function as a Micronaut {@link MethodElement}.
@@ -141,7 +141,7 @@ public final class PythonMethodElement extends AbstractPythonElement implements 
 
         for (int i = 0; i < arguments.size(); i++) {
             ArgumentDef argDef = arguments.get(i);
-            parameters[i] = new PythonParameterElement(argDef, environment, getElementAnnotationMetadataFactory());
+            parameters[i] = new PythonParameterElement(argDef, environment, this, getElementAnnotationMetadataFactory());
         }
 
         return parameters;
