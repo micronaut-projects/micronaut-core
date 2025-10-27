@@ -15,19 +15,20 @@
  */
 package io.micronaut.python.processing.visitor;
 
-import org.graalvm.polyglot.Value;
-
 import java.util.List;
 import java.util.Objects;
+
+import org.graalvm.polyglot.Value;
 
 /**
  * An AttributeDef node represents a class attribute definition.
  * <p>
- * AttributeDef(identifier name, expr? annotation, expr? value, list[DecoratorDef] decorators, str? documentation, bool isStatic)
+ * AttributeDef(identifier name, expr? annotation, expr? value, list[DecoratorDef] decorators, str? documentation, bool isStatic, str? typeName)
  * </p>
  *
  * @param name The name of the attribute.
- * @param annotation The type annotation.
+ * @param annotation The full type annotation string.
+ * @param typeName The extracted type name (e.g., "float" from "Annotated[float, Gt(0)]").
  * @param value The default value.
  * @param decorators The decorators.
  * @param documentation The documentation string.
@@ -38,6 +39,7 @@ import java.util.Objects;
 public record AttributeDef(
     String name,
     String annotation,
+    String typeName,
     Value value,
     List<DecoratorDef> decorators,
     String documentation,
@@ -45,11 +47,11 @@ public record AttributeDef(
 ) implements ElementDef {
 
     public AttributeDef(String name) {
-        this(name, null, null, List.of(), null, false);
+        this(name, null, null, null, List.of(), null, false);
     }
 
     public AttributeDef(String name, String annotation, Value value) {
-        this(name, annotation, value, List.of(), null, false);
+        this(name, annotation, annotation, value, List.of(), null, false);
     }
 
     public AttributeDef {

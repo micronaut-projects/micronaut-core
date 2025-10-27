@@ -1,15 +1,26 @@
 package io.micronaut.python.processing;
 
-import io.micronaut.core.annotation.Experimental;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.Test;
+
 import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
-import io.micronaut.python.processing.visitor.AbstractPythonClassElement;
+import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.python.processing.visitor.ArgumentDef;
 import io.micronaut.python.processing.visitor.ArgumentsDef;
 import io.micronaut.python.processing.visitor.ClassDef;
+import io.micronaut.python.processing.visitor.DecoratorDef;
 import io.micronaut.python.processing.visitor.FunctionDef;
 import io.micronaut.python.processing.visitor.PythonClassElement;
 import io.micronaut.python.processing.visitor.PythonEnumElement;
@@ -18,20 +29,6 @@ import io.micronaut.python.processing.visitor.PythonMethodElement;
 import jakarta.inject.Named;
 import jakarta.inject.Scope;
 import jakarta.inject.Singleton;
-import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.Test;
-
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-
-import io.micronaut.inject.ast.ParameterElement;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class PythonAstParserTest {
 
@@ -865,6 +862,141 @@ public class PythonAstParserTest {
                     "Declaring type should be DerivedClass for declared field");
                 assertEquals("DerivedClass", derivedField.getOwningType().getName(),
                     "Owning type should be DerivedClass for declared field");
+            }
+        }
+    }
+
+    @Test
+    void testAnnotatedAttributeParsing() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        try (PythonEnvironment environment = pythonProcessor.parse("""
+            from typing import Annotated
+
+            class Fruit:
+                name: str = "apple"
+                weight: Annotated[float, Gt(0)] = 1.5
+                count: Annotated[int, Min(1), Max(100)] = 10
+
+            # Define Gt, Min, Max as micronaut annotations for testing
+            @micronaut_annotation("Gt")
+            def Gt(value):
+                return lambda: None
+
+            @micronaut_annotation("Min")
+            def Min(value):
+                return lambda: None
+
+            @micronaut_annotation("Max")
+            def Max(value):
+                return lambda: None
+
+            def micronaut_annotation(name):
+                return lambda func: func
+            """)) {
+
+            try (PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment)) {
+                // Verify parsing completes successfully
+                assertNotNull(environment);
+                assertEquals(1, environment.classes().size());
+
+                ClassDef fruitClass = environment.classes().get("Fruit");
+                assertNotNull(fruitClass);
+                assertEquals("Fruit", fruitClass.name());
+
+                // Verify attributes are parsed
+                assertEquals(3, fruitClass.attributes().size(), "Should parse 3 attributes");
+
+                // Check weight attribute - should have full Annotated type and Gt decorator
+                var weightAttr = fruitClass.attributes().stream()
+                    .filter(attr -> "weight".equals(attr.name()))
+                    .findFirst();
+                assertTrue(weightAttr.isPresent(), "weight attribute should be parsed");
+                assertEquals("Annotated[float, Gt(0)]", weightAttr.get().annotation(), "weight should have full annotation string");
+                assertEquals("Annotated[float, Gt(0)]", weightAttr.get().typeName(), "weight should have full annotation as typeName for now");
+                assertEquals(1.5, weightAttr.get().value().asDouble(), 0.01, "weight should have value 1.5");
+
+                // Check that weight has Gt decorator
+                List<DecoratorDef> weightDecorators = weightAttr.get().decorators();
+                assertEquals(1, weightDecorators.size(), "weight should have 1 decorator");
+                DecoratorDef gtDecorator = weightDecorators.get(0);
+                assertEquals("Gt", gtDecorator.name(), "decorator should be Gt");
+                assertEquals("Gt", gtDecorator.annotationName(), "annotation name should be Gt");
+                assertTrue(gtDecorator.members().containsKey("value"), "Gt should have value member");
+                var gtMemberValue = gtDecorator.members().get("value");
+                assertTrue(gtMemberValue instanceof org.graalvm.polyglot.Value, "Gt value should be a GraalVM Value");
+                assertEquals(0, ((org.graalvm.polyglot.Value) gtMemberValue).asInt(), "Gt value should be 0");
+
+                // Check count attribute - should have extracted int type and Min/Max decorators
+                var countAttr = fruitClass.attributes().stream()
+                    .filter(attr -> "count".equals(attr.name()))
+                    .findFirst();
+                assertTrue(countAttr.isPresent(), "count attribute should be parsed");
+                assertEquals("Annotated[int, Min(1), Max(100)]", countAttr.get().annotation(), "count should have full annotation string");
+                assertEquals("Annotated[int, Min(1), Max(100)]", countAttr.get().typeName(), "count should have full annotation as typeName for now");
+                assertEquals(10, countAttr.get().value().asInt(), "count should have value 10");
+
+                // Check that count has Min and Max decorators
+                List<DecoratorDef> countDecorators = countAttr.get().decorators();
+                assertEquals(2, countDecorators.size(), "count should have 2 decorators");
+
+                // Find Min and Max decorators
+                var minDecorator = countDecorators.stream()
+                    .filter(d -> "Min".equals(d.name()))
+                    .findFirst();
+                assertTrue(minDecorator.isPresent(), "count should have Min decorator");
+                assertEquals(1, minDecorator.get().members().get("value").asInt(), "Min value should be 1");
+
+                var maxDecorator = countDecorators.stream()
+                    .filter(d -> "Max".equals(d.name()))
+                    .findFirst();
+                assertTrue(maxDecorator.isPresent(), "count should have Max decorator");
+                assertEquals(100, maxDecorator.get().members().get("value").asInt(), "Max value should be 100");
+
+                // Test that PythonFieldElement creates correct annotation metadata
+                ClassElement fruitElement = processingEnvironment.classes().get("Fruit");
+                assertNotNull(fruitElement);
+                assertInstanceOf(PythonClassElement.class, fruitElement);
+
+                PythonClassElement fruitPythonClass = (PythonClassElement) fruitElement;
+
+                // Get weight field
+                FieldElement weightField = fruitPythonClass.getEnclosedElements(ElementQuery.ALL_FIELDS)
+                    .stream()
+                    .filter(f -> "weight".equals(f.getName()))
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError("weight field should be present"));
+
+                assertInstanceOf(PythonFieldElement.class, weightField);
+                PythonFieldElement weightPythonField = (PythonFieldElement) weightField;
+
+                // Verify type resolution
+                assertEquals("double", weightPythonField.getType().getName(), "weight field should resolve to double");
+
+                // Verify annotation metadata is populated
+                var annotationMetadata = weightField.getAnnotationMetadata();
+                assertTrue(annotationMetadata.hasAnnotation("Gt"), "weight field should have Gt annotation");
+                var gtValue = annotationMetadata.intValue("Gt", "value");
+                assertTrue(gtValue.isPresent(), "Gt annotation should have value");
+                assertEquals(0, gtValue.getAsInt(), "Gt annotation should have value 0");
+
+                // Test count field with multiple annotations
+                FieldElement countField = fruitPythonClass.getEnclosedElements(ElementQuery.ALL_FIELDS)
+                    .stream()
+                    .filter(f -> "count".equals(f.getName()))
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError("count field should be present"));
+
+                var countAnnotationMetadata = countField.getAnnotationMetadata();
+                assertTrue(countAnnotationMetadata.hasAnnotation("Min"), "count field should have Min annotation");
+                assertTrue(countAnnotationMetadata.hasAnnotation("Max"), "count field should have Max annotation");
+
+                var minValue = countAnnotationMetadata.intValue("Min", "value");
+                assertTrue(minValue.isPresent(), "Min annotation should have value");
+                assertEquals(1, minValue.getAsInt(), "Min annotation should have value 1");
+
+                var maxValue = countAnnotationMetadata.intValue("Max", "value");
+                assertTrue(maxValue.isPresent(), "Max annotation should have value");
+                assertEquals(100, maxValue.getAsInt(), "Max annotation should have value 100");
             }
         }
     }

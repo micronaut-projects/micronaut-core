@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import io.micronaut.python.processing.visitor.AttributeDef;
 import org.graalvm.polyglot.Value;
 
 import io.micronaut.core.annotation.AnnotationValue;
@@ -110,6 +111,8 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
         } else if (element instanceof FunctionDef functionDef) {
             // TODO: include parent class of FunctionDef
             return List.of(functionDef);
+        } else if (element instanceof AttributeDef attributeDef) {
+            return List.of(attributeDef);
         }
         return List.of();
     }
@@ -192,12 +195,14 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
 
     @Override
     protected String getRepeatableName(DecoratorDef annotationMirror) {
-        throw new UnsupportedOperationException("TODO: support repeatable");
+        // TODO: Support repeatable
+        return null;
     }
 
     @Override
     protected String getRepeatableContainerNameForType(ElementDef annotationType) {
-        throw new UnsupportedOperationException("TODO: support repeatable");
+        // TODO: Support repeatable
+        return null;
     }
 
     @Override
