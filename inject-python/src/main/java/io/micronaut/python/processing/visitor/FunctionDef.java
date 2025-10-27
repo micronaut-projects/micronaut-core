@@ -17,6 +17,7 @@ package io.micronaut.python.processing.visitor;
 
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Objects;
 
 /**
  * A FunctionDef node represents a function definition.
@@ -44,6 +45,20 @@ public record FunctionDef(
     String documentation,
     boolean isAbstract
 ) implements ElementDef {
+
+    public FunctionDef {
+        Objects.requireNonNull(name, "Function name cannot be null");
+        if (arguments == null) {
+            arguments = ArgumentsDef.empty();
+        }
+        if (decorators == null) {
+            decorators = List.of();
+        }
+        if (typeParams == null) {
+            typeParams = List.of();
+        }
+        // declaringClassName can be null
+    }
 
     // Simplified constructors for easier Python interop
     public FunctionDef(String name, ArgumentsDef arguments, List<DecoratorDef> decorators, String returnTypeAnnotation) {

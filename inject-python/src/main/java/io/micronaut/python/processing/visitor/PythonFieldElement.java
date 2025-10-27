@@ -32,11 +32,13 @@ import java.util.Objects;
  */
 public final class PythonFieldElement extends AbstractPythonElement implements FieldElement {
     private final PythonProcessingEnvironment environment;
+    private final PythonClassElement declaringType;
     private final PythonClassElement owningType;
     private final ClassElement type;
 
     public PythonFieldElement(AttributeDef attributeDef,
                               PythonProcessingEnvironment environment,
+                              PythonClassElement declaringType,
                               PythonClassElement owningType,
                               ElementAnnotationMetadataFactory metadataFactory) {
         super(
@@ -45,7 +47,9 @@ public final class PythonFieldElement extends AbstractPythonElement implements F
             Objects.requireNonNull(metadataFactory, "ElementAnnotationMetadataFactory cannot be null")
         );
         this.environment = Objects.requireNonNull(environment, "PythonProcessingEnvironment cannot be null");
+        this.declaringType = Objects.requireNonNull(declaringType, "Declaring type cannot be null");
         this.owningType = Objects.requireNonNull(owningType, "Owning type cannot be null");
+
         this.type = resolveType(attributeDef);
     }
 
@@ -87,7 +91,7 @@ public final class PythonFieldElement extends AbstractPythonElement implements F
 
     @Override
     public ClassElement getDeclaringType() {
-        return owningType;
+        return declaringType;
     }
 
     @Override

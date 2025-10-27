@@ -17,6 +17,14 @@ package io.micronaut.python.processing.visitor;
 
 import java.util.List;
 
+/**
+ * Base interface for all Python AST element definitions.
+ * This sealed interface defines the common contract for all Python elements
+ * that can be processed by Micronaut's annotation processing system.
+ *
+ * @author Micronaut Team
+ * @since 5.0.0
+ */
 public sealed interface ElementDef permits AnnotationMemberDef, AttributeDef, ClassDef, FunctionDef {
     default List<DecoratorDef> decorators() {
         return List.of();

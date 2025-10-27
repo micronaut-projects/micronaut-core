@@ -15,11 +15,19 @@
  */
 package io.micronaut.python.processing.util;
 
+import org.graalvm.polyglot.Value;
+
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.python.processing.visitor.PythonVisitorContext;
-import org.graalvm.polyglot.Value;
 
+/**
+ * Utility class for GraalPy integration, providing type conversion and resolution utilities
+ * for Python AST processing within Micronaut.
+ *
+ * @author Micronaut Team
+ * @since 5.0.0
+ */
 public final class GraalPyUtil {
     /**
      * Utility method to convert GraalPy Value objects to Java types.

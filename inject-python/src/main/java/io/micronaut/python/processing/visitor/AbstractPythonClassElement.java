@@ -17,12 +17,9 @@ package io.micronaut.python.processing.visitor;
 
 import io.micronaut.inject.ast.ArrayableClassElement;
 import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 
-import java.util.List;
-
-public sealed abstract class AbstractPythonClassElement extends AbstractPythonElement implements ArrayableClassElement permits PythonClassElement, PythonEnumElement {
+public abstract sealed class AbstractPythonClassElement extends AbstractPythonElement implements ArrayableClassElement permits PythonClassElement, PythonEnumElement {
     protected final int arrayDimensions;
     protected final PythonProcessingEnvironment environment;
 

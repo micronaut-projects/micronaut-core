@@ -41,6 +41,7 @@ import java.util.Optional;
 public final class PythonMethodElement extends AbstractPythonElement implements MethodElement {
     private final PythonProcessingEnvironment environment;
     private final PythonClassElement declaringType;
+    private final PythonClassElement owningType;
     private final ClassElement returnType;
     private final ParameterElement[] parameters;
 
@@ -50,16 +51,19 @@ public final class PythonMethodElement extends AbstractPythonElement implements 
      * @param functionDef the function definition node; must not be {@code null}
      * @param environment the Python processing environment; must not be {@code null}
      * @param declaringType the class that declares this method; must not be {@code null}
+     * @param owningType the class that owns this method (may be a subclass); must not be {@code null}
      * @param metadataFactory the annotation metadata factory; must not be {@code null}
      * @throws NullPointerException if any parameter is {@code null}
      */
     public PythonMethodElement(FunctionDef functionDef,
                                PythonProcessingEnvironment environment,
                                PythonClassElement declaringType,
+                               PythonClassElement owningType,
                                ElementAnnotationMetadataFactory metadataFactory) {
         super(Objects.requireNonNull(functionDef, "FunctionDef cannot be null").name(), functionDef, metadataFactory);
         this.environment = Objects.requireNonNull(environment, "PythonProcessingEnvironment cannot be null");
         this.declaringType = Objects.requireNonNull(declaringType, "Declaring type cannot be null");
+        this.owningType = Objects.requireNonNull(owningType, "Owning type cannot be null");
 
         // Resolve return type
         this.returnType = resolveReturnType(functionDef);
@@ -120,17 +124,7 @@ public final class PythonMethodElement extends AbstractPythonElement implements 
 
     @Override
     public ClassElement getOwningType() {
-        return getDeclaringType();
-    }
-
-    /**
-     * Returns a string representation of the Python function, including its name.
-     *
-     * @return a string in the format "Python Function: <functionName>"
-     */
-    @Override
-    public String toString() {
-        return "Python Function: " + getNativeType().name();
+        return owningType;
     }
 
     private ClassElement resolveReturnType(FunctionDef functionDef) {

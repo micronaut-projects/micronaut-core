@@ -52,18 +52,6 @@ public record ClassDef(
     String documentation
 ) implements ElementDef {
 
-    public ClassDef(String name) {
-        this(name, "", List.of(), List.of(), List.of(), List.of(), List.of(), null, false, List.of(), null);
-    }
-
-    public ClassDef(String name, List<DecoratorDef> decoratorList) {
-        this(name, "", List.of(), decoratorList, List.of(), List.of(), List.of(), null, false, List.of(), null);
-    }
-
-    public ClassDef withConstructor(FunctionDef constructor) {
-        return new ClassDef(name, packageName, bases, decorators, typeParams, functions, attributes, constructor, isEnum, values, documentation);
-    }
-
     public ClassDef {
         Objects.requireNonNull(name, "Decorator name cannot be null");
         if (bases == null) {
@@ -87,6 +75,18 @@ public record ClassDef(
         if (values == null) {
             values = List.of();
         }
+    }
+
+    public ClassDef(String name) {
+        this(name, "", List.of(), List.of(), List.of(), List.of(), List.of(), null, false, List.of(), null);
+    }
+
+    public ClassDef(String name, List<DecoratorDef> decoratorList) {
+        this(name, "", List.of(), decoratorList, List.of(), List.of(), List.of(), null, false, List.of(), null);
+    }
+
+    public ClassDef withConstructor(FunctionDef constructor) {
+        return new ClassDef(name, packageName, bases, decorators, typeParams, functions, attributes, constructor, isEnum, values, documentation);
     }
 
     public ClassDef withFunction(FunctionDef function) {

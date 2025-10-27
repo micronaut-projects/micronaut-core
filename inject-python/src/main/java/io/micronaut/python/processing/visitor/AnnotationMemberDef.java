@@ -17,6 +17,15 @@ package io.micronaut.python.processing.visitor;
 
 import java.util.List;
 
+/**
+ * Represents a member of a Python annotation (decorator parameter).
+ * This record implements ElementDef to provide annotation member information
+ * for Micronaut's annotation processing system.
+ *
+ * @param name The name of the annotation member
+ * @author Micronaut Team
+ * @since 5.0.0
+ */
 public record AnnotationMemberDef(String name) implements ElementDef {
     @Override
     public List<DecoratorDef> decorators() {

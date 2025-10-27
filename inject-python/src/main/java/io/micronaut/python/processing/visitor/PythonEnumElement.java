@@ -15,13 +15,13 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import java.util.List;
+
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.EnumElement;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
-
-import java.util.List;
 
 /**
  * Represents a Python enum class element in the Micronaut injection context.
@@ -45,11 +45,6 @@ public final class PythonEnumElement extends AbstractPythonClassElement implemen
         super(classDef, environment);
     }
 
-    @Override
-    public boolean isEnum() {
-        return true;
-    }
-
     /**
      * Creates a new PythonEnumElement for the given class definition with array dimensions.
      *
@@ -59,6 +54,11 @@ public final class PythonEnumElement extends AbstractPythonClassElement implemen
      */
     public PythonEnumElement(ClassDef classDef, PythonProcessingEnvironment environment, int arrayDimensions) {
         super(classDef, environment, arrayDimensions);
+    }
+
+    @Override
+    public boolean isEnum() {
+        return true;
     }
 
     @Override

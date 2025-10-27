@@ -1,6 +1,8 @@
 package io.micronaut.python.processing;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
@@ -208,19 +210,19 @@ public class PythonAstParserTest {
                 assertEquals("list", complexAttr.get().annotation(), "complex_field should have list annotation");
 
                 // Now test that PythonFieldElement resolves types correctly
-                PythonFieldElement intField = new PythonFieldElement(intAttr.get(), processingEnvironment, testClass, processingEnvironment.metadataFactory());
+                PythonFieldElement intField = new PythonFieldElement(intAttr.get(), processingEnvironment, testClass, testClass, processingEnvironment.metadataFactory());
                 assertEquals("int", intField.getType().getName(), "int field should resolve to primitive int");
 
-                PythonFieldElement floatField = new PythonFieldElement(floatAttr.get(), processingEnvironment, testClass, processingEnvironment.metadataFactory());
+                PythonFieldElement floatField = new PythonFieldElement(floatAttr.get(), processingEnvironment, testClass, testClass, processingEnvironment.metadataFactory());
                 assertEquals("double", floatField.getType().getName(), "float field should resolve to primitive double");
 
-                PythonFieldElement strField = new PythonFieldElement(strAttr.get(), processingEnvironment, testClass, processingEnvironment.metadataFactory());
+                PythonFieldElement strField = new PythonFieldElement(strAttr.get(), processingEnvironment, testClass, testClass, processingEnvironment.metadataFactory());
                 assertEquals("java.lang.String", strField.getType().getName(), "str field should resolve to String");
 
-                PythonFieldElement boolField = new PythonFieldElement(boolAttr.get(), processingEnvironment, testClass, processingEnvironment.metadataFactory());
+                PythonFieldElement boolField = new PythonFieldElement(boolAttr.get(), processingEnvironment, testClass, testClass, processingEnvironment.metadataFactory());
                 assertEquals("boolean", boolField.getType().getName(), "bool field should resolve to primitive boolean");
 
-                PythonFieldElement complexField = new PythonFieldElement(complexAttr.get(), processingEnvironment, testClass, processingEnvironment.metadataFactory());
+                PythonFieldElement complexField = new PythonFieldElement(complexAttr.get(), processingEnvironment, testClass, testClass, processingEnvironment.metadataFactory());
                 assertEquals("java.lang.Object", complexField.getType().getName(), "complex field should fall back to Object");
             }
         }
@@ -256,7 +258,7 @@ public class PythonAstParserTest {
                     .findFirst();
                 assertTrue(publicMethodDef.isPresent(), "public_method should be present");
 
-                PythonMethodElement publicMethod = new PythonMethodElement(publicMethodDef.get(), processingEnvironment, testClass, processingEnvironment.metadataFactory());
+                PythonMethodElement publicMethod = new PythonMethodElement(publicMethodDef.get(), processingEnvironment, testClass, testClass, processingEnvironment.metadataFactory());
 
                 // Test method properties
                 assertEquals("public_method", publicMethod.getName());
@@ -282,7 +284,7 @@ public class PythonAstParserTest {
                     .findFirst();
                 assertTrue(privateMethodDef.isPresent(), "_private_method should be present");
 
-                PythonMethodElement privateMethod = new PythonMethodElement(privateMethodDef.get(), processingEnvironment, testClass, processingEnvironment.metadataFactory());
+                PythonMethodElement privateMethod = new PythonMethodElement(privateMethodDef.get(), processingEnvironment, testClass, testClass, processingEnvironment.metadataFactory());
                 assertFalse(privateMethod.isPublic(), "_private_method should not be public");
                 assertTrue(privateMethod.isPrivate(), "_private_method should be private");
 
@@ -292,7 +294,7 @@ public class PythonAstParserTest {
                     .findFirst();
                 assertTrue(noAnnotationsDef.isPresent(), "no_annotations should be present");
 
-                PythonMethodElement noAnnotationsMethod = new PythonMethodElement(noAnnotationsDef.get(), processingEnvironment, testClass, processingEnvironment.metadataFactory());
+                PythonMethodElement noAnnotationsMethod = new PythonMethodElement(noAnnotationsDef.get(), processingEnvironment, testClass, testClass, processingEnvironment.metadataFactory());
                 assertEquals(2, noAnnotationsMethod.getParameters().length, "should have 2 parameters");
                 assertEquals("java.lang.Object", noAnnotationsMethod.getReturnType().getName(), "return type should be Object");
 
@@ -302,7 +304,7 @@ public class PythonAstParserTest {
                     .findFirst();
                 assertTrue(returnOnlyDef.isPresent(), "return_only should be present");
 
-                PythonMethodElement returnOnlyMethod = new PythonMethodElement(returnOnlyDef.get(), processingEnvironment, testClass, processingEnvironment.metadataFactory());
+                PythonMethodElement returnOnlyMethod = new PythonMethodElement(returnOnlyDef.get(), processingEnvironment, testClass, testClass, processingEnvironment.metadataFactory());
                 assertEquals("int", returnOnlyMethod.getReturnType().getName(), "return type should be int");
                 assertEquals(0, returnOnlyMethod.getParameters().length, "should have no parameters");
             }
@@ -554,7 +556,6 @@ public class PythonAstParserTest {
     }
 
     @Test
-    @Disabled("Need to implement getEnclosedElements first")
     void testDocumentationParsing() {
         PythonAstParser pythonProcessor = new PythonAstParser();
         try (PythonEnvironment environment = pythonProcessor.parse("""
@@ -659,9 +660,9 @@ public class PythonAstParserTest {
                 // Test constructor parameter documentation
                 Optional<MethodElement> constructorOpt = pythonClass.getPrimaryConstructor();
                 assertTrue(constructorOpt.isPresent());
-                PythonMethodElement constructor = (PythonMethodElement) constructorOpt.get();
+                MethodElement constructorElement = constructorOpt.get();
 
-                ParameterElement[] constructorParams = constructor.getParameters();
+                ParameterElement[] constructorParams = constructorElement.getParameters();
                 assertEquals(2, constructorParams.length);
 
                 // Test constructor param documentation
@@ -703,6 +704,167 @@ public class PythonAstParserTest {
 
                 Optional<String> noDoc = undocumentedField.getDocumentation(false);
                 assertFalse(noDoc.isPresent());
+            }
+        }
+    }
+
+    @Test
+    void testElementQueryAPI() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        try (PythonEnvironment environment = pythonProcessor.parse("""
+            class TestElementQuery:
+                class_field = "value"
+
+                instance_field: str = "instance"
+
+                def public_method(self) -> str:
+                    return "public"
+
+                def _private_method(self) -> int:
+                    return 42
+
+                @staticmethod
+                def static_method() -> bool:
+                    return True
+
+                def abstract_method(self):
+                    pass
+            """)) {
+
+            try (PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment)) {
+                ClassElement classElement = processingEnvironment.classes().get("TestElementQuery");
+                assertNotNull(classElement);
+                assertTrue(classElement instanceof PythonClassElement);
+
+                PythonClassElement pythonClass = (PythonClassElement) classElement;
+
+                // Test ALL_METHODS query
+                List<MethodElement> allMethods = pythonClass.getEnclosedElements(ElementQuery.ALL_METHODS);
+                assertEquals(4, allMethods.size(), "Should have 4 methods");
+
+                // Test ALL_FIELDS query
+                List<FieldElement> allFields = pythonClass.getEnclosedElements(ElementQuery.ALL_FIELDS);
+                assertEquals(2, allFields.size(), "Should have 2 fields");
+
+                // Test filtering by name
+                List<MethodElement> publicMethods = pythonClass.getEnclosedElements(
+                    ElementQuery.ALL_METHODS.named("public_method")
+                );
+                assertEquals(1, publicMethods.size(), "Should find public_method");
+                assertEquals("public_method", publicMethods.get(0).getName());
+
+                // Test filtering by modifier (only public)
+                List<MethodElement> onlyPublicMethods = pythonClass.getEnclosedElements(
+                    ElementQuery.ALL_METHODS.onlyAccessible()
+                );
+                // Should exclude _private_method
+                assertTrue(onlyPublicMethods.stream().noneMatch(m -> m.getName().startsWith("_")),
+                    "Should not include private methods");
+
+                // Test only declared (no inherited)
+                List<MethodElement> declaredMethods = pythonClass.getEnclosedElements(
+                    ElementQuery.ALL_METHODS.onlyDeclared()
+                );
+                assertEquals(4, declaredMethods.size(), "Should have all declared methods");
+
+                // Test typed filtering (methods returning string)
+                List<MethodElement> stringMethods = pythonClass.getEnclosedElements(
+                    ElementQuery.ALL_METHODS.typed(type -> "java.lang.String".equals(type.getName()))
+                );
+                assertEquals(1, stringMethods.size(), "Should find method returning string");
+                assertEquals("public_method", stringMethods.get(0).getName());
+            }
+        }
+    }
+
+    @Test
+    void testElementQueryInheritance() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        try (PythonEnvironment environment = pythonProcessor.parse("""
+            class BaseClass:
+                base_field = "base"
+
+                def base_method(self) -> str:
+                    return "base"
+
+            class DerivedClass(BaseClass):
+                derived_field = "derived"
+
+                def derived_method(self) -> int:
+                    return 42
+
+                # No override of base_method, so we can test inherited method
+            """)) {
+
+            try (PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment)) {
+                ClassElement derivedClass = processingEnvironment.classes().get("DerivedClass");
+                assertNotNull(derivedClass);
+
+                // Test that we can query methods from inheritance hierarchy
+                List<MethodElement> allMethods = derivedClass.getEnclosedElements(ElementQuery.ALL_METHODS);
+                assertTrue(allMethods.size() >= 2, "Should have at least derived methods");
+
+                // Should include both derived and inherited methods
+                boolean hasDerivedMethod = allMethods.stream().anyMatch(m -> "derived_method".equals(m.getName()));
+                boolean hasBaseMethod = allMethods.stream().anyMatch(m -> "base_method".equals(m.getName()));
+
+                assertTrue(hasDerivedMethod, "Should include derived_method");
+                assertTrue(hasBaseMethod, "Should include base_method");
+
+                // Test declaring vs owning types for inherited elements
+                MethodElement baseMethod = allMethods.stream()
+                    .filter(m -> "base_method".equals(m.getName()))
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError("base_method should be present"));
+
+                // For inherited elements, declaring type should be the base class, owning type should be derived class
+                assertEquals("BaseClass", baseMethod.getDeclaringType().getName(),
+                    "Declaring type should be BaseClass for inherited method");
+                assertEquals("DerivedClass", baseMethod.getOwningType().getName(),
+                    "Owning type should be DerivedClass for inherited method");
+
+                // For declared elements, declaring and owning types should be the same
+                MethodElement derivedMethod = allMethods.stream()
+                    .filter(m -> "derived_method".equals(m.getName()))
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError("derived_method should be present"));
+
+                assertEquals("DerivedClass", derivedMethod.getDeclaringType().getName(),
+                    "Declaring type should be DerivedClass for declared method");
+                assertEquals("DerivedClass", derivedMethod.getOwningType().getName(),
+                    "Owning type should be DerivedClass for declared method");
+
+                // Test fields
+                List<FieldElement> allFields = derivedClass.getEnclosedElements(ElementQuery.ALL_FIELDS);
+                assertTrue(allFields.size() >= 2, "Should have at least derived fields");
+
+                boolean hasDerivedField = allFields.stream().anyMatch(f -> "derived_field".equals(f.getName()));
+                boolean hasBaseField = allFields.stream().anyMatch(f -> "base_field".equals(f.getName()));
+
+                assertTrue(hasDerivedField, "Should include derived_field");
+                assertTrue(hasBaseField, "Should include base_field");
+
+                // Test declaring vs owning types for inherited fields
+                FieldElement baseField = allFields.stream()
+                    .filter(f -> "base_field".equals(f.getName()))
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError("base_field should be present"));
+
+                assertEquals("BaseClass", baseField.getDeclaringType().getName(),
+                    "Declaring type should be BaseClass for inherited field");
+                assertEquals("DerivedClass", baseField.getOwningType().getName(),
+                    "Owning type should be DerivedClass for inherited field");
+
+                // For declared elements, declaring and owning types should be the same
+                FieldElement derivedField = allFields.stream()
+                    .filter(f -> "derived_field".equals(f.getName()))
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError("derived_field should be present"));
+
+                assertEquals("DerivedClass", derivedField.getDeclaringType().getName(),
+                    "Declaring type should be DerivedClass for declared field");
+                assertEquals("DerivedClass", derivedField.getOwningType().getName(),
+                    "Owning type should be DerivedClass for declared field");
             }
         }
     }
