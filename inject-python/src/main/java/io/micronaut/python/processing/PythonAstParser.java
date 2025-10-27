@@ -15,8 +15,10 @@
  */
 package io.micronaut.python.processing;
 
-import io.micronaut.python.processing.visitor.ClassDef;
-import io.micronaut.python.processing.visitor.DecoratorDef;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.function.Function;
+
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.HostAccess;
 import org.graalvm.polyglot.Source;
@@ -25,11 +27,10 @@ import org.graalvm.python.embedding.GraalPyResources;
 import org.graalvm.python.embedding.VirtualFileSystem;
 import org.intellij.lang.annotations.Language;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.function.Function;
+import io.micronaut.python.processing.visitor.ClassDef;
+import io.micronaut.python.processing.visitor.DecoratorDef;
 
-public class PythonAstParser {
+public final class PythonAstParser {
 
     public static final String PYTHON = "python";
     public static final String INJECT_RESOURCES = "GRAALPY-VFS/io.micronaut/micronaut-inject-python";
@@ -79,7 +80,6 @@ public class PythonAstParser {
             throw e;
         }
     }
-
 
     private static @Language("python") String getSource() {
         return """

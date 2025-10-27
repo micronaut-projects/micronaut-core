@@ -15,18 +15,6 @@
  */
 package io.micronaut.python.processing.annotation;
 
-import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
-import io.micronaut.inject.visitor.VisitorContext;
-import io.micronaut.python.processing.util.GraalPyUtil;
-import io.micronaut.python.processing.visitor.AnnotationMemberDef;
-import io.micronaut.python.processing.visitor.ClassDef;
-import io.micronaut.python.processing.visitor.ElementDef;
-import io.micronaut.python.processing.visitor.DecoratorDef;
-import io.micronaut.python.processing.visitor.FunctionDef;
-import io.micronaut.python.processing.visitor.PythonVisitorContext;
-import org.graalvm.polyglot.Value;
-
 import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
 import java.util.List;
@@ -34,6 +22,27 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import org.graalvm.polyglot.Value;
+
+import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
+import io.micronaut.inject.visitor.VisitorContext;
+import io.micronaut.python.processing.util.GraalPyUtil;
+import io.micronaut.python.processing.visitor.AnnotationMemberDef;
+import io.micronaut.python.processing.visitor.ClassDef;
+import io.micronaut.python.processing.visitor.DecoratorDef;
+import io.micronaut.python.processing.visitor.ElementDef;
+import io.micronaut.python.processing.visitor.FunctionDef;
+import io.micronaut.python.processing.visitor.PythonVisitorContext;
+
+/**
+ * Builder for creating annotation metadata from Python decorators and elements.
+ * This class extends Micronaut's annotation metadata builder to handle Python-specific
+ * annotation processing, converting Python decorators to Java annotation metadata.
+ *
+ * @author Micronaut Team
+ * @since 5.0.0
+ */
 public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<ElementDef, DecoratorDef> {
     private final Map<String, DecoratorDef> decorators;
     private final PythonVisitorContext visitorContext;

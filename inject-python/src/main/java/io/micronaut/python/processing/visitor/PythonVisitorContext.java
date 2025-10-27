@@ -15,25 +15,23 @@
  */
 package io.micronaut.python.processing.visitor;
 
-import io.micronaut.core.convert.ArgumentConversionContext;
-import io.micronaut.core.convert.value.MutableConvertibleValues;
-import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
-import io.micronaut.expressions.context.ExpressionCompilationContextFactory;
-import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
-import io.micronaut.inject.ast.Element;
-import io.micronaut.inject.ast.ElementFactory;
-import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
-import io.micronaut.inject.visitor.VisitorContext;
-import io.micronaut.inject.writer.GeneratedFile;
-import io.micronaut.python.processing.annotation.PythonAnnotationMetadataBuilder;
-import io.micronaut.python.processing.annotation.PythonElementAnnotationMetadataFactory;
-
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+
+import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.convert.value.MutableConvertibleValues;
+import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
+import io.micronaut.expressions.context.ExpressionCompilationContextFactory;
+import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.ElementFactory;
+import io.micronaut.inject.visitor.VisitorContext;
+import io.micronaut.inject.writer.GeneratedFile;
+import io.micronaut.python.processing.annotation.PythonAnnotationMetadataBuilder;
+import io.micronaut.python.processing.annotation.PythonElementAnnotationMetadataFactory;
 
 public class PythonVisitorContext implements VisitorContext {
     private final MutableConvertibleValues<Object> visitorAttributes = new MutableConvertibleValuesMap<>();

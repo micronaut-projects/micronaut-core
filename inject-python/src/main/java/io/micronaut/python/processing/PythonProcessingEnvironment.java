@@ -15,18 +15,17 @@
  */
 package io.micronaut.python.processing;
 
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
+
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.python.processing.annotation.PythonAnnotationMetadataBuilder;
 import io.micronaut.python.processing.annotation.PythonElementAnnotationMetadataFactory;
-import io.micronaut.python.processing.visitor.AbstractPythonClassElement;
 import io.micronaut.python.processing.visitor.ClassDef;
 import io.micronaut.python.processing.visitor.PythonClassElement;
 import io.micronaut.python.processing.visitor.PythonEnumElement;
 import io.micronaut.python.processing.visitor.PythonVisitorContext;
-
-import java.util.Map;
-import java.util.Objects;
-import java.util.stream.Collectors;
 
 /**
  * Represents a Python processing environment that extends the basic Python environment with additional
@@ -46,14 +45,6 @@ public record PythonProcessingEnvironment(
     PythonElementAnnotationMetadataFactory metadataFactory,
     PythonVisitorContext visitorContext
 ) implements AutoCloseable {
-
-    /**
-     * Closes the Python processing environment by closing the underlying Python environment.
-     */
-    @Override
-    public void close() {
-        environment.close();
-    }
 
     /**
      * Creates a Python processing environment with the specified Python environment.
@@ -82,6 +73,14 @@ public record PythonProcessingEnvironment(
         if (metadataFactory == null) {
             metadataFactory = visitorContext.getElementAnnotationMetadataFactory();
         }
+    }
+
+    /**
+     * Closes the Python processing environment by closing the underlying Python environment.
+     */
+    @Override
+    public void close() {
+        environment.close();
     }
 
     /**

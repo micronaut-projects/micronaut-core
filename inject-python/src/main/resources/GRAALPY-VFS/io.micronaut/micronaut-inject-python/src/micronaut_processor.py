@@ -30,6 +30,7 @@ class PrintNodeVisitor(ast.NodeVisitor):
         self.known_decorator_functions = OrderedDict()
         self.current_class = None
         self.current_class_attributes = []
+        self.last_attribute = None  # Track last processed attribute for docstring handling
 
     def visit(self, node: ast.AST) -> ast.AST:
         match node:
@@ -39,9 +40,26 @@ class PrintNodeVisitor(ast.NodeVisitor):
                     for d in node.decorator_list
                     if decorator_to_function(self, d) is not None
                 ]
+                # Extract base classes
+                bases = []
+                for base in node.bases:
+                    if isinstance(base, ast.Name):
+                        bases.append(base.id)
+                    elif isinstance(base, ast.Attribute):
+                        # Handle qualified names like module.Class
+                        # For simplicity, just use the attribute name
+                        bases.append(base.attr)
+                    else:
+                        # Handle other expression types by trying to unparse
+                        try:
+                            bases.append(ast.unparse(base))
+                        except AttributeError:
+                            # Fallback for older Python versions
+                            bases.append(ast.dump(base))
+
                 # Extract class docstring
                 class_doc = self._extract_docstring(node)
-                self.current_class = JavaClassDef(node.name, self.package_name, [], decorators, [], [], [], None, False, [], class_doc)
+                self.current_class = JavaClassDef(node.name, self.package_name, bases, decorators, [], [], [], None, False, [], class_doc)
                 self.current_class_attributes = []
 
                 # Check if this is an enum class
@@ -116,6 +134,11 @@ class PrintNodeVisitor(ast.NodeVisitor):
                 if self.current_class is not None:
                     self._handle_ann_assign(node)
                 return node
+            case ast.Expr():
+                # Handle potential field docstrings - string literals that follow attribute assignments
+                if self.current_class is not None and self.last_attribute is not None:
+                    self._handle_field_docstring(node)
+                return node
             case ast.Module():
                 self.current_class = None
                 self.callback.apply(node)
@@ -180,6 +203,37 @@ class PrintNodeVisitor(ast.NodeVisitor):
 
                 attr_def = JavaAttributeDef(attr_name, annotation, value, decorators, None, is_static)
                 self.current_class_attributes.append(attr_def)
+                self.last_attribute = attr_def
+
+    def _handle_field_docstring(self, node):
+        """
+        Handle ast.Expr nodes that might be field docstrings following attribute assignments.
+        """
+        if isinstance(node.value, (ast.Constant, ast.Str)):
+            # Extract the string value
+            if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+                docstring = node.value.value
+            elif isinstance(node.value, ast.Str):
+                docstring = node.value.s
+            else:
+                return
+
+            # If we have a last attribute and no documentation yet, set it
+            if self.last_attribute is not None and self.last_attribute.documentation() is None:
+                # Create a new attribute with documentation
+                updated_attr = JavaAttributeDef(
+                    self.last_attribute.name(),
+                    self.last_attribute.annotation(),
+                    self.last_attribute.value(),
+                    self.last_attribute.decorators(),
+                    docstring.strip(),
+                    self.last_attribute.isStatic()
+                )
+                # Replace the last attribute in the list
+                if self.current_class_attributes and self.current_class_attributes[-1] == self.last_attribute:
+                    self.current_class_attributes[-1] = updated_attr
+                # Update last_attribute reference
+                self.last_attribute = updated_attr
 
     def _is_enum_class(self, node):
         """

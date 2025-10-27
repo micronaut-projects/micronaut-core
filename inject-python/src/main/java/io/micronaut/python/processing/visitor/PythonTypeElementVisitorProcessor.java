@@ -23,19 +23,7 @@ import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.version.VersionUtils;
 import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.ConstructorElement;
-import io.micronaut.inject.ast.Element;
-import io.micronaut.inject.ast.ElementQuery;
-import io.micronaut.inject.ast.EnumConstantElement;
-import io.micronaut.inject.ast.FieldElement;
-import io.micronaut.inject.ast.MemberElement;
-import io.micronaut.inject.ast.MethodElement;
-import io.micronaut.inject.processing.ProcessingException;
-import io.micronaut.inject.visitor.ElementPostponedToNextRoundException;
-import io.micronaut.inject.visitor.TypeElementQuery;
 import io.micronaut.inject.visitor.TypeElementVisitor;
-import io.micronaut.inject.visitor.VisitorContext;
-import io.micronaut.python.processing.PythonEnvironment;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 
 import java.util.ArrayList;
@@ -81,6 +69,7 @@ public class PythonTypeElementVisitorProcessor {
 
     /**
      * Initialise the processor.
+     * @param environment The processing environment
      */
     public synchronized void init(PythonProcessingEnvironment environment) {
 

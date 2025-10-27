@@ -15,15 +15,13 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import java.util.Objects;
+
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ParameterElement;
-import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.python.processing.util.GraalPyUtil;
-import org.graalvm.polyglot.Value;
-
-import java.util.Objects;
 
 /**
  * A parameter element representing a Python function parameter.

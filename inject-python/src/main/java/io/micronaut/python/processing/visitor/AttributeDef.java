@@ -57,5 +57,6 @@ public record AttributeDef(
         if (decorators == null) {
             decorators = List.of();
         }
+        // declaringClassName can be null
     }
 }
