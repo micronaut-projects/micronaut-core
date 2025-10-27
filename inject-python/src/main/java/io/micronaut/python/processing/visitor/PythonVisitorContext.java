@@ -134,26 +134,26 @@ public class PythonVisitorContext implements VisitorContext {
 
     @Override
     public OutputStream visitClass(String classname, Element... originatingElements) throws IOException {
-        return null;
+        throw new UnsupportedOperationException();
     }
 
     @Override
     public void visitServiceDescriptor(String type, String classname) {
-
+        throw new UnsupportedOperationException();
     }
 
     @Override
     public void visitServiceDescriptor(String type, String classname, Element originatingElement) {
-
+        throw new UnsupportedOperationException();
     }
 
     @Override
     public Optional<GeneratedFile> visitGeneratedFile(String path, Element... originatingElements) {
-        return Optional.empty();
+        throw new UnsupportedOperationException();
     }
 
     @Override
     public void finish() {
-
+        throw new UnsupportedOperationException();
     }
 }
