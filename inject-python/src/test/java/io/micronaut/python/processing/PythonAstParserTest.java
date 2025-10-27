@@ -3,6 +3,7 @@ package io.micronaut.python.processing;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -10,13 +11,18 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import io.micronaut.context.annotation.BeanProperties;
 import org.junit.jupiter.api.Test;
 
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
+import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.ast.PropertyElement;
+import io.micronaut.inject.ast.PropertyElementQuery;
 import io.micronaut.python.processing.visitor.ArgumentDef;
 import io.micronaut.python.processing.visitor.ArgumentsDef;
 import io.micronaut.python.processing.visitor.ClassDef;
@@ -1147,5 +1153,302 @@ public class PythonAstParserTest {
                 assertEquals(100, countMaxValue.getAsInt(), "Max annotation should have value 100");
             }
         }
+    }
+
+    @Test
+    void testFieldBasedPropertySupport() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        try (PythonEnvironment environment = pythonProcessor.parse("""
+            class TestFieldProperties:
+                # Regular field properties
+                name: str = "test"
+                age: int = 25
+                active: bool = True
+
+                # Method (should not be a property)
+                def method(self):
+                    return "not a property"
+            """)) {
+
+            try (PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment)) {
+                ClassElement classElement = processingEnvironment.classes().get("TestFieldProperties");
+                assertNotNull(classElement);
+                assertInstanceOf(PythonClassElement.class, classElement);
+
+                PythonClassElement pythonClass = (PythonClassElement) classElement;
+
+                // Test getBeanProperties
+                List<PropertyElement> properties = pythonClass.getBeanProperties();
+                assertNotNull(properties, "getBeanProperties should return a list");
+
+                // Debug: print what we found
+                System.out.println("Found " + properties.size() + " properties:");
+                properties.forEach(p -> System.out.println("  - " + p.getName() + " (" + p.getType().getName() + ")"));
+
+                // Debug: check what's in the class definition
+                ClassDef testClassDef = environment.classes().get("TestFieldProperties");
+                System.out.println("ClassDef attributes: " + testClassDef.attributes().size());
+                testClassDef.attributes().forEach(attr -> System.out.println("  - attr: " + attr.name() + " (" + attr.annotation() + ")"));
+                System.out.println("ClassDef properties: " + testClassDef.properties().size());
+                testClassDef.properties().forEach(prop -> System.out.println("  - prop: " + prop.name()));
+
+                // Should find the field-based properties
+                assertTrue(properties.size() >= 3, "Should find at least 3 field-based properties. Found: " + properties.size());
+
+                // Find the name property
+                PropertyElement nameProperty = properties.stream()
+                    .filter(p -> "name".equals(p.getName()))
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError("name property should be found"));
+
+                assertEquals("java.lang.String", nameProperty.getType().getName(), "name property should have String type");
+                assertEquals(PropertyElement.AccessKind.FIELD, nameProperty.getReadAccessKind(), "name should be FIELD access");
+                assertEquals(PropertyElement.AccessKind.FIELD, nameProperty.getWriteAccessKind(), "name should be FIELD write access");
+
+                // Should have a field but no read/write methods
+                assertTrue(nameProperty.getField().isPresent(), "name property should have a field");
+                assertFalse(nameProperty.getReadMethod().isPresent(), "name property should not have read method");
+                assertFalse(nameProperty.getWriteMethod().isPresent(), "name property should not have write method");
+
+                // Find the age property
+                PropertyElement ageProperty = properties.stream()
+                    .filter(p -> "age".equals(p.getName()))
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError("age property should be found"));
+
+                assertEquals("int", ageProperty.getType().getName(), "age property should have int type");
+
+                // Find the active property
+                PropertyElement activeProperty = properties.stream()
+                    .filter(p -> "active".equals(p.getName()))
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError("active property should be found"));
+
+                assertEquals("boolean", activeProperty.getType().getName(), "active property should have boolean type");
+            }
+        }
+    }
+
+    @Test
+    void testPropertyDecoratorSupport() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        try (PythonEnvironment environment = pythonProcessor.parse("""
+            class TestPropertyDecorators:
+                _price = 0.0  # backing field
+
+                @property
+                def price(self) -> float:
+                    '''Get the current price.'''
+                    return self._price
+
+                @price.setter
+                def price(self, value: float):
+                    '''Set the price.'''
+                    if value >= 0:
+                        self._price = value
+
+                @property
+                def read_only_name(self) -> str:
+                    '''Read-only name property.'''
+                    return "readonly"
+
+                # Regular field
+                description: str = "test"
+            """)) {
+
+            try (PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment)) {
+                ClassElement classElement = processingEnvironment.classes().get("TestPropertyDecorators");
+                assertNotNull(classElement);
+                assertInstanceOf(PythonClassElement.class, classElement);
+
+                PythonClassElement pythonClass = (PythonClassElement) classElement;
+
+                // Test getBeanProperties
+                List<PropertyElement> properties = pythonClass.getBeanProperties();
+                assertNotNull(properties, "getBeanProperties should return a list");
+
+                // Should find properties
+                assertTrue(properties.size() >= 3, "Should find at least 3 properties");
+
+                // Test price property (has both getter and setter)
+                PropertyElement priceProperty = properties.stream()
+                    .filter(p -> "price".equals(p.getName()))
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError("price property should be found"));
+
+                assertEquals("double", priceProperty.getType().getName(), "price property should have double type");
+                assertEquals(PropertyElement.AccessKind.METHOD, priceProperty.getReadAccessKind(), "price read should be METHOD access");
+                assertEquals(PropertyElement.AccessKind.METHOD, priceProperty.getWriteAccessKind(), "price write should be METHOD access");
+
+                // Should have both read and write methods
+                assertTrue(priceProperty.getReadMethod().isPresent(), "price property should have read method");
+                assertTrue(priceProperty.getWriteMethod().isPresent(), "price property should have write method");
+
+                // Test read method details
+                MethodElement readMethod = priceProperty.getReadMethod().get();
+                assertEquals("price", readMethod.getName(), "read method should be named price");
+                assertEquals("double", readMethod.getReturnType().getName(), "read method should return double");
+
+                // Test write method details
+                MethodElement writeMethod = priceProperty.getWriteMethod().get();
+                assertEquals("price", writeMethod.getName(), "write method should be named price");
+                assertEquals(1, writeMethod.getParameters().length, "write method should have 1 parameter");
+                assertEquals("double", writeMethod.getParameters()[0].getType().getName(), "write method parameter should be double");
+
+                // Test read-only property
+                PropertyElement nameProperty = properties.stream()
+                    .filter(p -> "read_only_name".equals(p.getName()))
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError("read_only_name property should be found"));
+
+                assertEquals("java.lang.String", nameProperty.getType().getName(), "read_only_name property should have String type");
+                assertEquals(PropertyElement.AccessKind.METHOD, nameProperty.getReadAccessKind(), "read_only_name read should be METHOD access");
+                assertNull(nameProperty.getWriteAccessKind(), "read_only_name should not have write access");
+
+                assertTrue(nameProperty.getReadMethod().isPresent(), "read_only_name property should have read method");
+                assertFalse(nameProperty.getWriteMethod().isPresent(), "read_only_name property should not have write method");
+                assertFalse(nameProperty.getField().isPresent(), "read_only_name property should not have field");
+
+                assertTrue(nameProperty.isReadOnly(), "read_only_name should be read-only");
+                assertFalse(nameProperty.isWriteOnly(), "read_only_name should not be write-only");
+
+                // Test documentation
+                Optional<String> nameDoc = nameProperty.getDocumentation(true);
+                assertTrue(nameDoc.isPresent(), "read_only_name should have documentation");
+                assertEquals("Read-only name property.", nameDoc.get().trim());
+
+                // Test field-based property
+                PropertyElement descProperty = properties.stream()
+                    .filter(p -> "description".equals(p.getName()))
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError("description property should be found"));
+
+                assertEquals("java.lang.String", descProperty.getType().getName(), "description property should have String type");
+                assertEquals(PropertyElement.AccessKind.FIELD, descProperty.getReadAccessKind(), "description should be FIELD access");
+                assertTrue(descProperty.getField().isPresent(), "description should have field");
+                assertFalse(descProperty.getReadMethod().isPresent(), "description should not have read method");
+            }
+        }
+    }
+
+    @Test
+    void testPropertyElementWithQuery() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        try (PythonEnvironment environment = pythonProcessor.parse("""
+            class TestPropertyQuery:
+                # Regular field
+                name: str = "test"
+
+                # Property with getter and setter
+                @property
+                def age(self) -> int:
+                    return 25
+
+                @age.setter
+                def age(self, value: int):
+                    pass
+
+                # Read-only property
+                @property
+                def readonly(self) -> str:
+                    return "readonly"
+            """)) {
+
+            try (PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment)) {
+                ClassElement classElement = processingEnvironment.classes().get("TestPropertyQuery");
+                assertNotNull(classElement);
+                assertInstanceOf(PythonClassElement.class, classElement);
+
+                PythonClassElement pythonClass = (PythonClassElement) classElement;
+
+                // Test getBeanProperties with default query
+                List<PropertyElement> allProperties = pythonClass.getBeanProperties();
+                assertNotNull(allProperties);
+                assertTrue(allProperties.size() >= 1, "Should find at least 1 property");
+
+                PropertyElementQuery allPropertiesQuery = PropertyElementQuery.of(pythonClass.getAnnotationMetadata())
+                    .accessKinds(Set.of(BeanProperties.AccessKind.FIELD, BeanProperties.AccessKind.METHOD));
+                List<PropertyElement> queriedProperties = pythonClass.getBeanProperties(allPropertiesQuery);
+
+                assertNotNull(queriedProperties);
+                assertEquals(allProperties.size(), queriedProperties.size(), "Query results should match default");
+
+                // Test PropertyElementQuery filtering
+                testPropertyElementQueryFiltering(pythonClass);
+
+                // Results should be the same
+                assertEquals(allProperties.size(), queriedProperties.size(), "Query results should match default");
+
+                // Test property details
+                PropertyElement ageProperty = allProperties.stream()
+                    .filter(p -> "age".equals(p.getName()))
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError("age property should be found"));
+
+                assertFalse(ageProperty.isReadOnly(), "age should not be read-only");
+                assertFalse(ageProperty.isWriteOnly(), "age should not be write-only");
+
+                // Test read/write type information
+                Optional<ClassElement> readType = ageProperty.getReadType();
+                assertTrue(readType.isPresent(), "age should have read type");
+                assertEquals("int", readType.get().getName());
+
+                Optional<ClassElement> writeType = ageProperty.getWriteType();
+                assertTrue(writeType.isPresent(), "age should have write type");
+                assertEquals("int", writeType.get().getName());
+
+                // Test member access
+                Optional<? extends MemberElement> readMember = ageProperty.getReadMember();
+                assertTrue(readMember.isPresent(), "age should have read member");
+                assertTrue(readMember.get() instanceof MethodElement, "read member should be a method");
+
+                Optional<? extends MemberElement> writeMember = ageProperty.getWriteMember();
+                assertTrue(writeMember.isPresent(), "age should have write member");
+                assertTrue(writeMember.get() instanceof MethodElement, "write member should be a method");
+
+                // Test readonly property
+                PropertyElement readonlyProperty = allProperties.stream()
+                    .filter(p -> "readonly".equals(p.getName()))
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError("readonly property should be found"));
+
+                assertTrue(readonlyProperty.isReadOnly(), "readonly should be read-only");
+                assertFalse(readonlyProperty.isWriteOnly(), "readonly should not be write-only");
+
+                Optional<? extends MemberElement> readonlyWriteMember = readonlyProperty.getWriteMember();
+                assertFalse(readonlyWriteMember.isPresent(), "readonly should not have write member");
+            }
+        }
+    }
+
+    private static void testPropertyElementQueryFiltering(PythonClassElement pythonClass) {
+        // First, get all properties to understand what we have
+        List<PropertyElement> allProperties = pythonClass.getBeanProperties();
+        System.out.println("All properties found:");
+        allProperties.forEach(p -> {
+            String accessKind = p.getReadAccessKind() + "/" + (p.getWriteAccessKind() != null ? p.getWriteAccessKind() : "null");
+            System.out.println("  - " + p.getName() + " (" + accessKind + ")");
+        });
+
+        // Test includes filtering
+        PropertyElementQuery includesQuery = PropertyElementQuery.of(pythonClass.getAnnotationMetadata())
+            .includes(Set.of("name", "age"));
+        List<PropertyElement> includedProperties = pythonClass.getBeanProperties(includesQuery);
+        assertEquals(2, includedProperties.size(), "Should include only name and age");
+        assertTrue(includedProperties.stream().anyMatch(p -> "name".equals(p.getName())), "Should include name");
+        assertTrue(includedProperties.stream().anyMatch(p -> "age".equals(p.getName())), "Should include age");
+
+        // Test excludes filtering
+        PropertyElementQuery excludesQuery = PropertyElementQuery.of(pythonClass.getAnnotationMetadata())
+            .excludes(Set.of("readonly"));
+        List<PropertyElement> excludedProperties = pythonClass.getBeanProperties(excludesQuery);
+        assertFalse(excludedProperties.stream().anyMatch(p -> "readonly".equals(p.getName())), "Should exclude readonly");
+
+        // Test static properties filtering - should exclude static properties
+        PropertyElementQuery noStaticQuery = PropertyElementQuery.of(pythonClass.getAnnotationMetadata())
+            .allowStaticProperties(false);
+        List<PropertyElement> noStaticProperties = pythonClass.getBeanProperties(noStaticQuery);
+        // All our test properties are non-static, so size should remain the same
+        assertEquals(allProperties.size(), noStaticProperties.size(), "Should include all non-static properties");
     }
 }

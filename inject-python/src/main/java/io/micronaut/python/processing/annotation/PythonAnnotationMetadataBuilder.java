@@ -34,6 +34,7 @@ import io.micronaut.python.processing.visitor.ClassDef;
 import io.micronaut.python.processing.visitor.DecoratorDef;
 import io.micronaut.python.processing.visitor.ElementDef;
 import io.micronaut.python.processing.visitor.FunctionDef;
+import io.micronaut.python.processing.visitor.PropertyDef;
 import io.micronaut.python.processing.visitor.PythonVisitorContext;
 
 /**
@@ -111,6 +112,17 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
         } else if (element instanceof FunctionDef functionDef) {
             // TODO: include parent class of FunctionDef
             return List.of(functionDef);
+        } else if (element instanceof PropertyDef propertyDef) {
+            // For properties, include the property itself and its read/write methods
+            List<ElementDef> hierarchy = new java.util.ArrayList<>();
+            hierarchy.add(propertyDef);
+            if (propertyDef.getter() != null) {
+                hierarchy.add(propertyDef.getter());
+            }
+            if (propertyDef.setter() != null) {
+                hierarchy.add(propertyDef.setter());
+            }
+            return hierarchy;
         } else if (element instanceof AttributeDef attributeDef) {
             return List.of(attributeDef);
         } else if (element instanceof io.micronaut.python.processing.visitor.ArgumentDef argumentDef) {

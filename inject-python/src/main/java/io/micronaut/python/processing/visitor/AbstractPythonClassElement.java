@@ -15,6 +15,12 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+
+import io.micronaut.context.annotation.BeanProperties;
 import io.micronaut.inject.ast.ArrayableClassElement;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
@@ -23,13 +29,11 @@ import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.PropertyElement;
+import io.micronaut.inject.ast.PropertyElementQuery;
 import io.micronaut.inject.ast.utils.EnclosedElementsQuery;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.python.processing.util.GraalPyUtil;
-
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
 
 public abstract sealed class AbstractPythonClassElement extends AbstractPythonElement implements ArrayableClassElement permits PythonClassElement, PythonEnumElement {
     protected final int arrayDimensions;
@@ -94,6 +98,161 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
             return Optional.of(GraalPyUtil.parsePythonDocstring(doc));
         }
         return Optional.of(doc);
+    }
+
+    @Override
+    public List<PropertyElement> getBeanProperties() {
+        PropertyElementQuery defaultPropertyElementQuery = PropertyElementQuery.of(this);
+        return getBeanProperties(defaultPropertyElementQuery);
+    }
+
+    @Override
+    public List<PropertyElement> getBeanProperties(PropertyElementQuery propertyElementQuery) {
+        // differentiating this for Python doesn't make sense.
+        propertyElementQuery = propertyElementQuery.accessKinds(Set.of(BeanProperties.AccessKind.FIELD, BeanProperties.AccessKind.METHOD));
+        // For Python, we create properties from both @property decorators and regular attributes
+
+        // First, add properties from @property decorators (these are already PropertyDef instances)
+        List<PropertyElement> decoratorProperties = getEnclosedElements(ElementQuery.of(PropertyElement.class));
+        List<PropertyElement> allProperties = new java.util.ArrayList<>(decoratorProperties);
+
+        // Then, create properties from regular attributes that aren't already represented as properties
+        List<FieldElement> fields = getEnclosedElements(ElementQuery.ALL_FIELDS);
+        for (FieldElement field : fields) {
+            // Check if this field is already represented as a property
+            boolean alreadyExists = allProperties.stream()
+                .anyMatch(prop -> prop.getName().equals(field.getName()));
+
+            if (!alreadyExists) {
+                // Create a field-based property from the attribute
+                PropertyDef propertyDef = new PropertyDef(field.getName());
+                propertyDef = propertyDef.withField((AttributeDef) field.getNativeType());
+
+                PythonPropertyElement propertyElement = new PythonPropertyElement(
+                    propertyDef,
+                    environment,
+                    (AbstractPythonClassElement) field.getDeclaringType(),
+                    (AbstractPythonClassElement) field.getOwningType(),
+                    environment.metadataFactory()
+                );
+                allProperties.add(propertyElement);
+            }
+        }
+
+        // Apply propertyElementQuery filtering
+        return filterProperties(allProperties, propertyElementQuery);
+    }
+
+    private List<PropertyElement> filterProperties(List<PropertyElement> properties, PropertyElementQuery query) {
+        if (properties.isEmpty()) {
+            return properties;
+        }
+
+        Set<String> includes = query.getIncludes();
+        Set<String> excludes = query.getExcludes();
+        Set<String> excludedAnnotations = query.getExcludedAnnotations();
+        Set<io.micronaut.context.annotation.BeanProperties.AccessKind> accessKinds = query.getAccessKinds();
+        io.micronaut.context.annotation.BeanProperties.Visibility visibility = query.getVisibility();
+        boolean allowStaticProperties = query.isAllowStaticProperties();
+
+        List<PropertyElement> filteredProperties = new java.util.ArrayList<>();
+
+        for (PropertyElement property : properties) {
+            String propertyName = property.getName();
+
+            // Apply includes/excludes filtering
+            if (!includes.isEmpty() && !includes.contains(propertyName)) {
+                continue;
+            }
+            if (!excludes.isEmpty() && excludes.contains(propertyName)) {
+                continue;
+            }
+
+            // Apply annotation-based exclusion
+            if (isExcludedByAnnotations(property, excludedAnnotations)) {
+                continue;
+            }
+
+            // Apply access kind filtering
+            if (!isAccessibleViaAccessKinds(property, accessKinds)) {
+                continue;
+            }
+
+            // Apply visibility filtering
+            if (!isAccessibleViaVisibility(property, visibility)) {
+                continue;
+            }
+
+            // Apply static properties filtering
+            if (!allowStaticProperties && isStaticProperty(property)) {
+                continue;
+            }
+
+            filteredProperties.add(property);
+        }
+
+        return filteredProperties;
+    }
+
+    private boolean isExcludedByAnnotations(PropertyElement property, Set<String> excludedAnnotations) {
+        if (excludedAnnotations.isEmpty()) {
+            return false;
+        }
+
+        // Check if any of the property's elements (field, getter, setter) have excluded annotations
+        if (property.getField().isPresent() && hasExcludedAnnotation(property.getField().get(), excludedAnnotations)) {
+            return true;
+        }
+        if (property.getReadMethod().isPresent() && hasExcludedAnnotation(property.getReadMethod().get(), excludedAnnotations)) {
+            return true;
+        }
+        if (property.getWriteMethod().isPresent() && hasExcludedAnnotation(property.getWriteMethod().get(), excludedAnnotations)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private boolean hasExcludedAnnotation(io.micronaut.inject.ast.Element element, Set<String> excludedAnnotations) {
+        return excludedAnnotations.stream().anyMatch(element::hasAnnotation);
+    }
+
+    private boolean isAccessibleViaAccessKinds(PropertyElement property, Set<io.micronaut.context.annotation.BeanProperties.AccessKind> accessKinds) {
+        // Check if any of the requested access kinds match the property's actual access kinds
+        if (accessKinds.contains(io.micronaut.context.annotation.BeanProperties.AccessKind.METHOD)) {
+            // Property has METHOD access if it has a getter or setter
+            if (property.getReadMethod().isPresent() || property.getWriteMethod().isPresent()) {
+                return true;
+            }
+        }
+        if (accessKinds.contains(io.micronaut.context.annotation.BeanProperties.AccessKind.FIELD)) {
+            // Property has FIELD access if it has a field (field-based property)
+            if (property.getField().isPresent()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isAccessibleViaVisibility(PropertyElement property, io.micronaut.context.annotation.BeanProperties.Visibility visibility) {
+        // For Python, we consider all properties accessible for now
+        // In the future, we could check for private/protected modifiers if Python supports them
+        return visibility == io.micronaut.context.annotation.BeanProperties.Visibility.ANY ||
+               visibility == io.micronaut.context.annotation.BeanProperties.Visibility.DEFAULT ||
+               visibility == io.micronaut.context.annotation.BeanProperties.Visibility.PUBLIC;
+    }
+
+    private boolean isStaticProperty(PropertyElement property) {
+        // Check if the property is backed by a static field
+        return property.getField()
+            .map(field -> {
+                if (field instanceof PythonFieldElement pythonField) {
+                    AttributeDef attrDef = pythonField.getNativeType();
+                    return attrDef.isStatic();
+                }
+                return false;
+            })
+            .orElse(false);
     }
 
     private final class PythonEnclosedElementsQuery extends EnclosedElementsQuery<ClassDef, ElementDef> {
@@ -178,6 +337,12 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
                 elements.addAll(classNode.attributes());
             }
 
+            // Add properties if the query is for properties or members
+            if (elementType == PropertyElement.class ||
+                elementType == MemberElement.class) {
+                elements.addAll(classNode.properties());
+            }
+
             return elements;
         }
 
@@ -216,6 +381,8 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
                 return new PythonMethodElement(functionDef, environment, declaringClassElement, AbstractPythonClassElement.this, environment.metadataFactory());
             } else if (nativeType instanceof AttributeDef attributeDef) {
                 return new PythonFieldElement(attributeDef, environment, declaringClassElement, AbstractPythonClassElement.this, environment.metadataFactory());
+            } else if (nativeType instanceof PropertyDef propertyDef) {
+                return new PythonPropertyElement(propertyDef, environment, declaringClassElement, AbstractPythonClassElement.this, environment.metadataFactory());
             }
             throw new IllegalStateException("Unknown native type: " + nativeType.getClass());
         }

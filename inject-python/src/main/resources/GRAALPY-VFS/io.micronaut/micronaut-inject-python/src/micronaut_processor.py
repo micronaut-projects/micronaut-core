@@ -5,6 +5,7 @@ from collections import OrderedDict
 JavaClassDef = java.type("io.micronaut.python.processing.visitor.ClassDef")
 JavaFuncDef = java.type("io.micronaut.python.processing.visitor.FunctionDef")
 JavaAttributeDef = java.type("io.micronaut.python.processing.visitor.AttributeDef")
+PropertyDef = java.type("io.micronaut.python.processing.visitor.PropertyDef")
 DecoratorDef = java.type("io.micronaut.python.processing.visitor.DecoratorDef")
 ArgumentsDef = java.type("io.micronaut.python.processing.visitor.ArgumentsDef")
 ArgumentDef = java.type("io.micronaut.python.processing.visitor.ArgumentDef")
@@ -30,6 +31,7 @@ class PrintNodeVisitor(ast.NodeVisitor):
         self.known_decorator_functions = OrderedDict()
         self.current_class = None
         self.current_class_attributes = []
+        self.current_class_properties = {}  # Track properties being built: name -> PropertyDef
         self.last_attribute = None  # Track last processed attribute for docstring handling
 
     def visit(self, node: ast.AST) -> ast.AST:
@@ -59,7 +61,7 @@ class PrintNodeVisitor(ast.NodeVisitor):
 
                 # Extract class docstring
                 class_doc = self._extract_docstring(node)
-                self.current_class = JavaClassDef(node.name, self.package_name, bases, decorators, [], [], [], None, False, [], class_doc)
+                self.current_class = JavaClassDef(node.name, self.package_name, bases, decorators, [], [], [], [], None, False, [], class_doc)
                 self.current_class_attributes = []
 
                 # Check if this is an enum class
@@ -75,6 +77,10 @@ class PrintNodeVisitor(ast.NodeVisitor):
                     for attr in self.current_class_attributes:
                         self.current_class = self.current_class.withAttribute(attr)
 
+                    # Add collected properties to the class
+                    for property_def in self.current_class_properties.values():
+                        self.current_class = self.current_class.withProperty(property_def)
+
                     # Set enum information if applicable
                     if is_enum:
                         self.current_class = self.current_class.withEnum(True, enum_values)
@@ -82,11 +88,16 @@ class PrintNodeVisitor(ast.NodeVisitor):
                     self.callback.apply(self.current_class)
                     self.current_class = None
                     self.current_class_attributes = []
+                    self.current_class_properties = {}
                 return result
             case ast.FunctionDef():
-                # Skip @property decorated functions - they should be represented as PropertyElement
-                if self.current_class is not None and is_property_decorator(node):
-                    return node
+                # Handle property decorators
+                if self.current_class is not None:
+                    property_info = self._parse_property_decorators(node)
+                    if property_info:
+                        property_name, property_type = property_info
+                        self._handle_property_function(property_name, property_type, node)
+                        return node
 
                 if self.current_class is None and is_micronaut_decorator(node):
                     arg_dict = extract_arg_defaults(node)
@@ -163,8 +174,8 @@ class PrintNodeVisitor(ast.NodeVisitor):
                     value = None  # Non-evaluable expressions
 
                 # Determine if it's a class variable (static) or instance variable
-                # For simplicity, assume class-level assignments are static
-                is_static = True  # This is a heuristic; could be improved
+                # For Micronaut properties, treat class attributes as instance fields
+                is_static = False  # Regular Python attributes should be writable
 
                 attr_def = JavaAttributeDef(attr_name, None, None, value, [], None, is_static)
                 self.current_class_attributes.append(attr_def)
@@ -205,7 +216,8 @@ class PrintNodeVisitor(ast.NodeVisitor):
                         decorators = parsed_decorators  # Add any decorators found
 
                 # Determine if static (heuristic)
-                is_static = True
+                # For Micronaut properties, treat annotated attributes as instance fields
+                is_static = False
 
                 attr_def = JavaAttributeDef(attr_name, annotation, type_name, value, decorators, None, is_static)
                 self.current_class_attributes.append(attr_def)
@@ -382,6 +394,59 @@ class PrintNodeVisitor(ast.NodeVisitor):
             return DecoratorDef(decorator_name, decorator_name, members, [])
 
         return None
+
+    def _parse_property_decorators(self, func_node):
+        """
+        Parse property decorators from a function node.
+        Returns (property_name, property_type) if this is a property decorator, None otherwise.
+        property_type can be 'getter', 'setter', or 'deleter'
+        """
+        for decorator in func_node.decorator_list:
+            if isinstance(decorator, ast.Name) and decorator.id == "property":
+                # This is a @property getter
+                return func_node.name, "getter"
+            elif isinstance(decorator, ast.Attribute):
+                # Handle @property.setter or @property.deleter
+                if isinstance(decorator.value, ast.Name) and decorator.value.id == func_node.name:
+                    if decorator.attr == "setter":
+                        return func_node.name, "setter"
+                    elif decorator.attr == "deleter":
+                        return func_node.name, "deleter"
+        return None
+
+    def _handle_property_function(self, property_name, property_type, func_node):
+        """
+        Handle a property function (getter, setter, or deleter).
+        Creates or updates PropertyDef instances in self.current_class_properties.
+        """
+        if property_name not in self.current_class_properties:
+            # Create new property
+            self.current_class_properties[property_name] = PropertyDef(property_name)
+
+        property_def = self.current_class_properties[property_name]
+
+        # Parse function arguments and return type
+        arguments = parse_function_arguments(func_node)
+        return_type_annotation = parse_function_return_type(func_node)
+        func_doc = self._extract_docstring(func_node)
+
+        decorators = [
+            decorator_to_function(self, d)
+            for d in func_node.decorator_list
+            if decorator_to_function(self, d) is not None
+        ]
+
+        is_abstract = is_abstract_method(func_node)
+
+        func_def = JavaFuncDef(func_node.name, arguments, decorators, return_type_annotation, "", [], func_doc, is_abstract)
+
+        # Update the property based on type
+        if property_type == "getter":
+            property_def = property_def.withGetter(func_def)
+        elif property_type == "setter":
+            property_def = property_def.withSetter(func_def)
+
+        self.current_class_properties[property_name] = property_def
 
     def _extract_docstring(self, node):
         """
