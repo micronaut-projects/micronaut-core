@@ -30,15 +30,18 @@ import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementFactory;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.GeneratedFile;
+import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.python.processing.annotation.PythonAnnotationMetadataBuilder;
 import io.micronaut.python.processing.annotation.PythonElementAnnotationMetadataFactory;
 
 public class PythonVisitorContext implements VisitorContext {
     private final MutableConvertibleValues<Object> visitorAttributes = new MutableConvertibleValuesMap<>();
     private final Map<String, DecoratorDef> decorators;
+    private final PythonProcessingEnvironment processingEnvironment;
 
-    public PythonVisitorContext(Map<String, DecoratorDef> decorators) {
+    public PythonVisitorContext(Map<String, DecoratorDef> decorators, PythonProcessingEnvironment processingEnvironment) {
         this.decorators = decorators;
+        this.processingEnvironment = processingEnvironment;
     }
 
     @Override
@@ -48,7 +51,7 @@ public class PythonVisitorContext implements VisitorContext {
 
     @Override
     public ElementFactory<?, ?, ?, ?> getElementFactory() {
-        return null;
+        return new PythonElementFactory(processingEnvironment);
     }
 
     @Override

@@ -16,8 +16,10 @@
 package io.micronaut.python.processing.visitor;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.EnumConstantElement;
 import io.micronaut.inject.ast.EnumElement;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 
@@ -72,6 +74,17 @@ public final class PythonEnumElement extends AbstractPythonClassElement implemen
     @Override
     public List<String> values() {
         return getNativeType().values();
+    }
+
+    @Override
+    public List<EnumConstantElement> elements() {
+        return getNativeType().values().stream()
+            .map(enumValue -> {
+                // Create a synthetic AttributeDef for the enum constant
+                AttributeDef constantDef = new AttributeDef(enumValue, getName(), getName(), null, List.of(), null, true);
+                return new PythonEnumConstantElement(constantDef, environment, this, this, environment.metadataFactory());
+            })
+            .collect(Collectors.toList());
     }
 
     @Override
