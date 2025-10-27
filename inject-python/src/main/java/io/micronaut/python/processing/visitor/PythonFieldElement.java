@@ -15,14 +15,15 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import java.util.Objects;
+
+import org.graalvm.polyglot.Value;
+
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.python.processing.util.GraalPyUtil;
-import org.graalvm.polyglot.Value;
-
-import java.util.Objects;
 
 /**
  * A field element returning data from a Python {@link AttributeDef}.
@@ -103,16 +104,6 @@ public final class PythonFieldElement extends AbstractPythonElement implements F
         if (attributeDef.annotation() != null) {
             // Try to resolve the type annotation
             String annotation = attributeDef.annotation();
-            // Handle typing.Annotated specially
-            if (annotation.startsWith("Annotated[") || annotation.startsWith("typing.Annotated[")) {
-                // Extract the actual type from Annotated[type, metadata]
-                int startIdx = annotation.indexOf('[');
-                int endIdx = annotation.lastIndexOf(',');
-                if (startIdx > 0 && endIdx > startIdx) {
-                    String actualType = annotation.substring(startIdx + 1, endIdx).trim();
-                    return GraalPyUtil.resolvePythonTypeToJava(actualType, environment.visitorContext());
-                }
-            }
             return GraalPyUtil.resolvePythonTypeToJava(annotation, environment.visitorContext());
         }
         // Infer from value if no annotation

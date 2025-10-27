@@ -66,13 +66,23 @@ public final class GraalPyUtil {
      * Attempts to map Python primitive types to equivalent Java primitive types using PrimitiveElement,
      * otherwise falls back to visitor context lookup.
      *
-     * @param typeAnnotation the Python type annotation string (e.g., "int", "str", "bool", "float")
+     * @param typeAnnotation the Python type annotation string (e.g., "int", "str", "bool", "float", "Annotated[float, Gt(0)]")
      * @param visitorContext the visitor context for class element lookup
      * @return the resolved ClassElement, or Object ClassElement if resolution fails
      */
     public static ClassElement resolvePythonTypeToJava(String typeAnnotation, PythonVisitorContext visitorContext) {
         if (typeAnnotation == null || typeAnnotation.isBlank()) {
             return visitorContext.getClassElement(Object.class).orElse(ClassElement.of(Object.class));
+        }
+
+        // Handle Annotated types by extracting the base type
+        if (typeAnnotation.startsWith("Annotated[")) {
+            int bracketStart = typeAnnotation.indexOf('[');
+            int firstComma = typeAnnotation.indexOf(',', bracketStart);
+            if (firstComma != -1) {
+                String baseType = typeAnnotation.substring(bracketStart + 1, firstComma).trim();
+                return resolvePythonTypeToJava(baseType, visitorContext);
+            }
         }
 
         // Try to map Python primitive types to Java primitives

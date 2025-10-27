@@ -166,7 +166,7 @@ class PrintNodeVisitor(ast.NodeVisitor):
                 # For simplicity, assume class-level assignments are static
                 is_static = True  # This is a heuristic; could be improved
 
-                attr_def = JavaAttributeDef(attr_name, None, value, [], None, is_static)
+                attr_def = JavaAttributeDef(attr_name, None, None, value, [], None, is_static)
                 self.current_class_attributes.append(attr_def)
 
     def _handle_ann_assign(self, node):
@@ -194,14 +194,20 @@ class PrintNodeVisitor(ast.NodeVisitor):
                 except Exception:
                     value = None
 
-                # Check for @dataclass.field() or other decorators
+                # Check for typing.Annotated and extract decorators from metadata
                 decorators = []
-                # Note: AnnAssign doesn't have decorators directly, but we could check context
+                type_name = annotation  # Default to full annotation
+
+                if isinstance(node.annotation, ast.Subscript) and isinstance(node.annotation.value, ast.Name) and node.annotation.value.id == 'Annotated':
+                    parsed_annotation, parsed_decorators = self._parse_annotated_type(node.annotation)
+                    if parsed_annotation:
+                        type_name = parsed_annotation   # Use extracted type for typeName
+                        decorators = parsed_decorators  # Add any decorators found
 
                 # Determine if static (heuristic)
                 is_static = True
 
-                attr_def = JavaAttributeDef(attr_name, annotation, value, decorators, None, is_static)
+                attr_def = JavaAttributeDef(attr_name, annotation, type_name, value, decorators, None, is_static)
                 self.current_class_attributes.append(attr_def)
                 self.last_attribute = attr_def
 
@@ -224,6 +230,7 @@ class PrintNodeVisitor(ast.NodeVisitor):
                 updated_attr = JavaAttributeDef(
                     self.last_attribute.name(),
                     self.last_attribute.annotation(),
+                    self.last_attribute.typeName(),
                     self.last_attribute.value(),
                     self.last_attribute.decorators(),
                     docstring.strip(),
@@ -267,6 +274,114 @@ class PrintNodeVisitor(ast.NodeVisitor):
                         # For now, collect all non-private assignments as potential enum values
                         enum_values.append(name)
         return enum_values
+
+    def _parse_annotated_type(self, annotation_node):
+        """
+        Parse a typing.Annotated type annotation and extract the actual type and metadata decorators.
+        Returns (type_annotation, decorators_list)
+        """
+        decorators = []
+
+        # Parse the Annotated subscript arguments
+        if isinstance(annotation_node, ast.Subscript):
+            # Check if it's Annotated[...]
+            if isinstance(annotation_node.value, ast.Name) and annotation_node.value.id == 'Annotated':
+                # Extract from AST nodes
+                args = self._extract_subscript_args(annotation_node)
+                if args:
+                    try:
+                        type_annotation = self._extract_type_name(args[0])
+                    except:
+                        type_annotation = "object"  # fallback
+                    # Remaining args are metadata
+                    for metadata in args[1:]:
+                        if isinstance(metadata, ast.Call):
+                            decorator = self._parse_metadata_call(metadata)
+                            if decorator:
+                                decorators.append(decorator)
+                        # For non-call metadata, we could handle strings or other literals
+                        # but for now, focus on calls like Gt(0)
+
+        # Fallback to original annotation
+        try:
+            type_annotation = ast.unparse(annotation_node) if hasattr(ast, 'unparse') else ast.dump(annotation_node)
+        except:
+            type_annotation = "object"
+
+        return type_annotation, decorators
+
+    def _extract_subscript_args(self, subscript_node):
+        """
+        Extract arguments from a subscript AST node.
+        """
+        args = []
+        slice_node = subscript_node.slice
+
+        # Handle different slice formats
+        if isinstance(slice_node, ast.Index):  # Python < 3.9
+            slice_node = slice_node.value
+
+        if isinstance(slice_node, ast.Tuple):
+            args = slice_node.elts
+        elif slice_node:  # Single argument
+            args = [slice_node]
+
+        return args
+
+    def _extract_type_name(self, type_node):
+        """
+        Extract a type name from an AST type node.
+        """
+        if isinstance(type_node, ast.Name):
+            return type_node.id
+        elif isinstance(type_node, ast.Attribute):
+            # Handle qualified names like typing.List
+            names = []
+            current = type_node
+            while isinstance(current, ast.Attribute):
+                names.insert(0, current.attr)
+                current = current.value
+            if isinstance(current, ast.Name):
+                names.insert(0, current.id)
+            return '.'.join(names)
+        elif hasattr(ast, 'unparse'):
+            return ast.unparse(type_node)
+        else:
+            return ast.dump(type_node)
+
+    def _parse_metadata_call(self, call_node):
+        """
+        Parse a metadata call like Gt(0) into a DecoratorDef.
+        """
+        if isinstance(call_node, ast.Call) and isinstance(call_node.func, ast.Name):
+            decorator_name = call_node.func.id
+            # Extract arguments
+            members = {}
+            for i, arg in enumerate(call_node.args):
+                try:
+                    value = ast.literal_eval(arg)
+                    # For positional args, use generic names or indices
+                    # For validation constraints, typically the first arg is the value
+                    if i == 0:
+                        members['value'] = value
+                    else:
+                        members[f'arg{i}'] = value
+                except:
+                    members[f'arg{i}'] = ast.dump(arg) if hasattr(ast, 'dump') else str(arg)
+
+            # For keyword args
+            for kw in call_node.keywords:
+                if kw.arg:
+                    try:
+                        value = ast.literal_eval(kw.value)
+                        members[kw.arg] = value
+                    except:
+                        members[kw.arg] = ast.dump(kw.value) if hasattr(ast, 'dump') else str(kw.value)
+
+            # Create DecoratorDef with annotationName = name (assuming it's a Micronaut annotation)
+            return DecoratorDef(decorator_name, decorator_name, members, [])
+
+        return None
 
     def _extract_docstring(self, node):
         """
