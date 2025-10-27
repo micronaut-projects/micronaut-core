@@ -18,8 +18,6 @@ package io.micronaut.python.processing.visitor;
 import java.util.List;
 
 import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.Element;
-import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.EnumElement;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 
@@ -67,18 +65,8 @@ public final class PythonEnumElement extends AbstractPythonClassElement implemen
     }
 
     @Override
-    public ClassDef getNativeType() {
-        return (ClassDef) super.getNativeType();
-    }
-
-    @Override
     public String toString() {
         return "Python Enum: " + getNativeType().name();
-    }
-
-    @Override
-    public <T extends Element> List<T> getEnclosedElements(ElementQuery<T> query) {
-        return List.of();
     }
 
     @Override
