@@ -10,6 +10,7 @@ micronautBuild {
 
 dependencies {
     api(projects.micronautCoreProcessor)
+    implementation(projects.micronautInjectJava)
     api(libs.managed.graalpy) {
         artifact {
             type = "pom"

@@ -15,10 +15,14 @@
  */
 package io.micronaut.python.processing;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Function;
 
+import io.micronaut.core.util.StringUtils;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.HostAccess;
 import org.graalvm.polyglot.Source;
@@ -27,6 +31,7 @@ import org.graalvm.python.embedding.GraalPyResources;
 import org.graalvm.python.embedding.VirtualFileSystem;
 import org.intellij.lang.annotations.Language;
 
+import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.processing.visitor.ClassDef;
 import io.micronaut.python.processing.visitor.DecoratorDef;
 
@@ -81,6 +86,60 @@ public final class PythonAstParser {
         }
     }
 
+    public PythonEnvironment parse(Path... files) throws IOException {
+        StringBuilder combinedSources = new StringBuilder();
+        for (Path file : files) {
+            if (Files.isRegularFile(file) && file.toString().endsWith(".py")) {
+                combinedSources.append(Files.readString(file)).append("\n");
+            }
+        }
+        return parse(combinedSources.toString());
+    }
+
+    public String transform(@Language("python") String sources, VisitorContext visitorContext) {
+        Context context = GraalPyResources.contextBuilder(VirtualFileSystem.newBuilder()
+                .resourceDirectory(INJECT_RESOURCES)
+                .build())
+            // TODO: constrain this in future
+            .allowHostAccess(HostAccess.ALL)
+            .allowHostClassLookup(name -> name.startsWith("io.micronaut"))
+            .build();
+
+        try {
+            context.initialize(PYTHON);
+            Value bindings = context.getBindings(PYTHON);
+            bindings.putMember("src", sources);
+            bindings.putMember("callback_get_class_element", (Function<String, Object>) name -> {
+                var classElement = visitorContext.getClassElement(name);
+                return classElement.orElse(null);
+            });
+            bindings.putMember("callback_get_class_elements", (Function<String, Object[]>) packageName ->
+                visitorContext.getClassElements(packageName, StringUtils.EMPTY_STRING_ARRAY)
+            );
+            Value result = context.eval(Source.create(
+                PYTHON,
+                getTransformSource()
+            ));
+            return result.asString();
+        } finally {
+            if (context != null) {
+                context.close();
+            }
+        }
+    }
+
+    public PythonEnvironment process(@Language("python") String sources, VisitorContext visitorContext) {
+        return process(sources, "", visitorContext);
+    }
+
+    public PythonEnvironment process(@Language("python") String sources, String packageName, VisitorContext visitorContext) {
+        // First transform the code
+        String transformedCode = transform(sources, visitorContext);
+
+        // Then parse the transformed code
+        return parse(transformedCode, packageName);
+    }
+
     private static @Language("python") String getSource() {
         return """
             import ast
@@ -89,6 +148,18 @@ public final class PythonAstParser {
 
             tree = ast.parse(src)
             PrintNodeVisitor(callback, package_name).visit(tree)
+            """;
+    }
+
+    private static @Language("python") String getTransformSource() {
+        return """
+            import ast
+            from micronaut_transformer import MicronautTransformer, unparse
+
+            tree = ast.parse(src)
+            transformer = MicronautTransformer(callback_get_class_element, callback_get_class_elements)
+            transformed_tree = transformer.visit(tree)
+            unparse(transformed_tree)
             """;
     }
 }

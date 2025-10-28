@@ -10,7 +10,7 @@ dependencies {
         exclude(module = "groovy-all")
     }
     api(libs.jetbrains.annotations)
-
+    api(libs.jakarta.inject.api)
 
     testImplementation(platform(libs.test.boms.micronaut.validation))
 }
@@ -20,4 +20,3 @@ tasks {
         from("$projectDir/src/main/groovy")
     }
 }
-

@@ -38,10 +38,16 @@ public class PythonVisitorContext implements VisitorContext {
     private final MutableConvertibleValues<Object> visitorAttributes = new MutableConvertibleValuesMap<>();
     private final Map<String, DecoratorDef> decorators;
     private final PythonProcessingEnvironment processingEnvironment;
+    private final VisitorContext javaVisitorContext;
 
     public PythonVisitorContext(Map<String, DecoratorDef> decorators, PythonProcessingEnvironment processingEnvironment) {
+        this(decorators, processingEnvironment, null);
+    }
+
+    public PythonVisitorContext(Map<String, DecoratorDef> decorators, PythonProcessingEnvironment processingEnvironment, VisitorContext javaVisitorContext) {
         this.decorators = decorators;
         this.processingEnvironment = processingEnvironment;
+        this.javaVisitorContext = javaVisitorContext;
     }
 
     @Override
@@ -134,26 +140,72 @@ public class PythonVisitorContext implements VisitorContext {
 
     @Override
     public OutputStream visitClass(String classname, Element... originatingElements) throws IOException {
-        throw new UnsupportedOperationException();
+        if (javaVisitorContext != null) {
+            return javaVisitorContext.visitClass(classname, originatingElements);
+        } else {
+            throw new IllegalStateException("Java Visitor Context is null");
+        }
     }
 
     @Override
     public void visitServiceDescriptor(String type, String classname) {
-        throw new UnsupportedOperationException();
+        if (javaVisitorContext != null) {
+            javaVisitorContext.visitServiceDescriptor(type, classname);
+        }
     }
 
     @Override
     public void visitServiceDescriptor(String type, String classname, Element originatingElement) {
+        if (javaVisitorContext != null) {
+            javaVisitorContext.visitServiceDescriptor(type, classname, originatingElement);
+        }
         throw new UnsupportedOperationException();
     }
 
     @Override
     public Optional<GeneratedFile> visitGeneratedFile(String path, Element... originatingElements) {
-        throw new UnsupportedOperationException();
+        if (javaVisitorContext != null) {
+            return javaVisitorContext.visitGeneratedFile(path, originatingElements);
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public Optional<io.micronaut.inject.ast.ClassElement> getClassElement(String name) {
+        // First try to find in Python environment
+        io.micronaut.inject.ast.ClassElement pythonClass = processingEnvironment.classes().get(name);
+        if (pythonClass != null) {
+            return Optional.of(pythonClass);
+        }
+        // Fallback to Java visitor context
+        if (javaVisitorContext != null) {
+            return javaVisitorContext.getClassElement(name);
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public io.micronaut.inject.ast.ClassElement[] getClassElements(String aPackage, String... stereotypes) {
+        var pythonClasses = new java.util.ArrayList<io.micronaut.inject.ast.ClassElement>();
+        // Add Python classes from the environment
+        for (var entry : processingEnvironment.classes().entrySet()) {
+            var classElement = entry.getValue();
+            if (classElement.getPackageName().equals(aPackage)) {
+                pythonClasses.add(classElement);
+            }
+        }
+        // Add Java classes if visitor context is available
+        if (javaVisitorContext != null) {
+            var javaClasses = java.util.Arrays.asList(javaVisitorContext.getClassElements(aPackage, stereotypes));
+            pythonClasses.addAll(javaClasses);
+        }
+        return pythonClasses.toArray(new io.micronaut.inject.ast.ClassElement[0]);
     }
 
     @Override
     public void finish() {
-        throw new UnsupportedOperationException();
+        if (javaVisitorContext != null) {
+            javaVisitorContext.finish();
+        }
     }
 }

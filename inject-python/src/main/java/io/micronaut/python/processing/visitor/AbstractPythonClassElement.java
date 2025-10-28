@@ -321,8 +321,15 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
             Class<?> elementType = result.getElementType();
 
             // Add functions (methods) if the query is for methods/constructors or members
+            if (elementType == ConstructorElement.class) {
+                FunctionDef constructor = classNode.constructor();
+                if (constructor != null) {
+                    elements.add(constructor);
+                }
+            }
+
+            // Add functions (methods) if the query is for methods/constructors or members
             if (elementType == MethodElement.class ||
-                elementType == ConstructorElement.class ||
                 elementType == MemberElement.class) {
                 for (FunctionDef function : classNode.functions()) {
                     if (includeAbstract || !function.isAbstract()) {
