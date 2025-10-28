@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
+import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.python.processing.annotation.PythonAnnotationMetadataBuilder;
 import io.micronaut.python.processing.annotation.PythonElementAnnotationMetadataFactory;
@@ -43,6 +44,7 @@ public record PythonProcessingEnvironment(
     PythonEnvironment environment,
     PythonAnnotationMetadataBuilder annotationMetadataBuilder,
     PythonElementAnnotationMetadataFactory metadataFactory,
+    JavaVisitorContext javaVisitorContext,
     PythonVisitorContext visitorContext
 ) implements AutoCloseable {
 
@@ -51,21 +53,24 @@ public record PythonProcessingEnvironment(
      * The annotation metadata builder, metadata factory, and visitor context will be initialized automatically.
      *
      * @param environment The Python environment to use.
+     * @param javaVisitorContext The java visitor context
      */
-    public PythonProcessingEnvironment(PythonEnvironment environment) {
+    public PythonProcessingEnvironment(PythonEnvironment environment, JavaVisitorContext javaVisitorContext) {
         this(
             environment,
             null,
             null,
+            javaVisitorContext,
             null
         );
     }
 
     public PythonProcessingEnvironment {
         Objects.requireNonNull(environment, "Python environment cannot be null");
+        Objects.requireNonNull(javaVisitorContext, "JavaVisitorContext cannot be null");
 
         if (visitorContext == null) {
-            visitorContext = new PythonVisitorContext(environment.decorators(), this);
+            visitorContext = new PythonVisitorContext(environment.decorators(), this, javaVisitorContext);
         }
 
         if (annotationMetadataBuilder == null) {

@@ -34,13 +34,15 @@ import javax.lang.model.element.TypeElement;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Set;
+
+import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
+import io.micronaut.core.annotation.Generated;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.convert.value.MutableConvertibleValues;
+import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
+import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
+import io.micronaut.inject.visitor.TypeElementVisitor;
 
 /**
  * Abstract annotation processor base class.
@@ -48,7 +50,7 @@ import java.util.Set;
  * @author Graeme Rocher
  * @since 1.0
  */
-abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
+public abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
 
     /**
      * Annotation processor option used to activate incremental processing.
