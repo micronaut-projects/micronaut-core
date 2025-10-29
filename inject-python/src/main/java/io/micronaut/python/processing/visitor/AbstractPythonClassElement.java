@@ -385,7 +385,11 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
             }
 
             if (nativeType instanceof FunctionDef functionDef) {
-                return new PythonMethodElement(functionDef, environment, declaringClassElement, AbstractPythonClassElement.this, environment.metadataFactory());
+                if (functionDef.name().equals(FunctionDef.CONSTRUCTOR_NAME)) {
+                    return new PythonConstructorElement(functionDef, environment, declaringClassElement, AbstractPythonClassElement.this, environment.metadataFactory());
+                } else {
+                    return new PythonMethodElement(functionDef, environment, declaringClassElement, AbstractPythonClassElement.this, environment.metadataFactory());
+                }
             } else if (nativeType instanceof AttributeDef attributeDef) {
                 return new PythonFieldElement(attributeDef, environment, declaringClassElement, AbstractPythonClassElement.this, environment.metadataFactory());
             } else if (nativeType instanceof PropertyDef propertyDef) {

@@ -32,7 +32,7 @@ import java.lang.annotation.Target;
 @Documented
 @Retention(RUNTIME)
 @Target({ElementType.TYPE})
-public @interface PyronautApplication {
+public @interface PythonApplication {
 
     /**
      * Inline Python code to be processed.

@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Consumer;
 
 import javax.annotation.processing.Processor;
 import javax.tools.DiagnosticCollector;
@@ -34,7 +35,8 @@ import io.micronaut.annotation.processing.BeanDefinitionInjectProcessor;
 import io.micronaut.annotation.processing.MixinVisitorProcessor;
 import io.micronaut.annotation.processing.PackageElementVisitorProcessor;
 import io.micronaut.annotation.processing.TypeElementVisitorProcessor;
-import io.micronaut.python.processing.PyronautAnnotationProcessor;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.python.processing.PythonAnnotationProcessor;
 
 /**
  * Utility class for compiling Java sources with Micronaut annotation processors.
@@ -45,6 +47,17 @@ import io.micronaut.python.processing.PyronautAnnotationProcessor;
 final class PyronautJavaCompiler {
 
     private final JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+    private Consumer<ClassElement> classElementCallback;
+
+    /**
+     * Set the callback to be invoked for each class element created during processing.
+     * This is primarily used for testing purposes.
+     *
+     * @param callback The callback function
+     */
+    public void setClassElementCallback(Consumer<ClassElement> callback) {
+        this.classElementCallback = callback;
+    }
 
     /**
      * Compile sources to memory using in-memory file manager.
@@ -148,7 +161,13 @@ final class PyronautJavaCompiler {
         processors.add(new TypeElementVisitorProcessor());
         processors.add(new AggregatingTypeElementVisitorProcessor());
         processors.add(new BeanDefinitionInjectProcessor());
-        processors.add(new PyronautAnnotationProcessor());
+
+        PythonAnnotationProcessor pythonProcessor = new PythonAnnotationProcessor();
+        if (classElementCallback != null) {
+            pythonProcessor.setClassElementCallback(classElementCallback);
+        }
+        processors.add(pythonProcessor);
+
         return processors;
     }
 }

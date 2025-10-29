@@ -46,6 +46,8 @@ public record FunctionDef(
     boolean isAbstract
 ) implements ElementDef {
 
+    public static final String CONSTRUCTOR_NAME = "__init__";
+
     public FunctionDef {
         Objects.requireNonNull(name, "Function name cannot be null");
         if (arguments == null) {

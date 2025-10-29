@@ -931,7 +931,7 @@ public class PythonAstParserTest {
                 assertTrue(gtDecorator.members().containsKey("value"), "Gt should have value member");
                 var gtMemberValue = gtDecorator.members().get("value");
                 assertTrue(gtMemberValue instanceof org.graalvm.polyglot.Value, "Gt value should be a GraalVM Value");
-                assertEquals(0, ((org.graalvm.polyglot.Value) gtMemberValue).asInt(), "Gt value should be 0");
+                assertEquals(0, gtMemberValue.asInt(), "Gt value should be 0");
 
                 // Check count attribute - should have extracted int type and Min/Max decorators
                 var countAttr = fruitClass.attributes().stream()
