@@ -22,6 +22,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 import javax.annotation.processing.RoundEnvironment;
@@ -30,21 +31,33 @@ import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
 
 import io.micronaut.annotation.processing.AbstractInjectAnnotationProcessor;
-import io.micronaut.python.processing.annotation.PyronautApplication;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.python.processing.annotation.PythonApplication;
 import io.micronaut.python.processing.visitor.PythonTypeElementVisitorProcessor;
-import io.micronaut.python.processing.visitor.PythonVisitorContext;
 
 /**
- * Annotation processor for {@link PyronautApplication} that enables Python AST processing
+ * Annotation processor for {@link PythonApplication} that enables Python AST processing
  * during Java compilation.
  *
  * @since 4.8.0
  * @author Micronaut
  */
-@SupportedAnnotationTypes("io.micronaut.python.processing.annotation.PyronautApplication")
-public class PyronautAnnotationProcessor extends AbstractInjectAnnotationProcessor {
+@SupportedAnnotationTypes("io.micronaut.python.processing.annotation.PythonApplication")
+public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor {
+
+    private Consumer<ClassElement> classElementCallback;
 
     private final PythonAstParser parser = new PythonAstParser();
+
+    /**
+     * Set the callback to be invoked for each class element created during processing.
+     * This is primarily used for testing purposes.
+     *
+     * @param callback The callback function
+     */
+    public void setClassElementCallback(Consumer<ClassElement> callback) {
+        this.classElementCallback = callback;
+    }
 
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
@@ -53,26 +66,26 @@ public class PyronautAnnotationProcessor extends AbstractInjectAnnotationProcess
         }
 
         for (TypeElement annotation : annotations) {
-            if (PyronautApplication.class.getName().equals(annotation.getQualifiedName().toString())) {
-                processPyronautApplications(roundEnv);
+            if (PythonApplication.class.getName().equals(annotation.getQualifiedName().toString())) {
+                processPythonApplications(roundEnv);
             }
         }
 
         return false;
     }
 
-    private void processPyronautApplications(RoundEnvironment roundEnv) {
-        Set<? extends Element> elements = roundEnv.getElementsAnnotatedWith(PyronautApplication.class);
+    private void processPythonApplications(RoundEnvironment roundEnv) {
+        Set<? extends Element> elements = roundEnv.getElementsAnnotatedWith(PythonApplication.class);
 
         for (Element element : elements) {
-            PyronautApplication annotation = element.getAnnotation(PyronautApplication.class);
+            PythonApplication annotation = element.getAnnotation(PythonApplication.class);
             if (annotation != null) {
                 processAnnotation(annotation);
             }
         }
     }
 
-    private void processAnnotation(PyronautApplication annotation) {
+    private void processAnnotation(PythonApplication annotation) {
         try {
             PythonEnvironment environment;
             String transformedCode;
@@ -148,6 +161,11 @@ public class PyronautAnnotationProcessor extends AbstractInjectAnnotationProcess
             PythonTypeElementVisitorProcessor typeElementVisitorProcessor = new PythonTypeElementVisitorProcessor();
             typeElementVisitorProcessor.init(processingEnvironment);
             typeElementVisitorProcessor.process(processingEnvironment);
+
+            // Invoke callback for each class element if callback is set
+            if (classElementCallback != null) {
+                processingEnvironment.classes().values().forEach(classElementCallback);
+            }
 
             // Write transformed Python code to META-INF
             final String finalTransformedCode = transformedCode;

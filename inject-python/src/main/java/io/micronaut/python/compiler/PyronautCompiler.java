@@ -22,11 +22,14 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import javax.tools.JavaFileObject;
 import javax.tools.SimpleJavaFileObject;
+
+import io.micronaut.inject.ast.ClassElement;
 
 /**
  * Compiler for Python applications using Micronaut annotation processing.
@@ -51,6 +54,7 @@ public final class PyronautCompiler {
     private final String applicationClass;
     private final File targetDir;
     private final List<File> classpath;
+    private final Consumer<ClassElement> classElementCallback;
 
     private PyronautCompiler(Builder builder) {
         this.packageName = builder.packageName;
@@ -60,6 +64,7 @@ public final class PyronautCompiler {
         this.applicationClass = builder.applicationClass;
         this.targetDir = builder.targetDir;
         this.classpath = builder.classpath != null ? new ArrayList<>(builder.classpath) : null;
+        this.classElementCallback = builder.classElementCallback;
 
         validateConfiguration();
     }
@@ -82,6 +87,9 @@ public final class PyronautCompiler {
      */
     public ClassLoader buildClassLoader() {
         PyronautJavaCompiler compiler = new PyronautJavaCompiler();
+        if (classElementCallback != null) {
+            compiler.setClassElementCallback(classElementCallback);
+        }
         JavaFileObject[] sources = createJavaSources();
 
         Iterable<JavaFileObject> compiledClasses = compiler.compileInMemory(sources, classpath);
@@ -190,8 +198,8 @@ public final class PyronautCompiler {
         StringBuilder sb = new StringBuilder();
         sb.append("package ").append(pkg).append(";\n\n");
         sb.append("import io.micronaut.runtime.Micronaut;\n");
-        sb.append("import io.micronaut.python.processing.annotation.PyronautApplication;\n\n");
-        sb.append("@PyronautApplication(\n");
+        sb.append("import io.micronaut.python.processing.annotation.PythonApplication;\n\n");
+        sb.append("@PythonApplication(\n");
 
         if (hasSrc) {
             sb.append("    src = \"").append(pythonSrc).append("\"");
@@ -236,6 +244,7 @@ public final class PyronautCompiler {
         private String applicationClass;
         private File targetDir;
         private List<File> classpath;
+        private Consumer<ClassElement> classElementCallback;
 
         private Builder() {
         }
@@ -286,7 +295,7 @@ public final class PyronautCompiler {
         }
 
         /**
-         * Set the fully qualified name of an existing application class annotated with @PyronautApplication.
+         * Set the fully qualified name of an existing application class annotated with @PythonApplication.
          * If specified, no Java source will be generated. Requires javaSrc to be set.
          *
          * @param applicationClass The application class name
@@ -316,6 +325,18 @@ public final class PyronautCompiler {
          */
         public Builder classpath(List<File> classpath) {
             this.classpath = classpath != null ? new ArrayList<>(classpath) : null;
+            return this;
+        }
+
+        /**
+         * Set a callback to be invoked for each class element created during processing.
+         * This is primarily used for testing purposes to capture class elements.
+         *
+         * @param classElementCallback The callback function
+         * @return This builder
+         */
+        public Builder classElementCallback(Consumer<ClassElement> classElementCallback) {
+            this.classElementCallback = classElementCallback;
             return this;
         }
 
