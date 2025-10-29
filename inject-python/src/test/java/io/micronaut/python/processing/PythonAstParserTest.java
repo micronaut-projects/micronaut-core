@@ -11,10 +11,9 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-
-import io.micronaut.context.annotation.BeanProperties;
 import org.junit.jupiter.api.Test;
 
+import io.micronaut.context.annotation.BeanProperties;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
@@ -57,9 +56,65 @@ public class PythonAstParserTest {
     }
 
     @Test
+    void testParseDecorators() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        try (PythonEnvironment environment = pythonProcessor.parse("""
+from jakarta.inject import Singleton
+
+def micronaut_annotation(name, repeated=None):
+    def decorator(func):
+        func._micronaut_annotation_name = name
+        if repeated:
+            func._micronaut_repeatable_container = repeated
+        return func
+    return decorator
+
+@micronaut_annotation('jakarta.inject.Scope')
+def Scope(*args, **kwargs):
+    def decorator(func):
+        if not hasattr(func, '_micronaut_annotations'):
+            func._micronaut_annotations = []
+        annotation_data = {'name': 'jakarta.inject.Scope'}
+        annotation_data['args'] = args
+        annotation_data['kwargs'] = kwargs
+        func._micronaut_annotations.append(annotation_data)
+        return func
+    return decorator
+
+@micronaut_annotation('jakarta.inject.Singleton')
+def Singleton(*args, **kwargs):
+    def decorator(func):
+        if not hasattr(func, '_micronaut_annotations'):
+            func._micronaut_annotations = []
+        annotation_data = {'name': 'jakarta.inject.Singleton'}
+        annotation_data['args'] = args
+        annotation_data['kwargs'] = kwargs
+        func._micronaut_annotations.append(annotation_data)
+        return func
+    return decorator
+
+@Singleton
+class MySingletonService:
+    pass
+
+
+            """)) {
+            ClassDef myClass = environment.classes().get("MySingletonService");
+
+            assertNotNull(myClass);
+            assertEquals(1, myClass.decorators().size());
+
+            assertEquals(2, environment.decorators().size());
+
+            assertTrue(environment.decorators().containsKey(Singleton.class.getName()));
+            assertTrue(environment.decorators().containsKey(Scope.class.getName()));
+        }
+    }
+
+    @Test
     void testProcessingEnvironment() {
         try (PythonEnvironment environment = buildEnv();
-             PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment)) {
+             PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment, null)) {
 
             Map<String, ClassElement> classes = processingEnvironment.classes();
             assertNotNull(classes);
@@ -171,7 +226,7 @@ public class PythonAstParserTest {
                 complex_field: list = []
             """)) {
 
-            try (PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment)) {
+            try (PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment, null)) {
                 // Get the class definition
                 ClassDef testClassDef = environment.classes().get("TestPrimitives");
                 assertNotNull(testClassDef);
@@ -250,7 +305,7 @@ public class PythonAstParserTest {
                     return 42
             """)) {
 
-            try (PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment)) {
+            try (PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment, null)) {
                 // Get the class definition
                 ClassDef testClassDef = environment.classes().get("TestMethods");
                 PythonClassElement testClass = new PythonClassElement(testClassDef, processingEnvironment);
@@ -332,7 +387,7 @@ public class PythonAstParserTest {
                 PENDING = "pending"
             """)) {
 
-            try (PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment)) {
+            try (PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment, null)) {
                 // Verify parsing completes successfully
                 assertNotNull(environment);
                 assertEquals(2, environment.classes().size());
@@ -385,7 +440,7 @@ public class PythonAstParserTest {
                     pass
             """)) {
 
-            try (PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment)) {
+            try (PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment, null)) {
                 // Verify parsing completes successfully
                 assertNotNull(environment);
                 assertEquals(1, environment.classes().size());
@@ -444,7 +499,7 @@ public class PythonAstParserTest {
                     pass
             """, "com.example.mypackage")) {
 
-            try (PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment)) {
+            try (PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment, null)) {
                 // Verify parsing completes successfully
                 assertNotNull(environment);
                 assertEquals(1, environment.classes().size());
@@ -492,7 +547,7 @@ public class PythonAstParserTest {
                     pass
             """)) {
 
-            try (PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment)) {
+            try (PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment, null)) {
                 // Verify parsing completes successfully
                 assertNotNull(environment);
                 assertEquals(1, environment.classes().size());
@@ -527,26 +582,47 @@ public class PythonAstParserTest {
     private static PythonEnvironment buildEnv() {
         PythonAstParser pythonProcessor = new PythonAstParser();
         PythonEnvironment environment = pythonProcessor.parse("""
-            @scope
             @micronaut_annotation("jakarta.inject.Singleton")
-            def singleton(type):
-                return type
+            def Singleton(*args, **kwargs):
+                def decorator(func):
+                    if not hasattr(func, '_micronaut_annotations'):
+                        func._micronaut_annotations = []
+                    annotation_data = {'name': 'jakarta.inject.Singleton'}
+                    annotation_data['args'] = args
+                    annotation_data['kwargs'] = kwargs
+                    func._micronaut_annotations.append(annotation_data)
+                    return func
+                return decorator
 
             @micronaut_annotation("jakarta.inject.Scope")
-            def scope(func):
-                return func
+            def Scope(*args, **kwargs):
+                def decorator(func):
+                    if not hasattr(func, '_micronaut_annotations'):
+                        func._micronaut_annotations = []
+                    annotation_data = {'name': 'jakarta.inject.Scope'}
+                    annotation_data['args'] = args
+                    annotation_data['kwargs'] = kwargs
+                    func._micronaut_annotations.append(annotation_data)
+                    return func
+                return decorator
 
             @micronaut_annotation("jakarta.inject.Named")
-            def named(name = ""):
-                def decorator_named(func):
+            def Named(*args, **kwargs):
+                def decorator(func):
+                    if not hasattr(func, '_micronaut_annotations'):
+                        func._micronaut_annotations = []
+                    annotation_data = {'name': 'jakarta.inject.Named'}
+                    annotation_data['args'] = args
+                    annotation_data['kwargs'] = kwargs
+                    func._micronaut_annotations.append(annotation_data)
                     return func
-                return decorator_named
+                return decorator
 
-            def micronaut_annotation(func, name):
-                return func
+            def micronaut_annotation(name):
+                return lambda func: func
 
-            @singleton
-            @named("myName")
+            @Singleton
+            @Named("myName")
             class MyClass:
                 ""\"A simple example class""\"
                 i = 12345
@@ -601,7 +677,7 @@ public class PythonAstParserTest {
                 \"\"\"This field has documentation.\"\"\"
             """)) {
 
-            try (PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment)) {
+            try (PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment, null)) {
                 // Test class documentation
                 ClassElement classElement = processingEnvironment.classes().get("DocumentedClass");
                 assertNotNull(classElement);
@@ -735,7 +811,7 @@ public class PythonAstParserTest {
                     pass
             """)) {
 
-            try (PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment)) {
+            try (PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment, null)) {
                 ClassElement classElement = processingEnvironment.classes().get("TestElementQuery");
                 assertNotNull(classElement);
                 assertTrue(classElement instanceof PythonClassElement);

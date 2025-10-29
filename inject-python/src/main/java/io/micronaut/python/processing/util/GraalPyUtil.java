@@ -56,9 +56,177 @@ public final class GraalPyUtil {
                 return value.asString();
             }
         } else if (value.isString()) {
-            return value.asString();
+            // Handle single character strings -> char conversion
+            String strValue = value.asString();
+            if (strValue.length() == 1) {
+                return strValue.charAt(0);
+            }
+            return strValue;
+        } else if (value.isMetaObject()) {
+            // Handle Python class references
+            try {
+                if (value.canInvokeMember("__name__")) {
+                    Value nameValue = value.invokeMember("__name__");
+                    String className = nameValue.asString();
+                    // Map Python builtin types to Java types
+                    switch (className) {
+                        case "str":
+                            return String.class;
+                        case "int":
+                            return Integer.class;
+                        case "float":
+                            return Double.class;
+                        case "bool":
+                            return Boolean.class;
+                        default:
+                            // Try to find the class by name
+                            try {
+                                return Class.forName(className);
+                            } catch (ClassNotFoundException e) {
+                                return value;
+                            }
+                    }
+                }
+            } catch (Exception e) {
+                // Fall back to original value
+                return value;
+            }
+        } else if (value.hasIterator()) {
+            // Handle iterable values (like Python lists and arrays) -> typed arrays
+            try {
+                // Try array access first (works for both arrays and lists in some cases)
+                long size = -1;
+                try {
+                    size = value.getArraySize();
+                } catch (Exception e) {
+                    // Not an array, try to get size another way
+                    if (value.canInvokeMember("__len__")) {
+                        Value length = value.invokeMember("__len__");
+                        size = length.asLong();
+                    }
+                }
+
+                if (size > 0) {
+                    // Use array element access
+                    Value firstElement = value.getArrayElement(0);
+                    if (firstElement != null) {
+                        // Use first element to determine array type
+                        Object convertedFirst = convertValueToJava(firstElement);
+                        Class<?> componentType = getComponentType(convertedFirst);
+
+                        // Convert all elements
+                        java.util.List<Object> elements = new java.util.ArrayList<>();
+                        elements.add(convertedFirst);
+
+                        for (long i = 1; i < size; i++) {
+                            Value nextElement = value.getArrayElement(i);
+                            if (nextElement != null) {
+                                elements.add(convertValueToJava(nextElement));
+                            }
+                        }
+
+                        // Create typed array
+                        return createTypedArray(componentType, elements);
+                    }
+                }
+                // Empty iterable
+                return null;
+            } catch (Exception e) {
+                // Fall back to original value if array conversion fails
+                return value;
+            }
         }
         return value;
+    }
+
+    /**
+     * Get the component type for array creation based on the first element.
+     */
+    private static Class<?> getComponentType(Object firstElement) {
+        if (firstElement instanceof Boolean) {
+            return boolean.class;
+        } else if (firstElement instanceof Byte) {
+            return byte.class;
+        } else if (firstElement instanceof Character) {
+            return char.class;
+        } else if (firstElement instanceof Short) {
+            return short.class;
+        } else if (firstElement instanceof Integer) {
+            return int.class;
+        } else if (firstElement instanceof Long) {
+            return long.class;
+        } else if (firstElement instanceof Float) {
+            return float.class;
+        } else if (firstElement instanceof Double) {
+            return double.class;
+        } else if (firstElement instanceof String) {
+            return String.class;
+        } else if (firstElement instanceof Class) {
+            return Class.class;
+        } else {
+            return Object.class;
+        }
+    }
+
+    /**
+     * Create a typed array from the component type and element list.
+     */
+    private static Object createTypedArray(Class<?> componentType, java.util.List<Object> elements) {
+        if (componentType == boolean.class) {
+            boolean[] array = new boolean[elements.size()];
+            for (int i = 0; i < elements.size(); i++) {
+                array[i] = (Boolean) elements.get(i);
+            }
+            return array;
+        } else if (componentType == byte.class) {
+            byte[] array = new byte[elements.size()];
+            for (int i = 0; i < elements.size(); i++) {
+                array[i] = ((Number) elements.get(i)).byteValue();
+            }
+            return array;
+        } else if (componentType == char.class) {
+            char[] array = new char[elements.size()];
+            for (int i = 0; i < elements.size(); i++) {
+                array[i] = (Character) elements.get(i);
+            }
+            return array;
+        } else if (componentType == short.class) {
+            short[] array = new short[elements.size()];
+            for (int i = 0; i < elements.size(); i++) {
+                array[i] = ((Number) elements.get(i)).shortValue();
+            }
+            return array;
+        } else if (componentType == int.class) {
+            int[] array = new int[elements.size()];
+            for (int i = 0; i < elements.size(); i++) {
+                array[i] = ((Number) elements.get(i)).intValue();
+            }
+            return array;
+        } else if (componentType == long.class) {
+            long[] array = new long[elements.size()];
+            for (int i = 0; i < elements.size(); i++) {
+                array[i] = ((Number) elements.get(i)).longValue();
+            }
+            return array;
+        } else if (componentType == float.class) {
+            float[] array = new float[elements.size()];
+            for (int i = 0; i < elements.size(); i++) {
+                array[i] = ((Number) elements.get(i)).floatValue();
+            }
+            return array;
+        } else if (componentType == double.class) {
+            double[] array = new double[elements.size()];
+            for (int i = 0; i < elements.size(); i++) {
+                array[i] = ((Number) elements.get(i)).doubleValue();
+            }
+            return array;
+        } else if (componentType == String.class) {
+            return elements.toArray(new String[0]);
+        } else if (componentType == Class.class) {
+            return elements.toArray(new Class[0]);
+        } else {
+            return elements.toArray();
+        }
     }
 
     /**

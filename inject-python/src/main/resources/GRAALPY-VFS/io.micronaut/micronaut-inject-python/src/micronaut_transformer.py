@@ -53,7 +53,7 @@ class MicronautTransformer(ast.NodeTransformer):
         self.imports_to_transform = []
         self.generated_decorators = set()
 
-    def visit_ImportFrom(self, node: ast.ImportFrom) -> ast.ImportFrom:
+    def visit_ImportFrom(self, node: ast.ImportFrom):
         """
         Transform import statements like:
         from jakarta.inject import Singleton
@@ -64,27 +64,56 @@ class MicronautTransformer(ast.NodeTransformer):
             return node
 
         # Collect imports to transform - check if JavaVisitorContext.getClassElements returns annotations
+        transformed_any = False
         for alias in node.names:
             if alias.name == '*':
                 # Handle star imports - scan the entire package
-                self._handle_star_import(node.module)
+                if self._handle_star_import(node.module):
+                    transformed_any = True
             else:
                 # Handle specific imports
-                self._handle_specific_import(node.module, alias.name)
+                if self._handle_specific_import(node.module, alias.name):
+                    transformed_any = True
+
+        # If any imports were transformed, remove this import statement from the AST
+        # since the imported annotations won't exist at runtime
+        if transformed_any:
+            return None  # Remove the import from the AST
 
         return node
 
     def visit_Module(self, node: ast.Module) -> ast.Module:
         """
-        Process the entire module and add generated decorators at the end.
+        Process the entire module and add generated decorators at the beginning.
         """
         # First visit all nodes to collect imports
         self.generic_visit(node)
 
-        # Add generated decorator definitions
+        # Add generated decorator definitions at the beginning
         if self.transformed_code:
             # Create AST nodes for the generated decorators
             decorator_nodes = []
+
+            # Add the micronaut_annotation function first
+            micronaut_annotation_code = '''
+def micronaut_annotation(name, repeated=None):
+    """
+    Decorator to mark functions as Micronaut annotations.
+    """
+    def decorator(func):
+        func._micronaut_annotation_name = name
+        if repeated:
+            func._micronaut_repeatable_container = repeated
+        return func
+    return decorator
+'''
+            try:
+                micronaut_annotation_ast = ast.parse(micronaut_annotation_code)
+                decorator_nodes.extend(micronaut_annotation_ast.body)
+            except SyntaxError as e:
+                print(f"Error parsing micronaut_annotation: {e}")
+
+            # Add the generated decorator functions
             for decorator_code in self.transformed_code:
                 try:
                     # Parse the generated decorator code
@@ -94,14 +123,15 @@ class MicronautTransformer(ast.NodeTransformer):
                     print(f"Error parsing generated decorator: {e}")
                     continue
 
-            # Add the decorator nodes to the module
-            node.body.extend(decorator_nodes)
+            # Insert decorator nodes at the beginning of the module
+            node.body = decorator_nodes + node.body
 
         return node
 
-    def _handle_specific_import(self, module_name: str, import_name: str):
+    def _handle_specific_import(self, module_name: str, import_name: str) -> bool:
         """
         Handle specific imports like 'from jakarta.inject import Singleton'
+        Returns True if the import was transformed.
         """
         full_name = f"{module_name}.{import_name}"
 
@@ -111,6 +141,7 @@ class MicronautTransformer(ast.NodeTransformer):
             decorator_code = self._generate_decorator_from_class_element(class_element, import_name)
             if decorator_code:
                 self.transformed_code.append(decorator_code)
+                return True
         else:
             # Try with different naming conventions
             # Java style: Singleton -> singleton
@@ -122,18 +153,24 @@ class MicronautTransformer(ast.NodeTransformer):
                     decorator_code = self._generate_decorator_from_class_element(class_element, import_name)
                     if decorator_code:
                         self.transformed_code.append(decorator_code)
+                        return True
                 else:
                     # For testing purposes, generate a decorator anyway
                     decorator_code = self._generate_test_decorator(import_name, full_name)
                     self.transformed_code.append(decorator_code)
+                    return True
 
-    def _handle_star_import(self, module_name: str):
+        return False
+
+    def _handle_star_import(self, module_name: str) -> bool:
         """
         Handle star imports like 'from jakarta.inject import *'
+        Returns True if any imports were transformed.
         """
         # Get all ClassElements in the package
         class_elements = self.callback_get_class_elements(module_name, None)
         if class_elements:
+            transformed_any = False
             for class_element in class_elements:
                 # Check if it's an annotation
                 if self._is_annotation_class(class_element):
@@ -141,6 +178,10 @@ class MicronautTransformer(ast.NodeTransformer):
                     decorator_code = self._generate_decorator_from_class_element(class_element, import_name)
                     if decorator_code:
                         self.transformed_code.append(decorator_code)
+                        transformed_any = True
+            return transformed_any
+
+        return False
 
     def _is_annotation_class(self, class_element) -> bool:
         """
@@ -196,9 +237,28 @@ class MicronautTransformer(ast.NodeTransformer):
         param_signature = param_info['signature']
         param_handling = param_info['handling']
 
-        # Generate the decorator function
+        # Collect meta-annotations to include as decorators
+        decorator_lines = [f'@micronaut_annotation("{annotation_name}")']
+
+        # Get all annotations on this annotation class (meta-annotations)
+        annotation_names = annotation_metadata.getAnnotationNames()
+        for meta_annotation_name in annotation_names:
+            # Skip retention and other built-in annotations that aren't user-facing
+            if not meta_annotation_name.startswith('java.lang.annotation.'):
+                # Generate decorator for the meta-annotation if not already generated
+                meta_class_element = self.callback_get_class_element(meta_annotation_name)
+                if meta_class_element and self._is_annotation_class(meta_class_element):
+                    meta_decorator_name = meta_class_element.getSimpleName()
+                    if meta_decorator_name not in self.generated_decorators:
+                        meta_decorator_code = self._generate_decorator_from_class_element(meta_class_element, meta_decorator_name)
+                        if meta_decorator_code:
+                            self.transformed_code.append(meta_decorator_code)
+                    # Add the meta-annotation as a decorator
+                    decorator_lines.append(f'@{meta_decorator_name}')
+
+        # Generate the decorator function with meta-annotations
         decorator_code = f'''
-@micronaut_annotation("{annotation_name}"{repeatable_info})
+{chr(10).join(decorator_lines)}
 def {decorator_name}({param_signature}):
     """
     Micronaut annotation decorator for {annotation_name}.
@@ -215,9 +275,6 @@ def {decorator_name}({param_signature}):
         return func
     return decorator
 '''
-
-        # Handle meta-annotations (annotations on the annotation itself)
-        self._generate_meta_decorators(class_element, import_name)
 
         # Handle nested annotations (annotations referenced by this annotation's parameters)
         self._generate_nested_decorators(class_element, import_name)
@@ -267,9 +324,6 @@ def {decorator_name}({param_signature}):
         return func
     return decorator
 '''
-
-        # Handle meta-annotations (annotations on the annotation itself)
-        self._generate_meta_decorators(class_element, import_name)
 
         # Handle nested annotations (annotations referenced by this annotation's parameters)
         self._generate_nested_decorators(class_element, import_name)
@@ -327,32 +381,7 @@ def {decorator_name}({param_signature}):
 
         return None
 
-    def _generate_meta_decorators(self, class_element, parent_name: str):
-        """
-        Generate decorators for meta-annotations (annotations on the annotation itself).
-        """
-        annotation_metadata = class_element.getAnnotationMetadata()
 
-        # Get all annotations on this annotation class
-        annotation_names = annotation_metadata.getAnnotationNames()
-
-        # Check for repeatable annotation - this is a special case since @Repeatable
-        # is a meta-annotation on the annotation itself
-        repeatable_name = self._get_repeatable_name(annotation_metadata, class_element)
-        for annotation_name in annotation_names:
-            # Skip retention and other built-in annotations that aren't user-facing
-            if annotation_name.startswith('java.lang.annotation.'):
-                continue
-
-            # Get the annotation class element
-            meta_class_element = self.callback_get_class_element(annotation_name)
-            if meta_class_element and self._is_annotation_class(meta_class_element):
-                # Generate decorator for the meta-annotation
-                meta_decorator_name = meta_class_element.getSimpleName()
-                if meta_decorator_name not in self.generated_decorators:
-                    meta_decorator_code = self._generate_decorator_from_class_element(meta_class_element, meta_decorator_name)
-                    if meta_decorator_code:
-                        self.transformed_code.append(meta_decorator_code)
 
     def _generate_nested_decorators(self, class_element, parent_name: str):
         """

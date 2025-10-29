@@ -65,9 +65,24 @@ public record PythonProcessingEnvironment(
         );
     }
 
+    /**
+     * Creates a Python processing environment with the specified Python environment.
+     * The annotation metadata builder, metadata factory, and visitor context will be initialized automatically.
+     *
+     * @param environment The Python environment to use.
+     */
+    public PythonProcessingEnvironment(PythonEnvironment environment) {
+        this(
+            environment,
+            null,
+            null,
+            null,
+            null
+        );
+    }
+
     public PythonProcessingEnvironment {
         Objects.requireNonNull(environment, "Python environment cannot be null");
-        Objects.requireNonNull(javaVisitorContext, "JavaVisitorContext cannot be null");
 
         if (visitorContext == null) {
             visitorContext = new PythonVisitorContext(environment.decorators(), this, javaVisitorContext);

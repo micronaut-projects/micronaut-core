@@ -17,6 +17,7 @@ package io.micronaut.python.processing.annotation;
 
 import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -37,6 +38,8 @@ import io.micronaut.python.processing.visitor.FunctionDef;
 import io.micronaut.python.processing.visitor.PropertyDef;
 import io.micronaut.python.processing.visitor.PythonVisitorContext;
 
+import javax.lang.model.element.Element;
+
 /**
  * Builder for creating annotation metadata from Python decorators and elements.
  * This class extends Micronaut's annotation metadata builder to handle Python-specific
@@ -48,6 +51,7 @@ import io.micronaut.python.processing.visitor.PythonVisitorContext;
 public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<ElementDef, DecoratorDef> {
     private final Map<String, DecoratorDef> decorators;
     private final PythonVisitorContext visitorContext;
+    private final Map<String, ElementDef> annotationTypes = new HashMap<>();
 
     public PythonAnnotationMetadataBuilder(Map<String, DecoratorDef> decorators, PythonVisitorContext visitorContext) {
         this.decorators = decorators;
@@ -63,45 +67,8 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     }
 
     @Override
-    protected boolean hasAnnotation(ElementDef element, Class<? extends Annotation> annotation) {
-        List<DecoratorDef> decorators = element.decorators();
-        for (DecoratorDef decorator : decorators) {
-            if (decorator.annotationName().equals(annotation.getName())) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    @Override
-    protected boolean hasAnnotation(ElementDef element, String annotation) {
-        List<DecoratorDef> decorators = element.decorators();
-        for (DecoratorDef decorator : decorators) {
-            if (decorator.annotationName().equals(annotation)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    @Override
-    protected boolean hasAnnotations(ElementDef element) {
-        return !element.decorators().isEmpty();
-    }
-
-    @Override
     protected String getAnnotationTypeName(DecoratorDef annotationMirror) {
         return annotationMirror.annotationName();
-    }
-
-    @Override
-    protected String getElementName(ElementDef element) {
-        return element.name();
-    }
-
-    @Override
-    protected List<? extends DecoratorDef> getAnnotationsForType(ElementDef element) {
-        return element.decorators();
     }
 
     @Override
@@ -129,6 +96,51 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
             return List.of(argumentDef);
         }
         return List.of();
+    }
+
+    @Override
+    protected List<? extends DecoratorDef> getAnnotationsForType(ElementDef element) {
+        return element.decorators();
+    }
+
+    @Override
+    protected boolean hasAnnotation(ElementDef element, String annotation) {
+        List<DecoratorDef> decorators = element.decorators();
+        for (DecoratorDef decorator : decorators) {
+            if (decorator.annotationName().equals(annotation)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    protected boolean hasAnnotation(ElementDef element, Class<? extends Annotation> annotation) {
+        List<DecoratorDef> decorators = element.decorators();
+        for (DecoratorDef decorator : decorators) {
+            if (decorator.annotationName().equals(annotation.getName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    protected boolean hasAnnotations(ElementDef element) {
+        return !element.decorators().isEmpty();
+    }
+
+    @Override
+    protected Object readAnnotationValue(
+        ElementDef originatingElement,
+        ElementDef member,
+        String annotationName,
+        String memberName,
+        Object annotationValue) {
+        if (annotationValue instanceof Value value) {
+            return GraalPyUtil.convertValueToJava(value);
+        }
+        return annotationValue;
     }
 
     @Override
@@ -164,19 +176,6 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     }
 
     @Override
-    protected Object readAnnotationValue(
-        ElementDef originatingElement,
-        ElementDef member,
-        String annotationName,
-        String memberName,
-        Object annotationValue) {
-        if (annotationValue instanceof Value value) {
-            return GraalPyUtil.convertValueToJava(value);
-        }
-        return annotationValue;
-    }
-
-    @Override
     protected Map<? extends ElementDef, ?> readAnnotationDefaultValues(String annotationName, ElementDef annotationType) {
         DecoratorDef decoratorDef = this.decorators.get(annotationName);
         if (decoratorDef == null) {
@@ -200,6 +199,11 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     @Override
     protected <K extends Annotation> Optional<AnnotationValue<K>> getAnnotationValues(ElementDef originatingElement, ElementDef member, Class<K> annotationType) {
         return Optional.empty();
+    }
+
+    @Override
+    protected String getElementName(ElementDef element) {
+        return element.name();
     }
 
     @Override
