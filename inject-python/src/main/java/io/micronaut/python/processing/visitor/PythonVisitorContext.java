@@ -50,6 +50,10 @@ public class PythonVisitorContext implements VisitorContext {
         this.javaVisitorContext = javaVisitorContext;
     }
 
+    public VisitorContext getJavaVisitorContext() {
+        return javaVisitorContext;
+    }
+
     @Override
     public Language getLanguage() {
         return Language.PYTHON;

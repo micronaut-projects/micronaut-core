@@ -33,6 +33,7 @@ class PrintNodeVisitor(ast.NodeVisitor):
         self.current_class_attributes = []
         self.current_class_properties = {}  # Track properties being built: name -> PropertyDef
         self.last_attribute = None  # Track last processed attribute for docstring handling
+        self.in_function = False  # Track if we're inside a function definition
 
     def visit(self, node: ast.AST) -> ast.AST:
         match node:
@@ -91,50 +92,60 @@ class PrintNodeVisitor(ast.NodeVisitor):
                     self.current_class_properties = {}
                 return result
             case ast.FunctionDef():
-                # Handle property decorators
-                if self.current_class is not None:
-                    property_info = self._parse_property_decorators(node)
-                    if property_info:
-                        property_name, property_type = property_info
-                        self._handle_property_function(property_name, property_type, node)
-                        return node
+                # Track function nesting to avoid processing nested functions as micronaut decorators
+                was_in_function = self.in_function
+                self.in_function = True
 
-                if self.current_class is None and is_micronaut_decorator(node):
-                    arg_dict = extract_arg_defaults(node)
-                    stereotypes = [
-                        decorator_to_function(self, d)
-                        for d in node.decorator_list
-                        if decorator_to_function(self, d) is not None
-                    ]
-                    annotation_name = get_micronaut_annotation_name_value(node)
-                    decorator_def = DecoratorDef(node.name, annotation_name, arg_dict, stereotypes)
-                    self.known_decorators[node.name] = decorator_def
-                    self.callback.apply(decorator_def)
-                    return node
-                else:
-                    decorators = [
-                        decorator_to_function(self, d)
-                        for d in node.decorator_list
-                        if decorator_to_function(self, d) is not None
-                    ]
-
-                    # Parse function arguments and return type
-                    arguments = parse_function_arguments(node)
-                    return_type_annotation = parse_function_return_type(node)
-                    # Extract function docstring
-                    func_doc = self._extract_docstring(node)
-
-                    # Check if function is abstract
-                    is_abstract = is_abstract_method(node)
-
-                    func_def = JavaFuncDef(node.name, arguments, decorators, return_type_annotation, "", [], func_doc, is_abstract)
+                try:
+                    # Handle property decorators
                     if self.current_class is not None:
-                        if node.name == "__init__":
-                            # Set as constructor
-                            self.current_class = self.current_class.withConstructor(func_def)
-                        else:
-                            self.current_class = self.current_class.withFunction(func_def)
-                    return super().visit(node)
+                        property_info = self._parse_property_decorators(node)
+                        if property_info:
+                            property_name, property_type = property_info
+                            self._handle_property_function(property_name, property_type, node)
+                            return node
+
+                    # Only check for micronaut decorators on top-level functions (not nested)
+                    if self.current_class is None and not was_in_function and is_micronaut_decorator(node):
+                        arg_dict = extract_arg_defaults(node)
+                        # Filter out micronaut_annotation decorators as they are internal helpers
+                        stereotypes = [
+                            decorator_to_function(self, d)
+                            for d in node.decorator_list
+                            if (decorator_to_function(self, d) is not None and
+                                not is_micronaut_annotation_decorator(d))
+                        ]
+                        annotation_name = get_micronaut_annotation_name_value(node)
+                        decorator_def = DecoratorDef(node.name, annotation_name, arg_dict, stereotypes)
+                        self.known_decorators[node.name] = decorator_def
+                        self.callback.apply(decorator_def)
+                        return node
+                    else:
+                        decorators = [
+                            decorator_to_function(self, d)
+                            for d in node.decorator_list
+                            if decorator_to_function(self, d) is not None
+                        ]
+
+                        # Parse function arguments and return type
+                        arguments = parse_function_arguments(node)
+                        return_type_annotation = parse_function_return_type(node)
+                        # Extract function docstring
+                        func_doc = self._extract_docstring(node)
+
+                        # Check if function is abstract
+                        is_abstract = is_abstract_method(node)
+
+                        func_def = JavaFuncDef(node.name, arguments, decorators, return_type_annotation, "", [], func_doc, is_abstract)
+                        if self.current_class is not None:
+                            if node.name == "__init__":
+                                # Set as constructor
+                                self.current_class = self.current_class.withConstructor(func_def)
+                            else:
+                                self.current_class = self.current_class.withFunction(func_def)
+                        return super().visit(node)
+                finally:
+                    self.in_function = was_in_function
             case ast.Assign():
                 # Handle class attribute assignments
                 if self.current_class is not None:
@@ -485,8 +496,9 @@ def decorator_to_function(visitor, node):
             if decorator_declaration is not None:
                 return decorator_declaration
             else:
+                # If not a known micronaut decorator, treat as direct annotation
                 return None
-        # when a decorator takes argument values it is represnted by ast.Call
+        # when a decorator takes argument values it is represented by ast.Call
         # here we parse out the constants to the call and set them as the named
         # values to the decorator
         case ast.Call():
@@ -496,7 +508,9 @@ def decorator_to_function(visitor, node):
                 members = extract_call_arguments_with_defaults(decorator_declaration, node)
                 return DecoratorDef(decorator_name, decorator_declaration.annotationName(), members, decorator_declaration.stereotypes())
             else:
-                return None
+                # If not a known micronaut decorator, treat as direct annotation with arguments
+                members = extract_call_arguments_with_defaults(None, node)
+                return DecoratorDef(decorator_name, decorator_name, members, [])
         case _:
             return None
 
@@ -565,30 +579,53 @@ def extract_call_arguments_with_defaults(funcdef, call):
 
     return result
 
+def is_micronaut_annotation_decorator(decorator_node):
+    """
+    Returns True if the decorator node is a @micronaut_annotation decorator.
+    This is an internal decorator that should not be treated as a stereotype.
+    """
+    if isinstance(decorator_node, ast.Call):
+        # Check decorator name
+        is_target = (
+                (isinstance(decorator_node.func, ast.Name) and decorator_node.func.id == 'micronaut_annotation')
+                or (isinstance(decorator_node.func, ast.Attribute) and decorator_node.func.attr == 'micronaut_annotation')
+        )
+        return is_target
+    return False
+
 def is_micronaut_decorator(funcdef):
     """
     Returns True if the ast.FunctionDef is a top-level function (not inside a class)
-    and has a decorator named 'micronaut_annotation' in its decorators.
+    and has been transformed by the micronaut_transformer to create micronaut annotations.
+    This checks for functions that have @micronaut_annotation decorators or the _micronaut_annotations pattern.
     """
     if not isinstance(funcdef, ast.FunctionDef):
         return False
 
-    # Check for 'micronaut_annotation' in decorators.
+    # Check if this function has a @micronaut_annotation decorator
     for dec in funcdef.decorator_list:
-        # Handles both @micronaut_annotation and @something.micronaut_annotation
-        if isinstance(dec, ast.Name) and dec.id == "micronaut_annotation":
-            return True
-        elif isinstance(dec, ast.Attribute) and dec.attr == "micronaut_annotation":
-            return True
-        elif (
-                isinstance(dec, ast.Call)
-                and (
-                        (isinstance(dec.func, ast.Name) and dec.func.id == "micronaut_annotation")
-                        or (isinstance(dec.func, ast.Attribute) and dec.func.attr == "micronaut_annotation")
-                )
-        ):
-            # Handles @micronaut_annotation(...) or @something.micronaut_annotation(...)
-            return True
+        if isinstance(dec, ast.Call):
+            # Check decorator name
+            is_target = (
+                    (isinstance(dec.func, ast.Name) and dec.func.id == 'micronaut_annotation')
+                    or (isinstance(dec.func, ast.Attribute) and dec.func.attr == 'micronaut_annotation')
+            )
+            if is_target:
+                return True
+
+    # Also check for the _micronaut_annotations pattern (for backward compatibility)
+    if funcdef.body and len(funcdef.body) > 0:
+        # Look for the pattern where hasattr(func, '_micronaut_annotations') is checked
+        for stmt in funcdef.body:
+            if isinstance(stmt, ast.If) and isinstance(stmt.test, ast.UnaryOp):
+                # Look for: if not hasattr(func, '_micronaut_annotations'):
+                if (isinstance(stmt.test.op, ast.Not)
+                    and isinstance(stmt.test.operand, ast.Call)
+                    and isinstance(stmt.test.operand.func, ast.Name)
+                    and stmt.test.operand.func.id == "hasattr"):
+                    args = stmt.test.operand.args
+                    if len(args) >= 2 and isinstance(args[1], ast.Constant) and args[1].value == "_micronaut_annotations":
+                        return True
 
     return False
 
