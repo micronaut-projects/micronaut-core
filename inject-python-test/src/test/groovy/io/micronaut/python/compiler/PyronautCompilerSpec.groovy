@@ -183,7 +183,6 @@ class MyNamedService:
 
         // Verify the transformed content contains the original code and generated decorators
         def transformedContent = transformedFile.text
-        transformedContent.contains("from io.micronaut.python.compiler import TestAnnotation, Singleton, Named")
         transformedContent.contains("@TestAnnotation")
         transformedContent.contains("@Singleton")
         transformedContent.contains("@Named")
@@ -239,7 +238,6 @@ class MyNamedService:
 
         // Verify the transformed content contains the original code and generated decorators
         def transformedContent = transformedFile.text
-        transformedContent.contains("from jakarta.inject import Singleton, Named")
         transformedContent.contains("@Singleton")
         transformedContent.contains("@Named")
         transformedContent.contains("class MySingletonService:")
@@ -285,7 +283,6 @@ class MyRepeatableService:
 
         // Verify the transformed content contains the original code and generated decorators
         def transformedContent = transformedFile.text
-        transformedContent.contains("from io.micronaut.python.compiler import RepeatableAnnotation")
         transformedContent.contains("@RepeatableAnnotation")
         transformedContent.contains("class MyRepeatableService:")
 
@@ -326,7 +323,7 @@ class MyIntrospectedService:
 
         // Verify the transformed content contains the original code and generated decorators
         def transformedContent = transformedFile.text
-        transformedContent.contains("from io.micronaut.python.compiler import IntrospectedAnnotation, BuilderAnnotation")
+        !transformedContent.contains("from io.micronaut.python.compiler import IntrospectedAnnotation, BuilderAnnotation")
         transformedContent.contains("@IntrospectedAnnotation(builder=BuilderAnnotation(style='custom'))")
         transformedContent.contains("class MyIntrospectedService:")
 
@@ -371,7 +368,7 @@ class MyRealIntrospectedService:
 
         // Verify the transformed content contains the original code and generated decorators
         def transformedContent = transformedFile.text
-        transformedContent.contains("from io.micronaut.core.annotation import Introspected")
+        !transformedContent.contains("from io.micronaut.core.annotation import Introspected")
         transformedContent.contains("@Introspected")
         transformedContent.contains("class MyRealIntrospectedService:")
 

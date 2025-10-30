@@ -39,24 +39,28 @@ public final class PythonAstParser {
 
     public static final String PYTHON = "python";
     public static final String INJECT_RESOURCES = "GRAALPY-VFS/io.micronaut/micronaut-inject-python";
+    private final Context context;
 
-    public PythonEnvironment parse(@Language("python") String sources) {
-        return parse(sources, "");
-    }
-
-    public PythonEnvironment parse(@Language("python") String sources, String packageName) {
-        Context context = GraalPyResources.contextBuilder(VirtualFileSystem.newBuilder()
+    public PythonAstParser() {
+        this.context = GraalPyResources.contextBuilder(VirtualFileSystem.newBuilder()
                 .resourceDirectory(INJECT_RESOURCES)
                 .build())
             // TODO: constrain this in future
             .allowHostAccess(HostAccess.ALL)
             .allowHostClassLookup(name -> name.startsWith("io.micronaut"))
             .build();
+        context.initialize(PYTHON);
+    }
 
+    public PythonEnvironment parse(@Language("python") String sources) {
+        return parse(sources, "");
+    }
+
+    public PythonEnvironment parse(@Language("python") String sources, String packageName) {
         try {
             Map<String, DecoratorDef> decorators = new LinkedHashMap<>();
             Map<String, ClassDef> classes = new LinkedHashMap<>();
-            context.initialize(PYTHON);
+
             Value bindings = context.getBindings(PYTHON);
             bindings.putMember("callback", (Function<Object, Object>) o -> {
                 if (o instanceof ClassDef classDef) {
@@ -78,10 +82,6 @@ public final class PythonAstParser {
                 context
             );
         } catch (Exception e) {
-            // Close context on error
-            if (context != null) {
-                context.close();
-            }
             throw e;
         }
     }
@@ -97,35 +97,20 @@ public final class PythonAstParser {
     }
 
     public String transform(@Language("python") String sources, VisitorContext visitorContext) {
-        Context context = GraalPyResources.contextBuilder(VirtualFileSystem.newBuilder()
-                .resourceDirectory(INJECT_RESOURCES)
-                .build())
-            // TODO: constrain this in future
-            .allowHostAccess(HostAccess.ALL)
-            .allowHostClassLookup(name -> name.startsWith("io.micronaut"))
-            .build();
-
-        try {
-            context.initialize(PYTHON);
-            Value bindings = context.getBindings(PYTHON);
-            bindings.putMember("src", sources);
-            bindings.putMember("callback_get_class_element", (Function<String, Object>) name -> {
-                var classElement = visitorContext.getClassElement(name);
-                return classElement.orElse(null);
-            });
-            bindings.putMember("callback_get_class_elements", (Function<String, Object[]>) packageName ->
-                visitorContext.getClassElements(packageName, StringUtils.EMPTY_STRING_ARRAY)
-            );
-            Value result = context.eval(Source.create(
-                PYTHON,
-                getTransformSource()
-            ));
-            return result.asString();
-        } finally {
-            if (context != null) {
-                context.close();
-            }
-        }
+        Value bindings = context.getBindings(PYTHON);
+        bindings.putMember("src", sources);
+        bindings.putMember("callback_get_class_element", (Function<String, Object>) name -> {
+            var classElement = visitorContext.getClassElement(name);
+            return classElement.orElse(null);
+        });
+        bindings.putMember("callback_get_class_elements", (Function<String, Object[]>) packageName ->
+            visitorContext.getClassElements(packageName, StringUtils.EMPTY_STRING_ARRAY)
+        );
+        Value result = context.eval(Source.create(
+            PYTHON,
+            getTransformSource()
+        ));
+        return result.asString();
     }
 
     public PythonEnvironment process(@Language("python") String sources, VisitorContext visitorContext) {
@@ -161,5 +146,9 @@ public final class PythonAstParser {
             transformed_tree = transformer.visit(tree)
             unparse(transformed_tree)
             """;
+    }
+
+    public void close() {
+        this.context.close();
     }
 }

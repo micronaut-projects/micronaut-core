@@ -11,6 +11,8 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import io.micronaut.python.processing.visitor.PythonConstructorElement;
 import org.junit.jupiter.api.Test;
 
 import io.micronaut.context.annotation.BeanProperties;
@@ -123,7 +125,7 @@ class MySingletonService:
             ClassElement myClass = classes.get("MyClass");
 
             assertNotNull(myClass);
-            assertEquals("MyClass", myClass.getName());
+            assertEquals("MyClass", myClass.getSimpleName());
         }
     }
 
@@ -413,7 +415,7 @@ class MySingletonService:
                 assertTrue(colorElement instanceof PythonEnumElement, "Color should be a PythonEnumElement");
 
                 PythonEnumElement colorEnum = (PythonEnumElement) colorElement;
-                assertEquals("Color", colorEnum.getName());
+                assertEquals("Color", colorEnum.getSimpleName());
                 assertEquals(List.of("RED", "GREEN", "BLUE"), colorEnum.values());
 
                 ClassElement statusElement = classes.get("Status");
@@ -421,7 +423,7 @@ class MySingletonService:
                 assertTrue(statusElement instanceof PythonEnumElement, "Status should be a PythonEnumElement");
 
                 PythonEnumElement statusEnum = (PythonEnumElement) statusElement;
-                assertEquals("Status", statusEnum.getName());
+                assertEquals("Status", statusEnum.getSimpleName());
                 assertEquals(List.of("ACTIVE", "INACTIVE", "PENDING"), statusEnum.values());
             }
         }
@@ -478,7 +480,7 @@ class MySingletonService:
                 assertTrue(primaryConstructor.isPresent(), "Should have primary constructor");
 
                 MethodElement constructorElement = primaryConstructor.get();
-                assertTrue(constructorElement instanceof PythonMethodElement, "Constructor should be PythonMethodElement");
+                assertTrue(constructorElement instanceof PythonConstructorElement, "Constructor should be PythonMethodElement");
 
                 // Verify constructor method details
                 assertEquals("__init__", constructorElement.getName());
@@ -898,9 +900,9 @@ class MySingletonService:
                     .orElseThrow(() -> new AssertionError("base_method should be present"));
 
                 // For inherited elements, declaring type should be the base class, owning type should be derived class
-                assertEquals("BaseClass", baseMethod.getDeclaringType().getName(),
+                assertEquals("BaseClass", baseMethod.getDeclaringType().getSimpleName(),
                     "Declaring type should be BaseClass for inherited method");
-                assertEquals("DerivedClass", baseMethod.getOwningType().getName(),
+                assertEquals("DerivedClass", baseMethod.getOwningType().getSimpleName(),
                     "Owning type should be DerivedClass for inherited method");
 
                 // For declared elements, declaring and owning types should be the same
@@ -909,9 +911,9 @@ class MySingletonService:
                     .findFirst()
                     .orElseThrow(() -> new AssertionError("derived_method should be present"));
 
-                assertEquals("DerivedClass", derivedMethod.getDeclaringType().getName(),
+                assertEquals("DerivedClass", derivedMethod.getDeclaringType().getSimpleName(),
                     "Declaring type should be DerivedClass for declared method");
-                assertEquals("DerivedClass", derivedMethod.getOwningType().getName(),
+                assertEquals("DerivedClass", derivedMethod.getOwningType().getSimpleName(),
                     "Owning type should be DerivedClass for declared method");
 
                 // Test fields
@@ -930,9 +932,9 @@ class MySingletonService:
                     .findFirst()
                     .orElseThrow(() -> new AssertionError("base_field should be present"));
 
-                assertEquals("BaseClass", baseField.getDeclaringType().getName(),
+                assertEquals("BaseClass", baseField.getDeclaringType().getSimpleName(),
                     "Declaring type should be BaseClass for inherited field");
-                assertEquals("DerivedClass", baseField.getOwningType().getName(),
+                assertEquals("DerivedClass", baseField.getOwningType().getSimpleName(),
                     "Owning type should be DerivedClass for inherited field");
 
                 // For declared elements, declaring and owning types should be the same
@@ -941,9 +943,9 @@ class MySingletonService:
                     .findFirst()
                     .orElseThrow(() -> new AssertionError("derived_field should be present"));
 
-                assertEquals("DerivedClass", derivedField.getDeclaringType().getName(),
+                assertEquals("DerivedClass", derivedField.getDeclaringType().getSimpleName(),
                     "Declaring type should be DerivedClass for declared field");
-                assertEquals("DerivedClass", derivedField.getOwningType().getName(),
+                assertEquals("DerivedClass", derivedField.getOwningType().getSimpleName(),
                     "Owning type should be DerivedClass for declared field");
             }
         }

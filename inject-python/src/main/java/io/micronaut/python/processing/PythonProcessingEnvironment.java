@@ -28,6 +28,8 @@ import io.micronaut.python.processing.visitor.PythonClassElement;
 import io.micronaut.python.processing.visitor.PythonEnumElement;
 import io.micronaut.python.processing.visitor.PythonVisitorContext;
 
+import javax.lang.model.element.Element;
+
 /**
  * Represents a Python processing environment that extends the basic Python environment with additional
  * processing capabilities for annotation metadata and visitor context. This record is used during
@@ -45,8 +47,28 @@ public record PythonProcessingEnvironment(
     PythonAnnotationMetadataBuilder annotationMetadataBuilder,
     PythonElementAnnotationMetadataFactory metadataFactory,
     JavaVisitorContext javaVisitorContext,
-    PythonVisitorContext visitorContext
+    PythonVisitorContext visitorContext,
+    Element originatingElement
 ) implements AutoCloseable {
+
+    /**
+     * Creates a Python processing environment with the specified Python environment.
+     * The annotation metadata builder, metadata factory, and visitor context will be initialized automatically.
+     *
+     * @param environment The Python environment to use.
+     * @param javaVisitorContext The java visitor context
+     * @param originatingElement  The originating element
+     */
+    public PythonProcessingEnvironment(PythonEnvironment environment, JavaVisitorContext javaVisitorContext, Element originatingElement) {
+        this(
+            environment,
+            null,
+            null,
+            javaVisitorContext,
+            null,
+            originatingElement
+        );
+    }
 
     /**
      * Creates a Python processing environment with the specified Python environment.
@@ -61,9 +83,11 @@ public record PythonProcessingEnvironment(
             null,
             null,
             javaVisitorContext,
+            null,
             null
         );
     }
+
 
     /**
      * Creates a Python processing environment with the specified Python environment.
@@ -74,6 +98,7 @@ public record PythonProcessingEnvironment(
     public PythonProcessingEnvironment(PythonEnvironment environment) {
         this(
             environment,
+            null,
             null,
             null,
             null,

@@ -15,6 +15,8 @@
  */
 package io.micronaut.python.compiler;
 
+import org.jetbrains.annotations.Nullable;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
@@ -57,6 +59,30 @@ final class JavaFileObjectClassLoader extends ClassLoader {
             }
         }
         return super.findClass(name);
+    }
+
+    @Override
+    public @Nullable URL getResource(String name) {
+        try {
+            Enumeration<URL> resources = findResources(name);
+            if (resources.hasMoreElements()) {
+                return resources.nextElement();
+            } else {
+                return super.getResource(name);
+            }
+        } catch (IOException e) {
+            return super.getResource(name);
+        }
+    }
+
+    @Override
+    public Enumeration<URL> getResources(String name) throws IOException {
+        Enumeration<URL> resources = findResources(name);
+        if (resources.hasMoreElements()) {
+            return resources;
+        } else {
+            return super.getResources(name);
+        }
     }
 
     @Override

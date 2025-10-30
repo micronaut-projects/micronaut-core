@@ -91,7 +91,6 @@ public final class PyronautCompiler {
             compiler.setClassElementCallback(classElementCallback);
         }
         JavaFileObject[] sources = createJavaSources();
-
         Iterable<JavaFileObject> compiledClasses = compiler.compileInMemory(sources, classpath);
         return new JavaFileObjectClassLoader(compiledClasses);
     }

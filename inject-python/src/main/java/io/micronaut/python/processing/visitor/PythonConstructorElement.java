@@ -52,7 +52,7 @@ public final class PythonConstructorElement extends PythonMethodElement implemen
 
     @Override
     public String getName() {
-        return "<init>";
+        return "__init__";
     }
 
     @Override

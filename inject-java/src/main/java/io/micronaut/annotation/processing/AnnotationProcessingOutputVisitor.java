@@ -15,6 +15,7 @@
  */
 package io.micronaut.annotation.processing;
 
+import io.micronaut.annotation.processing.visitor.ElementProvider;
 import io.micronaut.annotation.processing.visitor.JavaNativeElement;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.ArrayUtils;
@@ -117,11 +118,12 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
     public void visitServiceDescriptor(String type, String classname, io.micronaut.inject.ast.Element originatingElement) {
         final String path = "META-INF/micronaut/" + type + "/" + classname;
         try {
+            Element element = originatingElement instanceof ElementProvider jne ? jne.element() : null;
             final FileObject fileObject = filer.createResource(
                 StandardLocation.CLASS_OUTPUT,
                 "",
                 path,
-                ((JavaNativeElement) originatingElement.getNativeType()).element()
+                element
             );
             try (Writer w = fileObject.openWriter()) {
                 w.write("");
@@ -142,7 +144,7 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
 
     private static Element[] toNativeOriginatingElements(io.micronaut.inject.ast.Element[] originatingElements) {
         return Arrays.stream(originatingElements)
-            .map(e -> ((JavaNativeElement) e.getNativeType()).element()).toArray(Element[]::new);
+            .map(e -> ((ElementProvider) e).element()).toArray(Element[]::new);
     }
 
     @Override

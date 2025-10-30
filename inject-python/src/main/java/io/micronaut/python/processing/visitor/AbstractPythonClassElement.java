@@ -20,6 +20,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
+import io.micronaut.annotation.processing.visitor.ElementProvider;
 import io.micronaut.context.annotation.BeanProperties;
 import io.micronaut.inject.ast.ArrayableClassElement;
 import io.micronaut.inject.ast.ClassElement;
@@ -34,8 +35,13 @@ import io.micronaut.inject.ast.PropertyElementQuery;
 import io.micronaut.inject.ast.utils.EnclosedElementsQuery;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.python.processing.util.GraalPyUtil;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
-public abstract sealed class AbstractPythonClassElement extends AbstractPythonElement implements ArrayableClassElement permits PythonClassElement, PythonEnumElement {
+public abstract sealed class AbstractPythonClassElement extends AbstractPythonElement
+    implements ArrayableClassElement, ElementProvider permits PythonClassElement, PythonEnumElement {
+    public static final String PYTHON_DEFAULT_PACKAGE = "python";
+
     protected final int arrayDimensions;
     protected final PythonProcessingEnvironment environment;
     /** Query implementation for enclosed elements. */
@@ -47,12 +53,21 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
 
     protected AbstractPythonClassElement(ClassDef classDef, PythonProcessingEnvironment environment, int arrayDimensions) {
         super(
-            classDef.packageName().isEmpty() ? classDef.name() : classDef.packageName() + "." + classDef.name(),
+            qualifiedClassName(classDef),
             classDef,
             environment.metadataFactory()
         );
         this.environment = environment;
         this.arrayDimensions = arrayDimensions;
+    }
+
+    private static @NotNull String qualifiedClassName(ClassDef classDef) {
+        return classDef.packageName().isEmpty() ? PYTHON_DEFAULT_PACKAGE + "." + classDef.name() : classDef.packageName() + "." + classDef.name();
+    }
+
+    @Override
+    public @Nullable javax.lang.model.element.Element element() {
+        return environment.originatingElement();
     }
 
     @Override
@@ -84,7 +99,8 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
 
     @Override
     public String getPackageName() {
-        return getNativeType().packageName();
+        String packageName = getNativeType().packageName();
+        return packageName.isEmpty() ? PYTHON_DEFAULT_PACKAGE : packageName;
     }
 
     @Override

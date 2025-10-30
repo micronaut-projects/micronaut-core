@@ -273,7 +273,14 @@ def {decorator_name}({param_signature}):
         {param_handling}
         func._micronaut_annotations.append(annotation_data)
         return func
-    return decorator
+
+    # Handle both @Annotation and @Annotation() usage patterns
+    if len(args) == 1 and len(kwargs) == 0 and callable(args[0]) and hasattr(args[0], '__name__'):
+        # Called as @Annotation (without parentheses) - args[0] is the function
+        return decorator(args[0])
+    else:
+        # Called as @Annotation() or @Annotation(param=value) - return decorator
+        return decorator
 '''
 
         # Handle nested annotations (annotations referenced by this annotation's parameters)
@@ -322,7 +329,14 @@ def {decorator_name}({param_signature}):
         {param_handling}
         func._micronaut_annotations.append(annotation_data)
         return func
-    return decorator
+
+    # Handle both @Annotation and @Annotation() usage patterns
+    if len(args) == 1 and len(kwargs) == 0 and callable(args[0]) and hasattr(args[0], '__name__'):
+        # Called as @Annotation (without parentheses) - args[0] is the function
+        return decorator(args[0])
+    else:
+        # Called as @Annotation() or @Annotation(param=value) - return decorator
+        return decorator
 '''
 
         # Handle nested annotations (annotations referenced by this annotation's parameters)

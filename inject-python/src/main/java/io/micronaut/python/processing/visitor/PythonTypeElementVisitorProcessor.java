@@ -116,7 +116,9 @@ public class PythonTypeElementVisitorProcessor {
         for (LoadedVisitor loadedVisitor : loadedVisitors) {
             TypeElementVisitor<?, ?> visitor = loadedVisitor.getVisitor();
             for (ClassElement element : classes.values()) {
-                visitor.visitClass(element, pythonVisitorContext);
+                if (loadedVisitor.matchesClass(element)) {
+                    visitor.visitClass(element, pythonVisitorContext);
+                }
             }
         }
 

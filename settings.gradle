@@ -25,6 +25,7 @@ include "core"
 include "core-reactive"
 include "core-processor"
 include "context"
+include 'context-python'
 include "context-propagation"
 include "discovery-core"
 include "function"
@@ -54,6 +55,7 @@ include 'inject-kotlin'
 include 'inject-kotlin-test'
 include 'inject-python'
 include 'inject-python-test'
+
 include "inject-test-utils"
 include "jackson-core"
 include "jackson-databind"
