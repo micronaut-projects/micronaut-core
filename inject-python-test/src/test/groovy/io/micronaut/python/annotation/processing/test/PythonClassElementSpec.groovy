@@ -20,6 +20,7 @@ import io.micronaut.inject.ast.ClassElement
 import io.micronaut.python.compiler.PrimitiveTypesAnnotation
 import io.micronaut.python.compiler.RepeatableAnnotation
 import spock.lang.PendingFeature
+import spock.lang.Unroll
 
 /**
  * Tests for Python class elements.
@@ -226,7 +227,7 @@ from io.micronaut.context.annotation import Executable
 @Singleton
 class SimpleService:
     @Executable
-    def greet(self, name):
+    def greet(self, name : str) -> str:
         return f"Hello, {name}!"
 
     def get_count(self):
@@ -272,5 +273,43 @@ class TestService:
         io.micronaut.context.python.ContextHolder.getContext()
         then:
         thrown(IllegalStateException)
+    }
+
+    @Unroll
+    def "test different return types: #description"() {
+        given: "Python code with specific return type annotation"
+        def pythonCode = """
+from jakarta.inject import Singleton
+from io.micronaut.context.annotation import Executable
+
+@Singleton
+class TypeTestService:
+    @Executable
+    def get_value(self) -> $pythonTypeAnnotation:
+        return $pythonValue
+"""
+
+        when: "Building ApplicationContext and calling method"
+        def context = buildContext(pythonCode)
+        def javaStub = context.classLoader.loadClass("python.TypeTestService")
+        def result = context.getBean(javaStub).getValue()
+
+        then: "Result should be correctly converted to expected type"
+        result == expectedValue
+        result.getClass() == expectedType
+
+        cleanup: "Ensure context is properly closed"
+        context?.close()
+
+        where:
+        description              | pythonTypeAnnotation | pythonValue | expectedValue | expectedType
+        "String return type"     | "str"                | '"hello"'   | "hello"       | String.class
+        "Integer return type"    | "int"                | "42"        | 42            | Integer  // Fixed: now returns int (primitive)
+        "Boolean True"           | "bool"               | "True"      | true          | Boolean  // Fixed: now returns boolean (primitive)
+        "Boolean False"          | "bool"               | "False"     | false         | Boolean  // Fixed: now returns boolean (primitive)
+        "Float return type"      | "float"              | "3.14"      | 3.14d         | Double   // Fixed: now returns double (primitive)
+//        "List return type"       | "list"               | "[1, 2, 3]" | "[1, 2, 3]"   | String.class  // TODO: Should be List.class once collection handling is added
+//        "Dict return type"       | "dict"               | '{"a": 1}'  | '{"a": 1}'    | String.class  // TODO: Should be Map.class once collection handling is added
+//        "None return type"       | "None"               | "None"      | "None"        | String.class  // TODO: Should be Void.class once void handling is added
     }
 }
