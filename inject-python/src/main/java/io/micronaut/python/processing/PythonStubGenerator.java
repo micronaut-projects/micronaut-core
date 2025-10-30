@@ -1,5 +1,13 @@
 package io.micronaut.python.processing;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.lang.model.element.Modifier;
+
+import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.Value;
+
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.naming.NameUtils;
@@ -21,12 +29,6 @@ import io.micronaut.sourcegen.model.MethodDef;
 import io.micronaut.sourcegen.model.ParameterDef;
 import io.micronaut.sourcegen.model.TypeDef;
 import io.micronaut.sourcegen.model.VariableDef;
-import org.graalvm.polyglot.Context;
-import org.graalvm.polyglot.Value;
-
-import javax.lang.model.element.Modifier;
-import java.util.ArrayList;
-import java.util.List;
 
 public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
@@ -74,20 +76,80 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             .returns(TypeDef.of(methodElement.getReturnType()));
 
                         for (@NonNull ParameterElement parameter : methodElement.getParameters()) {
-                            methodBuilder.addParameter(ParameterDef.builder(parameter.getName(), TypeDef.of(parameter.getType())).build());
+                            var parameterType = TypeDef.of(parameter.getType());
+                            ParameterDef parameterDef = ParameterDef
+                                .builder(parameter.getName(), parameterType).build();
+                            methodBuilder.addParameter(parameterDef);
                         }
 
                         builder.addMethod(methodBuilder
                             .build(((aThis, methodParameters) -> {
-                                VariableDef.Field pythonValueFIeld = aThis.field(pythonValue);
+                                VariableDef.Field pythonValueField = aThis.field(pythonValue);
                                 List<ExpressionDef> parameters = new ArrayList<>();
                                 parameters.add(ExpressionDef.constant(pythonFunctionName));
                                 parameters.addAll(methodParameters);
-                                return pythonValueFIeld.invoke(
+
+                                // Get the return type to determine appropriate conversion method
+                                var returnType = methodElement.getReturnType();
+                                var invokedValue = pythonValueField.invoke(
                                     "invokeMember",
                                     POLYGLOT_VALUE,
                                     parameters
-                                ).invoke("asString", ClassTypeDef.STRING).returning();
+                                );
+
+                                // Choose appropriate conversion method based on return type
+                                if (returnType.isPrimitive()) {
+                                    String primitiveTypeName = returnType.getName();
+                                    return switch (primitiveTypeName) {
+                                        case "int" ->
+                                            invokedValue.invoke("asInt", TypeDef.Primitive.INT).returning();
+                                        case "boolean" ->
+                                            invokedValue.invoke("asBoolean", TypeDef.Primitive.BOOLEAN).returning();
+                                        case "double" ->
+                                            invokedValue.invoke("asDouble", TypeDef.Primitive.DOUBLE).returning();
+                                        case "float" ->
+                                            invokedValue.invoke("asFloat", TypeDef.Primitive.FLOAT).returning();
+                                        case "long" ->
+                                            invokedValue.invoke("asLong", TypeDef.Primitive.LONG).returning();
+                                        case "short" ->
+                                            invokedValue.invoke("asShort", TypeDef.Primitive.SHORT).returning();
+                                        case "byte" ->
+                                            invokedValue.invoke("asByte", TypeDef.Primitive.BYTE).returning();
+                                        case "char" ->
+                                            invokedValue.invoke("asString", ClassTypeDef.STRING)
+                                                .invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0)).returning();
+                                        default ->
+                                            invokedValue.invoke("asString", ClassTypeDef.STRING).returning();
+                                    };
+                                } else {
+                                    // Handle boxed types and other reference types
+                                    String referenceTypeName = returnType.getName();
+                                    return switch (referenceTypeName) {
+                                        case "java.lang.Integer" ->
+                                            invokedValue.invoke("asInt", TypeDef.Primitive.INT).returning();
+                                        case "java.lang.Boolean" ->
+                                            invokedValue.invoke("asBoolean", TypeDef.Primitive.BOOLEAN).returning();
+                                        case "java.lang.Double" ->
+                                            invokedValue.invoke("asDouble", TypeDef.Primitive.DOUBLE).returning();
+                                        case "java.lang.Float" ->
+                                            invokedValue.invoke("asFloat", TypeDef.Primitive.FLOAT).returning();
+                                        case "java.lang.Long" ->
+                                            invokedValue.invoke("asLong", TypeDef.Primitive.LONG).returning();
+                                        case "java.lang.Short" ->
+                                            invokedValue.invoke("asShort", TypeDef.Primitive.SHORT).returning();
+                                        case "java.lang.Byte" ->
+                                            invokedValue.invoke("asByte", TypeDef.Primitive.BYTE).returning();
+                                        case "java.lang.Character" ->
+                                            invokedValue.invoke("asString", ClassTypeDef.STRING)
+                                                .invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0)).returning();
+                                        case "java.lang.String" ->
+                                            invokedValue.invoke("asString", ClassTypeDef.STRING).returning();
+                                        default ->
+                                            // For complex types (List, Map, etc.) or unknown types, convert to string for now
+                                            // TODO: Add proper handling for collections and complex types
+                                            invokedValue.invoke("asString", ClassTypeDef.STRING).returning();
+                                    };
+                                }
                             })));
                     }
 
