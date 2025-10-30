@@ -9,11 +9,11 @@ micronautBuild {
 }
 
 dependencies {
-    api(projects.micronautCoreProcessor)
-    api(projects.micronautInjectJava)
-    api(mnSourcegen.micronaut.sourcegen.generator.java)
-    api(mnSourcegen.micronaut.sourcegen.generator)
-    api(mnSourcegen.micronaut.sourcegen.annotations)
+    annotationProcessor(projects.micronautInjectJava)
+    annotationProcessor(projects.micronautGraal)
+
+    api(projects.micronautCore)
+    api(projects.micronautContext)
     api(libs.managed.graalpy) {
         artifact {
             type = "pom"
@@ -21,8 +21,6 @@ dependencies {
     }
     api(libs.managed.graalpy.embedding)
     compileOnly(libs.jetbrains.annotations)
-
-    testImplementation(projects.micronautContext)
     testImplementation(projects.micronautAop)
 }
 tasks.withType<Test>().configureEach {

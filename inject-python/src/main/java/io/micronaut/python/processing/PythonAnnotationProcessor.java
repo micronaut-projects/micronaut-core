@@ -25,6 +25,7 @@ import java.util.Set;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
+import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.lang.model.element.Element;
@@ -33,21 +34,22 @@ import javax.lang.model.element.TypeElement;
 import io.micronaut.annotation.processing.AbstractInjectAnnotationProcessor;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.python.processing.annotation.PythonApplication;
+import io.micronaut.python.processing.beans.PythonBeanDefinitionProcessor;
 import io.micronaut.python.processing.visitor.PythonTypeElementVisitorProcessor;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Annotation processor for {@link PythonApplication} that enables Python AST processing
  * during Java compilation.
  *
- * @since 4.8.0
  * @author Micronaut
+ * @since 4.8.0
  */
 @SupportedAnnotationTypes("io.micronaut.python.processing.annotation.PythonApplication")
 public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor {
 
+    private PythonAstParser parser;
     private Consumer<ClassElement> classElementCallback;
-
-    private final PythonAstParser parser = new PythonAstParser();
 
     /**
      * Set the callback to be invoked for each class element created during processing.
@@ -57,6 +59,12 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
      */
     public void setClassElementCallback(Consumer<ClassElement> callback) {
         this.classElementCallback = callback;
+    }
+
+    @Override
+    public synchronized void init(ProcessingEnvironment processingEnv) {
+        super.init(processingEnv);
+        parser = new PythonAstParser();
     }
 
     @Override
@@ -70,7 +78,9 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                 processPythonApplications(roundEnv);
             }
         }
-
+        if (roundEnv.processingOver()) {
+            parser.close();
+        }
         return false;
     }
 
@@ -80,87 +90,40 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         for (Element element : elements) {
             PythonApplication annotation = element.getAnnotation(PythonApplication.class);
             if (annotation != null) {
-                processAnnotation(annotation);
+                processAnnotation(element, annotation);
             }
         }
     }
 
-    private void processAnnotation(PythonApplication annotation) {
+    private void processAnnotation(Element element, PythonApplication annotation) {
         try {
             PythonEnvironment environment;
-            String transformedCode;
+            String transformedCode = applyASTTransforms(annotation);
+            if (transformedCode == null) {
+                return;
+            }
 
-            // Process inline code if provided
-            String code = annotation.code();
-            if (!code.isEmpty()) {
-                // Transform the source code first
-                try {
-                    transformedCode = parser.transform(code, javaVisitorContext);
-                } catch (Exception e) {
-                    error("Error transforming python code: " + e.getMessage(), e);
-                    return;
-                }
-                // Then parse the transformed code
-                try {
-                    environment = parser.parse(transformedCode);
-                } catch (Exception e) {
-                    error("Error parsing transformed python code: " + e.getMessage(), e);
-                    return;
-                }
-            } else {
-                // Process directory scanning if provided
-                String srcDir = annotation.src();
-                if (!srcDir.isEmpty()) {
-                    Path directory = Paths.get(srcDir);
-                    if (Files.isDirectory(directory)) {
-                        try (Stream<Path> stream = Files.walk(directory)) {
-                            Path[] files = stream
-                                .filter(Files::isRegularFile)
-                                .filter(path -> path.toString().endsWith(".py"))
-                                .toArray(Path[]::new);
-                            StringBuilder combinedSources = new StringBuilder();
-                            for (Path file : files) {
-                                combinedSources.append(Files.readString(file)).append("\n");
-                            }
-                            String sourceCode = combinedSources.toString();
-                            // Transform the source code first
-                            try {
-                                transformedCode = parser.transform(sourceCode, javaVisitorContext);
-                            } catch (Exception e) {
-                                error("Error transforming python code: " + e.getMessage(), e);
-                                return;
-                            }
-                            // Then parse the transformed code
-                            try {
-                                environment = parser.parse(transformedCode);
-                            } catch (Exception e) {
-                                error("Error parsing transformed python code: " + e.getMessage(), e);
-                                return;
-                            }
-                        } catch (IOException e) {
-                            error("Failed to scan directory for Python files: " + srcDir, e);
-                            return;
-                        } catch (Exception e) {
-                            error("Error processing python code: " + e.getMessage(), e);
-                            return;
-                        }
-                    } else {
-                        error("Source directory does not exist: " + srcDir);
-                        return;
-                    }
-                } else {
-                    note("No code or src specified in @PyronautApplication");
-                    return;
-                }
+            // Then parse the transformed code
+            try {
+                environment = parser.parse(transformedCode);
+            } catch (Exception e) {
+                error("Error parsing transformed python code: " + e.getMessage(), e);
+                return;
             }
 
             // Create processing environment and visitor context
-            PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment, javaVisitorContext);
+            PythonProcessingEnvironment processingEnvironment =
+                new PythonProcessingEnvironment(environment, javaVisitorContext, element);
 
             // Run type element visitor processing
-            PythonTypeElementVisitorProcessor typeElementVisitorProcessor = new PythonTypeElementVisitorProcessor();
+            PythonTypeElementVisitorProcessor typeElementVisitorProcessor =
+                new PythonTypeElementVisitorProcessor();
             typeElementVisitorProcessor.init(processingEnvironment);
             typeElementVisitorProcessor.process(processingEnvironment);
+
+            // Process bean definitions for Python classes
+            var beanDefinitionProcessor = new PythonBeanDefinitionProcessor();
+            beanDefinitionProcessor.processBeanDefinitions(processingEnvironment);
 
             // Invoke callback for each class element if callback is set
             if (classElementCallback != null) {
@@ -168,12 +131,11 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             }
 
             // Write transformed Python code to META-INF
-            final String finalTransformedCode = transformedCode;
-            if (!finalTransformedCode.isEmpty()) {
+            if (!transformedCode.isEmpty()) {
                 javaVisitorContext.visitMetaInfFile("pyronaut_application.py")
                     .ifPresent(generatedFile -> {
                         try (var writer = generatedFile.openWriter()) {
-                            writer.write(finalTransformedCode);
+                            writer.write(transformedCode);
                         } catch (IOException e) {
                             error("Failed to write transformed Python code to META-INF", e);
                         }
@@ -182,8 +144,8 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
 
             // The visitor context is now ready for use by Micronaut's type visitors
             note("Successfully processed Python environment with " +
-                 environment.classes().size() + " classes and " +
-                 environment.decorators().size() + " decorators");
+                environment.classes().size() + " classes and " +
+                environment.decorators().size() + " decorators");
 
         } catch (Exception e) {
             StringWriter sw = new StringWriter();
@@ -193,5 +155,60 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             error("Failed Trace: %s", stacktrace);
             error("Failed to process Python code: %s", e.getMessage());
         }
+    }
+
+    private @Nullable String applyASTTransforms(PythonApplication annotation) {
+        String transformedCode;
+        // Process inline code if provided
+        String code = annotation.code();
+        if (!code.isEmpty()) {
+            // Transform the source code first
+            try {
+                transformedCode = parser.transform(code, javaVisitorContext);
+            } catch (Exception e) {
+                error("Error transforming python code: " + e.getMessage(), e);
+                return null;
+            }
+
+        } else {
+            // Process directory scanning if provided
+            String srcDir = annotation.src();
+            if (!srcDir.isEmpty()) {
+                Path directory = Paths.get(srcDir);
+                if (Files.isDirectory(directory)) {
+                    try (Stream<Path> stream = Files.walk(directory)) {
+                        Path[] files = stream
+                            .filter(Files::isRegularFile)
+                            .filter(path -> path.toString().endsWith(".py"))
+                            .toArray(Path[]::new);
+                        StringBuilder combinedSources = new StringBuilder();
+                        for (Path file : files) {
+                            combinedSources.append(Files.readString(file)).append("\n");
+                        }
+                        String sourceCode = combinedSources.toString();
+                        // Transform the source code first
+                        try {
+                            transformedCode = parser.transform(sourceCode, javaVisitorContext);
+                        } catch (Exception e) {
+                            error("Error transforming python code: " + e.getMessage(), e);
+                            return null;
+                        }
+                    } catch (IOException e) {
+                        error("Failed to scan directory for Python files: " + srcDir, e);
+                        return null;
+                    } catch (Exception e) {
+                        error("Error processing python code: " + e.getMessage(), e);
+                        return null;
+                    }
+                } else {
+                    error("Source directory does not exist: " + srcDir);
+                    return null;
+                }
+            } else {
+                note("No code or src specified in @PyronautApplication");
+                return null;
+            }
+        }
+        return transformedCode;
     }
 }

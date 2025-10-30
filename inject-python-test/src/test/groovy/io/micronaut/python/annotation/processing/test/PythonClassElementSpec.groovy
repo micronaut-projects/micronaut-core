@@ -15,10 +15,10 @@
  */
 package io.micronaut.python.annotation.processing.test
 
+import io.micronaut.context.python.ContextHolder
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.python.compiler.PrimitiveTypesAnnotation
 import io.micronaut.python.compiler.RepeatableAnnotation
-import spock.lang.IgnoreIf
 import spock.lang.PendingFeature
 
 /**
@@ -215,5 +215,62 @@ class MyPrimitiveAnnotatedService:
         then:
         classElement != null
         classElement.getSimpleName() == "MyPrimitiveAnnotatedService"
+    }
+
+    def "test ApplicationContext can be started from generated Python script"() {
+        given:
+        def pythonCode = '''
+from jakarta.inject import Singleton
+from io.micronaut.context.annotation import Executable
+
+@Singleton
+class SimpleService:
+    @Executable
+    def greet(self, name):
+        return f"Hello, {name}!"
+
+    def get_count(self):
+        return 42
+'''
+
+        when: "Building ApplicationContext from Python code"
+        def context = buildContext(pythonCode)
+        def javaStub = context.classLoader.loadClass("python.SimpleService")
+
+        then: "Context should start successfully"
+        context != null
+        context.isRunning()
+        javaStub != null
+        context.getBean(javaStub).greet("John") == "Hello, John!"
+
+        ContextHolder.isInitialized()
+        ContextHolder.getContext() != null
+        ContextHolder.context.getBindings("python").getMember("SimpleService") != null
+
+
+        cleanup: "Ensure context is properly closed"
+        context?.close()
+    }
+
+    def "test ApplicationContext cleanup resets ContextHolder"() {
+        given:
+        def pythonCode = '''
+class TestService:
+    def ping(self):
+        return "pong"
+'''
+
+        when: "Building and closing ApplicationContext"
+        def context = buildContext(pythonCode)
+        context.close()
+
+        then: "ContextHolder should be reset"
+        !io.micronaut.context.python.ContextHolder.isInitialized()
+
+        and: "Accessing context after cleanup should throw exception"
+        when:
+        io.micronaut.context.python.ContextHolder.getContext()
+        then:
+        thrown(IllegalStateException)
     }
 }

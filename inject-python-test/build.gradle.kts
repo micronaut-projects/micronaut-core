@@ -5,6 +5,7 @@ plugins {
 dependencies {
     api(projects.micronautInjectPython)
     api(projects.micronautContext)
+    api(projects.micronautContextPython)
     api(libs.managed.groovy)
     api(libs.spock) {
         exclude(module = "groovy-all")

@@ -46,7 +46,7 @@ public final class PythonClassElement extends AbstractPythonClassElement {
     public Optional<MethodElement> getPrimaryConstructor() {
         FunctionDef constructor = getNativeType().constructor();
         if (constructor != null) {
-            return Optional.of(new PythonMethodElement(constructor, environment, this, this, environment.metadataFactory()));
+            return Optional.of(new PythonConstructorElement(constructor, environment, this, this, environment.metadataFactory()));
         }
         return Optional.empty();
     }

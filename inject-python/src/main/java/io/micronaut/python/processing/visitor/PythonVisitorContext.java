@@ -163,13 +163,20 @@ public class PythonVisitorContext implements VisitorContext {
         if (javaVisitorContext != null) {
             javaVisitorContext.visitServiceDescriptor(type, classname, originatingElement);
         }
-        throw new UnsupportedOperationException();
     }
 
     @Override
     public Optional<GeneratedFile> visitGeneratedFile(String path, Element... originatingElements) {
         if (javaVisitorContext != null) {
             return javaVisitorContext.visitGeneratedFile(path, originatingElements);
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public Optional<GeneratedFile> visitGeneratedSourceFile(String packageName, String fileNameWithoutExtension, Element... originatingElements) {
+        if (javaVisitorContext != null) {
+            return javaVisitorContext.visitGeneratedSourceFile(packageName, fileNameWithoutExtension, originatingElements);
         }
         return Optional.empty();
     }
