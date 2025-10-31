@@ -154,12 +154,6 @@ def micronaut_annotation(name, repeated=None):
                     if decorator_code:
                         self.transformed_code.append(decorator_code)
                         return True
-                else:
-                    # For testing purposes, generate a decorator anyway
-                    decorator_code = self._generate_test_decorator(import_name, full_name)
-                    self.transformed_code.append(decorator_code)
-                    return True
-
         return False
 
     def _handle_star_import(self, module_name: str) -> bool:

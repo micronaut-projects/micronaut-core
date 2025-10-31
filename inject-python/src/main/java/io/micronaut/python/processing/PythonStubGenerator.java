@@ -2,6 +2,8 @@ package io.micronaut.python.processing;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import javax.lang.model.element.Modifier;
 
@@ -10,7 +12,6 @@ import org.graalvm.polyglot.Value;
 
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.naming.NameUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.MethodElement;
@@ -27,12 +28,14 @@ import io.micronaut.sourcegen.model.ExpressionDef;
 import io.micronaut.sourcegen.model.FieldDef;
 import io.micronaut.sourcegen.model.MethodDef;
 import io.micronaut.sourcegen.model.ParameterDef;
+import io.micronaut.sourcegen.model.StatementDef;
 import io.micronaut.sourcegen.model.TypeDef;
 import io.micronaut.sourcegen.model.VariableDef;
 
 public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
     public static final TypeDef POLYGLOT_VALUE = TypeDef.of(Value.class);
+    public static final VariableDef.StaticField CLASS_OBJECT = ClassTypeDef.of(Object.class).getStaticField("class", TypeDef.CLASS);
 
     @Override
     public TypeElementQuery query() {
@@ -71,8 +74,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
                     for (MethodElement methodElement : methodsToBridge) {
                         String pythonFunctionName = methodElement.getName();
-                        String javaName = NameUtils.camelCase(pythonFunctionName);
-                        MethodDef.MethodDefBuilder methodBuilder = MethodDef.builder(javaName)
+                        MethodDef.MethodDefBuilder methodBuilder = MethodDef.builder(pythonFunctionName)
                             .returns(TypeDef.of(methodElement.getReturnType()));
 
                         for (@NonNull ParameterElement parameter : methodElement.getParameters()) {
@@ -99,28 +101,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
                                 // Choose appropriate conversion method based on return type
                                 if (returnType.isPrimitive()) {
-                                    String primitiveTypeName = returnType.getName();
-                                    return switch (primitiveTypeName) {
-                                        case "int" ->
-                                            invokedValue.invoke("asInt", TypeDef.Primitive.INT).returning();
-                                        case "boolean" ->
-                                            invokedValue.invoke("asBoolean", TypeDef.Primitive.BOOLEAN).returning();
-                                        case "double" ->
-                                            invokedValue.invoke("asDouble", TypeDef.Primitive.DOUBLE).returning();
-                                        case "float" ->
-                                            invokedValue.invoke("asFloat", TypeDef.Primitive.FLOAT).returning();
-                                        case "long" ->
-                                            invokedValue.invoke("asLong", TypeDef.Primitive.LONG).returning();
-                                        case "short" ->
-                                            invokedValue.invoke("asShort", TypeDef.Primitive.SHORT).returning();
-                                        case "byte" ->
-                                            invokedValue.invoke("asByte", TypeDef.Primitive.BYTE).returning();
-                                        case "char" ->
-                                            invokedValue.invoke("asString", ClassTypeDef.STRING)
-                                                .invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0)).returning();
-                                        default ->
-                                            invokedValue.invoke("asString", ClassTypeDef.STRING).returning();
-                                    };
+                                    return convertPrimitive(returnType, invokedValue);
                                 } else {
                                     // Handle boxed types and other reference types
                                     String referenceTypeName = returnType.getName();
@@ -144,10 +125,44 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                                 .invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0)).returning();
                                         case "java.lang.String" ->
                                             invokedValue.invoke("asString", ClassTypeDef.STRING).returning();
-                                        default ->
-                                            // For complex types (List, Map, etc.) or unknown types, convert to string for now
-                                            // TODO: Add proper handling for collections and complex types
-                                            invokedValue.invoke("asString", ClassTypeDef.STRING).returning();
+                                        default -> {
+                                            // Check for collection types
+                                            if (returnType.isAssignable(List.class)) {
+                                                ClassElement componentType = returnType.getFirstTypeArgument().orElse(null);
+                                                ExpressionDef genericType = toClassExpression(componentType);
+                                                yield ClassTypeDef.of("io.micronaut.context.python.GraalPyRuntimeUtil")
+                                                    .invokeStatic("convertList", ClassTypeDef.of(List.class),
+                                                        invokedValue, genericType)
+                                                    .returning();
+                                            } else if (returnType.isAssignable(Map.class)) {
+                                                Map<String, ClassElement> typeArguments = returnType.getTypeArguments();
+                                                ExpressionDef keyType = toClassExpression(typeArguments.get("K"));
+                                                ExpressionDef valueType = toClassExpression(typeArguments.get("V"));
+                                                yield ClassTypeDef.of("io.micronaut.context.python.GraalPyRuntimeUtil")
+                                                    .invokeStatic("convertMap", ClassTypeDef.of(Map.class),
+                                                        invokedValue, keyType, valueType)
+                                                    .returning();
+                                            } else if (returnType.isAssignable(Set.class)) {
+                                                ClassElement componentType = returnType.getFirstTypeArgument().orElse(null);
+                                                ExpressionDef genericType = toClassExpression(componentType);
+
+                                                yield ClassTypeDef.of("io.micronaut.context.python.GraalPyRuntimeUtil")
+                                                    .invokeStatic("convertSet", ClassTypeDef.of(Set.class),
+                                                        invokedValue, genericType)
+                                                    .returning();
+                                            } else if (returnType.isAssignable(java.util.Optional.class)) {
+                                                ClassElement componentType = returnType.getFirstTypeArgument().orElse(null);
+                                                ExpressionDef genericType = toClassExpression(componentType);
+
+                                                yield ClassTypeDef.of("io.micronaut.context.python.GraalPyRuntimeUtil")
+                                                    .invokeStatic("convertOptional", ClassTypeDef.of(java.util.Optional.class),
+                                                        invokedValue, genericType)
+                                                    .returning();
+                                            } else {
+                                                // For unknown types, convert to string as fallback
+                                                yield invokedValue.invoke("asString", ClassTypeDef.STRING).returning();
+                                            }
+                                        }
                                     };
                                 }
                             })));
@@ -160,6 +175,40 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
             }
         }
+    }
+
+    private static ExpressionDef toClassExpression(ClassElement componentType) {
+        ExpressionDef genericType;
+        if (componentType == null) {
+            genericType = CLASS_OBJECT;
+        } else {
+            genericType = ClassTypeDef.of(componentType).getStaticField("class", TypeDef.CLASS);
+        }
+        return genericType;
+    }
+
+    private static StatementDef convertPrimitive(ClassElement returnType, ExpressionDef.InvokeInstanceMethod invokedValue) {
+        String primitiveTypeName = returnType.getName();
+        return switch (primitiveTypeName) {
+            case "int", "java.lang.Integer" ->
+                invokedValue.invoke("asInt", TypeDef.Primitive.INT).returning();
+            case "boolean", "java.lang.Boolean" ->
+                invokedValue.invoke("asBoolean", TypeDef.Primitive.BOOLEAN).returning();
+            case "double", "java.lang.Double" ->
+                invokedValue.invoke("asDouble", TypeDef.Primitive.DOUBLE).returning();
+            case "float", "java.lang.Float" ->
+                invokedValue.invoke("asFloat", TypeDef.Primitive.FLOAT).returning();
+            case "long", "java.lang.Long" ->
+                invokedValue.invoke("asLong", TypeDef.Primitive.LONG).returning();
+            case "short", "java.lang.Short" ->
+                invokedValue.invoke("asShort", TypeDef.Primitive.SHORT).returning();
+            case "byte", "java.lang.Byte" ->
+                invokedValue.invoke("asByte", TypeDef.Primitive.BYTE).returning();
+            case "char", "java.lang.Character" ->
+                invokedValue.invoke("asString", ClassTypeDef.STRING)
+                    .invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0)).returning();
+            default -> invokedValue.invoke("asString", ClassTypeDef.STRING).returning();
+        };
     }
 
     @Override
