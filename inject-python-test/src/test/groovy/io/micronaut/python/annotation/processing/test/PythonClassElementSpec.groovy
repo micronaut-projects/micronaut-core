@@ -292,9 +292,8 @@ class TypeTestService:
 
         when: "Building ApplicationContext and calling method"
         def context = buildContext(pythonCode)
-        def javaStub = context.classLoader.loadClass("python.TypeTestService")
-        def result = context.getBean(javaStub).get_value()
-        def beanDefinition = context.getBeanDefinition(javaStub)
+        def result = getBean(context, "python.TypeTestService").get_value()
+        def beanDefinition = getBeanDefinition(context, "python.TypeTestService")
 
         then: "Result should be correctly converted to expected type"
         result == expectedValue

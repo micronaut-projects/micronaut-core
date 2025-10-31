@@ -20,6 +20,7 @@ import io.micronaut.aop.internal.InterceptorRegistryBean
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.ApplicationContextBuilder
 import io.micronaut.context.DefaultBeanDefinitionsProvider
+import io.micronaut.context.Qualifier
 import io.micronaut.context.event.ApplicationEventPublisherFactory
 import io.micronaut.context.python.ContextHolder
 import io.micronaut.core.io.IOUtils
@@ -47,6 +48,27 @@ import java.util.stream.StreamSupport
  * @since 4.8.0
  */
 abstract class AbstractPythonTypeElementSpec extends Specification {
+
+    /**
+     * Gets a bean from the context for the given class name
+     * @param context The context
+     * @param className The class name
+     * @return The bean instance
+     */
+    Object getBean(ApplicationContext context, String className, Qualifier qualifier = null) {
+        context.getBean(context.classLoader.loadClass(className), qualifier)
+    }
+
+
+    /**
+     * Gets a bean definition from the context for the given class name
+     * @param context The context
+     * @param className The class name
+     * @return The bean instance
+     */
+    BeanDefinition<?> getBeanDefinition(ApplicationContext context, String className, Qualifier qualifier = null) {
+        context.getBeanDefinition(context.classLoader.loadClass(className), qualifier)
+    }
 
     protected BeanDefinition buildBeanDefinition(String className, @Language("python") String pythonCode) {
         def classSimpleName = NameUtils.getSimpleName(className)
