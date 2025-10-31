@@ -7,7 +7,6 @@ import java.util.Set;
 
 import javax.lang.model.element.Modifier;
 
-import io.micronaut.python.processing.visitor.PythonClassElement;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Value;
 
@@ -21,6 +20,7 @@ import io.micronaut.inject.visitor.TypeElementQuery;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.processing.visitor.AbstractPythonClassElement;
+import io.micronaut.python.processing.visitor.PythonClassElement;
 import io.micronaut.sourcegen.generator.SourceGenerator;
 import io.micronaut.sourcegen.generator.SourceGenerators;
 import io.micronaut.sourcegen.model.ClassDef;
@@ -149,74 +149,64 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                     parameters
                                 );
 
-                                // Choose appropriate conversion method based on return type
+                                return handlReturnType(returnType, invokedValue);
+                            })));
+                    }
+
+                    // Find injection methods (annotated with @Inject)
+                    List<MethodElement> injectionMethods = element.getEnclosedElements(
+                        ElementQuery.ALL_METHODS
+                            .onlyAccessible()
+                            .onlyInstance()
+                            .annotated(ann -> ann.hasStereotype("jakarta.inject.Inject")));
+
+                    // Generate methods for injection
+                    for (MethodElement injectionMethod : injectionMethods) {
+                        MethodDef.MethodDefBuilder injectionMethodBuilder = MethodDef.builder(injectionMethod.getName());
+                        if (!injectionMethod.getReturnType().isVoid()) {
+                            injectionMethodBuilder.returns(TypeDef.of(injectionMethod.getReturnType()));
+                        }
+
+                        for (@NonNull ParameterElement parameter : injectionMethod.getParameters()) {
+                            var parameterType = TypeDef.of(parameter.getType());
+                            ParameterDef parameterDef = ParameterDef
+                                .builder(parameter.getName(), parameterType).build();
+                            injectionMethodBuilder.addParameter(parameterDef);
+                        }
+
+                        builder.addMethod(injectionMethodBuilder
+                            .build(((aThis, methodParameters) -> {
+                                VariableDef.Field pythonValueField = aThis.field(pythonValue);
+                                List<ExpressionDef> parameters = new ArrayList<>();
+                                parameters.add(ExpressionDef.constant(injectionMethod.getName()));
+
+                                // Handle parameter conversion for Python classes
+                                for (int i = 0; i < injectionMethod.getParameters().length; i++) {
+                                    ParameterElement param = injectionMethod.getParameters()[i];
+                                    VariableDef.MethodParameter methodParam = methodParameters.get(i);
+                                    if (param.getType() instanceof PythonClassElement) {
+                                        parameters.add(methodParam.invoke("asPolyglotValue", POLYGLOT_VALUE));
+                                    } else {
+                                        parameters.add(methodParam);
+                                    }
+                                }
+
+                                // Call the Python injection method
+                                var invokedValue = pythonValueField.invoke(
+                                    "invokeMember",
+                                    POLYGLOT_VALUE,
+                                    parameters
+                                );
+
+                                // For injection methods, just invoke without explicit return
+                                ClassElement returnType = injectionMethod.getReturnType();
                                 if (returnType.isVoid()) {
-                                    // For void methods, just invoke the Python method without returning
                                     return invokedValue;
-                                } else if (returnType.isPrimitive()) {
-                                    return convertPrimitive(returnType, invokedValue);
                                 } else {
-                                    // Handle boxed types and other reference types
-                                    String referenceTypeName = returnType.getName();
-                                    return switch (referenceTypeName) {
-                                        case "java.lang.Integer" ->
-                                            invokedValue.invoke("asInt", TypeDef.Primitive.INT).returning();
-                                        case "java.lang.Boolean" ->
-                                            invokedValue.invoke("asBoolean", TypeDef.Primitive.BOOLEAN).returning();
-                                        case "java.lang.Double" ->
-                                            invokedValue.invoke("asDouble", TypeDef.Primitive.DOUBLE).returning();
-                                        case "java.lang.Float" ->
-                                            invokedValue.invoke("asFloat", TypeDef.Primitive.FLOAT).returning();
-                                        case "java.lang.Long" ->
-                                            invokedValue.invoke("asLong", TypeDef.Primitive.LONG).returning();
-                                        case "java.lang.Short" ->
-                                            invokedValue.invoke("asShort", TypeDef.Primitive.SHORT).returning();
-                                        case "java.lang.Byte" ->
-                                            invokedValue.invoke("asByte", TypeDef.Primitive.BYTE).returning();
-                                        case "java.lang.Character" ->
-                                            invokedValue.invoke("asString", ClassTypeDef.STRING)
-                                                .invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0)).returning();
-                                        case "java.lang.String" ->
-                                            invokedValue.invoke("asString", ClassTypeDef.STRING).returning();
-                                        default -> {
-                                            // Check for collection types
-                                            if (returnType.isAssignable(List.class)) {
-                                                ClassElement componentType = returnType.getFirstTypeArgument().orElse(null);
-                                                ExpressionDef genericType = toClassExpression(componentType);
-                                                yield ClassTypeDef.of("io.micronaut.context.python.GraalPyRuntimeUtil")
-                                                    .invokeStatic("convertList", ClassTypeDef.of(List.class),
-                                                        invokedValue, genericType)
-                                                    .returning();
-                                            } else if (returnType.isAssignable(Map.class)) {
-                                                Map<String, ClassElement> typeArguments = returnType.getTypeArguments();
-                                                ExpressionDef keyType = toClassExpression(typeArguments.get("K"));
-                                                ExpressionDef valueType = toClassExpression(typeArguments.get("V"));
-                                                yield ClassTypeDef.of("io.micronaut.context.python.GraalPyRuntimeUtil")
-                                                    .invokeStatic("convertMap", ClassTypeDef.of(Map.class),
-                                                        invokedValue, keyType, valueType)
-                                                    .returning();
-                                            } else if (returnType.isAssignable(Set.class)) {
-                                                ClassElement componentType = returnType.getFirstTypeArgument().orElse(null);
-                                                ExpressionDef genericType = toClassExpression(componentType);
-
-                                                yield ClassTypeDef.of("io.micronaut.context.python.GraalPyRuntimeUtil")
-                                                    .invokeStatic("convertSet", ClassTypeDef.of(Set.class),
-                                                        invokedValue, genericType)
-                                                    .returning();
-                                            } else if (returnType.isAssignable(java.util.Optional.class)) {
-                                                ClassElement componentType = returnType.getFirstTypeArgument().orElse(null);
-                                                ExpressionDef genericType = toClassExpression(componentType);
-
-                                                yield ClassTypeDef.of("io.micronaut.context.python.GraalPyRuntimeUtil")
-                                                    .invokeStatic("convertOptional", ClassTypeDef.of(java.util.Optional.class),
-                                                        invokedValue, genericType)
-                                                    .returning();
-                                            } else {
-                                                // For unknown types, convert to string as fallback
-                                                yield invokedValue.invoke("asString", ClassTypeDef.STRING).returning();
-                                            }
-                                        }
-                                    };
+                                    return StatementDef.multi(
+                                        invokedValue,
+                                        ExpressionDef.nullValue().returning()
+                                    );
                                 }
                             })));
                     }
@@ -227,6 +217,77 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 }
 
             }
+        }
+    }
+
+    private static StatementDef handlReturnType(ClassElement returnType, ExpressionDef.InvokeInstanceMethod invokedValue) {
+        // Choose appropriate conversion method based on return type
+        if (returnType.isVoid()) {
+            // For void methods, just invoke the Python method without returning
+            return invokedValue;
+        } else if (returnType.isPrimitive()) {
+            return convertPrimitive(returnType, invokedValue);
+        } else {
+            // Handle boxed types and other reference types
+            String referenceTypeName = returnType.getName();
+            return switch (referenceTypeName) {
+                case "java.lang.Integer" ->
+                    invokedValue.invoke("asInt", TypeDef.Primitive.INT).returning();
+                case "java.lang.Boolean" ->
+                    invokedValue.invoke("asBoolean", TypeDef.Primitive.BOOLEAN).returning();
+                case "java.lang.Double" ->
+                    invokedValue.invoke("asDouble", TypeDef.Primitive.DOUBLE).returning();
+                case "java.lang.Float" ->
+                    invokedValue.invoke("asFloat", TypeDef.Primitive.FLOAT).returning();
+                case "java.lang.Long" ->
+                    invokedValue.invoke("asLong", TypeDef.Primitive.LONG).returning();
+                case "java.lang.Short" ->
+                    invokedValue.invoke("asShort", TypeDef.Primitive.SHORT).returning();
+                case "java.lang.Byte" ->
+                    invokedValue.invoke("asByte", TypeDef.Primitive.BYTE).returning();
+                case "java.lang.Character" -> invokedValue.invoke("asString", ClassTypeDef.STRING)
+                    .invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0)).returning();
+                case "java.lang.String" ->
+                    invokedValue.invoke("asString", ClassTypeDef.STRING).returning();
+                default -> {
+                    // Check for collection types
+                    if (returnType.isAssignable(List.class)) {
+                        ClassElement componentType = returnType.getFirstTypeArgument().orElse(null);
+                        ExpressionDef genericType = toClassExpression(componentType);
+                        yield ClassTypeDef.of("io.micronaut.context.python.GraalPyRuntimeUtil")
+                            .invokeStatic("convertList", ClassTypeDef.of(List.class),
+                                invokedValue, genericType)
+                            .returning();
+                    } else if (returnType.isAssignable(Map.class)) {
+                        Map<String, ClassElement> typeArguments = returnType.getTypeArguments();
+                        ExpressionDef keyType = toClassExpression(typeArguments.get("K"));
+                        ExpressionDef valueType = toClassExpression(typeArguments.get("V"));
+                        yield ClassTypeDef.of("io.micronaut.context.python.GraalPyRuntimeUtil")
+                            .invokeStatic("convertMap", ClassTypeDef.of(Map.class),
+                                invokedValue, keyType, valueType)
+                            .returning();
+                    } else if (returnType.isAssignable(Set.class)) {
+                        ClassElement componentType = returnType.getFirstTypeArgument().orElse(null);
+                        ExpressionDef genericType = toClassExpression(componentType);
+
+                        yield ClassTypeDef.of("io.micronaut.context.python.GraalPyRuntimeUtil")
+                            .invokeStatic("convertSet", ClassTypeDef.of(Set.class),
+                                invokedValue, genericType)
+                            .returning();
+                    } else if (returnType.isAssignable(java.util.Optional.class)) {
+                        ClassElement componentType = returnType.getFirstTypeArgument().orElse(null);
+                        ExpressionDef genericType = toClassExpression(componentType);
+
+                        yield ClassTypeDef.of("io.micronaut.context.python.GraalPyRuntimeUtil")
+                            .invokeStatic("convertOptional", ClassTypeDef.of(java.util.Optional.class),
+                                invokedValue, genericType)
+                            .returning();
+                    } else {
+                        // For unknown types, convert to string as fallback
+                        yield invokedValue.invoke("asString", ClassTypeDef.STRING).returning();
+                    }
+                }
+            };
         }
     }
 
