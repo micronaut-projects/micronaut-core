@@ -7,6 +7,9 @@ import java.util.Set;
 
 import javax.lang.model.element.Modifier;
 
+import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.inject.ast.PrimitiveElement;
+import io.micronaut.inject.ast.PropertyElement;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Value;
 
@@ -14,6 +17,7 @@ import io.micronaut.context.annotation.Executable;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
+import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.visitor.TypeElementQuery;
@@ -209,6 +213,35 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                     );
                                 }
                             })));
+                    }
+
+                    // Find injection fields (with Annotated[Type, Inject] syntax)
+                    // For now, we'll look for fields that have any annotation and check for Inject in metadata
+                    List<PropertyElement> beanProperties = element.getBeanProperties();
+                    for (PropertyElement beanProperty : beanProperties) {
+                        if (beanProperty.hasStereotype(AnnotationUtil.INJECT)) {
+                            MethodDef.MethodDefBuilder propertySetter = MethodDef.builder(beanProperty.getName())
+                                .returns(TypeDef.VOID);
+
+                            propertySetter.addParameter(TypeDef.of(beanProperty.getType()));
+
+                            builder.addMethod(propertySetter.build(((aThis, methodParameters) -> {
+                                VariableDef.Field pythonValueField = aThis.field(pythonValue);
+                                ExpressionDef param;
+                                if (beanProperty.getType() instanceof PythonClassElement) {
+                                    param = methodParameters.get(0).invoke("asPolyglotValue", POLYGLOT_VALUE);
+                                } else {
+                                    param = methodParameters.get(0);
+                                }
+                                // Call the Python injection method
+                                return pythonValueField.invoke(
+                                    "putMember",
+                                    TypeDef.VOID,
+                                    ExpressionDef.constant(beanProperty.getName()),
+                                    param
+                                );
+                            })));
+                        }
                     }
 
                     sourceGenerator.write(builder.build(), context, element);

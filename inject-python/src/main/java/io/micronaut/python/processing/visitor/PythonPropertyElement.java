@@ -24,6 +24,7 @@ import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
+import io.micronaut.inject.ast.annotation.PropertyElementAnnotationMetadata;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 
 /**
@@ -51,6 +52,7 @@ public final class PythonPropertyElement extends AbstractPythonElement implement
     private final FieldElement field;
     private final MethodElement readMethod;
     private final MethodElement writeMethod;
+    private final PropertyElementAnnotationMetadata annotationMetadata;
 
     public PythonPropertyElement(PropertyDef propertyDef,
                                  PythonProcessingEnvironment environment,
@@ -103,6 +105,12 @@ public final class PythonPropertyElement extends AbstractPythonElement implement
         }
 
         this.type = resolveType();
+        this.annotationMetadata = new PropertyElementAnnotationMetadata(this, readMethod, writeMethod, field, null, false);
+    }
+
+    @Override
+    public AnnotationMetadata getAnnotationMetadata() {
+        return this.annotationMetadata;
     }
 
     @Override
