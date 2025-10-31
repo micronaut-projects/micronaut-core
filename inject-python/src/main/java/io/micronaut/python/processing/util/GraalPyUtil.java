@@ -263,6 +263,7 @@ public final class GraalPyUtil {
             case "int" -> PrimitiveElement.INT;
             case "float" -> PrimitiveElement.DOUBLE;
             case "bool" -> PrimitiveElement.BOOLEAN;
+            case "None" -> PrimitiveElement.VOID;
             case "str" ->
                 visitorContext.getClassElement(String.class).orElse(ClassElement.of(String.class));
             default ->
