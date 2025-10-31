@@ -25,10 +25,10 @@ import org.jetbrains.kotlin.cli.common.messages.MessageRenderer
 import org.jetbrains.kotlin.cli.common.messages.PrintingMessageCollector
 import org.jetbrains.kotlin.cli.jvm.config.JavaSourceRoot
 import org.jetbrains.kotlin.com.intellij.core.CoreApplicationEnvironment
-import org.jetbrains.kotlin.com.intellij.mock.MockProject
+import org.jetbrains.kotlin.com.intellij.openapi.Disposable
 import org.jetbrains.kotlin.com.intellij.psi.PsiTreeChangeAdapter
 import org.jetbrains.kotlin.com.intellij.psi.PsiTreeChangeListener
-import org.jetbrains.kotlin.compiler.plugin.ComponentRegistrar
+import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar
 import org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi
 import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.config.languageVersionSettings
@@ -149,16 +149,16 @@ private class KspTestExtension(
 ) {
     private val loadedProviders = processorProviders
 
-    override fun loadProviders() = loadedProviders
+    override fun loadProviders(rootDisposable: Disposable) = loadedProviders
 }
 
 /**
  * Registers the [KspTestExtension] to load the given list of processors.
  */
 @OptIn(ExperimentalCompilerApi::class)
-private class KspCompileTestingComponentRegistrar(
-    private val compilation: KotlinCompilation
-) : ComponentRegistrar {
+private class KspCompileTestingCompilerPluginRegistrar(
+    private val compilation: KotlinCompilation, override val supportsK2: Boolean
+) : CompilerPluginRegistrar() {
     var providers = emptyList<SymbolProcessorProvider>()
 
     var options: MutableMap<String, String> = mutableMapOf()
@@ -168,7 +168,7 @@ private class KspCompileTestingComponentRegistrar(
     var allWarningsAsErrors: Boolean = false
     var withCompilation: Boolean = false
 
-    override fun registerProjectComponents(project: MockProject, configuration: CompilerConfiguration) {
+    override fun ExtensionStorage.registerExtensions(configuration: CompilerConfiguration) {
         if (providers.isEmpty()) {
             return
         }
@@ -178,10 +178,10 @@ private class KspCompileTestingComponentRegistrar(
             this.processingOptions.putAll(compilation.kspArgs)
 
             this.languageVersionSettings = configuration.languageVersionSettings
-            this.incremental = this@KspCompileTestingComponentRegistrar.incremental
-            this.incrementalLog = this@KspCompileTestingComponentRegistrar.incrementalLog
-            this.allWarningsAsErrors = this@KspCompileTestingComponentRegistrar.allWarningsAsErrors
-            this.withCompilation = this@KspCompileTestingComponentRegistrar.withCompilation
+            this.incremental = this@KspCompileTestingCompilerPluginRegistrar.incremental
+            this.incrementalLog = this@KspCompileTestingCompilerPluginRegistrar.incrementalLog
+            this.allWarningsAsErrors = this@KspCompileTestingCompilerPluginRegistrar.allWarningsAsErrors
+            this.withCompilation = this@KspCompileTestingCompilerPluginRegistrar.withCompilation
 
             this.cachesDir = compilation.kspCachesDir.also {
                 it.deleteRecursively()
@@ -228,21 +228,22 @@ private class KspCompileTestingComponentRegistrar(
             allWarningsAsErrors = allWarningsAsErrors
         )
         val registrar = KspTestExtension(options, providers, messageCollectorBasedKSPLogger)
-        AnalysisHandlerExtension.registerExtension(project, registrar)
+        AnalysisHandlerExtension.registerExtension(registrar)
         // Dummy extension point; Required by dropPsiCaches().
-        CoreApplicationEnvironment.registerExtensionPoint(project.extensionArea, PsiTreeChangeListener.EP.name, PsiTreeChangeAdapter::class.java)
+//        CoreApplicationEnvironment.registerExtensionPoint(PsiTreeChangeListener.EP.name, PsiTreeChangeAdapter::class.java)
     }
+
 }
 
 /**
  * Gets the test registrar from the plugin list or adds if it does not exist.
  */
 @OptIn(ExperimentalCompilerApi::class)
-private fun KotlinCompilation.getKspRegistrar(): KspCompileTestingComponentRegistrar {
-    compilerPlugins.firstIsInstanceOrNull<KspCompileTestingComponentRegistrar>()?.let {
+private fun KotlinCompilation.getKspRegistrar(): KspCompileTestingCompilerPluginRegistrar {
+    compilerPlugins.firstIsInstanceOrNull<KspCompileTestingCompilerPluginRegistrar>()?.let {
         return it
     }
-    val kspRegistrar = KspCompileTestingComponentRegistrar(this)
+    val kspRegistrar = KspCompileTestingCompilerPluginRegistrar(this, false)
     compilerPlugins = compilerPlugins + kspRegistrar
     return kspRegistrar
 }

@@ -21,7 +21,6 @@ import org.jetbrains.kotlin.cli.common.messages.PrintingMessageCollector
 import org.jetbrains.kotlin.cli.jvm.K2JVMCompiler
 import org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi
 import org.jetbrains.kotlin.config.JVMAssertionsMode
-import org.jetbrains.kotlin.config.JvmDefaultMode
 import org.jetbrains.kotlin.config.JvmTarget
 import org.jetbrains.kotlin.config.Services
 import java.io.*
@@ -57,9 +56,6 @@ class KotlinCompilation : AbstractKotlinCompilation<K2JVMCompilerArguments>() {
 	/** Generate metadata for Java 1.8 reflection on method parameters */
 	var javaParameters: Boolean = false
 
-	/** Use the old JVM backend */
-	var useOldBackend: Boolean = false
-
 	/** Paths where to find Java 9+ modules */
 	var javaModulePath: Path? = null
 
@@ -93,8 +89,7 @@ class KotlinCompilation : AbstractKotlinCompilation<K2JVMCompilerArguments>() {
 	/** Use type table in metadata serialization */
 	var useTypeTable: Boolean = false
 
-	/** Path to JSON file to dump Java to Kotlin declaration mappings */
-	var declarationsOutputPath: File? = null
+
 
     /** Suppress the \"cannot access built-in declaration\" error (useful with -no-stdlib) */
 	var suppressMissingBuiltinsError: Boolean = false
@@ -117,7 +112,7 @@ class KotlinCompilation : AbstractKotlinCompilation<K2JVMCompilerArguments>() {
 	/** Allow to use '@JvmDefault' annotation for JVM default method support.
 	 * {disable|enable|compatibility}
 	 * */
-	var jvmDefault: String = JvmDefaultMode.DEFAULT.description
+	var jvmDefault: String? = null
 
 	/** Generate metadata with strict version semantics (see kdoc on Metadata.extraInt) */
 	var strictMetadataVersionSemantics: Boolean = false
@@ -264,7 +259,6 @@ class KotlinCompilation : AbstractKotlinCompilation<K2JVMCompilerArguments>() {
 
 		args.jvmTarget = jvmTarget
 		args.javaParameters = javaParameters
-		args.useOldBackend = useOldBackend
 
 		if(javaModulePath != null)
 			args.javaModulePath = javaModulePath!!.toString()
@@ -285,16 +279,13 @@ class KotlinCompilation : AbstractKotlinCompilation<K2JVMCompilerArguments>() {
 		args.inheritMultifileParts = inheritMultifileParts
 		args.useTypeTable = useTypeTable
 
-		if(declarationsOutputPath != null)
-			args.declarationsOutputPath = declarationsOutputPath!!.toString()
-
 		if(javacArguments.isNotEmpty())
 			args.javacArguments = javacArguments.toTypedArray()
 
 		if(supportCompatqualCheckerFrameworkAnnotations != null)
 			args.supportCompatqualCheckerFrameworkAnnotations = supportCompatqualCheckerFrameworkAnnotations
 
-		args.jvmDefault = jvmDefault
+		jvmDefault?.let { args.jvmDefault = it }
 		args.strictMetadataVersionSemantics = strictMetadataVersionSemantics
 		args.sanitizeParentheses = sanitizeParentheses
 
@@ -321,15 +312,15 @@ class KotlinCompilation : AbstractKotlinCompilation<K2JVMCompilerArguments>() {
 			internalMessageStream, MessageRenderer.GRADLE_STYLE, verbose
 		)
 
-		/** The main compiler plugin (MainComponentRegistrar)
+		/** The main compiler plugin (MainCompilerPluginRegistrar)
 		 *  is instantiated by K2JVMCompiler using
 		 *  a service locator. So we can't just pass parameters to it easily.
 		 *  Instead, we need to use a thread-local global variable to pass
 		 *  any parameters that change between compilations
 		 *
 		 */
-		MainComponentRegistrar.threadLocalParameters.set(
-				MainComponentRegistrar.ThreadLocalParameters(
+		MainCompilerPluginRegistrar.threadLocalParameters.set(
+				MainCompilerPluginRegistrar.ThreadLocalParameters(
 					compilerPlugins
 				)
 		)
@@ -561,7 +552,7 @@ class KotlinCompilation : AbstractKotlinCompilation<K2JVMCompilerArguments>() {
 					return makeResult(exitCode)
 				}
 			} finally {
-				MainComponentRegistrar.threadLocalParameters.remove()
+				MainCompilerPluginRegistrar.threadLocalParameters.remove()
 			}
 
 			// step 3: compile Kotlin files
@@ -601,4 +592,3 @@ class KotlinCompilation : AbstractKotlinCompilation<K2JVMCompilerArguments>() {
 		const val OPTION_KAPT_KOTLIN_GENERATED = "kapt.kotlin.generated"
     }
 }
-

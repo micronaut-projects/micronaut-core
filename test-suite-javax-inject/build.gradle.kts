@@ -9,4 +9,7 @@ dependencies {
     testImplementation(projects.micronautInject)
     testImplementation(libs.javax.inject)
     testImplementation(libs.javax.annotation.api)
+    testImplementation(libs.junit4) {
+        because("TCK uses legacy JUnit")
+    }
 }

@@ -1,7 +1,7 @@
 plugins {
     id("io.micronaut.build.internal.convention-test-library")
-    alias(libs.plugins.kotlin2.jvm)
-    alias(libs.plugins.ksp2)
+    alias(libs.plugins.managed.kotlin.jvm)
+    alias(libs.plugins.managed.ksp)
 }
 
 micronautBuild {

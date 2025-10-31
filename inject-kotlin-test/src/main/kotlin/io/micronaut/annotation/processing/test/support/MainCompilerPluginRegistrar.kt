@@ -15,22 +15,14 @@
  */
 package io.micronaut.annotation.processing.test.support
 
-import org.jetbrains.kotlin.com.intellij.mock.MockProject
-import org.jetbrains.kotlin.compiler.plugin.ComponentRegistrar
+import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar
 import org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi
 import org.jetbrains.kotlin.config.CompilerConfiguration
 
 @OptIn(ExperimentalCompilerApi::class)
-internal class MainComponentRegistrar : ComponentRegistrar {
+internal class MainCompilerPluginRegistrar(override val supportsK2: Boolean = true) : CompilerPluginRegistrar() {
 
-    override fun registerProjectComponents(project: MockProject, configuration: CompilerConfiguration) {
-        // Handle unset parameters gracefully because this plugin may be accidentally called by other tools that
-        // discover it on the classpath (for example the kotlin jupyter kernel).
-        if (threadLocalParameters.get() == null) {
-            System.err.println("WARNING: MainComponentRegistrar::registerProjectComponents accessed before thread local parameters have been set")
-            return
-        }
-
+    override fun ExtensionStorage.registerExtensions(configuration: CompilerConfiguration) {
         val parameters = threadLocalParameters.get()
 
         /*
@@ -40,10 +32,11 @@ internal class MainComponentRegistrar : ComponentRegistrar {
         to register third-party plugins before kapt and hope that it works, although we don't
         know for sure if that is the correct way.
          */
-        parameters.compilerPlugins.forEach { componentRegistrar->
-            componentRegistrar.registerProjectComponents(project,configuration)
+        parameters.compilerPlugins.forEach { registar ->
+            with(registar) {
+                registerExtensions(configuration)
+            }
         }
-
     }
 
     companion object {
@@ -56,6 +49,6 @@ internal class MainComponentRegistrar : ComponentRegistrar {
     }
 
     data class ThreadLocalParameters @OptIn(ExperimentalCompilerApi::class) constructor(
-        val compilerPlugins: List<ComponentRegistrar>
+        val compilerPlugins: List<CompilerPluginRegistrar>
     )
 }

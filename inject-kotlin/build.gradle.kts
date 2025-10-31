@@ -1,3 +1,6 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+
 plugins {
     id("io.micronaut.build.internal.convention-library")
     alias(libs.plugins.managed.kotlin.jvm)
@@ -56,15 +59,15 @@ dependencies {
 configurations.all {
     resolutionStrategy.eachDependency {
         if (requested.group == "org.jetbrains.kotlin") {
-            useVersion(libs.versions.managed.kotlin.asProvider().get())
+            useVersion(libs.versions.managed.kotlin2.get())
         } else if (requested.group == "com.google.devtools.ksp") {
-            useVersion(libs.versions.managed.ksp.get())
+            useVersion(libs.versions.managed.ksp2.get())
         }
     }
 }
 
 tasks {
-    withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    withType<KotlinCompile>().configureEach {
         compilerOptions {
             freeCompilerArgs = listOf("-Xjvm-default=all")
         }
@@ -88,6 +91,6 @@ java {
 }
 kotlin {
     compilerOptions {
-        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21
+        jvmTarget = JvmTarget.JVM_21
     }
 }

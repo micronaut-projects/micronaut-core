@@ -24,7 +24,7 @@ import org.jetbrains.kotlin.cli.common.arguments.validateArguments
 import org.jetbrains.kotlin.cli.common.messages.MessageRenderer
 import org.jetbrains.kotlin.cli.common.messages.PrintingMessageCollector
 import org.jetbrains.kotlin.compiler.plugin.CommandLineProcessor
-import org.jetbrains.kotlin.compiler.plugin.ComponentRegistrar
+import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar
 import org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi
 import org.jetbrains.kotlin.config.Services
 import org.jetbrains.kotlin.load.java.JvmAbi
@@ -65,7 +65,7 @@ abstract class AbstractKotlinCompilation<A : CommonCompilerArguments> internal c
      * Compiler plugins that should be added to the compilation
      */
     @OptIn(ExperimentalCompilerApi::class)
-    var compilerPlugins: List<ComponentRegistrar> = emptyList()
+    var compilerPlugins: List<CompilerPluginRegistrar> = emptyList()
 
     /**
      * Commandline processors for compiler plugins that should be added to the compilation
@@ -184,8 +184,8 @@ abstract class AbstractKotlinCompilation<A : CommonCompilerArguments> internal c
          * To avoid that the annotation processors are executed twice,
          * the list is set to empty
          */
-        MainComponentRegistrar.threadLocalParameters.set(
-            MainComponentRegistrar.ThreadLocalParameters(
+        MainCompilerPluginRegistrar.threadLocalParameters.set(
+            MainCompilerPluginRegistrar.ThreadLocalParameters(
                 compilerPlugins
             )
         )
@@ -202,10 +202,10 @@ abstract class AbstractKotlinCompilation<A : CommonCompilerArguments> internal c
                     emptyList()
                 }
             args.pluginClasspaths = (args.pluginClasspaths ?: emptyArray()) +
-                    /** The resources path contains the MainComponentRegistrar and MainCommandLineProcessor which will
+                    /** The resources path contains the MainCompilerPluginRegistrar and MainCommandLineProcessor which will
                      be found by the Kotlin compiler's service loader. We add it only when the user has actually given
-                     us ComponentRegistrar instances to be loaded by the MainComponentRegistrar because the experimental
-                     K2 compiler doesn't support plugins yet. This way, users of K2 can prevent MainComponentRegistrar
+                     us CompilerPluginRegistrar instances to be loaded by the MainCompilerPluginRegistrar because the experimental
+                     K2 compiler doesn't support plugins yet. This way, users of K2 can prevent MainCompilerPluginRegistrar
                      from being loaded and crashing K2 by setting both [compilerPlugins] and [commandLineProcessors] to
                      the emptyList. */
                     if (compilerPlugins.isNotEmpty() || commandLineProcessors.isNotEmpty())
@@ -224,7 +224,7 @@ abstract class AbstractKotlinCompilation<A : CommonCompilerArguments> internal c
 
     @OptIn(ExperimentalCompilerApi::class)
     protected fun getResourcesPath(): String {
-        val resourceName = "META-INF/services/org.jetbrains.kotlin.compiler.plugin.ComponentRegistrar"
+        val resourceName = "META-INF/services/org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar"
         return this::class.java.classLoader.getResources(resourceName)
             .asSequence()
             .mapNotNull { url ->
@@ -236,9 +236,9 @@ abstract class AbstractKotlinCompilation<A : CommonCompilerArguments> internal c
                 }.toAbsolutePath()
             }
             .find { resourcesPath ->
-                ServiceLoaderLite.findImplementations(ComponentRegistrar::class.java, listOf(resourcesPath.toFile()))
-                    .any { implementation -> implementation == MainComponentRegistrar::class.java.name }
-            }?.toString() ?: throw AssertionError("Could not get path to ComponentRegistrar service from META-INF")
+                ServiceLoaderLite.findImplementations(CompilerPluginRegistrar::class.java, listOf(resourcesPath.toFile()))
+                    .any { implementation -> implementation == MainCompilerPluginRegistrar::class.java.name }
+            }?.toString() ?: throw AssertionError("Could not get path to CompilerPluginRegistrar service from META-INF")
     }
 
     /** Searches compiler log for known errors that are hard to debug for the user */

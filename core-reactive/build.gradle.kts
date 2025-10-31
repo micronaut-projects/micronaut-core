@@ -18,8 +18,5 @@ tasks {
         compilerOptions {
             jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21
         }
-        kotlinOptions {
-            languageVersion = "1.7"
-        }
     }
 }
