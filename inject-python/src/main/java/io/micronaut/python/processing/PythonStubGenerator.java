@@ -100,7 +100,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                 );
 
                                 // Choose appropriate conversion method based on return type
-                                if (returnType.isPrimitive()) {
+                                if (returnType.isVoid()) {
+                                    // For void methods, just invoke the Python method without returning
+                                    return invokedValue;
+                                } else if (returnType.isPrimitive()) {
                                     return convertPrimitive(returnType, invokedValue);
                                 } else {
                                     // Handle boxed types and other reference types
