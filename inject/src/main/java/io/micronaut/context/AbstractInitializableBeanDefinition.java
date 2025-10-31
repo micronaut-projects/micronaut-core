@@ -2148,7 +2148,8 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
             if (isIterable() && getAnnotationMetadata().hasDeclaredAnnotation(EachBean.class)) {
                 throw new DisabledBeanException("Bean [" + getBeanType().getSimpleName() + "] disabled by parent: " + e.getMessage());
             } else {
-                throw new DependencyInjectionException(resolutionContext, e);
+                // Propagate DisabledBeanException as-is so upstream logic can handle disabled dependencies
+                throw e;
             }
         } catch (NoSuchBeanException e) {
             throw new DependencyInjectionException(resolutionContext, e);
