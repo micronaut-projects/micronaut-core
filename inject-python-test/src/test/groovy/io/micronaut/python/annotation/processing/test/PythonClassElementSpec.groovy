@@ -266,11 +266,11 @@ class TestService:
         context.close()
 
         then: "ContextHolder should be reset"
-        !io.micronaut.context.python.ContextHolder.isInitialized()
+        !ContextHolder.isInitialized()
 
         and: "Accessing context after cleanup should throw exception"
         when:
-        io.micronaut.context.python.ContextHolder.getContext()
+        ContextHolder.getContext()
         then:
         thrown(IllegalStateException)
     }
@@ -281,6 +281,7 @@ class TestService:
         def pythonCode = """
 from jakarta.inject import Singleton
 from io.micronaut.context.annotation import Executable
+from typing import Optional
 
 @Singleton
 class TypeTestService:
@@ -292,24 +293,27 @@ class TypeTestService:
         when: "Building ApplicationContext and calling method"
         def context = buildContext(pythonCode)
         def javaStub = context.classLoader.loadClass("python.TypeTestService")
-        def result = context.getBean(javaStub).getValue()
+        def result = context.getBean(javaStub).get_value()
 
         then: "Result should be correctly converted to expected type"
         result == expectedValue
-        result.getClass() == expectedType
+        result?.getClass() == expectedType
 
         cleanup: "Ensure context is properly closed"
         context?.close()
 
         where:
-        description              | pythonTypeAnnotation | pythonValue | expectedValue | expectedType
-        "String return type"     | "str"                | '"hello"'   | "hello"       | String.class
-        "Integer return type"    | "int"                | "42"        | 42            | Integer  // Fixed: now returns int (primitive)
-        "Boolean True"           | "bool"               | "True"      | true          | Boolean  // Fixed: now returns boolean (primitive)
-        "Boolean False"          | "bool"               | "False"     | false         | Boolean  // Fixed: now returns boolean (primitive)
-        "Float return type"      | "float"              | "3.14"      | 3.14d         | Double   // Fixed: now returns double (primitive)
-//        "List return type"       | "list"               | "[1, 2, 3]" | "[1, 2, 3]"   | String.class  // TODO: Should be List.class once collection handling is added
-//        "Dict return type"       | "dict"               | '{"a": 1}'  | '{"a": 1}'    | String.class  // TODO: Should be Map.class once collection handling is added
-//        "None return type"       | "None"               | "None"      | "None"        | String.class  // TODO: Should be Void.class once void handling is added
+        description           | pythonTypeAnnotation | pythonValue | expectedValue        | expectedType
+        "Dict return type"    | "dict[str, int]"     | '{"a": 1}'  | ["a": 1]             | HashMap.class
+        "Optional present"    | "Optional[str]"      | '"Alice"'   | Optional.of("Alice") | Optional.class
+        "Optional empty"      | "Optional[str]"      | "None"      | Optional.empty()     | Optional.class
+        "None return type"    | "None"               | "None"      | null                 | null
+        "List return type"    | "list[int]"          | "[1, 2, 3]" | [1, 2, 3]            | ArrayList.class
+        "String return type"  | "str"                | '"hello"'   | "hello"              | String.class
+        "Integer return type" | "int"                | "42"        | 42                   | Integer
+        "Boolean True"        | "bool"               | "True"      | true                 | Boolean
+        "Boolean False"       | "bool"               | "False"     | false                | Boolean
+        "Float return type"   | "float"              | "3.14"      | 3.14d                | Double
+
     }
 }

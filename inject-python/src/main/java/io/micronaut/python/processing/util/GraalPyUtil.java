@@ -231,10 +231,10 @@ public final class GraalPyUtil {
 
     /**
      * Resolves a Python type annotation to a Java ClassElement.
-     * Attempts to map Python primitive types to equivalent Java primitive types using PrimitiveElement,
-     * otherwise falls back to visitor context lookup.
+     * Handles primitive types, collections with generics (list[int], dict[str, int]),
+     * and supports recursive resolution for nested generics.
      *
-     * @param typeAnnotation the Python type annotation string (e.g., "int", "str", "bool", "float", "Annotated[float, Gt(0)]")
+     * @param typeAnnotation the Python type annotation string (e.g., "int", "str", "bool", "float", "list[int]", "dict[str, int]")
      * @param visitorContext the visitor context for class element lookup
      * @return the resolved ClassElement, or Object ClassElement if resolution fails
      */
@@ -253,21 +253,207 @@ public final class GraalPyUtil {
             }
         }
 
+        // Handle generic types like list[int], dict[str, int], etc.
+        if (typeAnnotation.contains("[")) {
+            return resolveGenericPythonType(typeAnnotation, visitorContext);
+        }
+
         // Try to map Python primitive types to Java primitives
-        switch (typeAnnotation) {
-            case "int":
-                return PrimitiveElement.INT;
-            case "float":
-                return PrimitiveElement.DOUBLE;
-            case "bool":
-                return PrimitiveElement.BOOLEAN;
-            case "str":
-                return visitorContext.getClassElement(String.class).orElse(ClassElement.of(String.class));
-            default:
+        return switch (typeAnnotation) {
+            case "int" -> PrimitiveElement.INT;
+            case "float" -> PrimitiveElement.DOUBLE;
+            case "bool" -> PrimitiveElement.BOOLEAN;
+            case "str" ->
+                visitorContext.getClassElement(String.class).orElse(ClassElement.of(String.class));
+            default ->
                 // Fall back to visitor context lookup
-                return visitorContext.getClassElement(typeAnnotation).orElse(
+                visitorContext.getClassElement(typeAnnotation).orElse(
                     visitorContext.getClassElement(Object.class).orElse(ClassElement.of(Object.class))
                 );
+        };
+    }
+
+    /**
+     * Resolves generic Python types like list[int], dict[str, int], etc.
+     * Supports recursive resolution for nested generics.
+     */
+    private static ClassElement resolveGenericPythonType(String typeAnnotation, PythonVisitorContext visitorContext) {
+        // Parse the generic type structure
+        GenericTypeInfo genericInfo = parseGenericType(typeAnnotation);
+        if (genericInfo == null) {
+            return visitorContext.getClassElement(Object.class).orElse(ClassElement.of(Object.class));
+        }
+
+        // Resolve based on the base type
+        return switch (genericInfo.baseType) {
+            case "list" -> {
+                // list[T] -> List<T>
+                ClassElement listElement = visitorContext.getClassElement(java.util.List.class)
+                    .orElse(ClassElement.of(java.util.List.class));
+
+                if (!genericInfo.typeParameters.isEmpty()) {
+                    ClassElement elementType = resolvePythonTypeToJava(genericInfo.typeParameters.get(0), visitorContext);
+                    // For generics, use boxed types instead of primitives
+                    elementType = boxPrimitiveTypeIfNeeded(elementType, visitorContext);
+                    // Create parameterized type List<ElementType>
+                    yield listElement.withTypeArguments(java.util.Map.of("E", elementType));
+                }
+                yield listElement;
+            }
+            case "dict" -> {
+                // dict[K, V] -> Map<K, V>
+                ClassElement mapElement = visitorContext.getClassElement(java.util.Map.class)
+                    .orElse(ClassElement.of(java.util.Map.class));
+
+                if (genericInfo.typeParameters.size() >= 2) {
+                    ClassElement keyType = resolvePythonTypeToJava(genericInfo.typeParameters.get(0), visitorContext);
+                    ClassElement valueType = resolvePythonTypeToJava(genericInfo.typeParameters.get(1), visitorContext);
+
+                    // For generics, use boxed types instead of primitives
+                    keyType = boxPrimitiveTypeIfNeeded(keyType, visitorContext);
+                    valueType = boxPrimitiveTypeIfNeeded(valueType, visitorContext);
+
+                    // Create parameterized type Map<KeyType, ValueType>
+                    yield mapElement.withTypeArguments(java.util.Map.of("K", keyType, "V", valueType));
+                }
+                yield mapElement;
+            }
+            case "set" -> {
+                // set[T] -> Set<T>
+                ClassElement setElement = visitorContext.getClassElement(java.util.Set.class)
+                    .orElse(ClassElement.of(java.util.Set.class));
+
+                if (!genericInfo.typeParameters.isEmpty()) {
+                    ClassElement elementType = resolvePythonTypeToJava(genericInfo.typeParameters.get(0), visitorContext);
+                    // For generics, use boxed types instead of primitives
+                    elementType = boxPrimitiveTypeIfNeeded(elementType, visitorContext);
+                    yield setElement.withTypeArguments(java.util.Map.of("E", elementType));
+                }
+                yield setElement;
+            }
+            case "Optional" -> {
+                // Optional[T] -> Optional<T>
+                ClassElement optionalElement = visitorContext.getClassElement(java.util.Optional.class)
+                    .orElse(ClassElement.of(java.util.Optional.class));
+
+                if (!genericInfo.typeParameters.isEmpty()) {
+                    ClassElement elementType = resolvePythonTypeToJava(genericInfo.typeParameters.get(0), visitorContext);
+                    // For generics, use boxed types instead of primitives
+                    elementType = boxPrimitiveTypeIfNeeded(elementType, visitorContext);
+                    yield optionalElement.withTypeArguments(java.util.Map.of("T", elementType));
+                }
+                yield optionalElement;
+            }
+            default -> {
+                // Unknown generic type, fall back to Object
+                yield visitorContext.getClassElement(Object.class).orElse(ClassElement.of(Object.class));
+            }
+        };
+    }
+
+    /**
+     * Parses a generic type annotation like "list[int]" or "dict[str, int]"
+     */
+    private static GenericTypeInfo parseGenericType(String typeAnnotation) {
+        int bracketStart = typeAnnotation.indexOf('[');
+        if (bracketStart == -1) {
+            return null;
+        }
+
+        String baseType = typeAnnotation.substring(0, bracketStart).trim();
+        String paramsStr = typeAnnotation.substring(bracketStart + 1);
+
+        // Find matching closing bracket (handle nested brackets)
+        int bracketCount = 0;
+        int endIndex = -1;
+        for (int i = 0; i < paramsStr.length(); i++) {
+            char c = paramsStr.charAt(i);
+            if (c == '[') {
+                bracketCount++;
+            } else if (c == ']') {
+                bracketCount--;
+                if (bracketCount == -1) {
+                    endIndex = i;
+                    break;
+                }
+            }
+        }
+
+        if (endIndex == -1) {
+            return null; // Malformed
+        }
+
+        String typeParamsStr = paramsStr.substring(0, endIndex);
+        java.util.List<String> typeParameters = parseTypeParameters(typeParamsStr);
+
+        return new GenericTypeInfo(baseType, typeParameters);
+    }
+
+    /**
+     * Parses type parameters separated by commas, handling nested generics
+     */
+    private static java.util.List<String> parseTypeParameters(String typeParamsStr) {
+        java.util.List<String> parameters = new java.util.ArrayList<>();
+        int start = 0;
+        int bracketCount = 0;
+
+        for (int i = 0; i < typeParamsStr.length(); i++) {
+            char c = typeParamsStr.charAt(i);
+            if (c == '[') {
+                bracketCount++;
+            } else if (c == ']') {
+                bracketCount--;
+            } else if (c == ',' && bracketCount == 0) {
+                // Found a parameter separator
+                String param = typeParamsStr.substring(start, i).trim();
+                if (!param.isEmpty()) {
+                    parameters.add(param);
+                }
+                start = i + 1;
+            }
+        }
+
+        // Add the last parameter
+        String lastParam = typeParamsStr.substring(start).trim();
+        if (!lastParam.isEmpty()) {
+            parameters.add(lastParam);
+        }
+
+        return parameters;
+    }
+
+    /**
+     * Utility method to box primitive types for use in generics.
+     * Java generics require boxed types, so this converts primitives to their boxed equivalents.
+     */
+    private static ClassElement boxPrimitiveTypeIfNeeded(ClassElement elementType, PythonVisitorContext visitorContext) {
+        if (elementType.isPrimitive()) {
+            String primitiveName = elementType.getName();
+            return switch (primitiveName) {
+                case "int" -> visitorContext.getClassElement(Integer.class).orElse(ClassElement.of(Integer.class));
+                case "boolean" -> visitorContext.getClassElement(Boolean.class).orElse(ClassElement.of(Boolean.class));
+                case "double" -> visitorContext.getClassElement(Double.class).orElse(ClassElement.of(Double.class));
+                case "float" -> visitorContext.getClassElement(Float.class).orElse(ClassElement.of(Float.class));
+                case "long" -> visitorContext.getClassElement(Long.class).orElse(ClassElement.of(Long.class));
+                case "short" -> visitorContext.getClassElement(Short.class).orElse(ClassElement.of(Short.class));
+                case "byte" -> visitorContext.getClassElement(Byte.class).orElse(ClassElement.of(Byte.class));
+                case "char" -> visitorContext.getClassElement(Character.class).orElse(ClassElement.of(Character.class));
+                default -> elementType;
+            };
+        }
+        return elementType;
+    }
+
+    /**
+     * Simple data class to hold generic type information
+     */
+    private static class GenericTypeInfo {
+        final String baseType;
+        final java.util.List<String> typeParameters;
+
+        GenericTypeInfo(String baseType, java.util.List<String> typeParameters) {
+            this.baseType = baseType;
+            this.typeParameters = typeParameters;
         }
     }
 
