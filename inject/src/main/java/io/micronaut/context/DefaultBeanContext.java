@@ -199,7 +199,10 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
     private final Map<Argument, Collection<BeanDefinition>> beanCandidateCache = new ConcurrentLinkedHashMap.Builder<Argument, Collection<BeanDefinition>>().maximumWeightedCapacity(30).build();
 
     private final Map<Class<?>, Collection<BeanDefinitionProducer>> beanIndex = new ConcurrentHashMap<>(12);
-
+    
+    // Tracks instances that have already been initialized (e.g., via createBean) to avoid double @PostConstruct on registration
+    private final Set<Object> initializedInstances = Collections.newSetFromMap(new IdentityHashMap<>());
+    
     private final ClassLoader classLoader;
     private final Set<Class<?>> thisInterfaces = CollectionUtils.setOf(
             BeanDefinitionRegistry.class,
@@ -691,7 +694,18 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
         if (beanDefinition != null && !(beanDefinition instanceof RuntimeBeanDefinition<T>) && beanDefinition.getBeanType().isInstance(singleton)) {
             try (BeanResolutionContext context = newResolutionContext(beanDefinition, null)) {
                 if (inject) {
-                    doInjectAndInitialize(context, singleton, beanDefinition);
+                    // If the instance was already created (and initialized) by this context, avoid initializing twice.
+                    if (initializedInstances.contains(singleton)) {
+                        if (beanDefinition instanceof InjectableBeanDefinition<T> injectableBeanDefinition) {
+                            injectableBeanDefinition.inject(context, this, singleton);
+                        } else {
+                            // Fallback to the existing behavior if we cannot inject explicitly
+                            doInjectAndInitialize(context, singleton, beanDefinition);
+                        }
+                    } else {
+                        doInjectAndInitialize(context, singleton, beanDefinition);
+                        initializedInstances.add(singleton);
+                    }
                 }
                 DefaultBeanContext.BeanKey<T> key = new DefaultBeanContext.BeanKey<>(beanDefinition.asArgument(), qualifier);
                 singletonScope.registerSingletonBean(BeanRegistration.of(this, key, beanDefinition, singleton), qualifier);
@@ -1039,7 +1053,10 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
             try (BeanResolutionContext resolutionContext = newResolutionContext(beanDefinition, null)) {
                 if (beanDefinition instanceof InstantiatableBeanDefinition<T> instantiatableBeanDefinition) {
                     T bean = resolveByBeanFactory(resolutionContext, instantiatableBeanDefinition, qualifier, argumentValues);
-                    return postBeanCreated(resolutionContext, beanDefinition, beanArg, qualifier, bean);
+                    bean = postBeanCreated(resolutionContext, beanDefinition, beanArg, qualifier, bean);
+                    // Mark as initialized to prevent duplicate initialization on registerSingleton
+                    initializedInstances.add(bean);
+                    return bean;
                 }
             }
         }
@@ -1083,7 +1100,10 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
         }
         if (definition instanceof InstantiatableBeanDefinition<T> instantiatableBeanDefinition) {
             T bean = resolveByBeanFactory(resolutionContext, instantiatableBeanDefinition, qualifier, argumentValues);
-            return postBeanCreated(resolutionContext, definition, beanType, qualifier, bean);
+            bean = postBeanCreated(resolutionContext, definition, beanType, qualifier, bean);
+            // Mark as initialized to prevent duplicate initialization on registerSingleton
+            initializedInstances.add(bean);
+            return bean;
         } else {
             throw new BeanInstantiationException("BeanDefinition doesn't support creating a new instance of the bean");
         }
@@ -1409,7 +1429,10 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
             try (BeanResolutionContext context = newResolutionContext(candidate, resolutionContext)) {
                 if (candidate instanceof InstantiatableBeanDefinition<T> instantiatableBeanDefinition) {
                     T bean = resolveByBeanFactory(context, instantiatableBeanDefinition, qualifier, Collections.emptyMap());
-                    return postBeanCreated(context, candidate, Argument.of(beanType), qualifier, bean);
+                    bean = postBeanCreated(context, candidate, Argument.of(beanType), qualifier, bean);
+                    // Mark as initialized to prevent duplicate initialization on registerSingleton
+                    initializedInstances.add(bean);
+                    return bean;
                 } else {
                     throw new BeanInstantiationException("BeanDefinition doesn't support creating a new instance of the bean");
                 }
