@@ -32,6 +32,10 @@ public final class PythonClassElement extends AbstractPythonClassElement {
         super(classDef, environment, arrayDimensions);
     }
 
+    public boolean isPythonSource() {
+        return environment.classes().containsKey(getNativeType().name());
+    }
+
     @Override
     protected ClassElement createWithArrayDimensions(int arrayDimensions) {
         return new PythonClassElement(getNativeType(), environment, arrayDimensions);

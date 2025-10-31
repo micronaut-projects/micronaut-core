@@ -7,6 +7,7 @@ import java.util.Set;
 
 import javax.lang.model.element.Modifier;
 
+import io.micronaut.python.processing.visitor.PythonClassElement;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Value;
 
@@ -50,20 +51,69 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 try {
                     String typeName = element.getName();
                     var builder = ClassDef.builder(typeName);
+                    builder.addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.ValueCoercible"));
+
                     FieldDef pythonValue = FieldDef.builder("graalpyInternalValue")
                         .ofType(POLYGLOT_VALUE).addModifiers(Modifier.FINAL, Modifier.PRIVATE).build();
                     builder.addField(pythonValue);
-                    // add constructor that looks up value
-                    MethodDef.MethodDefBuilder constructor = MethodDef.constructor();
-                    builder.addMethod(
-                        constructor.build(((aThis, methodParameters) -> aThis.field(pythonValue).assign(
-                            ClassTypeDef.of("io.micronaut.context.python.ContextHolder")
-                                .invokeStatic("getContext", TypeDef.of(Context.class))
-                                .invoke("getBindings", POLYGLOT_VALUE, ExpressionDef.constant("python"))
-                                .invoke("getMember", POLYGLOT_VALUE, ExpressionDef.constant(element.getSimpleName()))
-                                .invoke("newInstance", POLYGLOT_VALUE)
-                        )))
-                    );
+
+                    // implement asPolygotValue
+                    builder.addMethod(MethodDef.builder("asPolyglotValue")
+                        .addModifiers(Modifier.PUBLIC)
+                        .returns(POLYGLOT_VALUE).build(((aThis, methodParameters) -> aThis.field(pythonValue).returning())));
+
+                    // Check if there's a primary constructor with parameters for dependency injection
+                    var pythonConstructor = element.getPrimaryConstructor().orElse(null);
+
+                    if (pythonConstructor != null && pythonConstructor.getParameters().length > 0) {
+                        // Generate constructor with dependency injection parameters
+                        MethodDef.MethodDefBuilder constructor = MethodDef.constructor();
+                        @NonNull ParameterElement[] parameters = pythonConstructor.getParameters();
+                        for (@NonNull ParameterElement parameter : parameters) {
+                            var parameterType = TypeDef.of(parameter.getType());
+                            ParameterDef parameterDef = ParameterDef
+                                .builder(parameter.getName(), parameterType).build();
+                            constructor.addParameter(parameterDef);
+                        }
+
+                        builder.addMethod(
+                            constructor.build(((aThis, methodParameters) -> {
+                                // Create the Python object by calling constructor with parameters
+                                ExpressionDef pythonClass = ClassTypeDef.of("io.micronaut.context.python.ContextHolder")
+                                    .invokeStatic("getContext", TypeDef.of(Context.class))
+                                    .invoke("getBindings", POLYGLOT_VALUE, ExpressionDef.constant("python"))
+                                    .invoke("getMember", POLYGLOT_VALUE, ExpressionDef.constant(element.getSimpleName()));
+
+                                List<ExpressionDef> arguments = new ArrayList<>();
+                                for (int i = 0; i < parameters.length; i++) {
+                                    @NonNull ParameterElement parameter = parameters[i];
+                                    VariableDef.MethodParameter methodParameter = methodParameters.get(i);
+                                    if (parameter.getType() instanceof PythonClassElement) {
+                                        arguments.add(methodParameter.invoke("asPolyglotValue", POLYGLOT_VALUE));
+                                    } else {
+                                        arguments.add(methodParameter);
+                                    }
+                                }
+                                // Pass constructor parameters directly to newInstance
+                                ExpressionDef pythonInstance = pythonClass.invoke("newInstance", POLYGLOT_VALUE, arguments);
+
+                                // Assign to field
+                                return aThis.field(pythonValue).assign(pythonInstance);
+                            }))
+                        );
+                    } else {
+                        // Default constructor for classes without __init__ or with no parameters
+                        MethodDef.MethodDefBuilder constructor = MethodDef.constructor();
+                        builder.addMethod(
+                            constructor.build(((aThis, methodParameters) -> aThis.field(pythonValue).assign(
+                                ClassTypeDef.of("io.micronaut.context.python.ContextHolder")
+                                    .invokeStatic("getContext", TypeDef.of(Context.class))
+                                    .invoke("getBindings", POLYGLOT_VALUE, ExpressionDef.constant("python"))
+                                    .invoke("getMember", POLYGLOT_VALUE, ExpressionDef.constant(element.getSimpleName()))
+                                    .invoke("newInstance", POLYGLOT_VALUE)
+                            )))
+                        );
+                    }
 
                     List<MethodElement> methodsToBridge = element.getEnclosedElements(
                         ElementQuery.ALL_METHODS
