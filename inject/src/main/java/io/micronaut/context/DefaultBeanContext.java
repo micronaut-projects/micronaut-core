@@ -2032,6 +2032,20 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
                     throw new BeanInstantiationException(MSG_BEAN_DEFINITION + (ref == null ? "<ref discarded>" : ref.getName()) + MSG_COULD_NOT_BE_LOADED + e.getMessage(), e);
                 }
             }
+            // Prune eager beans that are replaced by any replacement bean in the application,
+            // regardless of the replacement scope.
+            List<BeanDefinition<Object>> replacementTypes = new ArrayList<>(4);
+            for (BeanDefinitionProducer producer : beanDefinitionsClasses) {
+                BeanDefinition<Object> def = producer.getDefinitionIfEnabled(this);
+                if (def != null && def.getAnnotationMetadata().hasStereotype(REPLACES_ANN)) {
+                    replacementTypes.add(def);
+                }
+            }
+            if (!replacementTypes.isEmpty()) {
+                //noinspection unchecked,rawtypes
+                eagerInit.removeIf(def -> checkIfReplacementExists(null, (List) replacementTypes, def));
+            }
+            // Also apply local replacement filtering amongst eager beans themselves.
             filterReplacedBeans(null, eagerInit);
             OrderUtil.sortOrdered(eagerInit);
             for (BeanDefinition eagerInitDefinition : eagerInit) {
