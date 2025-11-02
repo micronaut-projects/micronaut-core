@@ -115,8 +115,9 @@ class PrintNodeVisitor(ast.NodeVisitor):
                             if (decorator_to_function(self, d) is not None and
                                 not is_micronaut_annotation_decorator(d))
                         ]
-                        annotation_name = get_micronaut_annotation_name_value(node)
-                        decorator_def = DecoratorDef(node.name, annotation_name, arg_dict, stereotypes)
+                        annotation_name = get_micronaut_annotation_value('name', node)
+                        repeated_name = get_micronaut_annotation_value('repeated', node)
+                        decorator_def = DecoratorDef(node.name, annotation_name, repeated_name, arg_dict, stereotypes)
                         self.known_decorators[node.name] = decorator_def
                         self.callback.apply(decorator_def)
                         return node
@@ -402,7 +403,7 @@ class PrintNodeVisitor(ast.NodeVisitor):
                         members[kw.arg] = ast.dump(kw.value) if hasattr(ast, 'dump') else str(kw.value)
 
             # Create DecoratorDef with annotationName = name (assuming it's a Micronaut annotation)
-            return DecoratorDef(decorator_name, decorator_name, members, [])
+            return DecoratorDef(decorator_name, decorator_name, None, members, [])
 
         return None
 
@@ -506,11 +507,17 @@ def decorator_to_function(visitor, node):
             decorator_declaration = visitor.known_decorators.get(decorator_name)
             if decorator_declaration is not None:
                 members = extract_call_arguments_with_defaults(decorator_declaration, node)
-                return DecoratorDef(decorator_name, decorator_declaration.annotationName(), members, decorator_declaration.stereotypes())
+                return DecoratorDef(
+                    decorator_name,
+                    decorator_declaration.annotationName(),
+                    decorator_declaration.annotationName(),
+                    members,
+                    decorator_declaration.stereotypes()
+                )
             else:
                 # If not a known micronaut decorator, treat as direct annotation with arguments
                 members = extract_call_arguments_with_defaults(None, node)
-                return DecoratorDef(decorator_name, decorator_name, members, [])
+                return DecoratorDef(decorator_name, decorator_name, None, members, [])
         case _:
             return None
 
@@ -629,7 +636,7 @@ def is_micronaut_decorator(funcdef):
 
     return False
 
-def get_micronaut_annotation_name_value(funcdef):
+def get_micronaut_annotation_value(name, funcdef):
     """
     If the ast.FunctionDef has a `@micronaut_annotation` decorator,
     returns the value used for `name` (either as keyword or first positional arg).
@@ -646,7 +653,7 @@ def get_micronaut_annotation_name_value(funcdef):
             if is_target:
                 # 1. Prefer kwarg 'name'
                 for kw in dec.keywords:
-                    if kw.arg == 'name':
+                    if kw.arg == name:
                         try:
                             return ast.literal_eval(kw.value)
                         except Exception:

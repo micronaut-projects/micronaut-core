@@ -106,7 +106,7 @@ class MySingletonService:
         classElement.getSimpleName() == "MySingletonService"
     }
 
-    @PendingFeature(reason = "support repeatable decorators")
+    @PendingFeature(reason = "currently failing due to bug in extract_call_arguments_with_defaults in micronaut_processor.py")
     def "test repeatable annotations are correctly resolved"() {
         given:
         def pythonCode = '''

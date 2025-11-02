@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import io.micronaut.python.processing.PythonProcessingEnvironment;
 import org.graalvm.polyglot.Value;
 
 import io.micronaut.core.annotation.AnnotationValue;
@@ -37,8 +38,6 @@ import io.micronaut.python.processing.visitor.ElementDef;
 import io.micronaut.python.processing.visitor.FunctionDef;
 import io.micronaut.python.processing.visitor.PropertyDef;
 import io.micronaut.python.processing.visitor.PythonVisitorContext;
-
-import javax.lang.model.element.Element;
 
 /**
  * Builder for creating annotation metadata from Python decorators and elements.
@@ -213,13 +212,22 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
 
     @Override
     protected String getRepeatableName(DecoratorDef annotationMirror) {
-        // TODO: Support repeatable
-        return null;
+        if (annotationMirror != null) {
+            return annotationMirror.repeatedName();
+        } else {
+            return null;
+        }
     }
 
     @Override
     protected String getRepeatableContainerNameForType(ElementDef annotationType) {
-        // TODO: Support repeatable
+        if (visitorContext != null) {
+            PythonProcessingEnvironment env = visitorContext.getProcessingEnvironment();
+            DecoratorDef decoratorDef = env.environment().decorators().get(annotationType.name());
+            if (decoratorDef != null) {
+                return decoratorDef.repeatedName();
+            }
+        }
         return null;
     }
 
