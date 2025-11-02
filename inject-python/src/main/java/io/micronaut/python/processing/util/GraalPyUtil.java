@@ -37,7 +37,9 @@ public final class GraalPyUtil {
      * @return the converted Java object, or the original value if conversion is not possible
      */
     public static Object convertValueToJava(Value value) {
-        if (value.isBoolean()) {
+        if (value == null || value.isNull()) {
+            return null;
+        } else if (value.isBoolean()) {
             return value.asBoolean();
         } else if (value.isNumber()) {
             if (value.fitsInByte()) {

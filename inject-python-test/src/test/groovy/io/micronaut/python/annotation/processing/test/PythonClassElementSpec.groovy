@@ -106,7 +106,6 @@ class MySingletonService:
         classElement.getSimpleName() == "MySingletonService"
     }
 
-    @PendingFeature(reason = "currently failing due to bug in extract_call_arguments_with_defaults in micronaut_processor.py")
     def "test repeatable annotations are correctly resolved"() {
         given:
         def pythonCode = '''
@@ -129,7 +128,7 @@ class MyAnnotatedService:
             assert annotations.size() == 3
 
             // Verify the values are correct
-            def values = annotations*.stringValues().sort()
+            def values = annotations*.stringValues().flatten().sort()
             assert values == ["first", "second", "third"]
 
             return element

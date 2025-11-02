@@ -507,6 +507,7 @@ def decorator_to_function(visitor, node):
             decorator_declaration = visitor.known_decorators.get(decorator_name)
             if decorator_declaration is not None:
                 members = extract_call_arguments_with_defaults(decorator_declaration, node)
+                print(f"DECORATOR {decorator_name} MEMBERS {members}")
                 return DecoratorDef(
                     decorator_name,
                     decorator_declaration.annotationName(),
@@ -558,31 +559,88 @@ def extract_call_arguments_with_defaults(funcdef, call):
     """
     result = {}
     if funcdef is None:
-        for i, arg in enumerate(call.args):
+        # For Java annotations used as decorators (funcdef is None),
+        # we need to map positional args to parameter names.
+        # For single-arg annotations, assume the parameter is named "value"
+        if len(call.args) == 1 and len(call.keywords) == 0:
+            # Single positional argument - assume it's the "value" parameter
             try:
-                value = ast.literal_eval(arg)
-            except Exception:
-                value = ast.dump(arg)
-            result[i] = value
+                value = ast.literal_eval(call.args[0])
+                print(f"DEBUG: single arg, value = {value}")
+            except Exception as e:
+                value = ast.dump(call.args[0])
+                print(f"DEBUG: single arg failed, dump = {value}, error = {e}")
+            result["value"] = value
+        else:
+            # Multiple args or keyword args - use positional indices as fallback
+            for i, arg in enumerate(call.args):
+                try:
+                    value = ast.literal_eval(arg)
+                except Exception:
+                    value = ast.dump(arg)
+                result[i] = value
+            # Handle keyword arguments
+            for kw in call.keywords:
+                if kw.arg is not None:
+                    print(f"DEBUG: processing keyword {kw.arg}, kw.value = {kw.value}, type = {type(kw.value)}")
+                    try:
+                        value = ast.literal_eval(kw.value)
+                        print(f"DEBUG: keyword literal_eval success, value = {value}")
+                    except Exception as e:
+                        value = ast.dump(kw.value)
+                        print(f"DEBUG: keyword literal_eval failed, dump = {value}, error = {e}")
+                    result[kw.arg] = value
     else:
-        for i, (entry) in enumerate(funcdef.members().entrySet()):
-            value = entry.getValue()
-            key = entry.getKey()
-            arg = call.args[i]
-            try:
-                value = ast.literal_eval(arg)
-            except Exception:
-                value = entry.getValue()
-            if value is not None:
-                result[key] = value
+        # Get parameter names from function definition
+        param_names = [entry.getKey() for entry in funcdef.members().entrySet()]
 
-    for kw in call.keywords:
-        if kw.arg is not None:
-            try:
-                value = ast.literal_eval(kw.value)
-            except Exception:
-                value = ast.dump(kw.value)
-            result[kw.arg] = value
+        # Special handling for Java annotations that use *args, **kwargs
+        # If no named parameters but we have positional args, assume single arg uses "value"
+        if len(param_names) == 0:
+            if len(call.args) == 1 and len(call.keywords) == 0:
+                # Single positional argument - assume it's the "value" parameter
+                try:
+                    value = ast.literal_eval(call.args[0])
+                except Exception as e:
+                    value = ast.dump(call.args[0])
+                    print(f"DEBUG: Java annotation single arg failed, dump = {value}, error = {e}")
+                result["value"] = value
+            else:
+                # Multiple args or keyword args - handle as before
+                for i, arg in enumerate(call.args):
+                    try:
+                        value = ast.literal_eval(arg)
+                    except Exception:
+                        value = ast.dump(arg)
+                    result[i] = value
+                # Handle keyword arguments
+                for kw in call.keywords:
+                    if kw.arg is not None:
+                        try:
+                            value = ast.literal_eval(kw.value)
+                        except Exception:
+                            value = ast.dump(kw.value)
+                        result[kw.arg] = value
+        else:
+            # Normal case with named parameters
+            # Map positional arguments by their position in the parameter list
+            for i, arg in enumerate(call.args):
+                if i < len(param_names):
+                    param_name = param_names[i]
+                    try:
+                        value = ast.literal_eval(arg)
+                    except Exception:
+                        value = ast.dump(arg)
+                    result[param_name] = value
+
+            # Map keyword arguments by their parameter names
+            for kw in call.keywords:
+                if kw.arg is not None:
+                    try:
+                        value = ast.literal_eval(kw.value)
+                    except Exception:
+                        value = ast.dump(kw.value)
+                    result[kw.arg] = value
 
     return result
 
