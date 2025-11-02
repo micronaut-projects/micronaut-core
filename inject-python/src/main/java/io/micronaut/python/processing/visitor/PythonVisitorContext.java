@@ -54,6 +54,10 @@ public class PythonVisitorContext implements VisitorContext {
         return javaVisitorContext;
     }
 
+    public PythonProcessingEnvironment getProcessingEnvironment() {
+        return processingEnvironment;
+    }
+
     @Override
     public Language getLanguage() {
         return Language.PYTHON;

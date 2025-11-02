@@ -67,12 +67,14 @@ import java.util.Objects;
  *
  * @param name           The identifier of the decorator, must not be null.
  * @param annotationName The Micronaut annotation name associated with this decorator
+ * @param repeatedName   The repeated name for repeatable annotations
  * @param members        The argument mapping for the decorator; must not be null, but may be empty.
  * @param stereotypes    Stereotypes are decorators applied to decorators
  */
 public record DecoratorDef(
     String name,
     String annotationName,
+    @Nullable String repeatedName,
     @Nullable Map<String, Value> members,
     @Nullable List<DecoratorDef> stereotypes) {
 
@@ -83,7 +85,7 @@ public record DecoratorDef(
      * @param annotationName The micronaut annotation name
      */
     public DecoratorDef(String name, String annotationName) {
-        this(name, annotationName, Map.of(), List.of());
+        this(name, annotationName, null, Map.of(), List.of());
     }
 
     /**
@@ -94,7 +96,7 @@ public record DecoratorDef(
      * @param members        The members
      */
     public DecoratorDef(String name, String annotationName, Map<String, Value> members) {
-        this(name, annotationName, members, List.of());
+        this(name, annotationName, null, members, List.of());
     }
 
     public DecoratorDef {

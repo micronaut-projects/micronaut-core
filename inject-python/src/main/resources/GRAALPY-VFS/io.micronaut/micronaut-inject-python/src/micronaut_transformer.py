@@ -232,7 +232,7 @@ def micronaut_annotation(name, repeated=None):
         param_handling = param_info['handling']
 
         # Collect meta-annotations to include as decorators
-        decorator_lines = [f'@micronaut_annotation("{annotation_name}")']
+        decorator_lines = [f'@micronaut_annotation("{annotation_name}"{repeatable_info})']
 
         # Get all annotations on this annotation class (meta-annotations)
         annotation_names = annotation_metadata.getAnnotationNames()
