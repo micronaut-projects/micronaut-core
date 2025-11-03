@@ -233,7 +233,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     List<PropertyElement> beanProperties = element.getBeanProperties();
                     for (PropertyElement beanProperty : beanProperties) {
                         if (beanProperty.hasStereotype(AnnotationUtil.INJECT)) {
-                            MethodDef.MethodDefBuilder propertySetter = MethodDef.builder(beanProperty.getName())
+                            MethodDef.MethodDefBuilder propertySetter = MethodDef
+                                .builder(beanProperty.getName())
                                 .returns(TypeDef.VOID);
 
                             propertySetter.addParameter(TypeDef.of(beanProperty.getType()));
