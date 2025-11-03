@@ -128,8 +128,18 @@ public sealed class PythonMethodElement extends AbstractPythonElement implements
     }
 
     private ClassElement resolveReturnType(FunctionDef functionDef) {
-        if (functionDef.returnType() != null && functionDef.returnType().typeAnnotation() != null) {
-            return GraalPyUtil.resolvePythonTypeToJava(functionDef.returnType().typeAnnotation(), environment.visitorContext());
+        ReturnDef returnDef = functionDef.returnType();
+        if (returnDef != null && returnDef.typeAnnotation() != null) {
+            ClassElement baseType = GraalPyUtil.resolvePythonTypeToJava(returnDef.typeAnnotation(), environment.visitorContext());
+
+            // If there are decorators, create a ClassElement with annotation metadata
+            if (!returnDef.decorators().isEmpty()) {
+                io.micronaut.core.annotation.AnnotationMetadata annotationMetadata =
+                    environment.visitorContext().getAnnotationMetadataBuilder().buildDeclared(returnDef);
+                return baseType.withAnnotationMetadata(annotationMetadata);
+            }
+
+            return baseType;
         }
         // Fall back to void/Object
         return environment.visitorContext().getClassElement(Object.class).orElse(ClassElement.of(Object.class));

@@ -247,7 +247,7 @@ public final class PythonPropertyElement extends AbstractPythonElement implement
 
         // Then try to get type from getter return type
         if (propertyDef.hasGetter()) {
-            String returnType = propertyDef.getter().returnTypeAnnotation();
+            String returnType = propertyDef.getter().returnType().typeAnnotation();
             if (returnType != null && !returnType.isEmpty()) {
                 ClassElement resolvedType = resolvePythonTypeToJava(returnType);
                 if (resolvedType != null) {

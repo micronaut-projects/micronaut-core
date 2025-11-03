@@ -23,12 +23,14 @@ package io.micronaut.python.processing.visitor;
  * </p>
  *
  * @param typeAnnotation The return type annotation string, or null if no return type is specified.
+ * @param decorators The decorators found on the return type annotation.
  * @author Micronaut Team
  * @since 5.0.0
  */
 public record ReturnDef(
-    String typeAnnotation
-) {
+    String typeAnnotation,
+    java.util.List<DecoratorDef> decorators
+) implements ElementDef {
 
     /**
      * Creates a ReturnDef with no return type annotation.
@@ -36,7 +38,7 @@ public record ReturnDef(
      * @return A new ReturnDef with null type annotation
      */
     public static ReturnDef none() {
-        return new ReturnDef(null);
+        return new ReturnDef(null, java.util.List.of());
     }
 
     /**
@@ -46,6 +48,22 @@ public record ReturnDef(
      * @return A new ReturnDef
      */
     public static ReturnDef of(String typeAnnotation) {
-        return new ReturnDef(typeAnnotation);
+        return new ReturnDef(typeAnnotation, java.util.List.of());
+    }
+
+    /**
+     * Creates a ReturnDef with the specified type annotation and decorators.
+     *
+     * @param typeAnnotation The return type annotation
+     * @param decorators The decorators for the return type
+     * @return A new ReturnDef
+     */
+    public static ReturnDef of(String typeAnnotation, java.util.List<DecoratorDef> decorators) {
+        return new ReturnDef(typeAnnotation, decorators != null ? decorators : java.util.List.of());
+    }
+
+    @Override
+    public String name() {
+        return typeAnnotation;
     }
 }

@@ -14,6 +14,7 @@ dependencies {
     api(libs.jakarta.inject.api)
 
     testImplementation(platform(libs.test.boms.micronaut.validation))
+    testImplementation(libs.micronaut.validation)
 }
 
 tasks {

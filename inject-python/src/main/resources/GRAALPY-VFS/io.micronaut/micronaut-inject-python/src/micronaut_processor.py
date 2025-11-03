@@ -9,6 +9,7 @@ PropertyDef = java.type("io.micronaut.python.processing.visitor.PropertyDef")
 DecoratorDef = java.type("io.micronaut.python.processing.visitor.DecoratorDef")
 ArgumentsDef = java.type("io.micronaut.python.processing.visitor.ArgumentsDef")
 ArgumentDef = java.type("io.micronaut.python.processing.visitor.ArgumentDef")
+ReturnDef = java.type("io.micronaut.python.processing.visitor.ReturnDef")
 
 def is_abstract_method(funcdef):
     """
@@ -129,15 +130,15 @@ class PrintNodeVisitor(ast.NodeVisitor):
                         ]
 
                         # Parse function arguments and return type
-                        arguments = parse_function_arguments(node)
-                        return_type_annotation = parse_function_return_type(node)
+                        arguments = parse_function_arguments(node, self)
+                        return_type = parse_function_return_type(node, self)
                         # Extract function docstring
                         func_doc = self._extract_docstring(node)
 
                         # Check if function is abstract
                         is_abstract = is_abstract_method(node)
 
-                        func_def = JavaFuncDef(node.name, arguments, decorators, return_type_annotation, "", [], func_doc, is_abstract)
+                        func_def = JavaFuncDef(node.name, arguments, decorators, return_type, "", [], func_doc, is_abstract)
                         if self.current_class is not None:
                             if node.name == "__init__":
                                 # Set as constructor
@@ -326,14 +327,8 @@ class PrintNodeVisitor(ast.NodeVisitor):
                                 decorators.append(decorator)
                         elif isinstance(metadata, ast.Name):
                             # Handle simple decorator names like NotBlank or Inject
-                            known_decorator = self.known_decorators.get(metadata.id)
-                            if known_decorator:
-                                # Use the fully qualified annotation name from the known decorator
-                                annotation_name = known_decorator.annotationName()
-                                decorator = DecoratorDef(metadata.id, annotation_name, None, {}, [])
-                            else:
-                                # Not a known decorator, use as-is
-                                decorator = DecoratorDef(metadata.id, metadata.id, None, {}, [])
+                            decorator_reference = metadata.id
+                            decorator = self.to_decorator_from_reference(decorator_reference)
                             decorators.append(decorator)
                         elif isinstance(metadata, ast.Attribute):
                             # Handle qualified decorator names like validation.NotBlank
@@ -350,6 +345,22 @@ class PrintNodeVisitor(ast.NodeVisitor):
             type_annotation = "object"
 
         return type_annotation, decorators
+
+    def to_decorator_from_reference(self, decorator_reference):
+        return self.to_decorator_from_reference_with_members(decorator_reference, {})
+
+    def to_decorator_from_reference_with_members(self, decorator_reference, members):
+        known_decorator = self.known_decorators.get(decorator_reference)
+        if known_decorator:
+            # Use the fully qualified annotation name from the known decorator
+            annotation_name = known_decorator.annotationName()
+            repeated_name = known_decorator.repeatedName()
+            decorator = DecoratorDef(decorator_reference, annotation_name, repeated_name, members,
+                                     known_decorator.stereotypes())
+        else:
+            # Not a known decorator, use as-is
+            decorator = DecoratorDef(decorator_reference, decorator_reference, None, members, [])
+        return decorator
 
     def _extract_subscript_args(self, subscript_node):
         """
@@ -398,25 +409,27 @@ class PrintNodeVisitor(ast.NodeVisitor):
             decorator_name = call_node.func.id
             # Extract arguments
             members = {}
-        for i, arg in enumerate(call_node.args):
-            try:
-                value = ast.literal_eval(arg)
-                # For positional args, use generic names or indices
-                # For validation constraints, typically the first arg is the value
-                if i == 0:
-                    members['value'] = value
-                else:
-                    members[f'arg{i}'] = value
-            except:
-                # Handle Name nodes (class references) specially
-                if isinstance(arg, ast.Name):
-                    value = arg.id
+
+            # For positional args
+            for i, arg in enumerate(call_node.args):
+                try:
+                    value = ast.literal_eval(arg)
+                    # For positional args, use generic names or indices
+                    # For validation constraints, typically the first arg is the value
                     if i == 0:
                         members['value'] = value
                     else:
                         members[f'arg{i}'] = value
-                else:
-                    members[f'arg{i}'] = ast.dump(arg) if hasattr(ast, 'dump') else str(arg)
+                except:
+                    # Handle Name nodes (class references) specially
+                    if isinstance(arg, ast.Name):
+                        value = arg.id
+                        if i == 0:
+                            members['value'] = value
+                        else:
+                            members[f'arg{i}'] = value
+                    else:
+                        members[f'arg{i}'] = ast.dump(arg) if hasattr(ast, 'dump') else str(arg)
 
             # For keyword args
             for kw in call_node.keywords:
@@ -433,7 +446,7 @@ class PrintNodeVisitor(ast.NodeVisitor):
                             members[kw.arg] = ast.dump(kw.value) if hasattr(ast, 'dump') else str(kw.value)
 
             # Create DecoratorDef with annotationName = name (assuming it's a Micronaut annotation)
-            return DecoratorDef(decorator_name, decorator_name, None, members, [])
+            return self.to_decorator_from_reference_with_members(decorator_name, members)
 
         return None
 
@@ -468,8 +481,8 @@ class PrintNodeVisitor(ast.NodeVisitor):
         property_def = self.current_class_properties[property_name]
 
         # Parse function arguments and return type
-        arguments = parse_function_arguments(func_node)
-        return_type_annotation = parse_function_return_type(func_node)
+        arguments = parse_function_arguments(func_node, self)
+        return_type_annotation = parse_function_return_type(func_node, self)
         func_doc = self._extract_docstring(func_node)
 
         decorators = [
@@ -796,7 +809,7 @@ def get_micronaut_annotation_value(name, funcdef):
             return None
     return None
 
-def _parse_annotated_type_static(annotation_node):
+def _parse_annotated_type_static(annotation_node, visitor):
     """
     Parse a typing.Annotated type annotation and extract the actual type and metadata decorators.
     Returns (type_annotation, decorators_list)
@@ -819,11 +832,21 @@ def _parse_annotated_type_static(annotation_node):
                 # Remaining args are metadata
                 for metadata in args[1:]:
                     if isinstance(metadata, ast.Call):
-                        decorator = _parse_metadata_call_static(metadata)
+                        decorator = _parse_metadata_call_static(metadata, visitor)
                         if decorator:
                             decorators.append(decorator)
-                    # For non-call metadata, we could handle strings or other literals
-                    # but for now, focus on calls like Gt(0)
+                    elif isinstance(metadata, ast.Name):
+                        # Handle simple decorator names like NotBlank or Inject
+                        decorator_reference = metadata.id
+                        decorator = visitor.to_decorator_from_reference(decorator_reference)
+                        decorators.append(decorator)
+                    elif isinstance(metadata, ast.Attribute):
+                        # Handle qualified decorator names like validation.NotBlank
+                        decorator_name = f"{metadata.value.id}.{metadata.attr}"
+                        decorator = DecoratorDef(decorator_name, decorator_name, None, {}, [])
+                        decorators.append(decorator)
+                    # For other metadata types (strings, numbers), we could handle them
+                    # but for now, focus on decorator names and calls
                 # Successfully parsed, return now
                 return type_annotation, decorators
             else:
@@ -883,7 +906,7 @@ def _extract_type_name_static(type_node):
     else:
         return ast.dump(type_node)
 
-def _parse_metadata_call_static(call_node):
+def _parse_metadata_call_static(call_node, visitor):
     """
     Parse a metadata call like Gt(0) into a DecoratorDef.
     Static version.
@@ -892,6 +915,8 @@ def _parse_metadata_call_static(call_node):
         decorator_name = call_node.func.id
         # Extract arguments
         members = {}
+
+        # For positional args
         for i, arg in enumerate(call_node.args):
             try:
                 value = ast.literal_eval(arg)
@@ -926,12 +951,12 @@ def _parse_metadata_call_static(call_node):
                     else:
                         members[kw.arg] = ast.dump(kw.value) if hasattr(ast, 'dump') else str(kw.value)
 
-        # Create DecoratorDef with annotationName = name (assuming it's a Micronaut annotation)
-        return DecoratorDef(decorator_name, decorator_name, None, members, [])
+        # Use visitor to look up known decorators
+        return visitor.to_decorator_from_reference_with_members(decorator_name, members)
 
     return None
 
-def parse_function_arguments(func_node):
+def parse_function_arguments(func_node, visitor):
     """
     Parse the arguments of an ast.FunctionDef node and return ArgumentsDef.
     """
@@ -969,7 +994,7 @@ def parse_function_arguments(func_node):
 
             # Check for typing.Annotated and extract decorators from metadata
             if isinstance(arg.annotation, ast.Subscript) and isinstance(arg.annotation.value, ast.Name) and arg.annotation.value.id == 'Annotated':
-                parsed_type, parsed_decorators = _parse_annotated_type_static(arg.annotation)
+                parsed_type, parsed_decorators = _parse_annotated_type_static(arg.annotation, visitor)
                 type_annotation = parsed_type   # Use extracted type for typeAnnotation
                 decorators = parsed_decorators  # Add any decorators found
             else:
@@ -993,17 +1018,24 @@ def parse_function_arguments(func_node):
 
     return ArgumentsDef.of(arguments)
 
-def parse_function_return_type(func_node):
+def parse_function_return_type(func_node, visitor):
     """
-    Parse the return type annotation of an ast.FunctionDef node and return a string.
+    Parse the return type annotation of an ast.FunctionDef node and return a ReturnDef.
     """
     if hasattr(func_node, 'returns') and func_node.returns is not None:
-        try:
-            return ast.unparse(func_node.returns)
-        except AttributeError:
-            return ast.dump(func_node.returns)
+        # Check for typing.Annotated and extract decorators from metadata
+        if isinstance(func_node.returns, ast.Subscript) and isinstance(func_node.returns.value, ast.Name) and func_node.returns.value.id == 'Annotated':
+            parsed_type, parsed_decorators = _parse_annotated_type_static(func_node.returns, visitor)
+            return ReturnDef.of(parsed_type, parsed_decorators)
+        else:
+            # Not Annotated, use full annotation
+            try:
+                type_annotation = ast.unparse(func_node.returns)
+            except AttributeError:
+                type_annotation = ast.dump(func_node.returns)
+            return ReturnDef.of(type_annotation)
 
-    return ""
+    return ReturnDef.none()
 
 def extract_parameter_documentation(func_node):
     """
