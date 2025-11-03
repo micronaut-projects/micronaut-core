@@ -317,4 +317,177 @@ class TypeTestService:
         "Float return type"   | "float"              | "3.14"      | 3.14d                | Double          | Double.TYPE
 
     }
+
+    def "test documentation survives full processing pipeline"() {
+        given: "Python code with comprehensive documentation"
+        def pythonCode = '''
+class DocumentedClass:
+    """This is a class with documentation.
+
+    This class demonstrates various documentation features
+    that should survive the full processing pipeline.
+    """
+    def __init__(self, name: str, age: int = 25):
+        """Initialize the documented class.
+
+        Args:
+            name (str): The name of the instance
+            age (int): The age of the instance, defaults to 25
+        """
+        self.name = name
+        self.age = age
+
+    def documented_method(self, param1: str, param2: int = 10) -> bool:
+        """A method with parameter documentation.
+
+        This method demonstrates parameter documentation extraction
+        that should survive transformation.
+
+        Args:
+            param1 (str): The first parameter description
+            param2 (int): The second parameter with default
+
+        Returns:
+            bool: Always returns True
+        """
+        return True
+
+    undocumented_field = "no docs"
+    documented_field: str = "has docs"
+    """This field has documentation."""
+'''
+
+        when: "Processing through full pipeline including micronaut_transformer.py"
+        def classElement = buildClassElement(pythonCode) { ClassElement element ->
+            return element
+        }
+
+        then: "Documentation should be preserved after full processing"
+        classElement != null
+        classElement.getSimpleName() == "DocumentedClass"
+
+        and: "Class documentation should be accessible"
+        def classDoc = classElement.getDocumentation(true)
+        classDoc.isPresent()
+        classDoc.get().contains("This is a class with documentation")
+        classDoc.get().contains("This class demonstrates various documentation features")
+
+        and: "Method documentation should be accessible"
+        def methods = classElement.getEnclosedElements(io.micronaut.inject.ast.ElementQuery.ALL_METHODS)
+        def method = methods.find { it.getName() == "documented_method" }
+        method != null
+
+        def methodDoc = method.getDocumentation(true)
+        methodDoc.isPresent()
+        methodDoc.get().contains("A method with parameter documentation")
+        methodDoc.get().contains("This method demonstrates parameter documentation extraction")
+
+        and: "Parameter documentation should be accessible"
+        def params = method.getParameters()
+        params.length == 2
+
+        def param1Doc = params[0].getDocumentation(false)
+        param1Doc.isPresent()
+        param1Doc.get().trim() == "The first parameter description"
+
+        def param2Doc = params[1].getDocumentation(false)
+        param2Doc.isPresent()
+        param2Doc.get().trim() == "The second parameter with default"
+
+        and: "Constructor parameter documentation should be accessible"
+        def constructor = classElement.getPrimaryConstructor().orElse(null)
+        constructor != null
+
+        def constructorParams = constructor.getParameters()
+        constructorParams.length == 2
+
+        def nameParamDoc = constructorParams[0].getDocumentation(false)
+        nameParamDoc.isPresent()
+        nameParamDoc.get().trim() == "The name of the instance"
+
+        def ageParamDoc = constructorParams[1].getDocumentation(false)
+        ageParamDoc.isPresent()
+        ageParamDoc.get().trim() == "The age of the instance, defaults to 25"
+
+        and: "Field documentation should be accessible"
+        def fields = classElement.getFields()
+        def documentedField = fields.find { it.getName() == "documented_field" }
+        documentedField != null
+
+        def fieldDoc = documentedField.getDocumentation(false)
+        fieldDoc.isPresent()
+        fieldDoc.get().trim() == "This field has documentation."
+    }
+
+    def "test documentation survives processing with annotation transformations"() {
+        given: "Python code with documentation AND Java annotation imports that get transformed"
+        def pythonCode = '''
+from jakarta.inject import Singleton
+from typing import Annotated
+
+@Singleton
+class AnnotatedDocumentedClass:
+    """A class with both annotations and documentation.
+
+    This tests that documentation survives the micronaut_transformer.py
+    transformations that convert Java imports to decorators.
+    """
+
+    def __init__(self, config: Annotated[str, "Configuration value"]):
+        """Initialize with annotated parameter.
+
+        Args:
+            config: A configuration value with annotation metadata
+        """
+        self.config = config
+
+    def annotated_method(self, param: Annotated[str, "Some annotation"]) -> str:
+        """Method with annotated parameters.
+
+        Args:
+            param: A parameter with annotation metadata that should survive transformation
+
+        Returns:
+            str: The processed parameter
+        """
+        return param
+'''
+
+        when: "Processing through full pipeline (includes micronaut_transformer.py)"
+        def classElement = buildClassElement(pythonCode) { ClassElement element ->
+            return element
+        }
+
+        then: "Both annotations and documentation should work after transformation"
+        classElement != null
+        classElement.getSimpleName() == "AnnotatedDocumentedClass"
+
+        and: "Annotation should be correctly resolved"
+        classElement.hasAnnotation("jakarta.inject.Singleton")
+
+        and: "Class documentation should survive transformation"
+        def classDoc = classElement.getDocumentation(true)
+        classDoc.isPresent()
+        classDoc.get().contains("A class with both annotations and documentation")
+        classDoc.get().contains("micronaut_transformer.py")
+
+        and: "Method documentation should survive transformation"
+        def method = classElement.getEnclosedElements(io.micronaut.inject.ast.ElementQuery.ALL_METHODS)
+            .find { it.getName() == "annotated_method" }
+        method != null
+
+        def methodDoc = method.getDocumentation(true)
+        methodDoc.isPresent()
+        methodDoc.get().contains("Method with annotated parameters")
+
+        and: "Parameter documentation should survive transformation"
+        def params = method.getParameters()
+        params.length == 1
+
+        def paramDoc = params[0].getDocumentation(false)
+        paramDoc.isPresent()
+        paramDoc.get().trim().contains("A parameter with annotation metadata")
+    }
+
+
 }
