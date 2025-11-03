@@ -40,4 +40,6 @@ internal fun CompilerMessageSeverity.toSeverity() = when (this) {
     CompilerMessageSeverity.INFO -> DiagnosticSeverity.INFO
     CompilerMessageSeverity.LOGGING,
     CompilerMessageSeverity.OUTPUT -> DiagnosticSeverity.LOGGING
+    CompilerMessageSeverity.FIXED_WARNING -> DiagnosticSeverity.WARNING
+
 }

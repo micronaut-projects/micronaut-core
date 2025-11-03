@@ -28,9 +28,10 @@ dependencies {
         exclude(group = "io.micronaut")
     }
 
+    testImplementation(libs.kotlin2.compiler.embeddable)
     testImplementation(projects.micronautContext)
     testImplementation(projects.micronautJacksonDatabind)
-    testImplementation(projects.micronautInjectKotlinTest)
+    testImplementation(projects.testInjectKotlin2Test)
     testImplementation(libs.managed.kotlin.stdlib)
     testImplementation(projects.micronautHttpClient)
     testImplementation(libs.managed.jackson.annotations)

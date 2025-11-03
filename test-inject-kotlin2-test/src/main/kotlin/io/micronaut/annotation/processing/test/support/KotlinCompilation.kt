@@ -275,7 +275,6 @@ class KotlinCompilation : AbstractKotlinCompilation<K2JVMCompilerArguments>() {
 
             args.jvmTarget = jvmTarget
             args.javaParameters = javaParameters
-            args.useOldBackend = useOldBackend
 
             if (javaModulePath != null) args.javaModulePath = javaModulePath!!.toString()
 
