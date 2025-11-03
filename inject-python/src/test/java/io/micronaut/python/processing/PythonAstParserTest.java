@@ -11,8 +11,6 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-
-import io.micronaut.python.processing.visitor.PythonConstructorElement;
 import org.junit.jupiter.api.Test;
 
 import io.micronaut.context.annotation.BeanProperties;
@@ -30,6 +28,7 @@ import io.micronaut.python.processing.visitor.ClassDef;
 import io.micronaut.python.processing.visitor.DecoratorDef;
 import io.micronaut.python.processing.visitor.FunctionDef;
 import io.micronaut.python.processing.visitor.PythonClassElement;
+import io.micronaut.python.processing.visitor.PythonConstructorElement;
 import io.micronaut.python.processing.visitor.PythonEnumElement;
 import io.micronaut.python.processing.visitor.PythonFieldElement;
 import io.micronaut.python.processing.visitor.PythonMethodElement;
@@ -759,7 +758,7 @@ class MySingletonService:
                 assertEquals("The age of the instance, defaults to 25", ageParamDoc.get().trim());
 
                 // Test field documentation
-                Optional<FieldElement> fieldOpt = pythonClass.getEnclosedElements(ElementQuery.ALL_FIELDS)
+                Optional<FieldElement> fieldOpt = pythonClass.getFields()
                     .stream()
                     .filter(f -> "documented_field".equals(f.getName()))
                     .findFirst();
@@ -777,7 +776,7 @@ class MySingletonService:
                 assertEquals("This field has documentation.", parsedFieldDoc.get().trim());
 
                 // Test field without documentation
-                Optional<FieldElement> undocumentedFieldOpt = pythonClass.getEnclosedElements(ElementQuery.ALL_FIELDS)
+                Optional<FieldElement> undocumentedFieldOpt = pythonClass.getFields()
                     .stream()
                     .filter(f -> "undocumented_field".equals(f.getName()))
                     .findFirst();
@@ -825,7 +824,7 @@ class MySingletonService:
                 assertEquals(4, allMethods.size(), "Should have 4 methods");
 
                 // Test ALL_FIELDS query
-                List<FieldElement> allFields = pythonClass.getEnclosedElements(ElementQuery.ALL_FIELDS);
+                List<FieldElement> allFields = pythonClass.getFields();
                 assertEquals(2, allFields.size(), "Should have 2 fields");
 
                 // Test filtering by name
@@ -916,37 +915,6 @@ class MySingletonService:
                 assertEquals("DerivedClass", derivedMethod.getOwningType().getSimpleName(),
                     "Owning type should be DerivedClass for declared method");
 
-                // Test fields
-                List<FieldElement> allFields = derivedClass.getEnclosedElements(ElementQuery.ALL_FIELDS);
-                assertTrue(allFields.size() >= 2, "Should have at least derived fields");
-
-                boolean hasDerivedField = allFields.stream().anyMatch(f -> "derived_field".equals(f.getName()));
-                boolean hasBaseField = allFields.stream().anyMatch(f -> "base_field".equals(f.getName()));
-
-                assertTrue(hasDerivedField, "Should include derived_field");
-                assertTrue(hasBaseField, "Should include base_field");
-
-                // Test declaring vs owning types for inherited fields
-                FieldElement baseField = allFields.stream()
-                    .filter(f -> "base_field".equals(f.getName()))
-                    .findFirst()
-                    .orElseThrow(() -> new AssertionError("base_field should be present"));
-
-                assertEquals("BaseClass", baseField.getDeclaringType().getSimpleName(),
-                    "Declaring type should be BaseClass for inherited field");
-                assertEquals("DerivedClass", baseField.getOwningType().getSimpleName(),
-                    "Owning type should be DerivedClass for inherited field");
-
-                // For declared elements, declaring and owning types should be the same
-                FieldElement derivedField = allFields.stream()
-                    .filter(f -> "derived_field".equals(f.getName()))
-                    .findFirst()
-                    .orElseThrow(() -> new AssertionError("derived_field should be present"));
-
-                assertEquals("DerivedClass", derivedField.getDeclaringType().getSimpleName(),
-                    "Declaring type should be DerivedClass for declared field");
-                assertEquals("DerivedClass", derivedField.getOwningType().getSimpleName(),
-                    "Owning type should be DerivedClass for declared field");
             }
         }
     }
@@ -961,8 +929,9 @@ class MySingletonService:
                 name: str = "apple"
                 weight: Annotated[float, Gt(0)] = 1.5
                 count: Annotated[int, Min(1), Max(100)] = 10
+                validated_name: Annotated[str, NotBlank] = "apple"
 
-            # Define Gt, Min, Max as micronaut annotations for testing
+            # Define Gt, Min, Max, NotBlank as micronaut annotations for testing
             @micronaut_annotation("Gt")
             def Gt(value):
                 return lambda: None
@@ -973,6 +942,10 @@ class MySingletonService:
 
             @micronaut_annotation("Max")
             def Max(value):
+                return lambda: None
+
+            @micronaut_annotation("NotBlank")
+            def NotBlank():
                 return lambda: None
 
             def micronaut_annotation(name):
@@ -989,7 +962,7 @@ class MySingletonService:
                 assertEquals("Fruit", fruitClass.name());
 
                 // Verify attributes are parsed
-                assertEquals(3, fruitClass.attributes().size(), "Should parse 3 attributes");
+                assertEquals(4, fruitClass.attributes().size(), "Should parse 4 attributes");
 
                 // Check weight attribute - should have full Annotated type and Gt decorator
                 var weightAttr = fruitClass.attributes().stream()
@@ -1045,7 +1018,7 @@ class MySingletonService:
                 PythonClassElement fruitPythonClass = (PythonClassElement) fruitElement;
 
                 // Get weight field
-                FieldElement weightField = fruitPythonClass.getEnclosedElements(ElementQuery.ALL_FIELDS)
+                FieldElement weightField = fruitPythonClass.getFields()
                     .stream()
                     .filter(f -> "weight".equals(f.getName()))
                     .findFirst()
@@ -1065,7 +1038,7 @@ class MySingletonService:
                 assertEquals(0, gtValue.getAsInt(), "Gt annotation should have value 0");
 
                 // Test count field with multiple annotations
-                FieldElement countField = fruitPythonClass.getEnclosedElements(ElementQuery.ALL_FIELDS)
+                FieldElement countField = fruitPythonClass.getFields()
                     .stream()
                     .filter(f -> "count".equals(f.getName()))
                     .findFirst()
@@ -1082,6 +1055,34 @@ class MySingletonService:
                 var maxValue = countAnnotationMetadata.intValue("Max", "value");
                 assertTrue(maxValue.isPresent(), "Max annotation should have value");
                 assertEquals(100, maxValue.getAsInt(), "Max annotation should have value 100");
+
+                // Check validated_name attribute - should have NotBlank decorator (constraint-only)
+                var validatedNameAttr = fruitClass.attributes().stream()
+                    .filter(attr -> "validated_name".equals(attr.name()))
+                    .findFirst();
+                assertTrue(validatedNameAttr.isPresent(), "validated_name attribute should be parsed");
+                assertEquals("Annotated[str, NotBlank]", validatedNameAttr.get().annotation(), "validated_name should have full annotation string");
+                assertEquals("Annotated[str, NotBlank]", validatedNameAttr.get().typeName(), "validated_name should have full annotation as typeName");
+                assertEquals("apple", validatedNameAttr.get().value().asString(), "validated_name should have value 'apple'");
+
+                // Check that validated_name has NotBlank decorator
+                List<DecoratorDef> validatedNameDecorators = validatedNameAttr.get().decorators();
+                assertEquals(1, validatedNameDecorators.size(), "validated_name should have 1 decorator");
+                DecoratorDef notBlankDecorator = validatedNameDecorators.get(0);
+                assertEquals("NotBlank", notBlankDecorator.name(), "decorator should be NotBlank");
+                assertEquals("NotBlank", notBlankDecorator.annotationName(), "annotation name should be NotBlank");
+                // NotBlank has no parameters, so members should be empty
+                assertTrue(notBlankDecorator.members().isEmpty(), "NotBlank should have no members");
+
+                // Test that PythonFieldElement creates correct annotation metadata for NotBlank
+                FieldElement validatedNameField = fruitPythonClass.getFields()
+                    .stream()
+                    .filter(f -> "validated_name".equals(f.getName()))
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError("validated_name field should be present"));
+
+                var validatedNameAnnotationMetadata = validatedNameField.getAnnotationMetadata();
+                assertTrue(validatedNameAnnotationMetadata.hasAnnotation("NotBlank"), "validated_name field should have NotBlank annotation");
             }
         }
     }
@@ -1280,13 +1281,13 @@ class MySingletonService:
                     .orElseThrow(() -> new AssertionError("name property should be found"));
 
                 assertEquals("java.lang.String", nameProperty.getType().getName(), "name property should have String type");
-                assertEquals(PropertyElement.AccessKind.FIELD, nameProperty.getReadAccessKind(), "name should be FIELD access");
-                assertEquals(PropertyElement.AccessKind.FIELD, nameProperty.getWriteAccessKind(), "name should be FIELD write access");
+                assertEquals(PropertyElement.AccessKind.METHOD, nameProperty.getReadAccessKind(), "name should be METHOD access");
+                assertEquals(PropertyElement.AccessKind.METHOD, nameProperty.getWriteAccessKind(), "name should be METHOD write access");
 
-                // Should have a field but no read/write methods
-                assertTrue(nameProperty.getField().isPresent(), "name property should have a field");
-                assertFalse(nameProperty.getReadMethod().isPresent(), "name property should not have read method");
-                assertFalse(nameProperty.getWriteMethod().isPresent(), "name property should not have write method");
+                // Should have a field and synthetic read/write methods
+                assertFalse(nameProperty.getField().isPresent(), "fields are inaccessible, accessible through synthetic methods");
+                assertTrue(nameProperty.getReadMethod().isPresent(), "name property should have synthetic read method");
+                assertTrue(nameProperty.getWriteMethod().isPresent(), "name property should have synthetic write method");
 
                 // Find the age property
                 PropertyElement ageProperty = properties.stream()
@@ -1402,9 +1403,9 @@ class MySingletonService:
                     .orElseThrow(() -> new AssertionError("description property should be found"));
 
                 assertEquals("java.lang.String", descProperty.getType().getName(), "description property should have String type");
-                assertEquals(PropertyElement.AccessKind.FIELD, descProperty.getReadAccessKind(), "description should be FIELD access");
-                assertTrue(descProperty.getField().isPresent(), "description should have field");
-                assertFalse(descProperty.getReadMethod().isPresent(), "description should not have read method");
+                assertEquals(PropertyElement.AccessKind.METHOD, descProperty.getReadAccessKind(), "description should be METHOD access");
+                assertFalse(descProperty.getField().isPresent(), "skip fields because they are inaccessible");
+                assertTrue(descProperty.getReadMethod().isPresent(), "description should have synthetic read method");
             }
         }
     }

@@ -188,8 +188,9 @@ class PrintNodeVisitor(ast.NodeVisitor):
                 # Determine if it's a class variable (static) or instance variable
                 # For Micronaut properties, treat class attributes as instance fields
                 is_static = False  # Regular Python attributes should be writable
+                type_name = None  # No type annotation for simple assignments
 
-                attr_def = JavaAttributeDef(attr_name, None, None, value, [], None, is_static)
+                attr_def = JavaAttributeDef(attr_name, None, type_name, value, [], None, is_static)
                 self.current_class_attributes.append(attr_def)
 
     def _handle_ann_assign(self, node):
@@ -323,8 +324,24 @@ class PrintNodeVisitor(ast.NodeVisitor):
                             decorator = self._parse_metadata_call(metadata)
                             if decorator:
                                 decorators.append(decorator)
-                        # For non-call metadata, we could handle strings or other literals
-                        # but for now, focus on calls like Gt(0)
+                        elif isinstance(metadata, ast.Name):
+                            # Handle simple decorator names like NotBlank or Inject
+                            known_decorator = self.known_decorators.get(metadata.id)
+                            if known_decorator:
+                                # Use the fully qualified annotation name from the known decorator
+                                annotation_name = known_decorator.annotationName()
+                                decorator = DecoratorDef(metadata.id, annotation_name, None, {}, [])
+                            else:
+                                # Not a known decorator, use as-is
+                                decorator = DecoratorDef(metadata.id, metadata.id, None, {}, [])
+                            decorators.append(decorator)
+                        elif isinstance(metadata, ast.Attribute):
+                            # Handle qualified decorator names like validation.NotBlank
+                            decorator_name = f"{metadata.value.id}.{metadata.attr}"
+                            decorator = DecoratorDef(decorator_name, decorator_name, None, {}, [])
+                            decorators.append(decorator)
+                        # For other metadata types (strings, numbers), we could handle them
+                        # but for now, focus on decorator names and calls
 
         # Fallback to original annotation
         try:
@@ -507,11 +524,10 @@ def decorator_to_function(visitor, node):
             decorator_declaration = visitor.known_decorators.get(decorator_name)
             if decorator_declaration is not None:
                 members = extract_call_arguments_with_defaults(decorator_declaration, node)
-                print(f"DECORATOR {decorator_name} MEMBERS {members}")
                 return DecoratorDef(
                     decorator_name,
                     decorator_declaration.annotationName(),
-                    decorator_declaration.annotationName(),
+                    decorator_declaration.repeatedName(),
                     members,
                     decorator_declaration.stereotypes()
                 )
@@ -566,10 +582,8 @@ def extract_call_arguments_with_defaults(funcdef, call):
             # Single positional argument - assume it's the "value" parameter
             try:
                 value = ast.literal_eval(call.args[0])
-                print(f"DEBUG: single arg, value = {value}")
             except Exception as e:
                 value = ast.dump(call.args[0])
-                print(f"DEBUG: single arg failed, dump = {value}, error = {e}")
             result["value"] = value
         else:
             # Multiple args or keyword args - use positional indices as fallback
@@ -582,13 +596,10 @@ def extract_call_arguments_with_defaults(funcdef, call):
             # Handle keyword arguments
             for kw in call.keywords:
                 if kw.arg is not None:
-                    print(f"DEBUG: processing keyword {kw.arg}, kw.value = {kw.value}, type = {type(kw.value)}")
                     try:
                         value = ast.literal_eval(kw.value)
-                        print(f"DEBUG: keyword literal_eval success, value = {value}")
                     except Exception as e:
                         value = ast.dump(kw.value)
-                        print(f"DEBUG: keyword literal_eval failed, dump = {value}, error = {e}")
                     result[kw.arg] = value
     else:
         # Get parameter names from function definition
@@ -603,7 +614,6 @@ def extract_call_arguments_with_defaults(funcdef, call):
                     value = ast.literal_eval(call.args[0])
                 except Exception as e:
                     value = ast.dump(call.args[0])
-                    print(f"DEBUG: Java annotation single arg failed, dump = {value}, error = {e}")
                 result["value"] = value
             else:
                 # Multiple args or keyword args - handle as before
@@ -718,7 +728,7 @@ def get_micronaut_annotation_value(name, funcdef):
                             return None
 
                 # 2. Or first positional argument, if present
-                if dec.args:
+                if dec.args and name == 'name':
                     try:
                         return ast.literal_eval(dec.args[0])
                     except Exception:
@@ -737,6 +747,7 @@ def _parse_annotated_type_static(annotation_node):
     Static version that can be called from functions.
     """
     decorators = []
+
 
     # Parse the Annotated subscript arguments
     if isinstance(annotation_node, ast.Subscript):
@@ -847,7 +858,7 @@ def _parse_metadata_call_static(call_node):
                     members[kw.arg] = ast.dump(kw.value) if hasattr(ast, 'dump') else str(kw.value)
 
         # Create DecoratorDef with annotationName = name (assuming it's a Micronaut annotation)
-        return DecoratorDef(decorator_name, decorator_name, members, [])
+        return DecoratorDef(decorator_name, decorator_name, None, members, [])
 
     return None
 
