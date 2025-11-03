@@ -15,20 +15,30 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.inject.ast.ClassElement;
+
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Represents a member of a Python annotation (decorator parameter).
  * This record implements ElementDef to provide annotation member information
  * for Micronaut's annotation processing system.
  *
- * @param name The name of the annotation member
+ * @param name       The name of the annotation member
+ * @param memberType The member type of the annotation
  * @author Micronaut Team
  * @since 5.0.0
  */
-public record AnnotationMemberDef(String name) implements ElementDef {
+public record AnnotationMemberDef(String name,
+                                  @Nullable ClassElement memberType) implements ElementDef {
     @Override
     public List<DecoratorDef> decorators() {
         return List.of();
+    }
+
+    public AnnotationMemberDef {
+        Objects.requireNonNull(name, "Annotation member name cannot be null");
     }
 }

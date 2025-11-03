@@ -23,12 +23,16 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import io.micronaut.python.processing.PythonProcessingEnvironment;
 import org.graalvm.polyglot.Value;
+import org.jetbrains.annotations.Nullable;
 
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ElementQuery;
+import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.visitor.VisitorContext;
+import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.python.processing.util.GraalPyUtil;
 import io.micronaut.python.processing.visitor.AnnotationMemberDef;
 import io.micronaut.python.processing.visitor.AttributeDef;
@@ -137,7 +141,11 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
         String memberName,
         Object annotationValue) {
         if (annotationValue instanceof Value value) {
-            return GraalPyUtil.convertValueToJava(value);
+            if (member instanceof AnnotationMemberDef memberDef && memberDef.memberType() != null) {
+                return GraalPyUtil.convertValueToJava(value, memberDef.memberType());
+            } else {
+                return GraalPyUtil.convertValueToJava(value);
+            }
         }
         return annotationValue;
     }
@@ -180,8 +188,13 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
         if (decoratorDef == null) {
             return Map.of();
         }
+        ClassElement javaAnnotationType = getJavaAnnotationType(annotationName);
         return decoratorDef.members().entrySet().stream().collect(Collectors.toMap(
-            entry -> new AnnotationMemberDef(entry.getKey()),
+            entry -> {
+                String memberName = entry.getKey();
+                ClassElement memberType = resolveAnnotationMemberType(javaAnnotationType, memberName);
+                return new AnnotationMemberDef(memberName, memberType);
+            },
             Map.Entry::getValue
         ));
     }
@@ -189,10 +202,39 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     @Override
     protected Map<? extends ElementDef, ?> readAnnotationRawValues(DecoratorDef annotationMirror) {
         Map<String, Value> members = annotationMirror.members();
+        ClassElement javaAnnotationType = getJavaAnnotationType(annotationMirror);
+
         return members.entrySet().stream().collect(Collectors.toMap(
-            entry -> new AnnotationMemberDef(entry.getKey()),
+            entry -> {
+                String memberName = entry.getKey();
+                ClassElement memberType = resolveAnnotationMemberType(javaAnnotationType, memberName);
+                return new AnnotationMemberDef(memberName,  memberType);
+            },
             Map.Entry::getValue
         ));
+    }
+
+    private static @Nullable ClassElement resolveAnnotationMemberType(ClassElement javaAnnotationType, String memberName) {
+        ClassElement memberType = null;
+        if (javaAnnotationType != null) {
+            memberType = javaAnnotationType.getEnclosedElement(ElementQuery.ALL_METHODS.onlyInstance()
+                .named(memberName))
+                .map(MethodElement::getReturnType)
+                .orElse(null);
+        }
+        return memberType;
+    }
+
+    private @Nullable ClassElement getJavaAnnotationType(DecoratorDef annotationMirror) {
+        String annotationName = annotationMirror.annotationName();
+        return getJavaAnnotationType(annotationName);
+    }
+
+    private @Nullable ClassElement getJavaAnnotationType(String annotationName) {
+        VisitorContext javaVisitorContext = visitorContext.getJavaVisitorContext();
+        return Optional.ofNullable(javaVisitorContext)
+            .flatMap(vc -> vc.getClassElement(annotationName))
+            .orElse(null);
     }
 
     @Override

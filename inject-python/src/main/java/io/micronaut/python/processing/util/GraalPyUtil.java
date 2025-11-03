@@ -15,11 +15,16 @@
  */
 package io.micronaut.python.processing.util;
 
+import java.util.Map;
+import java.util.Objects;
+
+import io.micronaut.core.annotation.AnnotationClassValue;
 import org.graalvm.polyglot.Value;
 
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.python.processing.visitor.PythonVisitorContext;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Utility class for GraalPy integration, providing type conversion and resolution utilities
@@ -71,23 +76,8 @@ public final class GraalPyUtil {
                     Value nameValue = value.invokeMember("__name__");
                     String className = nameValue.asString();
                     // Map Python builtin types to Java types
-                    switch (className) {
-                        case "str":
-                            return String.class;
-                        case "int":
-                            return Integer.class;
-                        case "float":
-                            return Double.class;
-                        case "bool":
-                            return Boolean.class;
-                        default:
-                            // Try to find the class by name
-                            try {
-                                return Class.forName(className);
-                            } catch (ClassNotFoundException e) {
-                                return value;
-                            }
-                    }
+                    Class<?> classReference = toClassReference(className);
+                    return Objects.requireNonNullElse(classReference, value);
                 }
             } catch (Exception e) {
                 // Fall back to original value
@@ -139,6 +129,26 @@ public final class GraalPyUtil {
             }
         }
         return value;
+    }
+
+    private static Class<?> toClassReference(String className) {
+        switch (className) {
+            case "str":
+                return String.class;
+            case "int":
+                return Integer.class;
+            case "float":
+                return Double.class;
+            case "bool":
+                return Boolean.class;
+            default:
+                // Try to find the class by name
+                try {
+                    return Class.forName(className);
+                } catch (ClassNotFoundException e) {
+                    return null;
+                }
+        }
     }
 
     /**
@@ -433,14 +443,22 @@ public final class GraalPyUtil {
         if (elementType.isPrimitive()) {
             String primitiveName = elementType.getName();
             return switch (primitiveName) {
-                case "int" -> visitorContext.getClassElement(Integer.class).orElse(ClassElement.of(Integer.class));
-                case "boolean" -> visitorContext.getClassElement(Boolean.class).orElse(ClassElement.of(Boolean.class));
-                case "double" -> visitorContext.getClassElement(Double.class).orElse(ClassElement.of(Double.class));
-                case "float" -> visitorContext.getClassElement(Float.class).orElse(ClassElement.of(Float.class));
-                case "long" -> visitorContext.getClassElement(Long.class).orElse(ClassElement.of(Long.class));
-                case "short" -> visitorContext.getClassElement(Short.class).orElse(ClassElement.of(Short.class));
-                case "byte" -> visitorContext.getClassElement(Byte.class).orElse(ClassElement.of(Byte.class));
-                case "char" -> visitorContext.getClassElement(Character.class).orElse(ClassElement.of(Character.class));
+                case "int" ->
+                    visitorContext.getClassElement(Integer.class).orElse(ClassElement.of(Integer.class));
+                case "boolean" ->
+                    visitorContext.getClassElement(Boolean.class).orElse(ClassElement.of(Boolean.class));
+                case "double" ->
+                    visitorContext.getClassElement(Double.class).orElse(ClassElement.of(Double.class));
+                case "float" ->
+                    visitorContext.getClassElement(Float.class).orElse(ClassElement.of(Float.class));
+                case "long" ->
+                    visitorContext.getClassElement(Long.class).orElse(ClassElement.of(Long.class));
+                case "short" ->
+                    visitorContext.getClassElement(Short.class).orElse(ClassElement.of(Short.class));
+                case "byte" ->
+                    visitorContext.getClassElement(Byte.class).orElse(ClassElement.of(Byte.class));
+                case "char" ->
+                    visitorContext.getClassElement(Character.class).orElse(ClassElement.of(Character.class));
                 default -> elementType;
             };
         }
@@ -448,15 +466,214 @@ public final class GraalPyUtil {
     }
 
     /**
-     * Simple data class to hold generic type information
+     * Converts GraalPy Value objects to Java types based on the provided ClassElement type information.
+     * This method handles type-specific conversion for annotation members and other typed values.
+     *
+     * @param value        the GraalPy Value to convert
+     * @param classElement the ClassElement representing the target Java type
+     * @return the converted Java object, or the original value if conversion is not possible
      */
-    private static class GenericTypeInfo {
-        final String baseType;
-        final java.util.List<String> typeParameters;
+    public static Object convertValueToJava(Value value, ClassElement classElement) {
+        Objects.requireNonNull(classElement, "ClassElement cannot be null");
 
-        GenericTypeInfo(String baseType, java.util.List<String> typeParameters) {
-            this.baseType = baseType;
-            this.typeParameters = typeParameters;
+        if (value == null || value.isNull()) {
+            return null;
+        }
+
+        // Handle primitive types
+        if (classElement.isPrimitive() && !classElement.isArray()) {
+            if (classElement.equals(PrimitiveElement.BOOLEAN)) {
+                return value.asBoolean();
+            } else if (classElement == PrimitiveElement.BYTE) {
+                if (value.fitsInByte()) {
+                    return value.asByte();
+                } else {
+                    return ((Number) convertValueToJava(value)).byteValue();
+                }
+            } else if (classElement.equals(PrimitiveElement.CHAR)) {
+                String str = value.asString();
+                return !str.isEmpty() ? str.charAt(0) : '\0';
+            } else if (classElement.equals(PrimitiveElement.DOUBLE)) {
+                return value.asDouble();
+            } else if (classElement.equals(PrimitiveElement.FLOAT)) {
+                if (value.fitsInFloat()) {
+                    return value.asFloat();
+                } else {
+                    return ((Number) convertValueToJava(value)).floatValue();
+                }
+            } else if (classElement.equals(PrimitiveElement.INT)) {
+                if (value.fitsInInt()) {
+                    return value.asInt();
+                } else {
+                    return ((Number) convertValueToJava(value)).intValue();
+                }
+            } else if (classElement.equals(PrimitiveElement.LONG)) {
+                if (value.fitsInLong()) {
+                    return value.asLong();
+                } else {
+                    return ((Number) convertValueToJava(value)).longValue();
+                }
+            } else if (classElement.equals(PrimitiveElement.SHORT)) {
+                if (value.fitsInShort()) {
+                    return value.asShort();
+                } else {
+                    return ((Number) convertValueToJava(value)).shortValue();
+                }
+            }
+        }
+
+        // Handle arrays
+        if (classElement.isArray()) {
+            ClassElement componentType = classElement.fromArray();
+            if (value.hasIterator()) {
+                long size = value.getArraySize();
+                if (size > 0) {
+                    // Convert array elements using the component type
+                    if (componentType.equals(PrimitiveElement.BOOLEAN)) {
+                        boolean[] array = new boolean[(int) size];
+                        for (int i = 0; i < size; i++) {
+                            Value element = value.getArrayElement(i);
+                            if (element != null) {
+                                array[i] = element.asBoolean();
+                            }
+                        }
+                        return array;
+                    } else if (componentType.equals(PrimitiveElement.BYTE)) {
+                        byte[] array = new byte[(int) size];
+                        for (int i = 0; i < size; i++) {
+                            Value element = value.getArrayElement(i);
+                            if (element != null) {
+                                array[i] = element.asByte();
+                            }
+                        }
+                        return array;
+                    } else if (componentType.equals(PrimitiveElement.CHAR)) {
+                        char[] array = new char[(int) size];
+                        for (int i = 0; i < size; i++) {
+                            Value element = value.getArrayElement(i);
+                            if (element != null) {
+                                String str = element.asString();
+                                array[i] = !str.isEmpty() ? str.charAt(0) : '\0';
+                            }
+                        }
+                        return array;
+                    } else if (componentType.equals(PrimitiveElement.DOUBLE)) {
+                        double[] array = new double[(int) size];
+                        for (int i = 0; i < size; i++) {
+                            Value element = value.getArrayElement(i);
+                            if (element != null) {
+                                array[i] = element.asDouble();
+                            }
+                        }
+                        return array;
+                    } else if (componentType.equals(PrimitiveElement.FLOAT)) {
+                        float[] array = new float[(int) size];
+                        for (int i = 0; i < size; i++) {
+                            Value element = value.getArrayElement(i);
+                            if (element != null) {
+                                array[i] = (float) element.asDouble();
+                            }
+                        }
+                        return array;
+                    } else if (componentType.equals(PrimitiveElement.INT)) {
+                        int[] array = new int[(int) size];
+                        for (int i = 0; i < size; i++) {
+                            Value element = value.getArrayElement(i);
+                            if (element != null) {
+                                array[i] = element.asInt();
+                            }
+                        }
+                        return array;
+                    } else if (componentType.equals(PrimitiveElement.LONG)) {
+                        long[] array = new long[(int) size];
+                        for (int i = 0; i < size; i++) {
+                            Value element = value.getArrayElement(i);
+                            if (element != null) {
+                                array[i] = element.asLong();
+                            }
+                        }
+                        return array;
+                    } else if (componentType.equals(PrimitiveElement.SHORT)) {
+                        short[] array = new short[(int) size];
+                        for (int i = 0; i < size; i++) {
+                            Value element = value.getArrayElement(i);
+                            if (element != null) {
+                                array[i] = element.asShort();
+                            }
+                        }
+                        return array;
+                    } else if ("java.lang.String".equals(componentType.getName())) {
+                        String[] array = new String[(int) size];
+                        for (int i = 0; i < size; i++) {
+                            Value element = value.getArrayElement(i);
+                            if (element != null) {
+                                array[i] = element.asString();
+                            }
+                        }
+                        return array;
+                    } else if ("java.lang.Class".equals(componentType.getName())) {
+                        // Handle Class arrays
+                        io.micronaut.core.annotation.AnnotationClassValue<?>[] array =
+                            new io.micronaut.core.annotation.AnnotationClassValue<?>[(int) size];
+                        for (int i = 0; i < size; i++) {
+                            Value element = value.getArrayElement(i);
+                            if (element != null) {
+                                array[i] = toClassValue(element);
+                            }
+                        }
+                        return array;
+                    } else {
+                        // Handle object arrays
+                        Object[] array = new Object[(int) size];
+                        for (int i = 0; i < size; i++) {
+                            Value element = value.getArrayElement(i);
+                            if (element != null) {
+                                array[i] = convertValueToJava(element, componentType);
+                            }
+                        }
+                        return array;
+                    }
+                }
+            }
+        }
+
+        // Handle java.lang.Class type
+        if ("java.lang.Class".equals(classElement.getName())) {
+            return toClassValue(value);
+        }
+
+        // Handle annotations - check if value has members that look like annotation members
+        if (value.hasMembers()) {
+            try {
+                // Try to convert to AnnotationValue
+                Map<String, Object> annotationValues = new java.util.HashMap<>();
+                for (String memberName : value.getMemberKeys()) {
+                    Value memberValue = value.getMember(memberName);
+                    if (memberValue != null) {
+                        // For annotation members, we don't have type information, so use the existing conversion
+                        annotationValues.put(memberName, convertValueToJava(memberValue));
+                    }
+                }
+                if (!annotationValues.isEmpty()) {
+                    return new io.micronaut.core.annotation.AnnotationValue(classElement.getName(), annotationValues);
+                }
+            } catch (Exception e) {
+                // Fall back to original conversion logic
+            }
+        }
+
+        // Fall back to the original conversion logic
+        return convertValueToJava(value);
+    }
+
+    private static @NotNull AnnotationClassValue<?> toClassValue(Value value) {
+        String typeName = value.asString();
+        Class<?> classReference = toClassReference(typeName);
+        String className = classReference != null ? classReference.getCanonicalName() : typeName;
+        if (classReference == null) {
+            return new AnnotationClassValue<>(className);
+        } else {
+            return new AnnotationClassValue<>(classReference);
         }
     }
 
@@ -509,5 +726,18 @@ public final class GraalPyUtil {
         }
 
         return result.toString().trim();
+    }
+
+    /**
+     * Simple data class to hold generic type information.
+     */
+    private static class GenericTypeInfo {
+        final String baseType;
+        final java.util.List<String> typeParameters;
+
+        GenericTypeInfo(String baseType, java.util.List<String> typeParameters) {
+            this.baseType = baseType;
+            this.typeParameters = typeParameters;
+        }
     }
 }

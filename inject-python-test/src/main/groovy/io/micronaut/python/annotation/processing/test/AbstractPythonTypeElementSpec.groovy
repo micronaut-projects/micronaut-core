@@ -112,22 +112,21 @@ abstract class AbstractPythonTypeElementSpec extends Specification {
      * @return The class element
      */
     <T> T buildClassElement(String pythonCode, Closure<T> closure) {
-        List<ClassElement> capturedElements = []
+        def localClosure = closure
+        T result
         def compiler = PyronautCompiler.builder()
             .pythonCode(pythonCode)
             .classElementCallback { ClassElement classElement ->
-                capturedElements.add(classElement)
+                if (localClosure != null) {
+                    result = localClosure?.call(classElement)
+                }
+                localClosure = null
             }
             .build()
 
         compiler.buildClassLoader()
 
-        // Return the first captured element to the closure
-        def element = capturedElements ? capturedElements[0] : null
-        if (element && closure) {
-            return closure.call(element)
-        }
-        return null
+        return result
     }
 
     /**
