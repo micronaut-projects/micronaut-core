@@ -5,7 +5,7 @@ import spock.lang.PendingFeature
 
 class FieldInjectionSpec extends AbstractPythonTypeElementSpec {
 
-    void "test fieldeibccb injection with Annotated[Type, Inject] syntax"() {
+    void "test field injection with Annotated[Type, Inject] syntax"() {
         given: "Python code with field injection"
         def pythonCode = '''
 from typing import Annotated
