@@ -24,55 +24,53 @@ import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.fasterxml.jackson.annotation.JsonUnwrapped;
 import com.fasterxml.jackson.annotation.JsonValue;
 import com.fasterxml.jackson.annotation.OptBoolean;
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.ObjectCodec;
-import com.fasterxml.jackson.core.SerializableString;
-import com.fasterxml.jackson.core.io.SerializedString;
-import com.fasterxml.jackson.databind.BeanDescription;
-import com.fasterxml.jackson.databind.DeserializationConfig;
-import com.fasterxml.jackson.databind.DeserializationContext;
-import com.fasterxml.jackson.databind.JavaType;
-import com.fasterxml.jackson.databind.JsonDeserializer;
-import com.fasterxml.jackson.databind.JsonMappingException;
-import com.fasterxml.jackson.databind.JsonSerializer;
-import com.fasterxml.jackson.databind.MapperFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.PropertyMetadata;
-import com.fasterxml.jackson.databind.PropertyName;
-import com.fasterxml.jackson.databind.PropertyNamingStrategy;
-import com.fasterxml.jackson.databind.SerializationConfig;
-import com.fasterxml.jackson.databind.SerializerProvider;
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.fasterxml.jackson.databind.annotation.JsonNaming;
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import com.fasterxml.jackson.databind.cfg.MapperConfig;
-import com.fasterxml.jackson.databind.deser.BeanDeserializerBuilder;
-import com.fasterxml.jackson.databind.deser.BeanDeserializerModifier;
-import com.fasterxml.jackson.databind.deser.CreatorProperty;
-import com.fasterxml.jackson.databind.deser.NullValueProvider;
-import com.fasterxml.jackson.databind.deser.SettableBeanProperty;
-import com.fasterxml.jackson.databind.deser.ValueInstantiator;
-import com.fasterxml.jackson.databind.deser.impl.MethodProperty;
-import com.fasterxml.jackson.databind.deser.std.StdValueInstantiator;
-import com.fasterxml.jackson.databind.introspect.AccessorNamingStrategy;
-import com.fasterxml.jackson.databind.introspect.AnnotatedClass;
-import com.fasterxml.jackson.databind.introspect.AnnotatedMember;
-import com.fasterxml.jackson.databind.introspect.AnnotatedMethod;
-import com.fasterxml.jackson.databind.introspect.AnnotationCollector;
-import com.fasterxml.jackson.databind.introspect.DefaultAccessorNamingStrategy;
-import com.fasterxml.jackson.databind.introspect.TypeResolutionContext;
-import com.fasterxml.jackson.databind.introspect.VirtualAnnotatedMember;
-import com.fasterxml.jackson.databind.jsontype.TypeDeserializer;
-import com.fasterxml.jackson.databind.module.SimpleModule;
-import com.fasterxml.jackson.databind.ser.AnyGetterWriter;
-import com.fasterxml.jackson.databind.ser.BeanPropertyWriter;
-import com.fasterxml.jackson.databind.ser.BeanSerializerBuilder;
-import com.fasterxml.jackson.databind.ser.BeanSerializerModifier;
-import com.fasterxml.jackson.databind.ser.impl.PropertySerializerMap;
-import com.fasterxml.jackson.databind.ser.std.MapSerializer;
-import com.fasterxml.jackson.databind.type.TypeFactory;
-import com.fasterxml.jackson.databind.util.SimpleBeanPropertyDefinition;
+import tools.jackson.core.JsonGenerator;
+import tools.jackson.core.JsonParser;
+import tools.jackson.core.SerializableString;
+import tools.jackson.core.io.SerializedString;
+import tools.jackson.databind.BeanDescription;
+import tools.jackson.databind.DeserializationConfig;
+import tools.jackson.databind.DeserializationContext;
+import tools.jackson.databind.JavaType;
+import tools.jackson.databind.ValueDeserializer;
+import tools.jackson.databind.ValueSerializer;
+import tools.jackson.databind.MapperFeature;
+import tools.jackson.databind.PropertyMetadata;
+import tools.jackson.databind.PropertyName;
+import tools.jackson.databind.PropertyNamingStrategy;
+import tools.jackson.databind.SerializationConfig;
+import tools.jackson.databind.SerializationContext;
+import tools.jackson.databind.annotation.JsonDeserialize;
+import tools.jackson.databind.annotation.JsonNaming;
+import tools.jackson.databind.annotation.JsonSerialize;
+import tools.jackson.databind.cfg.MapperBuilder;
+import tools.jackson.databind.cfg.MapperConfig;
+import tools.jackson.databind.deser.BeanDeserializerBuilder;
+import tools.jackson.databind.deser.ValueDeserializerModifier;
+import tools.jackson.databind.deser.CreatorProperty;
+import tools.jackson.databind.deser.NullValueProvider;
+import tools.jackson.databind.deser.SettableBeanProperty;
+import tools.jackson.databind.deser.ValueInstantiator;
+import tools.jackson.databind.deser.impl.MethodProperty;
+import tools.jackson.databind.deser.std.StdValueInstantiator;
+import tools.jackson.databind.introspect.AccessorNamingStrategy;
+import tools.jackson.databind.introspect.AnnotatedClass;
+import tools.jackson.databind.introspect.AnnotatedMember;
+import tools.jackson.databind.introspect.AnnotatedMethod;
+import tools.jackson.databind.introspect.AnnotationCollector;
+import tools.jackson.databind.introspect.DefaultAccessorNamingStrategy;
+import tools.jackson.databind.introspect.TypeResolutionContext;
+import tools.jackson.databind.introspect.VirtualAnnotatedMember;
+import tools.jackson.databind.jsontype.TypeDeserializer;
+import tools.jackson.databind.module.SimpleModule;
+import tools.jackson.databind.ser.AnyGetterWriter;
+import tools.jackson.databind.ser.BeanPropertyWriter;
+import tools.jackson.databind.ser.BeanSerializerBuilder;
+import tools.jackson.databind.ser.ValueSerializerModifier;
+import tools.jackson.databind.ser.impl.PropertySerializerMap;
+import tools.jackson.databind.ser.jdk.MapSerializer;
+import tools.jackson.databind.type.TypeFactory;
+import tools.jackson.databind.util.SimpleBeanPropertyDefinition;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.AnnotatedElement;
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -97,7 +95,6 @@ import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.util.ArrayList;
@@ -159,10 +156,9 @@ public class BeanIntrospectionModule extends SimpleModule {
     public void setupModule(SetupContext context) {
         super.setupModule(context);
 
-        ObjectCodec owner = context.getOwner();
-        if (owner instanceof ObjectMapper mapper) {
-            mapper.setConfig(mapper.getSerializationConfig().with(new BeanIntrospectionAccessorNamingStrategyProvider(mapper.getSerializationConfig().getAccessorNaming())));
-            mapper.setConfig(mapper.getDeserializationConfig().with(new BeanIntrospectionAccessorNamingStrategyProvider(mapper.getDeserializationConfig().getAccessorNaming())));
+        Object owner = context.getOwner();
+        if (owner instanceof MapperBuilder builder) {
+            builder.accessorNaming(new BeanIntrospectionAccessorNamingStrategyProvider(builder.baseSettings().getAccessorNaming()));
         }
     }
 
@@ -222,7 +218,7 @@ public class BeanIntrospectionModule extends SimpleModule {
     private <T> T findSerializerFromAnnotation(BeanProperty<?, ?> beanProperty, Class<? extends Annotation> annotationType) {
         AnnotationValue<?> jsonSerializeAnnotation = beanProperty.getAnnotation(annotationType);
         if (jsonSerializeAnnotation != null) {
-            // ideally, we'd use SerializerProvider here, but it's not exposed to the BeanSerializerModifier
+            // ideally, we'd use SerializationContext here, but it's not exposed to the ValueSerializerModifier
             Class<?> using = jsonSerializeAnnotation.classValue("using").orElse(null);
             if (using != null) {
                 BeanIntrospection<Object> usingIntrospection = findIntrospection(using);
@@ -302,21 +298,20 @@ public class BeanIntrospectionModule extends SimpleModule {
     /**
      * Modifies bean serialization.
      */
-    private final class BeanIntrospectionSerializerModifier extends BeanSerializerModifier {
+    private final class BeanIntrospectionSerializerModifier extends ValueSerializerModifier {
         @Override
-        public BeanSerializerBuilder updateBuilder(SerializationConfig config, BeanDescription beanDesc, BeanSerializerBuilder builder) {
-            final Class<?> beanClass = beanDesc.getBeanClass();
+        public BeanSerializerBuilder updateBuilder(SerializationConfig config, BeanDescription.Supplier supplier, BeanSerializerBuilder builder) {
+            final Class<?> beanClass = supplier.getBeanClass();
             final BeanIntrospection<Object> introspection = findIntrospection(beanClass);
 
             if (introspection == null) {
-                return super.updateBuilder(config, beanDesc, builder);
+                return super.updateBuilder(config, supplier, builder);
             } else {
                 PropertyNamingStrategy namingStrategy = findNamingStrategy(config, introspection);
 
-                final BeanSerializerBuilder newBuilder = new BeanSerializerBuilder(beanDesc) {
+                final BeanSerializerBuilder newBuilder = new BeanSerializerBuilder(config, supplier) {
                     @Override
-                    public JsonSerializer<?> build() {
-                        setConfig(config);
+                    public ValueSerializer<?> build() {
                         try {
                             return super.build();
                         } catch (RuntimeException e) {
@@ -343,7 +338,7 @@ public class BeanIntrospectionModule extends SimpleModule {
                         }
                         UnsafeBeanProperty<Object, Object> beanProperty = (UnsafeBeanProperty<Object, Object>) bp;
                         final String propertyName = getName(config, namingStrategy, beanProperty);
-                        JsonSerializer<?> serializerFromAnnotation = findSerializerFromAnnotation(beanProperty, JsonSerialize.class);
+                        ValueSerializer<?> serializerFromAnnotation = findSerializerFromAnnotation(beanProperty, JsonSerialize.class);
                         // normal property
 
                         BeanPropertyWriter writer = new BeanIntrospectionPropertyWriter(
@@ -378,13 +373,12 @@ public class BeanIntrospectionModule extends SimpleModule {
                             };
                             JavaType anyType = newType(beanProperty.asArgument(), config.getTypeFactory());
                             if (serializerFromAnnotation == null) {
-                                serializerFromAnnotation = MapSerializer.construct(/* ignored props*/ (Set<String>) null,
-                                    anyType, config.isEnabled(MapperFeature.USE_STATIC_TYPING),
-                                    null, null, null, /*filterId*/ null);
+                                serializerFromAnnotation = MapSerializer.construct(anyType, config.isEnabled(MapperFeature.USE_STATIC_TYPING),
+                                    null, null, null, /*filterId*/ null, /* ignored props*/ (Set<String>) null, /* ignored props*/ (Set<String>) null);
                             }
                             AnyGetterWriter anyGetter = new AnyGetterWriter(
                                 writer,
-                                new com.fasterxml.jackson.databind.BeanProperty.Std(
+                                new tools.jackson.databind.BeanProperty.Std(
                                     new PropertyName(bp.getName()),
                                     anyType.getContentType(),
                                     null,
@@ -426,7 +420,7 @@ public class BeanIntrospectionModule extends SimpleModule {
                         if (property.isPresent() &&
                             !property.get().isAnnotationPresent(JsonIgnore.class) &&
                             // we can't support XmlBeanPropertyWriter easily https://github.com/micronaut-projects/micronaut-core/issues/5907
-                            !existing.getClass().getName().equals("com.fasterxml.jackson.dataformat.xml.ser.XmlBeanPropertyWriter")
+                            !existing.getClass().getName().equals("tools.jackson.dataformat.xml.ser.XmlBeanPropertyWriter")
                             && !(existing instanceof AnyGetterWriter)) { // NOSONAR
                             final UnsafeBeanProperty<Object, Object> beanProperty = (UnsafeBeanProperty<Object, Object>) property.get();
                             newProperties.set(i, new BeanIntrospectionPropertyWriter(
@@ -452,19 +446,19 @@ public class BeanIntrospectionModule extends SimpleModule {
     /**
      * Modifies bean deserialization.
      */
-    private class BeanIntrospectionDeserializerModifier extends BeanDeserializerModifier {
+    private final class BeanIntrospectionDeserializerModifier extends ValueDeserializerModifier {
 
         @Override
         public BeanDeserializerBuilder updateBuilder(
             DeserializationConfig config,
-            BeanDescription beanDesc,
+            BeanDescription.Supplier supplier,
             BeanDeserializerBuilder builder) {
 
             if (builder.getValueInstantiator().getDelegateType(config) != null) {
                 return builder;
             }
 
-            final Class<?> beanClass = beanDesc.getBeanClass();
+            final Class<?> beanClass = supplier.getBeanClass();
             final var introspection = (UnsafeBeanInstantiationIntrospection<Object>) findIntrospection(beanClass);
             if (introspection == null) {
                 return builder;
@@ -477,7 +471,7 @@ public class BeanIntrospectionModule extends SimpleModule {
                     for (BeanProperty<Object, Object> beanProperty : introspection.getBeanProperties()) {
                         if (!beanProperty.isReadOnly()) {
                             builder.addOrReplaceProperty(new VirtualSetter(
-                                    beanDesc.getClassInfo(),
+                                    supplier.getClassInfo(),
                                     config.getTypeFactory(),
                                     (UnsafeBeanProperty<Object, Object>) beanProperty,
                                     getName(config, propertyNamingStrategy, beanProperty),
@@ -518,7 +512,7 @@ public class BeanIntrospectionModule extends SimpleModule {
                             SettableBeanProperty existing = builder.findProperty(PropertyName.construct(entry.getKey()));
                             if (existing == null) {
                                 builder.addOrReplaceProperty(new VirtualSetter(
-                                        beanDesc.getClassInfo(),
+                                        supplier.getClassInfo(),
                                         config.getTypeFactory(),
                                         (UnsafeBeanProperty<Object, Object>) entry.getValue(),
                                         entry.getKey(),
@@ -548,18 +542,11 @@ public class BeanIntrospectionModule extends SimpleModule {
                                 final AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
                                 PropertyMetadata propertyMetadata = newPropertyMetadata(argument, annotationMetadata);
                                 final String simpleName = existingProperty != null ? existingProperty.getName() : getName(config, propertyNamingStrategy, argument);
-                                TypeDeserializer typeDeserializer;
-                                try {
-                                    typeDeserializer = config.findTypeDeserializer(javaType);
-                                } catch (JsonMappingException e) {
-                                    typeDeserializer = null;
-                                }
+                                TypeDeserializer typeDeserializer = null;
                                 PropertyName propertyName = PropertyName.construct(simpleName);
-                                if (typeDeserializer == null) {
-                                    SettableBeanProperty settableBeanProperty = builder.findProperty(propertyName);
-                                    if (settableBeanProperty != null) {
-                                        typeDeserializer = settableBeanProperty.getValueTypeDeserializer();
-                                    }
+                                SettableBeanProperty settableBeanProperty = builder.findProperty(propertyName);
+                                if (settableBeanProperty != null) {
+                                    typeDeserializer = settableBeanProperty.getValueTypeDeserializer();
                                 }
 
                                 props[i] = new CreatorProperty(
@@ -583,18 +570,18 @@ public class BeanIntrospectionModule extends SimpleModule {
 
                                     @Override
                                     public AnnotatedMember getMember() {
-                                        return new IntrospectionVirtualAnnotatedMember(beanDesc.getClassInfo(), beanClass, argument.getName(), javaType, annotationMetadata);
+                                        return new IntrospectionVirtualAnnotatedMember(supplier.getClassInfo(), beanClass, argument.getName(), javaType, annotationMetadata);
                                     }
 
                                     @Override
-                                    public void deserializeAndSet(JsonParser p, DeserializationContext ctxt, Object instance) throws IOException {
+                                    public void deserializeAndSet(JsonParser p, DeserializationContext ctxt, Object instance) {
                                         if (property != null) {
                                             property.setUnsafe(instance, deserialize(p, ctxt));
                                         }
                                     }
 
                                     @Override
-                                    public Object deserializeSetAndReturn(JsonParser p, DeserializationContext ctxt, Object instance) throws IOException {
+                                    public Object deserializeSetAndReturn(JsonParser p, DeserializationContext ctxt, Object instance) {
                                         if (property != null) {
                                             property.setUnsafe(instance, deserialize(p, ctxt));
                                         }
@@ -602,14 +589,14 @@ public class BeanIntrospectionModule extends SimpleModule {
                                     }
 
                                     @Override
-                                    public void set(Object instance, Object value) {
+                                    public void set(DeserializationContext ctxt, Object instance, Object value) {
                                         if (property != null) {
                                             property.setUnsafe(instance, value);
                                         }
                                     }
 
                                     @Override
-                                    public Object setAndReturn(Object instance, Object value) {
+                                    public Object setAndReturn(DeserializationContext ctxt, Object instance, Object value) {
                                         if (property != null) {
                                             property.setUnsafe(instance, value);
                                         }
@@ -795,7 +782,7 @@ public class BeanIntrospectionModule extends SimpleModule {
                       TypeFactory typeFactory,
                       UnsafeBeanProperty<Object, Object> beanProperty,
                       String propertyName,
-                      JsonDeserializer<Object> valueDeser) {
+                      ValueDeserializer<Object> valueDeser) {
             super(
                 new PropertyName(propertyName),
                 newType(beanProperty.asArgument(), typeFactory),
@@ -816,15 +803,15 @@ public class BeanIntrospectionModule extends SimpleModule {
             this.typeResolutionContext = src.typeResolutionContext;
         }
 
-        VirtualSetter(JsonDeserializer<Object> deser, VirtualSetter src) {
+        VirtualSetter(ValueDeserializer<Object> deser, VirtualSetter src) {
             super(src._propName, src._type, src._metadata, deser);
             this.beanProperty = src.beanProperty;
             this.typeResolutionContext = src.typeResolutionContext;
         }
 
         @Override
-        public SettableBeanProperty withValueDeserializer(JsonDeserializer<?> deser) {
-            return new VirtualSetter((JsonDeserializer<Object>) deser, this);
+        public SettableBeanProperty withValueDeserializer(ValueDeserializer<?> deser) {
+            return new VirtualSetter((ValueDeserializer<Object>) deser, this);
         }
 
         @Override
@@ -854,23 +841,23 @@ public class BeanIntrospectionModule extends SimpleModule {
         }
 
         @Override
-        public void deserializeAndSet(JsonParser p, DeserializationContext ctxt, Object instance) throws IOException {
+        public void deserializeAndSet(JsonParser p, DeserializationContext ctxt, Object instance) {
             beanProperty.setUnsafe(instance, deserialize(p, ctxt));
         }
 
         @Override
-        public Object deserializeSetAndReturn(JsonParser p, DeserializationContext ctxt, Object instance) throws IOException {
+        public Object deserializeSetAndReturn(JsonParser p, DeserializationContext ctxt, Object instance) {
             beanProperty.setUnsafe(instance, deserialize(p, ctxt));
             return null;
         }
 
         @Override
-        public void set(Object instance, Object value) {
+        public void set(DeserializationContext ctxt, Object instance, Object value) {
             beanProperty.setUnsafe(instance, value);
         }
 
         @Override
-        public Object setAndReturn(Object instance, Object value) {
+        public Object setAndReturn(DeserializationContext ctxt, Object instance, Object value) {
             beanProperty.setUnsafe(instance, value);
             return null;
         }
@@ -903,7 +890,7 @@ public class BeanIntrospectionModule extends SimpleModule {
 
         BeanIntrospectionPropertyWriter(BeanPropertyWriter src,
                                         UnsafeBeanProperty<Object, Object> beanProperty,
-                                        JsonSerializer<Object> ser,
+                                        ValueSerializer<Object> ser,
                                         TypeFactory typeFactory,
                                         Class<?>[] views) {
             this(src.getSerializedName(), src, beanProperty, ser, typeFactory, views);
@@ -912,7 +899,7 @@ public class BeanIntrospectionModule extends SimpleModule {
         BeanIntrospectionPropertyWriter(SerializableString name,
                                         BeanPropertyWriter src,
                                         UnsafeBeanProperty<Object, Object> beanProperty,
-                                        JsonSerializer<Object> ser,
+                                        ValueSerializer<Object> ser,
                                         TypeFactory typeFactory,
                                         Class<?>[] views) {
             super(src);
@@ -933,7 +920,7 @@ public class BeanIntrospectionModule extends SimpleModule {
             String name,
             UnsafeBeanProperty<Object, Object> beanProperty,
             TypeFactory typeFactory,
-            JsonSerializer<?> ser) {
+            ValueSerializer<?> ser) {
             super(
                 SimpleBeanPropertyDefinition.construct(config, virtualMember),
                 virtualMember,
@@ -992,9 +979,9 @@ public class BeanIntrospectionModule extends SimpleModule {
         }
 
         @Override
-        public final void serializeAsField(Object bean, JsonGenerator gen, SerializerProvider prov) throws Exception {
+        public final void serializeAsProperty(Object bean, JsonGenerator gen, SerializationContext prov) throws Exception {
             if (!inView(prov.getActiveView())) {
-                serializeAsOmittedField(bean, gen, prov);
+                serializeAsOmittedProperty(bean, gen, prov);
                 return;
             }
             Object value = beanProperty.get(bean);
@@ -1003,16 +990,16 @@ public class BeanIntrospectionModule extends SimpleModule {
                 boolean willSuppressNulls = willSuppressNulls();
                 if (!willSuppressNulls && _nullSerializer != null) {
                     if (!isUnwrapping()) {
-                        gen.writeFieldName(fastName);
+                        gen.writeName(fastName);
                         _nullSerializer.serialize(null, gen, prov);
                     }
                 } else if (!willSuppressNulls) {
-                    gen.writeFieldName(fastName);
-                    prov.defaultSerializeNull(gen);
+                    gen.writeName(fastName);
+                    prov.defaultSerializeNullValue(gen);
                 }
                 return;
             }
-            JsonSerializer<Object> ser = _serializer;
+            ValueSerializer<Object> ser = _serializer;
             if (ser == null) {
                 Class<?> cls = value.getClass();
                 PropertySerializerMap map = _dynamicSerializers;
@@ -1035,10 +1022,10 @@ public class BeanIntrospectionModule extends SimpleModule {
                 return;
             }
             if (isUnwrapping()) {
-                JsonSerializer<Object> unwrappingSerializer = ser.unwrappingSerializer(null);
+                ValueSerializer<Object> unwrappingSerializer = ser.unwrappingSerializer(null);
                 unwrappingSerializer.serialize(value, gen, prov);
             } else {
-                gen.writeFieldName(fastName);
+                gen.writeName(fastName);
                 if (_typeSerializer == null) {
                     ser.serialize(value, gen, prov);
                 } else {
@@ -1048,9 +1035,9 @@ public class BeanIntrospectionModule extends SimpleModule {
         }
 
         @Override
-        public final void serializeAsElement(Object bean, JsonGenerator gen, SerializerProvider prov) throws Exception {
+        public final void serializeAsElement(Object bean, JsonGenerator gen, SerializationContext prov) throws Exception {
             if (!inView(prov.getActiveView())) {
-                serializeAsOmittedField(bean, gen, prov);
+                serializeAsOmittedProperty(bean, gen, prov);
                 return;
             }
 
@@ -1061,13 +1048,13 @@ public class BeanIntrospectionModule extends SimpleModule {
                 if (!willSuppressNulls && _nullSerializer != null) {
                     _nullSerializer.serialize(null, gen, prov);
                 } else if (willSuppressNulls) {
-                    serializeAsPlaceholder(bean, gen, prov);
+                    serializeAsOmittedElement(bean, gen, prov);
                 } else {
-                    prov.defaultSerializeNull(gen);
+                    prov.defaultSerializeNullValue(gen);
                 }
                 return;
             }
-            JsonSerializer<Object> ser = _serializer;
+            ValueSerializer<Object> ser = _serializer;
             if (ser == null) {
                 Class<?> cls = value.getClass();
                 PropertySerializerMap map = _dynamicSerializers;
@@ -1079,11 +1066,11 @@ public class BeanIntrospectionModule extends SimpleModule {
             if (_suppressableValue != null) {
                 if (MARKER_FOR_EMPTY == _suppressableValue) {
                     if (ser.isEmpty(prov, value)) {
-                        serializeAsPlaceholder(bean, gen, prov);
+                        serializeAsOmittedElement(bean, gen, prov);
                         return;
                     }
                 } else if (_suppressableValue.equals(value)) {
-                    serializeAsPlaceholder(bean, gen, prov);
+                    serializeAsOmittedElement(bean, gen, prov);
                     return;
                 }
             }
@@ -1131,23 +1118,23 @@ public class BeanIntrospectionModule extends SimpleModule {
         }
 
         @Override
-        public void deserializeAndSet(JsonParser p, DeserializationContext ctxt, Object instance) throws IOException {
+        public void deserializeAndSet(JsonParser p, DeserializationContext ctxt, Object instance) {
             beanProperty.setUnsafe(instance, deserialize(p, ctxt));
         }
 
         @Override
-        public Object deserializeSetAndReturn(JsonParser p, DeserializationContext ctxt, Object instance) throws IOException {
+        public Object deserializeSetAndReturn(JsonParser p, DeserializationContext ctxt, Object instance) {
             beanProperty.setUnsafe(instance, deserialize(p, ctxt));
             return null;
         }
 
         @Override
-        public void set(Object instance, Object value) {
+        public void set(DeserializationContext ctxt, Object instance, Object value) {
             beanProperty.setUnsafe(instance, value);
         }
 
         @Override
-        public Object setAndReturn(Object instance, Object value) {
+        public Object setAndReturn(DeserializationContext ctxt, Object instance, Object value) {
             beanProperty.setUnsafe(instance, value);
             return null;
         }

@@ -9,20 +9,20 @@ import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.annotation.JsonUnwrapped
 import com.fasterxml.jackson.annotation.JsonView
-import com.fasterxml.jackson.core.JsonGenerator
-import com.fasterxml.jackson.core.JsonParser
-import com.fasterxml.jackson.core.JsonProcessingException
-import com.fasterxml.jackson.databind.DeserializationContext
-import com.fasterxml.jackson.databind.JsonDeserializer
-import com.fasterxml.jackson.databind.JsonSerializer
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.databind.PropertyNamingStrategies
-import com.fasterxml.jackson.databind.SerializerProvider
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize
-import com.fasterxml.jackson.databind.annotation.JsonNaming
-import com.fasterxml.jackson.databind.annotation.JsonSerialize
-import com.fasterxml.jackson.dataformat.xml.XmlMapper
-import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper
+import tools.jackson.core.JsonGenerator
+import tools.jackson.core.JsonParser
+import tools.jackson.core.JacksonException
+import tools.jackson.databind.DeserializationContext
+import tools.jackson.databind.ValueDeserializer
+import tools.jackson.databind.ValueSerializer
+import tools.jackson.databind.ObjectMapper
+import tools.jackson.databind.PropertyNamingStrategies
+import tools.jackson.databind.SerializationContext
+import tools.jackson.databind.annotation.JsonDeserialize
+import tools.jackson.databind.annotation.JsonNaming
+import tools.jackson.databind.annotation.JsonSerialize
+import tools.jackson.dataformat.xml.XmlMapper
+import tools.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper
 import groovy.transform.EqualsAndHashCode
 import groovy.transform.PackageScope
 import io.micronaut.context.ApplicationContext
@@ -225,7 +225,7 @@ class BeanIntrospectionModuleSpec extends Specification {
 
         then:
         noExceptionThrown()
-        json == '{"name":"Bean Introspection Guide","author":null}'
+        json == '{"author":null,"name":"Bean Introspection Guide"}'
 
         cleanup:
         ctx.close()
@@ -265,7 +265,7 @@ class BeanIntrospectionModuleSpec extends Specification {
 
         then:
         noExceptionThrown()
-        json == '{"name":"Bean Introspection Guide","author":null}'
+        json == '{"author":null,"name":"Bean Introspection Guide"}'
 
         cleanup:
         ctx.close()
@@ -302,7 +302,7 @@ class BeanIntrospectionModuleSpec extends Specification {
         def str = objectMapper.writeValueAsString(plant)
 
         then:"The result is correct"
-        str == '{"name":"Rose","color":"green","hasFlowers":true}'
+        str == '{"color":"green","hasFlowers":true,"name":"Rose"}'
 
         when:"deserializing"
         def read = objectMapper.readValue(str, Plant)
@@ -930,17 +930,17 @@ class BeanIntrospectionModuleSpec extends Specification {
         String foo
 
         @Introspected
-        static class UpperCaseSerializer extends JsonSerializer<String> {
+        static class UpperCaseSerializer extends ValueSerializer<String> {
             @Override
-            void serialize(String value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+            void serialize(String value, JsonGenerator gen, SerializationContext serializers) throws IOException {
                 gen.writeString(value.toUpperCase(Locale.ENGLISH))
             }
         }
 
         @Introspected
-        static class LowerCaseDeserializer extends JsonDeserializer<String> {
+        static class LowerCaseDeserializer extends ValueDeserializer<String> {
             @Override
-            String deserialize(JsonParser p, DeserializationContext ctxt) throws IOException, JsonProcessingException {
+            String deserialize(JsonParser p, DeserializationContext ctxt) throws IOException, JacksonException {
                 return p.valueAsString.toLowerCase(Locale.ENGLISH)
             }
         }
@@ -1107,8 +1107,7 @@ class BeanIntrospectionModuleSpec extends Specification {
     void "xml modifier"() {
         given:
         ApplicationContext ctx = ApplicationContext.run()
-        XmlMapper objectMapper = new XmlMapper()
-        objectMapper.registerModule(ctx.getBean(BeanIntrospectionModule))
+        XmlMapper objectMapper = XmlMapper.builder().addModule(ctx.getBean(BeanIntrospectionModule)).build()
 
         expect:
         objectMapper.writeValueAsString(new UsesXmlElementWrapper()) ==

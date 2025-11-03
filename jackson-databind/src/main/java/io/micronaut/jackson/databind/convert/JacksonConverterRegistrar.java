@@ -15,17 +15,17 @@
  */
 package io.micronaut.jackson.databind.convert;
 
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JavaType;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.PropertyNamingStrategies;
-import com.fasterxml.jackson.databind.PropertyNamingStrategy;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ContainerNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.fasterxml.jackson.databind.type.TypeFactory;
+import tools.jackson.core.JsonParser;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JavaType;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.PropertyNamingStrategies;
+import tools.jackson.databind.PropertyNamingStrategy;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.ContainerNode;
+import tools.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.type.TypeFactory;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.core.annotation.Internal;
@@ -43,7 +43,6 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.jackson.JacksonConfiguration;
 import jakarta.inject.Inject;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.Optional;
@@ -145,29 +144,24 @@ public class JacksonConverterRegistrar implements TypeConverterRegistrar {
      */
     protected TypeConverter<JsonNode, Object> jsonNodeToObjectConverter() {
         return (node, targetType, context) -> {
-            try {
-                if (CharSequence.class.isAssignableFrom(targetType) && node instanceof ObjectNode) {
-                    return Optional.of(node.toString());
-                } else {
-                    Argument<Object> argument = null;
-                    if (node instanceof ContainerNode && context instanceof ArgumentConversionContext conversionContext && targetType.getTypeParameters().length != 0) {
-                        argument = conversionContext.getArgument();
-                    }
-                    Object result;
-                    if (argument != null) {
-                        ObjectMapper om = this.objectMapper.get();
-                        JsonParser jsonParser = om.treeAsTokens(node);
-                        TypeFactory typeFactory = om.getTypeFactory();
-                        JavaType javaType = JacksonConfiguration.constructType(argument, typeFactory);
-                        result = om.readValue(jsonParser, javaType);
-                    } else {
-                        result = this.objectMapper.get().treeToValue(node, targetType);
-                    }
-                    return Optional.ofNullable(result);
+            if (CharSequence.class.isAssignableFrom(targetType) && node instanceof ObjectNode) {
+                return Optional.of(node.toString());
+            } else {
+                Argument<Object> argument = null;
+                if (node instanceof ContainerNode && context instanceof ArgumentConversionContext conversionContext && targetType.getTypeParameters().length != 0) {
+                    argument = conversionContext.getArgument();
                 }
-            } catch (IOException e) {
-                context.reject(e);
-                return Optional.empty();
+                Object result;
+                if (argument != null) {
+                    ObjectMapper om = this.objectMapper.get();
+                    JsonParser jsonParser = om.treeAsTokens(node);
+                    TypeFactory typeFactory = om.getTypeFactory();
+                    JavaType javaType = JacksonConfiguration.constructType(argument, typeFactory);
+                    result = om.readValue(jsonParser, javaType);
+                } else {
+                    result = this.objectMapper.get().treeToValue(node, targetType);
+                }
+                return Optional.ofNullable(result);
             }
         };
     }
@@ -180,7 +174,7 @@ public class JacksonConverterRegistrar implements TypeConverterRegistrar {
             Map<String, Argument<?>> typeVariables = context.getTypeVariables();
             Class<?> elementType = typeVariables.isEmpty() ? Map.class : typeVariables.values().iterator().next().getType();
             var results = new ArrayList<>();
-            node.elements().forEachRemaining(jsonNode -> {
+            node.elements().forEach(jsonNode -> {
                 Optional<?> converted = conversionService.convert(jsonNode, elementType, context);
                 if (converted.isPresent()) {
                     results.add(converted.get());
@@ -198,7 +192,7 @@ public class JacksonConverterRegistrar implements TypeConverterRegistrar {
             try {
                 Object[] result = objectMapper.get().treeToValue(node, targetType);
                 return Optional.of(result);
-            } catch (JsonProcessingException e) {
+            } catch (JacksonException e) {
                 context.reject(e);
                 return Optional.empty();
             }

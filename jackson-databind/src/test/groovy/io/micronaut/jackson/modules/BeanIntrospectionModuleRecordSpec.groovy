@@ -1,13 +1,12 @@
 package io.micronaut.jackson.modules
 
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.ObjectMapper
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Replaces
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.beans.BeanIntrospection
 import jakarta.inject.Singleton
-import spock.lang.IgnoreIf
 import spock.lang.Issue
 
 import java.time.LocalDateTime

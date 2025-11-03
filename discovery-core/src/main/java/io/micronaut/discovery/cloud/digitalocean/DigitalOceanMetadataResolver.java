@@ -15,8 +15,8 @@
  */
 package io.micronaut.discovery.cloud.digitalocean;
 
-import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.json.JsonFactory;
+import tools.jackson.databind.ObjectMapper;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.Experimental;
@@ -112,7 +112,7 @@ public class DigitalOceanMetadataResolver implements ComputeInstanceMetadataReso
      * @param configuration Digital Ocean Metadata configuration
      */
     public DigitalOceanMetadataResolver(ObjectMapper objectMapper, DigitalOceanMetadataConfiguration configuration) {
-        this(configuration, objectMapper.getFactory(), new JacksonDatabindMapper(objectMapper));
+        this(configuration, (JsonFactory) objectMapper.tokenStreamFactory(), new JacksonDatabindMapper(objectMapper));
     }
 
     @Override

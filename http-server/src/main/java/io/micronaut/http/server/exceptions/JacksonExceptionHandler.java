@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.server.exceptions;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
+import tools.jackson.core.JacksonException;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.annotation.Produces;
@@ -30,9 +30,9 @@ import jakarta.inject.Singleton;
  */
 @Produces
 @Singleton
-@Requires(classes = JsonProcessingException.class)
+@Requires(classes = JacksonException.class)
 @Internal
-public final class JacksonExceptionHandler extends BaseJsonExceptionHandler<JsonProcessingException> implements ExceptionHandler<JsonProcessingException, Object> {
+public final class JacksonExceptionHandler extends BaseJsonExceptionHandler<JacksonException> implements ExceptionHandler<JacksonException, Object> {
     /**
      * Constructor.
      *

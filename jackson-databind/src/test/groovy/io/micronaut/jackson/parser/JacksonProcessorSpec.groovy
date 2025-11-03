@@ -16,16 +16,16 @@
 package io.micronaut.jackson.parser
 
 import com.fasterxml.jackson.annotation.JsonFormat
-import com.fasterxml.jackson.core.JsonFactory
-import com.fasterxml.jackson.core.JsonParseException
-import com.fasterxml.jackson.core.io.JsonEOFException
-import com.fasterxml.jackson.databind.DeserializationConfig
-import com.fasterxml.jackson.databind.DeserializationFeature
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize
-import com.fasterxml.jackson.databind.node.ArrayNode
-import com.fasterxml.jackson.databind.node.JsonNodeFactory
+import tools.jackson.core.json.JsonFactory
+import tools.jackson.core.exc.StreamReadException
+import tools.jackson.core.exc.UnexpectedEndOfInputException
+import tools.jackson.databind.DeserializationConfig
+import tools.jackson.databind.DeserializationFeature
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.ObjectMapper
+import tools.jackson.databind.annotation.JsonDeserialize
+import tools.jackson.databind.node.ArrayNode
+import tools.jackson.databind.node.JsonNodeFactory
 import io.micronaut.context.ApplicationContext
 import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
@@ -45,7 +45,7 @@ class JacksonProcessorSpec extends Specification {
 
         given:
         ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper)
-        JacksonProcessor processor = new JacksonProcessor(objectMapper.getDeserializationConfig())
+        JacksonProcessor processor = new JacksonProcessor(objectMapper.deserializationConfig())
         BigDecimal dec = new BigDecimal("888.7794538169553400000")
         BigD bigD = new BigD(bd1: dec, bd2: dec)
 
@@ -112,7 +112,7 @@ class JacksonProcessorSpec extends Specification {
 
         given:
         ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper)
-        DeserializationConfig cfg = objectMapper.getDeserializationConfig()
+        DeserializationConfig cfg = objectMapper.deserializationConfig()
         JacksonProcessor processor = new JacksonProcessor(cfg.with(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS))
         BigDecimal dec = new BigDecimal("888.7794538169553400000")
         BigD bigD = new BigD(bd1: dec, bd2: dec)
@@ -179,10 +179,13 @@ class JacksonProcessorSpec extends Specification {
     void "test big decimal - USE_BIG_DECIMAL_FOR_FLOATS and withExactBigDecimals"() {
 
         given:
-        ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper).setNodeFactory(JsonNodeFactory.withExactBigDecimals(false))
-        DeserializationConfig cfg = objectMapper.getDeserializationConfig().with(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
-        objectMapper.setConfig(cfg)
-        JacksonProcessor processor = new JacksonProcessor(objectMapper.getFactory(), cfg)
+        ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper)
+                .rebuild()
+                .nodeFactory(JsonNodeFactory.instance)
+                .configure(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS, true)
+                .build()
+        DeserializationConfig cfg = objectMapper.deserializationConfig()
+        JacksonProcessor processor = new JacksonProcessor(objectMapper.tokenStreamFactory() as JsonFactory, cfg)
         BigDecimal dec = new BigDecimal("888.7794538169553400000")
         BigD bigD = new BigD(bd1: dec, bd2: dec)
 
@@ -249,7 +252,7 @@ class JacksonProcessorSpec extends Specification {
 
         given:
         ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper)
-        JacksonProcessor processor = new JacksonProcessor(objectMapper.getDeserializationConfig())
+        JacksonProcessor processor = new JacksonProcessor(objectMapper.deserializationConfig())
         BigInteger bInt = new BigInteger("9223372036854775807")
         BigI bigI = new BigI(bi1: bInt, bi2: bInt)
 
@@ -334,7 +337,7 @@ class JacksonProcessorSpec extends Specification {
 
         given:
         ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper)
-        DeserializationConfig cfg = objectMapper.getDeserializationConfig()
+        DeserializationConfig cfg = objectMapper.deserializationConfig()
         JacksonProcessor processor = new JacksonProcessor(cfg.with(DeserializationFeature.USE_BIG_INTEGER_FOR_INTS))
         JacksonProcessor processor2 = new JacksonProcessor(cfg.with(DeserializationFeature.USE_BIG_INTEGER_FOR_INTS))
         BigInteger bInt = new BigInteger("9223372036854775807")
@@ -428,7 +431,7 @@ class JacksonProcessorSpec extends Specification {
 
         given:
         ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper)
-        DeserializationConfig cfg = objectMapper.getDeserializationConfig()
+        DeserializationConfig cfg = objectMapper.deserializationConfig()
         JacksonProcessor processor = new JacksonProcessor(cfg.with(DeserializationFeature.USE_BIG_INTEGER_FOR_INTS))
         BigInteger bInt = new BigInteger("9223372036854775807")
         NumsO bigI = new NumsO(bi1: bInt, bi2: bInt)
@@ -520,7 +523,7 @@ class JacksonProcessorSpec extends Specification {
 
         given:
         ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper)
-        JacksonProcessor processor = new JacksonProcessor(objectMapper.getDeserializationConfig())
+        JacksonProcessor processor = new JacksonProcessor(objectMapper.deserializationConfig())
         Foo instance = new Foo(name: "Fred", age: 10)
 
 
@@ -572,7 +575,7 @@ class JacksonProcessorSpec extends Specification {
         node != null
         error == null
         nodeCount == 1
-        string == '{"name":"Fred","age":10}'
+        string == '{"age":10,"name":"Fred"}'
 
         when:
         Foo foo = objectMapper.treeToValue(node, Foo)
@@ -587,7 +590,7 @@ class JacksonProcessorSpec extends Specification {
 
         given:
         ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper)
-        JacksonProcessor processor = new JacksonProcessor(objectMapper.getDeserializationConfig())
+        JacksonProcessor processor = new JacksonProcessor(objectMapper.deserializationConfig())
         Foo[] instances = [new Foo(name: "Fred", age: 10), new Foo(name: "Barney", age: 11)] as Foo[]
 
 
@@ -640,7 +643,7 @@ class JacksonProcessorSpec extends Specification {
         error == null
         nodeCount == 1
         node instanceof ArrayNode
-        string == '[{"name":"Fred","age":10},{"name":"Barney","age":11}]'
+        string == '[{"age":10,"name":"Fred"},{"age":11,"name":"Barney"}]'
 
         when:
         Foo[] foos = objectMapper.treeToValue(node, Foo[].class)
@@ -655,7 +658,7 @@ class JacksonProcessorSpec extends Specification {
     void "test incomplete JSON error"() {
         given:
         ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper)
-        JacksonProcessor processor = new JacksonProcessor(objectMapper.getDeserializationConfig())
+        JacksonProcessor processor = new JacksonProcessor(objectMapper.deserializationConfig())
 
 
         when:
@@ -703,14 +706,14 @@ class JacksonProcessorSpec extends Specification {
         !complete
         node == null
         error != null
-        error instanceof JsonEOFException
+        error instanceof UnexpectedEndOfInputException
 
     }
 
     void "test JSON syntax error"() {
         given:
         ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper)
-        JacksonProcessor processor = new JacksonProcessor(objectMapper.getDeserializationConfig())
+        JacksonProcessor processor = new JacksonProcessor(objectMapper.deserializationConfig())
 
 
         when:
@@ -758,14 +761,14 @@ class JacksonProcessorSpec extends Specification {
         !complete
         node == null
         error != null
-        error instanceof JsonParseException
+        error instanceof StreamReadException
 
     }
 
     void "test nested arrays"() {
         given:
         ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper)
-        JacksonProcessor processor = new JacksonProcessor(new JsonFactory(), true, objectMapper.getDeserializationConfig())
+        JacksonProcessor processor = new JacksonProcessor(new JsonFactory(), true, objectMapper.deserializationConfig())
 
         when:
         long longValue = Integer.MAX_VALUE + 1L

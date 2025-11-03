@@ -1,8 +1,8 @@
 package io.micronaut.http.server.netty.types
 
-import com.fasterxml.jackson.databind.json.JsonMapper
-import com.fasterxml.jackson.databind.node.JsonNodeFactory
-import com.fasterxml.jackson.databind.node.ObjectNode
+import tools.jackson.databind.json.JsonMapper
+import tools.jackson.databind.node.JsonNodeFactory
+import tools.jackson.databind.node.ObjectNode
 import groovy.transform.CompileStatic
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest

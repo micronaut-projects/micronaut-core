@@ -15,7 +15,7 @@
  */
 package io.micronaut.jackson.codec;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.BootstrapContextCompatible;

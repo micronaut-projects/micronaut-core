@@ -1,10 +1,8 @@
 package io.micronaut.kotlin.processing.aop.compile
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import io.micronaut.aop.Intercepted
 import io.micronaut.aop.InterceptorBinding
 import io.micronaut.aop.InterceptorKind
-import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.kotlin.processing.aop.simple.Mutating
 import io.micronaut.kotlin.processing.aop.simple.TestBinding
 import io.micronaut.context.ApplicationContext

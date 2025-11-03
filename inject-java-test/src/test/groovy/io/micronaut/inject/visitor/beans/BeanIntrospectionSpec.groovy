@@ -2862,8 +2862,8 @@ public class Test {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('test.Test','''\
 package test;
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import com.fasterxml.jackson.databind.ser.std.BooleanSerializer;
+import tools.jackson.databind.annotation.JsonSerialize;
+import tools.jackson.databind.ser.jdk.BooleanSerializer;
 
 @io.micronaut.core.annotation.Introspected
 class Test {

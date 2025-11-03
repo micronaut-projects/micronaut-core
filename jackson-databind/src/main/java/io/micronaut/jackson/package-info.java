@@ -20,6 +20,6 @@
 @Requires(classes = ObjectMapper.class)
 package io.micronaut.jackson;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import io.micronaut.context.annotation.Configuration;
 import io.micronaut.context.annotation.Requires;

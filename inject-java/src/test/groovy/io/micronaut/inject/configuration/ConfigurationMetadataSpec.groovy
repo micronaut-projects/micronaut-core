@@ -1,6 +1,6 @@
 package io.micronaut.inject.configuration
 
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.ObjectMapper
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.annotation.processing.test.JavaParser
 import org.intellij.lang.annotations.Language

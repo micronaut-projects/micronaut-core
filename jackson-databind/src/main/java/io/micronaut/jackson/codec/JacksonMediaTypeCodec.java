@@ -15,11 +15,11 @@
  */
 package io.micronaut.jackson.codec;
 
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.databind.JavaType;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.type.TypeFactory;
+import tools.jackson.core.JsonParser;
+import tools.jackson.databind.JavaType;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.type.TypeFactory;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
@@ -31,8 +31,6 @@ import io.micronaut.json.JsonFeatures;
 import io.micronaut.json.JsonMapper;
 import io.micronaut.json.codec.MapperMediaTypeCodec;
 import io.micronaut.runtime.ApplicationConfiguration;
-
-import java.io.IOException;
 
 /**
  * A {@link io.micronaut.http.codec.MediaTypeCodec} for JSON and Jackson.
@@ -119,16 +117,12 @@ public abstract class JacksonMediaTypeCodec extends MapperMediaTypeCodec {
      * @throws CodecException When object cannot be decoded
      */
     public <T> T decode(Argument<T> type, JsonNode node) throws CodecException {
-        try {
-            ObjectMapper objectMapper = getObjectMapper();
-            if (type.hasTypeVariables()) {
-                JsonParser jsonParser = objectMapper.treeAsTokens(node);
-                return objectMapper.readValue(jsonParser, constructJavaType(type));
-            } else {
-                return objectMapper.treeToValue(node, type.getType());
-            }
-        } catch (IOException e) {
-            throw new CodecException("Error decoding JSON stream for type [" + type.getName() + "]: " + e.getMessage(), e);
+        ObjectMapper objectMapper = getObjectMapper();
+        if (type.hasTypeVariables()) {
+            JsonParser jsonParser = objectMapper.treeAsTokens(node);
+            return objectMapper.readValue(jsonParser, constructJavaType(type));
+        } else {
+            return objectMapper.treeToValue(node, type.getType());
         }
     }
 
