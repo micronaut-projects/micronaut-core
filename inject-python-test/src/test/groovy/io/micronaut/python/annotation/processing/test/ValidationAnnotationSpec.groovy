@@ -22,6 +22,7 @@ import io.micronaut.inject.ast.ParameterElement
 import jakarta.validation.Constraint
 import jakarta.validation.Valid
 import jakarta.validation.constraints.*
+import org.intellij.lang.annotations.Language
 
 /**
  * Tests for Jakarta validation annotation processing in Python code.
@@ -33,7 +34,7 @@ class ValidationAnnotationSpec extends AbstractPythonTypeElementSpec {
 
     def "test dataclass attributes with Jakarta validation annotations"() {
         given: "Python dataclass with validation annotations on attributes"
-        def pythonCode = '''
+        @Language("python") def pythonCode = '''
 from dataclasses import dataclass
 from typing import Annotated
 from jakarta.validation.constraints import NotBlank, Min, Max, Size
@@ -122,7 +123,7 @@ class Product:
 
     def "test singleton bean method parameters and return types with validation annotations"() {
         given: "Python singleton bean with validated method parameters and return types"
-        def pythonCode = '''
+        @Language("python") def pythonCode = '''
 from jakarta.inject import Singleton
 from typing import Annotated
 from jakarta.validation.constraints import NotBlank, Min, Max, Size
@@ -241,7 +242,7 @@ class ProductService:
 
     def "test singleton bean constructor parameters with validation annotations"() {
         given: "Python singleton bean with validated constructor parameters"
-        def pythonCode = '''
+        @Language("python") def pythonCode = '''
 from jakarta.inject import Singleton
 from typing import Annotated
 from jakarta.validation.constraints import NotBlank, Min, Max, Email, Pattern
