@@ -22,6 +22,7 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.annotation.PropertyElementAnnotationMetadata;
@@ -69,8 +70,11 @@ public final class PythonPropertyElement extends AbstractPythonElement implement
         this.declaringType = declaringType;
         this.owningType = owningType;
 
-        // Initialize field, read method, and write method
-        this.field = propertyDef.hasField() ? new PythonFieldElement(
+        // Resolve type first before creating synthetic methods
+        this.type = resolveType();
+
+        // For Python properties, fields don't exist - everything is dynamic
+        this.field = propertyDef.field() != null ? new PythonFieldElement(
             propertyDef.field(),
             environment,
             declaringType,
@@ -78,33 +82,29 @@ public final class PythonPropertyElement extends AbstractPythonElement implement
             metadataFactory
         ) : null;
 
+        // Determine access kinds based on property definition
+        // If we have a getter (decorated property), use METHOD access
+        // If we only have a field, use METHOD access (but no synthetic methods)
+        this.readAccessKind = AccessKind.METHOD;
+        this.writeAccessKind = AccessKind.METHOD;
+
+        // Initialize read method - use real getter if available, otherwise synthetic
         this.readMethod = propertyDef.hasGetter() ? new PythonMethodElement(
             propertyDef.getter(),
             environment,
             declaringType,
             owningType,
             metadataFactory
-        ) : null;
+        ) : createSyntheticGetter();
 
+        // Initialize write method - use real setter if available, otherwise synthetic (only if writable)
         this.writeMethod = propertyDef.hasSetter() ? new PythonMethodElement(
             propertyDef.setter(),
             environment,
             declaringType,
             owningType,
             metadataFactory
-        ) : null;
-
-        // Determine access kinds and type
-        if (propertyDef.hasGetter()) {
-            this.readAccessKind = AccessKind.METHOD;
-            this.writeAccessKind = propertyDef.hasSetter() ? AccessKind.METHOD : null;
-        } else {
-            // Field-based property
-            this.readAccessKind = AccessKind.FIELD;
-            this.writeAccessKind = propertyDef.hasField() && !propertyDef.field().isStatic() ? AccessKind.FIELD : null;
-        }
-
-        this.type = resolveType();
+        ) : (isWritable() ? createSyntheticSetter() : null);
         this.annotationMetadata = new PropertyElementAnnotationMetadata(this, readMethod, writeMethod, field, null, false);
     }
 
@@ -129,11 +129,6 @@ public final class PythonPropertyElement extends AbstractPythonElement implement
     }
 
     @Override
-    public Optional<FieldElement> getField() {
-        return Optional.ofNullable(field);
-    }
-
-    @Override
     public Optional<MethodElement> getReadMethod() {
         return Optional.ofNullable(readMethod);
     }
@@ -150,7 +145,7 @@ public final class PythonPropertyElement extends AbstractPythonElement implement
 
     @Override
     public AccessKind getWriteAccessKind() {
-        return writeAccessKind;
+        return writeMethod != null ? writeAccessKind : null;
     }
 
     @Override
@@ -171,6 +166,13 @@ public final class PythonPropertyElement extends AbstractPythonElement implement
     @Override
     public boolean isWriteOnly() {
         return getReadMember().isEmpty();
+    }
+
+    private boolean isWritable() {
+        // A property is writable if:
+        // 1. It has a real setter method, OR
+        // 2. It's a field-based property (no getter/setter decorators)
+        return propertyDef.hasSetter() || (!propertyDef.hasGetter() && propertyDef.hasField());
     }
 
     @Override
@@ -255,13 +257,43 @@ public final class PythonPropertyElement extends AbstractPythonElement implement
         }
 
         // Fallback to Object
-        return environment.visitorContext().getClassElement(Object.class).orElse(null);
+        return ClassElement.of(Object.class);
     }
 
     private ClassElement resolvePythonTypeToJava(String pythonType) {
         return io.micronaut.python.processing.util.GraalPyUtil.resolvePythonTypeToJava(
             pythonType,
             environment.visitorContext()
+        );
+    }
+
+    private MethodElement createSyntheticGetter() {
+        // Create a synthetic getter method that returns the property type
+        return io.micronaut.inject.ast.MethodElement.of(
+            getDeclaringType(),
+            this.annotationMetadata != null ? this.annotationMetadata : this.field != null ? this.field.getTargetAnnotationMetadata() : AnnotationMetadata.EMPTY_METADATA,
+            getGenericType(),  // return type = property type
+            getGenericType(),  // generic return type = property type
+            getName()          // method name = property name
+            // no parameters for getter
+        );
+    }
+
+    private MethodElement createSyntheticSetter() {
+        // Create a parameter for the setter (same type as property)
+        var param = io.micronaut.inject.ast.ParameterElement.of(
+            getType(),
+            "value"
+        );
+
+        // Create a synthetic setter method that takes one parameter
+        return io.micronaut.inject.ast.MethodElement.of(
+            getDeclaringType(),
+            this.annotationMetadata != null ? this.annotationMetadata : this.field != null ? this.field.getTargetAnnotationMetadata() : AnnotationMetadata.EMPTY_METADATA,
+            PrimitiveElement.VOID,  // return type = void
+            PrimitiveElement.VOID,  // generic return type = void
+            getName(),              // method name = property name
+            param                   // single parameter
         );
     }
 

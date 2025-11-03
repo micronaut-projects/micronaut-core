@@ -20,6 +20,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
 import io.micronaut.annotation.processing.visitor.ElementProvider;
 import io.micronaut.context.annotation.BeanProperties;
 import io.micronaut.inject.ast.ArrayableClassElement;
@@ -35,8 +38,6 @@ import io.micronaut.inject.ast.PropertyElementQuery;
 import io.micronaut.inject.ast.utils.EnclosedElementsQuery;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.python.processing.util.GraalPyUtil;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 public abstract sealed class AbstractPythonClassElement extends AbstractPythonElement
     implements ArrayableClassElement, ElementProvider permits PythonClassElement, PythonEnumElement {
@@ -93,6 +94,13 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
     }
 
     @Override
+    public List<FieldElement> getFields() {
+        return getNativeType().attributes()
+            .stream().map(a -> (FieldElement) new PythonFieldElement(a, environment, this, this, environment.metadataFactory()))
+            .toList();
+    }
+
+    @Override
     public ClassDef getNativeType() {
         return (ClassDef) super.getNativeType();
     }
@@ -117,6 +125,11 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
     }
 
     @Override
+    public List<PropertyElement> getSyntheticBeanProperties() {
+        return getBeanProperties();
+    }
+
+    @Override
     public List<PropertyElement> getBeanProperties() {
         PropertyElementQuery defaultPropertyElementQuery = PropertyElementQuery.of(this);
         return getBeanProperties(defaultPropertyElementQuery);
@@ -124,8 +137,6 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
 
     @Override
     public List<PropertyElement> getBeanProperties(PropertyElementQuery propertyElementQuery) {
-        // differentiating this for Python doesn't make sense.
-        propertyElementQuery = propertyElementQuery.accessKinds(Set.of(BeanProperties.AccessKind.FIELD, BeanProperties.AccessKind.METHOD));
         // For Python, we create properties from both @property decorators and regular attributes
 
         // First, add properties from @property decorators (these are already PropertyDef instances)
@@ -133,22 +144,22 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
         List<PropertyElement> allProperties = new java.util.ArrayList<>(decoratorProperties);
 
         // Then, create properties from regular attributes that aren't already represented as properties
-        List<FieldElement> fields = getEnclosedElements(ElementQuery.ALL_FIELDS);
-        for (FieldElement field : fields) {
+        List<AttributeDef> fields = getNativeType().attributes();
+        for (AttributeDef field : fields) {
             // Check if this field is already represented as a property
             boolean alreadyExists = allProperties.stream()
-                .anyMatch(prop -> prop.getName().equals(field.getName()));
+                .anyMatch(prop -> prop.getName().equals(field.name()));
 
             if (!alreadyExists) {
                 // Create a field-based property from the attribute
-                PropertyDef propertyDef = new PropertyDef(field.getName());
-                propertyDef = propertyDef.withField((AttributeDef) field.getNativeType());
+                PropertyDef propertyDef = new PropertyDef(field.name());
+                propertyDef = propertyDef.withField(field);
 
                 PythonPropertyElement propertyElement = new PythonPropertyElement(
                     propertyDef,
                     environment,
-                    (AbstractPythonClassElement) field.getDeclaringType(),
-                    (AbstractPythonClassElement) field.getOwningType(),
+                    this,
+                    this,
                     environment.metadataFactory()
                 );
                 allProperties.add(propertyElement);
@@ -354,11 +365,13 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
                 }
             }
 
-            // Add attributes (fields) if the query is for fields or members
-            if (elementType == FieldElement.class ||
-                elementType == MemberElement.class) {
-                elements.addAll(classNode.attributes());
-            }
+            // For Python, attributes are not real fields since Python uses dynamic attributes
+            // So we don't return them as FieldElement instances to avoid injection issues
+            // Properties are handled separately via PropertyElement
+            // if (elementType == FieldElement.class ||
+            //     elementType == MemberElement.class) {
+            //     elements.addAll(classNode.attributes());
+            // }
 
             // Add properties if the query is for properties or members
             if (elementType == PropertyElement.class ||
