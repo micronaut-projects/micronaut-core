@@ -25,7 +25,7 @@ import java.util.List;
  * @author Micronaut Team
  * @since 5.0.0
  */
-public sealed interface ElementDef permits AnnotationMemberDef, ArgumentDef, AttributeDef, ClassDef, FunctionDef, PropertyDef {
+public sealed interface ElementDef permits AnnotationMemberDef, ArgumentDef, AttributeDef, ClassDef, FunctionDef, PropertyDef, ReturnDef {
     default List<DecoratorDef> decorators() {
         return List.of();
     }

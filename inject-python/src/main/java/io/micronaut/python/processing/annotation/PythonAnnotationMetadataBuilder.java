@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import io.micronaut.python.processing.visitor.ReturnDef;
 import org.graalvm.polyglot.Value;
 import org.jetbrains.annotations.Nullable;
 
@@ -97,6 +98,8 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
             return List.of(attributeDef);
         } else if (element instanceof io.micronaut.python.processing.visitor.ArgumentDef argumentDef) {
             return List.of(argumentDef);
+        } else if (element instanceof ReturnDef returnDef) {
+            return List.of(returnDef);
         }
         return List.of();
     }

@@ -15,8 +15,8 @@
  */
 package io.micronaut.python.processing.visitor;
 
-import java.util.List;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -28,7 +28,7 @@ import java.util.Objects;
  * @param name The name of the function.
  * @param arguments The function arguments.
  * @param decorators The decorators.
- * @param returnTypeAnnotation The raw return type annotation.
+ * @param returnType The parsed return type information.
  * @param typeComment The type comment.
  * @param typeParams The type parameters.
  * @param documentation The function documentation string.
@@ -39,7 +39,7 @@ public record FunctionDef(
     String name,
     ArgumentsDef arguments,
     List<DecoratorDef> decorators,
-    String returnTypeAnnotation,
+    ReturnDef returnType,
     String typeComment,
     List<Object> typeParams,
     String documentation,
@@ -63,29 +63,40 @@ public record FunctionDef(
     }
 
     // Simplified constructors for easier Python interop
-    public FunctionDef(String name, ArgumentsDef arguments, List<DecoratorDef> decorators, String returnTypeAnnotation) {
-        this(name, arguments, decorators, returnTypeAnnotation, "", java.util.List.of(), null, false);
+    public FunctionDef(String name, ArgumentsDef arguments, List<DecoratorDef> decorators, ReturnDef returnType) {
+        this(name, arguments, decorators, returnType, "", java.util.List.of(), null, false);
     }
 
-    public FunctionDef(String name, ArgumentsDef arguments, String returnTypeAnnotation) {
-        this(name, arguments, java.util.List.of(), returnTypeAnnotation, "", java.util.List.of(), null, false);
+    public FunctionDef(String name, ArgumentsDef arguments, ReturnDef returnType) {
+        this(name, arguments, java.util.List.of(), returnType, "", java.util.List.of(), null, false);
     }
 
     public FunctionDef(String name) {
-        this(name, ArgumentsDef.empty(), java.util.List.of(), "", "", java.util.List.of(), null, false);
+        this(name, ArgumentsDef.empty(), java.util.List.of(), ReturnDef.none(), "", java.util.List.of(), null, false);
     }
 
     public FunctionDef(String name, List<DecoratorDef> decoratorList) {
-        this(name, ArgumentsDef.empty(), decoratorList, "", "", java.util.List.of(), null, false);
+        this(name, ArgumentsDef.empty(), decoratorList, ReturnDef.none(), "", java.util.List.of(), null, false);
     }
 
     // Backward compatibility constructors
     public FunctionDef(String name, List<String> argumentNames, List<String> argumentTypes, List<DecoratorDef> decorators, String returnTypeAnnotation) {
-        this(name, createArgumentsDef(argumentNames, argumentTypes), decorators, returnTypeAnnotation, "", java.util.List.of(), null, false);
+        this(name, createArgumentsDef(argumentNames, argumentTypes), decorators,
+             returnTypeAnnotation != null && !returnTypeAnnotation.isEmpty() ? ReturnDef.of(returnTypeAnnotation) : ReturnDef.none(),
+             "", java.util.List.of(), null, false);
     }
 
     public FunctionDef(String name, List<String> argumentNames, List<String> argumentTypes, String returnTypeAnnotation) {
-        this(name, createArgumentsDef(argumentNames, argumentTypes), java.util.List.of(), returnTypeAnnotation, "", java.util.List.of(), null, false);
+        this(name, createArgumentsDef(argumentNames, argumentTypes), java.util.List.of(),
+             returnTypeAnnotation != null && !returnTypeAnnotation.isEmpty() ? ReturnDef.of(returnTypeAnnotation) : ReturnDef.none(),
+             "", java.util.List.of(), null, false);
+    }
+
+    // Constructor for Python interop with return type decorators
+    public FunctionDef(String name, ArgumentsDef arguments, List<DecoratorDef> decorators, String returnTypeAnnotation, List<DecoratorDef> returnTypeDecorators) {
+        this(name, arguments, decorators,
+             returnTypeAnnotation != null && !returnTypeAnnotation.isEmpty() ? ReturnDef.of(returnTypeAnnotation, returnTypeDecorators) : ReturnDef.none(),
+             "", java.util.List.of(), null, false);
     }
 
     private static ArgumentsDef createArgumentsDef(List<String> argumentNames, List<String> argumentTypes) {
@@ -102,8 +113,6 @@ public record FunctionDef(
      * Get the parsed return type as ReturnDef.
      */
     public ReturnDef returnType() {
-        return returnTypeAnnotation != null && !returnTypeAnnotation.isEmpty()
-            ? ReturnDef.of(returnTypeAnnotation)
-            : ReturnDef.none();
+        return returnType;
     }
 }
