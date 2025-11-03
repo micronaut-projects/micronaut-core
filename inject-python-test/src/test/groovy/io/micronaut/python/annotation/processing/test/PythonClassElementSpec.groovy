@@ -196,8 +196,7 @@ class MyPrimitiveAnnotatedService:
             assert annotation.doubleValues("doubleArray") == [1.1, 2.2] as double[]
             assert annotation.floatValues("floatArray") == [1.1f, 2.2f] as float[]
             assert annotation.intValues("intArray") == [10, 20, 30] as int[]
-            // TODO: Fix long array conversion, issue is currently bytes are being stored
-            // assert annotation.longValues("longArray") == [100L, 200L] as long[]
+            assert annotation.longValues("longArray") == [100L, 200L] as long[]
             assert annotation.shortValues("shortArray") == [1, 2, 3] as short[]
 
             // Test string and string array
@@ -205,9 +204,8 @@ class MyPrimitiveAnnotatedService:
             assert annotation.stringValues("stringArray") == ["hello", "world"] as String[]
 
             // Test class and class array
-            // TODO: fix annotation class parsing, issue appears to be parsing of annotation members in micronaut_processor.py
-//            assert annotation.annotationClassValue("classValue").get().name == String.name
-//            assert annotation.annotationClassValues("classArray")*.name == [String.class.name, Integer.class.name]
+            assert annotation.annotationClassValue("classValue").get().name == String.name
+            assert annotation.annotationClassValues("classArray")*.name == [String.class.name, Integer.class.name]
 
             return element
         }
@@ -473,7 +471,7 @@ class AnnotatedDocumentedClass:
 
         and: "Method documentation should survive transformation"
         def method = classElement.getEnclosedElements(io.micronaut.inject.ast.ElementQuery.ALL_METHODS)
-            .find { it.getName() == "annotated_method" }
+                .find { it.getName() == "annotated_method" }
         method != null
 
         def methodDoc = method.getDocumentation(true)

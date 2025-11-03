@@ -119,4 +119,18 @@ public record ClassDef(
     public ClassDef withEnum(boolean isEnum, List<String> values) {
         return new ClassDef(name, packageName, bases, decorators, typeParams, functions, attributes, properties, constructor, isEnum, values, documentation);
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        ClassDef classDef = (ClassDef) o;
+        return Objects.equals(name, classDef.name) && Objects.equals(packageName, classDef.packageName);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(name, packageName);
+    }
 }

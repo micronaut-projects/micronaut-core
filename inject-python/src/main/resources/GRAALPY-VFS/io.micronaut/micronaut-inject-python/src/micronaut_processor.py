@@ -398,16 +398,24 @@ class PrintNodeVisitor(ast.NodeVisitor):
             decorator_name = call_node.func.id
             # Extract arguments
             members = {}
-            for i, arg in enumerate(call_node.args):
-                try:
-                    value = ast.literal_eval(arg)
-                    # For positional args, use generic names or indices
-                    # For validation constraints, typically the first arg is the value
+        for i, arg in enumerate(call_node.args):
+            try:
+                value = ast.literal_eval(arg)
+                # For positional args, use generic names or indices
+                # For validation constraints, typically the first arg is the value
+                if i == 0:
+                    members['value'] = value
+                else:
+                    members[f'arg{i}'] = value
+            except:
+                # Handle Name nodes (class references) specially
+                if isinstance(arg, ast.Name):
+                    value = arg.id
                     if i == 0:
                         members['value'] = value
                     else:
                         members[f'arg{i}'] = value
-                except:
+                else:
                     members[f'arg{i}'] = ast.dump(arg) if hasattr(ast, 'dump') else str(arg)
 
             # For keyword args
@@ -417,7 +425,12 @@ class PrintNodeVisitor(ast.NodeVisitor):
                         value = ast.literal_eval(kw.value)
                         members[kw.arg] = value
                     except:
-                        members[kw.arg] = ast.dump(kw.value) if hasattr(ast, 'dump') else str(kw.value)
+                        # Handle Name nodes (class references) specially
+                        if isinstance(kw.value, ast.Name):
+                            value = kw.value.id
+                            members[kw.arg] = value
+                        else:
+                            members[kw.arg] = ast.dump(kw.value) if hasattr(ast, 'dump') else str(kw.value)
 
             # Create DecoratorDef with annotationName = name (assuming it's a Micronaut annotation)
             return DecoratorDef(decorator_name, decorator_name, None, members, [])
@@ -539,6 +552,28 @@ def decorator_to_function(visitor, node):
             return None
 
 
+def convert_ast_value(node):
+    """
+    Convert an AST node to a Python value, handling complex expressions like lists.
+    """
+    try:
+        # Try to evaluate the value if it's a constant or simple expression
+        return ast.literal_eval(node)
+    except Exception:
+        # Handle different AST node types
+        if isinstance(node, ast.Name):
+            # Class references
+            return node.id
+        elif isinstance(node, ast.List):
+            # Handle lists like [str, int]
+            return [convert_ast_value(elt) for elt in node.elts]
+        elif isinstance(node, ast.Tuple):
+            # Handle tuples
+            return tuple(convert_ast_value(elt) for elt in node.elts)
+        else:
+            # Fallback to AST dump for complex expressions
+            return ast.dump(node) if hasattr(ast, 'dump') else str(node)
+
 def extract_arg_defaults(func_node):
     """
     Given an ast.FunctionDef node, return an ordered dictionary
@@ -562,7 +597,11 @@ def extract_arg_defaults(func_node):
                 # Try to evaluate the value if it's a constant
                 val = ast.literal_eval(default)
             except Exception:
-                val = ast.dump(default)
+                # Handle Name nodes (class references) specially
+                if isinstance(default, ast.Name):
+                    val = default.id
+                else:
+                    val = ast.dump(default)
             arg_dict[arg] = val
 
     return arg_dict
@@ -583,7 +622,11 @@ def extract_call_arguments_with_defaults(funcdef, call):
             try:
                 value = ast.literal_eval(call.args[0])
             except Exception as e:
-                value = ast.dump(call.args[0])
+                # Handle Name nodes (class references) specially
+                if isinstance(call.args[0], ast.Name):
+                    value = call.args[0].id
+                else:
+                    value = ast.dump(call.args[0])
             result["value"] = value
         else:
             # Multiple args or keyword args - use positional indices as fallback
@@ -591,7 +634,11 @@ def extract_call_arguments_with_defaults(funcdef, call):
                 try:
                     value = ast.literal_eval(arg)
                 except Exception:
-                    value = ast.dump(arg)
+                    # Handle Name nodes (class references) specially
+                    if isinstance(arg, ast.Name):
+                        value = arg.id
+                    else:
+                        value = ast.dump(arg)
                 result[i] = value
             # Handle keyword arguments
             for kw in call.keywords:
@@ -599,7 +646,11 @@ def extract_call_arguments_with_defaults(funcdef, call):
                     try:
                         value = ast.literal_eval(kw.value)
                     except Exception as e:
-                        value = ast.dump(kw.value)
+                        # Handle Name nodes (class references) specially
+                        if isinstance(kw.value, ast.Name):
+                            value = kw.value.id
+                        else:
+                            value = ast.dump(kw.value)
                     result[kw.arg] = value
     else:
         # Get parameter names from function definition
@@ -621,16 +672,17 @@ def extract_call_arguments_with_defaults(funcdef, call):
                     try:
                         value = ast.literal_eval(arg)
                     except Exception:
-                        value = ast.dump(arg)
+                        # Handle Name nodes (class references) specially
+                        if isinstance(arg, ast.Name):
+                            value = arg.id
+                        else:
+                            value = ast.dump(arg)
                     result[i] = value
-                # Handle keyword arguments
-                for kw in call.keywords:
-                    if kw.arg is not None:
-                        try:
-                            value = ast.literal_eval(kw.value)
-                        except Exception:
-                            value = ast.dump(kw.value)
-                        result[kw.arg] = value
+            # Handle keyword arguments
+            for kw in call.keywords:
+                if kw.arg is not None:
+                    value = convert_ast_value(kw.value)
+                    result[kw.arg] = value
         else:
             # Normal case with named parameters
             # Map positional arguments by their position in the parameter list
@@ -640,7 +692,11 @@ def extract_call_arguments_with_defaults(funcdef, call):
                     try:
                         value = ast.literal_eval(arg)
                     except Exception:
-                        value = ast.dump(arg)
+                        # Handle Name nodes (class references) specially
+                        if isinstance(arg, ast.Name):
+                            value = arg.id
+                        else:
+                            value = ast.dump(arg)
                     result[param_name] = value
 
             # Map keyword arguments by their parameter names
@@ -846,7 +902,15 @@ def _parse_metadata_call_static(call_node):
                 else:
                     members[f'arg{i}'] = value
             except:
-                members[f'arg{i}'] = ast.dump(arg) if hasattr(ast, 'dump') else str(arg)
+                # Handle Name nodes (class references) specially
+                if isinstance(arg, ast.Name):
+                    value = arg.id
+                    if i == 0:
+                        members['value'] = value
+                    else:
+                        members[f'arg{i}'] = value
+                else:
+                    members[f'arg{i}'] = ast.dump(arg) if hasattr(ast, 'dump') else str(arg)
 
         # For keyword args
         for kw in call_node.keywords:
@@ -855,7 +919,12 @@ def _parse_metadata_call_static(call_node):
                     value = ast.literal_eval(kw.value)
                     members[kw.arg] = value
                 except:
-                    members[kw.arg] = ast.dump(kw.value) if hasattr(ast, 'dump') else str(kw.value)
+                    # Handle Name nodes (class references) specially
+                    if isinstance(kw.value, ast.Name):
+                        value = kw.value.id
+                        members[kw.arg] = value
+                    else:
+                        members[kw.arg] = ast.dump(kw.value) if hasattr(ast, 'dump') else str(kw.value)
 
         # Create DecoratorDef with annotationName = name (assuming it's a Micronaut annotation)
         return DecoratorDef(decorator_name, decorator_name, None, members, [])
