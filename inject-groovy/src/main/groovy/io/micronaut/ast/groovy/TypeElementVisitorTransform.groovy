@@ -57,7 +57,7 @@ import java.lang.reflect.Modifier
 @GroovyASTTransformation(phase = CompilePhase.SEMANTIC_ANALYSIS)
 class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitAware {
 
-    private static final classNode generatedNode = new ClassNode(Generated)
+    private static ClassNode generatedNode = new ClassNode(Generated)
     protected static ThreadLocal<Map<String, LoadedVisitor>> loadedVisitors = new ThreadLocal<>()
     protected static ThreadLocal<List<AbstractBeanDefinitionBuilder>> beanDefinitionBuilders = ThreadLocal.withInitial({ -> [] })
     private CompilationUnit compilationUnit

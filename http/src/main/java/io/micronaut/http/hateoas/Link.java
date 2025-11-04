@@ -178,7 +178,6 @@ public interface Link {
          */
         Builder deprecation(@Nullable URI deprecation);
 
-
         /**
          * @param deprecationURI The deprecation URI
          * @return The builder

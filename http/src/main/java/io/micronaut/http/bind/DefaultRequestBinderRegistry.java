@@ -363,7 +363,7 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
         }
     }
 
-    private static final class PushCapableRequestWrapper<B> extends HttpRequestWrapper<B> implements PushCapableHttpRequest<B> {
+    private static class PushCapableRequestWrapper<B> extends HttpRequestWrapper<B> implements PushCapableHttpRequest<B> {
         private final PushCapableHttpRequest<?> push;
 
         public PushCapableRequestWrapper(HttpRequest<B> primary, PushCapableHttpRequest<?> push) {
@@ -383,7 +383,7 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
         }
     }
 
-    private static final class ServerRequestWrapper<B> extends HttpRequestWrapper<B> implements ServerHttpRequest<B> {
+    private static class ServerRequestWrapper<B> extends HttpRequestWrapper<B> implements ServerHttpRequest<B> {
         private final ServerHttpRequest<?> server;
 
         public ServerRequestWrapper(HttpRequest<B> primary, ServerHttpRequest<?> server) {

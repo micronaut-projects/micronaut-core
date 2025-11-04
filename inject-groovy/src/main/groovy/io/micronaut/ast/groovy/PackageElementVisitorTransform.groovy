@@ -42,7 +42,7 @@ import org.codehaus.groovy.transform.GroovyASTTransformation
 @GroovyASTTransformation(phase = CompilePhase.SEMANTIC_ANALYSIS)
 final class PackageElementVisitorTransform implements ASTTransformation, CompilationUnitAware {
 
-    private static final classNode generatedNode = new ClassNode(Generated)
+    private static ClassNode generatedNode = new ClassNode(Generated)
     protected static ThreadLocal<List<PackageLoadedVisitor>> packageLoadedVisitorsLocal = new ThreadLocal<>()
     private CompilationUnit compilationUnit
 

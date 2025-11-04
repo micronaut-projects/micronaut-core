@@ -57,7 +57,6 @@ public interface MutableHttpRequest<B> extends HttpRequest<B>, MutableHttpMessag
         return this;
     }
 
-
     /**
      * Sets the uri on the request.
      *

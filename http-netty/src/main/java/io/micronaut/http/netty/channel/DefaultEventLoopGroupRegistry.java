@@ -80,6 +80,7 @@ public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
      * @param eventLoopGroupFactory The event loop group factory
      * @param beanLocator           The bean locator
      * @param loomCarrierGroupFactory Factory for the loom carrier group
+     * @param taskQueueInterceptors Task queue interceptors
      */
     public DefaultEventLoopGroupRegistry(EventLoopGroupFactory eventLoopGroupFactory, BeanLocator beanLocator, BeanProvider<LoomCarrierGroup.Factory> loomCarrierGroupFactory, List<TaskQueueInterceptor> taskQueueInterceptors) {
         this.eventLoopGroupFactory = eventLoopGroupFactory;

@@ -276,7 +276,7 @@ public final class FormRouteCompleter implements Subscriber<Object> {
         return singleMap;
     }
 
-    private class Claimant  {
+    private final class Claimant  {
         private final Sinks.Many<MicronautHttpData<?>> sink = Sinks.many().unicast().onBackpressureBuffer();
         private long demand;
         private MicronautHttpData<?> last;

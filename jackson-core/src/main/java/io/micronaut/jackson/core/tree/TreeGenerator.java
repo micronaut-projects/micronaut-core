@@ -360,7 +360,7 @@ public final class TreeGenerator extends JsonGenerator {
         JsonNode build();
     }
 
-    private class ArrayBuilder implements StructureBuilder {
+    private final class ArrayBuilder implements StructureBuilder {
 
         final List<JsonNode> values = new ArrayList<>();
 
@@ -380,7 +380,7 @@ public final class TreeGenerator extends JsonGenerator {
         }
     }
 
-    private class ObjectBuilder implements StructureBuilder {
+    private final class ObjectBuilder implements StructureBuilder {
 
         final Map<String, JsonNode> values = new LinkedHashMap<>();
         String currentFieldName = null;

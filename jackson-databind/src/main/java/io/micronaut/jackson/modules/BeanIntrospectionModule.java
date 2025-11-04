@@ -285,7 +285,7 @@ public class BeanIntrospectionModule extends SimpleModule {
         }
     }
 
-    private static final class IntrospectionVirtualAnnotatedMember extends VirtualAnnotatedMember {
+    private static class IntrospectionVirtualAnnotatedMember extends VirtualAnnotatedMember {
         private final AnnotationMetadata annotationMetadata;
 
         public IntrospectionVirtualAnnotatedMember(TypeResolutionContext typeResolutionContext, Class<?> beanClass, String name, JavaType javaType, AnnotationMetadata annotationMetadata) {
@@ -302,7 +302,7 @@ public class BeanIntrospectionModule extends SimpleModule {
     /**
      * Modifies bean serialization.
      */
-    private class BeanIntrospectionSerializerModifier extends BeanSerializerModifier {
+    private final class BeanIntrospectionSerializerModifier extends BeanSerializerModifier {
         @Override
         public BeanSerializerBuilder updateBuilder(SerializationConfig config, BeanDescription beanDesc, BeanSerializerBuilder builder) {
             final Class<?> beanClass = beanDesc.getBeanClass();

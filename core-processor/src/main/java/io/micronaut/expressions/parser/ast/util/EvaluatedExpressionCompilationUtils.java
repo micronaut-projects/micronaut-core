@@ -97,7 +97,7 @@ public final class EvaluatedExpressionCompilationUtils {
         throw new IllegalStateException("Unknown type " + type);
     }
 
-    private static final classElement getClassElementForName(VisitorContext visitorContext, String className) {
+    private static ClassElement getClassElementForName(VisitorContext visitorContext, String className) {
         return visitorContext.getClassElement(className)
                    .orElseThrow(() -> new ExpressionCompilationException(
                        "Can not resolve type information for [" + className + "]"));

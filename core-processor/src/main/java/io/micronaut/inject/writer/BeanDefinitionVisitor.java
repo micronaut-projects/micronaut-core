@@ -193,7 +193,6 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
      */
     String getBeanDefinitionName();
 
-
     /**
      * Finalize the bean definition to the given output stream.
      */

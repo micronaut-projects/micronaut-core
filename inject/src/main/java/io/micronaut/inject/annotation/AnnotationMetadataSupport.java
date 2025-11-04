@@ -508,7 +508,8 @@ public final class AnnotationMetadataSupport {
      *
      * @param <A> The annotation type
      */
-    private static final class AnnotationProxyHandler<A extends Annotation> implements InvocationHandler, AnnotationValueProvider<A> {
+
+    private static class AnnotationProxyHandler<A extends Annotation> implements InvocationHandler, AnnotationValueProvider<A> {
         private final int hashCode;
         private final Class<A> annotationClass;
         private final AnnotationValue<A> annotationValue;
