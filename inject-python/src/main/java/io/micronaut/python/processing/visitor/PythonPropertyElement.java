@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import java.util.Objects;
 import java.util.Optional;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -327,5 +328,24 @@ public final class PythonPropertyElement extends AbstractPythonElement implement
         }
 
         return Optional.empty();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        PythonPropertyElement that = (PythonPropertyElement) o;
+
+        return that.getNativeType().name().equals(getNativeType().name()) &&
+            owningType.equals(that.owningType);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(getNativeType().name(), owningType);
     }
 }
