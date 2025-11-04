@@ -25,6 +25,8 @@ import io.micronaut.context.event.ApplicationEventPublisherFactory
 import io.micronaut.context.python.ContextHolder
 import io.micronaut.core.io.IOUtils
 import io.micronaut.core.naming.NameUtils
+import io.micronaut.core.beans.BeanIntrospection
+import io.micronaut.core.beans.BeanIntrospector
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
 import io.micronaut.inject.ast.ClassElement
@@ -70,11 +72,38 @@ abstract class AbstractPythonTypeElementSpec extends Specification {
         context.getBeanDefinition(context.classLoader.loadClass(className), qualifier)
     }
 
-    protected BeanDefinition buildBeanDefinition(String className, @Language("python") String pythonCode) {
-        def classSimpleName = NameUtils.getSimpleName(className)
-        def beanDefName = (classSimpleName.startsWith('$') ? '' : '$') + classSimpleName + BeanDefinitionWriter.CLASS_SUFFIX
+    /**
+     * Gets a bean definition from the context for the given class name
+     * @param context The context
+     * @param className The class name
+     * @return The bean instance
+     */
+    BeanIntrospection<?> getBeanIntrospection(ApplicationContext context, String className, Qualifier qualifier = null) {
+        def simpleName = NameUtils.getSimpleName(className)
+        def beanDefName = (simpleName.startsWith('$') ? '' : '$') + simpleName + '$Introspection'
         def packageName = NameUtils.getPackageName(className)
         String beanFullName = "${packageName}.${beanDefName}"
+
+        try {
+            return (BeanIntrospection)context.classLoader.loadClass(beanFullName).newInstance()
+        } catch (ClassNotFoundException e) {
+            return null
+        }
+    }
+
+    /**
+     * Builds a BeanIntrospection for the given Python source code.
+     * The Python code should define a class that will be processed for introspection.
+     * @param className The expected class name (e.g., "python.TestClass")
+     * @param pythonCode The Python source code containing an @Introspected class
+     * @return The BeanIntrospection for the generated class
+     */
+    protected BeanIntrospection buildBeanIntrospection(String className, @Language("python") String pythonCode) {
+        def simpleName = NameUtils.getSimpleName(className)
+        def beanDefName = (simpleName.startsWith('$') ? '' : '$') + simpleName + '$Introspection'
+        def packageName = NameUtils.getPackageName(className)
+        String beanFullName = "${packageName}.${beanDefName}"
+
         def compiler = PyronautCompiler.builder()
                 .pythonCode(pythonCode)
                 .build()
@@ -82,7 +111,7 @@ abstract class AbstractPythonTypeElementSpec extends Specification {
         ClassLoader pythonClassLoader = compiler.buildClassLoader()
 
         try {
-            return (BeanDefinition)pythonClassLoader.loadClass(beanFullName).newInstance()
+            return (BeanIntrospection)pythonClassLoader.loadClass(beanFullName).newInstance()
         } catch (ClassNotFoundException e) {
             return null
         }

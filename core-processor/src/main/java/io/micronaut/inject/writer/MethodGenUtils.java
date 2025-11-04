@@ -20,6 +20,7 @@ import org.jspecify.annotations.Nullable;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.KotlinParameterElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
@@ -102,7 +103,7 @@ public final class MethodGenUtils {
                                                       List<? extends ExpressionDef> hasValuesExpressions) {
         ClassTypeDef beanType = (ClassTypeDef) TypeDef.erasure(constructor.getOwningType());
 
-        boolean isConstructor = constructor.getName().equals("<init>");
+        boolean isConstructor = constructor.getName().equals("<init>") || constructor instanceof ConstructorElement;
         boolean isCompanion = constructor.getOwningType().getSimpleName().endsWith("$Companion");
         List<ParameterElement> constructorArguments = Arrays.asList(constructor.getParameters());
         allowKotlinDefaults = allowKotlinDefaults && hasKotlinDefaultsParameters(constructorArguments);

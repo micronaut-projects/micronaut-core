@@ -22,6 +22,7 @@ import java.util.Set;
 
 import javax.lang.model.element.Modifier;
 
+import io.micronaut.core.annotation.Introspected;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Value;
 
@@ -166,7 +167,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                     parameters
                                 );
 
-                                return handlReturnType(returnType, invokedValue);
+                                return handleReturnType(returnType, invokedValue);
                             })));
                     }
 
@@ -232,29 +233,13 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     // For now, we'll look for fields that have any annotation and check for Inject in metadata
                     List<PropertyElement> beanProperties = element.getBeanProperties();
                     for (PropertyElement beanProperty : beanProperties) {
-                        if (beanProperty.hasStereotype(AnnotationUtil.INJECT)) {
-                            MethodDef.MethodDefBuilder propertySetter = MethodDef
-                                .builder(beanProperty.getName())
-                                .returns(TypeDef.VOID);
+                        boolean isIntrospected = element.hasStereotype(Introspected.class);
+                        if (isIntrospected || beanProperty.hasStereotype(AnnotationUtil.INJECT)) {
+                            addSetter(beanProperty, builder, pythonValue);
+                        }
 
-                            propertySetter.addParameter(TypeDef.of(beanProperty.getType()));
-
-                            builder.addMethod(propertySetter.build(((aThis, methodParameters) -> {
-                                VariableDef.Field pythonValueField = aThis.field(pythonValue);
-                                ExpressionDef param;
-                                if (beanProperty.getType() instanceof PythonClassElement) {
-                                    param = methodParameters.get(0).invoke("asPolyglotValue", POLYGLOT_VALUE);
-                                } else {
-                                    param = methodParameters.get(0);
-                                }
-                                // Call the Python injection method
-                                return pythonValueField.invoke(
-                                    "putMember",
-                                    TypeDef.VOID,
-                                    ExpressionDef.constant(beanProperty.getName()),
-                                    param
-                                );
-                            })));
+                        if (isIntrospected) {
+                            addGetter(beanProperty, builder, pythonValue);
                         }
                     }
 
@@ -267,7 +252,51 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         }
     }
 
-    private static StatementDef handlReturnType(ClassElement returnType, ExpressionDef.InvokeInstanceMethod invokedValue) {
+    private static void addGetter(PropertyElement beanProperty, ClassDef.ClassDefBuilder builder, FieldDef pythonValue) {
+        TypeDef propertyType = TypeDef.of(beanProperty.getType());
+        MethodDef.MethodDefBuilder getterBuilder = MethodDef.builder(beanProperty.getName())
+            .returns(propertyType);
+
+        builder.addMethod(getterBuilder.build(((aThis, methodParameters) -> {
+            VariableDef.Field pythonValueField = aThis.field(pythonValue);
+
+            // Get the return type to determine appropriate conversion method
+            var invokedValue = pythonValueField.invoke(
+                "getMember",
+                POLYGLOT_VALUE,
+                ExpressionDef.constant(beanProperty.getName()
+            ));
+
+            return handleReturnType(beanProperty.getType(), invokedValue);
+        })));
+    }
+
+    private static void addSetter(PropertyElement beanProperty, ClassDef.ClassDefBuilder builder, FieldDef pythonValue) {
+        MethodDef.MethodDefBuilder propertySetter = MethodDef
+            .builder(beanProperty.getName())
+            .returns(TypeDef.VOID);
+
+        propertySetter.addParameter(TypeDef.of(beanProperty.getType()));
+
+        builder.addMethod(propertySetter.build(((aThis, methodParameters) -> {
+            VariableDef.Field pythonValueField = aThis.field(pythonValue);
+            ExpressionDef param;
+            if (beanProperty.getType() instanceof PythonClassElement) {
+                param = methodParameters.get(0).invoke("asPolyglotValue", POLYGLOT_VALUE);
+            } else {
+                param = methodParameters.get(0);
+            }
+            // Call the Python injection method
+            return pythonValueField.invoke(
+                "putMember",
+                TypeDef.VOID,
+                ExpressionDef.constant(beanProperty.getName()),
+                param
+            );
+        })));
+    }
+
+    private static StatementDef handleReturnType(ClassElement returnType, ExpressionDef.InvokeInstanceMethod invokedValue) {
         // Choose appropriate conversion method based on return type
         if (returnType.isVoid()) {
             // For void methods, just invoke the Python method without returning
