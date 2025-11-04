@@ -348,4 +348,20 @@ public final class PythonPropertyElement extends AbstractPythonElement implement
     public int hashCode() {
         return Objects.hash(getNativeType().name(), owningType);
     }
+
+    @Override
+    protected AbstractPythonElement copyThis() {
+        return new PythonPropertyElement(
+            propertyDef,
+            environment,
+            declaringType,
+            owningType,
+            getElementAnnotationMetadataFactory()
+        );
+    }
+
+    @Override
+    public PropertyElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
+        return (PropertyElement) super.withAnnotationMetadata(annotationMetadata);
+    }
 }

@@ -16,18 +16,20 @@
 package io.micronaut.python.processing;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import javax.lang.model.element.Modifier;
 
-import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Bean;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Value;
 
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
@@ -55,6 +57,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
     public static final TypeDef POLYGLOT_VALUE = TypeDef.of(Value.class);
     public static final VariableDef.StaticField CLASS_OBJECT = ClassTypeDef.of(Object.class).getStaticField("class", TypeDef.CLASS);
+    public static final String AS_POLYGLOT_VALUE = "asPolyglotValue";
+    public static final String FROM_POLYGLOT_VALUE = "fromPolyglotValue";
+
+    private final Map<String, AbstractPythonClassElement> classElements = new LinkedHashMap<>();
 
     @Override
     public TypeElementQuery query() {
@@ -62,23 +68,52 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     @Override
+    public void finish(VisitorContext visitorContext) {
+        classElements.clear();
+    }
+
+    @Override
     public void visitClass(ClassElement element, VisitorContext context) {
-        if (element instanceof AbstractPythonClassElement) {
+        if (element instanceof AbstractPythonClassElement classElement) {
             SourceGenerator sourceGenerator = SourceGenerators.findByLanguage(VisitorContext.Language.JAVA).orElse(null);
             if (sourceGenerator != null) {
                 try {
+                    if (classElements.containsKey(classElement.getName())) {
+                        return;
+                    }
+
+                    classElements.put(classElement.getName(), classElement);
                     String typeName = element.getName();
                     var builder = ClassDef.builder(typeName);
+
                     builder.addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.ValueCoercible"));
 
                     FieldDef pythonValue = FieldDef.builder("graalpyInternalValue")
                         .ofType(POLYGLOT_VALUE).addModifiers(Modifier.FINAL, Modifier.PRIVATE).build();
                     builder.addField(pythonValue);
 
+                    builder.addMethod(
+                        MethodDef.constructor()
+                            .addParameter(ParameterDef.of("value", POLYGLOT_VALUE))
+                            .build(((aThis, methodParameters) ->
+                                aThis.field(pythonValue).assign(methodParameters.get(0))
+                            )
+                    ));
+
                     // implement asPolygotValue
-                    builder.addMethod(MethodDef.builder("asPolyglotValue")
+                    builder.addMethod(MethodDef.builder(AS_POLYGLOT_VALUE)
                         .addModifiers(Modifier.PUBLIC)
                         .returns(POLYGLOT_VALUE).build(((aThis, methodParameters) -> aThis.field(pythonValue).returning())));
+
+                    // implement static factory
+                    ClassTypeDef thisType = ClassTypeDef.of(typeName);
+                    builder.addMethod(MethodDef.builder(FROM_POLYGLOT_VALUE)
+                        .addModifiers(Modifier.PUBLIC,  Modifier.STATIC)
+                            .addParameter(POLYGLOT_VALUE)
+                        .returns(thisType).build(((aThis, methodParameters) ->
+                            thisType.instantiate(methodParameters).returning()))
+                    );
+
 
                     // Check if there's a primary constructor with parameters for dependency injection
                     var pythonConstructor = element.getPrimaryConstructor().orElse(null);
@@ -107,7 +142,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                     @NonNull ParameterElement parameter = parameters[i];
                                     VariableDef.MethodParameter methodParameter = methodParameters.get(i);
                                     if (parameter.getType() instanceof PythonClassElement) {
-                                        arguments.add(methodParameter.invoke("asPolyglotValue", POLYGLOT_VALUE));
+                                        arguments.add(methodParameter.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE));
                                     } else {
                                         arguments.add(methodParameter);
                                     }
@@ -137,7 +172,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         ElementQuery.ALL_METHODS
                             .onlyAccessible()
                             .onlyInstance()
-                            .annotated(ann -> ann.hasStereotype(Executable.class)));
+                            .annotated(ann -> ann.hasStereotype(Executable.class) ||
+                                ann.hasStereotype(AnnotationUtil.SCOPE) ||
+                                ann.hasStereotype(Bean.class)));
 
 
                     for (MethodElement methodElement : methodsToBridge) {
@@ -176,7 +213,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         ElementQuery.ALL_METHODS
                             .onlyAccessible()
                             .onlyInstance()
-                            .annotated(ann -> ann.hasStereotype("jakarta.inject.Inject")));
+                            .annotated(ann ->
+                                ann.hasStereotype(AnnotationUtil.INJECT)
+                            ));
 
                     // Generate methods for injection
                     for (MethodElement injectionMethod : injectionMethods) {
@@ -203,7 +242,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                     ParameterElement param = injectionMethod.getParameters()[i];
                                     VariableDef.MethodParameter methodParam = methodParameters.get(i);
                                     if (param.getType() instanceof PythonClassElement) {
-                                        parameters.add(methodParam.invoke("asPolyglotValue", POLYGLOT_VALUE));
+                                        parameters.add(methodParam.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE));
                                     } else {
                                         parameters.add(methodParam);
                                     }
@@ -252,7 +291,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         }
     }
 
-    private static void addGetter(PropertyElement beanProperty, ClassDef.ClassDefBuilder builder, FieldDef pythonValue) {
+    private void addGetter(PropertyElement beanProperty, ClassDef.ClassDefBuilder builder, FieldDef pythonValue) {
         TypeDef propertyType = TypeDef.of(beanProperty.getType());
         MethodDef.MethodDefBuilder getterBuilder = MethodDef.builder(beanProperty.getName())
             .returns(propertyType);
@@ -282,7 +321,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             VariableDef.Field pythonValueField = aThis.field(pythonValue);
             ExpressionDef param;
             if (beanProperty.getType() instanceof PythonClassElement) {
-                param = methodParameters.get(0).invoke("asPolyglotValue", POLYGLOT_VALUE);
+                param = methodParameters.get(0).invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE);
             } else {
                 param = methodParameters.get(0);
             }
@@ -296,7 +335,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         })));
     }
 
-    private static StatementDef handleReturnType(ClassElement returnType, ExpressionDef.InvokeInstanceMethod invokedValue) {
+    private StatementDef handleReturnType(ClassElement returnType, ExpressionDef.InvokeInstanceMethod invokedValue) {
         // Choose appropriate conversion method based on return type
         if (returnType.isVoid()) {
             // For void methods, just invoke the Python method without returning
@@ -359,8 +398,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                 invokedValue, genericType)
                             .returning();
                     } else {
-                        // For unknown types, convert to string as fallback
-                        yield invokedValue.invoke("asString", ClassTypeDef.STRING).returning();
+                        if (this.classElements.containsKey(returnType.getName())) {
+                            yield ClassTypeDef.of(returnType)
+                                .invokeStatic(FROM_POLYGLOT_VALUE, POLYGLOT_VALUE, invokedValue)
+                                .returning();
+                        } else {
+                            // For unknown types, convert to string as fallback
+                            yield invokedValue.invoke("asString", ClassTypeDef.STRING).returning();
+                        }
                     }
                 }
             };

@@ -19,12 +19,17 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
+import io.micronaut.annotation.processing.visitor.ElementProvider;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.python.processing.util.GraalPyUtil;
+import org.jetbrains.annotations.Nullable;
+
+import javax.lang.model.element.Element;
 
 /**
  * Represents a Python method/function as a Micronaut {@link MethodElement}.
@@ -38,7 +43,7 @@ import io.micronaut.python.processing.util.GraalPyUtil;
  * @see FunctionDef
  * @see <a href="https://docs.python.org/3/library/ast.html#ast.FunctionDef">Python AST FunctionDef</a>
  */
-public sealed class PythonMethodElement extends AbstractPythonElement implements MethodElement permits PythonConstructorElement {
+public sealed class PythonMethodElement extends AbstractPythonElement implements MethodElement, ElementProvider permits PythonConstructorElement {
     private final PythonProcessingEnvironment environment;
     private final AbstractPythonClassElement declaringType;
     private final AbstractPythonClassElement owningType;
@@ -199,5 +204,26 @@ public sealed class PythonMethodElement extends AbstractPythonElement implements
     @Override
     public int hashCode() {
         return Objects.hash(getNativeType().name(), owningType);
+    }
+
+    @Override
+    protected AbstractPythonElement copyThis() {
+        return new PythonMethodElement(
+            getNativeType(),
+            environment,
+            declaringType,
+            owningType,
+            getElementAnnotationMetadataFactory()
+        );
+    }
+
+    @Override
+    public MethodElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
+        return (MethodElement) super.withAnnotationMetadata(annotationMetadata);
+    }
+
+    @Override
+    public @Nullable Element element() {
+        return environment.originatingElement();
     }
 }

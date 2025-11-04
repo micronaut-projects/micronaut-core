@@ -17,6 +17,7 @@ package io.micronaut.python.processing.visitor;
 
 import java.util.Objects;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.annotation.AbstractAnnotationElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
@@ -29,6 +30,31 @@ abstract sealed class AbstractPythonElement extends AbstractAnnotationElement im
         super(metadataFactory);
         this.name = name;
         this.nativeType = nativeType;
+    }
+
+    /**
+     * @return copy of this element
+     */
+    protected abstract AbstractPythonElement copyThis();
+
+    /**
+     * @param element the values to be copied to
+     */
+    protected void copyValues(AbstractPythonElement element) {
+        element.presetAnnotationMetadata = presetAnnotationMetadata;
+    }
+
+    protected final AbstractPythonElement makeCopy() {
+        AbstractPythonElement element = copyThis();
+        copyValues(element);
+        return element;
+    }
+
+    @Override
+    public io.micronaut.inject.ast.Element withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
+        AbstractPythonElement abstractPythonElement = makeCopy();
+        abstractPythonElement.presetAnnotationMetadata = annotationMetadata;
+        return abstractPythonElement;
     }
 
     @Override
