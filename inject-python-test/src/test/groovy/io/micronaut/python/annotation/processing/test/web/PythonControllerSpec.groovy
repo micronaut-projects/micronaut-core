@@ -10,10 +10,10 @@ class PythonControllerSpec extends AbstractPythonTypeElementSpec {
     void "test python controller"() {
         given:
         def context = buildContext('''
-from jakarta.inject import Singleton
+from jakarta.inject import Singleton as S
 from io.micronaut.http.annotation import Controller, Get
 
-@Singleton
+@S
 class MessageService:
     def say_hello(self, name : str) -> str:
         return f"Hello {name}"

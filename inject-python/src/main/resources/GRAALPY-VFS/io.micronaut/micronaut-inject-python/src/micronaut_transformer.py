@@ -72,7 +72,7 @@ class MicronautTransformer(ast.NodeTransformer):
                     transformed_any = True
             else:
                 # Handle specific imports
-                if self._handle_specific_import(node.module, alias.name):
+                if self._handle_specific_import(node.module, alias):
                     transformed_any = True
 
         # If any imports were transformed, remove this import statement from the AST
@@ -128,17 +128,20 @@ def micronaut_annotation(name, repeated=None):
 
         return node
 
-    def _handle_specific_import(self, module_name: str, import_name: str) -> bool:
+    def _handle_specific_import(self, module_name: str, alias) -> bool:
         """
-        Handle specific imports like 'from jakarta.inject import Singleton'
+        Handle specific imports like 'from jakarta.inject import Singleton' or 'from jakarta.inject import Singleton as S'
         Returns True if the import was transformed.
         """
+        import_name = alias.name  # The actual name being imported (e.g., "Singleton")
+        decorator_name = alias.asname if alias.asname else alias.name  # The name to use for the decorator (e.g., "S" or "Singleton")
+
         full_name = f"{module_name}.{import_name}"
 
         # Try to get the ClassElement
         class_element = self.callback_get_class_element(full_name)
         if class_element:
-            decorator_code = self._generate_decorator_from_class_element(class_element, import_name)
+            decorator_code = self._generate_decorator_from_class_element(class_element, decorator_name)
             if decorator_code:
                 self.transformed_code.append(decorator_code)
                 return True
@@ -150,7 +153,7 @@ def micronaut_annotation(name, repeated=None):
                 alt_full_name = f"{module_name}.{alt_name}"
                 class_element = self.callback_get_class_element(alt_full_name)
                 if class_element:
-                    decorator_code = self._generate_decorator_from_class_element(class_element, import_name)
+                    decorator_code = self._generate_decorator_from_class_element(class_element, decorator_name)
                     if decorator_code:
                         self.transformed_code.append(decorator_code)
                         return True
