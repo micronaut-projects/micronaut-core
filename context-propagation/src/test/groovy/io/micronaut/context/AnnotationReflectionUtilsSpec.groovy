@@ -42,7 +42,8 @@ class AnnotationReflectionUtilsSpec extends Specification {
 
         then:
             argument.type == Consumer
-            argument.annotationMetadata.annotationNames.isEmpty()
+            argument.annotationMetadata.annotationNames.size() == 1
+            argument.annotationMetadata.annotationNames[0] == "io.micronaut.context.MyTypeUseAnnotation"
             argument.getTypeVariable("T").get().type == String
             argument.getTypeVariable("T").get().annotationMetadata.annotationNames.toList() == ["io.micronaut.core.annotation.Nullable"]
     }

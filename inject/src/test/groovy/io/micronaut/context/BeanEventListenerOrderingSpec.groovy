@@ -1,7 +1,7 @@
 package io.micronaut.context
 
+
 import io.micronaut.context.annotation.Bean
-import io.micronaut.context.annotation.Context
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.event.BeanCreatedEvent
 import io.micronaut.context.event.BeanCreatedEventListener
@@ -67,9 +67,20 @@ class BeanEventListenerOrderingSpec extends Specification {
 
     static List<OrderedBean> ON_CREATION_CALLBACKS = new ArrayList<>(10);
 
-    static interface OrderedBean extends BeanCreatedEventListener<DummyBean> {
+    // Converted to trait as a workaround to Groovy 5 compiler bug
+    // java.lang.IncompatibleClassChangeError: Found interface io.micronaut.context.BeanEventListenerOrderingSpec$OrderedBean, but class was expected
+    //	at io.micronaut.context.DefaultBeanContext.triggerBeanCreatedEventListener(DefaultBeanContext.java:2246)
+    //	at io.micronaut.context.DefaultBeanContext.postBeanCreated(DefaultBeanContext.java:2213)
+    //	at io.micronaut.context.DefaultBeanContext.createRegistration(DefaultBeanContext.java:2888)
+    //	at io.micronaut.context.DefaultBeanContext.resolveBeanRegistration(DefaultBeanContext.java:2761)
+    //	at io.micronaut.context.DefaultBeanContext.resolveBeanRegistration(DefaultBeanContext.java:2492)
+    //	at io.micronaut.context.DefaultBeanContext.getBean(DefaultBeanContext.java:1685)
+    //	at io.micronaut.context.DefaultBeanContext.getBean(DefaultBeanContext.java:814)
+    //	at io.micronaut.context.DefaultBeanContext.getBean(DefaultBeanContext.java:806)
+    //	at io.micronaut.context.BeanEventListenerOrderingSpec.test order(BeanEventListenerOrderingSpec.groovy:34)
+    static trait OrderedBean implements BeanCreatedEventListener<DummyBean> {
         @Override
-        default DummyBean onCreated(@NonNull BeanCreatedEvent<DummyBean> event) {
+        DummyBean onCreated(@NonNull BeanCreatedEvent<DummyBean> event) {
             // Verify the ordering of event listener beans when the type is the same.
             ON_CREATION_CALLBACKS.add(this);
             return event.getBean();

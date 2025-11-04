@@ -34,7 +34,7 @@ class MyRepoIntroductionSpec extends Specification {
             def interceptorDeclaredMethods = Arrays.stream(bean.getClass().getMethods()).filter(m -> m.getDeclaringClass() == bean.getClass()).collect(Collectors.toList())
             def repoDeclaredMethods = Arrays.stream(MyRepo.class.getMethods()).filter(m -> m.getDeclaringClass() == MyRepo.class).collect(Collectors.toList())
         then:
-            repoDeclaredMethods.size() == 3 // Groovy will exclude overridden methods (Java would have 4)
+            repoDeclaredMethods.size() == 4
             interceptorDeclaredMethods.size() == 3 // We need to intercept overridden methods
             bean.getClass().getName().contains("Intercepted")
             MyRepoIntroducer.EXECUTED_METHODS.isEmpty()

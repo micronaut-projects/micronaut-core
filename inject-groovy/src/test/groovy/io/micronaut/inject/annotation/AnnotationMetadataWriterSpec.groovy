@@ -482,7 +482,8 @@ class Test {
         AnnotationMetadata toWrite = buildTypeAnnotationMetadata("test.Test",'''\
 package test;
 
-@io.micronaut.inject.annotation.MyAnnotation
+// Groovy 5 no longer defaults to null but fails compilation if required annotation isn' set
+@io.micronaut.inject.annotation.MyAnnotation(intArray3=[], stringArray4 = [], boolArray4 = [], myEnumArray4 = [])
 class Test {
 }
 

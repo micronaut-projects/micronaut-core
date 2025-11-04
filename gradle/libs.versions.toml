@@ -55,7 +55,7 @@ selenium = "4.27.0"
 okio = "3.9.1"
 slf4j = "2.0.17"
 smallrye = "6.9.2"
-spock = "2.3-groovy-4.0"
+spock = "2.4-groovy-5.0-SNAPSHOT"
 spotbugs = "4.9.6"
 systemlambda = "1.2.1"
 testcontainers = "1.21.3"
@@ -72,7 +72,7 @@ junit4 = "4.13.2"
 # Versions which start with managed- are managed by Micronaut in the sense
 # that they will appear in the Micronaut BOM as <properties>
 #
-managed-groovy = "4.0.28"
+managed-groovy = "5.0.2"
 managed-jakarta-annotation-api = "2.1.1"
 managed-jackson = "2.19.2"
 managed-kotlin = "2.2.21"

@@ -855,7 +855,9 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
 
         private boolean isNonAbstract(ClassNode classNode, MethodNode methodNode) {
             if (methodNode.isDefault()) {
-                return false;
+                // Groovy 4.x used to implement default methods via traits, which caused
+                // MethodNode for default methods on interfaces to have default = false
+                return true;
             }
             if (methodNode.isPrivate() && classNode.isInterface()) {
                 return true;

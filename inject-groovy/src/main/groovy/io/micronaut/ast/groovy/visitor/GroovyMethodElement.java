@@ -157,7 +157,7 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
 
     @Override
     public boolean isAbstract() {
-        return methodNode.isAbstract();
+        return methodNode.isDefault() ? false : methodNode.isAbstract();
     }
 
     @Override
