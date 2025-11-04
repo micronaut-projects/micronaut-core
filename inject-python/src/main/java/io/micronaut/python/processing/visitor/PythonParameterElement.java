@@ -17,6 +17,7 @@ package io.micronaut.python.processing.visitor;
 
 import java.util.Objects;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
@@ -88,5 +89,20 @@ public final class PythonParameterElement extends AbstractPythonElement implemen
     @Override
     public java.util.Optional<String> getDocumentation(boolean parseContent) {
         return java.util.Optional.ofNullable(getNativeType().documentation());
+    }
+
+    @Override
+    protected AbstractPythonElement copyThis() {
+        return new PythonParameterElement(
+            getNativeType(),
+            environment,
+            methodElement,
+            getElementAnnotationMetadataFactory()
+        );
+    }
+
+    @Override
+    public ParameterElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
+        return (ParameterElement) super.withAnnotationMetadata(annotationMetadata);
     }
 }

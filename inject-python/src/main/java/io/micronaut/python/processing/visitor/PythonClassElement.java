@@ -32,6 +32,11 @@ public final class PythonClassElement extends AbstractPythonClassElement {
         super(classDef, environment, arrayDimensions);
     }
 
+    @Override
+    protected AbstractPythonElement copyThis() {
+        return new PythonClassElement(getNativeType(), environment, arrayDimensions);
+    }
+
     public boolean isPythonSource() {
         return environment.classes().containsKey(getNativeType().name());
     }
@@ -85,5 +90,4 @@ public final class PythonClassElement extends AbstractPythonClassElement {
         }
         return Optional.empty();
     }
-
 }

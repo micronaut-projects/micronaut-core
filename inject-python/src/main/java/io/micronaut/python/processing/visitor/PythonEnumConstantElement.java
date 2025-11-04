@@ -17,6 +17,7 @@ package io.micronaut.python.processing.visitor;
 
 import java.util.Objects;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.EnumConstantElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
@@ -115,5 +116,21 @@ public final class PythonEnumConstantElement extends AbstractPythonElement imple
         // For enum constants, we might want to return the Python value directly
         // or convert it to a suitable Java representation
         return pythonValue;
+    }
+
+    @Override
+    protected AbstractPythonElement copyThis() {
+        return new PythonEnumConstantElement(
+            getNativeType(),
+            declaringType.environment,
+            declaringType,
+            owningType,
+            getElementAnnotationMetadataFactory()
+        );
+    }
+
+    @Override
+    public EnumConstantElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
+        return (EnumConstantElement) super.withAnnotationMetadata(annotationMetadata);
     }
 }

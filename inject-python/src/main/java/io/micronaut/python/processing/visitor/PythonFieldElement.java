@@ -19,6 +19,7 @@ import java.util.Objects;
 
 import org.graalvm.polyglot.Value;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
@@ -167,5 +168,21 @@ public final class PythonFieldElement extends AbstractPythonElement implements F
     @Override
     public int hashCode() {
         return Objects.hash(getNativeType().name(), owningType);
+    }
+
+    @Override
+    protected AbstractPythonElement copyThis() {
+        return new PythonFieldElement(
+            getNativeType(),
+            environment,
+            declaringType,
+            owningType,
+            getElementAnnotationMetadataFactory()
+        );
+    }
+
+    @Override
+    public FieldElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
+        return (FieldElement) super.withAnnotationMetadata(annotationMetadata);
     }
 }

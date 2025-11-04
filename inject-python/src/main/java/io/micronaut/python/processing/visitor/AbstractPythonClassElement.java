@@ -24,7 +24,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import io.micronaut.annotation.processing.visitor.ElementProvider;
-import io.micronaut.context.annotation.BeanProperties;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.ast.ArrayableClassElement;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
@@ -426,5 +426,13 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
             }
             throw new IllegalStateException("Unknown native type: " + nativeType.getClass());
         }
+    }
+
+    @Override
+    protected abstract AbstractPythonElement copyThis();
+
+    @Override
+    public ClassElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
+        return (ClassElement) super.withAnnotationMetadata(annotationMetadata);
     }
 }

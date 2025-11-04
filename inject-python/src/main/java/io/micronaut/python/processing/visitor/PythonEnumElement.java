@@ -88,6 +88,11 @@ public final class PythonEnumElement extends AbstractPythonClassElement implemen
     }
 
     @Override
+    protected AbstractPythonElement copyThis() {
+        return new PythonEnumElement(getNativeType(), environment, arrayDimensions);
+    }
+
+    @Override
     public boolean isAssignable(String type) {
         return getName().equals(type);
     }
