@@ -3,6 +3,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     id("io.micronaut.build.internal.convention-library")
+    id("io.micronaut.build.internal.kotlin-base")
     alias(libs.plugins.managed.kotlin.jvm)
     alias(libs.plugins.managed.ksp)
 }
@@ -84,14 +85,5 @@ tasks {
         maxHeapSize = "3G"
         forkEvery = 40
         maxParallelForks = 4
-    }
-}
-java {
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
-}
-kotlin {
-    compilerOptions {
-        jvmTarget = JvmTarget.JVM_21
     }
 }

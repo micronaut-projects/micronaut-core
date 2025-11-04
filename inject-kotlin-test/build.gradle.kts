@@ -1,5 +1,6 @@
 plugins {
     id("io.micronaut.build.internal.convention-library")
+    id("io.micronaut.build.internal.kotlin-base")
     alias(libs.plugins.managed.kotlin.jvm)
 }
 
@@ -23,12 +24,6 @@ dependencies {
 }
 
 tasks {
-    compileKotlin {
-        compilerOptions {
-            jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21
-        }
-    }
-
     compileGroovy {
         // this allows groovy to access kotlin classes.
         classpath += files(compileKotlin.flatMap { k -> k.destinationDirectory })

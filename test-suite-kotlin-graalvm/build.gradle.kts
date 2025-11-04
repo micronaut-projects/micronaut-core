@@ -1,6 +1,7 @@
 plugins {
     id("io.micronaut.build.internal.convention-test-library")
     id("org.graalvm.buildtools.native")
+    id("io.micronaut.build.internal.kotlin-base")
     alias(libs.plugins.managed.kotlin.jvm)
     alias(libs.plugins.managed.ksp)
 }
@@ -63,11 +64,5 @@ configurations {
     nativeImageTestClasspath {
         exclude(group = "org.apache.groovy")
         exclude(group = "org.spockframework")
-    }
-}
-
-kotlin {
-    compilerOptions {
-        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21
     }
 }

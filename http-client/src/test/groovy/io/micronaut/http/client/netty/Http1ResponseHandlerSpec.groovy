@@ -308,7 +308,7 @@ class Http1ResponseHandlerSpec extends Specification {
         }
     }
 
-    private static final class SimpleListener implements Http1ResponseHandler.ResponseListener {
+    private static class SimpleListener implements Http1ResponseHandler.ResponseListener {
         HttpResponse response
         CloseableByteBody body
 

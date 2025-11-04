@@ -1,5 +1,6 @@
 plugins {
     id("io.micronaut.build.internal.convention-test-library")
+    id("io.micronaut.build.internal.kotlin-base")
     alias(libs.plugins.managed.kotlin.jvm)
     alias(libs.plugins.managed.ksp)
     alias(libs.plugins.managed.kotlin.allopen)
@@ -61,9 +62,3 @@ ksp {
     arg("kotlin.allopen.annotations", "io.micronaut.docs.aop.around.OpenSingleton|io.micronaut.docs.aop.around.AnotherOpenSingleton")
 }
 // end::ksp[]
-
-kotlin {
-    compilerOptions {
-        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21
-    }
-}

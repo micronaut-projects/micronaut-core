@@ -1,5 +1,6 @@
 plugins {
     id("io.micronaut.build.internal.convention-library")
+    id("io.micronaut.build.internal.kotlin-base")
     alias(libs.plugins.managed.kotlin.jvm)
 }
 
@@ -27,14 +28,6 @@ dependencies {
     testImplementation(libs.junit.jupiter.params)
     testImplementation(libs.micronaut.test.junit5) {
         exclude(group= "io.micronaut")
-    }
-}
-
-tasks {
-    compileKotlin {
-        compilerOptions {
-            jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21
-        }
     }
 }
 

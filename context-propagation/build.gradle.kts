@@ -1,5 +1,6 @@
 plugins {
     id("io.micronaut.build.internal.convention-library")
+    id("io.micronaut.build.internal.kotlin-base")
     alias(libs.plugins.managed.kotlin.jvm)
     alias(libs.plugins.managed.kotlin.kapt)
 }
@@ -67,20 +68,4 @@ dependencies {
     testImplementation(libs.managed.kotlin.stdlib.jdk8)
     testImplementation(libs.managed.kotlinx.coroutines.core)
     testImplementation(libs.managed.kotlinx.coroutines.reactor)
-}
-
-tasks {
-    compileKotlin {
-        compilerOptions {
-            jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21
-        }
-    }
-}
-
-tasks {
-    compileTestKotlin {
-        compilerOptions {
-            jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21
-        }
-    }
 }

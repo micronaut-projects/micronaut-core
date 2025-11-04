@@ -1,5 +1,6 @@
 plugins {
     id("io.micronaut.build.internal.convention-test-library")
+    id("io.micronaut.build.internal.kotlin-base")
     alias(libs.plugins.managed.kotlin.jvm)
     alias(libs.plugins.managed.ksp)
 }
@@ -86,11 +87,5 @@ configurations.all {
 tasks {
     test {
         useJUnitPlatform()
-    }
-}
-
-kotlin {
-    compilerOptions {
-        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21
     }
 }
