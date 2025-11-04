@@ -166,7 +166,7 @@ abstract class AbstractPythonTypeElementSpec extends Specification {
      * @param pythonCode The Python source code to process
      * @return The context. Should be shutdown after use
      */
-    ApplicationContext buildContext(String pythonCode, boolean includeAllBeans = false, Map properties = [:]) {
+    ApplicationContext buildContext(@Language("python") String pythonCode, boolean includeAllBeans = false, Map properties = [:]) {
         // Ensure ContextHolder is clean before starting
         ContextHolder.resetContext()
         assert !ContextHolder.isInitialized()
