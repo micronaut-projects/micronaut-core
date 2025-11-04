@@ -11,6 +11,6 @@ public class Message {
         class BuilderParentImpl {
         }
 
-        private Builder<BuilderT>.BuilderParentImpl meAsParent;
+        private BuilderParentImpl meAsParent;
     }
 }

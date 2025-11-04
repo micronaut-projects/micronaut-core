@@ -26,12 +26,10 @@ import io.micronaut.runtime.context.env.ConfigurationAdvice
 import jakarta.validation.Valid
 import spock.lang.PendingFeature
 
-import static io.micronaut.annotation.processing.test.KotlinCompiler.buildContext
-
 class ClassElementSpec extends AbstractKotlinCompilerSpec {
 
     void "test Java Record compile"() {
-        def ce  = buildClassElementJava('test.Product2', '''
+        def ce = buildClassElementJava('test.Product2', '''
 package test;
 
 record Product2(Double price, String name) {
@@ -51,7 +49,7 @@ record Product2(Double price, String name) {
     }
 
     void "test Java annotations"() {
-        def ce  = buildClassElementJava('test.Product', '''
+        def ce = buildClassElementJava('test.Product', '''
 package test;
 
 class Product {
@@ -84,7 +82,7 @@ class Product {
     }
 
     void "test Java Bean compile"() {
-        def ce  = buildClassElementJava('test.Product', '''
+        def ce = buildClassElementJava('test.Product', '''
 package test;
 
 class Product {
@@ -122,14 +120,14 @@ class Product {
     void "test visit enum"() {
 
         given:
-        AllElementsVisitor.VISITED_CLASS_ELEMENTS.clear()
-        AllElementsVisitor.VISITED_ELEMENTS.clear()
-        AllElementsVisitor.VISITED_METHOD_ELEMENTS.clear()
-        AllElementsVisitor.WRITE_FILE = true
-        AllElementsVisitor.WRITE_IN_METAINF = true
+            AllElementsVisitor.VISITED_CLASS_ELEMENTS.clear()
+            AllElementsVisitor.VISITED_ELEMENTS.clear()
+            AllElementsVisitor.VISITED_METHOD_ELEMENTS.clear()
+            AllElementsVisitor.WRITE_FILE = true
+            AllElementsVisitor.WRITE_IN_METAINF = true
 
         when:
-        def definition = buildBeanDefinition('test.MyBean', '''
+            def definition = buildBeanDefinition('test.MyBean', '''
 package test
 
 import io.micronaut.core.annotation.*
@@ -154,29 +152,29 @@ class HelloController {
 class MyBean {}
 ''')
         then:
-        definition
+            definition
 
-        AllElementsVisitor.VISITED_CLASS_ELEMENTS.size() == 3
-        def enumEl = AllElementsVisitor.VISITED_CLASS_ELEMENTS.find {
-            it.name == 'test.HelloController$Channel'
-        }
+            AllElementsVisitor.VISITED_CLASS_ELEMENTS.size() == 3
+            def enumEl = AllElementsVisitor.VISITED_CLASS_ELEMENTS.find {
+                it.name == 'test.HelloController$Channel'
+            }
 
-        enumEl
-        def enmConsts = ((KotlinEnumElement) enumEl).elements()
-        enmConsts
-        enmConsts.size() == 2
-        enmConsts.find {
-            it.name == "SYSTEM1"
-        } != null
-        enmConsts.find {
-            it.name == "SYSTEM2"
-        } != null
+            enumEl
+            def enmConsts = ((KotlinEnumElement) enumEl).elements()
+            enmConsts
+            enmConsts.size() == 2
+            enmConsts.find {
+                it.name == "SYSTEM1"
+            } != null
+            enmConsts.find {
+                it.name == "SYSTEM2"
+            } != null
     }
 
     void "test interface native properties"() {
 
         when:
-        def nativeProps = buildClassElementMapped('test.BaseConfiguration', '''
+            def nativeProps = buildClassElementMapped('test.BaseConfiguration', '''
 package test
 
 import io.micronaut.context.annotation.ConfigurationProperties
@@ -198,14 +196,14 @@ interface Other {
 
     void "test visitGeneratedFile"() {
         given:
-        AllElementsVisitor.VISITED_CLASS_ELEMENTS.clear()
-        AllElementsVisitor.VISITED_ELEMENTS.clear()
-        AllElementsVisitor.VISITED_METHOD_ELEMENTS.clear()
-        AllElementsVisitor.WRITE_FILE = true
-        AllElementsVisitor.WRITE_IN_METAINF = false
+            AllElementsVisitor.VISITED_CLASS_ELEMENTS.clear()
+            AllElementsVisitor.VISITED_ELEMENTS.clear()
+            AllElementsVisitor.VISITED_METHOD_ELEMENTS.clear()
+            AllElementsVisitor.WRITE_FILE = true
+            AllElementsVisitor.WRITE_IN_METAINF = false
 
         when:
-        def definition = buildBeanDefinition('test.visit.Test', '''
+            def definition = buildBeanDefinition('test.visit.Test', '''
 package test.visit
 
  import jakarta.inject.Singleton
@@ -218,24 +216,24 @@ class Test {
 ''')
 
         then:
-        AllElementsVisitor.VISITED_CLASS_ELEMENTS.size() == 1
-        AllElementsVisitor.VISITED_METHOD_ELEMENTS.size() == 1
-        definition.getClass().getClassLoader().getResource("foo/bar.txt").text == 'All good'
+            AllElementsVisitor.VISITED_CLASS_ELEMENTS.size() == 1
+            AllElementsVisitor.VISITED_METHOD_ELEMENTS.size() == 1
+            definition.getClass().getClassLoader().getResource("foo/bar.txt").text == 'All good'
 
         cleanup:
-        AllElementsVisitor.WRITE_FILE == false
+            AllElementsVisitor.WRITE_FILE == false
     }
 
     void "test visitGeneratedFile META-INF"() {
         given:
-        AllElementsVisitor.VISITED_CLASS_ELEMENTS.clear()
-        AllElementsVisitor.VISITED_ELEMENTS.clear()
-        AllElementsVisitor.VISITED_METHOD_ELEMENTS.clear()
-        AllElementsVisitor.WRITE_FILE = true
-        AllElementsVisitor.WRITE_IN_METAINF = true
+            AllElementsVisitor.VISITED_CLASS_ELEMENTS.clear()
+            AllElementsVisitor.VISITED_ELEMENTS.clear()
+            AllElementsVisitor.VISITED_METHOD_ELEMENTS.clear()
+            AllElementsVisitor.WRITE_FILE = true
+            AllElementsVisitor.WRITE_IN_METAINF = true
 
         when:
-        def definition = buildBeanDefinition('test.visit.Test', '''
+            def definition = buildBeanDefinition('test.visit.Test', '''
 package test.visit
 
  import jakarta.inject.Singleton
@@ -248,18 +246,18 @@ class Test {
 ''')
 
         then:
-        AllElementsVisitor.VISITED_CLASS_ELEMENTS.size() == 1
-        AllElementsVisitor.VISITED_METHOD_ELEMENTS.size() == 1
-        definition.getClass().getClassLoader().getResource("META-INF/foo/bar.txt").text == 'All good'
+            AllElementsVisitor.VISITED_CLASS_ELEMENTS.size() == 1
+            AllElementsVisitor.VISITED_METHOD_ELEMENTS.size() == 1
+            definition.getClass().getClassLoader().getResource("META-INF/foo/bar.txt").text == 'All good'
 
         cleanup:
-        AllElementsVisitor.WRITE_FILE == false
-        AllElementsVisitor.WRITE_IN_METAINF = false
+            AllElementsVisitor.WRITE_FILE == false
+            AllElementsVisitor.WRITE_IN_METAINF = false
     }
 
     void "test class element"() {
         expect:
-        buildClassElement('ast.test.Test', '''
+            buildClassElement('ast.test.Test', '''
 package ast.test
 
 import java.lang.IllegalStateException
@@ -345,115 +343,116 @@ interface One
 interface Two
 interface Three
 ''') { ClassElement classElement ->
-            List<ConstructorElement> constructorElements = classElement.getEnclosedElements(ElementQuery.CONSTRUCTORS)
-            List<ClassElement> allInnerClasses = classElement.getEnclosedElements(ElementQuery.ALL_INNER_CLASSES)
-            List<ClassElement> declaredInnerClasses = classElement.getEnclosedElements(ElementQuery.ALL_INNER_CLASSES.onlyDeclared())
-            List<PropertyElement> propertyElements = classElement.getBeanProperties()
-            List<PropertyElement> syntheticProperties = classElement.getSyntheticBeanProperties()
-            List<MethodElement> methodElements = classElement.getEnclosedElements(ElementQuery.ALL_METHODS)
-            List<MethodElement> declaredMethodElements = classElement.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared())
-            List<MethodElement> includeOverridden = classElement.getEnclosedElements(ElementQuery.ALL_METHODS.includeOverriddenMethods())
-            Map<String, MethodElement> methodMap = methodElements.collectEntries {
-                [it.name, it]
-            }
-            Map<String, MethodElement> declaredMethodMap = declaredMethodElements.collectEntries {
-                [it.name, it]
-            }
-            Map<String, PropertyElement> propMap = propertyElements.collectEntries {
-                [it.name, it]
-            }
-            Map<String, PropertyElement> synthPropMap = syntheticProperties.collectEntries {
-                [it.name, it]
-            }
-            Map<String, ClassElement> declaredInnerMap = declaredInnerClasses.collectEntries {
-                [it.simpleName, it]
-            }
-            Map<String, ClassElement> innerMap = allInnerClasses.collectEntries {
-                [it.simpleName, it]
-            }
+                List<ConstructorElement> constructorElements = classElement.getEnclosedElements(ElementQuery.CONSTRUCTORS)
+                List<ClassElement> allInnerClasses = classElement.getEnclosedElements(ElementQuery.ALL_INNER_CLASSES)
+                List<ClassElement> declaredInnerClasses = classElement.getEnclosedElements(ElementQuery.ALL_INNER_CLASSES.onlyDeclared())
+                List<PropertyElement> propertyElements = classElement.getBeanProperties()
+                List<PropertyElement> syntheticProperties = classElement.getSyntheticBeanProperties()
+                List<MethodElement> methodElements = classElement.getEnclosedElements(ElementQuery.ALL_METHODS)
+                List<MethodElement> declaredMethodElements = classElement.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared())
+                List<MethodElement> includeOverridden = classElement.getEnclosedElements(ElementQuery.ALL_METHODS.includeOverriddenMethods())
+                Map<String, MethodElement> methodMap = methodElements.collectEntries {
+                    [it.name, it]
+                }
+                Map<String, MethodElement> declaredMethodMap = declaredMethodElements.collectEntries {
+                    [it.name, it]
+                }
+                Map<String, PropertyElement> propMap = propertyElements.collectEntries {
+                    [it.name, it]
+                }
+                Map<String, PropertyElement> synthPropMap = syntheticProperties.collectEntries {
+                    [it.name, it]
+                }
+                Map<String, ClassElement> declaredInnerMap = declaredInnerClasses.collectEntries {
+                    [it.simpleName, it]
+                }
+                Map<String, ClassElement> innerMap = allInnerClasses.collectEntries {
+                    [it.simpleName, it]
+                }
 
-            def overridden = includeOverridden.find { it.declaringType.simpleName == 'Parent' && it.name == 'publicFunc' }
+                def overridden = includeOverridden.find { it.declaringType.simpleName == 'Parent' && it.name == 'publicFunc' }
 
-            assert classElement != null
-            assert classElement.interfaces*.simpleName as Set == ['One', "Two"] as Set
-            assert methodElements != null
-            assert !classElement.isAbstract()
-            assert classElement.name == 'ast.test.Test'
-            assert !classElement.isPrivate()
-            assert classElement.isPublic()
-            assert classElement.modifiers == [ElementModifier.FINAL, ElementModifier.PUBLIC] as Set
-            assert constructorElements.size() == 1
-            assert constructorElements[0].parameters.size() == 3
-            assert classElement.superType.isPresent()
-            assert classElement.superType.get().simpleName == 'Parent'
-            assert !classElement.superType.get().getSuperType().isPresent()
-            assert propertyElements.size() == 7
-            assert propMap.size() == 7
-            assert synthPropMap.size() == 6
-            assert methodElements.size() == 8
-            assert includeOverridden.size() == 9
-            assert declaredMethodElements.size() == 7
-            assert propMap.keySet() == ['conventionProp', 'publicReadOnlyProp', 'protectedReadOnlyProp', 'publicReadWriteProp', 'protectedReadWriteProp', 'publicConstructorReadOnly', 'protectedConstructorReadOnly'] as Set
-            assert synthPropMap.keySet() == ['publicReadOnlyProp', 'protectedReadOnlyProp', 'publicReadWriteProp', 'protectedReadWriteProp', 'publicConstructorReadOnly', 'protectedConstructorReadOnly'] as Set
-            // inner classes
-            assert allInnerClasses.size() == 4
-            assert declaredInnerClasses.size() == 3
-            assert !declaredInnerMap['Test$InnerClass1'].isStatic()
-            assert declaredInnerMap['Test$InnerClass2'].isStatic()
-            assert declaredInnerMap['Test$InnerClass1'].isPublic()
-            assert declaredInnerMap['Test$InnerClass2'].isPublic()
+                assert classElement != null
+                assert classElement.interfaces*.simpleName as Set == ['One', "Two"] as Set
+                assert methodElements != null
+                assert !classElement.isAbstract()
+                assert classElement.name == 'ast.test.Test'
+                assert !classElement.isPrivate()
+                assert classElement.isPublic()
+                assert classElement.modifiers == [ElementModifier.FINAL, ElementModifier.PUBLIC] as Set
+                assert constructorElements.size() == 1
+                assert constructorElements[0].parameters.size() == 3
+                assert classElement.superType.isPresent()
+                assert classElement.superType.get().simpleName == 'Parent'
+                assert !classElement.superType.get().getSuperType().isPresent()
+                assert propertyElements.size() == 7
+                assert propMap.size() == 7
+                assert synthPropMap.size() == 6
+                assert methodElements.size() == 8
+                assert includeOverridden.size() == 9
+                assert declaredMethodElements.size() == 7
+                assert propMap.keySet() == ['conventionProp', 'publicReadOnlyProp', 'protectedReadOnlyProp', 'publicReadWriteProp', 'protectedReadWriteProp', 'publicConstructorReadOnly', 'protectedConstructorReadOnly'] as Set
+                assert synthPropMap.keySet() == ['publicReadOnlyProp', 'protectedReadOnlyProp', 'publicReadWriteProp', 'protectedReadWriteProp', 'publicConstructorReadOnly', 'protectedConstructorReadOnly'] as Set
+                // inner classes
+                assert allInnerClasses.size() == 4
+                assert declaredInnerClasses.size() == 3
+                assert !declaredInnerMap['Test$InnerClass1'].isStatic()
+                assert declaredInnerMap['Test$InnerClass2'].isStatic()
+                assert declaredInnerMap['Test$InnerClass1'].isPublic()
+                assert declaredInnerMap['Test$InnerClass2'].isPublic()
 
-            // read-only public
-            assert propMap['publicReadOnlyProp'].isReadOnly()
-            assert !propMap['publicReadOnlyProp'].isWriteOnly()
-            assert propMap['publicReadOnlyProp'].isPublic()
-            assert propMap['publicReadOnlyProp'].readMethod.isPresent()
-            assert propMap['publicReadOnlyProp'].readMethod.get().isSynthetic()
-            assert !propMap['publicReadOnlyProp'].writeMethod.isPresent()
-            // read/write public property
-            assert !propMap['publicReadWriteProp'].isReadOnly()
-            assert !propMap['publicReadWriteProp'].isWriteOnly()
-            assert propMap['publicReadWriteProp'].isPublic()
-            assert propMap['publicReadWriteProp'].readMethod.isPresent()
-            assert propMap['publicReadWriteProp'].readMethod.get().isSynthetic()
-            assert propMap['publicReadWriteProp'].writeMethod.isPresent()
-            assert propMap['publicReadWriteProp'].writeMethod.get().isSynthetic()
-            // convention prop
-            assert !propMap['conventionProp'].isReadOnly()
-            assert !propMap['conventionProp'].isWriteOnly()
-            assert propMap['conventionProp'].isPublic()
-            assert propMap['conventionProp'].readMethod.isPresent()
-            assert !propMap['conventionProp'].readMethod.get().isSynthetic()
-            assert propMap['conventionProp'].writeMethod.isPresent()
-            assert !propMap['conventionProp'].writeMethod.get().isSynthetic()
+                // read-only public
+                assert propMap['publicReadOnlyProp'].isReadOnly()
+                assert !propMap['publicReadOnlyProp'].isWriteOnly()
+                assert propMap['publicReadOnlyProp'].isPublic()
+                assert propMap['publicReadOnlyProp'].readMethod.isPresent()
+                assert propMap['publicReadOnlyProp'].readMethod.get().isSynthetic()
+                assert !propMap['publicReadOnlyProp'].writeMethod.isPresent()
+                // read/write public property
+                assert !propMap['publicReadWriteProp'].isReadOnly()
+                assert !propMap['publicReadWriteProp'].isWriteOnly()
+                assert propMap['publicReadWriteProp'].isPublic()
+                assert propMap['publicReadWriteProp'].readMethod.isPresent()
+                assert propMap['publicReadWriteProp'].readMethod.get().isSynthetic()
+                assert propMap['publicReadWriteProp'].writeMethod.isPresent()
+                assert propMap['publicReadWriteProp'].writeMethod.get().isSynthetic()
+                // convention prop
+                assert !propMap['conventionProp'].isReadOnly()
+                assert !propMap['conventionProp'].isWriteOnly()
+                assert propMap['conventionProp'].isPublic()
+                assert propMap['conventionProp'].readMethod.isPresent()
+                assert !propMap['conventionProp'].readMethod.get().isSynthetic()
+                assert propMap['conventionProp'].writeMethod.isPresent()
+                assert !propMap['conventionProp'].writeMethod.get().isSynthetic()
 
-            // methods
-            assert methodMap.keySet() == ['publicFunc',  'parentFunc', 'openFunc', 'privateFunc', 'protectedFunc', 'suspendFunc', 'getConventionProp', 'setConventionProp'] as Set
-            assert declaredMethodMap.keySet()  == ['publicFunc', 'openFunc', 'privateFunc', 'protectedFunc', 'suspendFunc', 'getConventionProp', 'setConventionProp'] as Set
-            assert methodMap['suspendFunc'].isSuspend()
-            assert methodMap['suspendFunc'].returnType.name == String.name
-            assert methodMap['suspendFunc'].parameters.size() == 1
-            assert methodMap['suspendFunc'].suspendParameters.size() == 2
-            assert !methodMap['openFunc'].isFinal()
-            assert !methodMap['publicFunc'].isPackagePrivate()
-            assert !methodMap['publicFunc'].isPrivate()
-            assert !methodMap['publicFunc'].isStatic()
-            assert !methodMap['publicFunc'].isReflectionRequired()
-            assert methodMap['publicFunc'].hasParameters()
-            assert methodMap['publicFunc'].thrownTypes.size() == 1
-            assert methodMap['publicFunc'].thrownTypes[0].name == IllegalStateException.name
-            assert methodMap['publicFunc'].isPublic()
-            assert methodMap['publicFunc'].owningType.name == 'ast.test.Test'
-            assert methodMap['publicFunc'].declaringType.name == 'ast.test.Test'
-            assert !methodMap['publicFunc'].isFinal() // should be final? But apparently not
-            assert overridden != null
-            assert methodMap['publicFunc'].overrides(overridden)
-        }
+                // methods
+                assert methodMap.keySet() == ['publicFunc', 'parentFunc', 'openFunc', 'privateFunc', 'protectedFunc', 'suspendFunc', 'getConventionProp', 'setConventionProp'] as Set
+                assert declaredMethodMap.keySet() == ['publicFunc', 'openFunc', 'privateFunc', 'protectedFunc', 'suspendFunc', 'getConventionProp', 'setConventionProp'] as Set
+                assert methodMap['suspendFunc'].isSuspend()
+                assert methodMap['suspendFunc'].returnType.name == String.name
+                assert methodMap['suspendFunc'].parameters.size() == 1
+                assert methodMap['suspendFunc'].suspendParameters.size() == 2
+                assert !methodMap['openFunc'].isFinal()
+                assert !methodMap['publicFunc'].isPackagePrivate()
+                assert !methodMap['publicFunc'].isPrivate()
+                assert !methodMap['publicFunc'].isStatic()
+                assert !methodMap['publicFunc'].isReflectionRequired()
+                assert methodMap['publicFunc'].hasParameters()
+                assert methodMap['publicFunc'].thrownTypes.size() == 1
+                assert methodMap['publicFunc'].thrownTypes[0].name == IllegalStateException.name
+                assert methodMap['publicFunc'].isPublic()
+                assert methodMap['publicFunc'].owningType.name == 'ast.test.Test'
+                assert methodMap['publicFunc'].declaringType.name == 'ast.test.Test'
+                assert !methodMap['publicFunc'].isFinal() // should be final? But apparently not
+                assert overridden != null
+                assert methodMap['publicFunc'].overrides(overridden)
+            }
     }
 
+    @PendingFeature(reason = "https://github.com/google/ksp/issues/2422")
     void "test class element generics"() {
         expect:
-        buildClassElement('ast.test.Test', '''
+            buildClassElement('ast.test.Test', '''
 package ast.test
 
 /**
@@ -522,59 +521,59 @@ interface One<E>
 interface Two
 interface Three
 ''') { ClassElement classElement ->
-            List<ConstructorElement> constructorElements = classElement.getEnclosedElements(ElementQuery.CONSTRUCTORS)
-            List<PropertyElement> propertyElements = classElement.getBeanProperties()
-            List<PropertyElement> syntheticProperties = classElement.getSyntheticBeanProperties()
-            List<MethodElement> methodElements = classElement.getEnclosedElements(ElementQuery.ALL_METHODS)
-            Map<String, MethodElement> methodMap = methodElements.collectEntries {
-                [it.name, it]
+                List<ConstructorElement> constructorElements = classElement.getEnclosedElements(ElementQuery.CONSTRUCTORS)
+                List<PropertyElement> propertyElements = classElement.getBeanProperties()
+                List<PropertyElement> syntheticProperties = classElement.getSyntheticBeanProperties()
+                List<MethodElement> methodElements = classElement.getEnclosedElements(ElementQuery.ALL_METHODS)
+                Map<String, MethodElement> methodMap = methodElements.collectEntries {
+                    [it.name, it]
+                }
+                Map<String, PropertyElement> propMap = propertyElements.collectEntries {
+                    [it.name, it]
+                }
+                Map<String, PropertyElement> syntheticPropMap = syntheticProperties.collectEntries {
+                    [it.name, it]
+                }
+
+                assert classElement.documentation.isPresent()
+                assert methodMap['add'].parameters[1].genericType.simpleName == 'String'
+                assert methodMap['add'].parameters[1].type.simpleName == 'CharSequence'
+                assert methodMap['iterator'].returnType.firstTypeArgument.get().simpleName == 'Object'
+                assert methodMap['iterator'].genericReturnType.firstTypeArgument.get().simpleName == 'String'
+                assert methodMap['stream'].returnType.firstTypeArgument.get().simpleName == 'Object'
+                assert methodMap['stream'].genericReturnType.firstTypeArgument.get().simpleName == 'String'
+                assert propMap['conventionProp'].type.simpleName == 'String'
+                assert propMap['conventionProp'].genericType.simpleName == 'String'
+                assert propMap['conventionProp'].genericType.simpleName == 'String'
+                assert propMap['conventionProp'].readMethod.get().returnType.simpleName == 'CharSequence'
+                assert propMap['conventionProp'].readMethod.get().genericReturnType.simpleName == 'String'
+                assert propMap['conventionProp'].writeMethod.get().parameters[0].type.simpleName == 'CharSequence'
+                assert propMap['conventionProp'].writeMethod.get().parameters[0].genericType.simpleName == 'String'
+
+                assert propMap['parentConstructorProp'].type.simpleName == 'CharSequence'
+                assert propMap['parentConstructorProp'].genericType.simpleName == 'String'
+
+                assert syntheticPropMap['parentConstructorProp'].type.simpleName == 'CharSequence'
+                assert syntheticPropMap['parentConstructorProp'].genericType.simpleName == 'String'
+
+                assert propMap['constructorProp'].type.simpleName == 'String'
+                assert propMap['constructorProp'].genericType.simpleName == 'String'
+
+                assert syntheticPropMap['constructorProp'].type.simpleName == 'String'
+                assert syntheticPropMap['constructorProp'].genericType.simpleName == 'String'
+
+                assert propMap['parentProp'].type.simpleName == 'CharSequence'
+                assert propMap['parentProp'].genericType.simpleName == 'String'
+
+                assert syntheticPropMap['parentProp'].type.simpleName == 'CharSequence'
+                assert syntheticPropMap['parentProp'].genericType.simpleName == 'String'
+
+                assert methodMap['publicFunc'].documentation.isPresent()
+                assert methodMap['parentFunc'].returnType.simpleName == 'CharSequence'
+                assert methodMap['parentFunc'].genericReturnType.simpleName == 'String'
+                assert methodMap['parentFunc'].parameters[0].type.simpleName == 'CharSequence'
+                assert methodMap['parentFunc'].parameters[0].genericType.simpleName == 'String'
             }
-            Map<String, PropertyElement> propMap = propertyElements.collectEntries {
-                [it.name, it]
-            }
-            Map<String, PropertyElement> syntheticPropMap = syntheticProperties.collectEntries {
-                [it.name, it]
-            }
-
-            assert classElement.documentation.isPresent()
-            assert methodMap['add'].parameters[1].genericType.simpleName == 'String'
-            assert methodMap['add'].parameters[1].type.simpleName == 'CharSequence'
-            assert methodMap['iterator'].returnType.firstTypeArgument.get().simpleName == 'Object'
-            assert methodMap['iterator'].genericReturnType.firstTypeArgument.get().simpleName == 'String'
-            assert methodMap['stream'].returnType.firstTypeArgument.get().simpleName == 'Object'
-            assert methodMap['stream'].genericReturnType.firstTypeArgument.get().simpleName == 'String'
-            assert propMap['conventionProp'].type.simpleName == 'String'
-            assert propMap['conventionProp'].genericType.simpleName == 'String'
-            assert propMap['conventionProp'].genericType.simpleName == 'String'
-            assert propMap['conventionProp'].readMethod.get().returnType.simpleName == 'CharSequence'
-            assert propMap['conventionProp'].readMethod.get().genericReturnType.simpleName == 'String'
-            assert propMap['conventionProp'].writeMethod.get().parameters[0].type.simpleName == 'CharSequence'
-            assert propMap['conventionProp'].writeMethod.get().parameters[0].genericType.simpleName == 'String'
-
-            assert propMap['parentConstructorProp'].type.simpleName == 'CharSequence'
-            assert propMap['parentConstructorProp'].genericType.simpleName == 'String'
-
-            assert syntheticPropMap['parentConstructorProp'].type.simpleName == 'CharSequence'
-            assert syntheticPropMap['parentConstructorProp'].genericType.simpleName == 'String'
-
-            assert propMap['constructorProp'].type.simpleName == 'String'
-            assert propMap['constructorProp'].genericType.simpleName == 'String'
-
-            assert syntheticPropMap['constructorProp'].type.simpleName == 'String'
-            assert syntheticPropMap['constructorProp'].genericType.simpleName == 'String'
-
-            assert propMap['parentProp'].type.simpleName == 'CharSequence'
-            assert propMap['parentProp'].genericType.simpleName == 'String'
-
-            assert syntheticPropMap['parentProp'].type.simpleName == 'CharSequence'
-            assert syntheticPropMap['parentProp'].genericType.simpleName == 'String'
-
-            assert methodMap['publicFunc'].documentation.isPresent()
-            assert methodMap['parentFunc'].returnType.simpleName == 'CharSequence'
-            assert methodMap['parentFunc'].genericReturnType.simpleName == 'String'
-            assert methodMap['parentFunc'].parameters[0].type.simpleName == 'CharSequence'
-            assert methodMap['parentFunc'].parameters[0].genericType.simpleName == 'String'
-        }
     }
 
     void "test annotation metadata present on deep type parameters for field"() {
@@ -587,7 +586,7 @@ import java.util.List;
 class Test {
     var deepList: List<@Size(min=1, max=2) List<@NotEmpty List<@NotNull String>>>? = null
 }
-''')  {
+''') {
             def field = it.findField("deepList").get()
             initializeAllTypeArguments(field.getType())
             initializeAllTypeArguments(field.getGenericType())
@@ -632,7 +631,7 @@ class Test {
         return null
     }
 }
-''')  {
+''') {
             def method = it.findMethod("deepList").get()
             initializeAllTypeArguments(method.getReturnType())
             initializeAllTypeArguments(method.getGenericReturnType())
@@ -689,12 +688,12 @@ class Str
 
             // Type annotations shouldn't appear on the field
             field.getAnnotationMetadata().getAnnotationNames().asList() == [AnnotationUtil.NULLABLE]
-            field.getType().getAnnotationMetadata().getAnnotationNames().asList() == [TypeUseRuntimeAnn.name, TypeUseClassAnn.name ]
-            field.getGenericType().getAnnotationMetadata().getAnnotationNames().asList() == [TypeUseRuntimeAnn.name, TypeUseClassAnn.name ]
+            field.getType().getAnnotationMetadata().getAnnotationNames().asList() == [TypeUseRuntimeAnn.name, TypeUseClassAnn.name]
+            field.getGenericType().getAnnotationMetadata().getAnnotationNames().asList() == [TypeUseRuntimeAnn.name, TypeUseClassAnn.name]
             // Type annotations shouldn't appear on the method
             method.getAnnotationMetadata().getAnnotationNames().asList() == [AnnotationUtil.NULLABLE]
-            method.getReturnType().getAnnotationMetadata().getAnnotationNames().asList() == [TypeUseRuntimeAnn.name, TypeUseClassAnn.name ]
-            method.getGenericReturnType().getAnnotationMetadata().getAnnotationNames().asList() == [TypeUseRuntimeAnn.name, TypeUseClassAnn.name ]
+            method.getReturnType().getAnnotationMetadata().getAnnotationNames().asList() == [TypeUseRuntimeAnn.name, TypeUseClassAnn.name]
+            method.getGenericReturnType().getAnnotationMetadata().getAnnotationNames().asList() == [TypeUseRuntimeAnn.name, TypeUseClassAnn.name]
     }
 
     void "test type annotations on a method and a field 2"() {
@@ -730,24 +729,24 @@ class Str
     }
 
     void "test recursive generic type parameter"() {
-        given:
-            ClassElement ce = buildClassElement('test.TrackedSortedSet', '''\
+        expect:
+            buildClassElement('test.TrackedSortedSet', '''\
 package test
 
 class TrackedSortedSet<T : Comparable<T>>
 
-''')
-        expect:
-            def typeArguments = ce.getTypeArguments()
-            typeArguments.size() == 1
-            def typeArgument = typeArguments.get("T")
-            typeArgument.name == "java.lang.Comparable"
-            def nextTypeArguments = typeArgument.getTypeArguments()
-            def nextTypeArgument = nextTypeArguments.get("T")
-            nextTypeArgument.name == "java.lang.Comparable"
-            def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
-            def nextNextTypeArgument = nextNextTypeArguments.get("T")
-            nextNextTypeArgument.name == "java.lang.Object"
+''') { ce ->
+                def typeArguments = ce.getTypeArguments()
+                assert typeArguments.size() == 1
+                def typeArgument = typeArguments.get("T")
+                assert typeArgument.name == "java.lang.Comparable"
+                def nextTypeArguments = typeArgument.getTypeArguments()
+                def nextTypeArgument = nextTypeArguments.get("T")
+                assert nextTypeArgument.name == "java.lang.Comparable"
+                def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
+                def nextNextTypeArgument = nextNextTypeArguments.get("T")
+                assert nextNextTypeArgument.name == "java.lang.Object"
+            }
     }
 
     void "test annotation metadata present on deep type parameters for method 2"() {
@@ -859,8 +858,8 @@ class Test<T : Test<T>>
     }
 
     void "test recursive generic method return"() {
-        given:
-            ClassElement ce = buildClassElementTransformed('test.MyFactory', '''\
+        expect:
+            buildClassElement('test.MyFactory', '''\
 package test
 
 import org.hibernate.SessionFactory
@@ -876,22 +875,18 @@ class MyFactory {
 ''') {
                 def sessionFactoryMethod = it.findMethod("sessionFactory").get()
                 def withOptionsMethod = sessionFactoryMethod.getReturnType().findMethod("withOptions").get()
-                withOptionsMethod.getReturnType().getTypeArguments()
-                return it
+                assert withOptionsMethod.getReturnType().getTypeArguments()
+                def typeArguments = withOptionsMethod.getReturnType().getTypeArguments()
+                assert typeArguments.size() == 1
+                def typeArgument = typeArguments.get("T")
+                assert typeArgument.name == "org.hibernate.SessionBuilder"
+                def nextTypeArguments = typeArgument.getTypeArguments()
+                def nextTypeArgument = nextTypeArguments.get("T")
+                assert nextTypeArgument.name == "org.hibernate.SessionBuilder"
+                def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
+                def nextNextTypeArgument = nextNextTypeArguments.get("T")
+                assert nextNextTypeArgument.name == "java.lang.Object"
             }
-        expect:
-            def sessionFactoryMethod = ce.findMethod("sessionFactory").get()
-            def withOptionsMethod = sessionFactoryMethod.getReturnType().findMethod("withOptions").get()
-            def typeArguments = withOptionsMethod.getReturnType().getTypeArguments()
-            typeArguments.size() == 1
-            def typeArgument = typeArguments.get("T")
-            typeArgument.name == "org.hibernate.SessionBuilder"
-            def nextTypeArguments = typeArgument.getTypeArguments()
-            def nextTypeArgument = nextTypeArguments.get("T")
-            nextTypeArgument.name == "org.hibernate.SessionBuilder"
-            def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
-            def nextNextTypeArgument = nextNextTypeArguments.get("T")
-            nextNextTypeArgument.name == "java.lang.Object"
     }
 
     void "test recursive generic method return 2"() {
@@ -924,8 +919,8 @@ class MyBean {
     }
 
     void "test recursive generic method return 3"() {
-        given:
-            ClassElement ce = buildClassElement('test.MyFactory', '''\
+        expect:
+            buildClassElement('test.MyFactory', '''\
 package test
 
 class MyFactory {
@@ -946,22 +941,22 @@ class MyBean {
    }
 
 }
-''')
-        expect:
-            def myBeanMethod = ce.findMethod("myBean").get()
-            def myBuilderMethod = myBeanMethod.getReturnType().findMethod("myBuilder").get()
-            def typeArguments = myBuilderMethod.getReturnType().getTypeArguments()
-            typeArguments.size() == 1
-            def typeArgument = typeArguments.get("T")
-            typeArgument.name == "test.MyBuilder"
-            def nextTypeArguments = typeArgument.getTypeArguments()
-            def nextTypeArgument = nextTypeArguments.get("T")
-            nextTypeArgument.name == "java.lang.Object"
+''') { ce ->
+                def myBeanMethod = ce.findMethod("myBean").get()
+                def myBuilderMethod = myBeanMethod.getReturnType().findMethod("myBuilder").get()
+                def typeArguments = myBuilderMethod.getReturnType().getTypeArguments()
+                assert typeArguments.size() == 1
+                def typeArgument = typeArguments.get("T")
+                assert typeArgument.name == "test.MyBuilder"
+                def nextTypeArguments = typeArgument.getTypeArguments()
+                def nextTypeArgument = nextTypeArguments.get("T")
+                assert nextTypeArgument.name == "java.lang.Object"
+            }
     }
 
     void "test recursive generic method return 4"() {
-        given:
-            ClassElement ce = buildClassElement('test.MyFactory', '''\
+        expect:
+            buildClassElement('test.MyFactory', '''\
 package test
 
 class MyFactory {
@@ -982,22 +977,25 @@ class MyBean {
    }
 
 }
-''')
-        expect:
-            def myBeanMethod = ce.findMethod("myBean").get()
-            def myBuilderMethod = myBeanMethod.getReturnType().findMethod("myBuilder").get()
-            def typeArguments = myBuilderMethod.getReturnType().getTypeArguments()
-            typeArguments.size() == 1
-            def typeArgument = typeArguments.get("T")
-            typeArgument.name == "test.MyBuilder"
-            def nextTypeArguments = typeArgument.getTypeArguments()
-            def nextTypeArgument = nextTypeArguments.get("T")
-            nextTypeArgument.name == "java.lang.Object"
+''') { ce ->
+                def myBeanMethod = ce.findMethod("myBean").get()
+                def myBuilderMethod = myBeanMethod.getReturnType().findMethod("myBuilder").get()
+                def typeArguments = myBuilderMethod.getReturnType().getTypeArguments()
+                assert typeArguments.size() == 1
+                def typeArgument = typeArguments.get("T")
+                assert typeArgument.name == "test.MyBuilder"
+                def nextTypeArguments = typeArgument.getTypeArguments()
+                def nextTypeArgument = nextTypeArguments.get("T")
+                assert nextTypeArgument.name == "test.MyBuilder"
+                def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
+                def nextNextTypeArgument = nextNextTypeArguments.get("T")
+                assert nextNextTypeArgument.name == "java.lang.Object"
+            }
     }
 
     void "test recursive generic method return 5"() {
-        given:
-            ClassElement ce = buildClassElement('test.MyFactory', '''\
+        expect:
+            buildClassElement('test.MyFactory', '''\
 package test
 
 class MyFactory {
@@ -1018,20 +1016,20 @@ class MyBean<K : MyBuilder<K>> {
    }
 
 }
-''')
-        expect:
-            def myBeanMethod = ce.findMethod("myBean").get()
-            def myBuilderMethod = myBeanMethod.getReturnType().findMethod("myBuilder").get()
-            def typeArguments = myBuilderMethod.getReturnType().getTypeArguments()
-            typeArguments.size() == 1
-            def typeArgument = typeArguments.get("T")
-            typeArgument.name == "test.MyBuilder"
-            def nextTypeArguments = typeArgument.getTypeArguments()
-            def nextTypeArgument = nextTypeArguments.get("T")
-            nextTypeArgument.name == "test.MyBuilder"
-            def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
-            def nextNextTypeArgument = nextNextTypeArguments.get("T")
-            nextNextTypeArgument.name == "java.lang.Object"
+''') { ce ->
+                def myBeanMethod = ce.findMethod("myBean").get()
+                def myBuilderMethod = myBeanMethod.getReturnType().findMethod("myBuilder").get()
+                def typeArguments = myBuilderMethod.getReturnType().getTypeArguments()
+                assert typeArguments.size() == 1
+                def typeArgument = typeArguments.get("T")
+                assert typeArgument.name == "test.MyBuilder"
+                def nextTypeArguments = typeArgument.getTypeArguments()
+                def nextTypeArgument = nextTypeArguments.get("T")
+                assert nextTypeArgument.name == "test.MyBuilder"
+                def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
+                def nextNextTypeArgument = nextNextTypeArguments.get("T")
+                assert nextNextTypeArgument.name == "java.lang.Object"
+            }
     }
 
     void "test how the annotations from the type are propagated"() {
@@ -1550,7 +1548,8 @@ class Lst<E>
     }
 
     void "test generics model for wildcard"() {
-        MethodElement method = buildClassElementMapped('test.Test', '''
+        expect:
+        buildClassElement('test.Test', '''
 package test
 
 class Test<T> {
@@ -1562,21 +1561,23 @@ class Test<T> {
 
 class Lst<E>
 
-''', {ce -> ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get()})
-        expect:
+''') { ce ->
+            def method = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get()
             def genericTypeArgument = method.getGenericReturnType().getTypeArguments()["E"]
-            !genericTypeArgument.isGenericPlaceholder()
-            genericTypeArgument.isRawType()
-            genericTypeArgument.isWildcard()
+            assert !genericTypeArgument.isGenericPlaceholder()
+            assert genericTypeArgument.isRawType()
+            assert genericTypeArgument.isWildcard()
 
             def typeArgument = method.getReturnType().getTypeArguments()["E"]
-            !typeArgument.isGenericPlaceholder()
-            typeArgument.isRawType()
-            typeArgument.isWildcard()
+            assert !typeArgument.isGenericPlaceholder()
+            assert typeArgument.isRawType()
+            assert typeArgument.isWildcard()
+        }
     }
 
     void "test generics model for placeholder"() {
-        MethodElement method = buildClassElementMapped('test.Test', '''
+        expect:
+        buildClassElement('test.Test', '''
 package test
 
 class Test<T> {
@@ -1588,21 +1589,23 @@ class Test<T> {
 
 class Lst<E>
 
-''', {ce -> ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get()})
-        expect:
+''') { ce ->
+            def method = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get()
             def genericTypeArgument = method.getGenericReturnType().getTypeArguments()["E"]
-            genericTypeArgument.isGenericPlaceholder()
-            !genericTypeArgument.isRawType()
-            !genericTypeArgument.isWildcard()
+            assert genericTypeArgument.isGenericPlaceholder()
+            assert !genericTypeArgument.isRawType()
+            assert !genericTypeArgument.isWildcard()
 
             def typeArgument = method.getReturnType().getTypeArguments()["E"]
-            typeArgument.isGenericPlaceholder()
-            !typeArgument.isRawType()
-            !typeArgument.isWildcard()
+            assert typeArgument.isGenericPlaceholder()
+            assert !typeArgument.isRawType()
+            assert !typeArgument.isWildcard()
+        }
     }
 
     void "test generics model for class placeholder wildcard"() {
-        def (ClassElement ce, MethodElement method)  = buildClassElementMapped('test.Test', '''
+        expect:
+        buildClassElement('test.Test', '''
 package test
 
 class Test<T> {
@@ -1614,45 +1617,48 @@ class Test<T> {
 
 class Lst<E>
 
-''', {ce -> Tuple.tuple(ce, ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get())})
-        expect:
+''') { ce ->
+
+            def method = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get()
             def genericTypeArgument = method.getGenericReturnType().getTypeArguments()["E"]
-            !genericTypeArgument.isGenericPlaceholder()
-            !genericTypeArgument.isRawType()
-            genericTypeArgument.isWildcard()
+            assert !genericTypeArgument.isGenericPlaceholder()
+            assert !genericTypeArgument.isRawType()
+            assert genericTypeArgument.isWildcard()
 
             def genericWildcard = genericTypeArgument as WildcardElement
-            !genericWildcard.lowerBounds
-            genericWildcard.upperBounds.size() == 1
+            assert !genericWildcard.lowerBounds
+            assert genericWildcard.upperBounds.size() == 1
             def genericUpperBound = genericWildcard.upperBounds[0]
-            genericUpperBound.name == "java.lang.Object"
-            genericUpperBound.isGenericPlaceholder()
-            !genericUpperBound.isWildcard()
-            !genericUpperBound.isRawType()
+            assert genericUpperBound.name == "java.lang.Object"
+            assert genericUpperBound.isGenericPlaceholder()
+            assert !genericUpperBound.isWildcard()
+            assert !genericUpperBound.isRawType()
             def genericPlaceholderUpperBound = genericUpperBound as GenericPlaceholderElement
-            genericPlaceholderUpperBound.variableName == "T"
-            genericPlaceholderUpperBound.declaringElement.get() == ce
+            assert genericPlaceholderUpperBound.variableName == "T"
+            assert genericPlaceholderUpperBound.declaringElement.get() == ce
 
             def typeArgument = method.getReturnType().getTypeArguments()["E"]
-            !typeArgument.isGenericPlaceholder()
-            !typeArgument.isRawType()
-            typeArgument.isWildcard()
+            assert !typeArgument.isGenericPlaceholder()
+            assert !typeArgument.isRawType()
+            assert typeArgument.isWildcard()
 
             def wildcard = genericTypeArgument as WildcardElement
-            !wildcard.lowerBounds
-            wildcard.upperBounds.size() == 1
+            assert !wildcard.lowerBounds
+            assert wildcard.upperBounds.size() == 1
             def upperBound = wildcard.upperBounds[0]
-            upperBound.name == "java.lang.Object"
-            upperBound.isGenericPlaceholder()
-            !upperBound.isWildcard()
-            !upperBound.isRawType()
+            assert upperBound.name == "java.lang.Object"
+            assert upperBound.isGenericPlaceholder()
+            assert !upperBound.isWildcard()
+            assert !upperBound.isRawType()
             def placeholderUpperBound = upperBound as GenericPlaceholderElement
-            placeholderUpperBound.variableName == "T"
-            placeholderUpperBound.declaringElement.get() == ce
+            assert placeholderUpperBound.variableName == "T"
+            assert placeholderUpperBound.declaringElement.get() == ce
+        }
     }
 
     void "test generics model for method placeholder wildcard"() {
-        MethodElement method = buildClassElementMapped('test.Test', '''
+        expect:
+            buildClassElement('test.Test', '''
 package test
 
 class Test {
@@ -1664,48 +1670,49 @@ class Test {
 
 class Lst<E>
 
-''', {ce -> ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get()})
-        expect:
-            method.getDeclaredTypeVariables().size() == 1
-            method.getDeclaredTypeVariables()[0].declaringElement.get() == method
-            method.getDeclaredTypeVariables()[0].variableName == "T"
-            method.getDeclaredTypeArguments().size() == 1
-            def placeholder = method.getDeclaredTypeArguments()["T"] as GenericPlaceholderElement
-            placeholder.declaringElement.get() == method
-            placeholder.variableName == "T"
-            def genericTypeArgument = method.getGenericReturnType().getTypeArguments()["E"]
-            !genericTypeArgument.isGenericPlaceholder()
-            !genericTypeArgument.isRawType()
-            genericTypeArgument.isWildcard()
+''') { ce ->
+                def method = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get()
+                assert method.getDeclaredTypeVariables().size() == 1
+                assert method.getDeclaredTypeVariables()[0].declaringElement.get() == method
+                assert method.getDeclaredTypeVariables()[0].variableName == "T"
+                assert method.getDeclaredTypeArguments().size() == 1
+                def placeholder = method.getDeclaredTypeArguments()["T"] as GenericPlaceholderElement
+                assert placeholder.declaringElement.get() == method
+                assert placeholder.variableName == "T"
+                def genericTypeArgument = method.getGenericReturnType().getTypeArguments()["E"]
+                assert !genericTypeArgument.isGenericPlaceholder()
+                assert !genericTypeArgument.isRawType()
+                assert genericTypeArgument.isWildcard()
 
-            def genericWildcard = genericTypeArgument as WildcardElement
-            !genericWildcard.lowerBounds
-            genericWildcard.upperBounds.size() == 1
-            def genericUpperBound = genericWildcard.upperBounds[0]
-            genericUpperBound.name == "java.lang.Object"
-            genericUpperBound.isGenericPlaceholder()
-            !genericUpperBound.isWildcard()
-            !genericUpperBound.isRawType()
-            def genericPlaceholderUpperBound = genericUpperBound as GenericPlaceholderElement
-            genericPlaceholderUpperBound.variableName == "T"
-            genericPlaceholderUpperBound.declaringElement.get() == method
+                def genericWildcard = genericTypeArgument as WildcardElement
+                assert !genericWildcard.lowerBounds
+                assert genericWildcard.upperBounds.size() == 1
+                def genericUpperBound = genericWildcard.upperBounds[0]
+                assert genericUpperBound.name == "java.lang.Object"
+                assert genericUpperBound.isGenericPlaceholder()
+                assert !genericUpperBound.isWildcard()
+                assert !genericUpperBound.isRawType()
+                def genericPlaceholderUpperBound = genericUpperBound as GenericPlaceholderElement
+                assert genericPlaceholderUpperBound.variableName == "T"
+                assert genericPlaceholderUpperBound.declaringElement.get() == method
 
-            def typeArgument = method.getReturnType().getTypeArguments()["E"]
-            !typeArgument.isGenericPlaceholder()
-            !typeArgument.isRawType()
-            typeArgument.isWildcard()
+                def typeArgument = method.getReturnType().getTypeArguments()["E"]
+                assert !typeArgument.isGenericPlaceholder()
+                assert !typeArgument.isRawType()
+                assert typeArgument.isWildcard()
 
-            def wildcard = genericTypeArgument as WildcardElement
-            !wildcard.lowerBounds
-            wildcard.upperBounds.size() == 1
-            def upperBound = wildcard.upperBounds[0]
-            upperBound.name == "java.lang.Object"
-            upperBound.isGenericPlaceholder()
-            !upperBound.isWildcard()
-            !upperBound.isRawType()
-            def placeholderUpperBound = upperBound as GenericPlaceholderElement
-            placeholderUpperBound.variableName == "T"
-            placeholderUpperBound.declaringElement.get() == method
+                def wildcard = genericTypeArgument as WildcardElement
+                assert !wildcard.lowerBounds
+                assert wildcard.upperBounds.size() == 1
+                def upperBound = wildcard.upperBounds[0]
+                assert upperBound.name == "java.lang.Object"
+                assert upperBound.isGenericPlaceholder()
+                assert !upperBound.isWildcard()
+                assert !upperBound.isRawType()
+                def placeholderUpperBound = upperBound as GenericPlaceholderElement
+                assert placeholderUpperBound.variableName == "T"
+                assert placeholderUpperBound.declaringElement.get() == method
+            }
     }
 
 //    void "test generics model for constructor placeholder wildcard"() {
@@ -1887,7 +1894,8 @@ class UserController : MyApi {
     }
 
     void "test interface placeholder"() {
-        ClassElement ce = buildClassElement('test.MyRepo', '''
+        expect:
+            buildClassElement('test.MyRepo', '''
 package test
 import io.micronaut.context.annotation.Prototype
 import java.util.List
@@ -1902,30 +1910,30 @@ class MyBean {
     var name: String? = null
 }
 
-''')
+''') { ce ->
 
-        when:
             def repo = ce.getTypeArguments("test.Repo")
-        then:
-            repo.get("E").simpleName == "MyBean"
-            repo.get("E").getSyntheticBeanProperties().size() == 1
-            repo.get("E").getMethods().size() == 0
-            repo.get("E").getFields().size() == 1
-            repo.get("E").getFields().get(0).name == "name"
+            assert repo.get("E").simpleName == "MyBean"
+            assert repo.get("E").getSyntheticBeanProperties().size() == 1
+            assert repo.get("E").getMethods().size() == 0
+            assert repo.get("E").getFields().size() == 1
+            assert repo.get("E").getFields().get(0).name == "name"
+
             def element = ce.findMethod("save").get().getParameters()[0]
-            element.getGenericType().simpleName == "MyBean"
-            element.getType().simpleName == "Object"
-        when:
+            assert element.getGenericType().simpleName == "MyBean"
+            assert element.getType().simpleName == "Object"
+
             def genRepo = ce.getTypeArguments("test.GenericRepository")
-        then:
-            genRepo.get("E").simpleName == "MyBean"
-            genRepo.get("E").getSyntheticBeanProperties().size() == 1
-            genRepo.get("E").getMethods().size() == 0
-            genRepo.get("E").getFields().get(0).name == "name"
+            assert genRepo.get("E").simpleName == "MyBean"
+            assert genRepo.get("E").getSyntheticBeanProperties().size() == 1
+            assert genRepo.get("E").getMethods().size() == 0
+            assert genRepo.get("E").getFields().get(0).name == "name"
+        }
     }
 
     void "test interface placeholder 2"() {
-        ClassElement ce = buildClassElement('test.MyRepoX', '''
+        expect:
+            buildClassElement('test.MyRepoX', '''
 package test
 import io.micronaut.context.annotation.Prototype
 import java.util.List
@@ -1940,26 +1948,25 @@ class MyBeanX {
     var name: String? = null
 }
 
-''')
+''') { ce ->
 
-        when:
             def repo = ce.getTypeArguments("test.RepoX")
-        then:
-            repo.get("E").simpleName == "MyBeanX"
-            repo.get("E").getSyntheticBeanProperties().size() == 1
-            repo.get("E").getMethods().size() == 0
-            repo.get("E").getFields().size() == 1
-            repo.get("E").getFields().get(0).name == "name"
+            assert repo.get("E").simpleName == "MyBeanX"
+            assert repo.get("E").getSyntheticBeanProperties().size() == 1
+            assert repo.get("E").getMethods().size() == 0
+            assert repo.get("E").getFields().size() == 1
+            assert repo.get("E").getFields().get(0).name == "name"
+
             def element = ce.findMethod("save").get().getParameters()[0]
-            element.getGenericType().simpleName == "MyBeanX"
-            element.getType().simpleName == "Object"
-        when:
+            assert element.getGenericType().simpleName == "MyBeanX"
+            assert element.getType().simpleName == "Object"
+
             def genRepo = ce.getTypeArguments("test.GenericRepository")
-        then:
-            genRepo.get("E").simpleName == "MyBeanX"
-            genRepo.get("E").getSyntheticBeanProperties().size() == 1
-            genRepo.get("E").getMethods().size() == 0
-            genRepo.get("E").getFields().get(0).name == "name"
+            assert genRepo.get("E").simpleName == "MyBeanX"
+            assert genRepo.get("E").getSyntheticBeanProperties().size() == 1
+            assert genRepo.get("E").getMethods().size() == 0
+            assert genRepo.get("E").getFields().get(0).name == "name"
+        }
     }
 
     void "test interface placeholder 2 isAssignable"() {
@@ -1991,7 +1998,8 @@ class MyBeanX {
     }
 
     void "test abstract placeholder"() {
-        ClassElement ce = buildClassElement('test.MyRepo2', '''
+        expect:
+        buildClassElement('test.MyRepo2', '''
 package test
 import io.micronaut.context.annotation.Prototype
 import java.util.List
@@ -2007,33 +2015,32 @@ class MyBean {
     var name: String? = null
 }
 
-''')
+''') { ce ->
 
-        when:
             def repo = ce.getTypeArguments("test.Repo")
-        then:
-            repo.get("E").simpleName == "MyBean"
-            repo.get("E").hasAnnotation(MyEntity)
-            repo.get("E").getSyntheticBeanProperties().size() == 1
-            repo.get("E").getMethods().size() == 0
-            repo.get("E").getFields().size() == 1
-            repo.get("E").getFields().get(0).name == "name"
+            assert repo.get("E").simpleName == "MyBean"
+            assert repo.get("E").hasAnnotation(MyEntity)
+            assert repo.get("E").getSyntheticBeanProperties().size() == 1
+            assert repo.get("E").getMethods().size() == 0
+            assert repo.get("E").getFields().size() == 1
+            assert repo.get("E").getFields().get(0).name == "name"
 
             def element = ce.findMethod("save").get().getParameters()[0]
-            element.getGenericType().simpleName == "MyBean"
-            element.getType().simpleName == "Object"
-        when:
+            assert element.getGenericType().simpleName == "MyBean"
+            assert element.getType().simpleName == "Object"
+
             def genRepo = ce.getTypeArguments("test.GenericRepository")
-        then:
-            genRepo.get("E").simpleName == "MyBean"
-            genRepo.get("E").hasAnnotation(MyEntity)
-            genRepo.get("E").getSyntheticBeanProperties().size() == 1
-            genRepo.get("E").getMethods().size() == 0
-            genRepo.get("E").getFields().get(0).name == "name"
+            assert genRepo.get("E").simpleName == "MyBean"
+            assert genRepo.get("E").hasAnnotation(MyEntity)
+            assert genRepo.get("E").getSyntheticBeanProperties().size() == 1
+            assert genRepo.get("E").getMethods().size() == 0
+            assert genRepo.get("E").getFields().get(0).name == "name"
+        }
     }
 
     void "test abstract placeholder 2"() {
-        ClassElement ce = buildClassElement('test.MyRepo2', '''
+        expect:
+        buildClassElement('test.MyRepo2', '''
 package test
 import io.micronaut.context.annotation.Prototype
 import java.util.List
@@ -2049,33 +2056,32 @@ class MyBean {
     var name: String? = null
 }
 
-''')
+''') { ce ->
 
-        when:
             def repo = ce.getTypeArguments("test.Repo")
-        then:
-            repo.get("E").simpleName == "MyBean"
-            repo.get("E").hasAnnotation(MyEntity)
-            repo.get("E").getSyntheticBeanProperties().size() == 1
-            repo.get("E").getMethods().size() == 0
-            repo.get("E").getFields().size() == 1
-            repo.get("E").getFields().get(0).name == "name"
+            assert repo.get("E").simpleName == "MyBean"
+            assert repo.get("E").hasAnnotation(MyEntity)
+            assert repo.get("E").getSyntheticBeanProperties().size() == 1
+            assert repo.get("E").getMethods().size() == 0
+            assert repo.get("E").getFields().size() == 1
+            assert repo.get("E").getFields().get(0).name == "name"
 
             def element = ce.findMethod("save").get().getParameters()[0]
-            element.getGenericType().simpleName == "MyBean"
-            element.getType().simpleName == "Object"
-        when:
+            assert element.getGenericType().simpleName == "MyBean"
+            assert element.getType().simpleName == "Object"
+
             def genRepo = ce.getTypeArguments("test.GenericRepository")
-        then:
-            genRepo.get("E").simpleName == "MyBean"
-            genRepo.get("E").hasAnnotation(MyEntity)
-            genRepo.get("E").getSyntheticBeanProperties().size() == 1
-            genRepo.get("E").getMethods().size() == 0
-            genRepo.get("E").getFields().get(0).name == "name"
+            assert genRepo.get("E").simpleName == "MyBean"
+            assert genRepo.get("E").hasAnnotation(MyEntity)
+            assert genRepo.get("E").getSyntheticBeanProperties().size() == 1
+            assert genRepo.get("E").getMethods().size() == 0
+            assert genRepo.get("E").getFields().get(0).name == "name"
+            }
     }
 
     void "test abstract placeholder 3"() {
-        ClassElement ce = buildClassElement('test.MyRepo2', '''
+        expect:
+        buildClassElement('test.MyRepo2', '''
 package test
 import io.micronaut.context.annotation.Prototype
 import java.util.List
@@ -2091,29 +2097,27 @@ class MyBean {
     var name: String? = null
 }
 
-''')
+''') { ce ->
 
-        when:
             def repo = ce.getTypeArguments("test.Repo")
-        then:
-            repo.get("E").simpleName == "MyBean"
-            repo.get("E").hasAnnotation(MyEntity)
-            repo.get("E").getSyntheticBeanProperties().size() == 1
-            repo.get("E").getMethods().size() == 0
-            repo.get("E").getFields().size() == 1
-            repo.get("E").getFields().get(0).name == "name"
+            assert repo.get("E").simpleName == "MyBean"
+            assert repo.get("E").hasAnnotation(MyEntity)
+            assert repo.get("E").getSyntheticBeanProperties().size() == 1
+            assert repo.get("E").getMethods().size() == 0
+            assert repo.get("E").getFields().size() == 1
+            assert repo.get("E").getFields().get(0).name == "name"
 
             def element = ce.findMethod("save").get().getParameters()[0]
-            element.getGenericType().simpleName == "MyBean"
-            element.getType().simpleName == "Object"
-        when:
+            assert element.getGenericType().simpleName == "MyBean"
+            assert element.getType().simpleName == "Object"
+
             def genRepo = ce.getTypeArguments("test.GenericRepository")
-        then:
-            genRepo.get("E").simpleName == "MyBean"
-            genRepo.get("E").hasAnnotation(MyEntity)
-            genRepo.get("E").getSyntheticBeanProperties().size() == 1
-            genRepo.get("E").getMethods().size() == 0
-            genRepo.get("E").getFields().get(0).name == "name"
+            assert genRepo.get("E").simpleName == "MyBean"
+            assert genRepo.get("E").hasAnnotation(MyEntity)
+            assert genRepo.get("E").getSyntheticBeanProperties().size() == 1
+            assert genRepo.get("E").getMethods().size() == 0
+            assert genRepo.get("E").getFields().get(0).name == "name"
+            }
     }
 
     void "test internal methods"() {
@@ -2611,13 +2615,13 @@ class TestNamed {
 ''', {ce -> ce.findMethod("method").get().getReturnType().getBeanProperties()})
         expect:
             properties.stream().map {it.getName()}.toList() == [
-                    "sorted",
-                    "orderBy",
                     "number",
                     "size",
                     "offset",
                     "sort",
-                    "unpaged"
+                    "unpaged",
+                    "sorted",
+                    "orderBy"
             ]
     }
 

@@ -10,31 +10,6 @@ import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class IntroductionAdviceWithNewInterfaceSpec extends Specification {
 
-
-    void "test introduction closeable"() {
-        when:
-            def context = buildContext('''
-package test
-
-import io.micronaut.kotlin.processing.aop.introduction.*
-import io.micronaut.context.annotation.*
-
-@Stub("test")
-interface MyBean : AutoCloseable  {
-    val foo : String
-}
-
-''', true)
-            def bean = getBean(context, 'test.MyBean')
-
-        then:
-            bean.foo == 'test'
-            bean.close()
-
-        cleanup:
-            context.close()
-    }
-
     void "test configuration advice with Kotlin properties"() {
         when:
         def context = buildContext('''
@@ -86,6 +61,30 @@ interface MyBean  {
 
         cleanup:
         context.close()
+    }
+
+    void "test introduction closeable"() {
+        when:
+            def context = buildContext('''
+package test
+
+import io.micronaut.kotlin.processing.aop.introduction.*
+import io.micronaut.context.annotation.*
+
+@Stub("test")
+interface MyBean : AutoCloseable  {
+    val foo : String
+}
+
+''', true)
+            def bean = getBean(context, 'test.MyBean')
+
+        then:
+            bean.foo == 'test'
+            bean.close()
+
+        cleanup:
+            context.close()
     }
 
     void "test introduction advice with Kotlin properties"() {
