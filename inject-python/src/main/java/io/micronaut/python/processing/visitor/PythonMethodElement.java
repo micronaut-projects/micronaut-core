@@ -72,6 +72,18 @@ public sealed class PythonMethodElement extends AbstractPythonElement implements
         this.parameters = createParameters(functionDef);
     }
 
+    @Override
+    public boolean isReflectionRequired() {
+        // since we are in charge of Python stub generation, this doesn't make sense
+        return false;
+    }
+
+    @Override
+    public boolean isReflectionRequired(ClassElement callingType) {
+        // since we are in charge of Python stub generation, this doesn't make sense
+        return false;
+    }
+
     /**
      * Returns the native {@link FunctionDef} object that backs this element.
      *

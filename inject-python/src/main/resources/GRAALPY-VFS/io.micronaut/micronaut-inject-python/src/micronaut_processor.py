@@ -75,6 +75,46 @@ class PrintNodeVisitor(ast.NodeVisitor):
                 try:
                     result = super().visit(node)
                 finally:
+                    # Check if this is a dataclass and generate constructor if needed
+                    is_dataclass = any(
+                        (isinstance(dec, ast.Name) and dec.id == "dataclass") or
+                        (isinstance(dec, ast.Attribute) and dec.attr == "dataclass")
+                        for dec in node.decorator_list
+                    )
+
+                    if is_dataclass and self.current_class.constructor() is None:
+                        # Generate constructor from dataclass attributes
+                        dataclass_args = []
+                        for attr in self.current_class_attributes:
+                            # Only include attributes with type annotations (required for dataclass)
+                            if attr.typeName() and attr.typeName() != "None":
+                                # Create argument with same name as attribute
+                                arg_def = ArgumentDef.of(
+                                    attr.name(),  # arg_name
+                                    attr.annotation() or "",  # annotation
+                                    attr.typeName(),  # type_annotation
+                                    attr.value(),  # default_value (may be None)
+                                    attr.decorators(),  # decorators
+                                    None  # param_doc
+                                )
+                                dataclass_args.append(arg_def)
+
+                        if dataclass_args:
+                            # Create constructor function def
+                            arguments_def = ArgumentsDef.of(dataclass_args)
+                            return_def = ReturnDef.none()
+                            dataclass_constructor = JavaFuncDef(
+                                "__init__",  # name
+                                arguments_def,  # arguments
+                                [],  # decorators
+                                return_def,  # return_type
+                                "",  # ??? (not sure what this is)
+                                [],  # ??? (not sure what this is)
+                                None,  # func_doc
+                                False  # is_abstract
+                            )
+                            self.current_class = self.current_class.withConstructor(dataclass_constructor)
+
                     # Add collected attributes to the class before applying callback
                     for attr in self.current_class_attributes:
                         self.current_class = self.current_class.withAttribute(attr)
