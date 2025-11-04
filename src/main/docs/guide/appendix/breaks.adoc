@@ -68,7 +68,7 @@ The `@Executable` methods processor api:context.processor[ExecutableMethodProces
 
 The incorrect use will result in a warning and an error in the next major version.
 
-Both interfaces are revisited to have better generics and no longer have a superclass.
+Both interfaces are revisited to have better generics and no longer have now deleted `AnnotationProcessor` superclass.
 
 Executable methods annotated with `@Parallel` will not trigger parallel execution of api:context.processor[ExecutableMethodProcessor]. Users who relied on that functionality should handle parallelism separately.
 

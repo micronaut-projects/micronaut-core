@@ -62,7 +62,7 @@ import java.util.concurrent.ScheduledFuture;
  */
 @Internal
 @Singleton
-public final class ScheduledMethodProcessor implements ExecutableMethodProcessor<Scheduled>, Closeable {
+public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Scheduled>, Closeable {
 
     private static final Logger LOG = LoggerFactory.getLogger(TaskScheduler.class);
     private static final String MEMBER_FIXED_RATE = "fixedRate";
