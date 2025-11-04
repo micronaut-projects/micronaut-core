@@ -149,4 +149,23 @@ public final class PythonFieldElement extends AbstractPythonElement implements F
         }
         return java.util.Optional.of(doc);
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        PythonFieldElement that = (PythonFieldElement) o;
+
+        return that.getNativeType().name().equals(getNativeType().name()) &&
+            owningType.equals(that.owningType);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(getNativeType().name(), owningType);
+    }
 }
