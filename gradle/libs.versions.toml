@@ -316,16 +316,6 @@ ksp-aaEmbeddable = { module = "com.google.devtools.ksp:symbol-processing-aa-embe
 
 jfrunit-core = { module = "org.moditect.jfrunit:jfrunit-core", version.ref = "jfrunit" }
 
-kotlin-annotation-processing-embeddable = { module = "org.jetbrains.kotlin:kotlin-annotation-processing-embeddable", version.ref = "managed-kotlin" }
-kotlin-compiler-embeddable = { module = "org.jetbrains.kotlin:kotlin-compiler-embeddable", version.ref = "managed-kotlin" }
-kotlin-reflect = { module = "org.jetbrains.kotlin:kotlin-reflect", version.ref = "managed-kotlin" }
-kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "managed-kotlin" }
-kotlin-stdlib-jdk8 = { module = "org.jetbrains.kotlin:kotlin-stdlib-jdk8", version.ref = "managed-kotlin" }
-kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "managed-kotlin" }
-
-ksp-api = { module = "com.google.devtools.ksp:symbol-processing-api", version.ref = "managed-ksp" }
-ksp = { module = "com.google.devtools.ksp:symbol-processing", version.ref = "managed-ksp" }
-
 [plugins]
 managed-kotlin-allopen = { id = "org.jetbrains.kotlin.plugin.allopen", version.ref = "managed-kotlin" }
 managed-kotlin-noarg = { id = "org.jetbrains.kotlin.plugin.noarg", version.ref = "managed-kotlin" }

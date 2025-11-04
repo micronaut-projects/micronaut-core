@@ -10,9 +10,9 @@ dependencies {
     api(libs.spock) {
         exclude(module = "groovy-all")
     }
-    api(libs.ksp.api)
-    api(libs.ksp)
-    implementation(libs.kotlin.compiler.embeddable)
+    api(libs.managed.ksp.api)
+    api(libs.managed.ksp)
+    implementation(libs.managed.kotlin.compiler.embeddable)
     implementation(libs.ksp.commonDeps)
     implementation(libs.ksp.aaEmbeddable)
     implementation(libs.okio)
@@ -20,7 +20,7 @@ dependencies {
     testImplementation(libs.javax.persistence)
     testImplementation(projects.micronautRuntime)
     api(libs.blaze.persistence.core)
-    implementation(libs.kotlin.stdlib)
+    implementation(libs.managed.kotlin.stdlib)
 }
 
 tasks {

@@ -14,8 +14,8 @@ micronautBuild {
 }
 
 dependencies {
-    api(libs.kotlin.stdlib)
-    api(libs.kotlin.reflect)
+    api(libs.managed.kotlin.stdlib)
+    api(libs.managed.kotlin.reflect)
     api(libs.managed.kotlinx.coroutines.core)
     api(libs.managed.kotlinx.coroutines.jdk8)
     api(libs.managed.kotlinx.coroutines.rx2)
@@ -24,7 +24,7 @@ dependencies {
     api(projects.micronautRuntime)
 
     testImplementation(projects.micronautContext)
-    testImplementation(libs.kotlin.test)
+    testImplementation(libs.managed.kotlin.test)
     testImplementation(libs.managed.kotlinx.coroutines.core)
     testImplementation(libs.managed.kotlinx.coroutines.rx2)
     testImplementation(libs.managed.kotlinx.coroutines.slf4j)
