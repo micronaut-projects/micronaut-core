@@ -13,8 +13,8 @@ micronautBuild {
 }
 
 dependencies {
-    api(libs.kotlin2.stdlib)
-    api(libs.kotlin2.reflect)
+    api(libs.kotlin.stdlib)
+    api(libs.kotlin.reflect)
     api(libs.managed.kotlinx.coroutines.core)
     api(libs.managed.kotlinx.coroutines.jdk8)
     api(libs.managed.kotlinx.coroutines.rx2)
@@ -23,7 +23,7 @@ dependencies {
     api(projects.micronautRuntime)
 
     testImplementation(projects.micronautContext)
-    testImplementation(libs.kotlin2.test)
+    testImplementation(libs.kotlin.test)
     testImplementation(libs.managed.kotlinx.coroutines.core)
     testImplementation(libs.managed.kotlinx.coroutines.rx2)
     testImplementation(libs.managed.kotlinx.coroutines.slf4j)
@@ -72,9 +72,9 @@ dependencies {
 configurations.all {
     resolutionStrategy.eachDependency {
         if (requested.group == "org.jetbrains.kotlin") {
-            useVersion(libs.versions.managed.kotlin2.get())
+            useVersion(libs.versions.managed.kotlin.asProvider().get())
         } else if (requested.group == "com.google.devtools.ksp") {
-            useVersion(libs.versions.managed.ksp2.get())
+            useVersion(libs.versions.managed.ksp.get())
         }
     }
 }

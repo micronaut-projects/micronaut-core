@@ -28,7 +28,7 @@ dependencies {
         exclude(group = "io.micronaut")
     }
 
-    testImplementation(libs.kotlin2.compiler.embeddable)
+    testImplementation(libs.kotlin.compiler.embeddable)
     testImplementation(projects.micronautContext)
     testImplementation(projects.micronautJacksonDatabind)
     testImplementation(projects.micronautInjectKotlinTest)
@@ -60,9 +60,9 @@ dependencies {
 configurations.all {
     resolutionStrategy.eachDependency {
         if (requested.group == "org.jetbrains.kotlin") {
-            useVersion(libs.versions.managed.kotlin2.get())
+            useVersion(libs.versions.managed.kotlin.asProvider().get())
         } else if (requested.group == "com.google.devtools.ksp") {
-            useVersion(libs.versions.managed.ksp2.get())
+            useVersion(libs.versions.managed.ksp.get())
         }
     }
 }
