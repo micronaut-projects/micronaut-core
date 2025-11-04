@@ -82,7 +82,7 @@ class EventLoopFlowSpec extends Specification {
         mock.submitted.size() == 2
     }
 
-    private static class MockEventExecutor extends AbstractEventExecutor implements OrderedEventExecutor {
+    private static final class MockEventExecutor extends AbstractEventExecutor implements OrderedEventExecutor {
         boolean inEventLoop = false
         List<Runnable> submitted = []
 

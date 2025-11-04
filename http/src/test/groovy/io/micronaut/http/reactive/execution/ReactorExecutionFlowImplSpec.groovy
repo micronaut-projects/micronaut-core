@@ -29,7 +29,7 @@ class ReactorExecutionFlowImplSpec extends Specification {
             return immediateSubscriber.result;
         }
 
-    private static class ImmediateSubscriber implements CoreSubscriber<Object> {
+    private static final class ImmediateSubscriber implements CoreSubscriber<Object> {
         ImperativeExecutionFlow<Object> result;
         boolean done = false;
 

@@ -689,7 +689,7 @@ public class Publishers {
      *
      * @param <T> The type
      */
-    private static class JustCompletePublisher<T> implements MicronautPublisher<T> {
+    private static final class JustCompletePublisher<T> implements MicronautPublisher<T> {
 
         @Override
         public void subscribe(Subscriber<? super T> subscriber) {

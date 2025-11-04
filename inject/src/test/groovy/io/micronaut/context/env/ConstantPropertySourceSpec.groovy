@@ -43,7 +43,7 @@ class ConstantPropertySourceSpec extends Specification {
         return new TestPropertySource(name, values)
     }
 
-    private static class TestPropertySource extends MapPropertySource {
+    private static final class TestPropertySource extends MapPropertySource {
         TestPropertySource(String name, Map<String, String> values) {
             super(name, ['some.conf': name] + values)
         }

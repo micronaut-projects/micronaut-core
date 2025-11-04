@@ -132,7 +132,7 @@ class DefaultWebSocketBeanRegistry implements WebSocketBeanRegistry {
      * @param <T>
      * @author graemerocher
      */
-    private static class DefaultWebSocketBean<T> implements WebSocketBean<T> {
+    private static final class DefaultWebSocketBean<T> implements WebSocketBean<T> {
         private final T bean;
         private final BeanDefinition<T> definition;
         private final MethodExecutionHandle<T, ?> onOpen;

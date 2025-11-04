@@ -150,7 +150,7 @@ public class DefaultFileSystemResourceLoader implements FileSystemResourceLoader
         return false;
     }
 
-    private static class BaseDir {
+    private static final class BaseDir {
         final boolean exists;
         final Path dir;
 

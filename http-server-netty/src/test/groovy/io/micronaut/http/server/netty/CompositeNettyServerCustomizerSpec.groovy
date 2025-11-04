@@ -32,7 +32,7 @@ class CompositeNettyServerCustomizerSpec extends Specification {
         calledInRightOrder
     }
 
-    private static class OrderedCustomizer implements NettyServerCustomizer, Ordered {
+    private static final class OrderedCustomizer implements NettyServerCustomizer, Ordered {
         final int order
 
         OrderedCustomizer(int order) {

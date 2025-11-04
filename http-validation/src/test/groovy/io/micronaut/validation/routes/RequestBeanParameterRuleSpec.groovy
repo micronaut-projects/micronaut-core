@@ -24,7 +24,7 @@ class Foo {
     }
 
     @Introspected
-    private static class Bean {
+    private static final class Bean {
 
         @Nullable
         @QueryValue
@@ -64,7 +64,7 @@ class Foo {
     }
 
     @Introspected
-    private static class Bean {
+    private static final class Bean {
 
         @Nullable
         @QueryValue
@@ -117,7 +117,7 @@ class Foo {
     }
 
     @Introspected
-    private static class Bean {
+    private static final class Bean {
 
         @Nullable
         @QueryValue
@@ -189,7 +189,7 @@ class Foo {
     }
 
     @Introspected
-    private static class Bean {
+    private static final class Bean {
 
         @Nullable
         @QueryValue

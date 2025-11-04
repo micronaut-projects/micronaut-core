@@ -411,7 +411,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         }
     }
 
-    private static class StacklessStreamClosedChannelException extends ClosedChannelException {
+    private static final class StacklessStreamClosedChannelException extends ClosedChannelException {
         static final StacklessStreamClosedChannelException INSTANCE = new StacklessStreamClosedChannelException();
 
         @Override
@@ -425,7 +425,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         }
     }
 
-    private static class StacklessHttp2Exception extends Http2Exception {
+    private static final class StacklessHttp2Exception extends Http2Exception {
         StacklessHttp2Exception(Http2Error error) {
             super(error, "HTTP/2 peer sent error: " + error);
         }

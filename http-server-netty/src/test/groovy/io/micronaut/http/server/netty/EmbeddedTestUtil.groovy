@@ -34,7 +34,7 @@ class EmbeddedTestUtil {
         csDir.readPending = true
     }
 
-    private static class ConnectionDirection {
+    private static final class ConnectionDirection {
         final EmbeddedChannel source
         final EmbeddedChannel dest
         CompositeByteBuf sourceQueue

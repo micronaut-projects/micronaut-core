@@ -285,7 +285,7 @@ public class BeanIntrospectionModule extends SimpleModule {
         }
     }
 
-    private static class IntrospectionVirtualAnnotatedMember extends VirtualAnnotatedMember {
+    private static final class IntrospectionVirtualAnnotatedMember extends VirtualAnnotatedMember {
         private final AnnotationMetadata annotationMetadata;
 
         public IntrospectionVirtualAnnotatedMember(TypeResolutionContext typeResolutionContext, Class<?> beanClass, String name, JavaType javaType, AnnotationMetadata annotationMetadata) {
@@ -1116,7 +1116,7 @@ public class BeanIntrospectionModule extends SimpleModule {
     /**
      * A bean introspection setter.
      */
-    private static class BeanIntrospectionSetter extends SettableBeanProperty.Delegating {
+    private static final class BeanIntrospectionSetter extends SettableBeanProperty.Delegating {
 
         final UnsafeBeanProperty<Object, Object> beanProperty;
 

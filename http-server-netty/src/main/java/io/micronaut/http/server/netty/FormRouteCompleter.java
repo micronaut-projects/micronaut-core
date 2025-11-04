@@ -341,7 +341,7 @@ public final class FormRouteCompleter implements Subscriber<Object> {
         }
     }
 
-    private static class FieldSplitter<R> implements Subscriber<MicronautHttpData<?>> {
+    private static final class FieldSplitter<R> implements Subscriber<MicronautHttpData<?>> {
         final BiFunction<? super MicronautHttpData<?>, ? super Flux<PartData>, R> fieldFactory;
 
         Subscription upstream;

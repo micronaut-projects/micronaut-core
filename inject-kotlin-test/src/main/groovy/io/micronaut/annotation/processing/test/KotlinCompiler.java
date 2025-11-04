@@ -331,7 +331,7 @@ public class KotlinCompiler {
         }
     }
 
-    private static class ClassElementTypeElementSymbolProcessorProvider extends TypeElementSymbolProcessorProvider {
+    private static final class ClassElementTypeElementSymbolProcessorProvider extends TypeElementSymbolProcessorProvider {
         Consumer<ClassElement> classElements;
 
         public ClassElementTypeElementSymbolProcessorProvider(Consumer<ClassElement> classElements) {

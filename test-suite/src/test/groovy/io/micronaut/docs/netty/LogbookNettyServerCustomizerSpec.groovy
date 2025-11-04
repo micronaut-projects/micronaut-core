@@ -498,7 +498,7 @@ class LogbookNettyServerCustomizerSpec extends Specification {
         }
     }
 
-    private static class EmbeddedChannelId implements ChannelId {
+    private static final class EmbeddedChannelId implements ChannelId {
         @Override
         String asShortText() {
             return toString()
@@ -515,7 +515,7 @@ class LogbookNettyServerCustomizerSpec extends Specification {
         }
     }
 
-    private static class EmbeddedServerChannel extends EmbeddedChannel implements ServerChannel {
+    private static final class EmbeddedServerChannel extends EmbeddedChannel implements ServerChannel {
 
     }
 }

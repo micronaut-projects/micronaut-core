@@ -293,7 +293,7 @@ class Http1ResponseHandlerSpec extends Specification {
         channel.checkException()
     }
 
-    private static class ReadCounter extends ChannelOutboundHandlerAdapter {
+    private static final class ReadCounter extends ChannelOutboundHandlerAdapter {
         int reads = 0
 
         @Override
@@ -308,7 +308,7 @@ class Http1ResponseHandlerSpec extends Specification {
         }
     }
 
-    private static class SimpleListener implements Http1ResponseHandler.ResponseListener {
+    private static final class SimpleListener implements Http1ResponseHandler.ResponseListener {
         HttpResponse response
         CloseableByteBody body
 

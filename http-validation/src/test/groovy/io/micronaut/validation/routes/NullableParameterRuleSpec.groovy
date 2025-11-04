@@ -349,19 +349,19 @@ class Foo {
     String abc(@RequestBean Bean bean) {
         return "";
     }
-    
+
     @Introspected
-    private static class Bean {
-        
+    private static final class Bean {
+
         @Nullable
         @PathVariable
         private String abc;
-        
+
         public String getAbc() { return abc; }
         public void setAbc(String abc) { this.abc = abc; }
-        
+
     }
-    
+
 }
 
 """)
@@ -385,18 +385,18 @@ class Foo {
     String abc(@RequestBean Bean bean) {
         return "";
     }
-    
+
     @Introspected
-    private static class Bean {
-        
+    private static final class Bean {
+
         @PathVariable
         private Optional<String> abc;
-        
+
         public Optional<String> getAbc() { return abc; }
         public void setAbc(Optional<String> abc) { this.abc = abc; }
 
     }
-    
+
 }
 
 """)
@@ -419,17 +419,17 @@ class Foo {
     String abc(@RequestBean Bean bean) {
         return "";
     }
-    
+
     @Introspected
-    private static class Bean {
-        
+    private static final class Bean {
+
         @PathVariable
         private String abc;
-        
+
         public String getAbc() { return abc; }
         public void setAbc(String abc) { this.abc = abc; }
     }
-    
+
 }
 
 """)
@@ -452,18 +452,18 @@ class Foo {
     String abc(@RequestBean Bean bean) {
         return "";
     }
-    
+
     @Introspected
-    private static class Bean {
-        
+    private static final class Bean {
+
         @PathVariable(defaultValue = "x")
         private String abc;
-        
+
         public String getAbc() { return abc; }
         public void setAbc(String abc) { this.abc = abc; }
-        
+
     }
-    
+
 }
 
 """)
@@ -490,17 +490,17 @@ class Foo {
     String abc(@RequestBean Bean bean) {
         return "";
     }
-    
+
     @Introspected
-    private static class Bean {
-        
+    private static final class Bean {
+
         @QueryValue
         private Optional<String> abc;
-        
+
         public Optional<String> getAbc() { return abc; }
         public void setAbc(Optional<String> abc) { this.abc = abc; }
     }
-    
+
 }
 
 """)
@@ -523,18 +523,18 @@ class Foo {
     String abc(@RequestBean Bean bean) {
         return "";
     }
-    
+
     @Introspected
-    private static class Bean {
-        
+    private static final class Bean {
+
         @QueryValue
         private String abc;
-        
+
         public String getAbc() { return abc; }
         public void setAbc(String abc) { this.abc = abc; }
-        
+
     }
-    
+
 }
 
 """)
@@ -560,19 +560,19 @@ class Foo {
     String abc(@RequestBean Bean bean) {
         return "";
     }
-    
+
     @Introspected
-    private static class Bean {
-        
+    private static final class Bean {
+
         @PathVariable
         private String abc;
-        
+
         public String getAbc() { return abc; }
         public void setAbc(String abc) { this.abc = abc; }
 
-        
+
     }
-    
+
 }
 
 """)
@@ -599,25 +599,25 @@ class Foo {
     String abc(@RequestBean Bean bean) {
         return "";
     }
-   
+
     @Introspected
-    private static class Bean {
-        
+    private static final class Bean {
+
         @PathVariable
         private String abc;
-        
+
         @Nullable
         @PathVariable
         private String def;
-        
+
         public String getAbc() { return abc; }
         public void setAbc(String abc) { this.abc = abc; }
-        
+
         public String getDef() { return def; }
         public void setDef(String def) { this.def = def; }
-        
+
     }
-    
+
 }
 
 """)
@@ -641,18 +641,18 @@ class Foo {
     String abc(@RequestBean Bean bean) {
         return "";
     }
-    
+
     @Introspected
-    private static class Bean {
-        
+    private static final class Bean {
+
         @PathVariable
         private String abc;
-        
+
         public String getAbc() { return abc; }
         public void setAbc(String abc) { this.abc = abc; }
-        
+
     }
-    
+
 }
 
 """)
@@ -676,19 +676,19 @@ class Foo {
     String abc(@RequestBean Bean bean) {
         return "";
     }
-    
+
     @Introspected
-    private static class Bean {
-        
+    private static final class Bean {
+
         @Nullable
         @PathVariable
         private String abc;
-        
+
         public String getAbc() { return abc; }
         public void setAbc(String abc) { this.abc = abc; }
-        
+
     }
-    
+
 }
 
 """)
@@ -710,18 +710,18 @@ class Foo {
     String abc(@RequestBean Bean bean) {
         return "";
     }
-    
+
     @Introspected
-    private static class Bean {
-        
+    private static final class Bean {
+
         @PathVariable
         private String abc;
-        
+
         public String getAbc() { return abc; }
         public void setAbc(String abc) { this.abc = abc; }
-        
+
     }
-    
+
 }
 
 """)

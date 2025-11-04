@@ -53,11 +53,11 @@ class JacksonDatabindMapperSpec extends Specification {
         testBean.value == BigInteger.valueOf(42)
     }
 
-    private static class TestBean {
+    private static final class TestBean {
         BigInteger value
     }
 
-    private static class TestDeserializer extends JsonDeserializer<TestBean> {
+    private static final class TestDeserializer extends JsonDeserializer<TestBean> {
         @Override
         TestBean deserialize(JsonParser p, DeserializationContext ctxt) throws IOException, JsonProcessingException {
             return new TestBean(value: p.codec.readValue(p, BigInteger))

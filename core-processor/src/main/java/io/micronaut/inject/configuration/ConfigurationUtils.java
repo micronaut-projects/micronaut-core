@@ -181,7 +181,7 @@ public final class ConfigurationUtils {
         return path;
     }
 
-    private static ClassElement resolveSuperInterface(ClassElement declaringType) {
+    private static final classElement resolveSuperInterface(ClassElement declaringType) {
         return declaringType.getInterfaces().stream()
                 .filter(tm -> tm.hasStereotype(ConfigurationReader.class))
                 .findFirst()

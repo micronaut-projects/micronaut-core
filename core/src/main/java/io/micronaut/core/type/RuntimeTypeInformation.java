@@ -148,7 +148,7 @@ final class RuntimeTypeInformation {
         return typeInfo.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
     }
 
-    private static class LazyTypeInfo {
+    private static final class LazyTypeInfo {
         private static final Collection<TypeInformationProvider> TYPE_INFORMATION_PROVIDERS;
 
         static {
@@ -158,7 +158,7 @@ final class RuntimeTypeInformation {
         }
     }
 
-    private static class LazyWrappers {
+    private static final class LazyWrappers {
         private static final Map<Class<?>, Argument<?>> WRAPPER_TO_TYPE = new HashMap<>(3);
 
         static {
