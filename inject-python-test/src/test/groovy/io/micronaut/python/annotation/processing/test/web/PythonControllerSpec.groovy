@@ -10,13 +10,23 @@ class PythonControllerSpec extends AbstractPythonTypeElementSpec {
     void "test python controller"() {
         given:
         def context = buildContext('''
+from jakarta.inject import Singleton
 from io.micronaut.http.annotation import Controller, Get
+
+@Singleton
+class MessageService:
+    def say_hello(self, name : str) -> str:
+        return f"Hello {name}"
 
 @Controller("/hello")
 class HelloController:
+    def __init__(self, messageService: MessageService):
+        self.messageService = messageService
+
     @Get("/{name}")
     def say_hello(self, name : str) -> str:
-        return f"Hello {name}"
+        return self.messageService.say_hello(name)
+
 ''', true)
 
         def embeddedServer = context.getBean(EmbeddedServer)
