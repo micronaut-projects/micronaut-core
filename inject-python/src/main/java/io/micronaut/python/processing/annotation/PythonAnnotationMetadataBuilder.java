@@ -23,6 +23,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.python.processing.visitor.ReturnDef;
 import org.graalvm.polyglot.Value;
 import org.jetbrains.annotations.Nullable;
@@ -60,6 +62,15 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     public PythonAnnotationMetadataBuilder(Map<String, DecoratorDef> decorators, PythonVisitorContext visitorContext) {
         this.decorators = decorators;
         this.visitorContext = visitorContext;
+    }
+
+    @Override
+    public AnnotationMetadata buildDeclared(ElementDef element) {
+        if (element instanceof AnnotationMetadataProvider provider) {
+            return provider.getAnnotationMetadata();
+        } else {
+            return super.buildDeclared(element);
+        }
     }
 
     @Override
@@ -195,8 +206,7 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
         return decoratorDef.members().entrySet().stream().collect(Collectors.toMap(
             entry -> {
                 String memberName = entry.getKey();
-                ClassElement memberType = resolveAnnotationMemberType(javaAnnotationType, memberName);
-                return new AnnotationMemberDef(memberName, memberType);
+                return resolveMemberDef(javaAnnotationType, memberName);
             },
             Map.Entry::getValue
         ));
@@ -210,22 +220,10 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
         return members.entrySet().stream().collect(Collectors.toMap(
             entry -> {
                 String memberName = entry.getKey();
-                ClassElement memberType = resolveAnnotationMemberType(javaAnnotationType, memberName);
-                return new AnnotationMemberDef(memberName,  memberType);
+                return resolveMemberDef(javaAnnotationType, memberName);
             },
             Map.Entry::getValue
         ));
-    }
-
-    private static @Nullable ClassElement resolveAnnotationMemberType(ClassElement javaAnnotationType, String memberName) {
-        ClassElement memberType = null;
-        if (javaAnnotationType != null) {
-            memberType = javaAnnotationType.getEnclosedElement(ElementQuery.ALL_METHODS.onlyInstance()
-                .named(memberName))
-                .map(MethodElement::getReturnType)
-                .orElse(null);
-        }
-        return memberType;
     }
 
     private @Nullable ClassElement getJavaAnnotationType(DecoratorDef annotationMirror) {
@@ -242,6 +240,9 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
 
     @Override
     protected <K extends Annotation> Optional<AnnotationValue<K>> getAnnotationValues(ElementDef originatingElement, ElementDef member, Class<K> annotationType) {
+        if (member instanceof AnnotationMemberDef memberDef) {
+            return memberDef.getAnnotationMetadata().findAnnotation(annotationType);
+        }
         return Optional.empty();
     }
 
@@ -292,7 +293,32 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
 
     @Override
     protected ElementDef getAnnotationMember(ElementDef annotationElement, CharSequence member) {
-        return null;
+        String memberName = member.toString();
+        ClassElement javaAnnotationType = getJavaAnnotationType(annotationElement.name());
+        if (javaAnnotationType == null) {
+            return null;
+        } else {
+            return resolveMemberDef(javaAnnotationType, memberName);
+        }
+    }
+
+    private static @Nullable AnnotationMemberDef resolveMemberDef(ClassElement javaAnnotationType, String memberName) {
+        MethodElement annotationMember = resolveAnnotationMember(javaAnnotationType, memberName);
+        if (annotationMember == null) {
+            return null;
+        }
+        return new AnnotationMemberDef(
+            memberName,
+            annotationMember.getReturnType(),
+            annotationMember.getAnnotationMetadata()
+        );
+    }
+
+    private static @Nullable MethodElement resolveAnnotationMember(ClassElement javaAnnotationType, String memberName) {
+        return javaAnnotationType
+                .getEnclosedElement(ElementQuery.ALL_METHODS.onlyInstance()
+                .named(memberName))
+                .orElse(null);
     }
 
     @Override

@@ -15,6 +15,8 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ast.ClassElement;
 
@@ -32,10 +34,19 @@ import java.util.Objects;
  * @since 5.0.0
  */
 public record AnnotationMemberDef(String name,
-                                  @Nullable ClassElement memberType) implements ElementDef {
+                                  @Nullable ClassElement memberType,
+                                  @Nullable AnnotationMetadata annotationMetadata) implements ElementDef, AnnotationMetadataProvider {
     @Override
     public List<DecoratorDef> decorators() {
         return List.of();
+    }
+
+    @Override
+    public AnnotationMetadata getAnnotationMetadata() {
+        if (annotationMetadata == null) {
+            return AnnotationMetadata.EMPTY_METADATA;
+        }
+        return annotationMetadata;
     }
 
     public AnnotationMemberDef {

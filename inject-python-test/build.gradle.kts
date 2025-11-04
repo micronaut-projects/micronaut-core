@@ -15,6 +15,9 @@ dependencies {
 
     testImplementation(platform(libs.test.boms.micronaut.validation))
     testImplementation(libs.micronaut.validation)
+    testImplementation(projects.micronautHttpServerNetty)
+    testImplementation(projects.micronautHttpClient)
+    testImplementation(projects.micronautJacksonDatabind)
 }
 
 tasks {
