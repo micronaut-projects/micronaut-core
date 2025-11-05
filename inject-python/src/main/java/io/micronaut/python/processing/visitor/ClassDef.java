@@ -97,9 +97,24 @@ public record ClassDef(
 
     public ClassDef withFunction(FunctionDef function) {
         Objects.requireNonNull(function, "Function cannot be null");
+        function = function.withClassDef(this);
         List<FunctionDef> functions = new ArrayList<>(this.functions);
         functions.add(function);
-        return new ClassDef(name, packageName, bases, decorators, typeParams, functions, attributes, properties, constructor, isEnum, values, documentation);
+        ClassDef newClassDef = new ClassDef(
+            name,
+            packageName,
+            bases,
+            decorators,
+            typeParams,
+            functions,
+            attributes,
+            properties,
+            constructor,
+            isEnum,
+            values,
+            documentation
+        );
+        return newClassDef;
     }
 
     public ClassDef withAttribute(AttributeDef attribute) {

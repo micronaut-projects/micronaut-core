@@ -33,6 +33,7 @@ import java.util.Objects;
  * @param typeParams The type parameters.
  * @param documentation The function documentation string.
  * @param isAbstract Whether the function is abstract (decorated with @abstractmethod).
+ * @param declaringClass Declaring class, can be null if there is none
  * @see <a href="https://docs.python.org/3/library/ast.html#ast.FunctionDef">Python AST FunctionDef</a>
  */
 public record FunctionDef(
@@ -43,7 +44,8 @@ public record FunctionDef(
     String typeComment,
     List<Object> typeParams,
     String documentation,
-    boolean isAbstract
+    boolean isAbstract,
+    ClassDef declaringClass
 ) implements ElementDef {
 
     public static final String CONSTRUCTOR_NAME = "__init__";
@@ -64,39 +66,43 @@ public record FunctionDef(
 
     // Simplified constructors for easier Python interop
     public FunctionDef(String name, ArgumentsDef arguments, List<DecoratorDef> decorators, ReturnDef returnType) {
-        this(name, arguments, decorators, returnType, "", java.util.List.of(), null, false);
+        this(name, arguments, decorators, returnType, "", java.util.List.of(), null, false, null);
     }
 
     public FunctionDef(String name, ArgumentsDef arguments, ReturnDef returnType) {
-        this(name, arguments, java.util.List.of(), returnType, "", java.util.List.of(), null, false);
+        this(name, arguments, java.util.List.of(), returnType, "", java.util.List.of(), null, false, null);
     }
 
     public FunctionDef(String name) {
-        this(name, ArgumentsDef.empty(), java.util.List.of(), ReturnDef.none(), "", java.util.List.of(), null, false);
+        this(name, ArgumentsDef.empty(), java.util.List.of(), ReturnDef.none(), "", java.util.List.of(), null, false, null);
     }
 
     public FunctionDef(String name, List<DecoratorDef> decoratorList) {
-        this(name, ArgumentsDef.empty(), decoratorList, ReturnDef.none(), "", java.util.List.of(), null, false);
+        this(name, ArgumentsDef.empty(), decoratorList, ReturnDef.none(), "", java.util.List.of(), null, false, null);
     }
 
     // Backward compatibility constructors
     public FunctionDef(String name, List<String> argumentNames, List<String> argumentTypes, List<DecoratorDef> decorators, String returnTypeAnnotation) {
         this(name, createArgumentsDef(argumentNames, argumentTypes), decorators,
              returnTypeAnnotation != null && !returnTypeAnnotation.isEmpty() ? ReturnDef.of(returnTypeAnnotation) : ReturnDef.none(),
-             "", java.util.List.of(), null, false);
+             "", java.util.List.of(), null, false, null);
     }
 
     public FunctionDef(String name, List<String> argumentNames, List<String> argumentTypes, String returnTypeAnnotation) {
         this(name, createArgumentsDef(argumentNames, argumentTypes), java.util.List.of(),
              returnTypeAnnotation != null && !returnTypeAnnotation.isEmpty() ? ReturnDef.of(returnTypeAnnotation) : ReturnDef.none(),
-             "", java.util.List.of(), null, false);
+             "", java.util.List.of(), null, false, null);
     }
 
     // Constructor for Python interop with return type decorators
     public FunctionDef(String name, ArgumentsDef arguments, List<DecoratorDef> decorators, String returnTypeAnnotation, List<DecoratorDef> returnTypeDecorators) {
         this(name, arguments, decorators,
              returnTypeAnnotation != null && !returnTypeAnnotation.isEmpty() ? ReturnDef.of(returnTypeAnnotation, returnTypeDecorators) : ReturnDef.none(),
-             "", java.util.List.of(), null, false);
+             "", java.util.List.of(), null, false, null);
+    }
+
+    public FunctionDef(String name, ArgumentsDef arguments, List<DecoratorDef> decorators, ReturnDef returnType, String typeComment, List<Object> typeParams, String documentation, boolean isAbstract) {
+        this(name, arguments, decorators, returnType, typeComment, typeParams, documentation, isAbstract, null);
     }
 
     private static ArgumentsDef createArgumentsDef(List<String> argumentNames, List<String> argumentTypes) {
@@ -114,5 +120,19 @@ public record FunctionDef(
      */
     public ReturnDef returnType() {
         return returnType;
+    }
+
+    public FunctionDef withClassDef(ClassDef classDef) {
+        return new FunctionDef(
+            name,
+            arguments,
+            decorators,
+            returnType,
+            typeComment,
+            typeParams,
+            documentation,
+            isAbstract,
+            classDef
+        );
     }
 }

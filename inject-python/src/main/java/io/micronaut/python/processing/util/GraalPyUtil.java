@@ -19,6 +19,9 @@ import java.util.Map;
 import java.util.Objects;
 
 import io.micronaut.core.annotation.AnnotationClassValue;
+import io.micronaut.inject.visitor.VisitorContext;
+import io.micronaut.python.processing.PythonProcessingEnvironment;
+import io.micronaut.python.processing.visitor.PythonClassElement;
 import org.graalvm.polyglot.Value;
 
 import io.micronaut.inject.ast.ClassElement;
@@ -38,10 +41,11 @@ public final class GraalPyUtil {
      * Utility method to convert GraalPy Value objects to Java types.
      * This extracts the common type conversion logic used for both annotations and attribute values.
      *
-     * @param value the GraalPy Value to convert
+     * @param value          the GraalPy Value to convert
+     * @param visitorContext The visitor context
      * @return the converted Java object, or the original value if conversion is not possible
      */
-    public static Object convertValueToJava(Value value) {
+    public static Object convertValueToJava(Value value, VisitorContext visitorContext) {
         if (value == null || value.isNull()) {
             return null;
         } else if (value.isBoolean()) {
@@ -103,7 +107,7 @@ public final class GraalPyUtil {
                     Value firstElement = value.getArrayElement(0);
                     if (firstElement != null) {
                         // Use first element to determine array type
-                        Object convertedFirst = convertValueToJava(firstElement);
+                        Object convertedFirst = convertValueToJava(firstElement, visitorContext);
                         Class<?> componentType = getComponentType(convertedFirst);
 
                         // Convert all elements
@@ -113,7 +117,7 @@ public final class GraalPyUtil {
                         for (long i = 1; i < size; i++) {
                             Value nextElement = value.getArrayElement(i);
                             if (nextElement != null) {
-                                elements.add(convertValueToJava(nextElement));
+                                elements.add(convertValueToJava(nextElement, visitorContext));
                             }
                         }
 
@@ -469,11 +473,12 @@ public final class GraalPyUtil {
      * Converts GraalPy Value objects to Java types based on the provided ClassElement type information.
      * This method handles type-specific conversion for annotation members and other typed values.
      *
-     * @param value        the GraalPy Value to convert
-     * @param classElement the ClassElement representing the target Java type
+     * @param value          the GraalPy Value to convert
+     * @param classElement   the ClassElement representing the target Java type
+     * @param visitorContext The visitor context
      * @return the converted Java object, or the original value if conversion is not possible
      */
-    public static Object convertValueToJava(Value value, ClassElement classElement) {
+    public static Object convertValueToJava(Value value, ClassElement classElement, PythonVisitorContext visitorContext) {
         Objects.requireNonNull(classElement, "ClassElement cannot be null");
 
         if (value == null || value.isNull()) {
@@ -488,7 +493,7 @@ public final class GraalPyUtil {
                 if (value.fitsInByte()) {
                     return value.asByte();
                 } else {
-                    return ((Number) convertValueToJava(value)).byteValue();
+                    return ((Number) convertValueToJava(value, visitorContext)).byteValue();
                 }
             } else if (classElement.equals(PrimitiveElement.CHAR)) {
                 String str = value.asString();
@@ -499,25 +504,25 @@ public final class GraalPyUtil {
                 if (value.fitsInFloat()) {
                     return value.asFloat();
                 } else {
-                    return ((Number) convertValueToJava(value)).floatValue();
+                    return ((Number) convertValueToJava(value, visitorContext)).floatValue();
                 }
             } else if (classElement.equals(PrimitiveElement.INT)) {
                 if (value.fitsInInt()) {
                     return value.asInt();
                 } else {
-                    return ((Number) convertValueToJava(value)).intValue();
+                    return ((Number) convertValueToJava(value, visitorContext)).intValue();
                 }
             } else if (classElement.equals(PrimitiveElement.LONG)) {
                 if (value.fitsInLong()) {
                     return value.asLong();
                 } else {
-                    return ((Number) convertValueToJava(value)).longValue();
+                    return ((Number) convertValueToJava(value, visitorContext)).longValue();
                 }
             } else if (classElement.equals(PrimitiveElement.SHORT)) {
                 if (value.fitsInShort()) {
                     return value.asShort();
                 } else {
-                    return ((Number) convertValueToJava(value)).shortValue();
+                    return ((Number) convertValueToJava(value, visitorContext)).shortValue();
                 }
             }
         }
@@ -618,7 +623,7 @@ public final class GraalPyUtil {
                         for (int i = 0; i < size; i++) {
                             Value element = value.getArrayElement(i);
                             if (element != null) {
-                                array[i] = toClassValue(element);
+                                array[i] = toClassValue(element, visitorContext);
                             }
                         }
                         return array;
@@ -628,7 +633,7 @@ public final class GraalPyUtil {
                         for (int i = 0; i < size; i++) {
                             Value element = value.getArrayElement(i);
                             if (element != null) {
-                                array[i] = convertValueToJava(element, componentType);
+                                array[i] = convertValueToJava(element, componentType, visitorContext);
                             }
                         }
                         return array;
@@ -639,7 +644,7 @@ public final class GraalPyUtil {
 
         // Handle java.lang.Class type
         if ("java.lang.Class".equals(classElement.getName())) {
-            return toClassValue(value);
+            return toClassValue(value, visitorContext);
         }
 
         // Handle annotations - check if value has members that look like annotation members
@@ -651,7 +656,7 @@ public final class GraalPyUtil {
                     Value memberValue = value.getMember(memberName);
                     if (memberValue != null) {
                         // For annotation members, we don't have type information, so use the existing conversion
-                        annotationValues.put(memberName, convertValueToJava(memberValue));
+                        annotationValues.put(memberName, convertValueToJava(memberValue, visitorContext));
                     }
                 }
                 if (!annotationValues.isEmpty()) {
@@ -663,12 +668,20 @@ public final class GraalPyUtil {
         }
 
         // Fall back to the original conversion logic
-        return convertValueToJava(value);
+        return convertValueToJava(value, visitorContext);
     }
 
-    private static @NotNull AnnotationClassValue<?> toClassValue(Value value) {
+    private static @NotNull AnnotationClassValue<?> toClassValue(Value value, PythonVisitorContext visitorContext) {
         String typeName = value.asString();
         Class<?> classReference = toClassReference(typeName);
+        if (classReference == null && !typeName.contains(".")) {
+            PythonProcessingEnvironment environment = visitorContext.getProcessingEnvironment();
+            Map<String, ClassElement> classes = environment.classes();
+            String qualified = PythonClassElement.PYTHON_DEFAULT_PACKAGE + "." + typeName;
+            if (classes.containsKey(qualified)) {
+                return new AnnotationClassValue<>(qualified);
+            }
+        }
         String className = classReference != null ? classReference.getCanonicalName() : typeName;
         if (classReference == null) {
             return new AnnotationClassValue<>(className);

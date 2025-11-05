@@ -17,6 +17,7 @@ package io.micronaut.python.processing.visitor;
 
 import java.util.Objects;
 
+import io.micronaut.inject.visitor.VisitorContext;
 import org.graalvm.polyglot.Value;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -75,7 +76,7 @@ public final class PythonFieldElement extends AbstractPythonElement implements F
         AttributeDef attr = getNativeType();
         if (attr.value() != null) {
             // Try to convert Python literals to Java types
-            return convertPythonValueToJava(attr.value());
+            return convertPythonValueToJava(attr.value(), environment.visitorContext());
         }
         return null;
     }
@@ -109,16 +110,16 @@ public final class PythonFieldElement extends AbstractPythonElement implements F
         }
         // Infer from value if no annotation
         if (attributeDef.value() != null) {
-            return inferTypeFromValue(attributeDef.value());
+            return inferTypeFromValue(attributeDef.value(), environment.visitorContext());
         }
         return environment.visitorContext().getClassElement(Object.class).orElse(null);
     }
 
-    private ClassElement inferTypeFromValue(Value value) {
+    private ClassElement inferTypeFromValue(Value value, PythonVisitorContext visitorContext) {
         if (value == null) {
             return environment.visitorContext().getClassElement(Object.class).orElse(null);
         }
-        Object javaValue = GraalPyUtil.convertValueToJava(value);
+        Object javaValue = GraalPyUtil.convertValueToJava(value, visitorContext);
         if (javaValue instanceof Integer) {
             return environment.visitorContext().getClassElement(int.class).orElse(null);
         } else if (javaValue instanceof Double || javaValue instanceof Float) {
@@ -131,11 +132,11 @@ public final class PythonFieldElement extends AbstractPythonElement implements F
         return environment.visitorContext().getClassElement(Object.class).orElse(null);
     }
 
-    private Object convertPythonValueToJava(Value pythonValue) {
+    private Object convertPythonValueToJava(Value pythonValue, VisitorContext visitorContext) {
         if (pythonValue == null) {
             return null;
         }
-        return GraalPyUtil.convertValueToJava(pythonValue);
+        return GraalPyUtil.convertValueToJava(pythonValue, visitorContext);
     }
 
     @Override
