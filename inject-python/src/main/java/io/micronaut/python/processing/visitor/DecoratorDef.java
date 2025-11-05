@@ -113,4 +113,18 @@ public record DecoratorDef(
             stereotypes = Collections.unmodifiableList(stereotypes);
         }
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        DecoratorDef that = (DecoratorDef) o;
+        return Objects.equals(name, that.name) && Objects.equals(annotationName, that.annotationName);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(name, annotationName);
+    }
 }

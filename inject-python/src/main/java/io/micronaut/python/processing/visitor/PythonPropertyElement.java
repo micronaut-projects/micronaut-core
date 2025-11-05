@@ -111,6 +111,20 @@ public final class PythonPropertyElement extends AbstractPythonElement implement
     }
 
     @Override
+    public boolean equals(Object o) {
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        PythonPropertyElement that = (PythonPropertyElement) o;
+        return Objects.equals(propertyDef.name(), that.propertyDef.name()) && Objects.equals(owningType, that.owningType);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(propertyDef.name(), owningType);
+    }
+
+    @Override
     public ElementAnnotationMetadata getElementAnnotationMetadata() {
         return annotationMetadata;
     }
@@ -331,25 +345,6 @@ public final class PythonPropertyElement extends AbstractPythonElement implement
         }
 
         return Optional.empty();
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-        PythonPropertyElement that = (PythonPropertyElement) o;
-
-        return that.getNativeType().name().equals(getNativeType().name()) &&
-            owningType.equals(that.owningType);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(getNativeType().name(), owningType);
     }
 
     @Override
