@@ -18,6 +18,7 @@ package io.micronaut.python.processing;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -91,15 +92,24 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     String typeName = element.getName();
                     var builder = ClassDef.builder(typeName);
                     Collection<ClassElement> interfaces = classElement.getInterfaces();
-                    for (ClassElement anInterface : interfaces) {
-                        builder.addSuperinterface(TypeDef.of(anInterface));
-
-                    }
-
                     builder.addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.ValueCoercible"));
 
                     FieldDef pythonValue = FieldDef.builder("graalpyInternalValue")
                         .ofType(POLYGLOT_VALUE).addModifiers(Modifier.FINAL, Modifier.PRIVATE).build();
+
+                    for (ClassElement anInterface : interfaces) {
+                        builder.addSuperinterface(TypeDef.of(anInterface));
+                        List<MethodElement> methods = anInterface.getMethods();
+                        Set<MethodElement> methodSet = new LinkedHashSet<>();
+                        for (MethodElement method : methods) {
+                            if (methodSet.contains(method)) {
+                                continue;
+                            }
+                            addBridgeMethod(method, builder, pythonValue);
+                            methodSet.add(method);
+                        }
+                    }
+
                     builder.addField(pythonValue);
 
                     builder.addMethod(
