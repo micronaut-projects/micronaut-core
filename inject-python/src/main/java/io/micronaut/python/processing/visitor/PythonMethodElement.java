@@ -103,6 +103,8 @@ public sealed class PythonMethodElement extends AbstractPythonElement implements
         return false;
     }
 
+
+
     @Override
     public boolean isReflectionRequired(ClassElement callingType) {
         // since we are in charge of Python stub generation, this doesn't make sense

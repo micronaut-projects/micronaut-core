@@ -27,6 +27,7 @@ import javax.lang.model.element.Modifier;
 import io.micronaut.aop.Around;
 import io.micronaut.aop.InterceptorBinding;
 import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.ConfigurationReader;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Value;
 
@@ -257,7 +258,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     // For now, we'll look for fields that have any annotation and check for Inject in metadata
                     List<PropertyElement> beanProperties = element.getBeanProperties();
                     for (PropertyElement beanProperty : beanProperties) {
-                        boolean isIntrospected = element.hasStereotype(Introspected.class);
+                        boolean isIntrospected = element.hasStereotype(Introspected.class) || element.hasStereotype(ConfigurationReader.class);
                         if (isIntrospected || beanProperty.hasStereotype(AnnotationUtil.INJECT)) {
                             addSetter(beanProperty, builder, pythonValue);
                         }
@@ -328,9 +329,12 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     private static void addSetter(PropertyElement beanProperty, ClassDef.ClassDefBuilder builder, FieldDef pythonValue) {
+        TypeDef returnType = beanProperty.getWriteMethod()
+            .map(MethodElement::getReturnType)
+            .map(TypeDef::of).orElse(TypeDef.VOID);
         MethodDef.MethodDefBuilder propertySetter = MethodDef
             .builder(beanProperty.getName())
-            .returns(TypeDef.VOID);
+            .returns(returnType);
 
         propertySetter.addParameter(TypeDef.of(beanProperty.getType()));
 
@@ -343,12 +347,21 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 param = methodParameters.get(0);
             }
             // Call the Python injection method
-            return pythonValueField.invoke(
+            ExpressionDef.InvokeInstanceMethod result = pythonValueField.invoke(
                 "putMember",
                 TypeDef.VOID,
                 ExpressionDef.constant(beanProperty.getName()),
                 param
             );
+            if (returnType.equals(TypeDef.VOID)) {
+                return result;
+            } else {
+                return StatementDef.multi(
+                    result,
+                    ExpressionDef.nullValue().returning()
+                );
+            }
+
         })));
     }
 

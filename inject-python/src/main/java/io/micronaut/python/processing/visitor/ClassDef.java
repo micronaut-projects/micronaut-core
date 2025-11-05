@@ -92,7 +92,14 @@ public record ClassDef(
     }
 
     public ClassDef withConstructor(FunctionDef constructor) {
-        return new ClassDef(name, packageName, bases, decorators, typeParams, functions, attributes, properties, constructor, isEnum, values, documentation);
+        return new ClassDef(
+            name,
+            packageName,
+            bases,
+            decorators, typeParams,
+            functions,
+            attributes,
+            properties, constructor.withClassDef(this), isEnum, values, documentation);
     }
 
     public ClassDef withFunction(FunctionDef function) {
