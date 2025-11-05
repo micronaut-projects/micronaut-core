@@ -13,3 +13,7 @@ afterEvaluate {
 dependencies {
     testRuntimeOnly(libs.junit.platform.launcher)
 }
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}

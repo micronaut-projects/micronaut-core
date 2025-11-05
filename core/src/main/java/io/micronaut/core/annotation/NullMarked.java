@@ -54,7 +54,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  * </ul>
  *
  * @author Denis Stepanov
- * @see 4.10
+ * @since 4.10
  */
 @Documented
 @Target({MODULE, PACKAGE, TYPE, METHOD, CONSTRUCTOR})

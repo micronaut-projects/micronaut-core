@@ -61,3 +61,9 @@ ksp {
     arg("kotlin.allopen.annotations", "io.micronaut.docs.aop.around.OpenSingleton|io.micronaut.docs.aop.around.AnotherOpenSingleton")
 }
 // end::ksp[]
+
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
+    }
+}

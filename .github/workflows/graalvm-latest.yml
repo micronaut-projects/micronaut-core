@@ -8,11 +8,11 @@ on:
   push:
     branches:
       - master
-      - '[1-9]+.[0-9]+.x'
+      - '[0-9]+.[0-9]+.x'
   pull_request:
     branches:
       - master
-      - '[1-9]+.[0-9]+.x'
+      - '[0-9]+.[0-9]+.x'
 jobs:
   build_matrix:
     if: github.repository != 'micronaut-projects/micronaut-project-template'
@@ -28,6 +28,8 @@ jobs:
       - name: Build Matrix
         uses: micronaut-projects/github-actions/graalvm/build-matrix@master
         id: build-matrix
+        with:
+          java-version: '17'
   build:
     needs: build_matrix
     if: github.repository != 'micronaut-projects/micronaut-project-template'
@@ -42,12 +44,18 @@ jobs:
       DEVELOCITY_CACHE_USERNAME: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME }}
       DEVELOCITY_CACHE_PASSWORD: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD }}
     steps:
+      - name: Remove system JDKs
+        run: |
+          sudo rm -rf /usr/lib/jvm/*
+          unset JAVA_HOME
+          export PATH=$(echo "$PATH" | tr ':' '\n' | grep -v '/usr/lib/jvm' | paste -sd:)
       - uses: actions/checkout@v5
       - name: Pre-Build Steps
         uses: micronaut-projects/github-actions/graalvm/pre-build@master
         id: pre-build
         with:
           distribution: 'graalvm'
+          gradle-java: '17'
           java: ${{ matrix.java }}
       - name: Build Steps
         uses: micronaut-projects/github-actions/graalvm/build@master

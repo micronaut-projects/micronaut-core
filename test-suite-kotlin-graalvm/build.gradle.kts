@@ -1,4 +1,5 @@
 plugins {
+    id("io.micronaut.build.internal.convention-test-library")
     id("org.graalvm.buildtools.native")
     alias(libs.plugins.managed.kotlin.jvm)
     alias(libs.plugins.managed.ksp)
@@ -51,10 +52,22 @@ graalvmNative {
     }
 }
 
-configurations.testRuntimeClasspath {
-    resolutionStrategy.eachDependency {
-        if (requested.group == "org.jetbrains.kotlin") {
-            useVersion(libs.versions.managed.kotlin.asProvider().get())
+configurations {
+    testRuntimeClasspath {
+        resolutionStrategy.eachDependency {
+            if (requested.group == "org.jetbrains.kotlin") {
+                useVersion(libs.versions.managed.kotlin.asProvider().get())
+            }
         }
+    }
+    nativeImageTestClasspath {
+        exclude(group = "org.apache.groovy")
+        exclude(group = "org.spockframework")
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
     }
 }
