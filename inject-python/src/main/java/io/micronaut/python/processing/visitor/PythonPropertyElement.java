@@ -23,7 +23,6 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
-import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.annotation.PropertyElementAnnotationMetadata;
@@ -270,31 +269,27 @@ public final class PythonPropertyElement extends AbstractPythonElement implement
 
     private MethodElement createSyntheticGetter() {
         // Create a synthetic getter method that returns the property type
-        return io.micronaut.inject.ast.MethodElement.of(
-            getDeclaringType(),
-            this.annotationMetadata != null ? this.annotationMetadata : this.field != null ? this.field.getTargetAnnotationMetadata() : AnnotationMetadata.EMPTY_METADATA,
-            getGenericType(),  // return type = property type
-            getGenericType(),  // generic return type = property type
-            getName()          // method name = property name
-            // no parameters for getter
+        return new PythonPropertyGetterMethodElement(
+            getName(),
+            getType(),
+            this.annotationMetadata != null ? this.annotationMetadata : AnnotationMetadata.EMPTY_METADATA,
+            environment,
+            declaringType,
+            owningType,
+            getElementAnnotationMetadataFactory()
         );
     }
 
     private MethodElement createSyntheticSetter() {
-        // Create a parameter for the setter (same type as property)
-        var param = io.micronaut.inject.ast.ParameterElement.of(
-            getType(),
-            "value"
-        );
-
         // Create a synthetic setter method that takes one parameter
-        return io.micronaut.inject.ast.MethodElement.of(
-            getDeclaringType(),
-            this.annotationMetadata != null ? this.annotationMetadata : this.field != null ? this.field.getTargetAnnotationMetadata() : AnnotationMetadata.EMPTY_METADATA,
-            PrimitiveElement.VOID,  // return type = void
-            PrimitiveElement.VOID,  // generic return type = void
-            getName(),              // method name = property name
-            param                   // single parameter
+        return new PythonPropertySetterMethodElement(
+            getName(),
+            getType(),
+            this.annotationMetadata != null ? this.annotationMetadata : AnnotationMetadata.EMPTY_METADATA,
+            environment,
+            declaringType,
+            owningType,
+            getElementAnnotationMetadataFactory()
         );
     }
 

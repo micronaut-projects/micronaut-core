@@ -11,6 +11,28 @@ ArgumentsDef = java.type("io.micronaut.python.processing.visitor.ArgumentsDef")
 ArgumentDef = java.type("io.micronaut.python.processing.visitor.ArgumentDef")
 ReturnDef = java.type("io.micronaut.python.processing.visitor.ReturnDef")
 
+def extract_decorator_name(node):
+    """
+    Extract the decorator name from an AST decorator node.
+    Returns the decorator name as a string, or None if not extractable.
+    """
+    if isinstance(node, ast.Name):
+        return node.id
+    elif isinstance(node, ast.Attribute):
+        # Handle qualified names like module.Decorator
+        names = []
+        current = node
+        while isinstance(current, ast.Attribute):
+            names.insert(0, current.attr)
+            current = current.value
+        if isinstance(current, ast.Name):
+            names.insert(0, current.id)
+        return '.'.join(names)
+    elif isinstance(node, ast.Call):
+        # For decorator calls like @decorator(args), extract the function name
+        return extract_decorator_name(node.func)
+    return None
+
 def is_abstract_method(funcdef):
     """
     Returns True if the ast.FunctionDef has an @abstractmethod decorator.
@@ -40,11 +62,21 @@ class PrintNodeVisitor(ast.NodeVisitor):
     def visit(self, node: ast.AST) -> ast.AST:
         match node:
             case ast.ClassDef():
-                decorators = [
-                    decorator_to_function(self, d)
-                    for d in node.decorator_list
-                    if decorator_to_function(self, d) is not None
-                ]
+                # Capture all decorator names, not just Micronaut annotations
+                # This allows us to detect @dataclass and other non-Micronaut decorators
+                decorators = []
+                for d in node.decorator_list:
+                    # First try to get it as a Micronaut decorator
+                    micronaut_decorator = decorator_to_function(self, d)
+                    if micronaut_decorator is not None:
+                        decorators.append(micronaut_decorator)
+                    else:
+                        # For non-Micronaut decorators, extract the name and create a simple DecoratorDef
+                        decorator_name = extract_decorator_name(d)
+                        if decorator_name:
+                            # Create a DecoratorDef for non-Micronaut decorators
+                            simple_decorator = DecoratorDef(decorator_name, decorator_name, None, {}, [])
+                            decorators.append(simple_decorator)
                 # Extract base classes
                 bases = []
                 for base in node.bases:

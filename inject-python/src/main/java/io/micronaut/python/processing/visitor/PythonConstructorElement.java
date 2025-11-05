@@ -15,10 +15,14 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import io.micronaut.context.annotation.ConfigurationInject;
+import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
+
+import java.util.List;
 
 /**
  * Represents a Python constructor as a Micronaut {@link ConstructorElement}.
@@ -48,6 +52,20 @@ public final class PythonConstructorElement extends PythonMethodElement implemen
                                     AbstractPythonClassElement owningType,
                                     ElementAnnotationMetadataFactory metadataFactory) {
         super(constructorDef, environment, declaringType, owningType, metadataFactory);
+        List<DecoratorDef> decorators = constructorDef.declaringClass().decorators();
+        for (DecoratorDef decorator : decorators) {
+            if (owningType.hasDeclaredStereotype(ConfigurationReader.class) &&
+                decorator.name().equals("dataclass")) {
+                // data classes usee configuration inject
+                annotate(ConfigurationInject.class);
+                break;
+            }
+        }
+    }
+
+    @Override
+    public boolean isPublic() {
+        return true;
     }
 
     @Override
