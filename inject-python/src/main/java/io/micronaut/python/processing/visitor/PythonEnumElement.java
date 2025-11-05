@@ -81,7 +81,7 @@ public final class PythonEnumElement extends AbstractPythonClassElement implemen
         return getNativeType().values().stream()
             .map(enumValue -> {
                 // Create a synthetic AttributeDef for the enum constant
-                AttributeDef constantDef = new AttributeDef(enumValue, getName(), getName(), null, List.of(), null, true);
+                AttributeDef constantDef = new AttributeDef(enumValue, getName(), getName(), null, List.of(), null, true, getNativeType());
                 return new PythonEnumConstantElement(constantDef, environment, this, this, environment.metadataFactory());
             })
             .collect(Collectors.toList());

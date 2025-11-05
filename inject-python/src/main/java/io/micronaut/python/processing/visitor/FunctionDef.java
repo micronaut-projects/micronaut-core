@@ -105,6 +105,20 @@ public record FunctionDef(
         this(name, arguments, decorators, returnType, typeComment, typeParams, documentation, isAbstract, null);
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        FunctionDef that = (FunctionDef) o;
+        return Objects.equals(name, that.name) && Objects.equals(declaringClass, that.declaringClass);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(name, declaringClass);
+    }
+
     private static ArgumentsDef createArgumentsDef(List<String> argumentNames, List<String> argumentTypes) {
         List<ArgumentDef> args = new ArrayList<>();
         for (int i = 0; i < argumentNames.size(); i++) {
@@ -125,7 +139,7 @@ public record FunctionDef(
     public FunctionDef withClassDef(ClassDef classDef) {
         return new FunctionDef(
             name,
-            arguments,
+            arguments.withDeclaringFunction(this),
             decorators,
             returnType,
             typeComment,

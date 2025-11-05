@@ -31,6 +31,7 @@ import java.util.Objects;
  * @param defaultValue The default value as a GraalPy Value, or null if no default.
  * @param decorators The decorators applied to this parameter.
  * @param documentation The parameter documentation string.
+ * @param declaringFunction The function that declares this argument.
  * @author Micronaut Team
  * @since 5.0.0
  */
@@ -40,20 +41,30 @@ public record ArgumentDef(
     String typeAnnotation,
     Object defaultValue,
     List<DecoratorDef> decorators,
-    String documentation
+    String documentation,
+    FunctionDef declaringFunction
 ) implements ElementDef {
 
     public ArgumentDef(String name, String typeAnnotation) {
-        this(name, typeAnnotation, typeAnnotation, null, List.of(), null);
+        this(name, typeAnnotation, typeAnnotation, null, List.of(), null, null);
     }
 
     public ArgumentDef(String name, String annotation, String typeAnnotation, Object defaultValue, List<DecoratorDef> decorators, String documentation) {
-        this.name = Objects.requireNonNull(name, "Argument name cannot be null");
-        this.annotation = annotation;
-        this.typeAnnotation = typeAnnotation;
-        this.defaultValue = defaultValue;
-        this.decorators = decorators != null ? decorators : List.of();
-        this.documentation = documentation;
+        this(name, annotation, typeAnnotation, defaultValue, decorators, documentation, null);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        ArgumentDef that = (ArgumentDef) o;
+        return Objects.equals(name, that.name) && Objects.equals(declaringFunction, that.declaringFunction);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(name, declaringFunction);
     }
 
     /**
@@ -64,7 +75,7 @@ public record ArgumentDef(
      * @return A new ArgumentDef
      */
     public static ArgumentDef of(String name, String typeAnnotation) {
-        return new ArgumentDef(name, typeAnnotation, typeAnnotation, null, List.of(), null);
+        return new ArgumentDef(name, typeAnnotation, typeAnnotation, null, List.of(), null, null);
     }
 
     /**
@@ -74,7 +85,7 @@ public record ArgumentDef(
      * @return A new ArgumentDef
      */
     public static ArgumentDef of(String name) {
-        return new ArgumentDef(name, null, null, null, List.of(), null);
+        return new ArgumentDef(name, null, null, null, List.of(), null, null);
     }
 
     /**
@@ -86,7 +97,7 @@ public record ArgumentDef(
      * @return A new ArgumentDef
      */
     public static ArgumentDef of(String name, String typeAnnotation, Object defaultValue) {
-        return new ArgumentDef(name, typeAnnotation, typeAnnotation, defaultValue, List.of(), null);
+        return new ArgumentDef(name, typeAnnotation, typeAnnotation, defaultValue, List.of(), null, null);
     }
 
     /**
@@ -99,7 +110,7 @@ public record ArgumentDef(
      * @return A new ArgumentDef
      */
     public static ArgumentDef of(String name, String typeAnnotation, Object defaultValue, String documentation) {
-        return new ArgumentDef(name, typeAnnotation, typeAnnotation, defaultValue, List.of(), documentation);
+        return new ArgumentDef(name, typeAnnotation, typeAnnotation, defaultValue, List.of(), documentation, null);
     }
 
     /**
@@ -114,6 +125,16 @@ public record ArgumentDef(
      * @return A new ArgumentDef
      */
     public static ArgumentDef of(String name, String annotation, String typeAnnotation, Object defaultValue, List<DecoratorDef> decorators, String documentation) {
-        return new ArgumentDef(name, annotation, typeAnnotation, defaultValue, decorators, documentation);
+        return new ArgumentDef(name, annotation, typeAnnotation, defaultValue, decorators, documentation, null);
+    }
+
+    /**
+     * Creates a new ArgumentDef with the given declaring function.
+     *
+     * @param declaringFunction The function that declares this argument
+     * @return A new ArgumentDef with the declaring function set
+     */
+    public ArgumentDef withDeclaringFunction(FunctionDef declaringFunction) {
+        return new ArgumentDef(name, annotation, typeAnnotation, defaultValue, decorators, documentation, declaringFunction);
     }
 }

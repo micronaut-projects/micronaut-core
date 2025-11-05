@@ -23,7 +23,7 @@ import org.graalvm.polyglot.Value;
 /**
  * An AttributeDef node represents a class attribute definition.
  * <p>
- * AttributeDef(identifier name, expr? annotation, expr? value, list[DecoratorDef] decorators, str? documentation, bool isStatic, str? typeName)
+ * AttributeDef(identifier name, expr? annotation, expr? value, list[DecoratorDef] decorators, str? documentation, bool isStatic, str? typeName, ClassDef declaringClass)
  * </p>
  *
  * @param name The name of the attribute.
@@ -33,6 +33,7 @@ import org.graalvm.polyglot.Value;
  * @param decorators The decorators.
  * @param documentation The documentation string.
  * @param isStatic Whether the attribute is static (class-level).
+ * @param declaringClass The class that declares this attribute.
  * @see <a href="https://docs.python.org/3/library/ast.html#ast.Assign">Python AST Assign</a>
  * @see <a href="https://docs.python.org/3/library/ast.html#ast.AnnAssign">Python AST AnnAssign</a>
  */
@@ -43,15 +44,16 @@ public record AttributeDef(
     Value value,
     List<DecoratorDef> decorators,
     String documentation,
-    boolean isStatic
+    boolean isStatic,
+    ClassDef declaringClass
 ) implements ElementDef {
 
     public AttributeDef(String name) {
-        this(name, null, null, null, List.of(), null, false);
+        this(name, null, null, null, List.of(), null, false, null);
     }
 
     public AttributeDef(String name, String annotation, Value value) {
-        this(name, annotation, annotation, value, List.of(), null, false);
+        this(name, annotation, annotation, value, List.of(), null, false, null);
     }
 
     public AttributeDef {
@@ -59,6 +61,30 @@ public record AttributeDef(
         if (decorators == null) {
             decorators = List.of();
         }
-        // declaringClassName can be null
+        // declaringClass can be null
+    }
+
+    /**
+     * Creates a new AttributeDef with the given declaring class.
+     *
+     * @param declaringClass The class that declares this attribute
+     * @return A new AttributeDef with the declaring class set
+     */
+    public AttributeDef withDeclaringClass(ClassDef declaringClass) {
+        return new AttributeDef(name, annotation, typeName, value, decorators, documentation, isStatic, declaringClass);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        AttributeDef that = (AttributeDef) o;
+        return Objects.equals(name, that.name) && Objects.equals(declaringClass, that.declaringClass);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(name, declaringClass);
     }
 }

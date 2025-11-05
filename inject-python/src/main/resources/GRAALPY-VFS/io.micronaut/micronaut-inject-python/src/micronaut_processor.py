@@ -273,7 +273,7 @@ class PrintNodeVisitor(ast.NodeVisitor):
                 is_static = False  # Regular Python attributes should be writable
                 type_name = None  # No type annotation for simple assignments
 
-                attr_def = JavaAttributeDef(attr_name, None, type_name, value, [], None, is_static)
+                attr_def = JavaAttributeDef(attr_name, None, type_name, value, [], None, is_static, None)
                 self.current_class_attributes.append(attr_def)
 
     def _handle_ann_assign(self, node):
@@ -315,7 +315,7 @@ class PrintNodeVisitor(ast.NodeVisitor):
                 # For Micronaut properties, treat annotated attributes as instance fields
                 is_static = False
 
-                attr_def = JavaAttributeDef(attr_name, annotation, type_name, value, decorators, None, is_static)
+                attr_def = JavaAttributeDef(attr_name, annotation, type_name, value, decorators, None, is_static, None)
                 self.current_class_attributes.append(attr_def)
                 self.last_attribute = attr_def
 
@@ -342,7 +342,8 @@ class PrintNodeVisitor(ast.NodeVisitor):
                     self.last_attribute.value(),
                     self.last_attribute.decorators(),
                     docstring.strip(),
-                    self.last_attribute.isStatic()
+                    self.last_attribute.isStatic(),
+                    None
                 )
                 # Replace the last attribute in the list
                 if self.current_class_attributes and self.current_class_attributes[-1] == self.last_attribute:

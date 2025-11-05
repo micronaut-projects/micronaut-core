@@ -107,7 +107,7 @@ public record ClassDef(
         function = function.withClassDef(this);
         List<FunctionDef> functions = new ArrayList<>(this.functions);
         functions.add(function);
-        ClassDef newClassDef = new ClassDef(
+        return new ClassDef(
             name,
             packageName,
             bases,
@@ -121,20 +121,23 @@ public record ClassDef(
             values,
             documentation
         );
-        return newClassDef;
     }
 
     public ClassDef withAttribute(AttributeDef attribute) {
         Objects.requireNonNull(attribute, "Attribute cannot be null");
+        // Set the declaring class on the attribute
+        AttributeDef attributeWithDeclaringClass = attribute.withDeclaringClass(this);
         List<AttributeDef> attributes = new ArrayList<>(this.attributes);
-        attributes.add(attribute);
+        attributes.add(attributeWithDeclaringClass);
         return new ClassDef(name, packageName, bases, decorators, typeParams, functions, attributes, properties, constructor, isEnum, values, documentation);
     }
 
     public ClassDef withProperty(PropertyDef property) {
         Objects.requireNonNull(property, "Property cannot be null");
+        // Set the declaring class on the property
+        PropertyDef propertyWithDeclaringClass = property.withDeclaringClass(this);
         List<PropertyDef> properties = new ArrayList<>(this.properties);
-        properties.add(property);
+        properties.add(propertyWithDeclaringClass);
         return new ClassDef(name, packageName, bases, decorators, typeParams, functions, attributes, properties, constructor, isEnum, values, documentation);
     }
 
