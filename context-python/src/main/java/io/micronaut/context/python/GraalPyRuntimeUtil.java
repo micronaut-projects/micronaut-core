@@ -183,7 +183,6 @@ public final class GraalPyRuntimeUtil {
                             result.add(convertedElement);
                         } catch (Exception e) {
                             // Skip problematic elements
-                            continue;
                         }
                     } catch (Exception e) {
                         // Iterator exhausted (StopIteration in Python)
@@ -212,7 +211,7 @@ public final class GraalPyRuntimeUtil {
      * Generic value conversion method that handles primitives and recursively converts collections.
      */
     @SuppressWarnings("unchecked")
-    private static <T> T convertValue(Value value, Class<T> targetType) {
+    public static <T> T convertValue(Value value, Class<T> targetType) {
         if (value == null || value.isNull()) {
             return null;
         }
@@ -249,7 +248,11 @@ public final class GraalPyRuntimeUtil {
 
         // For other types, try to convert to string as fallback
         try {
-            return (T) value.asString();
+            if (targetType == Object.class) {
+                return (T) value.as(Object.class);
+            } else {
+                return null;
+            }
         } catch (Exception e) {
             return null;
         }

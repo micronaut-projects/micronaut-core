@@ -35,6 +35,7 @@ class PrintNodeVisitor(ast.NodeVisitor):
         self.current_class_properties = {}  # Track properties being built: name -> PropertyDef
         self.last_attribute = None  # Track last processed attribute for docstring handling
         self.in_function = False  # Track if we're inside a function definition
+        self.java_type_assignments = {}  # Track java.type() assignments: variable_name -> full_qualified_name
 
     def visit(self, node: ast.AST) -> ast.AST:
         match node:
@@ -48,7 +49,9 @@ class PrintNodeVisitor(ast.NodeVisitor):
                 bases = []
                 for base in node.bases:
                     if isinstance(base, ast.Name):
-                        bases.append(base.id)
+                        # Check if this is a Java type that was imported
+                        base_name = self.java_type_assignments.get(base.id, base.id)
+                        bases.append(base_name)
                     elif isinstance(base, ast.Attribute):
                         # Handle qualified names like module.Class
                         # For simplicity, just use the attribute name
@@ -158,6 +161,11 @@ class PrintNodeVisitor(ast.NodeVisitor):
                         ]
                         annotation_name = get_micronaut_annotation_value('name', node)
                         repeated_name = get_micronaut_annotation_value('repeated', node)
+
+                        # Track the annotation name for type resolution
+                        if annotation_name:
+                            self.java_type_assignments[node.name] = annotation_name
+
                         decorator_def = DecoratorDef(node.name, annotation_name, repeated_name, arg_dict, stereotypes)
                         self.known_decorators[node.name] = decorator_def
                         self.callback.apply(decorator_def)
@@ -189,6 +197,8 @@ class PrintNodeVisitor(ast.NodeVisitor):
                 finally:
                     self.in_function = was_in_function
             case ast.Assign():
+                # Track java.type() assignments first
+                self._track_java_type_assignments(node)
                 # Handle class attribute assignments
                 if self.current_class is not None:
                     self._handle_assign(node)
@@ -543,6 +553,32 @@ class PrintNodeVisitor(ast.NodeVisitor):
 
         self.current_class_properties[property_name] = property_def
 
+    def _track_java_type_assignments(self, node):
+        """
+        Track assignments that look like java.type() calls.
+        This helps resolve fully qualified names for imported Java types.
+        """
+        if len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+            var_name = node.targets[0].id
+            # Check if the value is a call to java.type()
+            if isinstance(node.value, ast.Call) and isinstance(node.value.func, ast.Attribute):
+                if (isinstance(node.value.func.value, ast.Name) and
+                    node.value.func.value.id == 'java' and
+                    node.value.func.attr == 'type' and
+                    len(node.value.args) == 1):
+                    # Extract the string value using ast.literal_eval which handles both Constant and Str
+                    try:
+                        full_qualified_name = ast.literal_eval(node.value.args[0])
+                        if isinstance(full_qualified_name, str):
+                            self.java_type_assignments[var_name] = full_qualified_name
+                    except (ValueError, TypeError):
+                        # Fallback to manual extraction for edge cases
+                        arg_node = node.value.args[0]
+                        if hasattr(arg_node, 'value') and isinstance(arg_node.value, str):
+                            self.java_type_assignments[var_name] = arg_node.value
+                        elif hasattr(arg_node, 's') and isinstance(arg_node.s, str):
+                            self.java_type_assignments[var_name] = arg_node.s
+
     def _extract_docstring(self, node):
         """
         Extract the docstring from a class or function node.
@@ -589,7 +625,7 @@ def decorator_to_function(visitor, node):
             decorator_name = node.func.id
             decorator_declaration = visitor.known_decorators.get(decorator_name)
             if decorator_declaration is not None:
-                members = extract_call_arguments_with_defaults(decorator_declaration, node)
+                members = extract_call_arguments_with_defaults(decorator_declaration, node, visitor)
                 return DecoratorDef(
                     decorator_name,
                     decorator_declaration.annotationName(),
@@ -599,33 +635,58 @@ def decorator_to_function(visitor, node):
                 )
             else:
                 # If not a known micronaut decorator, treat as direct annotation with arguments
-                members = extract_call_arguments_with_defaults(None, node)
-                return DecoratorDef(decorator_name, decorator_name, None, members, [])
+                members = extract_call_arguments_with_defaults(None, node, visitor)
+                # Resolve names in the members dict
+                resolved_members = {}
+                for key, value in members.items():
+                    if isinstance(value, str):
+                        # Check if this is a Java type that was imported
+                        resolved_value = visitor.java_type_assignments.get(value, value)
+                        resolved_members[key] = resolved_value
+                    else:
+                        resolved_members[key] = value
+                return DecoratorDef(decorator_name, decorator_name, None, resolved_members, [])
         case _:
             return None
 
 
-def convert_ast_value(node):
+def convert_ast_value(node, visitor=None):
     """
     Convert an AST node to a Python value, handling complex expressions like lists.
+    If visitor is provided, resolve Java type names to fully qualified names.
     """
+    # Handle different AST node types first, before trying ast.literal_eval
+    if isinstance(node, ast.Name):
+        # Class references - check if this is a Java type that should be resolved
+        name = node.id
+        if visitor is not None:
+            resolved_name = visitor.java_type_assignments.get(name, name)
+            return resolved_name
+        else:
+            return name
+    elif isinstance(node, ast.List):
+        # Handle lists like [str, int]
+        return [convert_ast_value(elt, visitor) for elt in node.elts]
+    elif isinstance(node, ast.Tuple):
+        # Handle tuples
+        return tuple(convert_ast_value(elt, visitor) for elt in node.elts)
+    elif isinstance(node, ast.Attribute):
+        # Handle qualified names like module.Class
+        names = []
+        current = node
+        while isinstance(current, ast.Attribute):
+            names.insert(0, current.attr)
+            current = current.value
+        if isinstance(current, ast.Name):
+            names.insert(0, current.id)
+        return '.'.join(names)
+
+    # Try to evaluate the value if it's a constant or simple expression
     try:
-        # Try to evaluate the value if it's a constant or simple expression
         return ast.literal_eval(node)
     except Exception:
-        # Handle different AST node types
-        if isinstance(node, ast.Name):
-            # Class references
-            return node.id
-        elif isinstance(node, ast.List):
-            # Handle lists like [str, int]
-            return [convert_ast_value(elt) for elt in node.elts]
-        elif isinstance(node, ast.Tuple):
-            # Handle tuples
-            return tuple(convert_ast_value(elt) for elt in node.elts)
-        else:
-            # Fallback to AST dump for complex expressions
-            return ast.dump(node) if hasattr(ast, 'dump') else str(node)
+        # Fallback to AST dump for complex expressions
+        return ast.dump(node) if hasattr(ast, 'dump') else str(node)
 
 def extract_arg_defaults(func_node):
     """
@@ -659,11 +720,12 @@ def extract_arg_defaults(func_node):
 
     return arg_dict
 
-def extract_call_arguments_with_defaults(funcdef, call):
+def extract_call_arguments_with_defaults(funcdef, call, visitor=None):
     """
     Given an ast.FunctionDef (can be None) and an ast.Call node,
     return a dict mapping argument names (from funcdef) or integer indices (if funcdef is None)
     to values from the call (and funcdef defaults if available).
+    If visitor is provided, use it for type name resolution.
     """
     result = {}
     if funcdef is None:
@@ -672,69 +734,42 @@ def extract_call_arguments_with_defaults(funcdef, call):
         # For single-arg annotations, assume the parameter is named "value"
         if len(call.args) == 1 and len(call.keywords) == 0:
             # Single positional argument - assume it's the "value" parameter
-            try:
-                value = ast.literal_eval(call.args[0])
-            except Exception as e:
-                # Handle Name nodes (class references) specially
-                if isinstance(call.args[0], ast.Name):
-                    value = call.args[0].id
-                else:
-                    value = ast.dump(call.args[0])
+            value = convert_ast_value(call.args[0], visitor)
             result["value"] = value
         else:
             # Multiple args or keyword args - use positional indices as fallback
             for i, arg in enumerate(call.args):
-                try:
-                    value = ast.literal_eval(arg)
-                except Exception:
-                    # Handle Name nodes (class references) specially
-                    if isinstance(arg, ast.Name):
-                        value = arg.id
-                    else:
-                        value = ast.dump(arg)
+                value = convert_ast_value(arg, visitor)
                 result[i] = value
             # Handle keyword arguments
             for kw in call.keywords:
                 if kw.arg is not None:
-                    try:
-                        value = ast.literal_eval(kw.value)
-                    except Exception as e:
-                        # Handle Name nodes (class references) specially
-                        if isinstance(kw.value, ast.Name):
-                            value = kw.value.id
-                        else:
-                            value = ast.dump(kw.value)
+                    value = convert_ast_value(kw.value, visitor)
                     result[kw.arg] = value
     else:
         # Get parameter names from function definition
-        param_names = [entry.getKey() for entry in funcdef.members().entrySet()]
+        try:
+            param_names = [entry.getKey() for entry in funcdef.members().entrySet()]
+        except:
+            # If funcdef.members() fails, treat as no parameters
+            param_names = []
 
         # Special handling for Java annotations that use *args, **kwargs
         # If no named parameters but we have positional args, assume single arg uses "value"
         if len(param_names) == 0:
             if len(call.args) == 1 and len(call.keywords) == 0:
                 # Single positional argument - assume it's the "value" parameter
-                try:
-                    value = ast.literal_eval(call.args[0])
-                except Exception as e:
-                    value = ast.dump(call.args[0])
+                value = convert_ast_value(call.args[0], visitor)
                 result["value"] = value
             else:
                 # Multiple args or keyword args - handle as before
                 for i, arg in enumerate(call.args):
-                    try:
-                        value = ast.literal_eval(arg)
-                    except Exception:
-                        # Handle Name nodes (class references) specially
-                        if isinstance(arg, ast.Name):
-                            value = arg.id
-                        else:
-                            value = ast.dump(arg)
+                    value = convert_ast_value(arg, visitor)
                     result[i] = value
             # Handle keyword arguments
             for kw in call.keywords:
                 if kw.arg is not None:
-                    value = convert_ast_value(kw.value)
+                    value = convert_ast_value(kw.value, visitor)
                     result[kw.arg] = value
         else:
             # Normal case with named parameters
@@ -742,23 +777,13 @@ def extract_call_arguments_with_defaults(funcdef, call):
             for i, arg in enumerate(call.args):
                 if i < len(param_names):
                     param_name = param_names[i]
-                    try:
-                        value = ast.literal_eval(arg)
-                    except Exception:
-                        # Handle Name nodes (class references) specially
-                        if isinstance(arg, ast.Name):
-                            value = arg.id
-                        else:
-                            value = ast.dump(arg)
+                    value = convert_ast_value(arg, visitor)
                     result[param_name] = value
 
             # Map keyword arguments by their parameter names
             for kw in call.keywords:
                 if kw.arg is not None:
-                    try:
-                        value = ast.literal_eval(kw.value)
-                    except Exception:
-                        value = ast.dump(kw.value)
+                    value = convert_ast_value(kw.value, visitor)
                     result[kw.arg] = value
 
     return result
@@ -930,6 +955,8 @@ def _extract_type_name_static(type_node):
     Static version.
     """
     if isinstance(type_node, ast.Name):
+        # Check if this is a Java type that was imported (passed via visitor parameter)
+        # For now, just return the id - the caller should handle resolution
         return type_node.id
     elif isinstance(type_node, ast.Attribute):
         # Handle qualified names like typing.List
@@ -1038,7 +1065,14 @@ def parse_function_arguments(func_node, visitor):
                 type_annotation = parsed_type   # Use extracted type for typeAnnotation
                 decorators = parsed_decorators  # Add any decorators found
             else:
-                type_annotation = annotation  # Not Annotated, use full annotation
+                # Resolve Java type names if this is a simple Name annotation
+                if isinstance(arg.annotation, ast.Name):
+                    type_name = arg.annotation.id
+                    # Check if this is a Java type that was imported
+                    resolved_type_name = visitor.java_type_assignments.get(type_name, type_name)
+                    type_annotation = resolved_type_name
+                else:
+                    type_annotation = annotation  # Not Annotated, use full annotation
 
 
         # Get default value
@@ -1068,12 +1102,19 @@ def parse_function_return_type(func_node, visitor):
             parsed_type, parsed_decorators = _parse_annotated_type_static(func_node.returns, visitor)
             return ReturnDef.of(parsed_type, parsed_decorators)
         else:
-            # Not Annotated, use full annotation
-            try:
-                type_annotation = ast.unparse(func_node.returns)
-            except AttributeError:
-                type_annotation = ast.dump(func_node.returns)
-            return ReturnDef.of(type_annotation)
+            # Resolve Java type names if this is a simple Name annotation
+            if isinstance(func_node.returns, ast.Name):
+                type_name = func_node.returns.id
+                # Check if this is a Java type that was imported
+                resolved_type_name = visitor.java_type_assignments.get(type_name, type_name)
+                return ReturnDef.of(resolved_type_name)
+            else:
+                # Not Annotated, use full annotation
+                try:
+                    type_annotation = ast.unparse(func_node.returns)
+                except AttributeError:
+                    type_annotation = ast.dump(func_node.returns)
+                return ReturnDef.of(type_annotation)
 
     return ReturnDef.none()
 

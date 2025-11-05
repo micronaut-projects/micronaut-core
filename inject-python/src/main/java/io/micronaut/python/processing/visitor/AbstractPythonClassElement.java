@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -60,6 +61,17 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
         );
         this.environment = environment;
         this.arrayDimensions = arrayDimensions;
+    }
+
+    @Override
+    public Collection<ClassElement> getInterfaces() {
+        ClassDef nativeType = getNativeType();
+        List<String> bases = nativeType.bases();
+
+        return bases.stream()
+            .flatMap(name -> environment.javaVisitorContext().getClassElement(name).stream())
+            .filter(ClassElement::isInterface)
+            .toList();
     }
 
     private static @NotNull String qualifiedClassName(ClassDef classDef) {

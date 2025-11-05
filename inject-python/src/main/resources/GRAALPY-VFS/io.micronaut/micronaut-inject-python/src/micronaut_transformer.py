@@ -36,7 +36,8 @@ except ImportError:
 
 class MicronautTransformer(ast.NodeTransformer):
     """
-    AST transformer that converts Java annotation imports into Python decorators.
+    AST transformer that converts Java imports into appropriate Python constructs.
+    Annotations become decorators, regular Java types become java.type() references.
     """
 
     def __init__(self, callback_get_class_element, callback_get_class_elements):
@@ -50,8 +51,10 @@ class MicronautTransformer(ast.NodeTransformer):
         self.callback_get_class_element = callback_get_class_element
         self.callback_get_class_elements = callback_get_class_elements
         self.transformed_code = []
+        self.java_type_assignments = []
         self.imports_to_transform = []
         self.generated_decorators = set()
+        self.has_java_import = False
 
     def visit_ImportFrom(self, node: ast.ImportFrom):
         """
@@ -76,7 +79,7 @@ class MicronautTransformer(ast.NodeTransformer):
                     transformed_any = True
 
         # If any imports were transformed, remove this import statement from the AST
-        # since the imported annotations won't exist at runtime
+        # since the imported items won't exist at runtime
         if transformed_any:
             return None  # Remove the import from the AST
 
@@ -84,18 +87,28 @@ class MicronautTransformer(ast.NodeTransformer):
 
     def visit_Module(self, node: ast.Module) -> ast.Module:
         """
-        Process the entire module and add generated decorators at the beginning.
+        Process the entire module and add generated decorators and java.type assignments at the beginning.
         """
         # First visit all nodes to collect imports
         self.generic_visit(node)
 
-        # Add generated decorator definitions at the beginning
-        if self.transformed_code:
-            # Create AST nodes for the generated decorators
-            decorator_nodes = []
+        # Add generated code at the beginning
+        if self.transformed_code or self.java_type_assignments or self.has_java_import:
+            # Create AST nodes for the generated code
+            generated_nodes = []
+
+            # Add import java statement if we have java.type() calls
+            if self.has_java_import:
+                java_import_code = "import java"
+                try:
+                    java_import_ast = ast.parse(java_import_code)
+                    generated_nodes.extend(java_import_ast.body)
+                except SyntaxError as e:
+                    print(f"Error parsing java import: {e}")
 
             # Add the micronaut_annotation function first
-            micronaut_annotation_code = '''
+            if self.transformed_code:
+                micronaut_annotation_code = '''
 def micronaut_annotation(name, repeated=None):
     """
     Decorator to mark functions as Micronaut annotations.
@@ -107,24 +120,32 @@ def micronaut_annotation(name, repeated=None):
         return func
     return decorator
 '''
-            try:
-                micronaut_annotation_ast = ast.parse(micronaut_annotation_code)
-                decorator_nodes.extend(micronaut_annotation_ast.body)
-            except SyntaxError as e:
-                print(f"Error parsing micronaut_annotation: {e}")
+                try:
+                    micronaut_annotation_ast = ast.parse(micronaut_annotation_code)
+                    generated_nodes.extend(micronaut_annotation_ast.body)
+                except SyntaxError as e:
+                    print(f"Error parsing micronaut_annotation: {e}")
+
+            # Add java.type() assignments
+            for java_type_assignment in self.java_type_assignments:
+                try:
+                    java_type_ast = ast.parse(java_type_assignment)
+                    generated_nodes.extend(java_type_ast.body)
+                except SyntaxError as e:
+                    print(f"Error parsing java type assignment: {e}")
 
             # Add the generated decorator functions
             for decorator_code in self.transformed_code:
                 try:
                     # Parse the generated decorator code
                     decorator_ast = ast.parse(decorator_code)
-                    decorator_nodes.extend(decorator_ast.body)
+                    generated_nodes.extend(decorator_ast.body)
                 except SyntaxError as e:
                     print(f"Error parsing generated decorator: {e}")
                     continue
 
-            # Insert decorator nodes at the beginning of the module
-            node.body = decorator_nodes + node.body
+            # Insert generated nodes at the beginning of the module
+            node.body = generated_nodes + node.body
 
         return node
 
@@ -134,16 +155,25 @@ def micronaut_annotation(name, repeated=None):
         Returns True if the import was transformed.
         """
         import_name = alias.name  # The actual name being imported (e.g., "Singleton")
-        decorator_name = alias.asname if alias.asname else alias.name  # The name to use for the decorator (e.g., "S" or "Singleton")
+        variable_name = alias.asname if alias.asname else alias.name  # The name to use for the variable (e.g., "S" or "Singleton")
 
         full_name = f"{module_name}.{import_name}"
 
         # Try to get the ClassElement
         class_element = self.callback_get_class_element(full_name)
         if class_element:
-            decorator_code = self._generate_decorator_from_class_element(class_element, decorator_name)
-            if decorator_code:
-                self.transformed_code.append(decorator_code)
+            # Check if it's an annotation
+            if self._is_annotation_class(class_element):
+                # Generate decorator for annotations
+                decorator_code = self._generate_decorator_from_class_element(class_element, variable_name)
+                if decorator_code:
+                    self.transformed_code.append(decorator_code)
+                    return True
+            else:
+                # Generate java.type() assignment for regular Java types
+                java_type_assignment = f"{variable_name} = java.type('{class_element.getName()}')"
+                self.java_type_assignments.append(java_type_assignment)
+                self.has_java_import = True
                 return True
         else:
             # Try with different naming conventions
@@ -153,9 +183,18 @@ def micronaut_annotation(name, repeated=None):
                 alt_full_name = f"{module_name}.{alt_name}"
                 class_element = self.callback_get_class_element(alt_full_name)
                 if class_element:
-                    decorator_code = self._generate_decorator_from_class_element(class_element, decorator_name)
-                    if decorator_code:
-                        self.transformed_code.append(decorator_code)
+                    # Check if it's an annotation
+                    if self._is_annotation_class(class_element):
+                        # Generate decorator for annotations
+                        decorator_code = self._generate_decorator_from_class_element(class_element, variable_name)
+                        if decorator_code:
+                            self.transformed_code.append(decorator_code)
+                            return True
+                    else:
+                        # Generate java.type() assignment for regular Java types
+                        java_type_assignment = f"{variable_name} = java.type('{class_element.getName()}')"
+                        self.java_type_assignments.append(java_type_assignment)
+                        self.has_java_import = True
                         return True
         return False
 

@@ -26,6 +26,7 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.expressions.context.ExpressionCompilationContextFactory;
+import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementFactory;
 import io.micronaut.inject.visitor.VisitorContext;
@@ -187,8 +188,18 @@ public class PythonVisitorContext implements VisitorContext {
 
     @Override
     public Optional<io.micronaut.inject.ast.ClassElement> getClassElement(String name) {
+        if (name.startsWith("java.") || name.startsWith("javax.")) {
+            return javaVisitorContext.getClassElement(name);
+        }
+
         // First try to find in Python environment
-        io.micronaut.inject.ast.ClassElement pythonClass = processingEnvironment.classes().get(name);
+        Map<String, ClassElement> classes = processingEnvironment.classes();
+        io.micronaut.inject.ast.ClassElement pythonClass = classes.get(name);
+        String defaultPackage = PythonClassElement.PYTHON_DEFAULT_PACKAGE + '.';
+        if (pythonClass == null && name.startsWith(defaultPackage)) {
+            // try default package
+            pythonClass = classes.get(name.substring(defaultPackage.length()));
+        }
         if (pythonClass != null) {
             return Optional.of(pythonClass);
         }

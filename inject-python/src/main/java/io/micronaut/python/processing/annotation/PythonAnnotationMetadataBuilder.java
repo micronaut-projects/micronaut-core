@@ -17,6 +17,7 @@ package io.micronaut.python.processing.annotation;
 
 import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -92,8 +93,18 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
             // TODO: load base classes
             return List.of(classDef);
         } else if (element instanceof FunctionDef functionDef) {
-            // TODO: include parent class of FunctionDef
-            return List.of(functionDef);
+            List<ElementDef> hierarchy;
+            if (inheritTypeAnnotations && functionDef.declaringClass() != null) {
+                hierarchy = buildHierarchy(
+                    functionDef.declaringClass(),
+                    false,
+                    declaredOnly
+                );
+            } else {
+                hierarchy = new ArrayList<>();
+            }
+            hierarchy.add(functionDef);
+            return hierarchy;
         } else if (element instanceof PropertyDef propertyDef) {
             // For properties, include the property itself and its read/write methods
             List<ElementDef> hierarchy = new java.util.ArrayList<>();
@@ -156,9 +167,9 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
         Object annotationValue) {
         if (annotationValue instanceof Value value) {
             if (member instanceof AnnotationMemberDef memberDef && memberDef.memberType() != null) {
-                return GraalPyUtil.convertValueToJava(value, memberDef.memberType());
+                return GraalPyUtil.convertValueToJava(value, memberDef.memberType(), visitorContext);
             } else {
-                return GraalPyUtil.convertValueToJava(value);
+                return GraalPyUtil.convertValueToJava(value, visitorContext);
             }
         }
         return annotationValue;

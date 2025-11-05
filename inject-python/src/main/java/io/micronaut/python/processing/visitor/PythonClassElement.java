@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Optional;
 
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 
@@ -71,6 +72,12 @@ public final class PythonClassElement extends AbstractPythonClassElement {
         for (String base : getNativeType().bases()) {
             ClassElement baseElement = environment.classes().get(base);
             if (baseElement != null && baseElement.isAssignable(type)) {
+                return true;
+            }
+        }
+
+        for (ClassElement anInterface : getInterfaces()) {
+            if (anInterface.isAssignable(type)) {
                 return true;
             }
         }

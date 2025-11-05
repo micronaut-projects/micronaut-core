@@ -16,6 +16,7 @@
 package io.micronaut.python.processing;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,6 +24,8 @@ import java.util.Set;
 
 import javax.lang.model.element.Modifier;
 
+import io.micronaut.aop.Around;
+import io.micronaut.aop.InterceptorBinding;
 import io.micronaut.context.annotation.Bean;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Value;
@@ -59,6 +62,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     public static final VariableDef.StaticField CLASS_OBJECT = ClassTypeDef.of(Object.class).getStaticField("class", TypeDef.CLASS);
     public static final String AS_POLYGLOT_VALUE = "asPolyglotValue";
     public static final String FROM_POLYGLOT_VALUE = "fromPolyglotValue";
+    public static final ClassTypeDef RUNTIME_UTIL = ClassTypeDef.of("io.micronaut.context.python.GraalPyRuntimeUtil");
 
     private final Map<String, AbstractPythonClassElement> classElements = new LinkedHashMap<>();
 
@@ -85,6 +89,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     classElements.put(classElement.getName(), classElement);
                     String typeName = element.getName();
                     var builder = ClassDef.builder(typeName);
+                    Collection<ClassElement> interfaces = classElement.getInterfaces();
+                    for (ClassElement anInterface : interfaces) {
+                        builder.addSuperinterface(TypeDef.of(anInterface));
+
+                    }
 
                     builder.addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.ValueCoercible"));
 
@@ -173,39 +182,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             .onlyAccessible()
                             .onlyInstance()
                             .annotated(ann -> ann.hasStereotype(Executable.class) ||
-                                ann.hasStereotype(AnnotationUtil.SCOPE) ||
-                                ann.hasStereotype(Bean.class)));
+                                ann.hasStereotype(Around.class) ||
+                                element.hasStereotype(Around.class) ||
+                                ann.hasDeclaredStereotype(AnnotationUtil.SCOPE) ||
+                                ann.hasDeclaredStereotype(Bean.class)));
 
 
                     for (MethodElement methodElement : methodsToBridge) {
-                        String pythonFunctionName = methodElement.getName();
-                        MethodDef.MethodDefBuilder methodBuilder = MethodDef.builder(pythonFunctionName)
-                            .returns(TypeDef.of(methodElement.getReturnType()));
-
-                        for (@NonNull ParameterElement parameter : methodElement.getParameters()) {
-                            var parameterType = TypeDef.of(parameter.getType());
-                            ParameterDef parameterDef = ParameterDef
-                                .builder(parameter.getName(), parameterType).build();
-                            methodBuilder.addParameter(parameterDef);
-                        }
-
-                        builder.addMethod(methodBuilder
-                            .build(((aThis, methodParameters) -> {
-                                VariableDef.Field pythonValueField = aThis.field(pythonValue);
-                                List<ExpressionDef> parameters = new ArrayList<>();
-                                parameters.add(ExpressionDef.constant(pythonFunctionName));
-                                parameters.addAll(methodParameters);
-
-                                // Get the return type to determine appropriate conversion method
-                                var returnType = methodElement.getReturnType();
-                                var invokedValue = pythonValueField.invoke(
-                                    "invokeMember",
-                                    POLYGLOT_VALUE,
-                                    parameters
-                                );
-
-                                return handleReturnType(returnType, invokedValue);
-                            })));
+                        addBridgeMethod(methodElement, builder, pythonValue);
                     }
 
                     // Find injection methods (annotated with @Inject)
@@ -213,6 +197,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         ElementQuery.ALL_METHODS
                             .onlyAccessible()
                             .onlyInstance()
+                            .filter(method -> !methodsToBridge.contains(method))
                             .annotated(ann ->
                                 ann.hasStereotype(AnnotationUtil.INJECT)
                             ));
@@ -289,6 +274,38 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
             }
         }
+    }
+
+    private void addBridgeMethod(MethodElement methodElement, ClassDef.ClassDefBuilder builder, FieldDef pythonValue) {
+        String pythonFunctionName = methodElement.getName();
+        MethodDef.MethodDefBuilder methodBuilder = MethodDef.builder(pythonFunctionName)
+            .addModifiers(Modifier.PUBLIC)
+            .returns(TypeDef.of(methodElement.getReturnType()));
+
+        for (@NonNull ParameterElement parameter : methodElement.getParameters()) {
+            var parameterType = TypeDef.of(parameter.getType());
+            ParameterDef parameterDef = ParameterDef
+                .builder(parameter.getName(), parameterType).build();
+            methodBuilder.addParameter(parameterDef);
+        }
+
+        builder.addMethod(methodBuilder
+            .build(((aThis, methodParameters) -> {
+                VariableDef.Field pythonValueField = aThis.field(pythonValue);
+                List<ExpressionDef> parameters = new ArrayList<>();
+                parameters.add(ExpressionDef.constant(pythonFunctionName));
+                parameters.addAll(methodParameters);
+
+                // Get the return type to determine appropriate conversion method
+                var returnType = methodElement.getReturnType();
+                var invokedValue = pythonValueField.invoke(
+                    "invokeMember",
+                    POLYGLOT_VALUE,
+                    parameters
+                );
+
+                return handleReturnType(returnType, invokedValue);
+            })));
     }
 
     private void addGetter(PropertyElement beanProperty, ClassDef.ClassDefBuilder builder, FieldDef pythonValue) {
@@ -369,7 +386,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     if (returnType.isAssignable(List.class)) {
                         ClassElement componentType = returnType.getFirstTypeArgument().orElse(null);
                         ExpressionDef genericType = toClassExpression(componentType);
-                        yield ClassTypeDef.of("io.micronaut.context.python.GraalPyRuntimeUtil")
+                        yield RUNTIME_UTIL
                             .invokeStatic("convertList", ClassTypeDef.of(List.class),
                                 invokedValue, genericType)
                             .returning();
@@ -377,7 +394,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         Map<String, ClassElement> typeArguments = returnType.getTypeArguments();
                         ExpressionDef keyType = toClassExpression(typeArguments.get("K"));
                         ExpressionDef valueType = toClassExpression(typeArguments.get("V"));
-                        yield ClassTypeDef.of("io.micronaut.context.python.GraalPyRuntimeUtil")
+                        yield RUNTIME_UTIL
                             .invokeStatic("convertMap", ClassTypeDef.of(Map.class),
                                 invokedValue, keyType, valueType)
                             .returning();
@@ -385,7 +402,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         ClassElement componentType = returnType.getFirstTypeArgument().orElse(null);
                         ExpressionDef genericType = toClassExpression(componentType);
 
-                        yield ClassTypeDef.of("io.micronaut.context.python.GraalPyRuntimeUtil")
+                        yield RUNTIME_UTIL
                             .invokeStatic("convertSet", ClassTypeDef.of(Set.class),
                                 invokedValue, genericType)
                             .returning();
@@ -393,7 +410,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         ClassElement componentType = returnType.getFirstTypeArgument().orElse(null);
                         ExpressionDef genericType = toClassExpression(componentType);
 
-                        yield ClassTypeDef.of("io.micronaut.context.python.GraalPyRuntimeUtil")
+                        yield RUNTIME_UTIL
                             .invokeStatic("convertOptional", ClassTypeDef.of(java.util.Optional.class),
                                 invokedValue, genericType)
                             .returning();
@@ -403,8 +420,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                 .invokeStatic(FROM_POLYGLOT_VALUE, POLYGLOT_VALUE, invokedValue)
                                 .returning();
                         } else {
-                            // For unknown types, convert to string as fallback
-                            yield invokedValue.invoke("asString", ClassTypeDef.STRING).returning();
+                            yield RUNTIME_UTIL
+                                .invokeStatic("convertValue", ClassTypeDef.OBJECT,
+                                    invokedValue, ClassTypeDef.of(returnType).getStaticField("class", TypeDef.CLASS))
+                                .returning();
                         }
                     }
                 }

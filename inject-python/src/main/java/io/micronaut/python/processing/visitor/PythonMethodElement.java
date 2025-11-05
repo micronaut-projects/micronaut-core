@@ -24,7 +24,10 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
+import io.micronaut.inject.ast.annotation.MethodElementAnnotationsHelper;
+import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.python.processing.util.GraalPyUtil;
 import org.jetbrains.annotations.Nullable;
@@ -49,6 +52,7 @@ public sealed class PythonMethodElement extends AbstractPythonElement implements
     private final AbstractPythonClassElement owningType;
     private final ClassElement returnType;
     private final ParameterElement[] parameters;
+    private final MethodElementAnnotationsHelper helper;
 
     /**
      * Constructs a new {@code PythonMethodElement} from the given {@code FunctionDef}.
@@ -75,6 +79,22 @@ public sealed class PythonMethodElement extends AbstractPythonElement implements
 
         // Create parameter elements
         this.parameters = createParameters(functionDef);
+        this.helper = new MethodElementAnnotationsHelper(this, metadataFactory);
+    }
+
+    @Override
+    protected MutableAnnotationMetadataDelegate<?> getAnnotationMetadataToWrite() {
+        return helper.getMethodAnnotationMetadata(presetAnnotationMetadata);
+    }
+
+    @Override
+    public ElementAnnotationMetadata getMethodAnnotationMetadata() {
+        return helper.getMethodAnnotationMetadata(presetAnnotationMetadata);
+    }
+
+    @Override
+    public AnnotationMetadata getAnnotationMetadata() {
+        return helper.getAnnotationMetadata(presetAnnotationMetadata);
     }
 
     @Override
