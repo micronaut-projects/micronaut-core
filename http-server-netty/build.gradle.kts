@@ -16,7 +16,6 @@ tasks {
         systemProperty("io.netty.leakDetection.level", "paranoid")
         systemProperty("io.netty.leakDetection.targetRecords", "100")
         systemProperty("junit.jupiter.extensions.autodetection.enabled", "true")
-        systemProperty("io.netty.util.LeakPresenceDetector.trackCreationStack", "true")
         jvmArgs("--add-opens=java.base/java.lang=ALL-UNNAMED")
         maxHeapSize = "1G"
     }
