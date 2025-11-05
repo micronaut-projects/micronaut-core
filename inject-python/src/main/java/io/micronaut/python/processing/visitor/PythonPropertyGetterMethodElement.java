@@ -25,8 +25,9 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
-import io.micronaut.inject.ast.annotation.MethodElementAnnotationsHelper;
+import io.micronaut.inject.ast.annotation.MethodElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 
@@ -45,39 +46,36 @@ public final class PythonPropertyGetterMethodElement extends AbstractPythonEleme
     private final AbstractPythonClassElement owningType;
     private final ClassElement returnType;
     private final String methodName;
-    private final MethodElementAnnotationsHelper helper;
+    private final PythonPropertyElement propertyElement;
 
     public PythonPropertyGetterMethodElement(
-            String methodName,
-            ClassElement returnType,
-            AnnotationMetadata annotationMetadata,
+            PythonPropertyElement propertyElement,
             PythonProcessingEnvironment environment,
             AbstractPythonClassElement declaringType,
             AbstractPythonClassElement owningType,
             ElementAnnotationMetadataFactory metadataFactory) {
-        super(methodName, null, metadataFactory);
-        this.methodName = methodName;
-        this.returnType = returnType;
+        super(propertyElement.getName(), null, metadataFactory);
+        this.methodName = propertyElement.getName();
+        this.returnType = propertyElement.getType();
+        this.propertyElement = propertyElement;
         this.environment = environment;
         this.declaringType = declaringType;
         this.owningType = owningType;
-        this.helper = new MethodElementAnnotationsHelper(this, metadataFactory);
-        this.presetAnnotationMetadata = annotationMetadata;
-    }
-
-    @Override
-    protected MutableAnnotationMetadataDelegate<?> getAnnotationMetadataToWrite() {
-        return helper.getMethodAnnotationMetadata(presetAnnotationMetadata);
-    }
-
-    @Override
-    public io.micronaut.inject.ast.annotation.ElementAnnotationMetadata getMethodAnnotationMetadata() {
-        return helper.getMethodAnnotationMetadata(presetAnnotationMetadata);
     }
 
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
-        return helper.getAnnotationMetadata(presetAnnotationMetadata);
+        return propertyElement.getTargetAnnotationMetadata();
+    }
+
+    @Override
+    protected ElementAnnotationMetadata getElementAnnotationMetadata() {
+        return new MethodElementAnnotationMetadata(this);
+    }
+
+    @Override
+    protected MutableAnnotationMetadataDelegate<?> getAnnotationMetadataToWrite() {
+        return getElementAnnotationMetadata();
     }
 
     @Override
@@ -173,9 +171,7 @@ public final class PythonPropertyGetterMethodElement extends AbstractPythonEleme
     @Override
     protected AbstractPythonElement copyThis() {
         return new PythonPropertyGetterMethodElement(
-            methodName,
-            returnType,
-            presetAnnotationMetadata,
+            propertyElement,
             environment,
             declaringType,
             owningType,

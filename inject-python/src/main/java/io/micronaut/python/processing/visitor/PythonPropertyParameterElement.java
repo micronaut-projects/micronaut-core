@@ -18,7 +18,9 @@ package io.micronaut.python.processing.visitor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
+import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 
 /**
  * A synthetic parameter element for Python property setter methods.
@@ -33,22 +35,31 @@ public final class PythonPropertyParameterElement extends AbstractPythonElement 
     private final ClassElement type;
     private final String name;
     private final ElementAnnotationMetadataFactory elementFactory;
+    private final PythonPropertyElement propertyElement;
 
     public PythonPropertyParameterElement(
-        String name,
-        ClassElement type,
-        AnnotationMetadata annotationMetadata,
+        PythonPropertyElement propertyElement,
         ElementAnnotationMetadataFactory metadataFactory) {
-        super(name, null, metadataFactory);
-        this.name = name;
-        this.type = type;
-        this.presetAnnotationMetadata = annotationMetadata;
+        super(propertyElement.getName(), null, metadataFactory);
+        this.propertyElement = propertyElement;
+        this.name = propertyElement.getName();
+        this.type = propertyElement.getType();
         this.elementFactory = metadataFactory;
     }
 
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
-        return presetAnnotationMetadata;
+        return propertyElement.getTargetAnnotationMetadata();
+    }
+
+    @Override
+    protected ElementAnnotationMetadata getElementAnnotationMetadata() {
+        return propertyElement.getElementAnnotationMetadata();
+    }
+
+    @Override
+    protected MutableAnnotationMetadataDelegate<?> getAnnotationMetadataToWrite() {
+        return propertyElement.getAnnotationMetadataToWrite();
     }
 
     @Override
@@ -83,7 +94,7 @@ public final class PythonPropertyParameterElement extends AbstractPythonElement 
 
     @Override
     public ParameterElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
-        return new PythonPropertyParameterElement(name, type, annotationMetadata, elementFactory);
+        return new PythonPropertyParameterElement(propertyElement, elementFactory);
     }
 
     @Override
@@ -106,8 +117,7 @@ public final class PythonPropertyParameterElement extends AbstractPythonElement 
     @Override
     protected PythonPropertyParameterElement copyThis() {
         PythonPropertyParameterElement element = new PythonPropertyParameterElement(
-            name, type,
-            presetAnnotationMetadata,
+            propertyElement,
             elementFactory
         );
         element.presetAnnotationMetadata = presetAnnotationMetadata;

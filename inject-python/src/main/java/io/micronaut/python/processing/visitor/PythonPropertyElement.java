@@ -24,7 +24,9 @@ import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PropertyElement;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
+import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import io.micronaut.inject.ast.annotation.PropertyElementAnnotationMetadata;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 
@@ -106,6 +108,16 @@ public final class PythonPropertyElement extends AbstractPythonElement implement
             metadataFactory
         ) : (isWritable() ? createSyntheticSetter() : null);
         this.annotationMetadata = new PropertyElementAnnotationMetadata(this, readMethod, writeMethod, field, null, false);
+    }
+
+    @Override
+    public ElementAnnotationMetadata getElementAnnotationMetadata() {
+        return annotationMetadata;
+    }
+
+    @Override
+    public MutableAnnotationMetadataDelegate<?> getAnnotationMetadataToWrite() {
+        return annotationMetadata;
     }
 
     @Override
@@ -270,9 +282,7 @@ public final class PythonPropertyElement extends AbstractPythonElement implement
     private MethodElement createSyntheticGetter() {
         // Create a synthetic getter method that returns the property type
         return new PythonPropertyGetterMethodElement(
-            getName(),
-            getType(),
-            this.annotationMetadata != null ? this.annotationMetadata : AnnotationMetadata.EMPTY_METADATA,
+            this,
             environment,
             declaringType,
             owningType,
@@ -283,9 +293,7 @@ public final class PythonPropertyElement extends AbstractPythonElement implement
     private MethodElement createSyntheticSetter() {
         // Create a synthetic setter method that takes one parameter
         return new PythonPropertySetterMethodElement(
-            getName(),
-            getType(),
-            this.annotationMetadata != null ? this.annotationMetadata : AnnotationMetadata.EMPTY_METADATA,
+            this,
             environment,
             declaringType,
             owningType,

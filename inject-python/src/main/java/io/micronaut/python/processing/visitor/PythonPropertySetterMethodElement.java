@@ -26,7 +26,10 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PrimitiveElement;
+import io.micronaut.inject.ast.annotation.AbstractElementAnnotationMetadata;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
+import io.micronaut.inject.ast.annotation.MethodElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.MethodElementAnnotationsHelper;
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
@@ -44,22 +47,19 @@ public final class PythonPropertySetterMethodElement extends AbstractPythonEleme
     private final PythonProcessingEnvironment environment;
     private final AbstractPythonClassElement declaringType;
     private final AbstractPythonClassElement owningType;
-    private final ClassElement parameterType;
     private final String methodName;
     private final ParameterElement parameter;
-    private final MethodElementAnnotationsHelper helper;
+    private final PythonPropertyElement propertyElement;
 
     public PythonPropertySetterMethodElement(
-            String methodName,
-            ClassElement parameterType,
-            AnnotationMetadata annotationMetadata,
+            PythonPropertyElement propertyElement,
             PythonProcessingEnvironment environment,
             AbstractPythonClassElement declaringType,
             AbstractPythonClassElement owningType,
             ElementAnnotationMetadataFactory metadataFactory) {
-        super(methodName, null, metadataFactory);
-        this.methodName = methodName;
-        this.parameterType = parameterType;
+        super(propertyElement.getName(), null, metadataFactory);
+        this.propertyElement = propertyElement;
+        this.methodName = propertyElement.getName();
         this.environment = environment;
         this.declaringType = declaringType;
         this.owningType = owningType;
@@ -67,29 +67,35 @@ public final class PythonPropertySetterMethodElement extends AbstractPythonEleme
         // Create the parameter for the setter using ParameterElement.of
         // Note: This creates an immutable parameter, but that's acceptable for synthetic setters
         this.parameter = new PythonPropertyParameterElement(
-            methodName,
-            parameterType,
-            annotationMetadata,
+            propertyElement,
             metadataFactory
         );
-
-        this.helper = new MethodElementAnnotationsHelper(this, metadataFactory);
-        this.presetAnnotationMetadata = annotationMetadata;
-    }
-
-    @Override
-    protected MutableAnnotationMetadataDelegate<?> getAnnotationMetadataToWrite() {
-        return helper.getMethodAnnotationMetadata(presetAnnotationMetadata);
-    }
-
-    @Override
-    public io.micronaut.inject.ast.annotation.ElementAnnotationMetadata getMethodAnnotationMetadata() {
-        return helper.getMethodAnnotationMetadata(presetAnnotationMetadata);
     }
 
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
-        return helper.getAnnotationMetadata(presetAnnotationMetadata);
+        return propertyElement.getTargetAnnotationMetadata();
+    }
+
+    @Override
+    protected ElementAnnotationMetadata getElementAnnotationMetadata() {
+        return new AbstractElementAnnotationMetadata() {
+
+            @Override
+            protected AnnotationMetadata getReturnInstance() {
+                return propertyElement.getTargetAnnotationMetadata();
+            }
+
+            @Override
+            protected MutableAnnotationMetadataDelegate<?> getAnnotationMetadataToWrite() {
+                return propertyElement.getAnnotationMetadataToWrite();
+            }
+        };
+    }
+
+    @Override
+    protected MutableAnnotationMetadataDelegate<?> getAnnotationMetadataToWrite() {
+        return getElementAnnotationMetadata();
     }
 
     @Override
@@ -184,11 +190,9 @@ public final class PythonPropertySetterMethodElement extends AbstractPythonEleme
     }
 
     @Override
-    protected AbstractPythonElement copyThis() {
+    protected PythonPropertySetterMethodElement copyThis() {
         return new PythonPropertySetterMethodElement(
-            methodName,
-            parameterType,
-            presetAnnotationMetadata,
+            propertyElement,
             environment,
             declaringType,
             owningType,
