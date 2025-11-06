@@ -57,6 +57,7 @@ jobs:
           distribution: 'graalvm'
           gradle-java: '21'
           java: ${{ matrix.java }}
+          nativeTestTask: ${{ matrix.native_test_task }}
       - name: Build Steps
         uses: micronaut-projects/github-actions/graalvm/build@master
         id: build
