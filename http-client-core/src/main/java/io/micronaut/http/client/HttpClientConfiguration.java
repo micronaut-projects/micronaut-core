@@ -1274,11 +1274,19 @@ public abstract class HttpClientConfiguration {
          */
         public static final String PREFIX = "http2";
 
+        /**
+         * The default max header list size in bytes.
+         */
+        @SuppressWarnings("WeakerAccess")
+        public static final int DEFAULT_MAX_HEADER_LIST_SIZE = 8192;
+
         private Duration pingIntervalRead = null;
 
         private Duration pingIntervalWrite = null;
 
         private Duration pingIntervalIdle = null;
+
+        private int maxHeaderListSize = DEFAULT_MAX_HEADER_LIST_SIZE;
 
         /**
          * For HTTP/2 connections, the interval from the last inbound message to when an automated ping
@@ -1341,6 +1349,25 @@ public abstract class HttpClientConfiguration {
          */
         public void setPingIntervalIdle(@Nullable Duration pingIntervalIdle) {
             this.pingIntervalIdle = pingIntervalIdle;
+        }
+
+        /**
+         * [available in the Netty HTTP client].
+         *
+         * @return The maximum allowed compressed header list size (in bytes) after decompression
+         * using HPACK (the HTTP/2 header compression algorithm).
+         */
+        public int getMaxHeaderListSize() {
+            return maxHeaderListSize;
+        }
+
+        /**
+         * Sets the maximum header list size the client can handle. Default value ({@value io.micronaut.http.client.HttpClientConfiguration.Http2ClientConfiguration#DEFAULT_MAX_HEADER_LIST_SIZE}).
+         *
+         * @param maxHeaderListSize The maximum header list size the client can handle
+         */
+        public void setMaxHeaderListSize(@ReadableBytes int maxHeaderListSize) {
+            this.maxHeaderListSize = maxHeaderListSize;
         }
     }
 
