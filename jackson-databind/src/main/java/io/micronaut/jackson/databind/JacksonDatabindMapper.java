@@ -236,7 +236,11 @@ public final class JacksonDatabindMapper implements JsonMapper {
 
     @Override
     public void writeValue(@NonNull OutputStream outputStream, @Nullable Object object) throws IOException {
-        objectMapper.writeValue(outputStream, object);
+        if (specializedWriter != null) {
+            specializedWriter.writeValue(outputStream, object);
+        } else {
+            objectMapper.writeValue(outputStream, object);
+        }
     }
 
     @Override

@@ -172,9 +172,9 @@ class Test {
         BeanDefinition definition = buildBeanDefinition('test.ConvertibleValuesSerializer', '''
 package test;
 
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.databind.JsonSerializer;
-import com.fasterxml.jackson.databind.SerializerProvider;
+import tools.jackson.core.JsonGenerator;
+import tools.jackson.databind.ValueSerializer;
+import tools.jackson.databind.SerializationContext;
 import io.micronaut.core.convert.value.ConvertibleValues;
 
 import jakarta.inject.Singleton;

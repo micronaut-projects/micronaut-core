@@ -80,7 +80,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         then:
         HttpClientResponseException e = thrown()
         e.message == """Invalid JSON: Unrecognized token 'The': was expecting (JSON String, Number, Array, Object or token 'null', 'true' or 'false')
- at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION` disabled); line: 1, column: 14]"""
+ at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION` disabled); byte offset: #13]"""
         e.response.status == HttpStatus.BAD_REQUEST
 
         when:

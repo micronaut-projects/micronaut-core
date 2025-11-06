@@ -32,7 +32,7 @@ package test;
 
 import io.micronaut.aop.simple.*;
 import io.micronaut.context.annotation.*;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 @Factory
 class MyBeanFactory {
     @Mutating("someVal")
