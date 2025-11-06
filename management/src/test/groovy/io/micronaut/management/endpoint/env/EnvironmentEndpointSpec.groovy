@@ -56,7 +56,7 @@ result.each { println "$it.key => $it.value"}
         result.activeEnvironments == ["test"]
         result.packages.contains("io.micronaut.management.endpoint.env")
         result.propertySources.size() == 3
-        result.propertySources.find { it.name == 'context' }.properties['foo.bar'] == 'baz'
+        result.propertySources.find { it.name == 'context' }.get("properties")['foo.bar'] == 'baz'
     }
 
     void "it returns all the properties of a property source"() {
@@ -68,7 +68,7 @@ result.each { println "$it.key => $it.value"}
 
         then:
         result.order == 0
-        result.properties['foo.bar'] == 'baz'
+        result.get("properties")['foo.bar'] == 'baz'
     }
 
     void "it returns not found if the property source doesn't exist"() {
@@ -103,7 +103,7 @@ result.each { println "$it.key => $it.value"}
         Map result = call()
 
         then:
-        result.properties == [
+        result.get("properties") == [
                 'endpoints.env.enabled'  : true,
                 'endpoints.env.sensitive': false,
                 'foo.bar'                : 'baz',
@@ -138,7 +138,7 @@ result.each { println "$it.key => $it.value"}
         result.activeEnvironments == ["test"]
         result.packages.contains("io.micronaut.management.endpoint.env")
         result.propertySources.size() == 3
-        result.propertySources*.properties.collectEntries().values().every { it == '*****' }
+        result.propertySources*.get("properties").collectEntries().values().every { it == '*****' }
     }
 
     void "individual properties can be masked"() {
@@ -154,7 +154,7 @@ result.each { println "$it.key => $it.value"}
         Map result = call()
 
         then:
-        result.properties == [
+        result.get("properties") == [
                 'endpoints.env.enabled': true,
                 'endpoints.env.sensitive': false,
                 'test.filter': 'individual',
@@ -187,9 +187,9 @@ result.each { println "$it.key => $it.value"}
         Map result = call()
 
         then:
-        result.properties['foo.bar'] == 'baz'
-        result.properties['my.password'] == '*****' // Caught by the legacy filter
-        result.properties['iShouldBeMasked'] == '*****'
+        result.get("properties")['foo.bar'] == 'baz'
+        result.get("properties")['my.password'] == '*****' // Caught by the legacy filter
+        result.get("properties")['iShouldBeMasked'] == '*****'
     }
 
     @Singleton
@@ -215,7 +215,7 @@ result.each { println "$it.key => $it.value"}
         Map result = call()
 
         then:
-        result.properties == [
+        result.get("properties") == [
                 'endpoints.env.enabled'  : '*****',
                 'endpoints.env.sensitive': '*****',
                 'foo.bar'                : '*****',
