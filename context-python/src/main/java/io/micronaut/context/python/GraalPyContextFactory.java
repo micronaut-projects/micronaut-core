@@ -42,8 +42,8 @@ import org.graalvm.python.embedding.VirtualFileSystem;
 @Factory
 public class GraalPyContextFactory {
     public static final String PYTHON = "python";
-    private static final String APPLICATION_PATH = "META-INF/GRAALPY-VFS/micronaut-application";
-    private static final String APPLICATION_LAUNCHER_PATH = APPLICATION_PATH + "/pyronaut_application.py";
+    public static final String APPLICATION_PATH = "META-INF/GRAALPY-VFS/micronaut-application";
+    public static final String APPLICATION_LAUNCHER_PATH = APPLICATION_PATH + "/pyronaut_application.py";
     public static final String PYRONAUT_MAIN_CLASS = "pyronaut_application.PyronautMain";
 
     private final ApplicationContext applicationContext;

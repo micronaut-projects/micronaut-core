@@ -214,7 +214,7 @@ class PythonElementFactoryTest {
             ClassDef classDef = new ClassDef("TestClass");
             ClassElement classElement = factory.newClassElement(classDef, processingEnvironment.metadataFactory());
 
-            AttributeDef fieldDef = new AttributeDef("testField", "str", "str", null, List.of(), null, false);
+            AttributeDef fieldDef = new AttributeDef("testField", "str", "str", null, List.of(), null, false, null);
             FieldElement fieldElement = factory.newFieldElement(classElement, fieldDef, processingEnvironment.metadataFactory());
 
             assertNotNull(fieldElement);
@@ -243,7 +243,7 @@ class PythonElementFactoryTest {
             ClassDef enumDef = new ClassDef("TestEnum").withEnum(true, List.of("CONSTANT"));
             ClassElement enumElement = factory.newClassElement(enumDef, processingEnvironment.metadataFactory());
 
-            AttributeDef constantDef = new AttributeDef("CONSTANT", "TestEnum", "TestEnum", null, List.of(), null, true);
+            AttributeDef constantDef = new AttributeDef("CONSTANT", "TestEnum", "TestEnum", null, List.of(), null, true, null);
             EnumConstantElement constantElement = factory.newEnumConstantElement(enumElement, constantDef, processingEnvironment.metadataFactory());
 
             assertNotNull(constantElement);
