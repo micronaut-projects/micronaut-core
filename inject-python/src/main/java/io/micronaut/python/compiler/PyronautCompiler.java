@@ -190,12 +190,11 @@ public final class PyronautCompiler {
     }
 
     private String generateMainClassSource() {
-        String pkg = getPackageName();
         boolean hasSrc = pythonSrc != null && !pythonSrc.isEmpty();
         boolean hasCode = pythonCode != null && !pythonCode.isEmpty();
 
         StringBuilder sb = new StringBuilder();
-        sb.append("package ").append(pkg).append(";\n\n");
+        sb.append("package ").append(getPackageName()).append(";\n\n");
         sb.append("import io.micronaut.runtime.Micronaut;\n");
         sb.append("import io.micronaut.python.processing.annotation.PythonApplication;\n\n");
         sb.append("@PythonApplication(\n");
@@ -221,7 +220,7 @@ public final class PyronautCompiler {
     }
 
     private String getPackageName() {
-        return packageName != null ? packageName : DEFAULT_PACKAGE_NAME;
+        return DEFAULT_PACKAGE_NAME;
     }
 
     private String escapeJavaString(String s) {

@@ -14,7 +14,7 @@ class PythonControllerSpec extends AbstractPythonTypeElementSpec {
         given:
         def context = buildContext('''
 from jakarta.inject import Singleton as S
-from io.micronaut.http.annotation import Controller, Get
+from micronaut.http.annotation import Controller, Get
 
 @S
 class MessageService:
@@ -48,7 +48,7 @@ class HelloController:
         given:
         def context = buildContext('''
 from jakarta.inject import Singleton as S
-from io.micronaut.http.annotation import Controller, Get
+from micronaut.http.annotation import Controller, Get
 
 @S
 class MessageService:
@@ -84,8 +84,8 @@ class HelloController:
         given:
         def context = buildContext('''
 from jakarta.inject import Singleton as S
-from io.micronaut.http.annotation import Controller, Get
-from io.micronaut.core.annotation import Introspected
+from micronaut.http.annotation import Controller, Get
+from micronaut.core.annotation import Introspected
 from dataclasses import dataclass
 
 @Introspected

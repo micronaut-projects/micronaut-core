@@ -8,7 +8,7 @@ class MethodInjectionSpec extends AbstractPythonTypeElementSpec {
         given: "Python code with method injection"
         def pythonCode = '''
 from jakarta.inject import Singleton, Inject
-from io.micronaut.context.annotation import Executable
+from micronaut.context.annotation import Executable
 
 @Singleton
 class HelperService:

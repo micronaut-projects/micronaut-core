@@ -28,7 +28,7 @@ class FactoryBeanMethodSpec extends AbstractPythonTypeElementSpec {
     void "test a factory bean with method"() {
         given:
         def context = buildContext('''\
-from io.micronaut.context.annotation import Factory, Bean, Prototype
+from micronaut.context.annotation import Factory, Bean, Prototype
 
 class Bar1:
     pass
@@ -63,7 +63,7 @@ class TestFactory:
     void "test a factory bean with static method"() {
         given:
         def context = buildContext('''\
-from io.micronaut.context.annotation import Factory, Bean, Prototype
+from micronaut.context.annotation import Factory, Bean, Prototype
 from jakarta.inject import Singleton
 
 class Bar1:

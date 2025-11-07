@@ -19,13 +19,17 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
-import io.micronaut.context.ApplicationContext;
-import io.micronaut.context.annotation.Factory;
+import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Engine;
+import org.graalvm.polyglot.HostAccess;
 import org.graalvm.polyglot.Source;
 
+import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.annotation.Factory;
 import jakarta.annotation.PreDestroy;
 import jakarta.inject.Singleton;
+import org.graalvm.python.embedding.GraalPyResources;
+import org.graalvm.python.embedding.VirtualFileSystem;
 
 /**
  * Factory bean that creates and initializes the GraalPy context.
@@ -37,6 +41,11 @@ import jakarta.inject.Singleton;
  */
 @Factory
 public class GraalPyContextFactory {
+    public static final String PYTHON = "python";
+    private static final String APPLICATION_PATH = "META-INF/GRAALPY-VFS/micronaut-application";
+    private static final String APPLICATION_LAUNCHER_PATH = APPLICATION_PATH + "/pyronaut_application.py";
+    public static final String PYRONAUT_MAIN_CLASS = "pyronaut_application.PyronautMain";
+
     private final ApplicationContext applicationContext;
 
     public GraalPyContextFactory(ApplicationContext applicationContext) {
@@ -53,14 +62,30 @@ public class GraalPyContextFactory {
     @Singleton
     public org.graalvm.polyglot.Context graalPyContext() {
         try {
-            // Create GraalPy context
-            org.graalvm.polyglot.Context context = org.graalvm.polyglot.Context.newBuilder("python")
-                .engine(Engine.create())
-                .allowAllAccess(true)
-                .build();
+            ClassLoader classLoader = applicationContext.getClassLoader();
 
-            // Load the generated Python application script
-            loadPythonApplicationScript(context);
+            Context context = GraalPyResources.contextBuilder(VirtualFileSystem.newBuilder()
+                    .resourceDirectory(APPLICATION_PATH)
+                        .resourceLoadingClass(classLoader.loadClass(PYRONAUT_MAIN_CLASS)).build())
+                // restrict in future?
+                .allowHostAccess(HostAccess.ALL)
+                .allowHostClassLookup(name -> true)
+                .build();
+            context.initialize(PYTHON);
+
+
+
+            // Try to load the generated pyronaut_application.py from META-INF
+            try (InputStream inputStream = classLoader
+                .getResourceAsStream(APPLICATION_LAUNCHER_PATH)) {
+
+                if (inputStream != null) {
+                    String scriptContent = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+                    Source source = Source.newBuilder(PYTHON, scriptContent, "pyronaut_application.py")
+                        .build();
+                    context.eval(source);
+                }
+            }
 
             // Make context available to bridge classes
             ContextHolder.setContext(context);
@@ -81,18 +106,4 @@ public class GraalPyContextFactory {
         ContextHolder.resetContext();
     }
 
-    private void loadPythonApplicationScript(org.graalvm.polyglot.Context context) throws IOException {
-        ClassLoader classLoader = applicationContext.getClassLoader();
-        // Try to load the generated pyronaut_application.py from META-INF
-        try (InputStream inputStream = classLoader
-                .getResourceAsStream("META-INF/pyronaut_application.py")) {
-
-            if (inputStream != null) {
-                String scriptContent = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
-                Source source = Source.newBuilder("python", scriptContent, "pyronaut_application.py")
-                    .build();
-                context.eval(source);
-            }
-        }
-    }
 }
