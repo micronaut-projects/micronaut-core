@@ -177,8 +177,8 @@ public class ConfigurationMetadataWriterVisitor implements TypeElementVisitor<Co
                                     getPropertyDocs(propertyElement),
                                     propertyElement.getAnnotationMetadata().stringValue(Bindable.class, "defaultValue").orElse(null)
                                 );
-                                if (memberElement instanceof MethodElement) {
-                                    annotateProperty(memberElement, metadata.getPath());
+                                if (memberElement instanceof MethodElement methodElement) {
+                                    annotateProperty(methodElement, metadata.getPath());
                                 }
                                 processed.add(memberElement);
                                 propertyElement.getField().ifPresent(processed::add);
@@ -234,6 +234,10 @@ public class ConfigurationMetadataWriterVisitor implements TypeElementVisitor<Co
 
     private void annotateProperty(Element memberElement, String path) {
         memberElement.annotate(Property.class, (builder) -> builder.member("name", path));
+    }
+
+    private void annotateProperty(MethodElement methodElement, String path) {
+        methodElement.getMethodAnnotationMetadata().annotate(Property.class, (builder) -> builder.member("name", path));
     }
 
     private boolean notProcessed(String prop, ClassElement declaringType) {

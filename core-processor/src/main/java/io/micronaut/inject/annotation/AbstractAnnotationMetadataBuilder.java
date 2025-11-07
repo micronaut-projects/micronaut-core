@@ -1720,9 +1720,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         final boolean isHierarchy = annotationMetadata instanceof AnnotationMetadataHierarchy;
         AnnotationMetadata declaredMetadata = annotationMetadata;
         if (isHierarchy) {
-            while (declaredMetadata instanceof AnnotationMetadataHierarchy) {
-                declaredMetadata = declaredMetadata.getDeclaredMetadata();
-            }
+            declaredMetadata = annotationMetadata.getDeclaredMetadata();
         }
         MutableAnnotationMetadata mutableAnnotationMetadata;
         if (declaredMetadata == AnnotationMetadata.EMPTY_METADATA) {
