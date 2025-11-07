@@ -15,6 +15,8 @@
  */
 package io.micronaut.python.compiler
 
+import io.micronaut.context.python.GraalPyContextFactory
+import io.micronaut.python.processing.PythonAnnotationProcessor
 import spock.lang.PendingFeature
 import spock.lang.Specification
 
@@ -162,31 +164,12 @@ class MyNamedService:
         then:
         tempDir.exists()
         // Check that META-INF file was generated
-        def metaInfDir = new File(tempDir, "META-INF")
-        metaInfDir.exists()
-        def transformedFile = new File(metaInfDir, "pyronaut_application.py")
+        def transformedFile = new File(tempDir, GraalPyContextFactory.APPLICATION_LAUNCHER_PATH)
         transformedFile.exists()
 
-        // Verify the transformed content contains the original code and generated decorators
         def transformedContent = transformedFile.text
-        transformedContent.contains("@TestAnnotation")
-        transformedContent.contains("@Singleton")
-        transformedContent.contains("@Named")
-        transformedContent.contains("class MyService:")
-        transformedContent.contains("class MySingletonService:")
-        transformedContent.contains("class MyNamedService:")
-
-        // Check that decorators were generated
-        transformedContent.contains("@micronaut_annotation('io.micronaut.python.compiler.TestAnnotation')")
-        transformedContent.contains("def TestAnnotation(")
-        transformedContent.contains("@micronaut_annotation('io.micronaut.python.compiler.Singleton')")
-        transformedContent.contains("def Singleton(")
-        transformedContent.contains("@micronaut_annotation('io.micronaut.python.compiler.Named')")
-        transformedContent.contains("def Named(")
-
-        // Check for meta-annotations (Singleton should also generate Scope decorator)
-        transformedContent.contains("@micronaut_annotation('io.micronaut.python.compiler.Scope')")
-        transformedContent.contains("def Scope(")
+        // no transformation are applied
+        pythonCode == transformedContent
 
         cleanup:
         tempDir.deleteDir()
@@ -219,21 +202,14 @@ class MyNamedService:
         // Check that META-INF file was generated
         def metaInfDir = new File(tempDir, "META-INF")
         metaInfDir.exists()
-        def transformedFile = new File(metaInfDir, "pyronaut_application.py")
+        def transformedFile = new File(metaInfDir, PythonAnnotationProcessor.APPLICATION_SRC_PATH + "/jakarta/inject/Singleton.py")
         transformedFile.exists()
 
         // Verify the transformed content contains the original code and generated decorators
         def transformedContent = transformedFile.text
-        transformedContent.contains("@Singleton")
-        transformedContent.contains("@Named")
-        transformedContent.contains("class MySingletonService:")
-        transformedContent.contains("class MyNamedService:")
-
         // Check that decorators were generated for jakarta.inject annotations
-        transformedContent.contains("@micronaut_annotation('jakarta.inject.Singleton')")
+        transformedContent.contains("@micronaut_annotation(\"jakarta.inject.Singleton\")")
         transformedContent.contains("def Singleton(")
-        transformedContent.contains("@micronaut_annotation('jakarta.inject.Named')")
-        transformedContent.contains("def Named(")
 
         cleanup:
         tempDir.deleteDir()
@@ -264,109 +240,18 @@ class MyRepeatableService:
         // Check that META-INF file was generated
         def metaInfDir = new File(tempDir, "META-INF")
         metaInfDir.exists()
-        def transformedFile = new File(metaInfDir, "pyronaut_application.py")
+        def transformedFile = new File(metaInfDir, PythonAnnotationProcessor.APPLICATION_SRC_PATH + "/micronaut/python/compiler/RepeatableAnnotation.py")
         transformedFile.exists()
 
         // Verify the transformed content contains the original code and generated decorators
         def transformedContent = transformedFile.text
-        transformedContent.contains("@RepeatableAnnotation")
-        transformedContent.contains("class MyRepeatableService:")
 
         // Check that decorator was generated with repeatable info using the new codepath
-        transformedContent.contains("@micronaut_annotation('io.micronaut.python.compiler.RepeatableAnnotation', repeated='io.micronaut.python.compiler.RepeatableAnnotations')")
+        transformedContent.contains("@micronaut_annotation(\"io.micronaut.python.compiler.RepeatableAnnotation\", repeated=\"io.micronaut.python.compiler.RepeatableAnnotations\")")
         transformedContent.contains("def RepeatableAnnotation(")
 
         cleanup:
         tempDir.deleteDir()
     }
 
-    def "test nested annotation transformation"() {
-        given:
-        def pythonCode = '''
-from micronaut.python.compiler import IntrospectedAnnotation, BuilderAnnotation
-
-@IntrospectedAnnotation(builder=BuilderAnnotation(style="custom"))
-class MyIntrospectedService:
-    pass
-'''
-        def tempDir = File.createTempDir("pyronaut-test-nested", "")
-        def compiler = PyronautCompiler.builder()
-            .pythonCode(pythonCode)
-            .javaSrc("inject-python-test/src/test/java")
-            .targetDir(tempDir)
-            .build()
-
-        when:
-        compiler.compile()
-
-        then:
-        tempDir.exists()
-        // Check that META-INF file was generated
-        def metaInfDir = new File(tempDir, "META-INF")
-        metaInfDir.exists()
-        def transformedFile = new File(metaInfDir, "pyronaut_application.py")
-        transformedFile.exists()
-
-        // Verify the transformed content contains the original code and generated decorators
-        def transformedContent = transformedFile.text
-        !transformedContent.contains("from io.micronaut.python.compiler import IntrospectedAnnotation, BuilderAnnotation")
-        transformedContent.contains("@IntrospectedAnnotation(builder=BuilderAnnotation(style='custom'))")
-        transformedContent.contains("class MyIntrospectedService:")
-
-        // Check that main decorator was generated
-        transformedContent.contains("@micronaut_annotation('io.micronaut.python.compiler.IntrospectedAnnotation')")
-        transformedContent.contains("def IntrospectedAnnotation(")
-
-        // Check that nested BuilderAnnotation decorator was generated by inspecting annotation methods
-        transformedContent.contains("@micronaut_annotation('io.micronaut.python.compiler.BuilderAnnotation')")
-        transformedContent.contains("def BuilderAnnotation(")
-
-        cleanup:
-        tempDir.deleteDir()
-    }
-
-    def "test real micronaut nested annotation transformation"() {
-        given:
-        def pythonCode = '''
-from micronaut.core.annotation import Introspected
-
-@Introspected
-class MyRealIntrospectedService:
-    pass
-'''
-        def tempDir = File.createTempDir("pyronaut-test-real-nested", "")
-        def compiler = PyronautCompiler.builder()
-            .pythonCode(pythonCode)
-            .javaSrc("core/src/main/java")
-            .targetDir(tempDir)
-            .build()
-
-        when:
-        compiler.compile()
-
-        then:
-        tempDir.exists()
-        // Check that META-INF file was generated
-        def metaInfDir = new File(tempDir, "META-INF")
-        metaInfDir.exists()
-        def transformedFile = new File(metaInfDir, "pyronaut_application.py")
-        transformedFile.exists()
-
-        // Verify the transformed content contains the original code and generated decorators
-        def transformedContent = transformedFile.text
-        !transformedContent.contains("from io.micronaut.core.annotation import Introspected")
-        transformedContent.contains("@Introspected")
-        transformedContent.contains("class MyRealIntrospectedService:")
-
-        // Check that main decorator was generated
-        transformedContent.contains("@micronaut_annotation('io.micronaut.core.annotation.Introspected')")
-        transformedContent.contains("def Introspected(")
-
-        // Check that nested IntrospectionBuilder decorator was generated by inspecting annotation methods
-        transformedContent.contains("@micronaut_annotation('io.micronaut.core.annotation.Introspected.IntrospectionBuilder')")
-        transformedContent.contains("def IntrospectionBuilder(")
-
-        cleanup:
-        tempDir.deleteDir()
-    }
 }

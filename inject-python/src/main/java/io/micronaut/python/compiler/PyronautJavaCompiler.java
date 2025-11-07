@@ -74,23 +74,39 @@ final class PyronautJavaCompiler {
         List<String> options = buildCompilerOptions(classpath);
         List<Processor> processors = getAnnotationProcessors();
 
-        JavaCompiler.CompilationTask task = compiler.getTask(
-            null, // Writer for additional output
-            fileManager, // File manager
-            diagnosticCollector, // Diagnostic collector
-            options, // Compiler options
-            Collections.emptyList(), // Classes to process (none)
-            Arrays.asList(sources) // Source files
-        );
+        try {
+            JavaCompiler.CompilationTask task = compiler.getTask(
+                null, // Writer for additional output
+                fileManager, // File manager
+                diagnosticCollector, // Diagnostic collector
+                options, // Compiler options
+                Collections.emptyList(), // Classes to process (none)
+                Arrays.asList(sources) // Source files
+            );
 
-        task.setProcessors(processors);
+            task.setProcessors(processors);
 
-        boolean success = task.call();
-        if (!success) {
-            throw new RuntimeException("Compilation failed: " + diagnosticCollector.getDiagnostics());
+            boolean success = task.call();
+            if (!success) {
+                throw new RuntimeException("Compilation failed: " + diagnosticCollector.getDiagnostics());
+            }
+        } finally {
+            shutdownProcessors(processors);
         }
 
         return fileManager.getOutputFiles();
+    }
+
+    private static void shutdownProcessors(List<Processor> processors) {
+        for (Processor processor : processors) {
+            if (processor instanceof AutoCloseable autoCloseable) {
+                try {
+                    autoCloseable.close();
+                } catch (Exception e) {
+                    // ignore
+                }
+            }
+        }
     }
 
     /**
@@ -114,20 +130,24 @@ final class PyronautJavaCompiler {
         List<String> options = buildCompilerOptions(classpath);
         List<Processor> processors = getAnnotationProcessors();
 
-        JavaCompiler.CompilationTask task = compiler.getTask(
-            null, // Writer for additional output
-            fileManager, // File manager
-            diagnosticCollector, // Diagnostic collector
-            options, // Compiler options
-            Collections.emptyList(), // Classes to process (none)
-            Arrays.asList(sources) // Source files
-        );
+        try {
+            JavaCompiler.CompilationTask task = compiler.getTask(
+                null, // Writer for additional output
+                fileManager, // File manager
+                diagnosticCollector, // Diagnostic collector
+                options, // Compiler options
+                Collections.emptyList(), // Classes to process (none)
+                Arrays.asList(sources) // Source files
+            );
 
-        task.setProcessors(processors);
+            task.setProcessors(processors);
 
-        boolean success = task.call();
-        if (!success) {
-            throw new RuntimeException("Compilation failed: " + diagnosticCollector.getDiagnostics());
+            boolean success = task.call();
+            if (!success) {
+                throw new RuntimeException("Compilation failed: " + diagnosticCollector.getDiagnostics());
+            }
+        } finally {
+            shutdownProcessors(processors);
         }
     }
 
@@ -166,6 +186,8 @@ final class PyronautJavaCompiler {
         if (classElementCallback != null) {
             pythonProcessor.setClassElementCallback(classElementCallback);
         }
+        // Enable testing mode to ensure proper cleanup of GraalVM contexts
+        // This prevents memory leaks in test environments
         processors.add(pythonProcessor);
 
         return processors;

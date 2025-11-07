@@ -53,9 +53,9 @@ import io.micronaut.python.processing.visitor.PythonTypeElementVisitorProcessor;
  * @since 4.8.0
  */
 @SupportedAnnotationTypes("io.micronaut.python.processing.annotation.PythonApplication")
-public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor {
-    private static final String APPLICATION_PATH = "GRAALPY-VFS/micronaut-application/";
-    private static final String APPLICATION_LAUNCHER_PATH = APPLICATION_PATH + "pyronaut_application.py";
+public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor implements AutoCloseable {
+    public static final String APPLICATION_PATH = "GRAALPY-VFS/micronaut-application/";
+    public static final String APPLICATION_LAUNCHER_PATH = APPLICATION_PATH + "pyronaut_application.py";
     public static final String APPLICATION_SRC_PATH = "GRAALPY-VFS/micronaut-application/src/";
 
     private PythonAstParser parser;
@@ -78,6 +78,11 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     }
 
     @Override
+    public void close() throws Exception {
+        parser.close();
+    }
+
+    @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
         if (annotations.isEmpty()) {
             return false;
@@ -90,8 +95,10 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         }
         if (roundEnv.processingOver()) {
             parser.close();
+            return false;
+        } else {
+            return true;
         }
-        return false;
     }
 
     private void processPythonApplications(RoundEnvironment roundEnv) {

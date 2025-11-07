@@ -264,6 +264,9 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
 
     @Override
     protected String getAnnotationMemberName(ElementDef member) {
+        if (member == null) {
+            return null;
+        }
         return member.name();
     }
 
@@ -316,16 +319,20 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     private static @Nullable AnnotationMemberDef resolveMemberDef(ClassElement javaAnnotationType, String memberName) {
         MethodElement annotationMember = resolveAnnotationMember(javaAnnotationType, memberName);
         if (annotationMember == null) {
-            return null;
+            return new AnnotationMemberDef(memberName, null, null);
+        } else {
+            return new AnnotationMemberDef(
+                memberName,
+                annotationMember.getReturnType(),
+                annotationMember.getAnnotationMetadata()
+            );
         }
-        return new AnnotationMemberDef(
-            memberName,
-            annotationMember.getReturnType(),
-            annotationMember.getAnnotationMetadata()
-        );
     }
 
     private static @Nullable MethodElement resolveAnnotationMember(ClassElement javaAnnotationType, String memberName) {
+        if (javaAnnotationType == null) {
+            return null;
+        }
         return javaAnnotationType
                 .getEnclosedElement(ElementQuery.ALL_METHODS.onlyInstance()
                 .named(memberName))

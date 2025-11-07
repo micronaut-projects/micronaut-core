@@ -188,10 +188,6 @@ public class PythonVisitorContext implements VisitorContext {
 
     @Override
     public Optional<io.micronaut.inject.ast.ClassElement> getClassElement(String name) {
-        if (name.startsWith("java.") || name.startsWith("javax.")) {
-            return javaVisitorContext.getClassElement(name);
-        }
-
         // First try to find in Python environment
         Map<String, ClassElement> classes = processingEnvironment.classes();
         io.micronaut.inject.ast.ClassElement pythonClass = classes.get(name);
