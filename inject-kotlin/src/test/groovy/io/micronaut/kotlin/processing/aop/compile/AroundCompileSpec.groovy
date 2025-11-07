@@ -27,7 +27,7 @@ import io.micronaut.kotlin.processing.aop.simple.Mutating
 import io.micronaut.kotlin.processing.aop.compile.MyClient
 import io.micronaut.kotlin.processing.aop.compile.MyClientImpl
 import io.micronaut.context.annotation.*
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.ObjectMapper
 
 @Factory
 class MyBeanFactory {

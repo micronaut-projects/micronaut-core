@@ -2,12 +2,10 @@ package io.micronaut.jackson
 
 import tools.jackson.databind.ObjectMapper
 import tools.jackson.databind.exc.MismatchedInputException
-import io.micronaut.context.annotation.Property
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
 
-@Property(name = "jackson.deserialization.failOnNullForPrimitives", value = "true")
 @MicronautTest
 class JacksonNullableFailOnMissingTest {
 
