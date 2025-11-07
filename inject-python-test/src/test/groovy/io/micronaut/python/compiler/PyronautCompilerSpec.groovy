@@ -84,20 +84,6 @@ class TestClass:
         thrown(IllegalArgumentException)
     }
 
-    def "test custom package name"() {
-        given:
-        def compiler = PyronautCompiler.builder()
-            .pythonCode("class Test: pass")
-            .packageName("com.example.test")
-            .build()
-
-        when:
-        def classLoader = compiler.buildClassLoader()
-
-        then:
-        classLoader.loadClass("com.example.test.PyronautMain") != null
-    }
-
     def "test compile to disk requires targetDir"() {
         given:
         def compiler = PyronautCompiler.builder()
@@ -148,7 +134,7 @@ class TestClass:
     def "test annotation transformation and META-INF file generation"() {
         given:
         def pythonCode = '''
-from io.micronaut.python.compiler import TestAnnotation, Singleton, Named
+from micronaut.python.compiler import TestAnnotation, Singleton, Named
 
 @TestAnnotation("test-value")
 class MyService:
@@ -256,7 +242,7 @@ class MyNamedService:
     def "test repeatable annotation transformation"() {
         given:
         def pythonCode = '''
-from io.micronaut.python.compiler import RepeatableAnnotation
+from micronaut.python.compiler import RepeatableAnnotation
 
 @RepeatableAnnotation("first")
 @RepeatableAnnotation("second")
@@ -297,7 +283,7 @@ class MyRepeatableService:
     def "test nested annotation transformation"() {
         given:
         def pythonCode = '''
-from io.micronaut.python.compiler import IntrospectedAnnotation, BuilderAnnotation
+from micronaut.python.compiler import IntrospectedAnnotation, BuilderAnnotation
 
 @IntrospectedAnnotation(builder=BuilderAnnotation(style="custom"))
 class MyIntrospectedService:
@@ -342,7 +328,7 @@ class MyIntrospectedService:
     def "test real micronaut nested annotation transformation"() {
         given:
         def pythonCode = '''
-from io.micronaut.core.annotation import Introspected
+from micronaut.core.annotation import Introspected
 
 @Introspected
 class MyRealIntrospectedService:

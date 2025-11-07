@@ -29,7 +29,7 @@ class ConfigurationPropertiesSpec extends AbstractPythonTypeElementSpec {
     void "test @ConfigurationProperties on Python @dataclass"() {
         given:
         def pythonCode = '''
-from io.micronaut.context.annotation import ConfigurationProperties
+from micronaut.context.annotation import ConfigurationProperties
 from dataclasses import dataclass
 
 @ConfigurationProperties("myapp")
@@ -62,8 +62,8 @@ class AppConfig:
     void "test @ConfigurationProperties on regular Python class with attributes"() {
         given:
         def pythonCode = '''
-from io.micronaut.context.annotation import ConfigurationProperties, Executable
-from io.micronaut.context.env import Environment
+from micronaut.context.annotation import ConfigurationProperties, Executable
+from micronaut.context.env import Environment
 
 @ConfigurationProperties("database")
 class DatabaseConfig:
@@ -98,7 +98,7 @@ class DatabaseConfig:
     void "test @ConfigurationProperties on Python class with @property decorator"() {
         given:
         def pythonCode = '''
-from io.micronaut.context.annotation import ConfigurationProperties
+from micronaut.context.annotation import ConfigurationProperties
 
 @ConfigurationProperties("cache")
 class CacheConfig:

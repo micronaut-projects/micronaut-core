@@ -109,7 +109,7 @@ class MySingletonService:
     def "test repeatable annotations are correctly resolved"() {
         given:
         def pythonCode = '''
-from io.micronaut.python.compiler import RepeatableAnnotation
+from micronaut.python.compiler import RepeatableAnnotation
 
 @RepeatableAnnotation("first")
 @RepeatableAnnotation("second")
@@ -142,7 +142,7 @@ class MyAnnotatedService:
     def "test annotation primitive types and arrays"() {
         given:
         def pythonCode = '''
-from io.micronaut.python.compiler import PrimitiveTypesAnnotation
+from micronaut.python.compiler import PrimitiveTypesAnnotation
 
 @PrimitiveTypesAnnotation(
     booleanValue=True,
@@ -219,7 +219,7 @@ class MyPrimitiveAnnotatedService:
         given:
         def pythonCode = '''
 from jakarta.inject import Singleton
-from io.micronaut.context.annotation import Executable
+from micronaut.context.annotation import Executable
 
 @Singleton
 class SimpleService:
@@ -277,7 +277,7 @@ class TestService:
         given: "Python code with specific return type annotation"
         def pythonCode = """
 from jakarta.inject import Singleton
-from io.micronaut.context.annotation import Executable
+from micronaut.context.annotation import Executable
 from typing import Optional
 
 @Singleton

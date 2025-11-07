@@ -29,7 +29,7 @@ class ExecutableMethodSpec extends AbstractPythonTypeElementSpec {
         given:
         def pythonCode = '''
 from jakarta.inject import Singleton
-from io.micronaut.context.annotation import Executable
+from micronaut.context.annotation import Executable
 
 @Singleton
 class ExecutableService:
@@ -58,7 +58,7 @@ class ExecutableService:
         given:
         def pythonCode = '''
 from jakarta.inject import Singleton
-from io.micronaut.python.compiler import MyExecutable
+from micronaut.python.compiler import MyExecutable
 from typing import Annotated
 
 @Singleton

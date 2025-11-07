@@ -8,7 +8,7 @@ class ConstructorInjectionSpec extends AbstractPythonTypeElementSpec {
         given: "Python code with constructor injection"
         def pythonCode = '''
 from jakarta.inject import Singleton
-from io.micronaut.context.annotation import Executable
+from micronaut.context.annotation import Executable
 
 @Singleton
 class DependencyService:

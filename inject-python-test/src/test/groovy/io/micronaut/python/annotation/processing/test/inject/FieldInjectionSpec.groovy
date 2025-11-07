@@ -10,7 +10,7 @@ class FieldInjectionSpec extends AbstractPythonTypeElementSpec {
         def pythonCode = '''
 from typing import Annotated
 from jakarta.inject import Singleton, Inject
-from io.micronaut.context.annotation import Executable
+from micronaut.context.annotation import Executable
 
 @Singleton
 class HelperService:

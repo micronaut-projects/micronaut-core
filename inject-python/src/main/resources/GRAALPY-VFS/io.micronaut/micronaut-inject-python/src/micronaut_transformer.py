@@ -54,6 +54,8 @@ class MicronautTransformer(ast.NodeTransformer):
         self.java_type_assignments = []
         self.imports_to_transform = []
         self.generated_decorators = set()
+        self.generated_decorator_code = {}
+        self.java_class_imports = {}
         self.has_java_import = False
 
     def visit_ImportFrom(self, node: ast.ImportFrom):
@@ -66,22 +68,40 @@ class MicronautTransformer(ast.NodeTransformer):
         if not node.module:
             return node
 
+        # Special handling for io. prefixed imports to avoid conflict with Python's builtin io module
+        transformed_module = node.module
+        if node.module.startswith('io.'):
+            transformed_module = node.module[3:]  # Remove 'io.' prefix
+
         # Collect imports to transform - check if JavaVisitorContext.getClassElements returns annotations
         transformed_any = False
         for alias in node.names:
             if alias.name == '*':
                 # Handle star imports - scan the entire package
-                if self._handle_star_import(node.module):
+                if self._handle_star_import(node.module, transformed_module):
                     transformed_any = True
             else:
                 # Handle specific imports
-                if self._handle_specific_import(node.module, alias):
+                if self._handle_specific_import(node.module, transformed_module, alias):
                     transformed_any = True
 
-        # If any imports were transformed, remove this import statement from the AST
-        # since the imported items won't exist at runtime
+        # If any imports were transformed, replace the import with the transformed module name
         if transformed_any:
-            return None  # Remove the import from the AST
+            if transformed_module != node.module:
+                # Create a new ImportFrom node with the transformed module name
+                new_node = ast.ImportFrom(
+                    module=transformed_module,
+                    names=node.names,
+                    level=node.level
+                )
+                # Copy other attributes
+                new_node.lineno = node.lineno
+                new_node.end_lineno = node.end_lineno
+                new_node.col_offset = node.col_offset
+                new_node.end_col_offset = node.end_col_offset
+                return new_node
+            else:
+                return None  # Remove the import from the AST
 
         return node
 
@@ -149,7 +169,7 @@ def micronaut_annotation(name, repeated=None):
 
         return node
 
-    def _handle_specific_import(self, module_name: str, alias) -> bool:
+    def _handle_specific_import(self, original_module_name: str, transformed_module_name: str, alias) -> bool:
         """
         Handle specific imports like 'from jakarta.inject import Singleton' or 'from jakarta.inject import Singleton as S'
         Returns True if the import was transformed.
@@ -157,7 +177,7 @@ def micronaut_annotation(name, repeated=None):
         import_name = alias.name  # The actual name being imported (e.g., "Singleton")
         variable_name = alias.asname if alias.asname else alias.name  # The name to use for the variable (e.g., "S" or "Singleton")
 
-        full_name = f"{module_name}.{import_name}"
+        full_name = f"{original_module_name}.{import_name}"
 
         # Try to get the ClassElement
         class_element = self.callback_get_class_element(full_name)
@@ -170,6 +190,8 @@ def micronaut_annotation(name, repeated=None):
                     self.transformed_code.append(decorator_code)
                     return True
             else:
+                # Collect Java class import for VFS generation
+                self._collect_java_class_import(transformed_module_name, variable_name, class_element.getName())
                 # Generate java.type() assignment for regular Java types
                 java_type_assignment = f"{variable_name} = java.type('{class_element.getName()}')"
                 self.java_type_assignments.append(java_type_assignment)
@@ -180,7 +202,7 @@ def micronaut_annotation(name, repeated=None):
             # Java style: Singleton -> singleton
             alt_name = self._to_python_case(import_name)
             if alt_name != import_name:
-                alt_full_name = f"{module_name}.{alt_name}"
+                alt_full_name = f"{original_module_name}.{alt_name}"
                 class_element = self.callback_get_class_element(alt_full_name)
                 if class_element:
                     # Check if it's an annotation
@@ -191,6 +213,8 @@ def micronaut_annotation(name, repeated=None):
                             self.transformed_code.append(decorator_code)
                             return True
                     else:
+                        # Collect Java class import for VFS generation
+                        self._collect_java_class_import(transformed_module_name, variable_name, class_element.getName())
                         # Generate java.type() assignment for regular Java types
                         java_type_assignment = f"{variable_name} = java.type('{class_element.getName()}')"
                         self.java_type_assignments.append(java_type_assignment)
@@ -198,13 +222,13 @@ def micronaut_annotation(name, repeated=None):
                         return True
         return False
 
-    def _handle_star_import(self, module_name: str) -> bool:
+    def _handle_star_import(self, original_module_name: str, transformed_module_name: str) -> bool:
         """
         Handle star imports like 'from jakarta.inject import *'
         Returns True if any imports were transformed.
         """
         # Get all ClassElements in the package
-        class_elements = self.callback_get_class_elements(module_name, None)
+        class_elements = self.callback_get_class_elements(original_module_name, None)
         if class_elements:
             transformed_any = False
             for class_element in class_elements:
@@ -245,6 +269,23 @@ def micronaut_annotation(name, repeated=None):
                         return is_annotation
         except Exception as e:
             print(f"Error checking annotation kind for {class_element.getName()}: {e}")
+
+        return False
+
+    def _is_nested_class(self, class_element) -> bool:
+        """
+        Check if a ClassElement represents a nested (inner) class.
+        """
+        try:
+            native_type = class_element.getNativeType()
+            if native_type and hasattr(native_type, 'element'):
+                java_element = native_type.element()
+                if java_element and hasattr(java_element, 'getNestingKind'):
+                    nesting_kind = java_element.getNestingKind()
+                    if hasattr(nesting_kind, 'name'):
+                        return nesting_kind.name() == 'MEMBER'
+        except Exception as e:
+            print(f"Error checking nesting kind for {class_element.getName()}: {e}")
 
         return False
 
@@ -292,8 +333,41 @@ def micronaut_annotation(name, repeated=None):
                     # Add the meta-annotation as a decorator
                     decorator_lines.append(f'@{meta_decorator_name}')
 
-        # Generate the decorator function with meta-annotations
+        # Collect imports for meta-annotations
+        import_lines = []
+        current_package = '.'.join(annotation_name.split('.')[:-1])  # Package of current annotation
+
+        for meta_annotation_name in annotation_metadata.getAnnotationNames():
+            if not meta_annotation_name.startswith('java.lang.annotation.'):
+                meta_package = '.'.join(meta_annotation_name.split('.')[:-1])
+                meta_simple_name = meta_annotation_name.split('.')[-1]
+
+                # Transform io. prefixed packages to avoid conflict with Python's builtin io module
+                import_package = meta_package
+                if meta_package.startswith('io.'):
+                    import_package = meta_package[3:]  # Remove 'io.' prefix
+
+                # Use absolute import path of the function
+                import_lines.append(f"from {import_package}.{meta_simple_name} import {meta_simple_name}")
+
+        # Remove duplicates
+        import_lines = list(set(import_lines))
+
+        # Generate the decorator function with imports, meta-annotations and micronaut_annotation for VFS
+        imports_section = '\n'.join(import_lines) + '\n\n' if import_lines else ''
+
         decorator_code = f'''
+{imports_section}def micronaut_annotation(name, repeated=None):
+    """
+    Decorator to mark functions as Micronaut annotations.
+    """
+    def decorator(func):
+        func._micronaut_annotation_name = name
+        if repeated:
+            func._micronaut_repeatable_container = repeated
+        return func
+    return decorator
+
 {chr(10).join(decorator_lines)}
 def {decorator_name}({param_signature}):
     """
@@ -318,6 +392,9 @@ def {decorator_name}({param_signature}):
         # Called as @Annotation() or @Annotation(param=value) - return decorator
         return decorator
 '''
+
+        # Store the generated code in the dict for extraction (use qualified annotation name as key)
+        self.generated_decorator_code[annotation_name] = decorator_code
 
         # Handle nested annotations (annotations referenced by this annotation's parameters)
         self._generate_nested_decorators(class_element, import_name)
@@ -348,8 +425,19 @@ def {decorator_name}({param_signature}):
         param_signature = param_info['signature']
         param_handling = param_info['handling']
 
-        # Generate the decorator function with custom annotation name
+        # Generate the decorator function with custom annotation name and micronaut_annotation
         decorator_code = f'''
+def micronaut_annotation(name, repeated=None):
+    """
+    Decorator to mark functions as Micronaut annotations.
+    """
+    def decorator(func):
+        func._micronaut_annotation_name = name
+        if repeated:
+            func._micronaut_repeatable_container = repeated
+        return func
+    return decorator
+
 @micronaut_annotation("{custom_annotation_name}"{repeatable_info})
 def {decorator_name}({param_signature}):
     """
@@ -374,7 +462,7 @@ def {decorator_name}({param_signature}):
         # Called as @Annotation() or @Annotation(param=value) - return decorator
         return decorator
 '''
-
+        self.generated_decorator_code[custom_annotation_name] = decorator_code
         # Handle nested annotations (annotations referenced by this annotation's parameters)
         self._generate_nested_decorators(class_element, import_name)
 
@@ -505,6 +593,18 @@ def {import_name}(*args, **kwargs):
     return decorator
 '''
 
+    def _collect_java_class_import(self, package_name: str, variable_name: str, full_class_name: str):
+        """
+        Collect Java class import for VFS generation.
+        """
+        if package_name not in self.java_class_imports:
+            self.java_class_imports[package_name] = []
+
+        self.java_class_imports[package_name].append({
+            'variable': variable_name,
+            'class_name': full_class_name
+        })
+
     def _to_python_case(self, java_name: str) -> str:
         """
         Convert Java PascalCase to Python snake_case.
@@ -518,6 +618,12 @@ def {import_name}(*args, **kwargs):
         Get all the generated decorator code.
         """
         return '\n'.join(self.transformed_code)
+
+    def get_generated_decorator_code(self) -> Dict[str, str]:
+        """
+        Get the generated decorator code as a dictionary mapping decorator name to code.
+        """
+        return self.generated_decorator_code
 
 
 def micronaut_annotation(name: str, repeated: Optional[str] = None):

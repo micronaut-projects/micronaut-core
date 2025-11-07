@@ -30,8 +30,8 @@ class AroundAdviceSpec extends AbstractPythonTypeElementSpec {
     void "test @TestAround on Python method modifies arguments"() {
         given:
         def pythonCode = '''
-from io.micronaut.python.aop import TestAround
-from io.micronaut.aop import MethodInterceptor, InterceptorBean, MethodInvocationContext
+from micronaut.python.aop import TestAround
+from micronaut.aop import MethodInterceptor, InterceptorBean, MethodInvocationContext
 
 @InterceptorBean(TestAround)
 class TestAroundInterceptor(MethodInterceptor):
@@ -84,8 +84,8 @@ class TestClass:
     void "test @TestAround interceptor is properly registered"() {
         given:
         def pythonCode = '''
-from io.micronaut.python.aop import TestAround
-from io.micronaut.aop import MethodInterceptor, InterceptorBean, MethodInvocationContext
+from micronaut.python.aop import TestAround
+from micronaut.aop import MethodInterceptor, InterceptorBean, MethodInvocationContext
 
 @InterceptorBean(TestAround)
 class TestAroundInterceptor(MethodInterceptor):

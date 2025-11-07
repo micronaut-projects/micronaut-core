@@ -30,7 +30,7 @@ class BeanIntrospectionSpec extends AbstractPythonTypeElementSpec {
     void "test @Introspected on Python @dataclass"() {
         given:
         def pythonCode = '''
-from io.micronaut.core.annotation import Introspected
+from micronaut.core.annotation import Introspected
 from dataclasses import dataclass
 
 @Introspected
@@ -66,7 +66,7 @@ class TestDataClass:
     void "test @Introspected on regular Python class with attributes"() {
         given:
         def pythonCode = '''
-from io.micronaut.core.annotation import Introspected
+from micronaut.core.annotation import Introspected
 
 @Introspected
 class TestClass:
@@ -104,7 +104,7 @@ class TestClass:
     void "test @Introspected on Python class with @property decorator"() {
         given:
         def pythonCode = '''
-from io.micronaut.core.annotation import Introspected
+from micronaut.core.annotation import Introspected
 
 @Introspected
 class TestPropertyClass:
