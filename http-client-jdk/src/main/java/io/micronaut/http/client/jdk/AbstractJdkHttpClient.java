@@ -358,13 +358,21 @@ abstract class AbstractJdkHttpClient {
         return resolveURI(request);
     }
 
+    /**
+     * @param request The request object
+     * @return The discriminator to use when selecting a server for the purposes of load balancing (defaults to {@link io.micronaut.http.HttpRequest})
+     */
+    protected Object getLoadBalancerDiscriminator(io.micronaut.http.HttpRequest<?> request) {
+        return request;
+    }
+
     private <I> Mono<URI> resolveURI(io.micronaut.http.HttpRequest<I> request) {
         URI requestURI = request.getUri();
         if (loadBalancer == null) {
             return Mono.error(populateServiceId(new NoHostException("Request URI specifies no host to connect to"), clientId, configuration));
         }
 
-        return Mono.from(loadBalancer.select(request)).map(server -> {
+        return Mono.from(loadBalancer.select(getLoadBalancerDiscriminator(request))).map(server -> {
                 Optional<String> authInfo = server.getMetadata().get(io.micronaut.http.HttpHeaders.AUTHORIZATION_INFO, String.class);
                 if (request instanceof MutableHttpRequest<?> mutableRequest && authInfo.isPresent()) {
                     mutableRequest.getHeaders().auth(authInfo.get());
