@@ -15,9 +15,6 @@
  */
 package io.micronaut.python.processing;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Function;
@@ -86,16 +83,6 @@ public final class PythonAstParser {
         }
     }
 
-    public PythonEnvironment parse(Path... files) throws IOException {
-        StringBuilder combinedSources = new StringBuilder();
-        for (Path file : files) {
-            if (Files.isRegularFile(file) && file.toString().endsWith(".py")) {
-                combinedSources.append(Files.readString(file)).append("\n");
-            }
-        }
-        return parse(combinedSources.toString());
-    }
-
     public TransformResult transform(@Language("python") String sources, VisitorContext visitorContext) {
         Value bindings = context.getBindings(PYTHON);
         bindings.putMember("src", sources);
@@ -117,8 +104,8 @@ public final class PythonAstParser {
         Map map = result.as(Map.class);
         String code = map.containsKey("code") ? map.get("code").toString() : null;
         Map<String, String> decorators = map.containsKey("decorators") ? (Map<String, String>) map.get("decorators") : null;
-        Map<String, java.util.List<Map<String, String>>> javaClassImports = map.containsKey("javaClassImports") ?
-            (Map<String, java.util.List<Map<String, String>>>) map.get("javaClassImports") : null;
+        Map<String, java.util.List<Map<String, String>>> javaClassImports =
+            map.containsKey("javaClassImports") ? (Map<String, java.util.List<Map<String, String>>>) map.get("javaClassImports") : null;
         return new TransformResult(
             code,
             decorators,

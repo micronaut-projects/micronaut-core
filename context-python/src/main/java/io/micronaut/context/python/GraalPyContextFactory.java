@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
+import io.micronaut.runtime.exceptions.ApplicationStartupException;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Engine;
 import org.graalvm.polyglot.HostAccess;
@@ -66,7 +67,7 @@ public class GraalPyContextFactory {
 
             Context context = GraalPyResources.contextBuilder(VirtualFileSystem.newBuilder()
                     .resourceDirectory(APPLICATION_PATH)
-                        .resourceLoadingClass(classLoader.loadClass(PYRONAUT_MAIN_CLASS)).build())
+                    .resourceLoadingClass(classLoader.loadClass(PYRONAUT_MAIN_CLASS)).build())
                 // restrict in future?
                 .allowHostAccess(HostAccess.ALL)
                 .allowHostClassLookup(name -> true)
@@ -93,7 +94,7 @@ public class GraalPyContextFactory {
             return context;
 
         } catch (Exception e) {
-            throw new RuntimeException("Failed to initialize GraalPy context", e);
+            throw new ApplicationStartupException("Failed to initialize GraalPy context: " + e.getMessage(), e);
         }
     }
 

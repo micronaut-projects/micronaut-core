@@ -122,7 +122,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             }
 
             // Transform the code for processing (to detect Micronaut annotations)
-            PythonAstParser.TransformResult transformedCode = applyASTTransforms(annotation, element);
+            PythonAstParser.TransformResult transformedCode = applyASTTransforms(annotation);
             // Extract decorators from the code
             if (transformedCode == null) {
                 return;
@@ -192,7 +192,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         }
     }
 
-    private PythonAstParser.@Nullable TransformResult applyASTTransforms(PythonApplication annotation, Element element) {
+    private PythonAstParser.@Nullable TransformResult applyASTTransforms(PythonApplication annotation) {
         PythonAstParser.TransformResult transformedCode;
         // Process inline code if provided
         String code = annotation.code();

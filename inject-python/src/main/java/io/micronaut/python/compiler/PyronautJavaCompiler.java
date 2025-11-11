@@ -25,6 +25,7 @@ import java.util.function.Consumer;
 import javax.annotation.processing.Processor;
 import javax.tools.DiagnosticCollector;
 import javax.tools.JavaCompiler;
+import javax.tools.JavaFileManager;
 import javax.tools.JavaFileObject;
 import javax.tools.StandardJavaFileManager;
 import javax.tools.StandardLocation;
@@ -42,7 +43,7 @@ import io.micronaut.python.processing.PythonAnnotationProcessor;
  * Utility class for compiling Java sources with Micronaut annotation processors.
  *
  * @author Micronaut
- * @since 4.8.0
+ * @since 5.0.0
  */
 final class PyronautJavaCompiler {
 
@@ -68,9 +69,15 @@ final class PyronautJavaCompiler {
      */
     Iterable<JavaFileObject> compileInMemory(JavaFileObject[] sources, List<File> classpath) {
         DiagnosticCollector<JavaFileObject> diagnosticCollector = new DiagnosticCollector<>();
-        InMemoryJavaFileManager fileManager = new InMemoryJavaFileManager(
+        InMemoryJavaFileManager inMemoryJavaFileManager = new InMemoryJavaFileManager(
             compiler.getStandardFileManager(diagnosticCollector, null, null));
 
+        compileJava(sources, classpath, inMemoryJavaFileManager, diagnosticCollector);
+
+        return inMemoryJavaFileManager.getOutputFiles();
+    }
+
+    private void compileJava(JavaFileObject[] sources, List<File> classpath, JavaFileManager fileManager, DiagnosticCollector<JavaFileObject> diagnosticCollector) {
         List<String> options = buildCompilerOptions(classpath);
         List<Processor> processors = getAnnotationProcessors();
 
@@ -93,8 +100,6 @@ final class PyronautJavaCompiler {
         } finally {
             shutdownProcessors(processors);
         }
-
-        return fileManager.getOutputFiles();
     }
 
     private static void shutdownProcessors(List<Processor> processors) {
@@ -127,28 +132,7 @@ final class PyronautJavaCompiler {
             throw new RuntimeException("Failed to set output location", e);
         }
 
-        List<String> options = buildCompilerOptions(classpath);
-        List<Processor> processors = getAnnotationProcessors();
-
-        try {
-            JavaCompiler.CompilationTask task = compiler.getTask(
-                null, // Writer for additional output
-                fileManager, // File manager
-                diagnosticCollector, // Diagnostic collector
-                options, // Compiler options
-                Collections.emptyList(), // Classes to process (none)
-                Arrays.asList(sources) // Source files
-            );
-
-            task.setProcessors(processors);
-
-            boolean success = task.call();
-            if (!success) {
-                throw new RuntimeException("Compilation failed: " + diagnosticCollector.getDiagnostics());
-            }
-        } finally {
-            shutdownProcessors(processors);
-        }
+        compileJava(sources, classpath, fileManager, diagnosticCollector);
     }
 
     private List<String> buildCompilerOptions(List<File> classpath) {
@@ -160,7 +144,7 @@ final class PyronautJavaCompiler {
         options.add("-classpath");
         StringBuilder cp = new StringBuilder();
         for (File file : classpath) {
-            if (cp.length() > 0) {
+            if (!cp.isEmpty()) {
                 cp.append(File.pathSeparator);
             }
             cp.append(file.getAbsolutePath());
