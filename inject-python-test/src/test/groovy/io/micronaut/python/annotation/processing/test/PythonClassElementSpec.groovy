@@ -19,7 +19,6 @@ import io.micronaut.context.python.ContextHolder
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.python.compiler.PrimitiveTypesAnnotation
 import io.micronaut.python.compiler.RepeatableAnnotation
-import spock.lang.PendingFeature
 import spock.lang.Unroll
 
 /**

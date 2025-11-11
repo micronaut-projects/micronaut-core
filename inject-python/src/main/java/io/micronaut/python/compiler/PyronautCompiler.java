@@ -171,14 +171,12 @@ public final class PyronautCompiler {
                  .forEach(path -> {
                      try {
                          String content = Files.readString(path);
-                         String relativePath = dir.relativize(path).toString();
-                         String className = relativePath.replace(File.separatorChar, '.').replace(".java", "");
                          sources.add(new SimpleJavaFileObject(
-                             java.net.URI.create("file:///" + path.toString()),
+                             java.net.URI.create("file:///" + path),
                              JavaFileObject.Kind.SOURCE
                          ) {
                              @Override
-                             public CharSequence getCharContent(boolean ignoreEncodingErrors) throws IOException {
+                             public CharSequence getCharContent(boolean ignoreEncodingErrors) {
                                  return content;
                              }
                          });
