@@ -24,6 +24,7 @@ dependencies {
 
     testImplementation(projects.micronautContext)
     testImplementation(projects.micronautAop)
+    testImplementation(projects.micronautContextPython)
 }
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()

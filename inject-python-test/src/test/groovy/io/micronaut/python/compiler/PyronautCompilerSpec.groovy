@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.compiler
 
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.python.GraalPyContextFactory
 import io.micronaut.python.processing.PythonAnnotationProcessor
 import spock.lang.PendingFeature
@@ -254,4 +255,123 @@ class MyRepeatableService:
         tempDir.deleteDir()
     }
 
+    def "test Python sources in multiple distinct packages are processed"() {
+        given:
+        def tempDir = File.createTempDir("pyronaut-test-multi-package", "")
+
+        // Create directory structure with multiple packages
+        def pythonDir = new File(tempDir, "")
+        def exampleDir = new File(tempDir, "example")
+
+        pythonDir.mkdirs()
+        exampleDir.mkdirs()
+
+        // Create Python files in different packages
+        def helloControllerPy = new File(pythonDir, "HelloController.py")
+        helloControllerPy.text = '''
+from jakarta.inject import Singleton
+
+@Singleton
+class HelloController:
+    def hello(self):
+        return "Hello from Python package"
+'''
+
+        def userControllerPy = new File(exampleDir, "UserController.py")
+        userControllerPy.text = '''
+from jakarta.inject import Singleton
+
+@Singleton
+class UserController:
+    def getUsers(self):
+        return ["user1", "user2"]
+'''
+
+        def compiler = PyronautCompiler.builder()
+            .pythonSrc(tempDir.absolutePath)
+            .javaSrc("inject-python-test/src/test/java")
+            .build()
+
+        when:
+        def classLoader = compiler.buildClassLoader()
+
+        then:
+        classLoader != null
+
+        when:
+        def context = ApplicationContext.builder()
+            .classLoader(classLoader)
+            .beanDefinitionsProvider(new InMemoryBeanDefinitionsProvider())
+            .build()
+            .start()
+
+        then:
+        context.getBean(classLoader.loadClass('example.UserController'))
+        context.getBean(classLoader.loadClass('python.HelloController'))
+
+        cleanup:
+        context.close()
+        tempDir.deleteDir()
+    }
+
+    def "test Python sources in multiple distinct packages are processed to disk"() {
+        given:
+        def tempSrcDir = File.createTempDir("pyronaut-test-multi-package-src", "")
+        def tempTargetDir = File.createTempDir("pyronaut-test-multi-package-target", "")
+
+        // Create directory structure with multiple packages
+        def pythonDir = new File(tempSrcDir, "")
+        def exampleDir = new File(tempSrcDir, "example")
+
+        pythonDir.mkdirs()
+        exampleDir.mkdirs()
+
+        // Create Python files in different packages
+        def helloControllerPy = new File(pythonDir, "HelloController.py")
+        helloControllerPy.text = '''
+from jakarta.inject import Singleton
+
+@Singleton
+class HelloController:
+    def hello(self):
+        return "Hello from Python package"
+'''
+
+        def userControllerPy = new File(exampleDir, "UserController.py")
+        userControllerPy.text = '''
+from jakarta.inject import Singleton
+
+@Singleton
+class UserController:
+    def getUsers(self):
+        return ["user1", "user2"]
+'''
+
+        def compiler = PyronautCompiler.builder()
+                .pythonSrc(tempSrcDir.absolutePath)
+                .javaSrc("inject-python-test/src/test/java")
+                .targetDir(tempTargetDir)
+                .build()
+
+        when:
+        compiler.compile()
+        def classLoader = new URLClassLoader(tempTargetDir.toURI().toURL())
+
+        then:
+        classLoader != null
+
+        when:
+        def context = ApplicationContext.builder()
+                .classLoader(classLoader)
+                .build()
+                .start()
+
+        then:
+        context.getBean(classLoader.loadClass('example.UserController'))
+        context.getBean(classLoader.loadClass('python.HelloController'))
+
+        cleanup:
+        context.close()
+        tempSrcDir.deleteDir()
+    }
 }

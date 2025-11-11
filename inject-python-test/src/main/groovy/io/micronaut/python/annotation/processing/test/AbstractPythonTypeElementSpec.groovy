@@ -33,6 +33,7 @@ import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.provider.BeanProviderDefinition
 import io.micronaut.inject.provider.JakartaProviderBeanDefinition
 import io.micronaut.inject.writer.BeanDefinitionWriter
+import io.micronaut.python.compiler.InMemoryBeanDefinitionsProvider
 import io.micronaut.python.compiler.PyronautCompiler
 import io.micronaut.python.processing.visitor.AbstractPythonClassElement
 import org.intellij.lang.annotations.Language
@@ -171,7 +172,7 @@ abstract class AbstractPythonTypeElementSpec extends Specification {
         ContextHolder.resetContext()
         assert !ContextHolder.isInitialized()
 
-        // Process Python code and generate Java classes + pyronaut_application.py
+        // Process Python code and generate Java classes
         List<ClassElement> capturedElements = []
         def compiler = PyronautCompiler.builder()
             .pythonCode(pythonCode)
@@ -194,52 +195,14 @@ abstract class AbstractPythonTypeElementSpec extends Specification {
         builder.properties(properties)
 
         // Include built-in bean references and Python-generated bean definitions
-        builder.beanDefinitionsProvider {
-            def references = []
-
-            // Add references for any generated bean definitions from Python processing
-            try {
-                // Look for generated bean definition references in the Python classloader
-                def resources = pythonClassLoader.getResources("META-INF/micronaut/io.micronaut.inject.BeanDefinitionReference")
-                for (def resource : resources) {
-                    String className = resource.toString().substring("mem:/CLASS_OUTPUT/META-INF/micronaut/io.micronaut.inject.BeanDefinitionReference/".length())
-                    def beanDefRef = (BeanDefinitionReference) pythonClassLoader.loadClass(className).newInstance()
-                    references.add(beanDefRef)
-                }
-            } catch (Exception e) {
-                // No bean definitions found, continue
-            }
-
-            def allReferences = new DefaultBeanDefinitionsProvider().provide(it)
-            if (includeAllBeans) {
-                return references + (includeAllBeans ? allReferences : getBuiltInBeanReferences())
-            } else {
-                def pythonOnly = allReferences.findAll{
-                    def className = it.getClass().name
-                    className.startsWith("io.micronaut.context.python") || className.startsWith(AbstractPythonClassElement.PYTHON_DEFAULT_PACKAGE)
-                }
-                return references + pythonOnly + getBuiltInBeanReferences()
-            }
-        }
+        builder.beanDefinitionsProvider(new InMemoryBeanDefinitionsProvider(includeAllBeans))
 
         configureContext(builder)
 
         def context = builder.build().start()
 
         // Verify that the ApplicationContext started successfully
-        // Note: The GraalPy context initialization may happen asynchronously during startup
-        // For now, just verify the context is running
         assert context.isRunning(): "ApplicationContext should be running"
-
-        // TODO: Debug why @Context bean isn't being loaded
-        // This should work once we figure out the bean discovery issue
-        // Thread.sleep(500)
-        // assert ContextHolder.isInitialized(): "GraalPy context should be initialized"
-        // assert ContextHolder.getContext() != null: "GraalPy context should not be null"
-
-        // Note: Cleanup verification will be handled in test cleanup blocks
-        // since ApplicationContext.closeEvent() is not available in this version
-
         return context
     }
 

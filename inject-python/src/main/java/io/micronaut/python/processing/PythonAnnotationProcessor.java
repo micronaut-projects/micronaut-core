@@ -21,12 +21,15 @@ import java.io.StringWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import javax.annotation.processing.ProcessingEnvironment;
@@ -36,6 +39,10 @@ import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
 
 import io.micronaut.annotation.processing.visitor.JavaNativeElement;
+import io.micronaut.core.io.IOUtils;
+import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.util.StringUtils;
+import org.graalvm.polyglot.Source;
 import org.jetbrains.annotations.Nullable;
 
 import io.micronaut.annotation.processing.AbstractInjectAnnotationProcessor;
@@ -55,7 +62,7 @@ import io.micronaut.python.processing.visitor.PythonTypeElementVisitorProcessor;
 @SupportedAnnotationTypes("io.micronaut.python.processing.annotation.PythonApplication")
 public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor implements AutoCloseable {
     public static final String APPLICATION_PATH = "GRAALPY-VFS/micronaut-application/";
-    public static final String APPLICATION_LAUNCHER_PATH = APPLICATION_PATH + "pyronaut_application.py";
+    public static final String APPLICATION_LAUNCHER_PATH = APPLICATION_PATH + "main.py";
     public static final String APPLICATION_SRC_PATH = "GRAALPY-VFS/micronaut-application/src/";
 
     private PythonAstParser parser;
@@ -114,41 +121,115 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
 
     private void processAnnotation(TypeElement element, PythonApplication annotation) {
         try {
-
+            ClassElement originatingElement = javaVisitorContext.getRequiredClassElement(
+                element.getQualifiedName().toString(),
+                javaVisitorContext.getElementAnnotationMetadataFactory()
+            );
             PythonEnvironment environment;
-            String originalCode = getOriginalCode(annotation);
-            if (originalCode == null) {
-                return;
-            }
-
             // Transform the code for processing (to detect Micronaut annotations)
-            PythonAstParser.TransformResult transformedCode = applyASTTransforms(annotation);
+            List<PythonAstParser.TransformResult> transformedList =
+                applyASTTransforms(annotation, originatingElement);
             // Extract decorators from the code
-            if (transformedCode == null) {
+            if (transformedList.isEmpty()) {
                 return;
             }
-
 
             // Then parse the transformed code
+            String srcDir = annotation.src();
             try {
-                environment = parser.parse(transformedCode.code());
+                List<Source> sourceList = transformedList
+                    .stream()
+                    .map(PythonAstParser.TransformResult::transformedSource)
+                    .toList();
+                environment = parser.parse(
+                    sourceList,
+                    srcDir
+                );
             } catch (Exception e) {
-                error("Error parsing transformed python code: " + e.getMessage(), e);
-                return;
+                throw new ProcessingException(originatingElement, "Error parsing transformed python code: " + e.getMessage());
+            }
+
+            String mainPy;
+            StringBuilder filesList = new StringBuilder();
+            if (StringUtils.isNotEmpty(annotation.code())) {
+                mainPy = annotation.code();
+            } else {
+                // on concrete main
+                mainPy = null;
+
+                if (StringUtils.isNotEmpty(srcDir)) {
+                    // source mode, so we need to write out each source to META-INF
+                    Map<String, List<String>> exportedModules = new LinkedHashMap<>();
+                    for (PythonAstParser.TransformResult transformResult : transformedList) {
+                        Source source = transformResult.originalSource();
+                        String path = source.getPath();
+                        int i = path.indexOf(srcDir);
+                        if (i > 0) {
+                            path = path.substring(i + srcDir.length() + 1);
+                        }
+
+                        String targetSource = APPLICATION_SRC_PATH + path;
+                        if (!transformResult.decorators().isEmpty()) {
+                            // has beans
+                            int parentIndex = path.lastIndexOf('/');
+                            if (parentIndex > -1) {
+                                String parentPath = path.substring(0, parentIndex + 1);
+                                exportedModules.computeIfAbsent(parentPath, k -> new ArrayList<>())
+                                    .add(NameUtils.filename(path));
+                            } else {
+                                exportedModules.computeIfAbsent("", k -> new ArrayList<>())
+                                    .add(NameUtils.filename(path));
+                            }
+                        }
+                        filesList.append("/META-INF/").append(targetSource).append("\n");
+                        javaVisitorContext.visitMetaInfFile(targetSource, originatingElement)
+                            .ifPresent(generatedFile -> {
+                                try (var writer = generatedFile.openWriter()) {
+                                    writer.write(source.getCharacters().toString());
+                                } catch (IOException e) {
+                                    throw new ProcessingException(originatingElement, "Failed to write transformed Python code to META-INF", e);
+                                }
+                            });
+                    }
+
+                    exportedModules.forEach((path, types) -> {
+                        String initFilePath = APPLICATION_SRC_PATH + path + "__init__.py";
+                        StringBuilder initContent = new StringBuilder();
+                        if (!types.isEmpty()) {
+                            for (String type : types) {
+                                initContent.append("from .").append(type).append(" import ").append(type).append('\n');
+                            }
+                            initContent.append("\n__all__ = ").append(types).append("\n");
+                        }
+                        filesList.append("/META-INF/").append(initFilePath).append("\n");
+                        javaVisitorContext.visitMetaInfFile(initFilePath, originatingElement)
+                            .ifPresent(generatedFile -> {
+                                try (var writer = generatedFile.openWriter()) {
+                                    writer.write(initContent.toString());
+                                } catch (IOException e) {
+                                    throw new ProcessingException(originatingElement, "Failed to write transformed Python code to META-INF", e);
+                                }
+                            });
+                    });
+                }
+
             }
 
             // Create processing environment and visitor context
             PythonProcessingEnvironment processingEnvironment =
                 new PythonProcessingEnvironment(environment, javaVisitorContext, element);
 
-            Map<String, String> decorators = transformedCode.decorators();
-            Map<String, List<Map<String, String>>> javaClassImports = transformedCode.javaClassImports();
-            ClassElement originatingElement = javaVisitorContext.getRequiredClassElement(
-                element.getQualifiedName().toString(),
-                javaVisitorContext.getElementAnnotationMetadataFactory()
-            );
+            Map<String, String> allDecorators = new LinkedHashMap<>();
+            Map<String, List<Map<String, String>>> allImports = new LinkedHashMap<>();
+            for (PythonAstParser.TransformResult transformResult : transformedList) {
 
-            writeAllToVFS(decorators, javaClassImports, originatingElement);
+                Map<String, String> decorators = transformResult.decorators();
+                allDecorators.putAll(decorators);
+
+                Map<String, List<Map<String, String>>> javaClassImports = transformResult.javaClassImports();
+                allImports.putAll(javaClassImports);
+            }
+            writeAllToVFS(filesList, allDecorators, allImports, originatingElement);
 
             // Run type element visitor processing
             PythonTypeElementVisitorProcessor typeElementVisitorProcessor =
@@ -166,14 +247,16 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             }
 
             // Write original Python code to META-INF
-            javaVisitorContext.visitMetaInfFile(APPLICATION_LAUNCHER_PATH, originatingElement)
-                .ifPresent(generatedFile -> {
-                    try (var writer = generatedFile.openWriter()) {
-                        writer.write(originalCode);
-                    } catch (IOException e) {
-                        error("Failed to write transformed Python code to META-INF", e);
-                    }
-                });
+            if (mainPy != null) {
+                javaVisitorContext.visitMetaInfFile(APPLICATION_LAUNCHER_PATH, originatingElement)
+                    .ifPresent(generatedFile -> {
+                        try (var writer = generatedFile.openWriter()) {
+                            writer.write(mainPy);
+                        } catch (IOException e) {
+                            throw new ProcessingException(originatingElement, "Failed to write transformed Python code to META-INF", e);
+                        }
+                    });
+            }
 
             // The visitor context is now ready for use by Micronaut's type visitors
             note("Successfully processed Python environment with " +
@@ -192,22 +275,21 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         }
     }
 
-    private PythonAstParser.@Nullable TransformResult applyASTTransforms(PythonApplication annotation) {
-        PythonAstParser.TransformResult transformedCode;
+    private List<PythonAstParser.TransformResult> applyASTTransforms(PythonApplication annotation, ClassElement originatingElement) {
         // Process inline code if provided
         String code = annotation.code();
         if (!code.isEmpty()) {
             // Transform the source code first
             try {
-                transformedCode = parser.transform(code, javaVisitorContext);
+                return parser.transform(javaVisitorContext, Source.create("python", code));
             } catch (Exception e) {
-                error("Error transforming python code: " + e.getMessage(), e);
-                return null;
+                throw new ProcessingException(originatingElement, "Error transforming python code: " + e.getMessage(), e);
             }
 
         } else {
             // Process directory scanning if provided
             String srcDir = annotation.src();
+            List<Source> sources = new ArrayList<>();
             if (!srcDir.isEmpty()) {
                 Path directory = Paths.get(srcDir);
                 if (Files.isDirectory(directory)) {
@@ -216,74 +298,25 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                             .filter(Files::isRegularFile)
                             .filter(path -> path.toString().endsWith(".py"))
                             .toArray(Path[]::new);
-                        StringBuilder combinedSources = new StringBuilder();
                         for (Path file : files) {
-                            combinedSources.append(Files.readString(file)).append("\n");
-                        }
-                        String sourceCode = combinedSources.toString();
-                        // Transform the source code first
-                        try {
-                            transformedCode = parser.transform(sourceCode, javaVisitorContext);
-                        } catch (Exception e) {
-                            error("Error transforming python code: " + e.getMessage(), e);
-                            return null;
+                            sources.add(Source.newBuilder("python", file.toFile()).build());
                         }
                     } catch (IOException e) {
-                        error("Failed to scan directory for Python files: " + srcDir, e);
-                        return null;
-                    } catch (Exception e) {
-                        error("Error processing python code: " + e.getMessage(), e);
-                        return null;
+                        throw new ProcessingException(originatingElement, "Error processing python code in directory [" + directory + "]: " + e.getMessage());
                     }
                 } else {
-                    error("Source directory does not exist: " + srcDir);
-                    return null;
+                    throw new ProcessingException(originatingElement, "Source directory does not exist: " + srcDir);
                 }
             } else {
-                note("No code or src specified in @PyronautApplication");
-                return null;
+                throw new ProcessingException(originatingElement, "Source directory does not exist: " + srcDir);
             }
-        }
-        return transformedCode;
-    }
 
-    private @Nullable String getOriginalCode(PythonApplication annotation) {
-        // Process inline code if provided
-        String code = annotation.code();
-        if (!code.isEmpty()) {
-            return code;
-        } else {
-            // Process directory scanning if provided
-            String srcDir = annotation.src();
-            if (!srcDir.isEmpty()) {
-                Path directory = Paths.get(srcDir);
-                if (Files.isDirectory(directory)) {
-                    try (Stream<Path> stream = Files.walk(directory)) {
-                        Path[] files = stream
-                            .filter(Files::isRegularFile)
-                            .filter(path -> path.toString().endsWith(".py"))
-                            .toArray(Path[]::new);
-                        StringBuilder combinedSources = new StringBuilder();
-                        for (Path file : files) {
-                            combinedSources.append(Files.readString(file)).append("\n");
-                        }
-                        return combinedSources.toString();
-                    } catch (IOException e) {
-                        error("Failed to scan directory for Python files: " + srcDir, e);
-                        return null;
-                    }
-                } else {
-                    error("Source directory does not exist: " + srcDir);
-                    return null;
-                }
-            } else {
-                note("No code or src specified in @PyronautApplication");
-                return null;
-            }
+            return parser.transform(javaVisitorContext, sources.toArray(new Source[0]));
         }
     }
 
     private void writeAllToVFS(
+        StringBuilder filesList,
         Map<String, String> decorators,
         Map<String, List<Map<String, String>>> javaClassImports,
         ClassElement originatingElement) {
@@ -291,7 +324,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         Map<String, List<String>> decoratorsByPackage = new LinkedHashMap<>();
         Map<String, Map<String, String>> javaClassesByPackage = new LinkedHashMap<>();
 
-        StringBuilder filesList = new StringBuilder();
+
 
         // Process decorators
         if (decorators != null && !decorators.isEmpty()) {
@@ -446,7 +479,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     private static boolean isNestedClass(ClassElement classElement) {
         try {
             if (classElement.getNativeType() instanceof JavaNativeElement jne &&
-               jne.element() instanceof TypeElement typeElement) {
+                jne.element() instanceof TypeElement typeElement) {
 
                 javax.lang.model.element.NestingKind nestingKind = typeElement.getNestingKind();
                 return nestingKind == javax.lang.model.element.NestingKind.MEMBER;
