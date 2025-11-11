@@ -15,10 +15,14 @@
  */
 package io.micronaut.python.processing;
 
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
+import io.micronaut.inject.processing.ProcessingException;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.HostAccess;
 import org.graalvm.polyglot.Source;
@@ -31,6 +35,7 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.processing.visitor.ClassDef;
 import io.micronaut.python.processing.visitor.DecoratorDef;
+import org.jetbrains.annotations.NotNull;
 
 public final class PythonAstParser {
 
@@ -54,38 +59,97 @@ public final class PythonAstParser {
     }
 
     public PythonEnvironment parse(@Language("python") String sources, String packageName) {
-        try {
-            Map<String, DecoratorDef> decorators = new LinkedHashMap<>();
-            Map<String, ClassDef> classes = new LinkedHashMap<>();
+        Map<String, DecoratorDef> decorators = new LinkedHashMap<>();
+        Map<String, ClassDef> classes = new LinkedHashMap<>();
 
-            Value bindings = context.getBindings(PYTHON);
-            bindings.putMember("callback", (Function<Object, Object>) o -> {
-                if (o instanceof ClassDef classDef) {
-                    classes.put(classDef.name(), classDef);
-                } else if (o instanceof DecoratorDef decoratorDef) {
-                    decorators.put(decoratorDef.annotationName(), decoratorDef);
-                }
-                return o;
-            });
-            bindings.putMember("src", sources);
-            bindings.putMember("package_name", packageName != null ? packageName : "");
+        Value bindings = context.getBindings(PYTHON);
+        bindings.putMember("callback", (Function<Object, Object>) o -> {
+            if (o instanceof ClassDef classDef) {
+                classes.put(classDef.name(), classDef);
+            } else if (o instanceof DecoratorDef decoratorDef) {
+                decorators.put(decoratorDef.annotationName(), decoratorDef);
+            }
+            return o;
+        });
+        bindings.putMember("src", sources);
+        bindings.putMember("package_name", packageName != null ? packageName : "");
+        context.eval(Source.create(
+            PYTHON,
+            getSource()
+        ));
+        return new PythonEnvironment(
+            classes,
+            decorators,
+            context
+        );
+    }
+
+    /**
+     * Parse the given sources located within the given source directory.
+     *
+     * @param sources The sources
+     * @param srcDir  The source directory
+     * @return The parsed environment
+     */
+    public PythonEnvironment parse(List<Source> sources, String srcDir) {
+        Map<String, DecoratorDef> decorators = new LinkedHashMap<>();
+        Map<String, ClassDef> classes = new LinkedHashMap<>();
+
+        Value bindings = context.getBindings(PYTHON);
+        bindings.putMember("callback", (Function<Object, Object>) o -> {
+            if (o instanceof ClassDef classDef) {
+                classes.put(classDef.name(), classDef);
+            } else if (o instanceof DecoratorDef decoratorDef) {
+                decorators.put(decoratorDef.annotationName(), decoratorDef);
+            }
+            return o;
+        });
+
+        for (Source source : sources) {
+            String packageName = getPackageNameOfSource(srcDir, source);
+            bindings.putMember("src", source.getCharacters());
+            bindings.putMember("package_name", packageName);
             context.eval(Source.create(
                 PYTHON,
                 getSource()
             ));
-            return new PythonEnvironment(
-                classes,
-                decorators,
-                context
-            );
-        } catch (Exception e) {
-            throw e;
         }
+        return new PythonEnvironment(
+            classes,
+            decorators,
+            context
+        );
     }
 
-    public TransformResult transform(@Language("python") String sources, VisitorContext visitorContext) {
+    public static String getPackageNameOfSource(String srcDir, Source source) {
+        String path = source.getPath();
+        String packageName = "python";
+        if (StringUtils.isNotEmpty(srcDir) && StringUtils.isNotEmpty(path)) {
+            int i = path.indexOf(srcDir);
+            if (i > 0) {
+                packageName = path.substring(i + srcDir.length() + 1);
+            }
+
+            if (packageName.indexOf('/') > -1) {
+                String fileName = "/" + source.getName();
+                if (packageName.endsWith(fileName)) {
+                    packageName = packageName.substring(0, packageName.length() - fileName.length());
+                }
+                packageName = packageName.replace('/', '.');
+            } else {
+                return "python";
+            }
+        }
+        return packageName;
+    }
+
+    public TransformResult transform(VisitorContext visitorContext, @Language("python") String sources) {
+        Source pythonSource = Source.create(PYTHON, sources);
+        return transform(visitorContext, pythonSource).get(0);
+    }
+
+    public @NotNull List<TransformResult> transform(VisitorContext visitorContext, Source... pythonSource) {
         Value bindings = context.getBindings(PYTHON);
-        bindings.putMember("src", sources);
         bindings.putMember("callback_get_class_element", (Function<String, Object>) name -> {
             // Transform package names back from "micronaut." to "io.micronaut." for Java lookups
             String javaName = name.startsWith("micronaut.") ? "io." + name : name;
@@ -97,20 +161,27 @@ public final class PythonAstParser {
             String javaPackageName = packageName.startsWith("micronaut.") ? "io." + packageName : packageName;
             return visitorContext.getClassElements(javaPackageName, StringUtils.EMPTY_STRING_ARRAY);
         });
-        Value result = context.eval(Source.create(
-            PYTHON,
-            getTransformSource()
-        ));
-        Map map = result.as(Map.class);
-        String code = map.containsKey("code") ? map.get("code").toString() : null;
-        Map<String, String> decorators = map.containsKey("decorators") ? (Map<String, String>) map.get("decorators") : null;
-        Map<String, java.util.List<Map<String, String>>> javaClassImports =
-            map.containsKey("javaClassImports") ? (Map<String, java.util.List<Map<String, String>>>) map.get("javaClassImports") : null;
-        return new TransformResult(
-            code,
-            decorators,
-            javaClassImports
-        );
+        List<TransformResult> results = new ArrayList<>();
+        for (Source source : pythonSource) {
+            bindings.putMember("src", source.getCharacters());
+
+            Value result = context.eval(Source.create(
+                PYTHON,
+                getTransformSource()
+            ));
+            Map map = result.as(Map.class);
+            String code = map.containsKey("code") ? map.get("code").toString() : null;
+            Map<String, String> decorators = map.containsKey("decorators") ? (Map<String, String>) map.get("decorators") : null;
+            Map<String, java.util.List<Map<String, String>>> javaClassImports =
+                map.containsKey("javaClassImports") ? (Map<String, java.util.List<Map<String, String>>>) map.get("javaClassImports") : null;
+            results.add(new TransformResult(
+                source,
+                code,
+                decorators,
+                javaClassImports
+            ));
+        }
+        return results;
     }
 
     public PythonEnvironment process(@Language("python") String sources, VisitorContext visitorContext) {
@@ -119,7 +190,7 @@ public final class PythonAstParser {
 
     public PythonEnvironment process(@Language("python") String sources, String packageName, VisitorContext visitorContext) {
         // First transform the code
-        TransformResult transformedCode = transform(sources, visitorContext);
+        TransformResult transformedCode = transform(visitorContext, sources);
 
         // Then parse the transformed code
         return parse(transformedCode.code(), packageName);
@@ -158,11 +229,36 @@ public final class PythonAstParser {
 
     /**
      * The result of a transformation
-     * @param code The transformed code
-     * @param decorators The decorators
+     *
+     * @param originalSource   The original source
+     * @param code             The transformed code
+     * @param decorators       The decorators
      * @param javaClassImports The Java class imports
      */
     public record TransformResult(
-        String code, Map<String, String> decorators,
-        Map<String, java.util.List<Map<String, String>>> javaClassImports) {}
+        Source originalSource,
+        String code,
+        Map<String, String> decorators,
+        Map<String, java.util.List<Map<String, String>>> javaClassImports) {
+
+        public Source transformedSource() {
+            try {
+                Source.Builder builder;
+                if (originalSource.getURL() != null) {
+                    builder = Source.newBuilder(originalSource.getLanguage(), originalSource.getURL());
+                } else if (originalSource.getURI() != null && !originalSource.getURI().toString().startsWith("truffle:")) {
+                    builder = Source.newBuilder(originalSource.getLanguage(), originalSource.getURI().toURL())
+                        .uri(originalSource.getURI());
+                } else {
+                    builder = Source.newBuilder(originalSource.getLanguage(), originalSource.getCharacters(), originalSource.getName());
+                }
+                return builder
+                    .name(originalSource.getName())
+                    .content(code)
+                    .build();
+            } catch (IOException e) {
+                throw new ProcessingException(null, "Unable to create transformed source for " + originalSource, e);
+            }
+        }
+    }
 }

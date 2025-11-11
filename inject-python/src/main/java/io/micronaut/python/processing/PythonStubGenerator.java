@@ -65,6 +65,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     public static final String AS_POLYGLOT_VALUE = "asPolyglotValue";
     public static final String FROM_POLYGLOT_VALUE = "fromPolyglotValue";
     public static final ClassTypeDef RUNTIME_UTIL = ClassTypeDef.of("io.micronaut.context.python.GraalPyRuntimeUtil");
+    public static final ClassTypeDef CONTEXT_HOLDER = ClassTypeDef.of("io.micronaut.context.python.ContextHolder");
 
     private final Map<String, AbstractPythonClassElement> classElements = new LinkedHashMap<>();
 
@@ -152,12 +153,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         builder.addMethod(
                             constructor.build(((aThis, methodParameters) -> {
                                 // Create the Python object by calling constructor with parameters
-                                ExpressionDef pythonClass = ClassTypeDef.of("io.micronaut.context.python.ContextHolder")
-                                    .invokeStatic("getContext", TypeDef.of(Context.class))
-                                    .invoke("getBindings", POLYGLOT_VALUE, ExpressionDef.constant("python"))
-                                    .invoke("getMember", POLYGLOT_VALUE, ExpressionDef.constant(element.getSimpleName()));
-
-                                List<ExpressionDef> arguments = new ArrayList<>();
+                                List<ExpressionDef> arguments = new ArrayList<>(List.of(
+                                    ExpressionDef.constant(element.getPackageName()),
+                                    ExpressionDef.constant(element.getSimpleName())
+                                ));
                                 for (int i = 0; i < parameters.length; i++) {
                                     @NonNull ParameterElement parameter = parameters[i];
                                     VariableDef.MethodParameter methodParameter = methodParameters.get(i);
@@ -168,7 +167,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                     }
                                 }
                                 // Pass constructor parameters directly to newInstance
-                                ExpressionDef pythonInstance = pythonClass.invoke("newInstance", POLYGLOT_VALUE, arguments);
+                                ExpressionDef pythonInstance = CONTEXT_HOLDER.invokeStatic(
+                                    "newInstance",
+                                    POLYGLOT_VALUE,
+                                    arguments
+                                );
 
                                 // Assign to field
                                 return aThis.field(pythonValue).assign(pythonInstance);
@@ -179,11 +182,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         MethodDef.MethodDefBuilder constructor = MethodDef.constructor();
                         builder.addMethod(
                             constructor.build(((aThis, methodParameters) -> aThis.field(pythonValue).assign(
-                                ClassTypeDef.of("io.micronaut.context.python.ContextHolder")
-                                    .invokeStatic("getContext", TypeDef.of(Context.class))
-                                    .invoke("getBindings", POLYGLOT_VALUE, ExpressionDef.constant("python"))
-                                    .invoke("getMember", POLYGLOT_VALUE, ExpressionDef.constant(element.getSimpleName()))
-                                    .invoke("newInstance", POLYGLOT_VALUE)
+                                CONTEXT_HOLDER
+                                    .invokeStatic("newInstance", POLYGLOT_VALUE,
+                                        List.of(
+                                            ExpressionDef.constant(element.getPackageName()),
+                                            ExpressionDef.constant(element.getSimpleName())
+                                        )
+
+                                    )
                             )))
                         );
                     }

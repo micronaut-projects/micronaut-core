@@ -15,7 +15,9 @@
  */
 package io.micronaut.context.python;
 
+import io.micronaut.core.reflect.exception.InstantiationException;
 import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.Value;
 
 /**
  * Static holder for the GraalPy context used by Python bridge classes.
@@ -46,6 +48,48 @@ public final class ContextHolder {
                 "Make sure micronaut-context-python is on the classpath.");
         }
         return ctx;
+    }
+
+    /**
+     * Create a new instance for the given package name, simple name and args.
+     *
+     * @param packageName The package name
+     * @param simpleName  The simple name
+     * @param args        T he args
+     * @return The new instance
+     */
+    public static Value newInstance(String packageName, String simpleName, Object... args) {
+        if (packageName == null || GraalPyContextFactory.PYTHON.equals(packageName)) {
+            return newInstance(simpleName, args);
+        } else {
+            Context ctx = getContext();
+            String source = "from " + packageName + " import " + simpleName + "; " + simpleName;
+            return ctx.eval(GraalPyContextFactory.PYTHON, source)
+                .newInstance(args);
+        }
+    }
+
+    /**
+     * Create a new instance for the given simple name and args.
+     *
+     * @param simpleName  The simple name
+     * @param args        T he args
+     * @return The new instance
+     */
+    public static Value newInstance(String simpleName, Object... args) {
+        Context ctx = getContext();
+        Value v = ctx.getBindings(GraalPyContextFactory.PYTHON).getMember(simpleName);
+        if (v != null && v.canInstantiate()) {
+            return v.newInstance(args);
+        } else {
+            Value member = ctx.eval(GraalPyContextFactory.PYTHON, "import " + simpleName + "; " + simpleName)
+                .getMember(simpleName);
+            if (member == null) {
+                throw new InstantiationException("Cannot find Python class: " + simpleName);
+            }
+            return member
+                .newInstance(args);
+        }
     }
 
     /**
