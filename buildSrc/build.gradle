@@ -5,12 +5,12 @@ plugins {
 repositories {
     mavenCentral()
     gradlePluginPortal()
+    mavenLocal()
 }
 
 dependencies {
     implementation libs.htmlsanitycheck
     implementation libs.micronaut.build.plugins
-
     implementation libs.tomlj
     implementation libs.japicmp.gradle.plugin
     implementation libs.native.gradle.plugin

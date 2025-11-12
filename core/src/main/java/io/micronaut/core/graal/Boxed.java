@@ -13,24 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.context.python;
+package io.micronaut.core.graal;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.graal.Boxed;
-import org.graalvm.polyglot.Value;
+import io.micronaut.core.annotation.Internal;
 
 /**
- * A type that is coercible to a Truffle Value.
+ * Internal interface to allow integration with Graal Polylot languages that marks a top as boxing or
+ * wrapping a foreign value of another language.
+ *
+ * <p>NOTE: regarded as internal and not for public consumption.</p>
+ *
+ * @param <T> The underlying type, usually a Truffle {@code Value}.
+ *
+ * @since 5.0.0
  */
-public interface ValueCoercible extends Boxed<Value> {
+@Internal
+public interface Boxed<T> {
     /**
-     * Converts the type to a Truffle value.
-     * @return The value
+     * Unbox the type
+     *
+     * @return The unboxed type.
      */
-    @NonNull Value asPolyglotValue();
-
-    @Override
-    default Value $unbox() {
-        return asPolyglotValue();
-    }
+    T $unbox();
 }
