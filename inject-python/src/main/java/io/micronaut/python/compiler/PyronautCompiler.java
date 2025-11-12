@@ -69,6 +69,17 @@ public final class PyronautCompiler {
         validateConfiguration();
     }
 
+    public static void main(String[] args) {
+        String sourceDir = args[0];
+        String destinationDir = args[1];
+
+        PyronautCompiler.builder()
+            .pythonSrc(sourceDir)
+            .targetDir(new File(destinationDir))
+            .build()
+            .compile();
+    }
+
     /**
      * Create a new builder for PyronautCompiler.
      *

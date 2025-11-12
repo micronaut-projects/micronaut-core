@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing;
 
+import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -26,10 +27,15 @@ import java.util.Set;
 import javax.lang.model.element.Modifier;
 
 import io.micronaut.aop.Around;
-import io.micronaut.aop.InterceptorBinding;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.ConfigurationReader;
-import org.graalvm.polyglot.Context;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Generated;
+import io.micronaut.core.annotation.Vetoed;
+import io.micronaut.inject.ast.Element;
+import io.micronaut.sourcegen.model.AbstractElementBuilder;
+import io.micronaut.sourcegen.model.AnnotationDef;
 import org.graalvm.polyglot.Value;
 
 import io.micronaut.context.annotation.Executable;
@@ -66,6 +72,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     public static final String FROM_POLYGLOT_VALUE = "fromPolyglotValue";
     public static final ClassTypeDef RUNTIME_UTIL = ClassTypeDef.of("io.micronaut.context.python.GraalPyRuntimeUtil");
     public static final ClassTypeDef CONTEXT_HOLDER = ClassTypeDef.of("io.micronaut.context.python.ContextHolder");
+    public static final String GENERATOR_NAME = "python";
+    private static final Set<String> ANNOTATION_PACKAGES_TO_COPY = Set.of("org.junit.jupiter.api", "io.micronaut.test.extensions.junit5.annotation");
 
     private final Map<String, AbstractPythonClassElement> classElements = new LinkedHashMap<>();
 
@@ -92,6 +100,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     classElements.put(classElement.getName(), classElement);
                     String typeName = element.getName();
                     var builder = ClassDef.builder(typeName);
+                    builder.addAnnotation(Vetoed.class);
+
+                    copyAnnotations(element, builder, ANNOTATION_PACKAGES_TO_COPY, context);
                     Collection<ClassElement> interfaces = classElement.getInterfaces();
                     builder.addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.ValueCoercible"));
 
@@ -106,20 +117,24 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             if (methodSet.contains(method)) {
                                 continue;
                             }
-                            addBridgeMethod(method, builder, pythonValue);
+                            addBridgeMethod(method, builder, pythonValue, context);
                             methodSet.add(method);
                         }
                     }
 
                     builder.addField(pythonValue);
 
-                    builder.addMethod(
-                        MethodDef.constructor()
-                            .addParameter(ParameterDef.of("value", POLYGLOT_VALUE))
-                            .build(((aThis, methodParameters) ->
-                                aThis.field(pythonValue).assign(methodParameters.get(0))
-                            )
-                    ));
+                    boolean isMicronautTest = element.hasStereotype("io.micronaut.test.extensions.junit5.annotation.MicronautTest");
+                    if (!isMicronautTest) {
+
+                        builder.addMethod(
+                            MethodDef.constructor()
+                                .addParameter(ParameterDef.of("value", POLYGLOT_VALUE))
+                                .build(((aThis, methodParameters) ->
+                                        aThis.field(pythonValue).assign(methodParameters.get(0))
+                                    )
+                                ));
+                    }
 
                     // implement asPolygotValue
                     builder.addMethod(MethodDef.builder(AS_POLYGLOT_VALUE)
@@ -128,12 +143,15 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
                     // implement static factory
                     ClassTypeDef thisType = ClassTypeDef.of(typeName);
-                    builder.addMethod(MethodDef.builder(FROM_POLYGLOT_VALUE)
-                        .addModifiers(Modifier.PUBLIC,  Modifier.STATIC)
+
+                    if (!isMicronautTest) {
+                        builder.addMethod(MethodDef.builder(FROM_POLYGLOT_VALUE)
+                            .addModifiers(Modifier.PUBLIC,  Modifier.STATIC)
                             .addParameter(POLYGLOT_VALUE)
-                        .returns(thisType).build(((aThis, methodParameters) ->
-                            thisType.instantiate(methodParameters).returning()))
-                    );
+                            .returns(thisType).build(((aThis, methodParameters) ->
+                                thisType.instantiate(methodParameters).returning()))
+                        );
+                    }
 
 
                     // Check if there's a primary constructor with parameters for dependency injection
@@ -206,7 +224,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
 
                     for (MethodElement methodElement : methodsToBridge) {
-                        addBridgeMethod(methodElement, builder, pythonValue);
+                        addBridgeMethod(methodElement, builder, pythonValue, context);
                     }
 
                     // Find injection methods (annotated with @Inject)
@@ -293,12 +311,26 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         }
     }
 
-    private void addBridgeMethod(MethodElement methodElement, ClassDef.ClassDefBuilder builder, FieldDef pythonValue) {
+    private void copyAnnotations(Element element, AbstractElementBuilder<?> builder, Set<String> annotationPackagesToCopy, VisitorContext visitorContext) {
+        AnnotationMetadata annotationMetadata = element.getAnnotationMetadata();
+        Set<String> annotationNames = annotationMetadata.getDeclaredAnnotationNames();
+        for (String annotationName : annotationNames) {
+            if (annotationPackagesToCopy.stream().anyMatch(annotationName::startsWith)) {
+                AnnotationValue<Annotation> av = annotationMetadata.getAnnotation(annotationName);
+                if (av != null) {
+                    builder.addAnnotation(AnnotationDef.of(av, visitorContext));
+                }
+            }
+        }
+    }
+
+    private void addBridgeMethod(MethodElement methodElement, ClassDef.ClassDefBuilder builder, FieldDef pythonValue, VisitorContext visitorContext) {
         String pythonFunctionName = methodElement.getName();
         MethodDef.MethodDefBuilder methodBuilder = MethodDef.builder(pythonFunctionName)
             .addModifiers(Modifier.PUBLIC)
             .returns(TypeDef.of(methodElement.getReturnType()));
 
+        copyAnnotations(methodElement, methodBuilder, ANNOTATION_PACKAGES_TO_COPY, visitorContext);
         for (@NonNull ParameterElement parameter : methodElement.getParameters()) {
             var parameterType = TypeDef.of(parameter.getType());
             ParameterDef parameterDef = ParameterDef

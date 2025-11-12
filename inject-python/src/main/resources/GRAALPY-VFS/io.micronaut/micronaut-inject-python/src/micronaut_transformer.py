@@ -57,6 +57,7 @@ class MicronautTransformer(ast.NodeTransformer):
         self.generated_decorator_code = {}
         self.java_class_imports = {}
         self.has_java_import = False
+        self.exported_types = []
 
     def visit_ImportFrom(self, node: ast.ImportFrom):
         """
@@ -168,6 +169,34 @@ def micronaut_annotation(name, repeated=None):
             node.body = generated_nodes + node.body
 
         return node
+
+    def visit_ClassDef(self, node: ast.ClassDef) -> ast.ClassDef:
+        """
+        Check if a class has Micronaut decorators and track it for export.
+        """
+        if node.decorator_list:
+            for decorator in node.decorator_list:
+                decorator_name = self._get_decorator_name(decorator)
+                if decorator_name in self.generated_decorators:
+                    self.exported_types.append(node.name)
+                    break
+        self.generic_visit(node)
+        return node
+
+    def _get_decorator_name(self, decorator) -> Optional[str]:
+        """
+        Extract the decorator name from an AST decorator node.
+        """
+        if isinstance(decorator, ast.Name):
+            return decorator.id
+        elif isinstance(decorator, ast.Call):
+            if isinstance(decorator.func, ast.Name):
+                return decorator.func.id
+        elif isinstance(decorator, ast.Attribute):
+            # Handle decorated decorators like @micronaut_annotation("...")
+            if isinstance(decorator.value, ast.Name) and decorator.value.id in self.generated_decorators:
+                return decorator.value.id
+        return None
 
     def _handle_specific_import(self, original_module_name: str, transformed_module_name: str, alias) -> bool:
         """
@@ -624,6 +653,12 @@ def {import_name}(*args, **kwargs):
         Get the generated decorator code as a dictionary mapping decorator name to code.
         """
         return self.generated_decorator_code
+
+    def get_exported_types(self) -> List[str]:
+        """
+        Get the list of types (classes/functions) that have Micronaut decorators.
+        """
+        return self.exported_types
 
 
 def micronaut_annotation(name: str, repeated: Optional[str] = None):
