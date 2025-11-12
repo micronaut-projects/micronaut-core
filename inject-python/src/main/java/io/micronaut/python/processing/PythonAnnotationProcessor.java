@@ -27,9 +27,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeSet;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import javax.annotation.processing.ProcessingEnvironment;
@@ -38,14 +36,12 @@ import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
 
-import io.micronaut.annotation.processing.visitor.JavaNativeElement;
-import io.micronaut.core.io.IOUtils;
 import io.micronaut.core.naming.NameUtils;
-import io.micronaut.core.util.StringUtils;
 import org.graalvm.polyglot.Source;
-import org.jetbrains.annotations.Nullable;
 
 import io.micronaut.annotation.processing.AbstractInjectAnnotationProcessor;
+import io.micronaut.annotation.processing.visitor.JavaNativeElement;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.python.processing.annotation.PythonApplication;
@@ -159,7 +155,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
 
                 if (StringUtils.isNotEmpty(srcDir)) {
                     // source mode, so we need to write out each source to META-INF
-                    Map<String, List<String>> exportedModules = new LinkedHashMap<>();
+                    Map<PathEntry, List<String>> exportedModules = new LinkedHashMap<>();
                     for (PythonAstParser.TransformResult transformResult : transformedList) {
                         Source source = transformResult.originalSource();
                         String path = source.getPath();
@@ -168,17 +164,20 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                             path = path.substring(i + srcDir.length() + 1);
                         }
 
+                        if (!srcDir.isEmpty() && path.startsWith(srcDir)) {
+                            path = path.substring(srcDir.length() + 1);
+                        }
                         String targetSource = APPLICATION_SRC_PATH + path;
-                        if (!transformResult.decorators().isEmpty()) {
-                            // has beans
+                        if (!transformResult.exportedTypes().isEmpty()) {
+                            // has exported types
                             int parentIndex = path.lastIndexOf('/');
                             if (parentIndex > -1) {
                                 String parentPath = path.substring(0, parentIndex + 1);
-                                exportedModules.computeIfAbsent(parentPath, k -> new ArrayList<>())
-                                    .add(NameUtils.filename(path));
+                                exportedModules.computeIfAbsent(new PathEntry(parentPath, path.substring(parentIndex)), k -> new ArrayList<>())
+                                    .addAll(transformResult.exportedTypes());
                             } else {
-                                exportedModules.computeIfAbsent("", k -> new ArrayList<>())
-                                    .add(NameUtils.filename(path));
+                                exportedModules.computeIfAbsent(new PathEntry("", path), k -> new ArrayList<>())
+                                    .addAll(transformResult.exportedTypes());
                             }
                         }
                         filesList.append("/META-INF/").append(targetSource).append("\n");
@@ -193,11 +192,11 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                     }
 
                     exportedModules.forEach((path, types) -> {
-                        String initFilePath = APPLICATION_SRC_PATH + path + "__init__.py";
+                        String initFilePath = APPLICATION_SRC_PATH + path.parent + "__init__.py";
                         StringBuilder initContent = new StringBuilder();
                         if (!types.isEmpty()) {
                             for (String type : types) {
-                                initContent.append("from .").append(type).append(" import ").append(type).append('\n');
+                                initContent.append("from .").append(NameUtils.filename(path.filename())).append(" import ").append(type).append('\n');
                             }
                             initContent.append("\n__all__ = ").append(types).append("\n");
                         }
@@ -489,4 +488,6 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         }
         return false;
     }
+
+    record PathEntry(String parent, String filename) {}
 }

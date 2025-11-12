@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
-import io.micronaut.inject.processing.ProcessingException;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.HostAccess;
 import org.graalvm.polyglot.Source;
@@ -30,12 +29,13 @@ import org.graalvm.polyglot.Value;
 import org.graalvm.python.embedding.GraalPyResources;
 import org.graalvm.python.embedding.VirtualFileSystem;
 import org.intellij.lang.annotations.Language;
+import org.jetbrains.annotations.NotNull;
 
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.processing.visitor.ClassDef;
 import io.micronaut.python.processing.visitor.DecoratorDef;
-import org.jetbrains.annotations.NotNull;
 
 public final class PythonAstParser {
 
@@ -126,7 +126,7 @@ public final class PythonAstParser {
         String packageName = "python";
         if (StringUtils.isNotEmpty(srcDir) && StringUtils.isNotEmpty(path)) {
             int i = path.indexOf(srcDir);
-            if (i > 0) {
+            if (i > -1) {
                 packageName = path.substring(i + srcDir.length() + 1);
             }
 
@@ -174,11 +174,13 @@ public final class PythonAstParser {
             Map<String, String> decorators = map.containsKey("decorators") ? (Map<String, String>) map.get("decorators") : null;
             Map<String, java.util.List<Map<String, String>>> javaClassImports =
                 map.containsKey("javaClassImports") ? (Map<String, java.util.List<Map<String, String>>>) map.get("javaClassImports") : null;
+            java.util.List<String> exportedTypes = map.containsKey("exportedTypes") ? (java.util.List<String>) map.get("exportedTypes") : new ArrayList<>();
             results.add(new TransformResult(
                 source,
                 code,
                 decorators,
-                javaClassImports
+                javaClassImports,
+                exportedTypes
             ));
         }
         return results;
@@ -218,7 +220,8 @@ public final class PythonAstParser {
             {
                 "code": unparse(transformed_tree),
                 "decorators": transformer.get_generated_decorator_code(),
-                "javaClassImports": transformer.java_class_imports
+                "javaClassImports": transformer.java_class_imports,
+                "exportedTypes": transformer.get_exported_types()
             }
             """;
     }
@@ -234,12 +237,14 @@ public final class PythonAstParser {
      * @param code             The transformed code
      * @param decorators       The decorators
      * @param javaClassImports The Java class imports
+     * @param exportedTypes    The types that have Micronaut decorators
      */
     public record TransformResult(
         Source originalSource,
         String code,
         Map<String, String> decorators,
-        Map<String, java.util.List<Map<String, String>>> javaClassImports) {
+        Map<String, java.util.List<Map<String, String>>> javaClassImports,
+        java.util.List<String> exportedTypes) {
 
         public Source transformedSource() {
             try {
