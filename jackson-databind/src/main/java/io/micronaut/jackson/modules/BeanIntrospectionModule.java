@@ -66,6 +66,7 @@ import tools.jackson.databind.module.SimpleModule;
 import tools.jackson.databind.ser.AnyGetterWriter;
 import tools.jackson.databind.ser.BeanPropertyWriter;
 import tools.jackson.databind.ser.BeanSerializerBuilder;
+import tools.jackson.databind.ser.Serializers;
 import tools.jackson.databind.ser.ValueSerializerModifier;
 import tools.jackson.databind.ser.impl.PropertySerializerMap;
 import tools.jackson.databind.ser.jdk.MapSerializer;
@@ -87,6 +88,7 @@ import io.micronaut.core.beans.UnsafeBeanProperty;
 import io.micronaut.core.reflect.exception.InstantiationException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.NativeImageUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.jackson.JacksonConfiguration;
 import io.micronaut.jackson.JacksonDeserializationPreInstantiateCallback;
@@ -159,6 +161,12 @@ public class BeanIntrospectionModule extends SimpleModule {
         Object owner = context.getOwner();
         if (owner instanceof MapperBuilder builder) {
             builder.accessorNaming(new BeanIntrospectionAccessorNamingStrategyProvider(builder.baseSettings().getAccessorNaming()));
+        }
+        // In native image, Jackson's default record path will try to introspect record components,
+        // which requires reflective metadata and can fail. For @Introspected records, prefer our
+        // reflection-free serializer to avoid Jackson's record path entirely.
+        if (NativeImageUtils.inImageCode() || NativeImageUtils.inImageRuntimeCode()) {
+            context.addSerializers(new IntrospectionRecordSerializers());
         }
     }
 
@@ -1183,6 +1191,76 @@ public class BeanIntrospectionModule extends SimpleModule {
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * Custom serializers to bypass Jackson's record introspection for @Introspected records in native image.
+     * This avoids calls to Class.getRecordComponents() and friends.
+     */
+    private final class IntrospectionRecordSerializers extends Serializers.Base {
+        @Override
+        public ValueSerializer<?> findSerializer(SerializationConfig config,
+                                          JavaType type, BeanDescription.Supplier beanDescRef, JsonFormat.Value formatOverrides)
+        {
+            Class<?> raw = type.getRawClass();
+            if (!raw.isRecord()) {
+                return null;
+            }
+            final BeanIntrospection<Object> introspection = findIntrospection(raw);
+            if (introspection == null) {
+                return null;
+            }
+            PropertyNamingStrategy namingStrategy = findNamingStrategy(config, introspection);
+            return new IntrospectionRecordSerializer(introspection, namingStrategy, config.getTypeFactory(), config);
+        }
+    }
+
+    /**
+     * A simple serializer that uses Micronaut BeanIntrospection to serialize a record without reflection.
+     * Note: This is a conservative implementation for native-image compatibility. It focuses on records and
+     * basic property emission. Advanced features (e.g., unwrapped, views) are still handled by the main serializer
+     * path via BeanIntrospectionPropertyWriter when not in native image.
+     */
+    private final class IntrospectionRecordSerializer extends ValueSerializer<Object> {
+        private final UnsafeBeanProperty<Object, Object>[] props;
+        private final SerializedString[] names;
+
+        IntrospectionRecordSerializer(BeanIntrospection<Object> introspection,
+                                      @Nullable PropertyNamingStrategy namingStrategy,
+                                      TypeFactory typeFactory,
+                                      SerializationConfig config) {
+            final Collection<BeanProperty<Object, Object>> beanProperties = introspection.getBeanProperties();
+            final List<UnsafeBeanProperty<Object, Object>> p = new ArrayList<>(beanProperties.size());
+            final List<SerializedString> n = new ArrayList<>(beanProperties.size());
+            for (BeanProperty<Object, Object> bp : beanProperties) {
+                if (bp.hasAnnotation(JsonIgnore.class) || bp.hasAnnotation(JsonValue.class)) {
+                    continue;
+                }
+                UnsafeBeanProperty<Object, Object> ubp = (UnsafeBeanProperty<Object, Object>) bp;
+                String propertyName = getName(config, namingStrategy, ubp);
+                p.add(ubp);
+                n.add(new SerializedString(propertyName));
+            }
+            //noinspection unchecked
+            this.props = p.toArray(new UnsafeBeanProperty[0]);
+            this.names = n.toArray(new SerializedString[0]);
+        }
+
+        @Override
+        public void serialize(Object value, JsonGenerator gen, SerializationContext prov) {
+            gen.writeStartObject();
+            for (int i = 0; i < props.length; i++) {
+                Object v = props[i].get(value);
+                if (v == null) {
+                    // Keep behavior conservative in native-image: skip nulls (aligns with common defaults)
+                    continue;
+                }
+                gen.writeName(names[i]);
+                ValueSerializer<Object> ser = prov.findValueSerializer(v.getClass());
+                ser.serialize(v, gen, prov);
+            }
+            gen.writeEndObject();
         }
     }
 }

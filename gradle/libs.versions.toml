@@ -105,7 +105,7 @@ boms-groovy = { module = "org.apache.groovy:groovy-bom", version.ref = "managed-
 boms-kotlin = { module = "org.jetbrains.kotlin:kotlin-bom", version.ref = "managed-kotlin" }
 boms-kotlin-coroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-bom", version.ref = "managed-kotlin-coroutines" }
 boms-netty = { module = "io.netty:netty-bom", version.ref = "managed-netty" }
-boms-jackson = { module = "com.fasterxml.jackson:jackson-bom", version.ref = "managed-jackson" }
+boms-jackson = { module = "tools.jackson:jackson-bom", version.ref = "managed-jackson" }
 boms-micronaut-sourcegen = { module = "io.micronaut.sourcegen:micronaut-sourcegen-bom", version.ref = "micronaut-sourcegen" }
 
 #
@@ -176,6 +176,7 @@ sonatype-scan = { module = "org.sonatype.gradle.plugins:scan-gradle-plugin", ver
 #
 # Other libraries are used by Micronaut but will not appear in the BOM
 #
+
 awaitility = { module = "org.awaitility:awaitility", version.ref = "awaitility" }
 
 aws-java-sdk-lambda = { module = "com.amazonaws:aws-java-sdk-lambda" }

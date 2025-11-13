@@ -12,8 +12,9 @@ tasks.withType<Test>().configureEach {
 dependencies {
     testAnnotationProcessor(projects.testSuiteAnnotationRemapperVisitor)
     testAnnotationProcessor(projects.micronautInjectJava)
+    testAnnotationProcessor(projects.micronautGraal)
     testImplementation(projects.micronautHttpServerNetty)
-    implementation(projects.micronautJacksonDatabind)
+    testImplementation(projects.micronautJacksonDatabind)
     testImplementation(projects.micronautHttpClient)
     testImplementation(libs.logback.classic)
     testImplementation(libs.micronaut.test.junit5) {

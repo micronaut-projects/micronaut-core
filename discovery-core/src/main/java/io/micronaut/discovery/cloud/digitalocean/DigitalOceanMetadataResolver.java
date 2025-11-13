@@ -19,7 +19,6 @@ import tools.jackson.core.json.JsonFactory;
 import tools.jackson.databind.ObjectMapper;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
-import io.micronaut.core.annotation.Experimental;
 import io.micronaut.discovery.cloud.ComputeInstanceMetadata;
 import io.micronaut.discovery.cloud.ComputeInstanceMetadataResolver;
 import io.micronaut.discovery.cloud.NetworkInterface;
