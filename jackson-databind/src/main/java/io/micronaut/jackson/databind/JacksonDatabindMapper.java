@@ -237,7 +237,12 @@ public final class JacksonDatabindMapper implements JsonMapper {
     @Override
     public void writeValue(@NonNull OutputStream outputStream, @Nullable Object object) throws IOException {
         if (specializedWriter != null) {
-            specializedWriter.writeValue(outputStream, object);
+            if (object == null) {
+                specializedWriter.writeValue(outputStream, null);
+            } else {
+                // Bind root type to retain static typing while preserving active view to avoid excessive dynamic lookups
+                specializedWriter.forType(object.getClass()).writeValue(outputStream, object);
+            }
         } else {
             objectMapper.writeValue(outputStream, object);
         }
@@ -250,6 +255,12 @@ public final class JacksonDatabindMapper implements JsonMapper {
 
     @Override
     public byte[] writeValueAsBytes(@Nullable Object object) throws IOException {
+        if (specializedWriter != null) {
+            if (object == null) {
+                return specializedWriter.writeValueAsBytes(null);
+            }
+            return specializedWriter.forType(object.getClass()).writeValueAsBytes(object);
+        }
         return objectMapper.writeValueAsBytes(object);
     }
 

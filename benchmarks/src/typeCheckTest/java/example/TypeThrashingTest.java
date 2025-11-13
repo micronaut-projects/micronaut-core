@@ -33,7 +33,17 @@ public class TypeThrashingTest {
 
     @BeforeAll
     static void setupAgent() {
-        TypePollutionTransformer.install(net.bytebuddy.agent.ByteBuddyAgent.install());
+        java.lang.instrument.Instrumentation inst = net.bytebuddy.agent.ByteBuddyAgent.install();
+        net.bytebuddy.agent.builder.AgentBuilder.Transformer transformer = io.micronaut.test.typepollution.TypePollutionTransformer.create();
+        new net.bytebuddy.agent.builder.AgentBuilder.Default()
+            // Ignore Gradle and Byte Buddy internals to avoid resolution issues
+            .ignore(net.bytebuddy.matcher.ElementMatchers.nameStartsWith("org.gradle.")
+                .or(net.bytebuddy.matcher.ElementMatchers.nameStartsWith("net.bytebuddy.")))
+            // Only transform Micronaut classes (the code under test)
+            .type(net.bytebuddy.matcher.ElementMatchers.nameStartsWith("io.micronaut."))
+            .transform(transformer)
+            .with(net.bytebuddy.agent.builder.AgentBuilder.RedefinitionStrategy.RETRANSFORMATION)
+            .installOn(inst);
     }
 
     @BeforeEach

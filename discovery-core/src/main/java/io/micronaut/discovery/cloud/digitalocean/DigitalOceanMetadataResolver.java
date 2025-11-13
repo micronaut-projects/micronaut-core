@@ -87,7 +87,6 @@ public class DigitalOceanMetadataResolver implements ComputeInstanceMetadataReso
      * @param mapper Mapper to use for deserialization
      */
     @Inject
-    @Experimental
     public DigitalOceanMetadataResolver(
         DigitalOceanMetadataConfiguration configuration,
         JsonFactory jsonFactory,
@@ -100,7 +99,10 @@ public class DigitalOceanMetadataResolver implements ComputeInstanceMetadataReso
 
     /**
      * Construct with default settings.
+     *
+     * @deprecated Prefer dependency injection. Use {@link #DigitalOceanMetadataResolver(DigitalOceanMetadataConfiguration, JsonFactory, JsonMapper)} instead.
      */
+    @Deprecated
     public DigitalOceanMetadataResolver() {
         configuration = new DigitalOceanMetadataConfiguration();
         jsonFactory = new JsonFactory();
@@ -110,7 +112,9 @@ public class DigitalOceanMetadataResolver implements ComputeInstanceMetadataReso
     /**
      * @param objectMapper To read and write JSON
      * @param configuration Digital Ocean Metadata configuration
+     * @deprecated Prefer dependency injection of {@link JsonMapper} and {@link JsonFactory}; use {@link #DigitalOceanMetadataResolver(DigitalOceanMetadataConfiguration, JsonFactory, JsonMapper)}.
      */
+    @Deprecated
     public DigitalOceanMetadataResolver(ObjectMapper objectMapper, DigitalOceanMetadataConfiguration configuration) {
         this(configuration, (JsonFactory) objectMapper.tokenStreamFactory(), new JacksonDatabindMapper(objectMapper));
     }
