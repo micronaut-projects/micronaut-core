@@ -46,9 +46,10 @@ def is_abstract_method(funcdef):
 
 class PrintNodeVisitor(ast.NodeVisitor):
 
-    def __init__(self, callback, package_name=""):
+    def __init__(self, callback, package_name="", visitor_context=None):
         self.callback = callback
         self.package_name = package_name
+        self.visitor_context = visitor_context
         # maintain insertion order
         self.known_decorators = OrderedDict()
         self.known_decorator_functions = OrderedDict()
@@ -795,7 +796,7 @@ def decorator_to_function(visitor, node):
 def convert_ast_value(node, visitor=None):
     """
     Convert an AST node to a Python value, handling complex expressions like lists.
-    If visitor is provided, resolve Java type names to fully qualified names.
+    If visitor is provided, resolve Java type names to fully qualified names and Java constants to their values.
     """
     # Handle different AST node types first, before trying ast.literal_eval
     if isinstance(node, ast.Name):
@@ -813,7 +814,7 @@ def convert_ast_value(node, visitor=None):
         # Handle tuples
         return tuple(convert_ast_value(elt, visitor) for elt in node.elts)
     elif isinstance(node, ast.Attribute):
-        # Handle qualified names like module.Class
+        # Handle qualified names like module.Class or constant references like StringUtils.TRUE
         names = []
         current = node
         while isinstance(current, ast.Attribute):
@@ -821,6 +822,15 @@ def convert_ast_value(node, visitor=None):
             current = current.value
         if isinstance(current, ast.Name):
             names.insert(0, current.id)
+
+        # Check if this might be a Java constant reference (e.g., StringUtils.TRUE)
+        if visitor is not None and len(names) >= 2:
+            # Try to resolve as a Java constant
+            constant_value = _resolve_java_constant(visitor, names)
+            if constant_value is not None:
+                return constant_value
+
+        # Return as qualified name string
         return '.'.join(names)
 
     # Try to evaluate the value if it's a constant or simple expression
@@ -829,6 +839,46 @@ def convert_ast_value(node, visitor=None):
     except Exception:
         # Fallback to AST dump for complex expressions
         return ast.dump(node) if hasattr(ast, 'dump') else str(node)
+
+def _resolve_java_constant(visitor, name_parts):
+    """
+    Try to resolve a qualified name as a Java constant (e.g., ['StringUtils', 'TRUE'] -> "true")
+    Returns the constant value if found, None otherwise.
+    """
+    if visitor is None or len(name_parts) < 2:
+        return None
+
+    # The last part is the field name, everything before is the class name
+    field_name = name_parts[-1]
+    class_name_parts = name_parts[:-1]
+    class_name = '.'.join(class_name_parts)
+
+    # First check if the class name is in java_type_assignments (imported types)
+    resolved_class_name = visitor.java_type_assignments.get(class_name, class_name)
+
+    # Try to get the class element from the visitor context
+    try:
+        if hasattr(visitor, 'visitor_context') and visitor.visitor_context is not None:
+            class_element = visitor.visitor_context.getClassElement(resolved_class_name).orElse(None)
+            if class_element is not None:
+                # Try to find the field using getFields() method
+                fields = class_element.getFields()
+                for field in fields:
+                    if field.getName() == field_name:
+                        if hasattr(field, 'getConstantValue'):
+                            constant_value = field.getConstantValue()
+                            # Check if it's an Optional or the value directly
+                            if hasattr(constant_value, 'isPresent') and constant_value.isPresent():
+                                return constant_value.get()
+                            elif constant_value is not None:
+                                # Direct value
+                                return constant_value
+                        break
+    except Exception:
+        # If constant resolution fails, continue with fallback
+        pass
+
+    return None
 
 def extract_arg_defaults(func_node):
     """
