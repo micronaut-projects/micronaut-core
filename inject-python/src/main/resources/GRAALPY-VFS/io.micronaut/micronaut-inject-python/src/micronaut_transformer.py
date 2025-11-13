@@ -58,6 +58,7 @@ class MicronautTransformer(ast.NodeTransformer):
         self.java_class_imports = {}
         self.has_java_import = False
         self.exported_types = []
+        self.all_class_names = []
 
     def visit_ImportFrom(self, node: ast.ImportFrom):
         """
@@ -172,8 +173,9 @@ def micronaut_annotation(name, repeated=None):
 
     def visit_ClassDef(self, node: ast.ClassDef) -> ast.ClassDef:
         """
-        Check if a class has Micronaut decorators and track it for export.
+        Track all class definitions and exported types separately.
         """
+        self.all_class_names.append(node.name)
         if node.decorator_list:
             for decorator in node.decorator_list:
                 decorator_name = self._get_decorator_name(decorator)

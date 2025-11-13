@@ -99,15 +99,33 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
                     classElements.put(classElement.getName(), classElement);
                     String typeName = element.getName();
-                    var builder = ClassDef.builder(typeName);
+                    var builder = ClassDef.builder(typeName)
+                        .addModifiers(Modifier.PUBLIC);
                     builder.addAnnotation(Vetoed.class);
 
                     copyAnnotations(element, builder, ANNOTATION_PACKAGES_TO_COPY, context);
                     Collection<ClassElement> interfaces = classElement.getInterfaces();
                     builder.addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.ValueCoercible"));
 
-                    FieldDef pythonValue = FieldDef.builder("graalpyInternalValue")
-                        .ofType(POLYGLOT_VALUE).addModifiers(Modifier.FINAL, Modifier.PRIVATE).build();
+                    // Check if this class extends another PythonClassElement
+                    ClassElement superType = element.getSuperType().orElse(null);
+                    boolean extendsPythonClass = superType instanceof AbstractPythonClassElement;
+
+                    ClassTypeDef superClassType = null;
+                    if (extendsPythonClass) {
+                        superClassType = ClassTypeDef.of(superType.getName());
+                        builder.superclass(superClassType);
+                    }
+
+                    FieldDef pythonValue;
+                    if (!extendsPythonClass) {
+                        // Only add the field for root classes (not extending other Python classes)
+                        pythonValue = FieldDef.builder("graalpyInternalValue")
+                            .ofType(POLYGLOT_VALUE).addModifiers(Modifier.FINAL, Modifier.PROTECTED).build();
+                        builder.addField(pythonValue);
+                    } else {
+                        pythonValue = null;
+                    }
 
                     for (ClassElement anInterface : interfaces) {
                         builder.addSuperinterface(TypeDef.of(anInterface));
@@ -122,35 +140,36 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         }
                     }
 
-                    builder.addField(pythonValue);
+                    boolean isJunit5Test = element.getEnclosedElement(ElementQuery.ALL_METHODS.onlyInstance().annotated(ann -> ann.hasDeclaredAnnotation("org.junit.jupiter.api.Test"))).isPresent();
 
-                    boolean isMicronautTest = element.hasStereotype("io.micronaut.test.extensions.junit5.annotation.MicronautTest");
-                    if (!isMicronautTest) {
+                    // Only add asPolyglotValue and fromPolyglotValue for root classes
+                    if (!extendsPythonClass) {
+                        if (!isJunit5Test) {
+                            builder.addMethod(
+                                MethodDef.constructor()
+                                    .addParameter(ParameterDef.of("value", POLYGLOT_VALUE))
+                                    .build(((aThis, methodParameters) ->
+                                            aThis.field(pythonValue).assign(methodParameters.get(0))
+                                        )
+                                    ));
+                        }
 
-                        builder.addMethod(
-                            MethodDef.constructor()
-                                .addParameter(ParameterDef.of("value", POLYGLOT_VALUE))
-                                .build(((aThis, methodParameters) ->
-                                        aThis.field(pythonValue).assign(methodParameters.get(0))
-                                    )
-                                ));
-                    }
+                        // implement asPolygotValue
+                        builder.addMethod(MethodDef.builder(AS_POLYGLOT_VALUE)
+                            .addModifiers(Modifier.PUBLIC)
+                            .returns(POLYGLOT_VALUE).build(((aThis, methodParameters) -> aThis.field(pythonValue).returning())));
 
-                    // implement asPolygotValue
-                    builder.addMethod(MethodDef.builder(AS_POLYGLOT_VALUE)
-                        .addModifiers(Modifier.PUBLIC)
-                        .returns(POLYGLOT_VALUE).build(((aThis, methodParameters) -> aThis.field(pythonValue).returning())));
+                        // implement static factory
+                        ClassTypeDef thisType = ClassTypeDef.of(typeName);
 
-                    // implement static factory
-                    ClassTypeDef thisType = ClassTypeDef.of(typeName);
-
-                    if (!isMicronautTest) {
-                        builder.addMethod(MethodDef.builder(FROM_POLYGLOT_VALUE)
-                            .addModifiers(Modifier.PUBLIC,  Modifier.STATIC)
-                            .addParameter(POLYGLOT_VALUE)
-                            .returns(thisType).build(((aThis, methodParameters) ->
-                                thisType.instantiate(methodParameters).returning()))
-                        );
+                        if (!isJunit5Test) {
+                            builder.addMethod(MethodDef.builder(FROM_POLYGLOT_VALUE)
+                                .addModifiers(Modifier.PUBLIC,  Modifier.STATIC)
+                                .addParameter(POLYGLOT_VALUE)
+                                .returns(thisType).build(((aThis, methodParameters) ->
+                                    thisType.instantiate(methodParameters).returning()))
+                            );
+                        }
                     }
 
 
@@ -191,24 +210,36 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                     arguments
                                 );
 
-                                // Assign to field
-                                return aThis.field(pythonValue).assign(pythonInstance);
+                                if (extendsPythonClass) {
+                                    // For child classes, call super with the polyglot value
+                                    return aThis.superRef().invokeConstructor(pythonInstance);
+                                } else {
+                                    // Assign to field for root classes
+                                    return aThis.field(pythonValue).assign(pythonInstance);
+                                }
                             }))
                         );
                     } else {
                         // Default constructor for classes without __init__ or with no parameters
                         MethodDef.MethodDefBuilder constructor = MethodDef.constructor();
                         builder.addMethod(
-                            constructor.build(((aThis, methodParameters) -> aThis.field(pythonValue).assign(
-                                CONTEXT_HOLDER
+                            constructor.build(((aThis, methodParameters) -> {
+                                ExpressionDef pythonInstance = CONTEXT_HOLDER
                                     .invokeStatic("newInstance", POLYGLOT_VALUE,
                                         List.of(
                                             ExpressionDef.constant(element.getPackageName()),
                                             ExpressionDef.constant(element.getSimpleName())
                                         )
+                                    );
 
-                                    )
-                            )))
+                                if (extendsPythonClass) {
+                                    // For child classes, call super with the polyglot value
+                                    return aThis.superRef().invokeConstructor(pythonInstance);
+                                } else {
+                                    // Assign to field for root classes
+                                    return aThis.field(pythonValue).assign(pythonInstance);
+                                }
+                            }))
                         );
                     }
 
@@ -216,7 +247,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         ElementQuery.ALL_METHODS
                             .onlyAccessible()
                             .onlyInstance()
-                            .annotated(ann -> ann.hasStereotype(Executable.class) ||
+                            .annotated(ann -> isJunit5Test || ann.hasStereotype(Executable.class) ||
                                 ann.hasStereotype(Around.class) ||
                                 element.hasStereotype(Around.class) ||
                                 ann.hasDeclaredStereotype(AnnotationUtil.SCOPE) ||
@@ -253,7 +284,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
                         builder.addMethod(injectionMethodBuilder
                             .build(((aThis, methodParameters) -> {
-                                VariableDef.Field pythonValueField = aThis.field(pythonValue);
+                                // For child classes, pythonValue will be null, so we need to create a field reference to the inherited field
+                                VariableDef.Field pythonValueField;
+                                if (pythonValue != null) {
+                                    pythonValueField = aThis.field(pythonValue);
+                                } else {
+                                    // For child classes, access the inherited field
+                                    pythonValueField = aThis.field("graalpyInternalValue", POLYGLOT_VALUE);
+                                }
                                 List<ExpressionDef> parameters = new ArrayList<>();
                                 parameters.add(ExpressionDef.constant(injectionMethod.getName()));
 
@@ -340,7 +378,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
         builder.addMethod(methodBuilder
             .build(((aThis, methodParameters) -> {
-                VariableDef.Field pythonValueField = aThis.field(pythonValue);
+                // For child classes, pythonValue will be null, so we need to create a field reference to the inherited field
+                VariableDef.Field pythonValueField;
+                if (pythonValue != null) {
+                    pythonValueField = aThis.field(pythonValue);
+                } else {
+                    // For child classes, access the inherited field
+                    pythonValueField = aThis.field("graalpyInternalValue", POLYGLOT_VALUE);
+                }
                 List<ExpressionDef> parameters = new ArrayList<>();
                 parameters.add(ExpressionDef.constant(pythonFunctionName));
                 parameters.addAll(methodParameters);
@@ -363,7 +408,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             .returns(propertyType);
 
         builder.addMethod(getterBuilder.build(((aThis, methodParameters) -> {
-            VariableDef.Field pythonValueField = aThis.field(pythonValue);
+            // For child classes, pythonValue will be null, so we need to create a field reference to the inherited field
+            VariableDef.Field pythonValueField;
+            if (pythonValue != null) {
+                pythonValueField = aThis.field(pythonValue);
+            } else {
+                // For child classes, access the inherited field
+                pythonValueField = aThis.field("graalpyInternalValue", POLYGLOT_VALUE);
+            }
 
             // Get the return type to determine appropriate conversion method
             var invokedValue = pythonValueField.invoke(
@@ -387,7 +439,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         propertySetter.addParameter(TypeDef.of(beanProperty.getType()));
 
         builder.addMethod(propertySetter.build(((aThis, methodParameters) -> {
-            VariableDef.Field pythonValueField = aThis.field(pythonValue);
+            // For child classes, pythonValue will be null, so we need to create a field reference to the inherited field
+            VariableDef.Field pythonValueField;
+            if (pythonValue != null) {
+                pythonValueField = aThis.field(pythonValue);
+            } else {
+                // For child classes, access the inherited field
+                pythonValueField = aThis.field("graalpyInternalValue", POLYGLOT_VALUE);
+            }
             ExpressionDef param;
             if (beanProperty.getType() instanceof PythonClassElement) {
                 param = methodParameters.get(0).invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE);

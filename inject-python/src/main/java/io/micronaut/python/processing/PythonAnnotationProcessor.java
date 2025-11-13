@@ -49,6 +49,7 @@ import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.python.processing.annotation.PythonApplication;
 import io.micronaut.python.processing.beans.PythonBeanDefinitionProcessor;
 import io.micronaut.python.processing.visitor.PythonTypeElementVisitorProcessor;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Annotation processor for {@link PythonApplication} that enables Python AST processing
@@ -158,7 +159,10 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
 
                 if (StringUtils.isNotEmpty(srcDir)) {
                     // source mode, so we need to write out each source to META-INF
-                    Map<PathEntry, List<String>> exportedModules = new LinkedHashMap<>();
+                    Map<PathEntry, List<String>> allModules = new LinkedHashMap<>();
+                    Set<String> allExportedTypes = transformedList.stream()
+                        .flatMap(tr -> tr.exportedTypes().stream())
+                        .collect(Collectors.toSet());
                     for (PythonAstParser.TransformResult transformResult : transformedList) {
                         Source source = transformResult.originalSource();
                         String path = source.getPath();
@@ -171,16 +175,16 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                             path = path.substring(srcDir.length() + 1);
                         }
                         String targetSource = APPLICATION_SRC_PATH + path;
-                        if (!transformResult.exportedTypes().isEmpty()) {
-                            // has exported types
+                        if (!transformResult.allClassNames().isEmpty()) {
+                            // has classes
                             int parentIndex = path.lastIndexOf('/');
                             if (parentIndex > -1) {
                                 String parentPath = path.substring(0, parentIndex + 1);
-                                exportedModules.computeIfAbsent(new PathEntry(parentPath, path.substring(parentIndex)), k -> new ArrayList<>())
-                                    .addAll(transformResult.exportedTypes());
+                                allModules.computeIfAbsent(new PathEntry(parentPath, path.substring(parentIndex)), k -> new ArrayList<>())
+                                    .addAll(transformResult.allClassNames());
                             } else {
-                                exportedModules.computeIfAbsent(new PathEntry("", path), k -> new ArrayList<>())
-                                    .addAll(transformResult.exportedTypes());
+                                allModules.computeIfAbsent(new PathEntry("", path), k -> new ArrayList<>())
+                                    .addAll(transformResult.allClassNames());
                             }
                         }
                         filesList.append("/META-INF/").append(targetSource).append("\n");
@@ -194,23 +198,32 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                             });
                     }
 
-                    TreeSet<String> byParent = exportedModules.keySet().stream().map(pe -> pe.parent)
+                    TreeSet<String> byParent = allModules.keySet().stream().map(pe -> pe.parent)
                         .collect(Collectors.toCollection(TreeSet::new));
                     for (String parent : byParent) {
                         String initFilePath = APPLICATION_SRC_PATH + parent + "__init__.py";
                         StringBuilder initContent = new StringBuilder();
-                        List<Map.Entry<PathEntry, List<String>>> entries = exportedModules.entrySet().stream()
+                        List<Map.Entry<PathEntry, List<String>>> entries = allModules.entrySet().stream()
                             .filter(entry -> entry.getKey().parent.equals(parent))
                             .toList();
+                        List<String> allTypes = new ArrayList<>();
+                        List<String> exportedTypes = new ArrayList<>();
                         for (Map.Entry<PathEntry, List<String>> entry : entries) {
                             List<String> types = entry.getValue();
                             String filename = entry.getKey().filename;
                             if (!types.isEmpty()) {
                                 for (String type : types) {
                                     initContent.append("from .").append(NameUtils.filename(filename)).append(" import ").append(type).append('\n');
+                                    allTypes.add(type);
+                                    // Check if this type has decorators (is in allExportedTypes)
+                                    if (allExportedTypes.contains(type)) {
+                                        exportedTypes.add(type);
+                                    }
                                 }
-                                initContent.append("\n__all__ = ").append(types).append("\n");
                             }
+                        }
+                        if (!exportedTypes.isEmpty()) {
+                            initContent.append("\n__all__ = ").append(toListOfString(exportedTypes)).append("\n");
                         }
                         filesList.append("/META-INF/").append(initFilePath).append("\n");
                         javaVisitorContext.visitMetaInfFile(initFilePath, originatingElement)
@@ -451,7 +464,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
 
             // Add __all__
             if (!allNames.isEmpty()) {
-                initContent.append("\n__all__ = ").append(allNames).append("\n");
+                initContent.append("\n__all__ = ").append(toListOfString(allNames)).append("\n");
             }
 
             // Write the __init__.py file
@@ -476,6 +489,10 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                     throw new ProcessingException(originatingElement, "Failed to write fileslist.txt to VFS");
                 }
             });
+    }
+
+    private static @NotNull String toListOfString(List<String> allNames) {
+        return "[" + String.join(",", allNames.stream().map(n -> "\"" + n + "\"").toList()) + "]";
     }
 
     private static void collectPackageNames(Set<String> decoratorsByPackage, Set<String> allPackages) {
