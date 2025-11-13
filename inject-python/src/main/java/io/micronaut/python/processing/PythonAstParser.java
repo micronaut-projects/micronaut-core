@@ -183,22 +183,29 @@ public final class PythonAstParser {
         for (Source source : pythonSource) {
             bindings.putMember("src", source.getCharacters());
 
-            Value result = context.eval(Source.create(
-                PYTHON,
-                getTransformSource()
-            ));
+            Value result = null;
+            try {
+                result = context.eval(Source.create(
+                    PYTHON,
+                    getTransformSource()
+                ));
+            } catch (Exception e) {
+                throw new ProcessingException(null, "Error processing Python source [" + source.getName() + "]: " + e.getMessage(), e);
+            }
             Map map = result.as(Map.class);
             String code = map.containsKey("code") ? map.get("code").toString() : null;
             Map<String, String> decorators = map.containsKey("decorators") ? (Map<String, String>) map.get("decorators") : null;
             Map<String, java.util.List<Map<String, String>>> javaClassImports =
                 map.containsKey("javaClassImports") ? (Map<String, java.util.List<Map<String, String>>>) map.get("javaClassImports") : null;
             java.util.List<String> exportedTypes = map.containsKey("exportedTypes") ? (java.util.List<String>) map.get("exportedTypes") : new ArrayList<>();
+            java.util.List<String> allClassNames = map.containsKey("allClassNames") ? (java.util.List<String>) map.get("allClassNames") : new ArrayList<>();
             results.add(new TransformResult(
                 source,
                 code,
                 decorators,
                 javaClassImports,
-                exportedTypes
+                exportedTypes,
+                allClassNames
             ));
         }
         return results;
@@ -239,7 +246,8 @@ public final class PythonAstParser {
                 "code": unparse(transformed_tree),
                 "decorators": transformer.get_generated_decorator_code(),
                 "javaClassImports": transformer.java_class_imports,
-                "exportedTypes": transformer.get_exported_types()
+                "exportedTypes": transformer.get_exported_types(),
+                "allClassNames": transformer.all_class_names
             }
             """;
     }
@@ -256,13 +264,15 @@ public final class PythonAstParser {
      * @param decorators       The decorators
      * @param javaClassImports The Java class imports
      * @param exportedTypes    The types that have Micronaut decorators
+     * @param allClassNames    All class names defined in the source
      */
     public record TransformResult(
         Source originalSource,
         String code,
         Map<String, String> decorators,
         Map<String, java.util.List<Map<String, String>>> javaClassImports,
-        java.util.List<String> exportedTypes) {
+        java.util.List<String> exportedTypes,
+        java.util.List<String> allClassNames) {
 
         public Source transformedSource() {
             try {

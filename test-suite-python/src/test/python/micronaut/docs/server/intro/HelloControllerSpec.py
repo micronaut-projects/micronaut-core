@@ -8,6 +8,7 @@ from jakarta.inject import Inject
 from typing import Annotated
 # end::imports[]
 
+
 # tag::class[]
 @MicronautTest # <1>
 class HelloClientSpec:
