@@ -31,7 +31,10 @@ class AroundAdviceSpec extends AbstractPythonTypeElementSpec {
         given:
         def pythonCode = '''
 from micronaut.python.aop import TestAround
-from micronaut.aop import MethodInterceptor, InterceptorBean, MethodInvocationContext
+from micronaut.aop import InterceptorBean, MethodInvocationContext
+import java
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
 
 @InterceptorBean(TestAround)
 class TestAroundInterceptor(MethodInterceptor):
@@ -85,7 +88,10 @@ class TestClass:
         given:
         def pythonCode = '''
 from micronaut.python.aop import TestAround
-from micronaut.aop import MethodInterceptor, InterceptorBean, MethodInvocationContext
+from micronaut.aop import InterceptorBean, MethodInvocationContext
+import java
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
 
 @InterceptorBean(TestAround)
 class TestAroundInterceptor(MethodInterceptor):
