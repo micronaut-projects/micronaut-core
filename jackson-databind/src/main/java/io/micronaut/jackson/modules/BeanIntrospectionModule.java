@@ -445,7 +445,15 @@ public class BeanIntrospectionModule extends SimpleModule {
                     }
                     newBuilder.setProperties(newProperties);
                 }
-                newBuilder.setFilteredProperties(builder.getFilteredProperties());
+                // Ensure filtered properties do not cause length mismatch in Jackson 3:
+                // when we recreated properties from introspection (common in native-image),
+                // the original filtered array (from builder) may be empty or of different length,
+                // which leads to "Trying to set 0 filtered properties; must match length of non-filtered `properties` (...)"
+                if (ignoreReflectiveProperties || (CollectionUtils.isEmpty(properties) && CollectionUtils.isNotEmpty(beanProperties))) {
+                    newBuilder.setFilteredProperties(null);
+                } else {
+                    newBuilder.setFilteredProperties(builder.getFilteredProperties());
+                }
                 return newBuilder;
             }
         }
@@ -1201,8 +1209,7 @@ public class BeanIntrospectionModule extends SimpleModule {
     private final class IntrospectionRecordSerializers extends Serializers.Base {
         @Override
         public ValueSerializer<?> findSerializer(SerializationConfig config,
-                                          JavaType type, BeanDescription.Supplier beanDescRef, JsonFormat.Value formatOverrides)
-        {
+                                          JavaType type, BeanDescription.Supplier beanDescRef, JsonFormat.Value formatOverrides) {
             Class<?> raw = type.getRawClass();
             if (!raw.isRecord()) {
                 return null;
