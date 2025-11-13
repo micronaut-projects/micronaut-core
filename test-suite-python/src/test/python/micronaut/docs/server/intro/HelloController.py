@@ -6,7 +6,8 @@ from micronaut.http.annotation import Controller, Get
 # tag::class[]
 @Controller("/hello") # <1>
 class HelloController:
-    @Get(produces = MediaType.TEXT_PLAIN) # <2>
+    # TODO: Fix MediaType.TEXT_PLAIN ref
+    @Get(produces = "text/plain") # <2>
     def index(self) -> str:
         return "Hello World" # <3>
 # end::class[]
