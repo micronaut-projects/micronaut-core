@@ -141,7 +141,8 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                     .toList();
                 environment = parser.parse(
                     sourceList,
-                    srcDir
+                    srcDir,
+                    javaVisitorContext
                 );
             } catch (Exception e) {
                 throw new ProcessingException(originatingElement, "Error parsing transformed python code: " + e.getMessage());

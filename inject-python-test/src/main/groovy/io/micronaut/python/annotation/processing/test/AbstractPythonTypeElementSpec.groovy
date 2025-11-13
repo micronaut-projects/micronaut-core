@@ -141,7 +141,7 @@ abstract class AbstractPythonTypeElementSpec extends Specification {
      * @param closure the callback
      * @return The class element
      */
-    <T> T buildClassElement(String pythonCode, Closure<T> closure) {
+    <T> T buildClassElement(@Language("python") String pythonCode, Closure<T> closure) {
         def localClosure = closure
         T result
         def compiler = PyronautCompiler.builder()

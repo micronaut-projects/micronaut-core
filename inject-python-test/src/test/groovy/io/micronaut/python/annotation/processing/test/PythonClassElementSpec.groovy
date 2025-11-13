@@ -16,6 +16,7 @@
 package io.micronaut.python.annotation.processing.test
 
 import io.micronaut.context.python.ContextHolder
+import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.python.compiler.PrimitiveTypesAnnotation
 import io.micronaut.python.compiler.RepeatableAnnotation
@@ -74,6 +75,22 @@ class MyService:
         then:
         classElement != null
         classElement.getSimpleName() == "MyService"
+    }
+
+    def "test constant references resolve to correct value in annotation metadata"() {
+        expect:
+        buildClassElement('''
+from jakarta.inject import Named
+from micronaut.core.util import StringUtils
+
+@Named(StringUtils.TRUE)
+class MySingletonService:
+    pass
+''')    { ClassElement element ->
+            assert element != null
+            assert element.stringValue(AnnotationUtil.NAMED).get() == "true"
+            return element
+        }
     }
 
     def "test stereotype annotations are correctly resolved"() {

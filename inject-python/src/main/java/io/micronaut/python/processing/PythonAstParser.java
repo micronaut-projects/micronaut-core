@@ -59,6 +59,10 @@ public final class PythonAstParser {
     }
 
     public PythonEnvironment parse(@Language("python") String sources, String packageName) {
+        return parse(sources, packageName, null);
+    }
+
+    public PythonEnvironment parse(@Language("python") String sources, String packageName, VisitorContext visitorContext) {
         Map<String, DecoratorDef> decorators = new LinkedHashMap<>();
         Map<String, ClassDef> classes = new LinkedHashMap<>();
 
@@ -73,6 +77,7 @@ public final class PythonAstParser {
         });
         bindings.putMember("src", sources);
         bindings.putMember("package_name", packageName != null ? packageName : "");
+        bindings.putMember("visitor_context", visitorContext);
         context.eval(Source.create(
             PYTHON,
             getSource()
@@ -92,6 +97,18 @@ public final class PythonAstParser {
      * @return The parsed environment
      */
     public PythonEnvironment parse(List<Source> sources, String srcDir) {
+        return parse(sources, srcDir, null);
+    }
+
+    /**
+     * Parse the given sources located within the given source directory.
+     *
+     * @param sources The sources
+     * @param srcDir  The source directory
+     * @param visitorContext The visitor context for constant resolution
+     * @return The parsed environment
+     */
+    public PythonEnvironment parse(List<Source> sources, String srcDir, VisitorContext visitorContext) {
         Map<String, DecoratorDef> decorators = new LinkedHashMap<>();
         Map<String, ClassDef> classes = new LinkedHashMap<>();
 
@@ -109,6 +126,7 @@ public final class PythonAstParser {
             String packageName = getPackageNameOfSource(srcDir, source);
             bindings.putMember("src", source.getCharacters());
             bindings.putMember("package_name", packageName);
+            bindings.putMember("visitor_context", visitorContext);
             context.eval(Source.create(
                 PYTHON,
                 getSource()
@@ -205,7 +223,7 @@ public final class PythonAstParser {
             from micronaut_processor import PrintNodeVisitor
 
             tree = ast.parse(src)
-            PrintNodeVisitor(callback, package_name).visit(tree)
+            PrintNodeVisitor(callback, package_name, visitor_context).visit(tree)
             """;
     }
 
