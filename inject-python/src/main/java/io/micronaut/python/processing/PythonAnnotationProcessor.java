@@ -429,8 +429,11 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             // Add Java class assignments
             if (javaClassesInPackage != null) {
                 for (java.util.Map.Entry<String, String> mapping : javaClassesInPackage.entrySet()) {
-                    initContent.append(mapping.getKey()).append(" = java.type('").append(mapping.getValue()).append("')\n");
-                    allNames.add(mapping.getKey());
+                    String typeName = mapping.getKey();
+                    String typeImport = typeName + "Type";
+                    initContent.append(typeImport).append(" = java.type('").append(mapping.getValue()).append("')\n");
+                    initContent.append("class ").append(typeName).append("(").append(typeImport).append("):\n pass\n");
+                    allNames.add(typeName);
                 }
             }
 

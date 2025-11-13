@@ -210,8 +210,8 @@ class PrintNodeVisitor(ast.NodeVisitor):
                         ]
 
                         # Parse function arguments and return type
-                        arguments = parse_function_arguments(node, self)
-                        return_type = parse_function_return_type(node, self)
+                        arguments = self.parse_function_arguments(node)
+                        return_type = self.parse_function_return_type(node)
                         # Extract function docstring
                         func_doc = self._extract_docstring(node)
 
@@ -390,6 +390,7 @@ class PrintNodeVisitor(ast.NodeVisitor):
         Returns (type_annotation, decorators_list)
         """
         decorators = []
+        type_annotation = "object"  # default fallback
 
         # Parse the Annotated subscript arguments
         if isinstance(annotation_node, ast.Subscript):
@@ -420,12 +421,24 @@ class PrintNodeVisitor(ast.NodeVisitor):
                             decorators.append(decorator)
                         # For other metadata types (strings, numbers), we could handle them
                         # but for now, focus on decorator names and calls
-
-        # Fallback to original annotation
-        try:
-            type_annotation = ast.unparse(annotation_node) if hasattr(ast, 'unparse') else ast.dump(annotation_node)
-        except:
-            type_annotation = "object"
+                else:
+                    # Fallback to original annotation if no args
+                    try:
+                        type_annotation = ast.unparse(annotation_node) if hasattr(ast, 'unparse') else ast.dump(annotation_node)
+                    except:
+                        type_annotation = "object"
+            else:
+                # Not Annotated, fallback to original annotation
+                try:
+                    type_annotation = ast.unparse(annotation_node) if hasattr(ast, 'unparse') else ast.dump(annotation_node)
+                except:
+                    type_annotation = "object"
+        else:
+            # Not a subscript, fallback to original annotation
+            try:
+                type_annotation = ast.unparse(annotation_node) if hasattr(ast, 'unparse') else ast.dump(annotation_node)
+            except:
+                type_annotation = "object"
 
         return type_annotation, decorators
 
@@ -468,7 +481,8 @@ class PrintNodeVisitor(ast.NodeVisitor):
         Extract a type name from an AST type node.
         """
         if isinstance(type_node, ast.Name):
-            return type_node.id
+            # Check if this is a Java type that was imported
+            return self.java_type_assignments.get(type_node.id, type_node.id)
         elif isinstance(type_node, ast.Attribute):
             # Handle qualified names like typing.List
             names = []
@@ -564,8 +578,8 @@ class PrintNodeVisitor(ast.NodeVisitor):
         property_def = self.current_class_properties[property_name]
 
         # Parse function arguments and return type
-        arguments = parse_function_arguments(func_node, self)
-        return_type_annotation = parse_function_return_type(func_node, self)
+        arguments = self.parse_function_arguments(func_node)
+        return_type_annotation = self.parse_function_return_type(func_node)
         func_doc = self._extract_docstring(func_node)
 
         decorators = [
@@ -627,6 +641,101 @@ class PrintNodeVisitor(ast.NodeVisitor):
                 # Python < 3.8 uses ast.Str for string literals
                 return first_stmt.value.s
         return None
+
+    def parse_function_arguments(self, func_node):
+        """
+        Parse the arguments of an ast.FunctionDef node and return ArgumentsDef.
+        """
+        args_list = func_node.args.args
+        defaults = func_node.args.defaults
+
+        # Only the last len(defaults) arguments have defaults
+        num_no_defaults = len(args_list) - len(defaults)
+        default_values = [None] * num_no_defaults + defaults
+
+        # Skip 'self' parameter for instance methods (methods inside classes)
+        # Check if this is an instance method by looking for a 'self' parameter
+        skip_self = (len(args_list) > 0 and args_list[0].arg == 'self')
+
+        # Extract parameter documentation from docstring
+        param_docs = extract_parameter_documentation(func_node)
+
+        arguments = []
+        for i, arg in enumerate(args_list):
+            arg_name = arg.arg
+
+                    # Skip self parameter for instance methods
+            if skip_self and arg_name == 'self':
+                continue
+
+            # Extract type annotation if present
+            annotation = ""
+            type_annotation = ""
+            decorators = []
+            if hasattr(arg, 'annotation') and arg.annotation is not None:
+                try:
+                    annotation = ast.unparse(arg.annotation)
+                except AttributeError:
+                    annotation = ast.dump(arg.annotation)
+
+                # Check for typing.Annotated and extract decorators from metadata
+                if isinstance(arg.annotation, ast.Subscript) and isinstance(arg.annotation.value, ast.Name) and arg.annotation.value.id == 'Annotated':
+                    parsed_type, parsed_decorators = self._parse_annotated_type(arg.annotation)
+                    type_annotation = parsed_type   # Use extracted type for typeAnnotation
+                    decorators = parsed_decorators  # Add any decorators found
+                else:
+                    # Resolve Java type names if this is a simple Name annotation
+                    if isinstance(arg.annotation, ast.Name):
+                        type_name = arg.annotation.id
+                        # Check if this is a Java type that was imported
+                        resolved_type_name = self.java_type_assignments.get(type_name, type_name)
+                        type_annotation = resolved_type_name
+                    else:
+                        type_annotation = annotation  # Not Annotated, use full annotation
+
+
+            # Get default value
+            default_value = default_values[i]
+            if default_value is not None:
+                try:
+                    # Try to evaluate the value
+                    default_value = ast.literal_eval(default_value)
+                except Exception:
+                    # For non-literal defaults, keep as is or dump
+                    default_value = ast.dump(default_value)
+
+            # Get parameter documentation
+            param_doc = param_docs.get(arg_name, None)
+
+            arguments.append(ArgumentDef.of(arg_name, annotation, type_annotation, default_value, decorators, param_doc))
+
+        return ArgumentsDef.of(arguments)
+
+    def parse_function_return_type(self, func_node):
+        """
+        Parse the return type annotation of an ast.FunctionDef node and return a ReturnDef.
+        """
+        if hasattr(func_node, 'returns') and func_node.returns is not None:
+            # Check for typing.Annotated and extract decorators from metadata
+            if isinstance(func_node.returns, ast.Subscript) and isinstance(func_node.returns.value, ast.Name) and func_node.returns.value.id == 'Annotated':
+                parsed_type, parsed_decorators = self._parse_annotated_type(func_node.returns)
+                return ReturnDef.of(parsed_type, parsed_decorators)
+            else:
+                # Resolve Java type names if this is a simple Name annotation
+                if isinstance(func_node.returns, ast.Name):
+                    type_name = func_node.returns.id
+                    # Check if this is a Java type that was imported
+                    resolved_type_name = self.java_type_assignments.get(type_name, type_name)
+                    return ReturnDef.of(resolved_type_name)
+                else:
+                    # Not Annotated, use full annotation
+                    try:
+                        type_annotation = ast.unparse(func_node.returns)
+                    except AttributeError:
+                        type_annotation = ast.dump(func_node.returns)
+                    return ReturnDef.of(type_annotation)
+
+        return ReturnDef.none()
 
 def is_property_decorator(funcdef):
     """
@@ -907,249 +1016,9 @@ def get_micronaut_annotation_value(name, funcdef):
             return None
     return None
 
-def _parse_annotated_type_static(annotation_node, visitor):
-    """
-    Parse a typing.Annotated type annotation and extract the actual type and metadata decorators.
-    Returns (type_annotation, decorators_list)
-    Static version that can be called from functions.
-    """
-    decorators = []
 
 
-    # Parse the Annotated subscript arguments
-    if isinstance(annotation_node, ast.Subscript):
-        # Check if it's Annotated[...]
-        if isinstance(annotation_node.value, ast.Name) and annotation_node.value.id == 'Annotated':
-            # Extract from AST nodes
-            args = _extract_subscript_args_static(annotation_node)
-            if args:
-                try:
-                    type_annotation = _extract_type_name_static(args[0])
-                except Exception as e:
-                    type_annotation = "object"  # fallback
-                # Remaining args are metadata
-                for metadata in args[1:]:
-                    if isinstance(metadata, ast.Call):
-                        decorator = _parse_metadata_call_static(metadata, visitor)
-                        if decorator:
-                            decorators.append(decorator)
-                    elif isinstance(metadata, ast.Name):
-                        # Handle simple decorator names like NotBlank or Inject
-                        decorator_reference = metadata.id
-                        decorator = visitor.to_decorator_from_reference(decorator_reference)
-                        decorators.append(decorator)
-                    elif isinstance(metadata, ast.Attribute):
-                        # Handle qualified decorator names like validation.NotBlank
-                        decorator_name = f"{metadata.value.id}.{metadata.attr}"
-                        decorator = DecoratorDef(decorator_name, decorator_name, None, {}, [])
-                        decorators.append(decorator)
-                    # For other metadata types (strings, numbers), we could handle them
-                    # but for now, focus on decorator names and calls
-                # Successfully parsed, return now
-                return type_annotation, decorators
-            else:
-                # Fallback to original annotation
-                try:
-                    type_annotation = ast.unparse(annotation_node) if hasattr(ast, 'unparse') else ast.dump(annotation_node)
-                except:
-                    type_annotation = "object"
-                return type_annotation, decorators
 
-    # Fallback to original annotation
-    try:
-        type_annotation = ast.unparse(annotation_node) if hasattr(ast, 'unparse') else ast.dump(annotation_node)
-    except:
-        type_annotation = "object"
-
-    return type_annotation, decorators
-
-def _extract_subscript_args_static(subscript_node):
-    """
-    Extract arguments from a subscript AST node.
-    Static version.
-    """
-    args = []
-    slice_node = subscript_node.slice
-
-    # Handle different slice formats
-    if isinstance(slice_node, ast.Index):  # Python < 3.9
-        slice_node = slice_node.value
-
-    if isinstance(slice_node, ast.Tuple):
-        args = slice_node.elts
-    elif slice_node:  # Single argument
-        args = [slice_node]
-
-    return args
-
-def _extract_type_name_static(type_node):
-    """
-    Extract a type name from an AST type node.
-    Static version.
-    """
-    if isinstance(type_node, ast.Name):
-        # Check if this is a Java type that was imported (passed via visitor parameter)
-        # For now, just return the id - the caller should handle resolution
-        return type_node.id
-    elif isinstance(type_node, ast.Attribute):
-        # Handle qualified names like typing.List
-        names = []
-        current = type_node
-        while isinstance(current, ast.Attribute):
-            names.insert(0, current.attr)
-            current = current.value
-        if isinstance(current, ast.Name):
-            names.insert(0, current.id)
-        return '.'.join(names)
-    elif hasattr(ast, 'unparse'):
-        return ast.unparse(type_node)
-    else:
-        return ast.dump(type_node)
-
-def _parse_metadata_call_static(call_node, visitor):
-    """
-    Parse a metadata call like Gt(0) into a DecoratorDef.
-    Static version.
-    """
-    if isinstance(call_node, ast.Call) and isinstance(call_node.func, ast.Name):
-        decorator_name = call_node.func.id
-        # Extract arguments
-        members = {}
-
-        # For positional args
-        for i, arg in enumerate(call_node.args):
-            try:
-                value = ast.literal_eval(arg)
-                # For positional args, use generic names or indices
-                # For validation constraints, typically the first arg is the value
-                if i == 0:
-                    members['value'] = value
-                else:
-                    members[f'arg{i}'] = value
-            except:
-                # Handle Name nodes (class references) specially
-                if isinstance(arg, ast.Name):
-                    value = arg.id
-                    if i == 0:
-                        members['value'] = value
-                    else:
-                        members[f'arg{i}'] = value
-                else:
-                    members[f'arg{i}'] = ast.dump(arg) if hasattr(ast, 'dump') else str(arg)
-
-        # For keyword args
-        for kw in call_node.keywords:
-            if kw.arg:
-                try:
-                    value = ast.literal_eval(kw.value)
-                    members[kw.arg] = value
-                except:
-                    # Handle Name nodes (class references) specially
-                    if isinstance(kw.value, ast.Name):
-                        value = kw.value.id
-                        members[kw.arg] = value
-                    else:
-                        members[kw.arg] = ast.dump(kw.value) if hasattr(ast, 'dump') else str(kw.value)
-
-        # Use visitor to look up known decorators
-        return visitor.to_decorator_from_reference_with_members(decorator_name, members)
-
-    return None
-
-def parse_function_arguments(func_node, visitor):
-    """
-    Parse the arguments of an ast.FunctionDef node and return ArgumentsDef.
-    """
-    args_list = func_node.args.args
-    defaults = func_node.args.defaults
-
-    # Only the last len(defaults) arguments have defaults
-    num_no_defaults = len(args_list) - len(defaults)
-    default_values = [None] * num_no_defaults + defaults
-
-    # Skip 'self' parameter for instance methods (methods inside classes)
-    # Check if this is an instance method by looking for a 'self' parameter
-    skip_self = (len(args_list) > 0 and args_list[0].arg == 'self')
-
-    # Extract parameter documentation from docstring
-    param_docs = extract_parameter_documentation(func_node)
-
-    arguments = []
-    for i, arg in enumerate(args_list):
-        arg_name = arg.arg
-
-        # Skip self parameter for instance methods
-        if skip_self and arg_name == 'self':
-            continue
-
-        # Extract type annotation if present
-        annotation = ""
-        type_annotation = ""
-        decorators = []
-        if hasattr(arg, 'annotation') and arg.annotation is not None:
-            try:
-                annotation = ast.unparse(arg.annotation)
-            except AttributeError:
-                annotation = ast.dump(arg.annotation)
-
-            # Check for typing.Annotated and extract decorators from metadata
-            if isinstance(arg.annotation, ast.Subscript) and isinstance(arg.annotation.value, ast.Name) and arg.annotation.value.id == 'Annotated':
-                parsed_type, parsed_decorators = _parse_annotated_type_static(arg.annotation, visitor)
-                type_annotation = parsed_type   # Use extracted type for typeAnnotation
-                decorators = parsed_decorators  # Add any decorators found
-            else:
-                # Resolve Java type names if this is a simple Name annotation
-                if isinstance(arg.annotation, ast.Name):
-                    type_name = arg.annotation.id
-                    # Check if this is a Java type that was imported
-                    resolved_type_name = visitor.java_type_assignments.get(type_name, type_name)
-                    type_annotation = resolved_type_name
-                else:
-                    type_annotation = annotation  # Not Annotated, use full annotation
-
-
-        # Get default value
-        default_value = default_values[i]
-        if default_value is not None:
-            try:
-                # Try to evaluate the value
-                default_value = ast.literal_eval(default_value)
-            except Exception:
-                # For non-literal defaults, keep as is or dump
-                default_value = ast.dump(default_value)
-
-        # Get parameter documentation
-        param_doc = param_docs.get(arg_name, None)
-
-        arguments.append(ArgumentDef.of(arg_name, annotation, type_annotation, default_value, decorators, param_doc))
-
-    return ArgumentsDef.of(arguments)
-
-def parse_function_return_type(func_node, visitor):
-    """
-    Parse the return type annotation of an ast.FunctionDef node and return a ReturnDef.
-    """
-    if hasattr(func_node, 'returns') and func_node.returns is not None:
-        # Check for typing.Annotated and extract decorators from metadata
-        if isinstance(func_node.returns, ast.Subscript) and isinstance(func_node.returns.value, ast.Name) and func_node.returns.value.id == 'Annotated':
-            parsed_type, parsed_decorators = _parse_annotated_type_static(func_node.returns, visitor)
-            return ReturnDef.of(parsed_type, parsed_decorators)
-        else:
-            # Resolve Java type names if this is a simple Name annotation
-            if isinstance(func_node.returns, ast.Name):
-                type_name = func_node.returns.id
-                # Check if this is a Java type that was imported
-                resolved_type_name = visitor.java_type_assignments.get(type_name, type_name)
-                return ReturnDef.of(resolved_type_name)
-            else:
-                # Not Annotated, use full annotation
-                try:
-                    type_annotation = ast.unparse(func_node.returns)
-                except AttributeError:
-                    type_annotation = ast.dump(func_node.returns)
-                return ReturnDef.of(type_annotation)
-
-    return ReturnDef.none()
 
 def extract_parameter_documentation(func_node):
     """
