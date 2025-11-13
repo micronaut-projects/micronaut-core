@@ -18,6 +18,7 @@ package io.micronaut.context.python;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
+import io.micronaut.core.util.StringUtils;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.HostAccess;
 import org.graalvm.polyglot.Source;
@@ -67,6 +68,8 @@ public class GraalPyContextFactory {
                     .resourceDirectory(APPLICATION_PATH)
                     .resourceLoadingClass(classLoader.loadClass(PYRONAUT_MAIN_CLASS)).build())
                 // restrict in future?
+                .option("python.ExposeInternalSources", StringUtils.TRUE)
+                .allowExperimentalOptions(true)
                 .allowHostAccess(HostAccess.ALL)
                 .allowHostClassLookup(name -> true)
                 .build();

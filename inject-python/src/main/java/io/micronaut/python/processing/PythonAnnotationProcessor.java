@@ -27,7 +27,9 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import javax.annotation.processing.ProcessingEnvironment;
@@ -186,19 +188,28 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                                 try (var writer = generatedFile.openWriter()) {
                                     writer.write(source.getCharacters().toString());
                                 } catch (IOException e) {
-                                    throw new ProcessingException(originatingElement, "Failed to write transformed Python code to META-INF", e);
+                                    throw new ProcessingException(originatingElement, "Failed to write Python code to [" + targetSource + "]: " + e.getMessage(), e);
                                 }
                             });
                     }
 
-                    exportedModules.forEach((path, types) -> {
-                        String initFilePath = APPLICATION_SRC_PATH + path.parent + "__init__.py";
+                    TreeSet<String> byParent = exportedModules.keySet().stream().map(pe -> pe.parent)
+                        .collect(Collectors.toCollection(TreeSet::new));
+                    for (String parent : byParent) {
+                        String initFilePath = APPLICATION_SRC_PATH + parent + "__init__.py";
                         StringBuilder initContent = new StringBuilder();
-                        if (!types.isEmpty()) {
-                            for (String type : types) {
-                                initContent.append("from .").append(NameUtils.filename(path.filename())).append(" import ").append(type).append('\n');
+                        List<Map.Entry<PathEntry, List<String>>> entries = exportedModules.entrySet().stream()
+                            .filter(entry -> entry.getKey().parent.equals(parent))
+                            .toList();
+                        for (Map.Entry<PathEntry, List<String>> entry : entries) {
+                            List<String> types = entry.getValue();
+                            String filename = entry.getKey().filename;
+                            if (!types.isEmpty()) {
+                                for (String type : types) {
+                                    initContent.append("from .").append(NameUtils.filename(filename)).append(" import ").append(type).append('\n');
+                                }
+                                initContent.append("\n__all__ = ").append(types).append("\n");
                             }
-                            initContent.append("\n__all__ = ").append(types).append("\n");
                         }
                         filesList.append("/META-INF/").append(initFilePath).append("\n");
                         javaVisitorContext.visitMetaInfFile(initFilePath, originatingElement)
@@ -206,12 +217,11 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                                 try (var writer = generatedFile.openWriter()) {
                                     writer.write(initContent.toString());
                                 } catch (IOException e) {
-                                    throw new ProcessingException(originatingElement, "Failed to write transformed Python code to META-INF", e);
+                                    throw new ProcessingException(originatingElement, "Failed to write Python code to [" + initFilePath + "]: " + e.getMessage(), e);
                                 }
                             });
-                    });
+                    }
                 }
-
             }
 
             // Create processing environment and visitor context
@@ -252,7 +262,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                         try (var writer = generatedFile.openWriter()) {
                             writer.write(mainPy);
                         } catch (IOException e) {
-                            throw new ProcessingException(originatingElement, "Failed to write transformed Python code to META-INF", e);
+                            throw new ProcessingException(originatingElement, "Failed to write Python code to [" + APPLICATION_LAUNCHER_PATH + "]: " + e.getMessage(), e);
                         }
                     });
             }
