@@ -2,6 +2,7 @@ package io.micronaut.python.annotation.processing.test.inject
 
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementSpec
+import io.micronaut.runtime.server.EmbeddedServer
 import jakarta.validation.Constraint
 import jakarta.validation.constraints.NotNull
 
@@ -10,14 +11,11 @@ class ConstructorInjectionSpec extends AbstractPythonTypeElementSpec {
         given: "Python code with constructor injection"
         def pythonCode = '''
 from jakarta.inject import Singleton
-#from micronaut.http.client import HttpClient
+from micronaut.http.client import HttpClient
 from micronaut.http.client.annotation import Client
 from jakarta.validation.constraints import NotNull
 from micronaut.context.annotation import Executable
 from typing import Annotated
-import java
-
-HttpClient = java.type("io.micronaut.http.client.HttpClient")
 
 @Singleton
 class MainService:
@@ -32,14 +30,19 @@ class MainService:
             return "has not client"
 '''
 
-        when: "Building ApplicationContext and getting the main service"
-        def context = buildContext(pythonCode)
-        def mainService = getBean(context, "python.MainService")
-        def defnition = getBeanDefinition(context, "python.MainService")
+        when: "Building ApplicationContext and getting the bean definition"
+        def context = buildContext(pythonCode, true)
+        context.getBean(EmbeddedServer).start()
 
-        then: "Constructor injection should work"
-        mainService.get_message() == "has clent"
-        defnition.constructor.arguments[0].getAnnotationMetadata().stringValue(Client).get() == '/'
+        def definition = getBeanDefinition(context, "python.MainService")
+        def bean = getBean(context, "python.MainService")
+
+        then: "Type should be resolved correctly"
+        // Check that the type annotation is correctly parsed
+        def argType = definition.constructor.arguments[0].type
+        argType.name == 'io.micronaut.http.client.HttpClient'
+        definition.constructor.arguments[0].getAnnotationMetadata().stringValue(Client).get() == '/'
+        bean.get_message() == "has client"
 
         cleanup: "Ensure context is properly closed"
         context?.close()

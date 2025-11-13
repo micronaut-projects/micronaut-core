@@ -11,9 +11,8 @@ from typing import Annotated
 # tag::class[]
 @MicronautTest # <1>
 class HelloClientSpec:
-    def __init__(self, server : EmbeddedServer, client : Annotated[HttpClient, Client("/")]):
-        self.server = server
-        self.client = client
+    server : Annotated[EmbeddedServer, Inject] # <1>
+    client : Annotated[HttpClient, Inject, Client("/")] # <2>
 
     @Test
     def test_hello_world_response(self) -> None:
