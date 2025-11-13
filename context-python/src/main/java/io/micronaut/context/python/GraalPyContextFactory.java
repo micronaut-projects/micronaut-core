@@ -68,8 +68,8 @@ public class GraalPyContextFactory {
                     .resourceDirectory(APPLICATION_PATH)
                     .resourceLoadingClass(classLoader.loadClass(PYRONAUT_MAIN_CLASS)).build())
                 // restrict in future?
-                .option("python.ExposeInternalSources", StringUtils.TRUE)
-                .allowExperimentalOptions(true)
+//                .option("python.ExposeInternalSources", StringUtils.TRUE)
+//                .allowExperimentalOptions(true)
                 .allowHostAccess(HostAccess.ALL)
                 .allowHostClassLookup(name -> true)
                 .build();
