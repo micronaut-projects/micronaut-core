@@ -31,9 +31,9 @@ import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.core.annotation.Generated;
 import io.micronaut.core.annotation.Vetoed;
 import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.sourcegen.model.AbstractElementBuilder;
 import io.micronaut.sourcegen.model.AnnotationDef;
 import org.graalvm.polyglot.Value;
@@ -135,7 +135,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             if (methodSet.contains(method)) {
                                 continue;
                             }
-                            addBridgeMethod(method, builder, pythonValue, context);
+                            addBridgeMethod(method, builder, pythonValue, context, false);
                             methodSet.add(method);
                         }
                     }
@@ -255,7 +255,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
 
                     for (MethodElement methodElement : methodsToBridge) {
-                        addBridgeMethod(methodElement, builder, pythonValue, context);
+                        addBridgeMethod(methodElement, builder, pythonValue, context, isJunit5Test);
                     }
 
                     // Find injection methods (annotated with @Inject)
@@ -326,6 +326,19 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             })));
                     }
 
+                    // Find static factory methods (annotated with @Creator)
+                    List<MethodElement> staticCreatorMethod = element.getEnclosedElements(
+                        ElementQuery.ALL_METHODS
+                            .onlyAccessible()
+                            .onlyStatic()
+                            .annotated(ann -> ann.hasStereotype("io.micronaut.core.annotation.Creator"))
+                    );
+
+                    // Generate static factory methods for @Creator methods
+                    for (MethodElement creatorMethod : staticCreatorMethod) {
+                        addCreatorFactoryMethod(creatorMethod, builder, element, context);
+                    }
+
                     // Find injection fields (with Annotated[Type, Inject] syntax)
                     // For now, we'll look for fields that have any annotation and check for Inject in metadata
                     List<PropertyElement> beanProperties = element.getBeanProperties();
@@ -362,11 +375,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         }
     }
 
-    private void addBridgeMethod(MethodElement methodElement, ClassDef.ClassDefBuilder builder, FieldDef pythonValue, VisitorContext visitorContext) {
+    private void addBridgeMethod(MethodElement methodElement, ClassDef.ClassDefBuilder builder, FieldDef pythonValue, VisitorContext visitorContext, boolean isJunit5Test) {
         String pythonFunctionName = methodElement.getName();
         MethodDef.MethodDefBuilder methodBuilder = MethodDef.builder(pythonFunctionName)
             .addModifiers(Modifier.PUBLIC)
-            .returns(TypeDef.of(methodElement.getReturnType()));
+            .returns(isJunit5Test ? TypeDef.Primitive.VOID : TypeDef.of(methodElement.getReturnType()));
 
         copyAnnotations(methodElement, methodBuilder, ANNOTATION_PACKAGES_TO_COPY, visitorContext);
         for (@NonNull ParameterElement parameter : methodElement.getParameters()) {
@@ -398,7 +411,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     parameters
                 );
 
-                return handleReturnType(returnType, invokedValue);
+                if (isJunit5Test) {
+                    return invokedValue;
+                } else {
+                    return handleReturnType(returnType, invokedValue);
+                }
             })));
     }
 
@@ -559,6 +576,52 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             genericType = ClassTypeDef.of(componentType).getStaticField("class", TypeDef.CLASS);
         }
         return genericType;
+    }
+
+    private void addCreatorFactoryMethod(MethodElement creatorMethod, ClassDef.ClassDefBuilder builder, ClassElement element, VisitorContext context) {
+        String pythonMethodName = creatorMethod.getName();
+        ClassTypeDef thisType = ClassTypeDef.of(element.getName());
+
+        MethodDef.MethodDefBuilder factoryMethodBuilder = MethodDef.builder(pythonMethodName)
+            .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+            .returns(thisType);
+
+        // Add parameters
+        for (int i = 0; i < creatorMethod.getParameters().length; i++) {
+            @NonNull ParameterElement parameter = creatorMethod.getParameters()[i];
+            // first parameter in Python is the class, skip it
+            if (i == 0) {
+                continue;
+            }
+            var parameterType = TypeDef.of(parameter.getType());
+            ParameterDef parameterDef = ParameterDef
+                .builder(parameter.getName(), parameterType).build();
+            factoryMethodBuilder.addParameter(parameterDef);
+        }
+
+        builder.addMethod(factoryMethodBuilder
+            .build(((aThis, methodParameters) -> {
+                // Call the Python static method via CONTEXT_HOLDER
+                List<ExpressionDef> arguments = new ArrayList<>();
+                arguments.add(ExpressionDef.constant(element.getPackageName()));
+                arguments.add(ExpressionDef.constant(element.getSimpleName()));
+                arguments.add(ExpressionDef.constant(pythonMethodName));
+
+                // Add method parameters
+                for (VariableDef.MethodParameter methodParam : methodParameters) {
+                    arguments.add(methodParam);
+                }
+
+                // Call invokeStaticMethod and convert the result
+                ExpressionDef pythonResult = CONTEXT_HOLDER.invokeStatic(
+                    "invokeStaticMethod",
+                    POLYGLOT_VALUE,
+                    arguments
+                );
+
+                // Convert the result back to the Java type
+                return thisType.invokeStatic(FROM_POLYGLOT_VALUE, POLYGLOT_VALUE, pythonResult).returning();
+            })));
     }
 
     private static StatementDef convertPrimitive(ClassElement returnType, ExpressionDef.InvokeInstanceMethod invokedValue) {

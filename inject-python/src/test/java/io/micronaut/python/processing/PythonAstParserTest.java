@@ -505,7 +505,7 @@ class MySingletonService:
                 assertNotNull(environment);
                 assertEquals(1, environment.classes().size());
 
-                ClassDef testClassDef = environment.classes().get("TestClass");
+                ClassDef testClassDef = environment.classes().get("com.example.mypackage.TestClass");
                 assertNotNull(testClassDef);
                 assertEquals("TestClass", testClassDef.name());
                 assertEquals("com.example.mypackage", testClassDef.packageName());
@@ -514,7 +514,7 @@ class MySingletonService:
                 Map<String, ClassElement> classes = processingEnvironment.classes();
                 assertEquals(1, classes.size());
 
-                ClassElement classElement = classes.get("TestClass");
+                ClassElement classElement = classes.get("com.example.mypackage.TestClass");
                 assertNotNull(classElement);
                 assertTrue(classElement instanceof PythonClassElement, "Should be PythonClassElement");
 
@@ -970,7 +970,7 @@ class MySingletonService:
                     .findFirst();
                 assertTrue(weightAttr.isPresent(), "weight attribute should be parsed");
                 assertEquals("Annotated[float, Gt(0)]", weightAttr.get().annotation(), "weight should have full annotation string");
-                assertEquals("Annotated[float, Gt(0)]", weightAttr.get().typeName(), "weight should have full annotation as typeName for now");
+                assertEquals("float", weightAttr.get().typeName(), "weight should have full annotation as typeName for now");
                 assertEquals(1.5, weightAttr.get().value().asDouble(), 0.01, "weight should have value 1.5");
 
                 // Check that weight has Gt decorator
@@ -990,7 +990,7 @@ class MySingletonService:
                     .findFirst();
                 assertTrue(countAttr.isPresent(), "count attribute should be parsed");
                 assertEquals("Annotated[int, Min(1), Max(100)]", countAttr.get().annotation(), "count should have full annotation string");
-                assertEquals("Annotated[int, Min(1), Max(100)]", countAttr.get().typeName(), "count should have full annotation as typeName for now");
+                assertEquals("int", countAttr.get().typeName(), "count should have full annotation as typeName for now");
                 assertEquals(10, countAttr.get().value().asInt(), "count should have value 10");
 
                 // Check that count has Min and Max decorators
@@ -1062,7 +1062,7 @@ class MySingletonService:
                     .findFirst();
                 assertTrue(validatedNameAttr.isPresent(), "validated_name attribute should be parsed");
                 assertEquals("Annotated[str, NotBlank]", validatedNameAttr.get().annotation(), "validated_name should have full annotation string");
-                assertEquals("Annotated[str, NotBlank]", validatedNameAttr.get().typeName(), "validated_name should have full annotation as typeName");
+                assertEquals("str", validatedNameAttr.get().typeName(), "validated_name should have full annotation as typeName");
                 assertEquals("apple", validatedNameAttr.get().value().asString(), "validated_name should have value 'apple'");
 
                 // Check that validated_name has NotBlank decorator

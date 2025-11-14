@@ -118,4 +118,44 @@ class MainService:
         cleanup: "Ensure context is properly closed"
         context?.close()
     }
+
+    void "test factory method injection with @Creator"() {
+        given: "Python code with factory method injection"
+        def pythonCode = '''
+from jakarta.inject import Singleton
+from micronaut.core.annotation import Creator
+from typing import Annotated
+from dataclasses import dataclass
+from micronaut.context.annotation import Executable
+
+@dataclass
+@Singleton
+class Engine:
+    cylinders: int
+
+    @classmethod
+    @Creator
+    def get_default(cls) -> "Engine":
+        return cls(8)
+
+@Singleton
+class CarService:
+    def __init__(self, engine: Engine):
+        self.engine = engine
+
+    @Executable
+    def get_engine_cylinders(self) -> int:
+        return self.engine.cylinders
+'''
+
+        when: "Building ApplicationContext and getting the car service"
+        def context = buildContext(pythonCode)
+        def carService = getBean(context, "python.CarService")
+
+        then: "Factory method injection should work"
+        carService.get_engine_cylinders() == 8
+
+        cleanup: "Ensure context is properly closed"
+        context?.close()
+    }
 }

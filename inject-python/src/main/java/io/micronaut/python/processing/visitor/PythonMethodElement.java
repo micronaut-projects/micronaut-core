@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -103,12 +104,16 @@ public sealed class PythonMethodElement extends AbstractPythonElement implements
         return false;
     }
 
-
-
     @Override
     public boolean isReflectionRequired(ClassElement callingType) {
         // since we are in charge of Python stub generation, this doesn't make sense
         return false;
+    }
+
+    @Override
+    public boolean isStatic() {
+        // Use the isStatic field from FunctionDef which is set during parsing
+        return getNativeType().isStatic();
     }
 
     /**
@@ -186,14 +191,15 @@ public sealed class PythonMethodElement extends AbstractPythonElement implements
 
     private ParameterElement[] createParameters(FunctionDef functionDef) {
         List<ArgumentDef> arguments = functionDef.arguments().arguments();
-        ParameterElement[] parameters = new ParameterElement[arguments.size()];
+        boolean isStatic = functionDef.isStatic();
+        List<ParameterElement> parameters = new ArrayList<>(isStatic ? arguments.size() - 1: arguments.size());
 
-        for (int i = 0; i < arguments.size(); i++) {
+        for (int i = isStatic  ? 1 : 0; i < arguments.size(); i++) {
             ArgumentDef argDef = arguments.get(i);
-            parameters[i] = new PythonParameterElement(argDef, environment, this, getElementAnnotationMetadataFactory());
+            parameters.add(new PythonParameterElement(argDef, environment, this, getElementAnnotationMetadataFactory()));
         }
 
-        return parameters;
+        return parameters.toArray(ParameterElement.ZERO_PARAMETER_ELEMENTS);
     }
 
     @Override
