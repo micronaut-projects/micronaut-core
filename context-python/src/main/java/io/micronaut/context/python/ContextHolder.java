@@ -73,7 +73,7 @@ public final class ContextHolder {
      * Create a new instance for the given simple name and args.
      *
      * @param simpleName  The simple name
-     * @param args        T he args
+     * @param args        The args
      * @return The new instance
      */
     public static Value newInstance(String simpleName, Object... args) {
@@ -89,6 +89,49 @@ public final class ContextHolder {
             }
             return member
                 .newInstance(args);
+        }
+    }
+
+    /**
+     * Invoke a static method on the given Python class.
+     *
+     * @param packageName The package name
+     * @param simpleName  The simple class name
+     * @param methodName  The method name
+     * @param args        The method arguments
+     * @return The method result
+     */
+    public static Value invokeStaticMethod(String packageName, String simpleName, String methodName, Object... args) {
+        if (packageName == null || GraalPyContextFactory.PYTHON.equals(packageName)) {
+            return invokeStaticMethod(simpleName, methodName, args);
+        } else {
+            Context ctx = getContext();
+            Value pythonClass = ctx.eval(GraalPyContextFactory.PYTHON, "from " + packageName + " import " + simpleName + "; " + simpleName);
+            return pythonClass.invokeMember(methodName, args);
+        }
+    }
+
+    /**
+     * Invoke a static method on the given Python class.
+     *
+     * @param simpleName  The simple name
+     * @param methodName The method name
+     * @param args        The args
+     * @return The new instance
+     */
+    public static Value invokeStaticMethod(String simpleName, String methodName, Object... args) {
+        Context ctx = getContext();
+        Value v = ctx.getBindings(GraalPyContextFactory.PYTHON).getMember(simpleName);
+        if (v != null) {
+            return v.invokeMember(methodName);
+        } else {
+            Value member = ctx.eval(GraalPyContextFactory.PYTHON, "import " + simpleName + "; " + simpleName)
+                .getMember(simpleName);
+            if (member == null) {
+                throw new InstantiationException("Cannot find Python class: " + simpleName);
+            }
+            return member
+                .invokeMember(methodName, args);
         }
     }
 

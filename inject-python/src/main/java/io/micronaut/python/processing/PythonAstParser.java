@@ -69,7 +69,8 @@ public final class PythonAstParser {
         Value bindings = context.getBindings(PYTHON);
         bindings.putMember("callback", (Function<Object, Object>) o -> {
             if (o instanceof ClassDef classDef) {
-                classes.put(classDef.name(), classDef);
+                String qualifiedName = resolveQualifiedName(packageName, classDef);
+                classes.put(qualifiedName, classDef);
             } else if (o instanceof DecoratorDef decoratorDef) {
                 decorators.put(decoratorDef.annotationName(), decoratorDef);
             }
@@ -87,6 +88,14 @@ public final class PythonAstParser {
             decorators,
             context
         );
+    }
+
+    private static @NotNull String resolveQualifiedName(String packageName, ClassDef classDef) {
+        String qualifiedName = classDef.name();
+        if (!StringUtils.isEmpty(packageName)) {
+            qualifiedName = packageName + "." + qualifiedName;
+        }
+        return qualifiedName;
     }
 
     /**
@@ -115,7 +124,8 @@ public final class PythonAstParser {
         Value bindings = context.getBindings(PYTHON);
         bindings.putMember("callback", (Function<Object, Object>) o -> {
             if (o instanceof ClassDef classDef) {
-                classes.put(classDef.name(), classDef);
+                String qualifiedName = resolveQualifiedName(classDef.packageName(), classDef);
+                classes.put(qualifiedName, classDef);
             } else if (o instanceof DecoratorDef decoratorDef) {
                 decorators.put(decoratorDef.annotationName(), decoratorDef);
             }

@@ -54,6 +54,21 @@ public final class PythonClassElement extends AbstractPythonClassElement {
 
     @Override
     public Optional<MethodElement> getPrimaryConstructor() {
+        // First check for @Creator methods (static factory methods)
+        List<FunctionDef> functions = getNativeType().functions();
+        for (FunctionDef function : functions) {
+            if (function.isStatic()) {
+                // Check if this static method has @Creator annotation
+                for (DecoratorDef decorator : function.decorators()) {
+                    if ("Creator".equals(decorator.name()) ||
+                        "io.micronaut.core.annotation.Creator".equals(decorator.annotationName())) {
+                        return Optional.of(new PythonMethodElement(function, environment, this, this, environment.metadataFactory()));
+                    }
+                }
+            }
+        }
+
+        // Fall back to regular constructor
         FunctionDef constructor = getNativeType().constructor();
         if (constructor != null) {
             return Optional.of(new PythonConstructorElement(constructor, environment, this, this, environment.metadataFactory()));

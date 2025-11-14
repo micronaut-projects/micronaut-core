@@ -44,6 +44,20 @@ def is_abstract_method(funcdef):
             return True
     return False
 
+def is_static_method(func_node):
+    """
+    Check if a function node represents a static method (has @staticmethod or @classmethod decorator).
+    """
+    for decorator in func_node.decorator_list:
+        if isinstance(decorator, ast.Name):
+            if decorator.id in ("staticmethod", "classmethod"):
+                return True
+        elif isinstance(decorator, ast.Attribute):
+            if decorator.attr in ("staticmethod", "classmethod"):
+                return True
+    return False
+
+
 class PrintNodeVisitor(ast.NodeVisitor):
 
     def __init__(self, callback, package_name="", visitor_context=None):
@@ -59,10 +73,15 @@ class PrintNodeVisitor(ast.NodeVisitor):
         self.last_attribute = None  # Track last processed attribute for docstring handling
         self.in_function = False  # Track if we're inside a function definition
         self.java_type_assignments = {}  # Track java.type() assignments: variable_name -> full_qualified_name
+        self.imported_types = {}  # Track imported types: simple_name -> full_qualified_name
+        self.local_classes = set()  # Track class names defined in this file
 
     def visit(self, node: ast.AST) -> ast.AST:
         match node:
             case ast.ClassDef():
+                # Track class names for local type resolution
+                self.local_classes.add(node.name)
+
                 # Capture all decorator names, not just Micronaut annotations
                 # This allows us to detect @dataclass and other non-Micronaut decorators
                 decorators = []
@@ -82,8 +101,8 @@ class PrintNodeVisitor(ast.NodeVisitor):
                 bases = []
                 for base in node.bases:
                     if isinstance(base, ast.Name):
-                        # Check if this is a Java type that was imported
-                        base_name = self.java_type_assignments.get(base.id, base.id)
+                        # Resolve type names (including imported types)
+                        base_name = self._extract_type_name(base)
                         bases.append(base_name)
                     elif isinstance(base, ast.Attribute):
                         # Handle qualified names like module.Class
@@ -218,8 +237,9 @@ class PrintNodeVisitor(ast.NodeVisitor):
 
                         # Check if function is abstract
                         is_abstract = is_abstract_method(node)
+                        is_static = is_static_method(node)
 
-                        func_def = JavaFuncDef(node.name, arguments, decorators, return_type, "", [], func_doc, is_abstract)
+                        func_def = JavaFuncDef(node.name, arguments, decorators, return_type, "", [], func_doc, is_abstract, is_static)
                         if self.current_class is not None:
                             if node.name == "__init__":
                                 # Set as constructor
@@ -241,6 +261,50 @@ class PrintNodeVisitor(ast.NodeVisitor):
                 if self.current_class is not None:
                     self._handle_ann_assign(node)
                 return node
+            case ast.ImportFrom():
+                # Track imported types for name resolution
+                if node.module:
+                    for alias in node.names:
+                        # Handle relative imports
+                        java_module = node.module
+                        is_relative = node.level > 0
+                        if is_relative:
+                            # Relative import: resolve relative to current package
+                            relative_module = node.module.lstrip('.')
+                            if relative_module:
+                                # from .Module import Class -> current_package.Module
+                                java_module = f"{self.package_name}.{relative_module}"
+                            else:
+                                # from . import Class -> current_package
+                                java_module = self.package_name
+                        else:
+                            # Absolute import: map Python import modules to Java packages
+                            # Micronaut packages (micronaut.*) need 'io.' prefix added back
+                            # Other packages (jakarta.*, user packages) keep their names
+                            if not node.module.startswith('io.') and node.module.startswith('micronaut.'):
+                                java_module = f"io.{node.module}"
+
+                        # For relative imports, the full name is the module path
+                        # For absolute imports, the full name is module.name
+                        if is_relative:
+                            full_name = java_module
+                        else:
+                            full_name = f"{java_module}.{alias.name}"
+
+                        if alias.asname:
+                            self.imported_types[alias.asname] = full_name
+                        else:
+                            self.imported_types[alias.name] = full_name
+                return super().visit(node)
+            case ast.Import():
+                # Track imported modules/types for name resolution
+                for alias in node.names:
+                    if alias.asname:
+                        self.imported_types[alias.asname] = alias.name
+                    else:
+                        # For 'import module', the module name becomes available
+                        self.imported_types[alias.name] = alias.name
+                return super().visit(node)
             case ast.Expr():
                 # Handle potential field docstrings - string literals that follow attribute assignments
                 if self.current_class is not None and self.last_attribute is not None:
@@ -480,9 +544,42 @@ class PrintNodeVisitor(ast.NodeVisitor):
     def _extract_type_name(self, type_node):
         """
         Extract a type name from an AST type node.
+        Handles quoted strings by unquoting them and qualifying local class names.
         """
-        if isinstance(type_node, ast.Name):
+        if isinstance(type_node, ast.Constant):
+            # Handle string literals like 'Engine' or "Engine"
+            if isinstance(type_node.value, str):
+                type_name = type_node.value
+                # Check if this is a local class and qualify it
+                if type_name in self.local_classes:
+                    return f"{self.package_name}.{type_name}"
+                # Check if this is an imported type
+                imported_name = self.imported_types.get(type_name)
+                if imported_name:
+                    return imported_name
+                # Check if this is a Java type that was imported
+                return self.java_type_assignments.get(type_name, type_name)
+        elif isinstance(type_node, ast.Str):
+            # Handle older Python versions with ast.Str
+            type_name = type_node.s
+            # Check if this is a local class and qualify it
+            if type_name in self.local_classes:
+                return f"{self.package_name}.{type_name}"
+            # Check if this is an imported type
+            imported_name = self.imported_types.get(type_name)
+            if imported_name:
+                return imported_name
             # Check if this is a Java type that was imported
+            return self.java_type_assignments.get(type_name, type_name)
+        elif isinstance(type_node, ast.Name):
+            # Check if this is an imported type first
+            imported_name = self.imported_types.get(type_node.id)
+            if imported_name:
+                return imported_name
+            # Check if this is a local class
+            if type_node.id in self.local_classes:
+                return f"{self.package_name}.{type_node.id}"
+            # Then check if this is a Java type that was imported
             return self.java_type_assignments.get(type_node.id, type_node.id)
         elif isinstance(type_node, ast.Attribute):
             # Handle qualified names like typing.List
@@ -590,8 +687,9 @@ class PrintNodeVisitor(ast.NodeVisitor):
         ]
 
         is_abstract = is_abstract_method(func_node)
+        is_static = is_static_method(func_node)
 
-        func_def = JavaFuncDef(func_node.name, arguments, decorators, return_type_annotation, "", [], func_doc, is_abstract)
+        func_def = JavaFuncDef(func_node.name, arguments, decorators, return_type_annotation, "", [], func_doc, is_abstract, is_static)
 
         # Update the property based on type
         if property_type == "getter":
@@ -685,14 +783,8 @@ class PrintNodeVisitor(ast.NodeVisitor):
                     type_annotation = parsed_type   # Use extracted type for typeAnnotation
                     decorators = parsed_decorators  # Add any decorators found
                 else:
-                    # Resolve Java type names if this is a simple Name annotation
-                    if isinstance(arg.annotation, ast.Name):
-                        type_name = arg.annotation.id
-                        # Check if this is a Java type that was imported
-                        resolved_type_name = self.java_type_assignments.get(type_name, type_name)
-                        type_annotation = resolved_type_name
-                    else:
-                        type_annotation = annotation  # Not Annotated, use full annotation
+                    # Resolve type names (including imported types)
+                    type_annotation = self._extract_type_name(arg.annotation)
 
 
             # Get default value
@@ -722,19 +814,9 @@ class PrintNodeVisitor(ast.NodeVisitor):
                 parsed_type, parsed_decorators = self._parse_annotated_type(func_node.returns)
                 return ReturnDef.of(parsed_type, parsed_decorators)
             else:
-                # Resolve Java type names if this is a simple Name annotation
-                if isinstance(func_node.returns, ast.Name):
-                    type_name = func_node.returns.id
-                    # Check if this is a Java type that was imported
-                    resolved_type_name = self.java_type_assignments.get(type_name, type_name)
-                    return ReturnDef.of(resolved_type_name)
-                else:
-                    # Not Annotated, use full annotation
-                    try:
-                        type_annotation = ast.unparse(func_node.returns)
-                    except AttributeError:
-                        type_annotation = ast.dump(func_node.returns)
-                    return ReturnDef.of(type_annotation)
+                # Resolve type names (including imported types)
+                type_annotation = self._extract_type_name(func_node.returns)
+                return ReturnDef.of(type_annotation)
 
         return ReturnDef.none()
 
@@ -783,9 +865,14 @@ def decorator_to_function(visitor, node):
                 resolved_members = {}
                 for key, value in members.items():
                     if isinstance(value, str):
-                        # Check if this is a Java type that was imported
-                        resolved_value = visitor.java_type_assignments.get(value, value)
-                        resolved_members[key] = resolved_value
+                        # Check imported types first
+                        imported_name = visitor.imported_types.get(value)
+                        if imported_name:
+                            resolved_members[key] = imported_name
+                        else:
+                            # Check if this is a Java type that was imported
+                            resolved_value = visitor.java_type_assignments.get(value, value)
+                            resolved_members[key] = resolved_value
                     else:
                         resolved_members[key] = value
                 return DecoratorDef(decorator_name, decorator_name, None, resolved_members, [])
@@ -800,9 +887,14 @@ def convert_ast_value(node, visitor=None):
     """
     # Handle different AST node types first, before trying ast.literal_eval
     if isinstance(node, ast.Name):
-        # Class references - check if this is a Java type that should be resolved
+        # Class references - check if this is a type that should be resolved
         name = node.id
         if visitor is not None:
+            # Check imported types first
+            imported_name = visitor.imported_types.get(name)
+            if imported_name:
+                return imported_name
+            # Then check Java type assignments
             resolved_name = visitor.java_type_assignments.get(name, name)
             return resolved_name
         else:

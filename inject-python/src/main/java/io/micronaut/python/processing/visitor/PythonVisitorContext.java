@@ -189,15 +189,17 @@ public class PythonVisitorContext implements VisitorContext {
     @Override
     public Optional<io.micronaut.inject.ast.ClassElement> getClassElement(String name) {
         // First try to find in Python environment
-        Map<String, ClassElement> classes = processingEnvironment.classes();
-        io.micronaut.inject.ast.ClassElement pythonClass = classes.get(name);
-        String defaultPackage = PythonClassElement.PYTHON_DEFAULT_PACKAGE + '.';
-        if (pythonClass == null && name.startsWith(defaultPackage)) {
-            // try default package
-            pythonClass = classes.get(name.substring(defaultPackage.length()));
-        }
-        if (pythonClass != null) {
-            return Optional.of(pythonClass);
+        if (!name.startsWith("java.") && !name.startsWith("javax.")) {
+            Map<String, ClassElement> classes = processingEnvironment.classes();
+            io.micronaut.inject.ast.ClassElement pythonClass = classes.get(name);
+            String defaultPackage = PythonClassElement.PYTHON_DEFAULT_PACKAGE + '.';
+            if (pythonClass == null && name.startsWith(defaultPackage)) {
+                // try default package
+                pythonClass = classes.get(name.substring(defaultPackage.length()));
+            }
+            if (pythonClass != null) {
+                return Optional.of(pythonClass);
+            }
         }
         // Fallback to Java visitor context
         if (javaVisitorContext != null) {
