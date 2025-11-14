@@ -376,6 +376,16 @@ class PrintNodeVisitor(ast.NodeVisitor):
                         type_name = parsed_annotation   # Use extracted type for typeName
                         decorators = parsed_decorators  # Add any decorators found
 
+                        # Check if the parsed type annotation is nullable and add @Nullable decorator
+                        if self._is_nullable_type_annotation(parsed_annotation):
+                            nullable_decorator = DecoratorDef("Nullable", "jakarta.annotation.Nullable", None, {}, [])
+                            decorators.append(nullable_decorator)
+                else:
+                    # For non-Annotated types, check if the type itself is nullable
+                    if self._is_nullable_union_type(node.annotation):
+                        nullable_decorator = DecoratorDef("Nullable", "jakarta.annotation.Nullable", None, {}, [])
+                        decorators.append(nullable_decorator)
+
                 # Determine if static (heuristic)
                 # For Micronaut properties, treat annotated attributes as instance fields
                 is_static = False
@@ -591,10 +601,60 @@ class PrintNodeVisitor(ast.NodeVisitor):
             if isinstance(current, ast.Name):
                 names.insert(0, current.id)
             return '.'.join(names)
+        elif isinstance(type_node, ast.BinOp) and isinstance(type_node.op, ast.BitOr):
+            # Handle union types like X | Y, extract non-None types
+            return self._extract_union_type(type_node)
         elif hasattr(ast, 'unparse'):
             return ast.unparse(type_node)
         else:
             return ast.dump(type_node)
+
+    def _extract_union_type(self, type_node):
+        """
+        Extract type from union, removing None types.
+        For unions like X | Y | None, returns X | Y.
+        For unions like X | None, returns X.
+        """
+        if isinstance(type_node, ast.BinOp) and isinstance(type_node.op, ast.BitOr):
+            left = self._extract_union_type(type_node.left)
+            right = self._extract_union_type(type_node.right)
+            types = []
+            if left and left != 'None':
+                types.append(left)
+            if right and right != 'None':
+                types.append(right)
+            return ' | '.join(types) if types else 'object'
+        else:
+            return self._extract_type_name(type_node)
+
+    def _is_nullable_union_type(self, type_node):
+        """
+        Check if type annotation represents a nullable union type.
+        Returns True if the type contains None in a union.
+        """
+        if isinstance(type_node, ast.BinOp) and isinstance(type_node.op, ast.BitOr):
+            left_nullable = self._is_nullable_union_type(type_node.left)
+            right_nullable = self._is_nullable_union_type(type_node.right)
+            if left_nullable or right_nullable:
+                return True
+            left = self._extract_type_name(type_node.left)
+            right = self._extract_type_name(type_node.right)
+            return left == 'None' or right == 'None'
+        elif isinstance(type_node, ast.Name):
+            return type_node.id == 'None'
+        elif isinstance(type_node, ast.Constant) and type_node.value is None:
+            return True
+        return False
+
+    def _is_nullable_type_annotation(self, type_annotation_str):
+        """
+        Check if a type annotation string represents a nullable type.
+        This checks the string representation for union types containing None.
+        """
+        if not isinstance(type_annotation_str, str):
+            return False
+        # Check for union types like "HelperService | None"
+        return ' | None' in type_annotation_str or type_annotation_str == 'None'
 
     def _parse_metadata_call(self, call_node):
         """
@@ -785,6 +845,11 @@ class PrintNodeVisitor(ast.NodeVisitor):
                 else:
                     # Resolve type names (including imported types)
                     type_annotation = self._extract_type_name(arg.annotation)
+
+                # Check for nullable union types and add @Nullable decorator
+                if self._is_nullable_union_type(arg.annotation):
+                    nullable_decorator = DecoratorDef("Nullable", "jakarta.annotation.Nullable", None, {}, [])
+                    decorators.append(nullable_decorator)
 
 
             # Get default value

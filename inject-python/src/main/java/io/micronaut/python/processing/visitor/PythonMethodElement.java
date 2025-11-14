@@ -25,6 +25,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.annotation.MethodElementAnnotationsHelper;
@@ -186,7 +187,7 @@ public sealed class PythonMethodElement extends AbstractPythonElement implements
             return baseType;
         }
         // Fall back to void/Object
-        return environment.visitorContext().getClassElement(Object.class).orElse(ClassElement.of(Object.class));
+        return PrimitiveElement.VOID;
     }
 
     private ParameterElement[] createParameters(FunctionDef functionDef) {

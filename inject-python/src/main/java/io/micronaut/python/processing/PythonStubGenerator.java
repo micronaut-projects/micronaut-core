@@ -198,7 +198,17 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                     @NonNull ParameterElement parameter = parameters[i];
                                     VariableDef.MethodParameter methodParameter = methodParameters.get(i);
                                     if (parameter.getType() instanceof PythonClassElement) {
-                                        arguments.add(methodParameter.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE));
+                                        if (parameter.hasAnnotation("jakarta.annotation.Nullable")) {
+                                            // Handle nullable Python class parameters
+                                            arguments.add(
+                                                methodParameter.isNull().doIfElse(
+                                                    ExpressionDef.nullValue(),
+                                                    methodParameter.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE)
+                                                )
+                                            );
+                                        } else {
+                                            arguments.add(methodParameter.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE));
+                                        }
                                     } else {
                                         arguments.add(methodParameter);
                                     }
