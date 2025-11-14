@@ -1,5 +1,4 @@
 from jakarta.inject import Singleton, Inject
-from typing import Annotated
 
 @Singleton
 class Engine:
@@ -8,9 +7,13 @@ class Engine:
 
 @Singleton
 class Vehicle:
-    engine : Annotated[Engine, Inject] # <1>
+    def __init__(self):
+        self.engine = None
+
+    @Inject
+    def initialize(self, engine: Engine): # <1>
+        self.engine = engine
 
     def start(self) -> str:
         return self.engine.start()
-
 
