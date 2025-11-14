@@ -44,7 +44,6 @@ public final class PropertyElementAnnotationMetadata implements ElementAnnotatio
 
     private final io.micronaut.inject.ast.Element thisElement;
     private final List<MutableAnnotationMetadataDelegate<?>> writeElements;
-    private final AnnotationMetadata propertyAnnotationMetadata;
     private final AnnotationMetadata propertyReadAnnotationMetadata;
     private final AnnotationMetadata propertyWriteAnnotationMetadata;
 
@@ -58,36 +57,35 @@ public final class PropertyElementAnnotationMetadata implements ElementAnnotatio
                                              FieldElement field,
                                              @Nullable
                                              ParameterElement constructorParameter,
-                                             @Nullable AnnotationMetadata recordComponentAnnotationMetadata,
+                                             @Nullable AnnotationMetadata propertyComponentAnnotationMetadata,
                                              boolean includeSynthetic) {
 
         this.thisElement = thisElement;
-        List<AnnotationMetadata> elements = new ArrayList<>(3);
-        List<AnnotationMetadata> readElements = new ArrayList<>(3);
         List<MutableAnnotationMetadataDelegate<?>> writeElements = new ArrayList<>(3);
-        if (recordComponentAnnotationMetadata != null) {
-            elements.add(recordComponentAnnotationMetadata);
-            readElements.add(recordComponentAnnotationMetadata);
+        List<AnnotationMetadata> readElements = new ArrayList<>(3);
+        if (propertyComponentAnnotationMetadata != null) {
+            readElements.add(propertyComponentAnnotationMetadata);
         }
         if (setter != null && (!setter.isSynthetic() || includeSynthetic)) {
-            elements.add(setter.getMethodAnnotationMetadata());
             writeElements.add(setter.getMethodAnnotationMetadata());
+            readElements.add(setter.getMethodAnnotationMetadata());
             ParameterElement[] parameters = setter.getParameters();
             if (parameters.length > 0) {
                 ParameterElement parameter = parameters[0];
                 MutableAnnotationMetadataDelegate<?> typeAnnotationMetadata = parameter.getType().getTypeAnnotationMetadata();
                 if (!typeAnnotationMetadata.isEmpty()) {
-                    elements.add(typeAnnotationMetadata);
                     writeElements.add(typeAnnotationMetadata);
+                    readElements.add(typeAnnotationMetadata);
                 }
             }
         }
         if (constructorParameter != null) {
-            elements.add(constructorParameter);
+            writeElements.add(constructorParameter);
+            readElements.add(constructorParameter);
             MutableAnnotationMetadataDelegate<?> typeAnnotationMetadata = constructorParameter.getType().getTypeAnnotationMetadata();
             if (!typeAnnotationMetadata.isEmpty()) {
-                elements.add(typeAnnotationMetadata);
                 writeElements.add(typeAnnotationMetadata);
+                readElements.add(typeAnnotationMetadata);
             }
         }
         if (field != null && (!field.isSynthetic() || includeSynthetic)) {
@@ -106,12 +104,10 @@ public final class PropertyElementAnnotationMetadata implements ElementAnnotatio
                     }
                 }
             } else {
-                elements.add(field);
                 writeElements.add(field);
                 readElements.add(field);
                 MutableAnnotationMetadataDelegate<?> typeAnnotationMetadata = field.getType().getTypeAnnotationMetadata();
                 if (!typeAnnotationMetadata.isEmpty()) {
-                    elements.add(typeAnnotationMetadata);
                     writeElements.add(typeAnnotationMetadata);
                     readElements.add(typeAnnotationMetadata);
                 }
@@ -119,23 +115,20 @@ public final class PropertyElementAnnotationMetadata implements ElementAnnotatio
         }
 
         if (getter != null && (!getter.isSynthetic() || includeSynthetic)) {
-            elements.add(getter.getMethodAnnotationMetadata());
+            writeElements.add(getter.getMethodAnnotationMetadata());
             readElements.add(getter.getMethodAnnotationMetadata());
             MutableAnnotationMetadataDelegate<?> typeAnnotationMetadata = getter.getReturnType().getTypeAnnotationMetadata();
             if (!typeAnnotationMetadata.isEmpty()) {
-                elements.add(typeAnnotationMetadata);
+                writeElements.add(typeAnnotationMetadata);
                 readElements.add(typeAnnotationMetadata);
             }
         }
 
         // The instance AnnotationMetadata of each element can change after a modification
         // Set annotation metadata as actual elements so the changes are reflected
-        AnnotationMetadata[] hierarchy = elements.toArray(AnnotationMetadata[]::new);
-        this.propertyAnnotationMetadata =
-            hierarchy.length == 1 ? hierarchy[0] : new AnnotationMetadataHierarchy(true, hierarchy);
-        AnnotationMetadata[] readHierarchy = readElements.toArray(AnnotationMetadata[]::new);
+        AnnotationMetadata[] hierarchy = readElements.toArray(AnnotationMetadata[]::new);
         this.propertyReadAnnotationMetadata =
-            readHierarchy.length == 1 ? readHierarchy[0] : new AnnotationMetadataHierarchy(true, readHierarchy);
+            hierarchy.length == 1 ? hierarchy[0] : new AnnotationMetadataHierarchy(true, hierarchy);
         AnnotationMetadata[] writeHierarchy = writeElements.toArray(AnnotationMetadata[]::new);
         this.propertyWriteAnnotationMetadata =
             writeHierarchy.length == 1 ? writeHierarchy[0] : new AnnotationMetadataHierarchy(true, writeHierarchy);
