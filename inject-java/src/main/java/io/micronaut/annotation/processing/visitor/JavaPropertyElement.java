@@ -49,6 +49,8 @@ final class JavaPropertyElement extends AbstractJavaMemberElement implements Pro
     private final MethodElement setter;
     @Nullable
     private final FieldElement field;
+    @Nullable
+    private final AnnotationMetadata propertyComponentAnnotationMetadata;
     private final boolean excluded;
     private final PropertyElementAnnotationMetadata annotationMetadata;
     @Nullable
@@ -59,6 +61,7 @@ final class JavaPropertyElement extends AbstractJavaMemberElement implements Pro
                         @Nullable MethodElement getter,
                         @Nullable MethodElement setter,
                         @Nullable FieldElement field,
+                        @Nullable AnnotationMetadata propertyComponentAnnotationMetadata,
                         ElementAnnotationMetadataFactory annotationMetadataFactory,
                         String name,
                         AccessKind readAccessKind,
@@ -71,12 +74,13 @@ final class JavaPropertyElement extends AbstractJavaMemberElement implements Pro
         this.getter = getter;
         this.setter = setter;
         this.field = field;
+        this.propertyComponentAnnotationMetadata = propertyComponentAnnotationMetadata;
         this.name = name;
         this.readAccessKind = readAccessKind;
         this.writeAccessKind = writeAccessKind;
         this.owningElement = owningElement;
         this.excluded = excluded;
-        this.annotationMetadata = new PropertyElementAnnotationMetadata(this, getter, setter, field, null, false);
+        this.annotationMetadata = new PropertyElementAnnotationMetadata(this, getter, setter, field, null, propertyComponentAnnotationMetadata, false);
         this.doc = doc;
     }
 
@@ -99,7 +103,7 @@ final class JavaPropertyElement extends AbstractJavaMemberElement implements Pro
 
     @Override
     protected AbstractJavaElement copyThis() {
-        return new JavaPropertyElement(owningElement, type, getter, setter, field, elementAnnotationMetadataFactory, name, readAccessKind, writeAccessKind, excluded, visitorContext, doc);
+        return new JavaPropertyElement(owningElement, type, getter, setter, field, propertyComponentAnnotationMetadata, elementAnnotationMetadataFactory, name, readAccessKind, writeAccessKind, excluded, visitorContext, doc);
     }
 
     @Override

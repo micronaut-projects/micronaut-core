@@ -21,13 +21,13 @@ import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
-import io.micronaut.inject.ast.PropertyElementQuery;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.PropertyElement;
+import io.micronaut.inject.ast.PropertyElementQuery;
 
 import java.util.ArrayList;
 import java.util.Collections;

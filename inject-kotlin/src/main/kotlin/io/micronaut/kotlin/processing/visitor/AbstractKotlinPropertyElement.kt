@@ -58,6 +58,7 @@ internal abstract class AbstractKotlinPropertyElement<T : KotlinNativeElement>(
             setter.orElse(null),
             field.orElse(null),
             constructorParameter.orElse(null),
+            null,
             true
         )
     }
