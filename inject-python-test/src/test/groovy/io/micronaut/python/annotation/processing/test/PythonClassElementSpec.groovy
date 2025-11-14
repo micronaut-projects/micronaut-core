@@ -319,10 +319,10 @@ class TypeTestService:
 
         where:
         description           | pythonTypeAnnotation | pythonValue | expectedValue        | expectedType    | returnType
+        "None return type"    | "None"               | "None"      | null                 | null            | void.class
         "Dict return type"    | "dict[str, int]"     | '{"a": 1}'  | ["a": 1]             | HashMap.class   | Map.class
         "Optional present"    | "Optional[str]"      | '"Alice"'   | Optional.of("Alice") | Optional.class  | Optional.class
         "Optional empty"      | "Optional[str]"      | "None"      | Optional.empty()     | Optional.class  | Optional.class
-        "None return type"    | "None"               | "None"      | null                 | null            | void.class
         "List return type"    | "list[int]"          | "[1, 2, 3]" | [1, 2, 3]            | ArrayList.class | List.class
         "String return type"  | "str"                | '"hello"'   | "hello"              | String.class    | String.class
         "Integer return type" | "int"                | "42"        | 42                   | Integer         | Integer.TYPE

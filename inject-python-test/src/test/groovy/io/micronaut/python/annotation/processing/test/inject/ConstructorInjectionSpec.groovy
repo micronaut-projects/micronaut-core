@@ -158,4 +158,39 @@ class CarService:
         cleanup: "Ensure context is properly closed"
         context?.close()
     }
+
+    void "test constructor injection with nullable argument"() {
+        given:
+        def pythonCode = '''
+from jakarta.inject import Singleton
+from dataclasses import dataclass
+from micronaut.context.annotation import Executable
+
+@dataclass
+class Engine:
+    cylinders: int
+
+    def start(self) -> str:
+        return f"Vrooom! {self.cylinders}"
+
+@Singleton
+class Vehicle:
+    def __init__(self, engine: Engine | None):
+        self.engine = engine if engine is not None else Engine(6)
+
+    @Executable
+    def start(self) -> str:
+        return self.engine.start()
+
+'''
+        when: "Building ApplicationContext and getting the car service"
+        def context = buildContext(pythonCode)
+        def carService = getBean(context, "python.Vehicle")
+
+        then: "Factory method injection should work"
+        carService.start() == "Vrooom! 6"
+
+        cleanup: "Ensure context is properly closed"
+        context?.close()
+    }
 }

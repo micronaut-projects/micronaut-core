@@ -93,4 +93,38 @@ class MainService:
         cleanup: "Ensure context is properly closed"
         context?.close()
     }
+
+    @PendingFeature(reason = "nullable not yet supported on attributes")
+    void "test field injection with Annotated[Type, Inject] syntax - nullable"() {
+        given: "Python code with field injection"
+        def pythonCode = '''
+from typing import Annotated
+from jakarta.inject import Singleton, Inject
+from micronaut.context.annotation import Executable
+
+class HelperService:
+    def get_help(self) -> str:
+        return "I am helping!"
+
+@Singleton
+class MainService:
+    helper: Annotated[HelperService | None, Inject] = None
+
+    @Executable
+    def get_combined_message(self) -> str:
+        if self.helper is None:
+            return "No helper available"
+        return "Main service with: " + self.helper.get_help()
+'''
+
+        when: "Building ApplicationContext and getting the main service"
+        def context = buildContext(pythonCode)
+        def mainService = getBean(context, "python.MainService")
+
+        then: "Field injection should work"
+        mainService.get_combined_message() == "No helper available"
+
+        cleanup: "Ensure context is properly closed"
+        context?.close()
+    }
 }
