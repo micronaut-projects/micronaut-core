@@ -16,3 +16,8 @@ micronautBuild {
         enabledAfter("5.0.0")
     }
 }
+
+tasks.named("ossIndexAudit") {
+    // the task fails if there are no dependencies (:facepalm:)
+    enabled = false
+}
