@@ -601,6 +601,18 @@ class PrintNodeVisitor(ast.NodeVisitor):
             if isinstance(current, ast.Name):
                 names.insert(0, current.id)
             return '.'.join(names)
+        elif isinstance(type_node, ast.Subscript):
+            # Handle generic types like List[SomeClass] or Dict[str, SomeClass]
+            base_name = self._extract_type_name(type_node.value)  # e.g., "List"
+
+            # Process the subscript arguments
+            args = self._extract_subscript_args(type_node)
+            if args:
+                # Recursively extract type names for each argument
+                arg_names = [self._extract_type_name(arg) for arg in args]
+                return f"{base_name}[{', '.join(arg_names)}]"
+            else:
+                return base_name
         elif isinstance(type_node, ast.BinOp) and isinstance(type_node.op, ast.BitOr):
             # Handle union types like X | Y, extract non-None types
             return self._extract_union_type(type_node)

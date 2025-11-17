@@ -34,6 +34,7 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Vetoed;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.PrimitiveElement;
+import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.sourcegen.model.AbstractElementBuilder;
 import io.micronaut.sourcegen.model.AnnotationDef;
 import org.graalvm.polyglot.Value;
@@ -127,6 +128,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         pythonValue = null;
                     }
 
+                    // Track method names that have been added to avoid duplicates
+                    Set<String> addedMethodNames = new LinkedHashSet<>();
+
                     for (ClassElement anInterface : interfaces) {
                         builder.addSuperinterface(TypeDef.of(anInterface));
                         List<MethodElement> methods = anInterface.getMethods();
@@ -135,7 +139,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             if (methodSet.contains(method)) {
                                 continue;
                             }
-                            addBridgeMethod(method, builder, pythonValue, context, false);
+                            addBridgeMethod(method, builder, pythonValue, context, false, addedMethodNames);
                             methodSet.add(method);
                         }
                     }
@@ -197,21 +201,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                 for (int i = 0; i < parameters.length; i++) {
                                     @NonNull ParameterElement parameter = parameters[i];
                                     VariableDef.MethodParameter methodParameter = methodParameters.get(i);
-                                    if (parameter.getType() instanceof PythonClassElement) {
-                                        if (parameter.hasAnnotation("jakarta.annotation.Nullable")) {
-                                            // Handle nullable Python class parameters
-                                            arguments.add(
-                                                methodParameter.isNull().doIfElse(
-                                                    ExpressionDef.nullValue(),
-                                                    methodParameter.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE)
-                                                )
-                                            );
-                                        } else {
-                                            arguments.add(methodParameter.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE));
-                                        }
-                                    } else {
-                                        arguments.add(methodParameter);
-                                    }
+                                    coerceParameterToPolyglotValue(parameter, arguments, methodParameter);
                                 }
                                 // Pass constructor parameters directly to newInstance
                                 ExpressionDef pythonInstance = CONTEXT_HOLDER.invokeStatic(
@@ -265,7 +255,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
 
                     for (MethodElement methodElement : methodsToBridge) {
-                        addBridgeMethod(methodElement, builder, pythonValue, context, isJunit5Test);
+                        addBridgeMethod(methodElement, builder, pythonValue, context, isJunit5Test, addedMethodNames);
                     }
 
                     // Find injection methods (annotated with @Inject)
@@ -309,11 +299,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                 for (int i = 0; i < injectionMethod.getParameters().length; i++) {
                                     ParameterElement param = injectionMethod.getParameters()[i];
                                     VariableDef.MethodParameter methodParam = methodParameters.get(i);
-                                    if (param.getType() instanceof PythonClassElement) {
-                                        parameters.add(methodParam.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE));
-                                    } else {
-                                        parameters.add(methodParam);
-                                    }
+                                    coerceParameterToPolyglotValue(param, parameters, methodParam);
                                 }
 
                                 // Call the Python injection method
@@ -372,6 +358,32 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         }
     }
 
+    private static void coerceParameterToPolyglotValue(
+        TypedElement param,
+        List<ExpressionDef> parameters,
+        VariableDef.MethodParameter methodParam) {
+        ClassElement genericType = param.getGenericType();
+        if (genericType.isAssignable(Map.class) && genericType.getTypeArguments().get("V") instanceof PythonClassElement) {
+            parameters.add(RUNTIME_UTIL.invokeStatic("coerceMap", TypeDef.of(Map.class), methodParam));
+        } else if (genericType.isAssignable(List.class) && genericType.getTypeArguments().get("E") instanceof PythonClassElement) {
+            parameters.add(RUNTIME_UTIL.invokeStatic("coerceList", TypeDef.of(List.class), methodParam));
+        } else if (genericType instanceof PythonClassElement) {
+            if (param.hasAnnotation("jakarta.annotation.Nullable")) {
+                // Handle nullable Python class parameters
+                parameters.add(
+                    methodParam.isNull().doIfElse(
+                        ExpressionDef.nullValue(),
+                        methodParam.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE)
+                    )
+                );
+            } else {
+                parameters.add(methodParam.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE));
+            }
+        } else {
+            parameters.add(methodParam);
+        }
+    }
+
     private void copyAnnotations(Element element, AbstractElementBuilder<?> builder, Set<String> annotationPackagesToCopy, VisitorContext visitorContext) {
         AnnotationMetadata annotationMetadata = element.getAnnotationMetadata();
         Set<String> annotationNames = annotationMetadata.getDeclaredAnnotationNames();
@@ -385,8 +397,16 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         }
     }
 
-    private void addBridgeMethod(MethodElement methodElement, ClassDef.ClassDefBuilder builder, FieldDef pythonValue, VisitorContext visitorContext, boolean isJunit5Test) {
+    private void addBridgeMethod(MethodElement methodElement, ClassDef.ClassDefBuilder builder, FieldDef pythonValue, VisitorContext visitorContext, boolean isJunit5Test, Set<String> addedMethodNames) {
         String pythonFunctionName = methodElement.getName();
+
+        // Check if method name has already been added to avoid duplicates
+        if (addedMethodNames.contains(pythonFunctionName)) {
+            return;
+        }
+
+        addedMethodNames.add(pythonFunctionName);
+
         MethodDef.MethodDefBuilder methodBuilder = MethodDef.builder(pythonFunctionName)
             .addModifiers(Modifier.PUBLIC)
             .returns(isJunit5Test ? TypeDef.Primitive.VOID : TypeDef.of(methodElement.getReturnType()));
@@ -474,18 +494,18 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 // For child classes, access the inherited field
                 pythonValueField = aThis.field("graalpyInternalValue", POLYGLOT_VALUE);
             }
-            ExpressionDef param;
-            if (beanProperty.getType() instanceof PythonClassElement) {
-                param = methodParameters.get(0).invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE);
-            } else {
-                param = methodParameters.get(0);
-            }
+            List<ExpressionDef> parameters = new ArrayList<>();
+            parameters.add(ExpressionDef.constant(beanProperty.getName()));
+            coerceParameterToPolyglotValue(
+                beanProperty,
+                parameters,
+                methodParameters.getFirst()
+            );
             // Call the Python injection method
             ExpressionDef.InvokeInstanceMethod result = pythonValueField.invoke(
                 "putMember",
                 TypeDef.VOID,
-                ExpressionDef.constant(beanProperty.getName()),
-                param
+                parameters
             );
             if (returnType.equals(TypeDef.VOID)) {
                 return result;

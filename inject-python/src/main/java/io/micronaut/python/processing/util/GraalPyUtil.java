@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing.util;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
@@ -303,7 +304,7 @@ public final class GraalPyUtil {
 
         // Resolve based on the base type
         return switch (genericInfo.baseType) {
-            case "list" -> {
+            case "list", "List", "typing.List" -> {
                 // list[T] -> List<T>
                 ClassElement listElement = visitorContext.getClassElement(java.util.List.class)
                     .orElse(ClassElement.of(java.util.List.class));
@@ -317,7 +318,7 @@ public final class GraalPyUtil {
                 }
                 yield listElement;
             }
-            case "dict" -> {
+            case "dict", "Dict", "typing.Dict" -> {
                 // dict[K, V] -> Map<K, V>
                 ClassElement mapElement = visitorContext.getClassElement(java.util.Map.class)
                     .orElse(ClassElement.of(java.util.Map.class));
@@ -331,11 +332,14 @@ public final class GraalPyUtil {
                     valueType = boxPrimitiveTypeIfNeeded(valueType, visitorContext);
 
                     // Create parameterized type Map<KeyType, ValueType>
-                    yield mapElement.withTypeArguments(java.util.Map.of("K", keyType, "V", valueType));
+                    LinkedHashMap<String, ClassElement> map = new LinkedHashMap<>();
+                    map.put("K", keyType);
+                    map.put("V", valueType);
+                    yield mapElement.withTypeArguments(map);
                 }
                 yield mapElement;
             }
-            case "set" -> {
+            case "set", "Set" -> {
                 // set[T] -> Set<T>
                 ClassElement setElement = visitorContext.getClassElement(java.util.Set.class)
                     .orElse(ClassElement.of(java.util.Set.class));

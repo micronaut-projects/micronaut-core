@@ -193,4 +193,115 @@ class Vehicle:
         cleanup: "Ensure context is properly closed"
         context?.close()
     }
+
+    void "test constructor injection with typed Dict container type"() {
+        given: "Python code with constructor injection using Dict type"
+        def pythonCode = '''
+from typing import Dict, Annotated
+from jakarta.inject import Singleton, Inject, Named
+from micronaut.context.annotation import Executable
+
+class ServiceBase:
+    @Executable
+    def get_name(self) -> str:
+        return "BaseService"
+
+@Singleton
+@Named("serviceA")
+class ServiceA(ServiceBase):
+    @Executable
+    def get_name(self) -> str:
+        return "ServiceA"
+
+@Singleton
+@Named("serviceB")
+class ServiceB(ServiceBase):
+    def get_name(self) -> str:
+        return "ServiceB"
+
+@Singleton
+class DictConstructorService:
+    def __init__(self, services: Annotated[Dict[str, ServiceBase], Inject]):
+        self.services = services
+
+    @Executable
+    def get_service_count(self) -> int:
+        if self.services is None:
+            return 0
+        return len(self.services)
+
+    @Executable
+    def get_service_names(self) -> str:
+        if self.services is None:
+            return "no services"
+        names = [service.get_name() for service in self.services.values()]
+        return ",".join(sorted(names))
+'''
+
+        when: "Building ApplicationContext and getting the dict constructor service"
+        def context = buildContext(pythonCode)
+        def dictService = getBean(context, "python.DictConstructorService")
+
+        then: "Dict constructor injection should work"
+        dictService.get_service_count() == 2
+        dictService.get_service_names() == "ServiceA,ServiceB"
+
+        cleanup: "Ensure context is properly closed"
+        context?.close()
+    }
+
+    void "test constructor injection with typed List container type"() {
+        given: "Python code with constructor injection using List type"
+        def pythonCode = '''
+from typing import List, Annotated
+from jakarta.inject import Singleton, Inject
+from micronaut.context.annotation import Executable
+
+class ListItemService:
+    def __init__(self, name: str):
+        self.name = name
+
+    def get_name(self) -> str:
+        return self.name
+
+@Singleton
+class ItemA(ListItemService):
+    def __init__(self):
+        super().__init__("ItemA")
+
+@Singleton
+class ItemB(ListItemService):
+    def __init__(self):
+        super().__init__("ItemB")
+
+@Singleton
+class ListConstructorService:
+    def __init__(self, items: Annotated[List[ListItemService], Inject]):
+        self.items = items
+
+    @Executable
+    def get_item_count(self) -> int:
+        if self.items is None:
+            return 0
+        return len(self.items)
+
+    @Executable
+    def get_item_names(self) -> str:
+        if self.items is None:
+            return "no items"
+        names = [item.get_name() for item in self.items]
+        return ",".join(sorted(names))
+'''
+
+        when: "Building ApplicationContext and getting the list constructor service"
+        def context = buildContext(pythonCode)
+        def listService = getBean(context, "python.ListConstructorService")
+
+        then: "List constructor injection should work"
+        listService.get_item_count() == 2
+        listService.get_item_names() == "ItemA,ItemB"
+
+        cleanup: "Ensure context is properly closed"
+        context?.close()
+    }
 }
