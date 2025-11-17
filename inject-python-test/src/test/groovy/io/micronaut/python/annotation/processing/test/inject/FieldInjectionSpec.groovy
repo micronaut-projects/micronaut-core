@@ -235,4 +235,59 @@ class ListConsumerService:
         cleanup: "Ensure context is properly closed"
         context?.close()
     }
+
+    void "test field injection with named qualifiers"() {
+        given: "Python code with named qualifier field injection"
+        def pythonCode = '''
+from typing import Annotated
+from jakarta.inject import Singleton, Named, Inject
+from micronaut.context.annotation import Executable
+
+class Thing:
+    def get_name(self) -> str:
+        return "Thing"
+
+@Singleton
+@Named("one")
+class ThingOne(Thing):
+    @Executable
+    def get_name(self) -> str:
+        return "one"
+
+@Singleton
+@Named("two")
+class ThingTwo(Thing):
+    @Executable
+    def get_name(self) -> str:
+        return "two"
+
+@Singleton
+class NamedQualifierService:
+    thing_one: Annotated[Thing, Inject, Named("one")] = None
+    thing_two: Annotated[Thing, Inject, Named("two")] = None
+
+    @Executable
+    def get_thing_one_name(self) -> str:
+        if self.thing_one is None:
+            return "None"
+        return self.thing_one.get_name()
+
+    @Executable
+    def get_thing_two_name(self) -> str:
+        if self.thing_two is None:
+            return "None"
+        return self.thing_two.get_name()
+'''
+
+        when: "Building ApplicationContext and getting the named qualifier service"
+        def context = buildContext(pythonCode)
+        def service = getBean(context, "python.NamedQualifierService")
+
+        then: "Named qualifier field injection should work"
+        service.get_thing_one_name() == "one"
+        service.get_thing_two_name() == "two"
+
+        cleanup: "Ensure context is properly closed"
+        context?.close()
+    }
 }

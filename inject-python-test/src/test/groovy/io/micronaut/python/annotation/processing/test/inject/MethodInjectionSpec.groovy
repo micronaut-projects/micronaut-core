@@ -161,4 +161,68 @@ class ListMethodService:
         cleanup: "Ensure context is properly closed"
         context?.close()
     }
+
+    void "test method injection with named qualifiers"() {
+        given: "Python code with named qualifier method injection"
+        def pythonCode = '''
+from typing import Annotated
+from jakarta.inject import Singleton, Named, Inject
+from micronaut.context.annotation import Executable
+
+class Thing:
+    def get_name(self) -> str:
+        return "Thing"
+
+@Singleton
+@Named("one")
+class ThingOne(Thing):
+    @Executable
+    def get_name(self) -> str:
+        return "one"
+
+@Singleton
+@Named("two")
+class ThingTwo(Thing):
+    @Executable
+    def get_name(self) -> str:
+        return "two"
+
+@Singleton
+class NamedQualifierService:
+    def __init__(self):
+        self.thing_one = None
+        self.thing_two = None
+
+    @Inject
+    def set_thing_one(self, thing_one: Annotated[Thing, Named("one")]):
+        self.thing_one = thing_one
+
+    @Inject
+    def set_thing_two(self, thing_two: Annotated[Thing, Named("two")]):
+        self.thing_two = thing_two
+
+    @Executable
+    def get_thing_one_name(self) -> str:
+        if self.thing_one is None:
+            return "None"
+        return self.thing_one.get_name()
+
+    @Executable
+    def get_thing_two_name(self) -> str:
+        if self.thing_two is None:
+            return "None"
+        return self.thing_two.get_name()
+'''
+
+        when: "Building ApplicationContext and getting the named qualifier service"
+        def context = buildContext(pythonCode)
+        def service = getBean(context, "python.NamedQualifierService")
+
+        then: "Named qualifier method injection should work"
+        service.get_thing_one_name() == "one"
+        service.get_thing_two_name() == "two"
+
+        cleanup: "Ensure context is properly closed"
+        context?.close()
+    }
 }
