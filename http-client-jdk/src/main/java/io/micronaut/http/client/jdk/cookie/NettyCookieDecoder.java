@@ -15,14 +15,12 @@
  */
 package io.micronaut.http.client.jdk.cookie;
 
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.client.netty.NettyClientHttpRequest;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.simple.cookies.SimpleCookie;
@@ -35,8 +33,8 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * A cookie decoder that extracts cookies from the {@link NettyClientHttpRequest} if it is present.
- * Required as {@link NettyClientHttpRequest} does not implement {@link HttpRequest#getCookies()}.
+ * A cookie decoder that extracts cookies from the request headers if present.
+ * This is primarily needed for request implementations that do not implement HttpRequest#getCookies().
  *
  * @since 4.0.0
  * @author Tim Yates
@@ -44,7 +42,6 @@ import java.util.Optional;
 @Singleton
 @Experimental
 @Internal
-@Requires(classes = NettyClientHttpRequest.class)
 public class NettyCookieDecoder implements CookieDecoder {
 
     public static final int ORDER = 1;
@@ -57,29 +54,29 @@ public class NettyCookieDecoder implements CookieDecoder {
     @NonNull
     @Override
     public Optional<Cookies> decode(HttpRequest<?> request) {
-        if (request instanceof NettyClientHttpRequest nettyClientHttpRequest) {
-            SimpleCookies entries = new SimpleCookies(conversionService);
+        List<HttpCookie> headerCookies = request
+            .getHeaders()
+            .getAll(HttpHeaders.COOKIE)
+            .stream()
+            .map(HttpCookie::parse)
+            .flatMap(Collection::stream)
+            .toList();
 
-            List<HttpCookie> headerCookies = nettyClientHttpRequest
-                .getHeaders()
-                .getAll(HttpHeaders.COOKIE)
-                .stream()
-                .map(HttpCookie::parse)
-                .flatMap(Collection::stream)
-                .toList();
-
-            headerCookies.forEach(cookie -> {
-                Cookie c = new SimpleCookie(cookie.getName(), cookie.getValue());
-                c.maxAge(cookie.getMaxAge());
-                c.domain(cookie.getDomain());
-                c.httpOnly(cookie.isHttpOnly());
-                c.path(cookie.getPath());
-                c.secure(cookie.getSecure());
-                entries.put(cookie.getName(), c);
-            });
-            return Optional.of(entries);
+        if (headerCookies.isEmpty()) {
+            return Optional.empty();
         }
-        return Optional.empty();
+
+        SimpleCookies entries = new SimpleCookies(conversionService);
+        headerCookies.forEach(cookie -> {
+            Cookie c = new SimpleCookie(cookie.getName(), cookie.getValue());
+            c.maxAge(cookie.getMaxAge());
+            c.domain(cookie.getDomain());
+            c.httpOnly(cookie.isHttpOnly());
+            c.path(cookie.getPath());
+            c.secure(cookie.getSecure());
+            entries.put(cookie.getName(), c);
+        });
+        return Optional.of(entries);
     }
 
     @Override

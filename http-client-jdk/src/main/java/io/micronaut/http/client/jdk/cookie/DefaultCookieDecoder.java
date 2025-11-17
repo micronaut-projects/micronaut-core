@@ -41,6 +41,6 @@ public class DefaultCookieDecoder implements CookieDecoder {
 
     @Override
     public int getOrder() {
-        return NettyCookieDecoder.ORDER + 1;
+        return 2;
     }
 }

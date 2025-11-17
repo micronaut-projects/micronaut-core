@@ -22,6 +22,7 @@ import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Primary;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
@@ -111,6 +112,7 @@ import java.util.concurrent.ThreadFactory;
 @Factory
 @BootstrapContextCompatible
 @Internal
+@Requires(classes = Channel.class)
 public
 class DefaultNettyHttpClientRegistry implements AutoCloseable,
         HttpClientRegistry<HttpClient>,
@@ -160,6 +162,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
      * @param jsonMapper                      JSON Mapper
      * @param blockingExecutor                Optional executor for blocking operations
      */
+    @SuppressWarnings("checkstyle:ParameterNumber")
     public DefaultNettyHttpClientRegistry(
         HttpClientConfiguration defaultHttpClientConfiguration,
         HttpClientFilterResolver<ClientFilterResolutionContext> httpClientFilterResolver,

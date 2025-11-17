@@ -16,8 +16,10 @@ dependencies {
     api(projects.micronautContext)
     api(projects.micronautHttpClientCore)
     api(projects.micronautWebsocket)
-    api(projects.micronautHttpNetty)
-    api(libs.managed.netty.handler.proxy)
+    compileOnly(projects.micronautHttpNetty)
+    testImplementation(projects.micronautHttpNetty)
+    api(projects.micronautHttpClientJdk)
+    compileOnly(libs.managed.netty.handler.proxy)
 
     compileOnly(projects.micronautHttpNettyHttp3)
     testImplementation(projects.micronautHttpNettyHttp3)

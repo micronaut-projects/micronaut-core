@@ -16,6 +16,7 @@
 package io.micronaut.http.client.netty.ssl;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.client.HttpClientConfiguration;
@@ -32,6 +33,7 @@ import jakarta.inject.Singleton;
  */
 @Singleton
 @BootstrapContextCompatible
+@Requires(classes = NettySslContextBuilder.class)
 public class NettyClientSslFactory {
     /**
      * Create a client-side SSL context builder for the given client configuration.

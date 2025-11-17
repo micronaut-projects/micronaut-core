@@ -1,0 +1,24 @@
+# Sample guideline, please follow similar structure for guideline with code samples
+# 1. Suggest using streams instead of simple loops for better readability.
+#          <example>
+#          *Comment:
+#          Category: Minor
+#          Issue: Use streams instead of a loop for better readability.
+#          Code Block:
+#
+#        ```java
+#            // Calculate squares of numbers
+#            List<Integer> squares = new ArrayList<>();
+#            for (int number : numbers) {
+#              squares.add(number * number);
+#            }
+#          ```
+#          Recommendation:
+#
+#        ```java
+#            // Calculate squares of numbers
+#            List<Integer> squares = Arrays.stream(numbers)
+#              .map(n -> n * n) // Map each number to its square
+#              .toList();
+#          ```
+#          </example>

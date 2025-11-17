@@ -17,6 +17,7 @@ package io.micronaut.http.client.netty.ssl;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Secondary;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.http.HttpVersion;
@@ -61,6 +62,7 @@ import java.util.Optional;
 @Singleton
 @BootstrapContextCompatible
 @Secondary
+@Requires(classes = SslContext.class)
 public class NettyClientSslBuilder extends SslBuilder<SslContext> implements ClientSslBuilder {
     private static final Logger LOG = LoggerFactory.getLogger(NettyClientSslBuilder.class);
 

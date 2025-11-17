@@ -23,8 +23,6 @@ import io.micronaut.http.MutableHttpRequestWrapper;
 import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.CloseableByteBody;
-import io.micronaut.http.netty.NettyHttpRequestBuilder;
-import io.netty.handler.codec.http.HttpRequest;
 
 import java.io.Closeable;
 import java.io.IOException;
