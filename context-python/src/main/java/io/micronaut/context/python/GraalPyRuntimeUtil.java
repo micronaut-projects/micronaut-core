@@ -20,7 +20,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
+import io.micronaut.core.annotation.Internal;
 import org.graalvm.polyglot.Value;
 
 /**
@@ -30,7 +32,42 @@ import org.graalvm.polyglot.Value;
  * @author Micronaut Team
  * @since 5.0.0
  */
+@Internal
 public final class GraalPyRuntimeUtil {
+
+    /**
+     * Coerce a map of types that may extend from {@link ValueCoercible} back to a native value map.
+     * @param map The map
+     * @param <V> The value type of the map
+     * @return The resulting map
+     */
+    public static <V> Map<String, Object> coerceMap(Map<String, V> map) {
+        return
+            map.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, (entry) -> {
+                Object v = entry.getValue();
+                if (v instanceof ValueCoercible valueCoercible) {
+                    return valueCoercible.asPolyglotValue();
+                }
+                return v;
+            }));
+    }
+
+    /**
+     * Coerce a list of types that may extend from {@link ValueCoercible} back to a native value list.
+     * @param list The list
+     * @param <E> The element type of the list
+     * @return The resulting list
+     *
+     */
+    public static <E> List<Object> coerceList(List<E> list) {
+        return
+            list.stream().map(v -> {
+                if (v instanceof ValueCoercible valueCoercible) {
+                    return valueCoercible.asPolyglotValue();
+                }
+                return v;
+            }).toList();
+    }
 
     /**
      * Convert a GraalPy Value representing a list to a Java List.
