@@ -206,7 +206,6 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                         List<Map.Entry<PathEntry, List<String>>> entries = allModules.entrySet().stream()
                             .filter(entry -> entry.getKey().parent.equals(parent))
                             .toList();
-                        List<String> allTypes = new ArrayList<>();
                         List<String> exportedTypes = new ArrayList<>();
                         for (Map.Entry<PathEntry, List<String>> entry : entries) {
                             List<String> types = entry.getValue();
@@ -214,7 +213,6 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                             if (!types.isEmpty()) {
                                 for (String type : types) {
                                     initContent.append("from .").append(NameUtils.filename(filename)).append(" import ").append(type).append('\n');
-                                    allTypes.add(type);
                                     // Check if this type has decorators (is in allExportedTypes)
                                     if (allExportedTypes.contains(type)) {
                                         exportedTypes.add(type);

@@ -193,7 +193,7 @@ public final class PythonAstParser {
         for (Source source : pythonSource) {
             bindings.putMember("src", source.getCharacters());
 
-            Value result = null;
+            Value result;
             try {
                 result = context.eval(Source.create(
                     PYTHON,
