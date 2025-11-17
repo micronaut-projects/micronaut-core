@@ -5,6 +5,7 @@ import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementS
 import io.micronaut.runtime.server.EmbeddedServer
 import jakarta.validation.Constraint
 import jakarta.validation.constraints.NotNull
+import spock.lang.PendingFeature
 
 class ConstructorInjectionSpec extends AbstractPythonTypeElementSpec {
     void "test annotated constructor injection - imported type"() {
@@ -181,6 +182,46 @@ class Vehicle:
     @Executable
     def start(self) -> str:
         return self.engine.start()
+
+'''
+        when: "Building ApplicationContext and getting the car service"
+        def context = buildContext(pythonCode)
+        def carService = getBean(context, "python.Vehicle")
+
+        then: "Factory method injection should work"
+        carService.start() == "Vrooom! 6"
+
+        cleanup: "Ensure context is properly closed"
+        context?.close()
+    }
+
+    @PendingFeature(reason = "Unclear how to use generics for external Java types")
+    void "test constructor injection with bean provider"() {
+        given:
+        def pythonCode = '''
+from jakarta.inject import Singleton
+from dataclasses import dataclass
+from micronaut.context.annotation import Executable
+
+import java
+
+BeanProvider = java.type("io.micronaut.context.BeanProvider")
+
+@dataclass
+class Engine:
+    cylinders: int
+
+    def start(self) -> str:
+        return f"Vrooom! {self.cylinders}"
+
+@Singleton
+class Vehicle:
+    def __init__(self, engine: BeanProvider[Engine]):
+        self.engine = engine
+
+    @Executable
+    def start(self) -> str:
+        return self.engine.get().start()
 
 '''
         when: "Building ApplicationContext and getting the car service"
