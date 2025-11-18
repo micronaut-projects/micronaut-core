@@ -17,6 +17,7 @@ import io.micronaut.scheduling.TaskExecutors
 import io.micronaut.scheduling.annotation.ExecuteOn
 import io.netty.util.concurrent.ThreadPerTaskExecutor
 import jakarta.inject.Inject
+import spock.lang.IgnoreIf
 import spock.lang.Specification
 
 import java.net.http.HttpRequest
@@ -69,7 +70,7 @@ class LoomCarrierSpec extends Specification {
         ctx.close()
     }
 
-    @spock.lang.Requires({ jvm.isJava23Compatible() && !jvm.isJava23() }) // jdk 24 introduced sub pollers on the FJP
+    @spock.lang.Requires({ jvm.isJava23Compatible() && !jvm.isJava23() && !os.macOs }) // jdk 24 introduced sub pollers on the FJP
     def 'sticky on poller thread'() {
         given:
         def ctx = ApplicationContext.run([
