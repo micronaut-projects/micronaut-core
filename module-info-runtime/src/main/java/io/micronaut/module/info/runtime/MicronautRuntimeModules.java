@@ -16,6 +16,7 @@
 package io.micronaut.module.info.runtime;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.NonNull;
 import jakarta.inject.Singleton;
 
 import java.util.List;
@@ -27,7 +28,8 @@ import java.util.List;
  */
 @Singleton
 @Experimental
-public class MicronautRuntimeModules {
+@NonNull
+public final class MicronautRuntimeModules {
     private final MicronautRuntimeModule root;
 
     public MicronautRuntimeModules(List<MicronautRuntimeModule> modules) {

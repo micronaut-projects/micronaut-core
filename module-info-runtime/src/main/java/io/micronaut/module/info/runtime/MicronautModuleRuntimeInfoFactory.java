@@ -15,7 +15,6 @@
  */
 package io.micronaut.module.info.runtime;
 
-import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.module.info.AbstractMicronautModuleInfo;
@@ -24,10 +23,10 @@ import io.micronaut.module.info.MicronautModuleInfoLoader;
 import jakarta.inject.Singleton;
 
 import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
-import java.util.Map;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Factory that creates runtime bean definitions for {@link MicronautRuntimeModule} instances.
@@ -36,11 +35,10 @@ import java.util.HashMap;
  */
 @Internal
 @Factory
-class MicronautModuleRuntimeInfoFactory {
+final class MicronautModuleRuntimeInfoFactory {
 
     @Singleton
-    public List<MicronautRuntimeModule> getAllModules(ApplicationContext context) {
-        var moduleInfos = context.getBeansOfType(MicronautModuleInfo.class);
+    public List<MicronautRuntimeModule> getAllModules(List<MicronautModuleInfo> moduleInfos) {
         var serviceLoaded = MicronautModuleInfoLoader.getAllModules();
         var allModules = new ArrayList<>(moduleInfos);
         allModules.addAll(serviceLoaded);

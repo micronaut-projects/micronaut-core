@@ -116,6 +116,10 @@ public final class MicronautRuntimeModule {
         return info.getTags();
     }
 
+    /**
+     * Returns the root module descriptor.
+     * @return the root descriptor
+     */
     public MicronautRuntimeModule getRoot() {
         if (parent == null) {
             return this;
