@@ -36,7 +36,6 @@ class ConstantPropertySourceSpec extends Specification {
         "default" | 'application'
         "dev"     | "application-dev"
         "cloud"   | "application-cloud"
-
     }
 
     private static TestPropertySource propertySource(String name, Map<String, String> values = [:]) {
