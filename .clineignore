@@ -6,6 +6,8 @@ build/
 */build/
 !build/docs/
 !build/docs/**
+!build/generated/
+!build/generated/**
 
 # === Dependency/Cache directories ===
 .gradle/
