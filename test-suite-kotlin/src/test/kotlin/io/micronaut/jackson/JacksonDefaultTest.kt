@@ -35,26 +35,3 @@ class JacksonDefaultTest {
         Assertions.assertTrue(exception.message!!.contains("Cannot map `null` into type `long`"))
     }
 }
-// @Override
-//                    public Object createFromObjectWith(DeserializationContext ctxt,
-//                                                       SettableBeanProperty[] props, PropertyValueBuffer buffer) throws IOException {
-//
-////                        var isKotlinClass = introspection.hasAnnotation("kotlin.Metadata"); //Arrays.stream(introspection.getBeanType().getAnnotations()).anyMatch(annotation -> annotation.getName().equals("kotlin.Metadata"));
-////                        if (false && isKotlinClass == false) {
-////                            var values = buffer.getParameters(props);
-////                            return createFromObjectWith(ctxt, values);
-////                        }
-//                        Object[] args = new Object[props.length];
-//
-//                        for (int i = 0; i < props.length; i++) {
-//
-//                            var prop = props[i];
-//                            var isOptionalConstructorArg = Arrays.stream(constructorArguments).anyMatch(introspectionProp -> introspectionProp.getName().equals(prop.getName()) && introspectionProp.findAnnotation(jakarta.annotation.Nullable.class).isPresent());
-//                            if (!buffer.hasParameter(prop) && isOptionalConstructorArg) {
-//                                args[i] = null;
-//                            } else {
-//                                args[i] = buffer.getParameter(prop);
-//                            }
-//                        }
-//                        return createFromObjectWith(ctxt, args);
-//                    }
