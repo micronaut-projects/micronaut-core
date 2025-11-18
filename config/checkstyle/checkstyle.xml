@@ -178,7 +178,7 @@
         <module name="SimplifyBooleanExpression"/>
         <module name="SimplifyBooleanReturn"/>
 
-        <!-- Checks for Inner assigment -->
+        <!-- Checks for Inner assignment -->
         <!-- See https://checkstyle.org/config_coding.html#InnerAssignment -->
         <module name="InnerAssignment">
             <property name="tokens" value="ASSIGN,PLUS_ASSIGN,MINUS_ASSIGN"/>
