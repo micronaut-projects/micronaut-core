@@ -10,7 +10,7 @@ DecoratorDef = java.type("io.micronaut.python.processing.visitor.DecoratorDef")
 ArgumentsDef = java.type("io.micronaut.python.processing.visitor.ArgumentsDef")
 ArgumentDef = java.type("io.micronaut.python.processing.visitor.ArgumentDef")
 ReturnDef = java.type("io.micronaut.python.processing.visitor.ReturnDef")
-TypeDef = java.type("io.micronaut.python.processing.visitor.TypeDef")
+TypeRef = java.type("io.micronaut.python.processing.visitor.TypeRef")
 
 def extract_decorator_name(node):
     """
@@ -224,6 +224,8 @@ class PrintNodeVisitor(ast.NodeVisitor):
                         # Parse function arguments and return type
                         arguments = self.parse_function_arguments(node)
                         return_type = self.parse_function_return_type(node)
+                        # Extract function type parameters
+                        func_type_params = self._parse_function_type_params(node)
                         # Extract function docstring
                         func_doc = self._extract_docstring(node)
 
@@ -231,7 +233,7 @@ class PrintNodeVisitor(ast.NodeVisitor):
                         is_abstract = is_abstract_method(node)
                         is_static = is_static_method(node)
 
-                        func_def = JavaFuncDef(node.name, arguments, decorators, return_type, "", [], func_doc, is_abstract, is_static)
+                        func_def = JavaFuncDef(node.name, arguments, decorators, return_type, "", func_type_params, func_doc, is_abstract, is_static)
                         if self.current_class is not None:
                             if node.name == "__init__":
                                 # Set as constructor
@@ -816,6 +818,73 @@ class PrintNodeVisitor(ast.NodeVisitor):
 
         return type_params
 
+    def _parse_function_type_params(self, func_node):
+        """
+        Parse type parameters from an ast.FunctionDef node.
+        Returns a list of TypeVar objects.
+        Handles Python 3.12+ type_params syntax and older syntax by parsing from type annotations.
+        """
+        type_params = []
+        TypeVar = java.type("io.micronaut.python.processing.visitor.TypeVar")
+
+        # Check if the function node has type_params (Python 3.12+)
+        if hasattr(func_node, 'type_params') and func_node.type_params:
+            for type_param in func_node.type_params:
+                if isinstance(type_param, ast.TypeVar):
+                    # Extract name
+                    name = type_param.name
+
+                    # Extract bound if present
+                    bound = None
+                    if type_param.bound is not None:
+                        bound = self._extract_type_name(type_param.bound)
+
+                    # Extract constraints (for TypeVar with constraints)
+                    constraints = []
+                    if hasattr(type_param, 'constraints') and type_param.constraints:
+                        for constraint in type_param.constraints:
+                            constraint_name = self._extract_type_name(constraint)
+                            constraints.append(constraint_name)
+
+                    # Create TypeVar object
+                    type_var = TypeVar(name, bound, constraints)
+                    type_params.append(type_var)
+        else:
+            # Try to parse type parameters from function annotations (fallback for older Python)
+            type_params = self._parse_type_params_from_annotations(func_node)
+
+        return type_params
+
+    def _parse_type_params_from_annotations(self, func_node):
+        """
+        Parse type parameters from function annotations by looking for TypeVar usage.
+        This is a fallback for Python versions that don't support type_params.
+        """
+        type_params = []
+        TypeVar = java.type("io.micronaut.python.processing.visitor.TypeVar")
+
+        # Look for type parameters in the function signature by examining type annotations
+        # For syntax like def func[S](param: S), we need to parse S from the annotations
+
+        # Check if the function name contains type parameters (e.g., def func[S](...))
+        func_name = func_node.name
+
+        if '[' in func_name and func_name.endswith(']'):
+            # Extract type parameter names from function name
+            # e.g., "singleton_list[S]" -> ["S"]
+            try:
+                bracket_content = func_name.split('[', 1)[1].rstrip(']')
+                if bracket_content:
+                    param_names = [name.strip() for name in bracket_content.split(',')]
+                    for param_name in param_names:
+                        # Create TypeVar objects for each parameter name
+                        type_var = TypeVar(param_name, None, [])
+                        type_params.append(type_var)
+            except:
+                pass
+
+        return type_params
+
     def _parse_type_var_call(self, call_node):
         """
         Parse a TypeVar call like TypeVar('T', bound=SomeType) into a TypeVar object.
@@ -875,23 +944,23 @@ class PrintNodeVisitor(ast.NodeVisitor):
         if isinstance(type_node, ast.Name):
             # Simple type like 'str' or 'MyBase'
             name = self._extract_type_name(type_node)
-            return TypeDef(name)
+            return TypeRef(name)
         elif isinstance(type_node, ast.Attribute):
             # Qualified type like 'module.MyClass'
             name = self._extract_type_name(type_node)
-            return TypeDef(name)
+            return TypeRef(name)
         elif isinstance(type_node, ast.Subscript):
             # Generic type like 'MyBase[str]' or 'dict[str, int]'
             base_name = self._extract_type_name(type_node.value)
             type_args = self._extract_subscript_args(type_node)
             # Recursively parse each type argument
             type_arg_defs = [self._parse_type(arg) for arg in type_args]
-            return TypeDef(base_name, type_arg_defs)
+            return TypeRef(base_name, type_arg_defs)
         else:
             # Fallback for other expression types
             try:
                 name = ast.unparse(type_node) if hasattr(ast, 'unparse') else ast.dump(type_node)
-                return TypeDef(name)
+                return TypeRef(name)
             except:
                 return None
 

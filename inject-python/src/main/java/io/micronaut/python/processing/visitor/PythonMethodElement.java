@@ -16,6 +16,7 @@
 package io.micronaut.python.processing.visitor;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -24,6 +25,7 @@ import java.util.Optional;
 import io.micronaut.annotation.processing.visitor.ElementProvider;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PrimitiveElement;
@@ -291,6 +293,20 @@ public sealed class PythonMethodElement extends AbstractPythonElement implements
     @Override
     public MethodElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
         return (MethodElement) super.withAnnotationMetadata(annotationMetadata);
+    }
+
+    @Override
+    public List<? extends GenericPlaceholderElement> getDeclaredTypeVariables() {
+        List<TypeVar> typeVars = getNativeType().typeParams();
+        if (typeVars.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<GenericPlaceholderElement> placeholders = new ArrayList<>(typeVars.size());
+        for (TypeVar typeVar : typeVars) {
+            placeholders.add(new PythonGenericPlaceholderElement(typeVar, environment, Collections.emptyList(), (PythonClassElement) getDeclaringType()));
+        }
+        return placeholders;
     }
 
     @Override
