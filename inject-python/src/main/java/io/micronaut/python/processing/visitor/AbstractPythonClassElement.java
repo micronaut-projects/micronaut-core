@@ -41,7 +41,7 @@ import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.python.processing.util.GraalPyUtil;
 
 public abstract sealed class AbstractPythonClassElement extends AbstractPythonElement
-    implements ArrayableClassElement, ElementProvider permits PythonClassElement, PythonEnumElement {
+    implements ArrayableClassElement, ElementProvider permits PythonClassElement, PythonEnumElement, PythonGenericPlaceholderElement {
     public static final String PYTHON_DEFAULT_PACKAGE = "python";
 
     protected final int arrayDimensions;
@@ -66,10 +66,10 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
     @Override
     public Collection<ClassElement> getInterfaces() {
         ClassDef nativeType = getNativeType();
-        List<String> bases = nativeType.bases();
+        List<TypeRef> bases = nativeType.bases();
 
         return bases.stream()
-            .flatMap(name -> environment.javaVisitorContext().getClassElement(name).stream())
+            .flatMap(base -> environment.javaVisitorContext().getClassElement(base.name()).stream())
             .filter(ClassElement::isInterface)
             .toList();
     }
@@ -324,11 +324,11 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
 
         @Override
         protected ClassDef getSuperClass(ClassDef classNode) {
-            List<String> bases = classNode.bases();
+            List<TypeRef> bases = classNode.bases();
             if (!bases.isEmpty()) {
                 // Find the first base class that exists in our environment
-                for (String base : bases) {
-                    ClassElement baseElement = environment.classes().get(base);
+                for (TypeRef base : bases) {
+                    ClassElement baseElement = environment.classes().get(base.name());
                     if (baseElement != null) {
                         return ((PythonClassElement) baseElement).getNativeType();
                     }
@@ -339,14 +339,14 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
 
         @Override
         protected List<ClassDef> getInterfaces(ClassDef classNode) {
-            List<String> bases = classNode.bases();
+            List<TypeRef> bases = classNode.bases();
             if (bases.size() <= 1) {
                 return List.of();
             }
             // Return remaining base classes as "interfaces"
             return bases.subList(1, bases.size()).stream()
                 .map(base -> {
-                    ClassElement baseElement = environment.classes().get(base);
+                    ClassElement baseElement = environment.classes().get(base.name());
                     return baseElement != null ? ((PythonClassElement) baseElement).getNativeType() : null;
                 })
                 .filter(Objects::nonNull)
@@ -416,12 +416,23 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
         protected Element toAstElement(ElementDef nativeType, Class<?> elementType) {
             // Determine the declaring class element
             AbstractPythonClassElement declaringClassElement = AbstractPythonClassElement.this; // Default to the queried class
-            if (currentDeclaringClass != null && currentDeclaringClass != getNativeClassType(AbstractPythonClassElement.this)) {
-                // This is an inherited element - find the declaring class
-                String declaringClassName = currentDeclaringClass.name();
-                ClassElement declaringElement = environment.classes().get(declaringClassName);
-                if (declaringElement instanceof PythonClassElement pythonDeclaringClass) {
-                    declaringClassElement = pythonDeclaringClass;
+            if (nativeType instanceof MemberDef memberDef && memberDef.declaringClass() != null) {
+                ClassDef classDef = memberDef.declaringClass();
+                String qualifiedName = classDef.qualifiedName();
+                if (!qualifiedName.equals(declaringClassElement.getName())) {
+                    ClassElement ce = environment.classes().get(qualifiedName);
+                    if (ce instanceof AbstractPythonClassElement ape) {
+                        declaringClassElement = ape;
+                    }
+                }
+            } else {
+                if (currentDeclaringClass != null && currentDeclaringClass != getNativeClassType(AbstractPythonClassElement.this)) {
+                    // This is an inherited element - find the declaring class
+                    String declaringClassName = currentDeclaringClass.name();
+                    ClassElement declaringElement = environment.classes().get(declaringClassName);
+                    if (declaringElement instanceof PythonClassElement pythonDeclaringClass) {
+                        declaringClassElement = pythonDeclaringClass;
+                    }
                 }
             }
 

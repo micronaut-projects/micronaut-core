@@ -27,7 +27,7 @@ import java.util.Objects;
  *
  * @param name The name of the class.
  * @param packageName The package name of the class.
- * @param bases The base class names.
+ * @param bases The base classes with their type arguments.
  * @param decorators The decorators.
  * @param typeParams The type parameters.
  * @param functions The functions defined in the class.
@@ -42,7 +42,7 @@ import java.util.Objects;
 public record ClassDef(
     String name,
     String packageName,
-    List<String> bases,
+    List<TypeRef> bases,
     List<DecoratorDef> decorators,
     List<TypeVar> typeParams,
     List<FunctionDef> functions,
@@ -143,6 +143,10 @@ public record ClassDef(
 
     public ClassDef withEnum(boolean isEnum, List<String> values) {
         return new ClassDef(name, packageName, bases, decorators, typeParams, functions, attributes, properties, constructor, isEnum, values, documentation);
+    }
+
+    public String qualifiedName() {
+        return packageName + "." + name;
     }
 
     @Override

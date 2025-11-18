@@ -16,13 +16,18 @@
 package io.micronaut.python.processing.util;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
 import io.micronaut.core.annotation.AnnotationClassValue;
+import io.micronaut.expressions.parser.ast.util.TypeDescriptors;
+import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.python.processing.visitor.PythonClassElement;
+import io.micronaut.python.processing.visitor.TypeRef;
+import io.micronaut.sourcegen.model.ClassTypeDef;
 import org.graalvm.polyglot.Value;
 
 import io.micronaut.inject.ast.ClassElement;
@@ -251,11 +256,48 @@ public final class GraalPyUtil {
      * Handles primitive types, collections with generics (list[int], dict[str, int]),
      * and supports recursive resolution for nested generics.
      *
-     * @param typeAnnotation the Python type annotation string (e.g., "int", "str", "bool", "float", "list[int]", "dict[str, int]")
+     * @param typeRef        The python type def
      * @param visitorContext the visitor context for class element lookup
      * @return the resolved ClassElement, or Object ClassElement if resolution fails
      */
-    public static ClassElement resolvePythonTypeToJava(String typeAnnotation, PythonVisitorContext visitorContext) {
+    public static ClassElement resolvePythonTypeToJava(TypeRef typeRef, PythonVisitorContext visitorContext) {
+        if (typeRef == null) {
+            return ClassElement.of(Object.class);
+        }
+
+        String name = typeRef.name();
+        ClassElement classElement = resolvePythonTypeToJava(name, visitorContext, Map.of());
+        List<TypeRef> typeArguments = typeRef.typeArguments();
+        List<? extends GenericPlaceholderElement> declaredGenericPlaceholders = classElement.getDeclaredGenericPlaceholders();
+        if (!typeArguments.isEmpty() && declaredGenericPlaceholders != null && !declaredGenericPlaceholders.isEmpty() && typeArguments.size() == declaredGenericPlaceholders.size()) {
+            Map<String, ClassElement> resolvedTypeArguments = new LinkedHashMap<>(declaredGenericPlaceholders.size());
+            for (int i = 0; i < declaredGenericPlaceholders.size(); i++) {
+                GenericPlaceholderElement placeHolder = declaredGenericPlaceholders.get(i);
+                TypeRef typeParmeterDef = typeArguments.get(i);
+                ClassElement resolvedType = GraalPyUtil.resolvePythonTypeToJava(typeParmeterDef, visitorContext);
+                if (resolvedType.isPrimitive()) {
+                    ClassTypeDef boxedType = TypeDescriptors.toBoxedIfNecessary(io.micronaut.sourcegen.model.TypeDef.of(resolvedType));
+                    resolvedType = ClassElement.of(boxedType.getName());
+                }
+                String variableName = placeHolder.getVariableName();
+                resolvedTypeArguments.put(variableName, resolvedType);
+            }
+            return classElement.withTypeArguments(resolvedTypeArguments);
+        }
+        return classElement;
+    }
+
+    /**
+     * Resolves a Python type annotation to a Java ClassElement.
+     * Handles primitive types, collections with generics (list[int], dict[str, int]),
+     * and supports recursive resolution for nested generics.
+     *
+     * @param typeAnnotation the Python type annotation string (e.g., "int", "str", "bool", "float", "list[int]", "dict[str, int]")
+     * @param visitorContext the visitor context for class element lookup
+     * @param boundGenerics The bound generic types
+     * @return the resolved ClassElement, or Object ClassElement if resolution fails
+     */
+    public static ClassElement resolvePythonTypeToJava(String typeAnnotation, PythonVisitorContext visitorContext, Map<String, ClassElement> boundGenerics) {
         if (typeAnnotation == null || typeAnnotation.isBlank()) {
             return visitorContext.getClassElement(Object.class).orElse(ClassElement.of(Object.class));
         }
@@ -266,7 +308,7 @@ public final class GraalPyUtil {
             int firstComma = typeAnnotation.indexOf(',', bracketStart);
             if (firstComma != -1) {
                 String baseType = typeAnnotation.substring(bracketStart + 1, firstComma).trim();
-                return resolvePythonTypeToJava(baseType, visitorContext);
+                return resolvePythonTypeToJava(baseType, visitorContext, boundGenerics);
             }
         }
 
@@ -283,11 +325,16 @@ public final class GraalPyUtil {
             case "None" -> PrimitiveElement.VOID;
             case "str" ->
                 visitorContext.getClassElement(String.class).orElse(ClassElement.of(String.class));
+            case "dict" ->
+                visitorContext.getClassElement(Map.class).orElse(ClassElement.of(Map.class));
+            case "list" ->
+                visitorContext.getClassElement(List.class).orElse(ClassElement.of(List.class));
             default ->
                 // Fall back to visitor context lookup
-                visitorContext.getClassElement(typeAnnotation).orElse(
-                    visitorContext.getClassElement(Object.class).orElse(ClassElement.of(Object.class))
-                );
+                visitorContext.getClassElement(typeAnnotation).orElseGet(() -> {
+                    ClassElement classElement = boundGenerics.get(typeAnnotation);
+                    return Objects.requireNonNullElseGet(classElement, () -> ClassElement.of(Object.class));
+                });
         };
     }
 
@@ -310,7 +357,7 @@ public final class GraalPyUtil {
                     .orElse(ClassElement.of(java.util.List.class));
 
                 if (!genericInfo.typeParameters.isEmpty()) {
-                    ClassElement elementType = resolvePythonTypeToJava(genericInfo.typeParameters.get(0), visitorContext);
+                    ClassElement elementType = resolvePythonTypeToJava(genericInfo.typeParameters.get(0), visitorContext, Map.of());
                     // For generics, use boxed types instead of primitives
                     elementType = boxPrimitiveTypeIfNeeded(elementType, visitorContext);
                     // Create parameterized type List<ElementType>
@@ -324,8 +371,8 @@ public final class GraalPyUtil {
                     .orElse(ClassElement.of(java.util.Map.class));
 
                 if (genericInfo.typeParameters.size() >= 2) {
-                    ClassElement keyType = resolvePythonTypeToJava(genericInfo.typeParameters.get(0), visitorContext);
-                    ClassElement valueType = resolvePythonTypeToJava(genericInfo.typeParameters.get(1), visitorContext);
+                    ClassElement keyType = resolvePythonTypeToJava(genericInfo.typeParameters.get(0), visitorContext, Map.of());
+                    ClassElement valueType = resolvePythonTypeToJava(genericInfo.typeParameters.get(1), visitorContext, Map.of());
 
                     // For generics, use boxed types instead of primitives
                     keyType = boxPrimitiveTypeIfNeeded(keyType, visitorContext);
@@ -339,26 +386,26 @@ public final class GraalPyUtil {
                 }
                 yield mapElement;
             }
-            case "set", "Set" -> {
+            case "set", "Set", "typing.Set" -> {
                 // set[T] -> Set<T>
                 ClassElement setElement = visitorContext.getClassElement(java.util.Set.class)
                     .orElse(ClassElement.of(java.util.Set.class));
 
                 if (!genericInfo.typeParameters.isEmpty()) {
-                    ClassElement elementType = resolvePythonTypeToJava(genericInfo.typeParameters.get(0), visitorContext);
+                    ClassElement elementType = resolvePythonTypeToJava(genericInfo.typeParameters.get(0), visitorContext, Map.of());
                     // For generics, use boxed types instead of primitives
                     elementType = boxPrimitiveTypeIfNeeded(elementType, visitorContext);
                     yield setElement.withTypeArguments(java.util.Map.of("E", elementType));
                 }
                 yield setElement;
             }
-            case "Optional" -> {
+            case "Optional", "typing.Optional" -> {
                 // Optional[T] -> Optional<T>
                 ClassElement optionalElement = visitorContext.getClassElement(java.util.Optional.class)
                     .orElse(ClassElement.of(java.util.Optional.class));
 
                 if (!genericInfo.typeParameters.isEmpty()) {
-                    ClassElement elementType = resolvePythonTypeToJava(genericInfo.typeParameters.get(0), visitorContext);
+                    ClassElement elementType = resolvePythonTypeToJava(genericInfo.typeParameters.get(0), visitorContext, Map.of());
                     // For generics, use boxed types instead of primitives
                     elementType = boxPrimitiveTypeIfNeeded(elementType, visitorContext);
                     yield optionalElement.withTypeArguments(java.util.Map.of("T", elementType));

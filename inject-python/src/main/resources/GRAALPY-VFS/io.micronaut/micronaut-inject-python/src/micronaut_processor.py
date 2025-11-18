@@ -10,6 +10,7 @@ DecoratorDef = java.type("io.micronaut.python.processing.visitor.DecoratorDef")
 ArgumentsDef = java.type("io.micronaut.python.processing.visitor.ArgumentsDef")
 ArgumentDef = java.type("io.micronaut.python.processing.visitor.ArgumentDef")
 ReturnDef = java.type("io.micronaut.python.processing.visitor.ReturnDef")
+TypeDef = java.type("io.micronaut.python.processing.visitor.TypeDef")
 
 def extract_decorator_name(node):
     """
@@ -100,25 +101,16 @@ class PrintNodeVisitor(ast.NodeVisitor):
                 # Extract base classes
                 bases = []
                 for base in node.bases:
-                    if isinstance(base, ast.Name):
-                        # Resolve type names (including imported types)
-                        base_name = self._extract_type_name(base)
-                        bases.append(base_name)
-                    elif isinstance(base, ast.Attribute):
-                        # Handle qualified names like module.Class
-                        # For simplicity, just use the attribute name
-                        bases.append(base.attr)
-                    else:
-                        # Handle other expression types by trying to unparse
-                        try:
-                            bases.append(ast.unparse(base))
-                        except AttributeError:
-                            # Fallback for older Python versions
-                            bases.append(ast.dump(base))
+                    base_class_def = self._parse_base_class(base)
+                    if base_class_def:
+                        bases.append(base_class_def)
+
+                # Extract type parameters
+                type_params = self._parse_type_params(node)
 
                 # Extract class docstring
                 class_doc = self._extract_docstring(node)
-                self.current_class = JavaClassDef(node.name, self.package_name, bases, decorators, [], [], [], [], None, False, [], class_doc)
+                self.current_class = JavaClassDef(node.name, self.package_name, bases, decorators, type_params, [], [], [], None, False, [], class_doc)
                 self.current_class_attributes = []
 
                 # Check if this is an enum class
@@ -770,6 +762,138 @@ class PrintNodeVisitor(ast.NodeVisitor):
             property_def = property_def.withSetter(func_def)
 
         self.current_class_properties[property_name] = property_def
+
+    def _parse_type_params(self, node):
+        """
+        Parse type parameters from an ast.ClassDef node.
+        Returns a list of TypeVar objects.
+        Handles both Python 3.12+ type_params and Generic[T] syntax.
+        """
+        type_params = []
+        TypeVar = java.type("io.micronaut.python.processing.visitor.TypeVar")
+
+        # Check if the node has type_params (Python 3.12+)
+        if hasattr(node, 'type_params') and node.type_params:
+            for type_param in node.type_params:
+                if isinstance(type_param, ast.TypeVar):
+                    # Extract name
+                    name = type_param.name
+
+                    # Extract bound if present
+                    bound = None
+                    if type_param.bound is not None:
+                        bound = self._extract_type_name(type_param.bound)
+
+                    # Extract constraints (for TypeVar with constraints)
+                    constraints = []
+                    if hasattr(type_param, 'constraints') and type_param.constraints:
+                        for constraint in type_param.constraints:
+                            constraint_name = self._extract_type_name(constraint)
+                            constraints.append(constraint_name)
+
+                    # Create TypeVar object
+                    type_var = TypeVar(name, bound, constraints)
+                    type_params.append(type_var)
+        else:
+            # Check for Generic[T] syntax in bases (Python < 3.12)
+            for base in node.bases:
+                if isinstance(base, ast.Subscript):
+                    # Check if it's Generic[...]
+                    if isinstance(base.value, ast.Name) and base.value.id == 'Generic':
+                        # Extract type arguments from Generic[T1, T2, ...]
+                        args = self._extract_subscript_args(base)
+                        for arg in args:
+                            if isinstance(arg, ast.Name):
+                                # Simple TypeVar reference like T
+                                name = arg.id
+                                type_var = TypeVar(name, None, [])
+                                type_params.append(type_var)
+                            elif isinstance(arg, ast.Call) and isinstance(arg.func, ast.Name) and arg.func.id == 'TypeVar':
+                                # TypeVar call like TypeVar('T', bound=SomeType)
+                                type_var = self._parse_type_var_call(arg)
+                                if type_var:
+                                    type_params.append(type_var)
+
+        return type_params
+
+    def _parse_type_var_call(self, call_node):
+        """
+        Parse a TypeVar call like TypeVar('T', bound=SomeType) into a TypeVar object.
+        Returns a TypeVar object or None if parsing fails.
+        """
+        if not (isinstance(call_node, ast.Call) and isinstance(call_node.func, ast.Name) and call_node.func.id == 'TypeVar'):
+            return None
+
+        TypeVar = java.type("io.micronaut.python.processing.visitor.TypeVar")
+
+        # Extract arguments
+        args = call_node.args
+        kwargs = {kw.arg: kw.value for kw in call_node.keywords if kw.arg}
+
+        # First argument should be the name (string literal)
+        name = None
+        if args and len(args) >= 1:
+            try:
+                name = ast.literal_eval(args[0])
+            except:
+                return None
+
+        if not name or not isinstance(name, str):
+            return None
+
+        # Extract bound
+        bound = None
+        if 'bound' in kwargs:
+            bound = self._extract_type_name(kwargs['bound'])
+        elif len(args) >= 2:
+            bound = self._extract_type_name(args[1])
+
+        # Extract constraints
+        constraints = []
+        if 'constraints' in kwargs:
+            # constraints should be a list/tuple
+            constraint_node = kwargs['constraints']
+            if isinstance(constraint_node, (ast.List, ast.Tuple)):
+                for item in constraint_node.elts:
+                    constraint_name = self._extract_type_name(item)
+                    constraints.append(constraint_name)
+
+        return TypeVar(name, bound, constraints)
+
+    def _parse_base_class(self, base_node):
+        """
+        Parse a base class AST node and return a TypeDef.
+        Handles simple names like 'str' and subscripted types like 'MyBase[str]'.
+        """
+        return self._parse_type(base_node)
+
+    def _parse_type(self, type_node):
+        """
+        Parse a type AST node and return a TypeDef.
+        Handles simple names, qualified names, and subscripted types recursively.
+        """
+        if isinstance(type_node, ast.Name):
+            # Simple type like 'str' or 'MyBase'
+            name = self._extract_type_name(type_node)
+            return TypeDef(name)
+        elif isinstance(type_node, ast.Attribute):
+            # Qualified type like 'module.MyClass'
+            name = self._extract_type_name(type_node)
+            return TypeDef(name)
+        elif isinstance(type_node, ast.Subscript):
+            # Generic type like 'MyBase[str]' or 'dict[str, int]'
+            base_name = self._extract_type_name(type_node.value)
+            type_args = self._extract_subscript_args(type_node)
+            # Recursively parse each type argument
+            type_arg_defs = [self._parse_type(arg) for arg in type_args]
+            return TypeDef(base_name, type_arg_defs)
+        else:
+            # Fallback for other expression types
+            try:
+                name = ast.unparse(type_node) if hasattr(ast, 'unparse') else ast.dump(type_node)
+                return TypeDef(name)
+            except:
+                return None
 
     def _track_java_type_assignments(self, node):
         """

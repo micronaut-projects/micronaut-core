@@ -46,7 +46,7 @@ public record AttributeDef(
     String documentation,
     boolean isStatic,
     ClassDef declaringClass
-) implements ElementDef {
+) implements ElementDef, MemberDef {
 
     public AttributeDef(String name) {
         this(name, null, null, null, List.of(), null, false, null);

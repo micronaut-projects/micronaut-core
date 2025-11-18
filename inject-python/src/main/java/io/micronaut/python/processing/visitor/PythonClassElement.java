@@ -15,15 +15,20 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
+import io.micronaut.python.processing.util.GraalPyUtil;
 
 public final class PythonClassElement extends AbstractPythonClassElement {
+    private Map<String, ClassElement> resolvedTypeArguments;
 
     public PythonClassElement(ClassDef classDef, PythonProcessingEnvironment environment) {
         super(classDef, environment);
@@ -33,8 +38,13 @@ public final class PythonClassElement extends AbstractPythonClassElement {
         super(classDef, environment, arrayDimensions);
     }
 
+    PythonClassElement(ClassDef classDef, PythonProcessingEnvironment environment, int arrayDimensions, Map<String, ClassElement> resolvedTypeArguments) {
+        super(classDef, environment, arrayDimensions);
+        this.resolvedTypeArguments = resolvedTypeArguments;
+    }
+
     @Override
-    protected AbstractPythonElement copyThis() {
+    protected PythonClassElement copyThis() {
         return new PythonClassElement(getNativeType(), environment, arrayDimensions);
     }
 
@@ -81,11 +91,11 @@ public final class PythonClassElement extends AbstractPythonClassElement {
         if (getName().equals(type)) {
             return true;
         }
-        if (getNativeType().bases().contains(type)) {
-            return true;
-        }
-        for (String base : getNativeType().bases()) {
-            ClassElement baseElement = environment.classes().get(base);
+        for (TypeRef base : getNativeType().bases()) {
+            if (base.name().equals(type)) {
+                return true;
+            }
+            ClassElement baseElement = environment.classes().get(base.name());
             if (baseElement != null && baseElement.isAssignable(type)) {
                 return true;
             }
@@ -101,15 +111,55 @@ public final class PythonClassElement extends AbstractPythonClassElement {
 
     @Override
     public Optional<ClassElement> getSuperType() {
-        List<String> bases = getNativeType().bases();
+        List<TypeRef> bases = getNativeType().bases();
         if (!bases.isEmpty()) {
-            for (String base : bases) {
-                ClassElement baseElement = environment.classes().get(base);
+            for (TypeRef base : bases) {
+                ClassElement baseElement = environment.classes().get(base.name());
                 if (baseElement != null) {
-                    return Optional.of(baseElement);
+                    List<? extends GenericPlaceholderElement> declaredGenericPlaceholders = baseElement.getDeclaredGenericPlaceholders();
+                    List<TypeRef> typeArguments = base.typeArguments();
+                    if (!typeArguments.isEmpty() && declaredGenericPlaceholders != null && !declaredGenericPlaceholders.isEmpty() && typeArguments.size() == declaredGenericPlaceholders.size()) {
+                        Map<String, ClassElement> resolvedTypeArguments = new HashMap<>(declaredGenericPlaceholders.size());
+                        for (int i = 0; i < declaredGenericPlaceholders.size(); i++) {
+                            GenericPlaceholderElement placeHolder = declaredGenericPlaceholders.get(i);
+                            TypeRef typeRef = typeArguments.get(i);
+                            ClassElement resolvedType = GraalPyUtil.resolvePythonTypeToJava(typeRef, environment.visitorContext());
+                            String variableName = placeHolder.getVariableName();
+                            resolvedTypeArguments.put(variableName, resolvedType);
+                        }
+                        return Optional.of(baseElement.withTypeArguments(resolvedTypeArguments));
+                    } else {
+                        return Optional.of(baseElement);
+                    }
                 }
             }
         }
         return Optional.empty();
+    }
+
+    @Override
+    public Map<String, ClassElement> getTypeArguments() {
+        if (resolvedTypeArguments == null) {
+            return super.getTypeArguments();
+        } else {
+            return resolvedTypeArguments;
+        }
+    }
+
+    @Override
+    public ClassElement withTypeArguments(Map<String, ClassElement> typeArguments) {
+        return new PythonClassElement(getNativeType(), environment, arrayDimensions, typeArguments);
+    }
+
+    @NonNull
+    @Override
+    public List<? extends GenericPlaceholderElement> getDeclaredGenericPlaceholders() {
+        return getNativeType().typeParams().stream()
+            .map(typeVar -> {
+                // For now, we'll create empty bounds. Bounds handling can be added later
+                List<PythonClassElement> bounds = List.of();
+                return new PythonGenericPlaceholderElement(typeVar, environment, bounds, this);
+            })
+            .toList();
     }
 }

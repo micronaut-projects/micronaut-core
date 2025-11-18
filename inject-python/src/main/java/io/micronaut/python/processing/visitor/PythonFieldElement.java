@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import java.util.Map;
 import java.util.Objects;
 
 import io.micronaut.inject.visitor.VisitorContext;
@@ -105,12 +106,12 @@ public final class PythonFieldElement extends AbstractPythonElement implements F
     private ClassElement resolveType(AttributeDef attributeDef) {
         if (attributeDef.typeName() != null) {
             // Use the parsed type name (e.g., "io.micronaut.runtime.server.EmbeddedServer")
-            return GraalPyUtil.resolvePythonTypeToJava(attributeDef.typeName(), environment.visitorContext());
+            return GraalPyUtil.resolvePythonTypeToJava(attributeDef.typeName(), environment.visitorContext(), Map.of());
         }
         if (attributeDef.annotation() != null) {
             // Fallback to resolving the full annotation string
             String annotation = attributeDef.annotation();
-            return GraalPyUtil.resolvePythonTypeToJava(annotation, environment.visitorContext());
+            return GraalPyUtil.resolvePythonTypeToJava(annotation, environment.visitorContext(), Map.of());
         }
         // Infer from value if no annotation
         if (attributeDef.value() != null) {

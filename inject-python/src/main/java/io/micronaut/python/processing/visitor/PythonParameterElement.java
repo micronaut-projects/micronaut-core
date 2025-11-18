@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import java.util.Map;
 import java.util.Objects;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -38,11 +39,11 @@ import io.micronaut.python.processing.util.GraalPyUtil;
 public final class PythonParameterElement extends AbstractPythonElement implements ParameterElement {
     private final PythonProcessingEnvironment environment;
     private final ClassElement type;
-    private final MethodElement methodElement;
+    private final PythonMethodElement methodElement;
 
     public PythonParameterElement(ArgumentDef argumentDef,
                                   PythonProcessingEnvironment environment,
-                                  MethodElement methodElement,
+                                  PythonMethodElement methodElement,
                                   ElementAnnotationMetadataFactory metadataFactory) {
         super(
             Objects.requireNonNull(argumentDef, "ArgumentDef cannot be null").name(),
@@ -68,13 +69,20 @@ public final class PythonParameterElement extends AbstractPythonElement implemen
 
     @Override
     public ClassElement getGenericType() {
-        return getType(); // Python doesn't have generics in the same way
+        Map<String, Map<String, ClassElement>> allGenerics = methodElement.getOwningType().getAllTypeArguments();
+        ClassDef classDef = methodElement.getNativeType().declaringClass();
+        Map<String, ClassElement> boundGenerics = classDef != null ? allGenerics.getOrDefault(classDef.qualifiedName(), Map.of()) : Map.of();
+        return GraalPyUtil.resolvePythonTypeToJava(
+            getNativeType().typeAnnotation(),
+            environment.visitorContext(),
+            boundGenerics
+        );
     }
 
     private ClassElement resolveType(ArgumentDef argumentDef) {
         if (argumentDef.typeAnnotation() != null) {
             // Use the same type resolution logic as fields
-            return GraalPyUtil.resolvePythonTypeToJava(argumentDef.typeAnnotation(), environment.visitorContext());
+            return GraalPyUtil.resolvePythonTypeToJava(argumentDef.typeAnnotation(), environment.visitorContext(), Map.of());
         }
 
         // Fall back to Object when no type annotation
@@ -82,7 +90,7 @@ public final class PythonParameterElement extends AbstractPythonElement implemen
     }
 
     @Override
-    public MethodElement getMethodElement() {
+    public PythonMethodElement getMethodElement() {
         return methodElement;
     }
 
