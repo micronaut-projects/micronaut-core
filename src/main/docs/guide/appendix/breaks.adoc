@@ -5,6 +5,12 @@ This section documents breaking changes between Micronaut versions
 
 === Core Changes
 
+==== Update to Jackson 3
+
+Micronaut Jackson Databind uses https://github.com/FasterXML/jackson/wiki/Jackson-Release-3.0[Jackson 3].
+If you use Micronaut Jackson Databind, check the https://github.com/FasterXML/jackson/blob/main/jackson3/MIGRATING_TO_JACKSON_3.md[Jackson 3 Migration Guide].
+
+
 ==== Bean context changes
 
 The default implementations of api:context.BeanContext[BeanContext], api:context.ApplicationContext[ApplicationContext] and api:context.env.Environment[Environment] are no longer public and non-final.
