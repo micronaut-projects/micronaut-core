@@ -17,7 +17,7 @@ package io.micronaut.http.client;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.client.annotation.Client;

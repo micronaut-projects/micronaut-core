@@ -15,7 +15,7 @@
  */
 package io.micronaut.management.endpoint.env;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 
 /**
  * A bean interface that allows hiding or masking of parts of the environment and its property sources when they are

@@ -16,7 +16,7 @@
 package io.micronaut.http.client.netty;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.http.netty.AbstractCompositeCustomizer;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;

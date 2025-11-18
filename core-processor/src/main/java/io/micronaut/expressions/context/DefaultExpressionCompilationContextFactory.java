@@ -17,7 +17,7 @@ package io.micronaut.expressions.context;
 
 import io.micronaut.context.annotation.AnnotationExpressionContext;
 import io.micronaut.core.annotation.AnnotationClassValue;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.expressions.EvaluatedExpressionReference;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;

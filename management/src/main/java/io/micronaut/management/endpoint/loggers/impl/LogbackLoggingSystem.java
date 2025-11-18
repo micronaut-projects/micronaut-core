@@ -21,7 +21,7 @@ import ch.qos.logback.classic.LoggerContext;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.logging.LogLevel;
 import io.micronaut.logging.impl.LogbackUtils;

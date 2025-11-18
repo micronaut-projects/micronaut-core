@@ -18,7 +18,6 @@ package io.micronaut.aop.introduction
 import io.micronaut.aop.MethodInterceptor
 import io.micronaut.aop.MethodInvocationContext
 import io.micronaut.core.annotation.AnnotationMetadata
-import org.jspecify.annotations.Nullable
 import io.micronaut.core.type.MutableArgumentValue
 import jakarta.inject.Singleton
 
@@ -31,7 +30,6 @@ class StubIntroducer implements MethodInterceptor<Object, Object> {
 
     public Map<String, AnnotationMetadata> visitedMethods = new LinkedHashMap<>()
 
-    @Nullable
     @Override
     Object intercept(MethodInvocationContext<Object, Object> context) {
         visitedMethods.put(context.getMethodName(), context.getAnnotationMetadata())
@@ -39,6 +37,5 @@ class StubIntroducer implements MethodInterceptor<Object, Object> {
         if (iterator.hasNext())
             return iterator.next().getValue()
         return null
-
     }
 }

@@ -16,7 +16,6 @@ class MyRepoIntroducer : MethodInterceptor<Any, Any> {
         return 0
     }
 
-    @Nullable
     override fun intercept(context: MethodInvocationContext<Any, Any>): Any? {
         executableMethods.add(context.executableMethod.targetMethod)
         return null

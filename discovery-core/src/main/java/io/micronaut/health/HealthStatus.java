@@ -17,7 +17,7 @@ package io.micronaut.health;
 
 import com.fasterxml.jackson.annotation.JsonValue;
 import io.micronaut.core.annotation.Introspected;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.annotation.ReflectiveAccess;
 
 import java.util.Optional;

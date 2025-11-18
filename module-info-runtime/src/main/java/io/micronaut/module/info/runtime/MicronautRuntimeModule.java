@@ -16,7 +16,7 @@
 package io.micronaut.module.info.runtime;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.module.info.MavenCoordinates;
 import io.micronaut.module.info.MicronautModuleInfo;
 

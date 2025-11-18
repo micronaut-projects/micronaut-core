@@ -18,7 +18,7 @@ package io.micronaut.context;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.StringUtils;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;

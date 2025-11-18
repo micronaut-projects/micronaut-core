@@ -17,7 +17,7 @@ package io.micronaut.context;
 
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
@@ -131,7 +131,7 @@ sealed interface BeanResolutionTracer permits ConsoleBeanResolutionTracer {
      */
     <B, T> void traceInjectBean(
         @NonNull BeanResolutionContext resolutionContext,
-        @NonNull BeanResolutionContext.Segment<B, T> segment);
+        BeanResolutionContext.@NonNull Segment<B, T> segment);
 
     /**
      * Called on the completion of resolution of an injection point.

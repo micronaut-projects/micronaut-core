@@ -17,7 +17,7 @@ package io.micronaut.http.server.util.locale;
 
 import io.micronaut.context.AbstractLocalizedMessageSource;
 import io.micronaut.context.MessageSource;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.LocaleResolver;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.runtime.http.scope.RequestAware;
@@ -32,7 +32,7 @@ import java.util.Locale;
 @RequestScope
 public class HttpLocalizedMessageSource extends AbstractLocalizedMessageSource<HttpRequest<?>> implements RequestAware {
     private Locale locale;
-    
+
     /**
      * @param localeResolver The locale resolver
      * @param messageSource  The message source

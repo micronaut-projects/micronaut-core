@@ -17,7 +17,7 @@ package io.micronaut.annotation.processing;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.inject.visitor.PackageElementVisitor;

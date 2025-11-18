@@ -1,6 +1,6 @@
 package io.micronaut.web.router.uri;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 final class WhatwgUrl {

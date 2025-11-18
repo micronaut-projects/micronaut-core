@@ -283,7 +283,7 @@ class Foo {
 package test;
 
 import io.micronaut.http.annotation.*;
-import org.jspecify.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 
 @Controller("/foo")
 class Foo {

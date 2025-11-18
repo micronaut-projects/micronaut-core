@@ -20,7 +20,7 @@ import com.github.javaparser.javadoc.Javadoc;
 import com.github.javaparser.javadoc.JavadocBlockTag;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
@@ -67,9 +67,8 @@ final class JavaParameterElement extends AbstractTypeAwareJavaElement implements
         this.methodElement = methodElement;
     }
 
-    @NonNull
     @Override
-    public JavaNativeElement.Variable getNativeType() {
+    public JavaNativeElement.@NonNull Variable getNativeType() {
         return (JavaNativeElement.Variable) super.getNativeType();
     }
 

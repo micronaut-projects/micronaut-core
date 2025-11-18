@@ -1,7 +1,7 @@
 package io.micronaut.http.server.stack;
 
 import io.micronaut.context.ApplicationContext;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.body.CloseableAvailableByteBody;

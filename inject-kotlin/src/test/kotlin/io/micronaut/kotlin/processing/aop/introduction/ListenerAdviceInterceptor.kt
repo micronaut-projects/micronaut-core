@@ -38,7 +38,6 @@ class ListenerAdviceInterceptor : MethodInterceptor<Any, Any> {
         return recievedMessages
     }
 
-    @Nullable
     override fun intercept(context: MethodInvocationContext<Any, Any>): Any? {
         return if (context.methodName == "onApplicationEvent") {
             val v = context.parameterValues[0]

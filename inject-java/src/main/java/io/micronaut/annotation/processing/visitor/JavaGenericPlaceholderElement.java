@@ -17,7 +17,7 @@ package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ClassElement;
@@ -139,9 +139,8 @@ final class JavaGenericPlaceholderElement extends JavaClassElement implements Ge
         return new AnnotationMetadataHierarchy(true, super.getAnnotationMetadata(), getGenericTypeAnnotationMetadata());
     }
 
-    @NonNull
     @Override
-    public JavaNativeElement.Placeholder getGenericNativeType() {
+    public JavaNativeElement.@NonNull Placeholder getGenericNativeType() {
         return genericNativeType;
     }
 

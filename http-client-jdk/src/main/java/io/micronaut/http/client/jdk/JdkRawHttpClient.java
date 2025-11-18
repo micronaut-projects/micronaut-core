@@ -16,7 +16,7 @@
 package io.micronaut.http.client.jdk;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.ByteBodyHttpResponseWrapper;

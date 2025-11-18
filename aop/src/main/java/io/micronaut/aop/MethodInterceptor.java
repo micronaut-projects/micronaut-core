@@ -33,12 +33,10 @@ public interface MethodInterceptor<T, R> extends Interceptor<T, R> {
      * @param context The context
      * @return The result
      */
-    @Nullable
-    R intercept(MethodInvocationContext<T, R> context);
+    @Nullable R intercept(MethodInvocationContext<T, R> context);
 
-    @Nullable
     @Override
-    default R intercept(InvocationContext<T, R> context) {
+    default @Nullable R intercept(InvocationContext<T, R> context) {
         if (context instanceof MethodInvocationContext) {
             return intercept((MethodInvocationContext<T, R>) context);
         } else {

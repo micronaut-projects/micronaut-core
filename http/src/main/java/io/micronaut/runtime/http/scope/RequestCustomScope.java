@@ -19,7 +19,7 @@ import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.scope.AbstractConcurrentCustomScope;
 import io.micronaut.context.scope.BeanCreationContext;
 import io.micronaut.context.scope.CreatedBean;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.http.HttpRequest;

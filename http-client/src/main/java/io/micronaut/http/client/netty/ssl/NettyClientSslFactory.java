@@ -17,7 +17,7 @@ package io.micronaut.http.client.netty.ssl;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.netty.NettySslContextBuilder;
 import jakarta.inject.Singleton;

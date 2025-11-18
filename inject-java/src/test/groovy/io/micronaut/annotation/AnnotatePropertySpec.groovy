@@ -1,7 +1,7 @@
 package io.micronaut.annotation
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
-import io.micronaut.core.annotation.NonNull
+import org.jspecify.annotations.NonNull
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.MethodElement

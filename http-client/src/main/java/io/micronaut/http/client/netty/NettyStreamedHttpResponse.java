@@ -17,7 +17,7 @@ package io.micronaut.http.client.netty;
 
 import com.google.errorprone.annotations.concurrent.GuardedBy;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
@@ -123,9 +123,8 @@ final class NettyStreamedHttpResponse<B> implements MutableHttpResponse<B>, Nett
         return this.nettyResponse;
     }
 
-    @NonNull
     @Override
-    public io.netty.handler.codec.http.HttpResponse toHttpResponse() {
+    public io.netty.handler.codec.http.@NonNull HttpResponse toHttpResponse() {
         return this.nettyResponse;
     }
 

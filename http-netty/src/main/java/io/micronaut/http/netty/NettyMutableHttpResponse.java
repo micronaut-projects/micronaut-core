@@ -16,7 +16,7 @@
 package io.micronaut.http.netty;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.async.publisher.Publishers;
@@ -176,7 +176,7 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
      * @param response The mn response
      * @return The netty response
      */
-    public static @NonNull HttpResponse toNoBodyResponse(@NonNull io.micronaut.http.HttpResponse<?> response) {
+    public static @NonNull HttpResponse toNoBodyResponse(io.micronaut.http.@NonNull HttpResponse<?> response) {
         Objects.requireNonNull(response, "The response cannot be null");
         while (response instanceof HttpResponseWrapper<?> wrapper) {
             response = wrapper.getDelegate();

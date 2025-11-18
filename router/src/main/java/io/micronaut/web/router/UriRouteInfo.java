@@ -15,7 +15,7 @@
  */
 package io.micronaut.web.router;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.uri.UriMatchTemplate;

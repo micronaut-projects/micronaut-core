@@ -17,7 +17,7 @@ package io.micronaut.annotation.processing;
 
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.core.annotation.Generated;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.util.CollectionUtils;
@@ -234,8 +234,7 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
      *
      * @return The visitor kind
      */
-    @NonNull
-    protected TypeElementVisitor.VisitorKind getVisitorKind() {
+    protected TypeElementVisitor.@NonNull VisitorKind getVisitorKind() {
         return getIncrementalProcessorType().equals(GRADLE_PROCESSING_ISOLATING) ? TypeElementVisitor.VisitorKind.ISOLATING : TypeElementVisitor.VisitorKind.AGGREGATING;
     }
 

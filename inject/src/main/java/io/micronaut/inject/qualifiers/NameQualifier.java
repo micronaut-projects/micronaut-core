@@ -18,7 +18,7 @@ package io.micronaut.inject.qualifiers;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.naming.NameResolver;
 import io.micronaut.inject.BeanType;
 import io.micronaut.inject.QualifiedBeanType;

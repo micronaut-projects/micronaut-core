@@ -17,7 +17,7 @@ package io.micronaut.core.util;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NextMajorVersion;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;

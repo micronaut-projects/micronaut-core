@@ -16,7 +16,7 @@
 package io.micronaut.scheduling.executor;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.runtime.graceful.GracefulShutdownCapable;
 
 import java.util.OptionalLong;

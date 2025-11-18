@@ -16,7 +16,7 @@
 package io.micronaut.kotlin.processing.visitor
 
 import io.micronaut.core.annotation.AnnotationMetadata
-import io.micronaut.core.annotation.NonNull
+import org.jspecify.annotations.NonNull
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
 import io.micronaut.inject.ast.ArrayableClassElement
 import io.micronaut.inject.ast.ClassElement
@@ -79,7 +79,7 @@ internal class KotlinWildcardElement(
 
     override fun getGenericNativeType() = internalGenericNativeType
 
-    override fun foldBoundGenericTypes(@NonNull fold: Function<ClassElement?, ClassElement?>): ClassElement? {
+    override fun foldBoundGenericTypes(fold: Function<ClassElement?, ClassElement?>): ClassElement? {
         val upperBounds: List<KotlinClassElement?> = this.upperBounds
             .map { ele ->
                 toKotlinClassElement(

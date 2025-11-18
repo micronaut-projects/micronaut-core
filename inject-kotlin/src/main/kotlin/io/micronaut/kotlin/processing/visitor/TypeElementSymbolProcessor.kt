@@ -30,7 +30,7 @@ import com.google.devtools.ksp.visitor.KSTopDownVisitor
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.annotation.Requires.Sdk
 import io.micronaut.core.annotation.Generated
-import io.micronaut.core.annotation.NonNull
+import org.jspecify.annotations.NonNull
 import io.micronaut.core.annotation.Vetoed
 import io.micronaut.core.order.OrderUtil
 import io.micronaut.core.util.StringUtils
@@ -203,7 +203,6 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
         }
     }
 
-    @NonNull
     private fun findTypeElementVisitors(): Collection<TypeElementVisitor<*, *>> {
         val typeElementVisitors: MutableMap<String, TypeElementVisitor<*, *>> = HashMap(10)
         for (definition in SERVICE_LOADER) {

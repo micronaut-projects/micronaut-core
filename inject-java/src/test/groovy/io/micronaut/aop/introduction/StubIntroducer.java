@@ -42,9 +42,8 @@ public class StubIntroducer implements MethodInterceptor<Object, Object> {
         return POSITION;
     }
 
-    @Nullable
     @Override
-    public Object intercept(MethodInvocationContext<Object, Object> context) {
+    public @Nullable Object intercept(MethodInvocationContext<Object, Object> context) {
         visitedMethods.put(context.getMethodName(), context.getAnnotationMetadata());
         Iterator<MutableArgumentValue<?>> iterator = context.getParameters().values().iterator();
         if(iterator.hasNext())

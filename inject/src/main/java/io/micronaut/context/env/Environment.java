@@ -18,7 +18,7 @@ package io.micronaut.context.env;
 import io.micronaut.context.ApplicationContextConfiguration;
 import io.micronaut.context.LifeCycle;
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionServiceProvider;
 import io.micronaut.core.convert.MutableConversionService;

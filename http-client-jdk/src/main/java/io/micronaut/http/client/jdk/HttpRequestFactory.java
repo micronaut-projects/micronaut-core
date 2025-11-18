@@ -17,7 +17,7 @@ package io.micronaut.http.client.jdk;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.type.Argument;
@@ -58,8 +58,7 @@ public final class HttpRequestFactory {
     private HttpRequestFactory() {
     }
 
-    @NonNull
-    public static <I> HttpRequest.Builder builder(
+    public static <I> HttpRequest.@NonNull Builder builder(
         @NonNull URI uri, io.micronaut.http.HttpRequest<I> request,
         @NonNull HttpClientConfiguration configuration,
         @Nullable Argument<?> bodyType,

@@ -20,7 +20,7 @@ import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.validation.BeanDefinitionValidator;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 /**

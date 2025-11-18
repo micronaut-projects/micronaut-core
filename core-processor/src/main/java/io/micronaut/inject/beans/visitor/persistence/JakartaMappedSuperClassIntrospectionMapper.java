@@ -16,7 +16,7 @@
 package io.micronaut.inject.beans.visitor.persistence;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 
 /**
  * Handle mapped super class.

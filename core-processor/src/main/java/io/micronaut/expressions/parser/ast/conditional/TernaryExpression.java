@@ -16,7 +16,7 @@
 package io.micronaut.expressions.parser.ast.conditional;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.expressions.parser.ast.ExpressionNode;

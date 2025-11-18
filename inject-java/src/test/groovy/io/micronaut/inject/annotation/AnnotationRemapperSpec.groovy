@@ -1,6 +1,6 @@
 package io.micronaut.inject.annotation
 
-import io.micronaut.core.annotation.NonNull
+import org.jspecify.annotations.NonNull
 import org.jspecify.annotations.Nullable
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationUtil
@@ -35,7 +35,7 @@ class Test {
         AnnotationMetadata metadata = buildMethodArgumentAnnotationMetadata('''
 package test;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 @jakarta.inject.Singleton
 class Test {
 
@@ -57,7 +57,7 @@ class Test {
         def definition = buildBeanDefinition('test.Test', '''
 package test;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 @jakarta.inject.Singleton
 class Test {
 

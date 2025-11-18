@@ -16,7 +16,7 @@
 package io.micronaut.http;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 
 /**
  * A {@link HttpRequest} that is potentially capable of HTTP2 server push. Code should check

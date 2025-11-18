@@ -28,7 +28,7 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * A transformer that remaps {@link io.micronaut.core.annotation.NonNull} to {@link io.micronaut.core.annotation.AnnotationUtil#NON_NULL}.
+ * A transformer that remaps {@link org.jspecify.annotations.NonNull} to {@link io.micronaut.core.annotation.AnnotationUtil#NON_NULL}.
  *
  * @author graemerocher
  * @since 2.4.0
@@ -38,7 +38,7 @@ public class CoreNonNullTransformer implements NamedAnnotationTransformer {
 
     @Override
     public String getName() {
-        return "io.micronaut.core.annotation.NonNull";
+        return "org.jspecify.annotations.NonNull";
     }
 
     @Override

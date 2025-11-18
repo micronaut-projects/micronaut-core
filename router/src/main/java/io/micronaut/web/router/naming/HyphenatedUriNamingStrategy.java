@@ -16,7 +16,7 @@
 package io.micronaut.web.router.naming;
 
 import io.micronaut.context.annotation.Value;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.conventions.TypeConvention;

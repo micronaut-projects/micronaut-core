@@ -4,5 +4,5 @@ import io.micronaut.core.annotation.Introspected
 import org.jspecify.annotations.Nullable
 //tag::class[]
 @Introspected
-data class ContactEntity(@Nullable var id: Long? = null, val firstName: String, val lastName: String)
+data class ContactEntity(var id: Long? = null, val firstName: String, val lastName: String)
 //end::class[]

@@ -17,7 +17,7 @@ package io.micronaut.ast.groovy;
 
 import groovy.lang.GroovyObject;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.utils.NativeElementsHelper;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.MethodNode;

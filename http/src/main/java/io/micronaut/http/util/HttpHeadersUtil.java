@@ -16,7 +16,7 @@
 package io.micronaut.http.util;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.HttpHeaders;

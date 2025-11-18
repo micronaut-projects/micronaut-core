@@ -15,7 +15,7 @@
  */
 package io.micronaut.context.event;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;

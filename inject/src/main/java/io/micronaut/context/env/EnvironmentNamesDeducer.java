@@ -15,7 +15,7 @@
  */
 package io.micronaut.context.env;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 
 import java.util.Set;
 

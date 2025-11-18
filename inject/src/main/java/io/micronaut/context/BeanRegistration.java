@@ -16,7 +16,7 @@
 package io.micronaut.context;
 
 import io.micronaut.context.scope.CreatedBean;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.order.Ordered;

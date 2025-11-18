@@ -16,7 +16,7 @@
 package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 
 /**
  * Stores data about an element that references a field.

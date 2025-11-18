@@ -16,7 +16,7 @@
 package io.micronaut.json.tree;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.CollectionUtils;
 
 import java.util.Map;

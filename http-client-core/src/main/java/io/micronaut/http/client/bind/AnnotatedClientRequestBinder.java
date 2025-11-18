@@ -18,7 +18,7 @@ package io.micronaut.http.client.bind;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Indexed;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.http.MutableHttpRequest;
 
 import java.lang.annotation.Annotation;

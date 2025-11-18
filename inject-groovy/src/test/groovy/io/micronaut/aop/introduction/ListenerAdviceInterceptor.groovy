@@ -17,7 +17,6 @@ package io.micronaut.aop.introduction
 
 import io.micronaut.aop.MethodInterceptor
 import io.micronaut.aop.MethodInvocationContext
-import org.jspecify.annotations.Nullable
 import jakarta.inject.Singleton
 
 /**
@@ -38,7 +37,6 @@ class ListenerAdviceInterceptor implements MethodInterceptor<Object,Object> {
         return recievedMessages
     }
 
-    @Nullable
     @Override
     Object intercept(MethodInvocationContext<Object, Object> context) {
         if(context.getMethodName().equalsIgnoreCase("onApplicationEvent")) {

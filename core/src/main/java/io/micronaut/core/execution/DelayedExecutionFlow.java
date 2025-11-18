@@ -15,7 +15,7 @@
  */
 package io.micronaut.core.execution;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.CompletionException;

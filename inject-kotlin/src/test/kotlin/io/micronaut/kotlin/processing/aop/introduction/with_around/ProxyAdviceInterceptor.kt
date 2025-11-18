@@ -25,7 +25,6 @@ import java.lang.RuntimeException
 @Singleton
 class ProxyAdviceInterceptor(private val beanContext: BeanContext) : MethodInterceptor<Any, Any> {
 
-    @Nullable
     override fun intercept(context: MethodInvocationContext<Any, Any>): Any? {
         if (context.methodName.equals("getId", ignoreCase = true)) {
             // Test invocation delegation

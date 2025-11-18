@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.server.util.locale;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.locale.LocaleResolutionConfiguration;
 
 import java.util.Optional;

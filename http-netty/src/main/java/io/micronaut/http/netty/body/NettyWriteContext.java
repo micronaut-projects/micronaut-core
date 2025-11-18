@@ -17,7 +17,7 @@ package io.micronaut.http.netty.body;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.http.body.ByteBody;
 import io.netty.handler.codec.http.HttpResponse;
 

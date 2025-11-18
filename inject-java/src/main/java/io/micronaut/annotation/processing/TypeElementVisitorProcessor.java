@@ -21,7 +21,7 @@ import io.micronaut.annotation.processing.visitor.JavaNativeElement;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.visitor.VisitorUtils;
 import io.micronaut.core.annotation.NextMajorVersion;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.order.OrderUtil;

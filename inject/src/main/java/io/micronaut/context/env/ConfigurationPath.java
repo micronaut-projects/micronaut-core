@@ -18,7 +18,7 @@ package io.micronaut.context.env;
 import io.micronaut.context.Qualifier;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.EachProperty;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.value.PropertyCatalog;
 import io.micronaut.core.value.PropertyResolver;
@@ -107,8 +107,7 @@ public sealed interface ConfigurationPath
     /**
      * @return The current kind
      */
-    @NonNull
-    ConfigurationSegment.ConfigurationKind kind();
+    ConfigurationSegment.@NonNull ConfigurationKind kind();
 
     /**
      * @return The current bound name if any.

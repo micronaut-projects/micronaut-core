@@ -1,6 +1,6 @@
 package io.micronaut.http.netty.body
 
-import io.micronaut.core.annotation.NonNull
+import org.jspecify.annotations.NonNull
 import org.jspecify.annotations.Nullable
 import io.micronaut.core.annotation.Order
 import io.micronaut.core.type.Argument

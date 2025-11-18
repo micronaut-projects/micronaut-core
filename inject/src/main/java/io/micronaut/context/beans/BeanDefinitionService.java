@@ -20,7 +20,7 @@ import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.DisabledBean;
 import io.micronaut.context.RuntimeBeanDefinition;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanConfiguration;

@@ -29,7 +29,7 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.*;
 import io.micronaut.aop.Introduction;
 import io.micronaut.context.annotation.Type;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import io.micronaut.aop.MethodInterceptor;
