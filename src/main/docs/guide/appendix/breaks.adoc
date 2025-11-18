@@ -5,6 +5,11 @@ This section documents breaking changes between Micronaut versions
 
 === Core Changes
 
+==== Update to Apache Groovy 5
+
+Micronaut 5 uses http://groovy-lang.org/releasenotes/groovy-5.0.html[Apache Groovy 5].
+Check https://groovy-lang.org/releasenotes/groovy-5.0.html#Groovy5.0-breaking[Groovy 5 breaking changes].
+
 ==== Bean context changes
 
 The default implementations of api:context.BeanContext[BeanContext], api:context.ApplicationContext[ApplicationContext] and api:context.env.Environment[Environment] are no longer public and non-final.
