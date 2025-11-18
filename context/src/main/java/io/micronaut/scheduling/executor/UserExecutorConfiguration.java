@@ -19,7 +19,7 @@ import io.micronaut.context.annotation.ConfigurationInject;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.ArgumentUtils;
 
 import jakarta.validation.constraints.Min;

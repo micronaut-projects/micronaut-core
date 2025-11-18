@@ -21,7 +21,7 @@ import io.micronaut.http.annotation.CookieValue;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Header;
 
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.time.ZonedDateTime;
 import java.util.Arrays;
 import java.util.List;

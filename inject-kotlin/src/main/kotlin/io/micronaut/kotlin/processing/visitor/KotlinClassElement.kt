@@ -256,7 +256,7 @@ internal open class KotlinClassElement(
 
     private val resolvedAnnotationMetadata: AnnotationMetadata by lazy {
         if (presetAnnotationMetadata != null) {
-            presetAnnotationMetadata
+            presetAnnotationMetadata!!
         } else {
             if (definedType != null) {
                 AnnotationMetadataHierarchy(

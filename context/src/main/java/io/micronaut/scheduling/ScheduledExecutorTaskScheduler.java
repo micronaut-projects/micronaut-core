@@ -19,7 +19,7 @@ import static io.micronaut.core.util.ArgumentUtils.check;
 
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.scheduling.cron.CronExpression;
 import jakarta.inject.Named;

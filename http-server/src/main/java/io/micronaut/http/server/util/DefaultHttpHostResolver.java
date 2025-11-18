@@ -17,7 +17,7 @@ package io.micronaut.http.server.util;
 
 import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;

@@ -1,7 +1,7 @@
 package io.micronaut.core.io.service
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
-import io.micronaut.core.annotation.Nullable
+import org.jspecify.annotations.Nullable
 import io.micronaut.core.expressions.EvaluatedExpression
 import io.micronaut.core.graal.GraalReflectionConfigurer
 import io.micronaut.inject.BeanDefinition

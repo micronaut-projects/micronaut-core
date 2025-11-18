@@ -15,7 +15,7 @@
  */
 package io.micronaut.web.router;
 
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.http.HttpStatus;
 
 import java.util.Optional;

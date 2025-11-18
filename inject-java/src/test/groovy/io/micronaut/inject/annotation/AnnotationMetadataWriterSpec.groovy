@@ -105,7 +105,7 @@ class Test {
         AnnotationMetadata metadata = buildMethodAnnotationMetadata('''\
 package test;
 
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 class Test {
     @Nullable

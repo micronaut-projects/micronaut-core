@@ -17,7 +17,7 @@ package io.micronaut.http.netty;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;

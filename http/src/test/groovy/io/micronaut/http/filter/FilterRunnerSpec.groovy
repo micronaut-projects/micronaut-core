@@ -1,6 +1,6 @@
 package io.micronaut.http.filter
 
-import io.micronaut.core.annotation.Nullable
+import org.jspecify.annotations.Nullable
 import io.micronaut.core.convert.ConversionService
 import io.micronaut.core.execution.CompletableFutureExecutionFlow
 import io.micronaut.core.execution.ExecutionFlow

@@ -16,7 +16,7 @@
 package io.micronaut.http.server.netty.handler;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.server.netty.HttpCompressionStrategy;
@@ -307,7 +307,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
             return super.initialSettings(settings);
         }
 
-        public ConnectionHandlerBuilder accessLogManagerFactory(@Nullable Http2AccessLogManager.Factory accessLogManagerFactory) {
+        public ConnectionHandlerBuilder accessLogManagerFactory(Http2AccessLogManager.@Nullable Factory accessLogManagerFactory) {
             this.accessLogManagerFactory = accessLogManagerFactory;
             return this;
         }

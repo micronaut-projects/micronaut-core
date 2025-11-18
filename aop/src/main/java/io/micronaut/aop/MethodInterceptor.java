@@ -15,7 +15,7 @@
  */
 package io.micronaut.aop;
 
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A MethodInterceptor extends the generic {@link Interceptor} and provides an interface more specific to method interception.

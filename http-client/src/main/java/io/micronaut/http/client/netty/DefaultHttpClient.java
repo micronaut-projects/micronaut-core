@@ -21,7 +21,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.async.propagation.ReactivePropagation;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.beans.BeanMap;
@@ -2065,7 +2065,7 @@ public class DefaultHttpClient implements
         return result;
     }
 
-    private static void setRedirectHeaders(@Nullable io.micronaut.http.HttpRequest<?> request, MutableHttpRequest<Object> redirectRequest) {
+    private static void setRedirectHeaders(io.micronaut.http.@Nullable HttpRequest<?> request, MutableHttpRequest<Object> redirectRequest) {
         if (request != null) {
             for (Map.Entry<String, List<String>> originalHeader : request.getHeaders()) {
                 if (!REDIRECT_HEADER_BLOCKLIST.contains(originalHeader.getKey())) {

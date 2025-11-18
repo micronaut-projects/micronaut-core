@@ -18,7 +18,7 @@ package io.micronaut.aop.introduction
 import io.micronaut.aop.MethodInterceptor
 import io.micronaut.aop.MethodInvocationContext
 import io.micronaut.core.annotation.AnnotationMetadata
-import io.micronaut.core.annotation.Nullable
+import org.jspecify.annotations.Nullable
 import io.micronaut.core.type.MutableArgumentValue
 import jakarta.inject.Singleton
 

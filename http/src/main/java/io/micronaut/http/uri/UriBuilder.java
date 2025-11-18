@@ -17,7 +17,7 @@ package io.micronaut.http.uri;
 
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.net.URI;
 import java.util.Map;
 

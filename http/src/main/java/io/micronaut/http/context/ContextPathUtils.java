@@ -16,7 +16,7 @@
 package io.micronaut.http.context;
 
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.StringUtils;
 
 import java.net.URI;

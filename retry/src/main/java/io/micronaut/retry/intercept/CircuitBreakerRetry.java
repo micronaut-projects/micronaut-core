@@ -16,7 +16,7 @@
 package io.micronaut.retry.intercept;
 
 import io.micronaut.context.event.ApplicationEventPublisher;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.retry.CircuitState;
 import io.micronaut.retry.RetryStateBuilder;

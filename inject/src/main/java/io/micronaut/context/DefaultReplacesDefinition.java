@@ -21,7 +21,7 @@ import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ReplacesDefinition;
 import io.micronaut.inject.qualifiers.Qualifiers;

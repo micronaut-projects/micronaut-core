@@ -18,7 +18,7 @@ package io.micronaut.context;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.QualifiedBeanType;
 import jakarta.inject.Singleton;
 

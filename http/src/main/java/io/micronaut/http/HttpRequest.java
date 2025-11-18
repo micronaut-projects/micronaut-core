@@ -16,7 +16,7 @@
 package io.micronaut.http;
 
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.http.cookie.Cookies;
 
 import javax.net.ssl.SSLPeerUnverifiedException;

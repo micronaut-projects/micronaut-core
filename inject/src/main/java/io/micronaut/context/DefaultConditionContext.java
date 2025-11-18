@@ -15,7 +15,7 @@
  */
 package io.micronaut.context;
 
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.context.condition.Failure;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;

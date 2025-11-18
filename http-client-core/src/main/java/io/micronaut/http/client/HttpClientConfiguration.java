@@ -19,7 +19,7 @@ import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.Toggleable;
@@ -933,8 +933,7 @@ public abstract class HttpClientConfiguration {
      * @return The HTTP/2 configuration.
      * @since 4.6.0
      */
-    @Nullable
-    public HttpClientConfiguration.Http2ClientConfiguration getHttp2Configuration() {
+    public HttpClientConfiguration.@Nullable Http2ClientConfiguration getHttp2Configuration() {
         return null;
     }
 

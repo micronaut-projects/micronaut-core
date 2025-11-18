@@ -51,7 +51,7 @@ internal class KotlinWildcardElement(
 
     private val resolvedAnnotationMetadata: AnnotationMetadata by lazy {
         if (presetAnnotationMetadata != null) {
-            presetAnnotationMetadata
+            presetAnnotationMetadata!!
         } else {
             AnnotationMetadataHierarchy(
                 true,

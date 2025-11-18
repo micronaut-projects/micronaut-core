@@ -19,7 +19,7 @@ import io.micronaut.context.AbstractMessageSource;
 import io.micronaut.context.MessageSource;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.ArgumentUtils;
 import jakarta.inject.Inject;
 

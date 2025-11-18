@@ -18,7 +18,7 @@ package io.micronaut.aop.factory.mapped;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.exceptions.BeanContextException;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.ExecutableMethod;
 
 import jakarta.inject.Singleton;

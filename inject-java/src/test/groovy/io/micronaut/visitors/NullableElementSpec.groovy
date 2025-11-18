@@ -346,12 +346,12 @@ class Test {
 
     @Nullable
     String[] jspecifyArrayField;
-    @io.micronaut.core.annotation.Nullable
+    @org.jspecify.annotations.Nullable
     String[] micronautArrayField;
 
     String @Nullable [] jspecifyArrayField2;
 
-    String @io.micronaut.core.annotation.Nullable [] micronautArrayField2;
+    String @org.jspecify.annotations.Nullable [] micronautArrayField2;
 
 }
 ''') { ClassElement classElement ->

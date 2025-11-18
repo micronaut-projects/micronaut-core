@@ -17,7 +17,7 @@ package io.micronaut.context.env;
 
 import io.micronaut.context.env.exp.RandomPropertyExpressionResolver;
 import io.micronaut.context.exceptions.ConfigurationException;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.naming.NameUtils;

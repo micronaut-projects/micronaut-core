@@ -20,7 +20,7 @@ import ch.qos.logback.classic.LoggerContext;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.logging.LogLevel;
 import io.micronaut.logging.LoggingSystem;
 import jakarta.inject.Singleton;
