@@ -43,7 +43,7 @@ public record FunctionDef(
     List<DecoratorDef> decorators,
     ReturnDef returnType,
     String typeComment,
-    List<Object> typeParams,
+    List<TypeVar> typeParams,
     String documentation,
     boolean isAbstract,
     boolean isStatic,
@@ -103,11 +103,11 @@ public record FunctionDef(
              "", java.util.List.of(), null, false, false, null);
     }
 
-    public FunctionDef(String name, ArgumentsDef arguments, List<DecoratorDef> decorators, ReturnDef returnType, String typeComment, List<Object> typeParams, String documentation, boolean isAbstract) {
+    public FunctionDef(String name, ArgumentsDef arguments, List<DecoratorDef> decorators, ReturnDef returnType, String typeComment, List<TypeVar> typeParams, String documentation, boolean isAbstract) {
         this(name, arguments, decorators, returnType, typeComment, typeParams, documentation, isAbstract, false, null);
     }
 
-    public FunctionDef(String name, ArgumentsDef arguments, List<DecoratorDef> decorators, ReturnDef returnType, String typeComment, List<Object> typeParams, String documentation, boolean isAbstract, boolean isStatic) {
+    public FunctionDef(String name, ArgumentsDef arguments, List<DecoratorDef> decorators, ReturnDef returnType, String typeComment, List<TypeVar> typeParams, String documentation, boolean isAbstract, boolean isStatic) {
         this(name, arguments, decorators, returnType, typeComment, typeParams, documentation, isAbstract, isStatic, null);
     }
 

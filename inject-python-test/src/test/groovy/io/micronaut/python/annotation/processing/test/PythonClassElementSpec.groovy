@@ -22,6 +22,7 @@ import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.python.compiler.PrimitiveTypesAnnotation
 import io.micronaut.python.compiler.RepeatableAnnotation
+import spock.lang.PendingFeature
 import spock.lang.Unroll
 
 /**
@@ -342,6 +343,45 @@ class MyDerived(MyBase[str]):
             assert methods.size() == 1
             assert methods[0].genericReturnType.name == String.name
             assert methods[0].parameters[0].genericType.name == String.name
+            return element
+        }
+    }
+
+    @PendingFeature(reason = """
+Function _parse_function_type_params in micronaut_processor.py cannot find type_params
+
+FunctionDef https://docs.python.org/3/library/ast.html#ast.FunctionDef defines type_params but only since 3.12 so maybe a Python version issue.
+""")
+    def "test method-level type variables"() {
+        given:
+        def pythonCode = '''
+from typing import TypeVar, List
+
+S = TypeVar('S')
+
+class Helper:
+    def singleton_list(self, item: S) -> List[S]:
+        return [item]
+'''
+
+        expect:
+        buildClassElement(pythonCode, "Helper") { ClassElement element ->
+            def methods = element.getMethods()
+            println "Found ${methods.size()} methods"
+            methods.each { println "Method: ${it.getName()}" }
+
+            assert methods.size() == 1
+            def method = methods[0]
+            assert method.getName() == "singleton_list"
+
+            // Check that the method has declared type variables
+            def typeVars = method.getDeclaredTypeVariables()
+            println "Found ${typeVars.size()} type variables"
+            typeVars.each { println "Type var: ${it.getVariableName()}" }
+
+            assert typeVars.size() == 1
+            assert typeVars[0].getVariableName() == "S"
+
             return element
         }
     }
