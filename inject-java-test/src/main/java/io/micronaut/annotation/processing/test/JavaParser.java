@@ -16,8 +16,11 @@
 package io.micronaut.annotation.processing.test;
 
 import com.sun.source.util.JavacTask;
-import io.micronaut.annotation.processing.*;
-
+import io.micronaut.annotation.processing.AggregatingTypeElementVisitorProcessor;
+import io.micronaut.annotation.processing.BeanDefinitionInjectProcessor;
+import io.micronaut.annotation.processing.MixinVisitorProcessor;
+import io.micronaut.annotation.processing.PackageElementVisitorProcessor;
+import io.micronaut.annotation.processing.TypeElementVisitorProcessor;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.CollectionUtils;
@@ -33,12 +36,24 @@ import javax.lang.model.element.AnnotationValue;
 import javax.lang.model.element.Element;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
-import javax.tools.*;
+import javax.tools.Diagnostic;
+import javax.tools.DiagnosticCollector;
+import javax.tools.JavaCompiler;
+import javax.tools.JavaFileManager;
+import javax.tools.JavaFileObject;
+import javax.tools.ToolProvider;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.io.Reader;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -296,6 +311,10 @@ public class JavaParser implements Closeable {
                     "-source",
                     jvm.getJavaSpecificationVersion()
             );
+        } else if (jvm.isJavaVersionCompatible(25)) {
+            // For testing only, the annotation processors will be found
+            // on classpath, not annotation processor path
+            options = Set.of("-proc:full");
         } else {
             options = Collections.emptySet();
         }
