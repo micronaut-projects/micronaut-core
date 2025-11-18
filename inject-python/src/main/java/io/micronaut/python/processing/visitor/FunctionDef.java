@@ -48,7 +48,7 @@ public record FunctionDef(
     boolean isAbstract,
     boolean isStatic,
     ClassDef declaringClass
-) implements ElementDef {
+) implements ElementDef, MemberDef {
 
     public static final String CONSTRUCTOR_NAME = "__init__";
 

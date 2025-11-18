@@ -17,7 +17,9 @@ package io.micronaut.python.annotation.processing.test
 
 import io.micronaut.context.python.ContextHolder
 import io.micronaut.core.annotation.AnnotationUtil
+import io.micronaut.core.type.Argument
 import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.ast.MethodElement
 import io.micronaut.python.compiler.PrimitiveTypesAnnotation
 import io.micronaut.python.compiler.RepeatableAnnotation
 import spock.lang.Unroll
@@ -86,7 +88,7 @@ from micronaut.core.util import StringUtils
 @Named(StringUtils.TRUE)
 class MySingletonService:
     pass
-''')    { ClassElement element ->
+''') { ClassElement element ->
             assert element != null
             assert element.stringValue(AnnotationUtil.NAMED).get() == "true"
             return element
@@ -288,6 +290,88 @@ class TestService:
         thrown(IllegalStateException)
     }
 
+    def "test getDeclaredGenericPlaceholders returns type variables"() {
+        given:
+        def pythonCode = '''
+from typing import Generic, TypeVar
+
+T = TypeVar('T')
+
+class MyBase(Generic[T]):
+    pass
+'''
+
+        expect:
+        buildClassElement(pythonCode) { ClassElement element ->
+            assert element != null
+            assert element.getSimpleName() == "MyBase"
+            def placeholders = element.getDeclaredGenericPlaceholders()
+            assert placeholders.size() == 1
+            def placeholder = placeholders[0]
+            assert placeholder.getVariableName() == "T"
+
+            return element
+        }
+    }
+
+
+    def "test generic type arguments populated from actual types in inheritance"() {
+        given:
+        def pythonCode = '''
+from typing import Generic, TypeVar
+
+T = TypeVar('T')
+
+class MyBase(Generic[T]):
+    def echo(val : T) -> T:
+        return val
+
+class MyDerived(MyBase[str]):
+    pass
+'''
+
+        expect:
+        // Test that we can build classes with generic base classes without errors
+        buildClassElement(pythonCode, "MyDerived") { ClassElement element ->
+            // Test that getSuperType() works correctly
+            def superType = element.getSuperType()
+            assert superType.isPresent()
+            assert superType.get().getSimpleName() == "MyBase"
+            assert superType.get().typeArguments["T"].name == String.name
+            def methods = element.getMethods()
+            assert methods.size() == 1
+            assert methods[0].genericReturnType.name == String.name
+            assert methods[0].parameters[0].genericType.name == String.name
+            return element
+        }
+    }
+
+    def "test nested generic type arguments in base classes"() {
+        given:
+        def pythonCode = '''
+from typing import Generic, TypeVar
+
+T = TypeVar('T')
+
+class MyBase(Generic[T]):
+    def get_value(self) -> T:
+        return None
+
+class MyDerived(MyBase[dict[str, int]]):
+    pass
+'''
+
+        expect:
+        // Test that we can build classes with nested generic base classes without errors
+        buildClassElement(pythonCode, "MyDerived") { ClassElement element ->
+            // Test that getSuperType() works correctly
+            def superType = element.getSuperType()
+            assert superType.isPresent()
+            assert superType.get().getSimpleName() == "MyBase"
+            return element
+        }
+    }
+
     @Unroll
     def "test different return types: #description"() {
         given: "Python code with specific return type annotation"
@@ -319,16 +403,63 @@ class TypeTestService:
 
         where:
         description           | pythonTypeAnnotation | pythonValue | expectedValue        | expectedType    | returnType
-        "None return type"    | "None"               | "None"      | null                 | null            | void.class
-        "Dict return type"    | "dict[str, int]"     | '{"a": 1}'  | ["a": 1]             | HashMap.class   | Map.class
         "Optional present"    | "Optional[str]"      | '"Alice"'   | Optional.of("Alice") | Optional.class  | Optional.class
         "Optional empty"      | "Optional[str]"      | "None"      | Optional.empty()     | Optional.class  | Optional.class
+        "None return type"    | "None"               | "None"      | null                 | null            | void.class
+        "Dict return type"    | "dict[str, int]"     | '{"a": 1}'  | ["a": 1]             | HashMap.class   | Map.class
         "List return type"    | "list[int]"          | "[1, 2, 3]" | [1, 2, 3]            | ArrayList.class | List.class
         "String return type"  | "str"                | '"hello"'   | "hello"              | String.class    | String.class
         "Integer return type" | "int"                | "42"        | 42                   | Integer         | Integer.TYPE
         "Boolean True"        | "bool"               | "True"      | true                 | Boolean         | Boolean.TYPE
         "Boolean False"       | "bool"               | "False"     | false                | Boolean         | Boolean.TYPE
         "Float return type"   | "float"              | "3.14"      | 3.14d                | Double          | Double.TYPE
+
+    }
+
+    @Unroll
+    def "test different return types via generics: #description"() {
+        given: "Python code with specific return type annotation"
+        def pythonCode = """
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+from typing import Generic, TypeVar, List, Optional
+
+T = TypeVar('T')
+
+class MyBase(Generic[T]):
+    @Executable
+    def get_value(self) -> T:
+        return $pythonValue
+
+@Singleton
+class TypeTestService(MyBase[$pythonTypeAnnotation]):
+    pass
+"""
+
+        when: "Building ApplicationContext and calling method"
+        def context = buildContext(pythonCode)
+        def result = getBean(context, "python.TypeTestService").get_value()
+        def beanDefinition = getBeanDefinition(context, "python.TypeTestService")
+
+        then: "Result should be correctly converted to expected type"
+        beanDefinition.executableMethods.size() == 1
+        beanDefinition.executableMethods[0].returnType.asArgument() == returnType
+        result == expectedValue
+
+        cleanup: "Ensure context is properly closed"
+        context?.close()
+
+        where:
+        description           | pythonTypeAnnotation | pythonValue | expectedValue | expectedType    | returnType
+//        "Optional present"    | "Optional[str]"      | '"Alice"'   | Optional.of("Alice") | Optional.class  | Optional.class
+//        "Optional empty"      | "Optional[str]"      | "None"      | Optional.empty()     | Optional.class  | Optional.class
+        "Dict return type"    | "dict[str, int]"     | '{"a": 1}'  | ["a": 1]      | HashMap.class   | Argument.mapOf(String, Integer)
+        "List return type"    | "list[int]"          | "[1, 2, 3]" | [1, 2, 3]     | ArrayList.class | Argument.listOf(Integer)
+        "String return type"  | "str"                | '"hello"'   | "hello"       | String.class    | Argument.STRING
+        "Integer return type" | "int"                | "42"        | 42            | Integer         | Argument.INT
+        "Boolean True"        | "bool"               | "True"      | true          | Boolean         | Argument.BOOLEAN
+        "Boolean False"       | "bool"               | "False"     | false         | Boolean         | Argument.BOOLEAN
+        "Float return type"   | "float"              | "3.14"      | 3.14d         | Double          | Argument.DOUBLE
 
     }
 

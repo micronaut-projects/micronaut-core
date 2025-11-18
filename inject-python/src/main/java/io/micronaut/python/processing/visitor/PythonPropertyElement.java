@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -289,8 +290,8 @@ public final class PythonPropertyElement extends AbstractPythonElement implement
     private ClassElement resolvePythonTypeToJava(String pythonType) {
         return io.micronaut.python.processing.util.GraalPyUtil.resolvePythonTypeToJava(
             pythonType,
-            environment.visitorContext()
-        );
+            environment.visitorContext(),
+            Map.of());
     }
 
     private MethodElement createSyntheticGetter() {

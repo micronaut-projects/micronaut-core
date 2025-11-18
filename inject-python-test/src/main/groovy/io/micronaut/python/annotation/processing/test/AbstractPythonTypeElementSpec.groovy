@@ -160,6 +160,30 @@ abstract class AbstractPythonTypeElementSpec extends Specification {
     }
 
     /**
+     * Builds a class element for the given Python source code.
+     * @param pythonCode The Python source code
+     * @param closure the callback
+     * @return The class element
+     */
+    <T> T buildClassElement(@Language("python") String pythonCode, String simpleName, Closure<T> closure) {
+        def localClosure = closure
+        T result
+        def compiler = PyronautCompiler.builder()
+                .pythonCode(pythonCode)
+                .classElementCallback { ClassElement classElement ->
+                    if (localClosure != null && classElement.simpleName == simpleName) {
+                        result = localClosure?.call(classElement)
+                        localClosure = null
+                    }
+                }
+                .build()
+
+        compiler.buildClassLoader()
+
+        return result
+    }
+
+    /**
      * Builds an {@link ApplicationContext} containing the Python processing results.
      * This includes generated Java classes, pyronaut_application.py script, and verifies
      * that the GraalPy context is properly initialized and cleaned up.

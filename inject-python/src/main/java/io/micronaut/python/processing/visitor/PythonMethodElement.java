@@ -17,6 +17,7 @@ package io.micronaut.python.processing.visitor;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -55,6 +56,8 @@ public sealed class PythonMethodElement extends AbstractPythonElement implements
     private final ClassElement returnType;
     private final ParameterElement[] parameters;
     private final MethodElementAnnotationsHelper helper;
+
+    private ClassElement resolvedGenericReturnType;
 
     /**
      * Constructs a new {@code PythonMethodElement} from the given {@code FunctionDef}.
@@ -172,10 +175,49 @@ public sealed class PythonMethodElement extends AbstractPythonElement implements
         return owningType;
     }
 
+    @Override
+    public ClassElement getGenericReturnType() {
+        return resolveGenericReturnType(getNativeType());
+    }
+
+    private ClassElement resolveGenericReturnType(FunctionDef functionDef) {
+        if (resolvedGenericReturnType == null) {
+
+            Map<String, Map<String, ClassElement>> allGenerics = getOwningType().getAllTypeArguments();
+            ClassDef declaringClass = functionDef.declaringClass();
+            Map<String, ClassElement> boundGenerics = declaringClass != null ? allGenerics.getOrDefault(declaringClass.qualifiedName(), Map.of()) : Map.of();
+            ReturnDef returnDef = functionDef.returnType();
+            if (returnDef != null && returnDef.typeAnnotation() != null) {
+                ClassElement baseType = GraalPyUtil.resolvePythonTypeToJava(
+                    returnDef.typeAnnotation(),
+                    environment.visitorContext(),
+                    boundGenerics
+                );
+
+                // If there are decorators, create a ClassElement with annotation metadata
+                if (!returnDef.decorators().isEmpty()) {
+                    io.micronaut.core.annotation.AnnotationMetadata annotationMetadata =
+                        environment.visitorContext().getAnnotationMetadataBuilder().buildDeclared(returnDef);
+                    resolvedGenericReturnType = baseType.withAnnotationMetadata(annotationMetadata);
+                } else {
+                    resolvedGenericReturnType = baseType;
+                }
+            } else {
+                // Fall back to void/Object
+                resolvedGenericReturnType = PrimitiveElement.VOID;
+            }
+        }
+        return resolvedGenericReturnType;
+    }
+
     private ClassElement resolveReturnType(FunctionDef functionDef) {
         ReturnDef returnDef = functionDef.returnType();
         if (returnDef != null && returnDef.typeAnnotation() != null) {
-            ClassElement baseType = GraalPyUtil.resolvePythonTypeToJava(returnDef.typeAnnotation(), environment.visitorContext());
+            ClassElement baseType = GraalPyUtil.resolvePythonTypeToJava(
+                returnDef.typeAnnotation(),
+                environment.visitorContext(),
+                Map.of()
+            );
 
             // If there are decorators, create a ClassElement with annotation metadata
             if (!returnDef.decorators().isEmpty()) {

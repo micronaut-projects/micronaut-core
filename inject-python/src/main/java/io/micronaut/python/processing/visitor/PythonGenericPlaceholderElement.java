@@ -1,0 +1,104 @@
+/*
+ * Copyright 2017-2025 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.micronaut.python.processing.visitor;
+
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.GenericPlaceholderElement;
+import io.micronaut.python.processing.PythonProcessingEnvironment;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+
+/**
+ * Implementation of {@link GenericPlaceholderElement} for Python TypeVars.
+ *
+ * @author Micronaut
+ * @since 4.8.0
+ */
+public final class PythonGenericPlaceholderElement extends AbstractPythonClassElement implements GenericPlaceholderElement {
+
+    private final TypeVar typeVar;
+    private final List<PythonClassElement> bounds;
+
+    public PythonGenericPlaceholderElement(TypeVar typeVar,
+                                           PythonProcessingEnvironment environment,
+                                           List<PythonClassElement> bounds) {
+        this(typeVar, environment, bounds, null);
+    }
+
+    public PythonGenericPlaceholderElement(TypeVar typeVar,
+                                           PythonProcessingEnvironment environment,
+                                           List<PythonClassElement> bounds,
+                                           PythonClassElement declaringElement) {
+        super(new ClassDef(typeVar.name()), environment);
+        this.typeVar = typeVar;
+        this.bounds = bounds != null ? bounds : Collections.emptyList();
+        this.declaringElement = declaringElement;
+    }
+
+    private PythonClassElement declaringElement;
+
+    @Override
+    protected ClassElement createWithArrayDimensions(int arrayDimensions) {
+        return new PythonGenericPlaceholderElement(typeVar, environment, bounds);
+    }
+
+    @Override
+    protected AbstractPythonElement copyThis() {
+        return new PythonGenericPlaceholderElement(typeVar, environment, bounds);
+    }
+
+    @Override
+    public boolean isTypeVariable() {
+        return true;
+    }
+
+    @Override
+    public boolean isRawType() {
+        return false;
+    }
+
+    @NonNull
+    @Override
+    public List<? extends ClassElement> getBounds() {
+        return bounds;
+    }
+
+    @NonNull
+    @Override
+    public String getVariableName() {
+        return typeVar.name();
+    }
+
+    @Override
+    public Optional<Element> getDeclaringElement() {
+        return Optional.ofNullable(declaringElement);
+    }
+
+    @Override
+    public boolean isAssignable(String type) {
+        // A type variable is only assignable to itself
+        return getName().equals(type);
+    }
+
+    @Override
+    public String toString() {
+        return "Python Generic Placeholder: " + getVariableName();
+    }
+}
