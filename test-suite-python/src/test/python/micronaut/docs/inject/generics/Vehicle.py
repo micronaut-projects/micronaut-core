@@ -2,12 +2,12 @@ from jakarta.inject import Singleton, Named
 from .Engine import Engine
 from .V8 import V8
 
-# tag::class[]
 @Singleton
 class Vehicle:
-    def __init__(self, engine: Engine[V8]): # <4>
+    # tag::constructor[]
+    def __init__(self, engine: Engine[V8]):
         self.engine = engine
+    # end::constructor[]
 
     def start(self) -> str:
-        return self.engine.start() # <5>
-# end::class[]
+        return self.engine.start()
