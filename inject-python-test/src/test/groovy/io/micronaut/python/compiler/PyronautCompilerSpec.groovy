@@ -441,4 +441,89 @@ class UserController:
         context.close()
         tempSrcDir.deleteDir()
     }
+
+    def "test relatve import of Python decorator"() {
+        given:
+        def tempSrcDir = File.createTempDir("pyronaut-test-multi-package-src", "")
+        def tempTargetDir = File.createTempDir("pyronaut-test-multi-package-target", "")
+
+        // Create directory structure with multiple packages
+        def pythonDir = new File(tempSrcDir, "example")
+        def exampleDir = new File(tempSrcDir, "example")
+
+        pythonDir.mkdirs()
+        exampleDir.mkdirs()
+
+        // Create Python files in different packages
+        def notNullPy = new File(pythonDir, "NotNull.py")
+        notNullPy.text = '''
+from micronaut.aop import Around
+@Around
+def NotNull(func):
+    return func
+'''
+
+        def notNullInterceptor = new File(exampleDir, "NotNullInterceptor.py")
+        notNullInterceptor.text = '''
+from micronaut.aop import InterceptorBean, MethodInvocationContext
+from micronaut.context.annotation import Executable
+import java
+from .NotNull import NotNull
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+
+@InterceptorBean(NotNull)
+class TestAroundInterceptor(MethodInterceptor):
+    def intercept(self, context : MethodInvocationContext):
+        for param in context.getParameters().values():
+            if (param.getValue() is None):
+                raise Exception(f"Null parameter [{param.getName()}] is not allowed")
+        return context.proceed()
+'''
+
+        def notNullExample = new File(exampleDir, "NotNullExample.py")
+        notNullExample.text = '''
+from micronaut.context.annotation import Executable
+from jakarta.inject import Singleton
+
+from .NotNull import NotNull
+
+@Singleton
+class NotNullExample:
+    @NotNull
+    @Executable
+    def doWork(self, taskName : str):
+        print(f"Doing job: {taskName}")
+'''
+
+        def compiler = PyronautCompiler.builder()
+                .pythonSrc(tempSrcDir.absolutePath)
+                .javaSrc("inject-python-test/src/test/java")
+                .targetDir(tempTargetDir)
+                .build()
+
+        when:
+        compiler.compile()
+        def classLoader = new URLClassLoader(tempTargetDir.toURI().toURL())
+
+        then:
+        classLoader != null
+
+        when:
+        def context = ApplicationContext.builder()
+                .classLoader(classLoader)
+                .build()
+                .start()
+
+        def bean = context.getBean(classLoader.loadClass('example.NotNullExample'))
+        bean.doWork(null)
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message == 'Exception: Null parameter [taskName] is not allowed'
+
+        cleanup:
+        context.close()
+        tempSrcDir.deleteDir()
+    }
 }

@@ -128,7 +128,14 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
 
     @Override
     protected List<? extends DecoratorDef> getAnnotationsForType(ElementDef element) {
-        return element.decorators();
+        List<DecoratorDef> decoratorList = element.decorators();
+        if (decoratorList.isEmpty()) {
+            DecoratorDef decoratorDef = this.decorators.get(element.name());
+            if (decoratorDef != null) {
+                return decoratorDef.stereotypes();
+            }
+        }
+        return decoratorList;
     }
 
     @Override
