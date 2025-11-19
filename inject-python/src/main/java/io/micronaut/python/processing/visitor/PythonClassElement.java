@@ -123,7 +123,7 @@ public final class PythonClassElement extends AbstractPythonClassElement {
                         for (int i = 0; i < declaredGenericPlaceholders.size(); i++) {
                             GenericPlaceholderElement placeHolder = declaredGenericPlaceholders.get(i);
                             TypeRef typeRef = typeArguments.get(i);
-                            ClassElement resolvedType = GraalPyUtil.resolvePythonTypeToJava(typeRef, environment.visitorContext());
+                            ClassElement resolvedType = GraalPyUtil.resolvePythonTypeToJava(typeRef, environment.visitorContext(), Map.of());
                             String variableName = placeHolder.getVariableName();
                             resolvedTypeArguments.put(variableName, resolvedType);
                         }

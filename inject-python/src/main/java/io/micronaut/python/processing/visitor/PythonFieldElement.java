@@ -105,8 +105,12 @@ public final class PythonFieldElement extends AbstractPythonElement implements F
 
     private ClassElement resolveType(AttributeDef attributeDef) {
         if (attributeDef.typeName() != null) {
+            Map<String, Map<String, ClassElement>> allGenerics = getOwningType().getAllTypeArguments();
+            ClassDef declaringClass = attributeDef.declaringClass();
+            Map<String, ClassElement> boundGenerics = declaringClass != null ? allGenerics.getOrDefault(declaringClass.qualifiedName(), Map.of()) : Map.of();
+
             // Use the parsed type name (e.g., "io.micronaut.runtime.server.EmbeddedServer")
-            return GraalPyUtil.resolvePythonTypeToJava(attributeDef.typeName(), environment.visitorContext(), Map.of());
+            return GraalPyUtil.resolvePythonTypeToJava(attributeDef.typeName(), environment.visitorContext(), boundGenerics);
         }
         if (attributeDef.annotation() != null) {
             // Fallback to resolving the full annotation string

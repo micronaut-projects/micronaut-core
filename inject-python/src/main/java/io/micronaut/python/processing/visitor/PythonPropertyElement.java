@@ -274,8 +274,8 @@ public final class PythonPropertyElement extends AbstractPythonElement implement
 
         // Then try to get type from getter return type
         if (propertyDef.hasGetter()) {
-            String returnType = propertyDef.getter().returnType().typeAnnotation();
-            if (returnType != null && !returnType.isEmpty()) {
+            TypeRef returnType = propertyDef.getter().returnType().typeAnnotation();
+            if (returnType != null) {
                 ClassElement resolvedType = resolvePythonTypeToJava(returnType);
                 if (resolvedType != null) {
                     return resolvedType;
@@ -287,11 +287,10 @@ public final class PythonPropertyElement extends AbstractPythonElement implement
         return ClassElement.of(Object.class);
     }
 
-    private ClassElement resolvePythonTypeToJava(String pythonType) {
+    private ClassElement resolvePythonTypeToJava(TypeRef pythonType) {
         return io.micronaut.python.processing.util.GraalPyUtil.resolvePythonTypeToJava(
             pythonType,
-            environment.visitorContext(),
-            Map.of());
+            environment.visitorContext(), Map.of());
     }
 
     private MethodElement createSyntheticGetter() {

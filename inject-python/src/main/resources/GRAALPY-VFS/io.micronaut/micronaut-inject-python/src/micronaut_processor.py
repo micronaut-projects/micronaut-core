@@ -375,6 +375,9 @@ class PrintNodeVisitor(ast.NodeVisitor):
                             nullable_decorator = DecoratorDef("Nullable", "jakarta.annotation.Nullable", None, {}, [])
                             decorators.append(nullable_decorator)
                 else:
+                    # Parse type into TypeRef structure
+                    type_name = self._parse_type(node.annotation)
+
                     # For non-Annotated types, check if the type itself is nullable
                     if self._is_nullable_union_type(node.annotation):
                         nullable_decorator = DecoratorDef("Nullable", "jakarta.annotation.Nullable", None, {}, [])
@@ -456,10 +459,10 @@ class PrintNodeVisitor(ast.NodeVisitor):
     def _parse_annotated_type(self, annotation_node):
         """
         Parse a typing.Annotated type annotation and extract the actual type and metadata decorators.
-        Returns (type_annotation, decorators_list)
+        Returns (type_annotation, decorators_list) where type_annotation is now a TypeRef
         """
         decorators = []
-        type_annotation = "object"  # default fallback
+        type_annotation = TypeRef("object")  # default fallback
 
         # Parse the Annotated subscript arguments
         if isinstance(annotation_node, ast.Subscript):
@@ -469,9 +472,9 @@ class PrintNodeVisitor(ast.NodeVisitor):
                 args = self._extract_subscript_args(annotation_node)
                 if args:
                     try:
-                        type_annotation = self._extract_type_name(args[0])
+                        type_annotation = self._parse_type(args[0])
                     except:
-                        type_annotation = "object"  # fallback
+                        type_annotation = TypeRef("object")  # fallback
                     # Remaining args are metadata
                     for metadata in args[1:]:
                         if isinstance(metadata, ast.Call):
@@ -493,21 +496,24 @@ class PrintNodeVisitor(ast.NodeVisitor):
                 else:
                     # Fallback to original annotation if no args
                     try:
-                        type_annotation = ast.unparse(annotation_node) if hasattr(ast, 'unparse') else ast.dump(annotation_node)
+                        type_name = ast.unparse(annotation_node) if hasattr(ast, 'unparse') else ast.dump(annotation_node)
+                        type_annotation = TypeRef(type_name)
                     except:
-                        type_annotation = "object"
+                        type_annotation = TypeRef("object")
             else:
                 # Not Annotated, fallback to original annotation
                 try:
-                    type_annotation = ast.unparse(annotation_node) if hasattr(ast, 'unparse') else ast.dump(annotation_node)
+                    type_name = ast.unparse(annotation_node) if hasattr(ast, 'unparse') else ast.dump(annotation_node)
+                    type_annotation = TypeRef(type_name)
                 except:
-                    type_annotation = "object"
+                    type_annotation = TypeRef("object")
         else:
             # Not a subscript, fallback to original annotation
             try:
-                type_annotation = ast.unparse(annotation_node) if hasattr(ast, 'unparse') else ast.dump(annotation_node)
+                type_name = ast.unparse(annotation_node) if hasattr(ast, 'unparse') else ast.dump(annotation_node)
+                type_annotation = TypeRef(type_name)
             except:
-                type_annotation = "object"
+                type_annotation = TypeRef("object")
 
         return type_annotation, decorators
 
@@ -652,15 +658,19 @@ class PrintNodeVisitor(ast.NodeVisitor):
             return True
         return False
 
-    def _is_nullable_type_annotation(self, type_annotation_str):
+    def _is_nullable_type_annotation(self, type_annotation):
         """
-        Check if a type annotation string represents a nullable type.
-        This checks the string representation for union types containing None.
+        Check if a type annotation represents a nullable type.
+        This checks for union types containing None.
         """
-        if not isinstance(type_annotation_str, str):
+        if isinstance(type_annotation, str):
+            # Legacy string handling
+            return ' | None' in type_annotation or type_annotation == 'None'
+        elif hasattr(type_annotation, 'name'):
+            # TypeRef object
+            return type_annotation.name() == 'None'
+        else:
             return False
-        # Check for union types like "HelperService | None"
-        return ' | None' in type_annotation_str or type_annotation_str == 'None'
 
     def _parse_metadata_call(self, call_node):
         """
@@ -949,6 +959,15 @@ class PrintNodeVisitor(ast.NodeVisitor):
             # Qualified type like 'module.MyClass'
             name = self._extract_type_name(type_node)
             return TypeRef(name)
+        elif isinstance(type_node, ast.Constant):
+            # Handle string literals (forward references) like "Engine"
+            if isinstance(type_node.value, str):
+                name = self._extract_type_name(type_node)
+                return TypeRef(name)
+            else:
+                # Fallback for other constant types
+                name = str(type_node.value)
+                return TypeRef(name)
         elif isinstance(type_node, ast.Subscript):
             # Generic type like 'MyBase[str]' or 'dict[str, int]'
             base_name = self._extract_type_name(type_node.value)
@@ -1034,7 +1053,7 @@ class PrintNodeVisitor(ast.NodeVisitor):
 
             # Extract type annotation if present
             annotation = ""
-            type_annotation = ""
+            type_annotation = None
             decorators = []
             if hasattr(arg, 'annotation') and arg.annotation is not None:
                 try:
@@ -1048,8 +1067,8 @@ class PrintNodeVisitor(ast.NodeVisitor):
                     type_annotation = parsed_type   # Use extracted type for typeAnnotation
                     decorators = parsed_decorators  # Add any decorators found
                 else:
-                    # Resolve type names (including imported types)
-                    type_annotation = self._extract_type_name(arg.annotation)
+                    # Parse type into TypeRef structure
+                    type_annotation = self._parse_type(arg.annotation)
 
                 # Check for nullable union types and add @Nullable decorator
                 if self._is_nullable_union_type(arg.annotation):
@@ -1084,8 +1103,8 @@ class PrintNodeVisitor(ast.NodeVisitor):
                 parsed_type, parsed_decorators = self._parse_annotated_type(func_node.returns)
                 return ReturnDef.of(parsed_type, parsed_decorators)
             else:
-                # Resolve type names (including imported types)
-                type_annotation = self._extract_type_name(func_node.returns)
+                # Parse type into TypeRef structure
+                type_annotation = self._parse_type(func_node.returns)
                 return ReturnDef.of(type_annotation)
 
         return ReturnDef.none()

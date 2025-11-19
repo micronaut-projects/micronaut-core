@@ -23,12 +23,12 @@ import org.graalvm.polyglot.Value;
 /**
  * An AttributeDef node represents a class attribute definition.
  * <p>
- * AttributeDef(identifier name, expr? annotation, expr? value, list[DecoratorDef] decorators, str? documentation, bool isStatic, str? typeName, ClassDef declaringClass)
+ * AttributeDef(identifier name, expr? annotation, expr? value, list[DecoratorDef] decorators, str? documentation, bool isStatic, TypeRef? typeName, ClassDef declaringClass)
  * </p>
  *
  * @param name The name of the attribute.
  * @param annotation The full type annotation string.
- * @param typeName The extracted type name (e.g., "float" from "Annotated[float, Gt(0)]").
+ * @param typeName The extracted type name (e.g., TypeRef for "List[str]").
  * @param value The default value.
  * @param decorators The decorators.
  * @param documentation The documentation string.
@@ -40,7 +40,7 @@ import org.graalvm.polyglot.Value;
 public record AttributeDef(
     String name,
     String annotation,
-    String typeName,
+    TypeRef typeName,
     Value value,
     List<DecoratorDef> decorators,
     String documentation,
@@ -53,7 +53,7 @@ public record AttributeDef(
     }
 
     public AttributeDef(String name, String annotation, Value value) {
-        this(name, annotation, annotation, value, List.of(), null, false, null);
+        this(name, annotation, null, value, List.of(), null, false, null);
     }
 
     public AttributeDef {

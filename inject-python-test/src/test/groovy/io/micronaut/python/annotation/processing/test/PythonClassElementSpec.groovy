@@ -342,7 +342,39 @@ class MyDerived(MyBase[str]):
             def methods = element.getMethods()
             assert methods.size() == 1
             assert methods[0].genericReturnType.name == String.name
+            assert methods[0].returnType.name == Object.name
             assert methods[0].parameters[0].genericType.name == String.name
+            assert methods[0].parameters[0].type.name == Object.name
+            return element
+        }
+    }
+
+    def "test generic type arguments populated from function return types and arguments"() {
+        given:
+        def pythonCode = '''
+from typing import Generic, TypeVar
+
+T = TypeVar('T')
+
+class MyGeneric(Generic[T]):
+    pass
+
+class MyClass:
+    def echo(val : MyGeneric[str]) -> MyGeneric[str]:
+        return val
+'''
+
+        expect:
+        // Test that we can build classes with generic base classes without errors
+        buildClassElement(pythonCode, "MyClass") { ClassElement element ->
+            // Test that getSuperType() works correctly
+            def methods = element.getMethods()
+            assert methods.size() == 1
+            assert methods[0].genericReturnType.name == "python.MyGeneric"
+            assert methods[0].genericReturnType.getFirstTypeArgument().get().name == String.name
+            assert methods[0].returnType.name == "python.MyGeneric"
+            assert methods[0].parameters[0].genericType.name == "python.MyGeneric"
+            assert methods[0].parameters[0].type.name == "python.MyGeneric"
             return element
         }
     }
@@ -491,8 +523,8 @@ class TypeTestService(MyBase[$pythonTypeAnnotation]):
 
         where:
         description           | pythonTypeAnnotation | pythonValue | expectedValue | expectedType    | returnType
-//        "Optional present"    | "Optional[str]"      | '"Alice"'   | Optional.of("Alice") | Optional.class  | Optional.class
-//        "Optional empty"      | "Optional[str]"      | "None"      | Optional.empty()     | Optional.class  | Optional.class
+        "Optional present"    | "Optional[str]"      | '"Alice"'   | "Alice"       | Optional.class  | Argument.of(Optional, String)
+        "Optional empty"      | "Optional[str]"      | "None"      | null          | Optional.class  | Argument.of(Optional, String)
         "Dict return type"    | "dict[str, int]"     | '{"a": 1}'  | ["a": 1]      | HashMap.class   | Argument.mapOf(String, Integer)
         "List return type"    | "list[int]"          | "[1, 2, 3]" | [1, 2, 3]     | ArrayList.class | Argument.listOf(Integer)
         "String return type"  | "str"                | '"hello"'   | "hello"       | String.class    | Argument.STRING
