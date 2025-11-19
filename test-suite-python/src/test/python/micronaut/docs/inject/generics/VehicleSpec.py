@@ -10,7 +10,6 @@ class VehicleSpec:
     context : Annotated[ApplicationContext, Inject] = None
 
     @Test
-    @Disabled("Generic types not represented in the AST yet")
     def test_start_vehicle(self):
         # tag::start[]
         Vehicle = java.type("micronaut.docs.inject.generics.Vehicle")

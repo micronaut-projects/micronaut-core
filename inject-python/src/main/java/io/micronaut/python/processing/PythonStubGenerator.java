@@ -112,7 +112,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     ClassElement superType = element.getSuperType().orElse(null);
                     boolean extendsPythonClass = superType instanceof AbstractPythonClassElement;
 
-                    ClassTypeDef superClassType = null;
+                    ClassTypeDef superClassType;
                     if (extendsPythonClass) {
                         superClassType = ClassTypeDef.of(superType.getName());
                         builder.superclass(superClassType);
@@ -185,7 +185,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         MethodDef.MethodDefBuilder constructor = MethodDef.constructor();
                         @NonNull ParameterElement[] parameters = pythonConstructor.getParameters();
                         for (@NonNull ParameterElement parameter : parameters) {
-                            var parameterType = TypeDef.of(parameter.getType());
+                            var parameterType = ClassTypeDef.of(parameter.getType().getName());
                             ParameterDef parameterDef = ParameterDef
                                 .builder(parameter.getName(), parameterType).build();
                             constructor.addParameter(parameterDef);
