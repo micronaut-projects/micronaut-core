@@ -28,7 +28,7 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * A transformer that remaps {@link org.jspecify.annotations.Nullable} to {@link io.micronaut.core.annotation.AnnotationUtil#NULLABLE}.
+ * A transformer that remaps {@link io.micronaut.core.annotation.Nullable} to {@link io.micronaut.core.annotation.AnnotationUtil#NULLABLE}.
  *
  * @author graemerocher
  * @since 2.4.0
@@ -38,7 +38,7 @@ public class CoreNullableTransformer implements NamedAnnotationTransformer {
 
     @Override
     public String getName() {
-        return "org.jspecify.annotations.Nullable";
+        return "io.micronaut.core.annotation.Nullable";
     }
 
     @Override
