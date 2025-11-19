@@ -86,20 +86,20 @@ public record FunctionDef(
     // Backward compatibility constructors
     public FunctionDef(String name, List<String> argumentNames, List<String> argumentTypes, List<DecoratorDef> decorators, String returnTypeAnnotation) {
         this(name, createArgumentsDef(argumentNames, argumentTypes), decorators,
-             returnTypeAnnotation != null && !returnTypeAnnotation.isEmpty() ? ReturnDef.of(returnTypeAnnotation) : ReturnDef.none(),
+             returnTypeAnnotation != null && !returnTypeAnnotation.isEmpty() ? ReturnDef.of(new TypeRef(returnTypeAnnotation)) : ReturnDef.none(),
              "", java.util.List.of(), null, false, false, null);
     }
 
     public FunctionDef(String name, List<String> argumentNames, List<String> argumentTypes, String returnTypeAnnotation) {
         this(name, createArgumentsDef(argumentNames, argumentTypes), java.util.List.of(),
-             returnTypeAnnotation != null && !returnTypeAnnotation.isEmpty() ? ReturnDef.of(returnTypeAnnotation) : ReturnDef.none(),
+             returnTypeAnnotation != null && !returnTypeAnnotation.isEmpty() ? ReturnDef.of(new TypeRef(returnTypeAnnotation)) : ReturnDef.none(),
              "", java.util.List.of(), null, false, false, null);
     }
 
     // Constructor for Python interop with return type decorators
     public FunctionDef(String name, ArgumentsDef arguments, List<DecoratorDef> decorators, String returnTypeAnnotation, List<DecoratorDef> returnTypeDecorators) {
         this(name, arguments, decorators,
-             returnTypeAnnotation != null && !returnTypeAnnotation.isEmpty() ? ReturnDef.of(returnTypeAnnotation, returnTypeDecorators) : ReturnDef.none(),
+             returnTypeAnnotation != null && !returnTypeAnnotation.isEmpty() ? ReturnDef.of(new TypeRef(returnTypeAnnotation), returnTypeDecorators) : ReturnDef.none(),
              "", java.util.List.of(), null, false, false, null);
     }
 
@@ -131,7 +131,7 @@ public record FunctionDef(
         for (int i = 0; i < argumentNames.size(); i++) {
             String argName = argumentNames.get(i);
             String argType = i < argumentTypes.size() ? argumentTypes.get(i) : "";
-            args.add(ArgumentDef.of(argName, argType));
+            args.add(ArgumentDef.of(argName, new TypeRef(argType)));
         }
         return ArgumentsDef.of(args);
     }

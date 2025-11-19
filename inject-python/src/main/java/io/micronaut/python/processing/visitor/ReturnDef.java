@@ -18,17 +18,17 @@ package io.micronaut.python.processing.visitor;
 /**
  * A ReturnDef represents the return type annotation of a function.
  * <p>
- * This record captures the return type annotation string from a Python function's
+ * This record captures the return type annotation from a Python function's
  * type hint (e.g., "-> int", "-> str", "-> List[str]").
  * </p>
  *
- * @param typeAnnotation The return type annotation string, or null if no return type is specified.
+ * @param typeAnnotation The return type annotation, or null if no return type is specified.
  * @param decorators The decorators found on the return type annotation.
  * @author Micronaut Team
  * @since 5.0.0
  */
 public record ReturnDef(
-    String typeAnnotation,
+    TypeRef typeAnnotation,
     java.util.List<DecoratorDef> decorators
 ) implements ElementDef {
 
@@ -47,7 +47,7 @@ public record ReturnDef(
      * @param typeAnnotation The return type annotation
      * @return A new ReturnDef
      */
-    public static ReturnDef of(String typeAnnotation) {
+    public static ReturnDef of(TypeRef typeAnnotation) {
         return new ReturnDef(typeAnnotation, java.util.List.of());
     }
 
@@ -58,12 +58,12 @@ public record ReturnDef(
      * @param decorators The decorators for the return type
      * @return A new ReturnDef
      */
-    public static ReturnDef of(String typeAnnotation, java.util.List<DecoratorDef> decorators) {
+    public static ReturnDef of(TypeRef typeAnnotation, java.util.List<DecoratorDef> decorators) {
         return new ReturnDef(typeAnnotation, decorators != null ? decorators : java.util.List.of());
     }
 
     @Override
     public String name() {
-        return typeAnnotation;
+        return typeAnnotation != null ? typeAnnotation.name() : null;
     }
 }

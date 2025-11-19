@@ -27,7 +27,7 @@ import java.util.Objects;
  *
  * @param name The parameter name.
  * @param annotation The full type annotation string.
- * @param typeAnnotation The extracted type name (e.g., "int" from "Annotated[int, Gt(0)]").
+ * @param typeAnnotation The extracted type annotation (e.g., TypeRef for "List[str]").
  * @param defaultValue The default value as a GraalPy Value, or null if no default.
  * @param decorators The decorators applied to this parameter.
  * @param documentation The parameter documentation string.
@@ -38,18 +38,18 @@ import java.util.Objects;
 public record ArgumentDef(
     String name,
     String annotation,
-    String typeAnnotation,
+    TypeRef typeAnnotation,
     Object defaultValue,
     List<DecoratorDef> decorators,
     String documentation,
     FunctionDef declaringFunction
 ) implements ElementDef {
 
-    public ArgumentDef(String name, String typeAnnotation) {
-        this(name, typeAnnotation, typeAnnotation, null, List.of(), null, null);
+    public ArgumentDef(String name, TypeRef typeAnnotation) {
+        this(name, typeAnnotation != null ? typeAnnotation.name() : null, typeAnnotation, null, List.of(), null, null);
     }
 
-    public ArgumentDef(String name, String annotation, String typeAnnotation, Object defaultValue, List<DecoratorDef> decorators, String documentation) {
+    public ArgumentDef(String name, String annotation, TypeRef typeAnnotation, Object defaultValue, List<DecoratorDef> decorators, String documentation) {
         this(name, annotation, typeAnnotation, defaultValue, decorators, documentation, null);
     }
 
@@ -74,8 +74,8 @@ public record ArgumentDef(
      * @param typeAnnotation The type annotation (nullable)
      * @return A new ArgumentDef
      */
-    public static ArgumentDef of(String name, String typeAnnotation) {
-        return new ArgumentDef(name, typeAnnotation, typeAnnotation, null, List.of(), null, null);
+    public static ArgumentDef of(String name, TypeRef typeAnnotation) {
+        return new ArgumentDef(name, typeAnnotation != null ? typeAnnotation.name() : null, typeAnnotation, null, List.of(), null, null);
     }
 
     /**
@@ -96,8 +96,8 @@ public record ArgumentDef(
      * @param defaultValue The default value (nullable)
      * @return A new ArgumentDef
      */
-    public static ArgumentDef of(String name, String typeAnnotation, Object defaultValue) {
-        return new ArgumentDef(name, typeAnnotation, typeAnnotation, defaultValue, List.of(), null, null);
+    public static ArgumentDef of(String name, TypeRef typeAnnotation, Object defaultValue) {
+        return new ArgumentDef(name, typeAnnotation != null ? typeAnnotation.name() : null, typeAnnotation, defaultValue, List.of(), null, null);
     }
 
     /**
@@ -109,8 +109,8 @@ public record ArgumentDef(
      * @param documentation The parameter documentation (nullable)
      * @return A new ArgumentDef
      */
-    public static ArgumentDef of(String name, String typeAnnotation, Object defaultValue, String documentation) {
-        return new ArgumentDef(name, typeAnnotation, typeAnnotation, defaultValue, List.of(), documentation, null);
+    public static ArgumentDef of(String name, TypeRef typeAnnotation, Object defaultValue, String documentation) {
+        return new ArgumentDef(name, typeAnnotation != null ? typeAnnotation.name() : null, typeAnnotation, defaultValue, List.of(), documentation, null);
     }
 
     /**
@@ -124,7 +124,7 @@ public record ArgumentDef(
      * @param documentation The parameter documentation (nullable)
      * @return A new ArgumentDef
      */
-    public static ArgumentDef of(String name, String annotation, String typeAnnotation, Object defaultValue, List<DecoratorDef> decorators, String documentation) {
+    public static ArgumentDef of(String name, String annotation, TypeRef typeAnnotation, Object defaultValue, List<DecoratorDef> decorators, String documentation) {
         return new ArgumentDef(name, annotation, typeAnnotation, defaultValue, decorators, documentation, null);
     }
 
