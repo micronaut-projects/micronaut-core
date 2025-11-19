@@ -5,6 +5,10 @@ This section documents breaking changes between Micronaut versions
 
 === Core Changes
 
+=== JSpecify Nullability Annotations
+
+The Micronaut APIs use <<jspecify, JSpecify Annotations>>, and we recommend users to embrace JSpecify nullability annotations.
+
 ==== Bean context changes
 
 The default implementations of api:context.BeanContext[BeanContext], api:context.ApplicationContext[ApplicationContext] and api:context.env.Environment[Environment] are no longer public and non-final.
