@@ -15,17 +15,6 @@
  */
 package io.micronaut.jackson.databind.convert;
 
-import tools.jackson.core.JsonParser;
-import tools.jackson.core.JacksonException;
-import tools.jackson.databind.JavaType;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.PropertyNamingStrategies;
-import tools.jackson.databind.PropertyNamingStrategy;
-import tools.jackson.databind.node.ArrayNode;
-import tools.jackson.databind.node.ContainerNode;
-import tools.jackson.databind.node.ObjectNode;
-import tools.jackson.databind.type.TypeFactory;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.core.annotation.Internal;
@@ -42,6 +31,17 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.jackson.JacksonConfiguration;
 import jakarta.inject.Inject;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.JsonParser;
+import tools.jackson.databind.JavaType;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.PropertyNamingStrategies;
+import tools.jackson.databind.PropertyNamingStrategy;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.ContainerNode;
+import tools.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.type.TypeFactory;
 
 import java.util.ArrayList;
 import java.util.Map;
@@ -144,24 +144,29 @@ public class JacksonConverterRegistrar implements TypeConverterRegistrar {
      */
     protected TypeConverter<JsonNode, Object> jsonNodeToObjectConverter() {
         return (node, targetType, context) -> {
-            if (CharSequence.class.isAssignableFrom(targetType) && node instanceof ObjectNode) {
-                return Optional.of(node.toString());
-            } else {
-                Argument<Object> argument = null;
-                if (node instanceof ContainerNode && context instanceof ArgumentConversionContext conversionContext && targetType.getTypeParameters().length != 0) {
-                    argument = conversionContext.getArgument();
-                }
-                Object result;
-                if (argument != null) {
-                    ObjectMapper om = this.objectMapper.get();
-                    JsonParser jsonParser = om.treeAsTokens(node);
-                    TypeFactory typeFactory = om.getTypeFactory();
-                    JavaType javaType = JacksonConfiguration.constructType(argument, typeFactory);
-                    result = om.readValue(jsonParser, javaType);
+            try {
+                if (CharSequence.class.isAssignableFrom(targetType) && node instanceof ObjectNode) {
+                    return Optional.of(node.toString());
                 } else {
-                    result = this.objectMapper.get().treeToValue(node, targetType);
+                    Argument<Object> argument = null;
+                    if (node instanceof ContainerNode && context instanceof ArgumentConversionContext conversionContext && targetType.getTypeParameters().length != 0) {
+                        argument = conversionContext.getArgument();
+                    }
+                    Object result;
+                    if (argument != null) {
+                        ObjectMapper om = this.objectMapper.get();
+                        JsonParser jsonParser = om.treeAsTokens(node);
+                        TypeFactory typeFactory = om.getTypeFactory();
+                        JavaType javaType = JacksonConfiguration.constructType(argument, typeFactory);
+                        result = om.readValue(jsonParser, javaType);
+                    } else {
+                        result = this.objectMapper.get().treeToValue(node, targetType);
+                    }
+                    return Optional.ofNullable(result);
                 }
-                return Optional.ofNullable(result);
+            } catch (JacksonException e) {
+                context.reject(e);
+                return Optional.empty();
             }
         };
     }

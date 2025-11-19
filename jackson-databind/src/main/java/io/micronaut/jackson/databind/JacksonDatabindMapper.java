@@ -297,7 +297,7 @@ public final class JacksonDatabindMapper implements JsonMapper {
 
     @Override
     public @NonNull Processor<byte[], JsonNode> createReactiveParser(@NonNull Consumer<Processor<byte[], JsonNode>> onSubscribe, boolean streamArray) {
-        return new JacksonCoreProcessor(streamArray, (JsonFactory) objectMapper.tokenStreamFactory(), config) {
+        return new JacksonCoreProcessor(streamArray, objectMapper.tokenStreamFactory(), config) {
             @Override
             public void subscribe(Subscriber<? super JsonNode> downstreamSubscriber) {
                 onSubscribe.accept(this);

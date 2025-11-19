@@ -16,24 +16,6 @@
 package io.micronaut.jackson;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import tools.jackson.core.json.JsonFactory;
-import tools.jackson.core.JsonParser;
-import tools.jackson.core.TSFBuilder;
-import tools.jackson.databind.DefaultTyping;
-import tools.jackson.databind.DeserializationContext;
-import tools.jackson.databind.DeserializationFeature;
-import tools.jackson.databind.JacksonModule;
-import tools.jackson.databind.ValueDeserializer;
-import tools.jackson.databind.ValueSerializer;
-import tools.jackson.databind.KeyDeserializer;
-import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.PropertyNamingStrategy;
-import tools.jackson.databind.deser.ValueDeserializerModifier;
-import tools.jackson.databind.deser.jdk.StringDeserializer;
-import tools.jackson.databind.json.JsonMapper;
-import tools.jackson.databind.jsontype.DefaultBaseTypeLimitingValidator;
-import tools.jackson.databind.module.SimpleModule;
-import tools.jackson.databind.ser.ValueSerializerModifier;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Factory;
@@ -48,6 +30,24 @@ import io.micronaut.jackson.serialize.MicronautDeserializers;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
+import tools.jackson.core.JsonParser;
+import tools.jackson.core.json.JsonFactory;
+import tools.jackson.core.json.JsonFactoryBuilder;
+import tools.jackson.databind.DefaultTyping;
+import tools.jackson.databind.DeserializationContext;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.JacksonModule;
+import tools.jackson.databind.KeyDeserializer;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.PropertyNamingStrategy;
+import tools.jackson.databind.ValueDeserializer;
+import tools.jackson.databind.ValueSerializer;
+import tools.jackson.databind.deser.ValueDeserializerModifier;
+import tools.jackson.databind.deser.jdk.StringDeserializer;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.jsontype.DefaultBaseTypeLimitingValidator;
+import tools.jackson.databind.module.SimpleModule;
+import tools.jackson.databind.ser.ValueSerializerModifier;
 
 import java.text.SimpleDateFormat;
 import java.util.Locale;
@@ -104,9 +104,9 @@ public class ObjectMapperFactory {
     @Singleton
     @BootstrapContextCompatible
     public JsonFactory jsonFactory(JacksonConfiguration jacksonConfiguration) {
-        final TSFBuilder<?, ?> jsonFactoryBuilder = JsonFactory.builder();
+        final JsonFactoryBuilder jsonFactoryBuilder = JsonFactory.builder();
         jacksonConfiguration.getFactorySettings().forEach(jsonFactoryBuilder::configure);
-        return (JsonFactory) jsonFactoryBuilder.build();
+        return jsonFactoryBuilder.build();
     }
 
     /**
@@ -140,7 +140,7 @@ public class ObjectMapperFactory {
     @Primary
     @Named("json")
     @BootstrapContextCompatible
-    public ObjectMapper objectMapper(@Nullable JacksonConfiguration jacksonConfiguration,
+    public JsonMapper objectMapper(@Nullable JacksonConfiguration jacksonConfiguration,
                                      @Nullable JsonFactory jsonFactory) {
         JsonMapper.Builder builder = jsonFactory != null ? JsonMapper.builder(jsonFactory) : JsonMapper.builder();
 
