@@ -15,12 +15,15 @@
  */
 package io.micronaut.http.server.netty;
 
+import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.netty.buffer.ByteBufHolder;
+import io.netty.contrib.multipart.DecoderQuirk;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.LastHttpContent;
@@ -49,6 +52,8 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 @Internal
 public final class FormDataHttpContentProcessor {
+
+    private static boolean contribCodecMissing;
 
     protected final NettyHttpRequest<?> nettyHttpRequest;
     protected final long advertisedLength;
@@ -89,12 +94,38 @@ public final class FormDataHttpContentProcessor {
         HttpDataFactory factory = new MicronautHttpData.Factory(multipart, characterEncoding);
         // prevent the decoders from immediately parsing the content
         HttpRequest nativeRequest = nettyHttpRequest.toHttpRequestWithoutBody();
-        if (HttpPostRequestDecoder.isMultipart(nativeRequest)) {
-            this.decoder = new HttpPostMultipartRequestDecoder(factory, nativeRequest, characterEncoding, configuration.getFormMaxFields(), configuration.getFormMaxBufferedBytes());
-        } else {
-            this.decoder = new HttpPostStandardRequestDecoder(factory, nativeRequest, characterEncoding, configuration.getFormMaxFields(), configuration.getFormMaxBufferedBytes());
-        }
+        this.decoder = createDecoder(factory, nativeRequest, characterEncoding, configuration);
         this.partMaxSize = multipart.getMaxFileSize();
+    }
+
+    private static InterfaceHttpPostRequestDecoder createDecoder(HttpDataFactory factory, HttpRequest request, Charset charset, NettyHttpServerConfiguration configuration) {
+        if (!contribCodecMissing) {
+            try {
+                var builder = io.netty.contrib.multipart.vintage.HttpPostRequestDecoder.builder()
+                    .dataFactory(factory)
+                    .charset(charset)
+                    .maxFields(configuration.getFormMaxFields())
+                    .undecodedLimit(configuration.getFormMaxBufferedBytes())
+                    .enableQuirks(configuration.getFormDecoderQuirks().stream()
+                        .map(name -> ConversionService.SHARED.convertRequired(name, DecoderQuirk.class))
+                        .toArray(DecoderQuirk[]::new));
+                if (HttpPostRequestDecoder.isMultipart(request)) {
+                    return builder.buildMultipart(request);
+                } else {
+                    return builder.buildStandard(request);
+                }
+            } catch (LinkageError e) {
+                if (!configuration.getFormDecoderQuirks().isEmpty()) {
+                    throw new ConfigurationException("Configuration contained form-decoder-quirks, but failed to load new decoder implementation", e);
+                }
+                contribCodecMissing = true;
+            }
+        }
+        if (HttpPostRequestDecoder.isMultipart(request)) {
+            return new HttpPostMultipartRequestDecoder(factory, request, charset, configuration.getFormMaxFields(), configuration.getFormMaxBufferedBytes());
+        } else {
+            return new HttpPostStandardRequestDecoder(factory, request, charset, configuration.getFormMaxFields(), configuration.getFormMaxBufferedBytes());
+        }
     }
 
     protected void onData(ByteBufHolder message, Collection<? super InterfaceHttpData> out) {
