@@ -15,12 +15,6 @@
  */
 package io.micronaut.jackson.core.parser;
 
-import tools.jackson.core.ObjectReadContext;
-import tools.jackson.core.json.JsonFactory;
-import tools.jackson.core.JsonToken;
-import tools.jackson.core.async.ByteArrayFeeder;
-import tools.jackson.core.exc.UnexpectedEndOfInputException;
-import tools.jackson.core.json.async.NonBlockingByteArrayJsonParser;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.async.processor.SingleThreadedBufferingProcessor;
@@ -32,6 +26,12 @@ import io.micronaut.json.tree.JsonNode;
 import org.reactivestreams.Subscriber;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import tools.jackson.core.JsonToken;
+import tools.jackson.core.ObjectReadContext;
+import tools.jackson.core.TokenStreamFactory;
+import tools.jackson.core.async.ByteArrayFeeder;
+import tools.jackson.core.exc.UnexpectedEndOfInputException;
+import tools.jackson.core.json.async.NonBlockingByteArrayJsonParser;
 
 import java.io.IOException;
 import java.util.Optional;
@@ -52,7 +52,7 @@ public class JacksonCoreProcessor extends SingleThreadedBufferingProcessor<byte[
     private NonBlockingByteArrayJsonParser currentNonBlockingByteArrayJsonParser;
     private TreeGenerator currentGenerator = null;
 
-    private final JsonFactory jsonFactory;
+    private final TokenStreamFactory jsonFactory;
     private final JsonStreamConfig deserializationConfig;
     private final JsonNodeTreeCodec treeCodec;
 
@@ -69,13 +69,13 @@ public class JacksonCoreProcessor extends SingleThreadedBufferingProcessor<byte[
      * @param jsonFactory Factory to use for creating the parser
      * @param deserializationConfig The deserialization configuration (in particular bignum handling)
      */
-    public JacksonCoreProcessor(boolean streamArray, JsonFactory jsonFactory, @NonNull JsonStreamConfig deserializationConfig) {
+    public JacksonCoreProcessor(boolean streamArray, TokenStreamFactory jsonFactory, @NonNull JsonStreamConfig deserializationConfig) {
         this.jsonFactory = jsonFactory;
         this.streamArray = streamArray;
         this.treeCodec = JsonNodeTreeCodec.getInstance().withConfig(deserializationConfig);
         this.jsonStream = true;
         this.deserializationConfig = deserializationConfig;
-        this.currentNonBlockingByteArrayJsonParser = (NonBlockingByteArrayJsonParser) jsonFactory.createNonBlockingByteArrayParser(ObjectReadContext.empty());
+        this.currentNonBlockingByteArrayJsonParser = jsonFactory.createNonBlockingByteArrayParser(ObjectReadContext.empty());
     }
 
     /**
