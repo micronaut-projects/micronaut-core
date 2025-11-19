@@ -1,7 +1,7 @@
 package io.micronaut.inject.annotation
 
-import org.jspecify.annotations.NonNull
-import org.jspecify.annotations.Nullable
+import io.micronaut.core.annotation.NonNull
+import io.micronaut.core.annotation.Nullable
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
@@ -13,7 +13,7 @@ class AnnotationRemapperSpec extends AbstractTypeElementSpec {
         AnnotationMetadata metadata = buildMethodArgumentAnnotationMetadata('''
 package test;
 
-import org.jspecify.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 @jakarta.inject.Singleton
 class Test {
 
@@ -35,7 +35,7 @@ class Test {
         AnnotationMetadata metadata = buildMethodArgumentAnnotationMetadata('''
 package test;
 
-import org.jspecify.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 @jakarta.inject.Singleton
 class Test {
 
@@ -57,12 +57,12 @@ class Test {
         def definition = buildBeanDefinition('test.Test', '''
 package test;
 
-import org.jspecify.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 @jakarta.inject.Singleton
 class Test {
 
     @io.micronaut.context.annotation.Executable
-    void test(@NonNull String one, @org.jspecify.annotations.Nullable String two) {
+    void test(@NonNull String one, @io.micronaut.core.annotation.Nullable String two) {
 
     }
 }

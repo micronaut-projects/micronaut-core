@@ -336,7 +336,7 @@ class Test {
 
     void "test jspecify annotations arrays"() {
         expect:
-            buildClassElement('''
+        buildClassElement('''
 package test;
 
 import org.jspecify.annotations.NonNull;
@@ -346,12 +346,12 @@ class Test {
 
     @Nullable
     String[] jspecifyArrayField;
-    @org.jspecify.annotations.Nullable
+    @io.micronaut.core.annotation.Nullable
     String[] micronautArrayField;
 
     String @Nullable [] jspecifyArrayField2;
 
-    String @org.jspecify.annotations.Nullable [] micronautArrayField2;
+    String @io.micronaut.core.annotation.Nullable [] micronautArrayField2;
 
 }
 ''') { ClassElement classElement ->

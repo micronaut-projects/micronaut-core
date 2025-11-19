@@ -18,7 +18,7 @@ package io.micronaut.inject.value.nullablevalue;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
 
-import org.jspecify.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 

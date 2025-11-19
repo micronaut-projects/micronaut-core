@@ -1,7 +1,7 @@
 package io.micronaut.test.lombok;
 
 import io.micronaut.core.annotation.Introspected;
-import org.jspecify.annotations.NonNull;
+import io.micronaut.core.annotation.NonNull;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.Value;

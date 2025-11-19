@@ -17,7 +17,7 @@ package io.micronaut.docs.config.value;
 
 // tag::imports[]
 import io.micronaut.context.annotation.Value;
-import org.jspecify.annotations.Nullable;
+import io.micronaut.core.annotation.Nullable;
 
 import jakarta.inject.Singleton;
 // end::imports[]
