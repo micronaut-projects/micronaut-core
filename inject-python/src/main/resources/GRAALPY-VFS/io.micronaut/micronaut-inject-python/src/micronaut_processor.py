@@ -194,7 +194,7 @@ class PrintNodeVisitor(ast.NodeVisitor):
                             return node
 
                     # Only check for micronaut decorators on top-level functions (not nested)
-                    if self.current_class is None and not was_in_function and is_micronaut_decorator(node):
+                    if self.current_class is None and not was_in_function and is_micronaut_decorator(node, self):
                         arg_dict = extract_arg_defaults(node)
                         # Filter out micronaut_annotation decorators as they are internal helpers
                         stereotypes = [
@@ -205,6 +205,10 @@ class PrintNodeVisitor(ast.NodeVisitor):
                         ]
                         annotation_name = get_micronaut_annotation_value('name', node)
                         repeated_name = get_micronaut_annotation_value('repeated', node)
+
+                        # For decorators defined with Micronaut annotations like @Around, use package naming
+                        if annotation_name is None:
+                            annotation_name = f"{self.package_name}.{node.name}"
 
                         # Track the annotation name for type resolution
                         if annotation_name:
@@ -1130,8 +1134,14 @@ def decorator_to_function(visitor, node):
             if decorator_declaration is not None:
                 return decorator_declaration
             else:
-                # If not a known micronaut decorator, treat as direct annotation
-                return None
+                # Check if this is an imported Micronaut/jakarta.inject annotation
+                imported_name = visitor.imported_types.get(node.id)
+                if imported_name:
+                    # Create a DecoratorDef for the Micronaut/jakarta.inject annotation
+                    return DecoratorDef(node.id, imported_name, None, {}, [])
+                else:
+                    # If not a known micronaut decorator, treat as direct annotation
+                    return None
         # when a decorator takes argument values it is represented by ast.Call
         # here we parse out the constants to the call and set them as the named
         # values to the decorator
@@ -1375,11 +1385,13 @@ def is_micronaut_annotation_decorator(decorator_node):
         return is_target
     return False
 
-def is_micronaut_decorator(funcdef):
+def is_micronaut_decorator(funcdef, visitor=None):
     """
     Returns True if the ast.FunctionDef is a top-level function (not inside a class)
-    and has been transformed by the micronaut_transformer to create micronaut annotations.
-    This checks for functions that have @micronaut_annotation decorators or the _micronaut_annotations pattern.
+    and has been transformed by the micronaut_transformer to create micronaut annotations,
+    or is decorated with Micronaut/jakarta.inject annotations.
+    This checks for functions that have @micronaut_annotation decorators or the _micronaut_annotations pattern,
+    or decorators imported from micronaut.* or jakarta.inject.* packages.
     """
     if not isinstance(funcdef, ast.FunctionDef):
         return False
@@ -1390,7 +1402,7 @@ def is_micronaut_decorator(funcdef):
             # Check decorator name
             is_target = (
                     (isinstance(dec.func, ast.Name) and dec.func.id == 'micronaut_annotation')
-                    or (isinstance(dec.func, ast.Attribute) and dec.func.attr == 'micronaut_annotation')
+                    or (isinstance(dec.func, ast.Attribute) and dec.attr == 'micronaut_annotation')
             )
             if is_target:
                 return True
@@ -1408,6 +1420,15 @@ def is_micronaut_decorator(funcdef):
                     args = stmt.test.operand.args
                     if len(args) >= 2 and isinstance(args[1], ast.Constant) and args[1].value == "_micronaut_annotations":
                         return True
+
+    # Check if this function has decorators imported from micronaut.* or jakarta.inject.* packages
+    if visitor is not None:
+        for dec in funcdef.decorator_list:
+            decorator_name = extract_decorator_name(dec)
+            if decorator_name:
+                existing_decorator = visitor.known_decorators.get(decorator_name)
+                if existing_decorator and (existing_decorator.annotationName().startswith('io.micronaut.') or existing_decorator.annotationName().startswith('jakarta.inject.')):
+                    return True
 
     return False
 
