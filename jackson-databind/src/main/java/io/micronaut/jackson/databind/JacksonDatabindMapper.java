@@ -16,16 +16,6 @@
 package io.micronaut.jackson.databind;
 
 import com.fasterxml.jackson.annotation.JsonView;
-import tools.jackson.core.exc.StreamReadException;
-import tools.jackson.core.json.JsonFactory;
-import tools.jackson.core.JsonParser;
-import tools.jackson.databind.DeserializationFeature;
-import tools.jackson.databind.JacksonModule;
-import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.ObjectReader;
-import tools.jackson.databind.ObjectWriter;
-import tools.jackson.databind.DeserializationContext;
-import tools.jackson.databind.cfg.MapperBuilder;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -53,6 +43,16 @@ import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Processor;
 import org.reactivestreams.Subscriber;
+import tools.jackson.core.JsonParser;
+import tools.jackson.core.exc.StreamReadException;
+import tools.jackson.core.json.JsonFactory;
+import tools.jackson.databind.DeserializationContext;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.JacksonModule;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectReader;
+import tools.jackson.databind.ObjectWriter;
+import tools.jackson.databind.cfg.MapperBuilder;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -237,12 +237,7 @@ public final class JacksonDatabindMapper implements JsonMapper {
     @Override
     public void writeValue(@NonNull OutputStream outputStream, @Nullable Object object) throws IOException {
         if (specializedWriter != null) {
-            if (object == null) {
-                specializedWriter.writeValue(outputStream, null);
-            } else {
-                // Bind root type to retain static typing while preserving active view to avoid excessive dynamic lookups
-                specializedWriter.forType(object.getClass()).writeValue(outputStream, object);
-            }
+            specializedWriter.writeValue(outputStream, object);
         } else {
             objectMapper.writeValue(outputStream, object);
         }
@@ -256,10 +251,7 @@ public final class JacksonDatabindMapper implements JsonMapper {
     @Override
     public byte[] writeValueAsBytes(@Nullable Object object) throws IOException {
         if (specializedWriter != null) {
-            if (object == null) {
-                return specializedWriter.writeValueAsBytes(null);
-            }
-            return specializedWriter.forType(object.getClass()).writeValueAsBytes(object);
+            return specializedWriter.writeValueAsBytes(object);
         }
         return objectMapper.writeValueAsBytes(object);
     }
