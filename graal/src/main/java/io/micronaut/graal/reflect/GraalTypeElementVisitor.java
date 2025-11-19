@@ -24,7 +24,6 @@ import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.ReflectionConfig;
 import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.core.annotation.TypeHint;
@@ -89,7 +88,6 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
         return Set.of(
             ReflectiveAccess.class.getName(),
             TypeHint.class.getName(),
-            Introspected.class.getName(),
             Import.class.getName(),
             "javax.persistence.Entity",
             "jakarta.persistence.Entity",
@@ -195,28 +193,6 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                     final String beanName = element.getName();
                     addBean(beanName, reflectiveClasses);
                     resolveClassData(beanName + "[]", reflectiveClasses);
-                }
-            }
-
-            // Ensure @Introspected records have reflective access to component accessor methods in Native Image,
-            // because Jackson's record support queries record components and requires accessor methods to be present
-            // in reflection configuration. This keeps Jackson working even if it inspects record metadata.
-            if (element.isRecord() && element.hasAnnotation(Introspected.class)) {
-                MethodElement ctor = element.getPrimaryConstructor().orElse(null);
-                if (ctor != null) {
-                    // Ensure canonical constructor is reflectively available for Jackson RecordUtil
-                    processMethodElement(ctor, reflectiveClasses);
-
-                    // Ensure component accessor methods are reflectively available
-                    ReflectionConfigData data = resolveClassData(element.getName(), reflectiveClasses);
-                    for (ParameterElement p : ctor.getParameters()) {
-                        data.methods.add(
-                            AnnotationValue.builder(ReflectionConfig.ReflectiveMethodConfig.class)
-                                .member("name", p.getName())
-                                .member("parameterTypes", AnnotationClassValue.ZERO_ANNOTATION_CLASS_VALUES)
-                                .build()
-                        );
-                    }
                 }
             }
 
