@@ -1,59 +1,8 @@
-plugins {
-    id 'java-library'
-}
+import io.micronaut.build.internal.python.PyronautCompilerPlugin
 
-// Create compileTestPython task for test sources
-tasks.register('compileTestPython', PythonCompile) {
-    source.set(layout.projectDirectory.dir("src/test/python"))
-    destinationDir.set(layout.buildDirectory.dir("classes/java/test"))
-    classpath = sourceSets.test.compileClasspath + files(sourceSets.test.java.classesDirectory) + files(sourceSets.main.java.classesDirectory)
-    dependsOn( project.project(":micronaut-inject-python").assemble )
-}
+pluginManager.apply(PyronautCompilerPlugin)
 
-// Make test depend on compileTestPython
-tasks.named('test') {
-    dependsOn tasks.named('compileTestPython')
-}
-
-import org.gradle.api.DefaultTask
-import org.gradle.api.file.DirectoryProperty
-import org.gradle.api.file.ConfigurableFileCollection
-import org.gradle.api.tasks.*
-import org.gradle.process.ExecOperations
-import javax.inject.Inject
-
-abstract class PythonCompile extends DefaultTask {
-
-    private final ExecOperations execOps
-
-    @InputDirectory
-    final DirectoryProperty source = project.objects.directoryProperty()
-
-    @OutputDirectory
-    final DirectoryProperty destinationDir = project.objects.directoryProperty()
-
-    // New: classpath input (for runtime deps or tool jars)
-    @Classpath
-    final ConfigurableFileCollection classpath = project.objects.fileCollection()
-
-    @Inject
-    PythonCompile(ExecOperations execOperations) {
-        this.execOps = execOperations
-    }
-
-    @TaskAction
-    void compile() {
-        execOps.javaexec {
-            // Combine the project runtime classpath + any user-supplied entries
-            def cp = this.project.project(":micronaut-inject-python").sourceSets["main"].runtimeClasspath + this.classpath
-            delegate.classpath = cp
-            // 🧩 Enable remote debugging on port 5005
-//            jvmArgs(
-//                    "-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:5005"
-//            )
-            systemProperties("org.graalvm.python.vfs.allow_multiple": "true", "org.graalvm.python.vfs.multiple_vfs_checks_as_warning": "true")
-            mainClass.set("io.micronaut.python.compiler.PyronautCompiler")
-            args(source.get().asFile.absolutePath, destinationDir.get().asFile.absolutePath)
-        }
-    }
+dependencies {
+    pyronautCompiler(projects.micronautInjectPython)
+    pyronautCompiler(projects.micronautContextPython)
 }
