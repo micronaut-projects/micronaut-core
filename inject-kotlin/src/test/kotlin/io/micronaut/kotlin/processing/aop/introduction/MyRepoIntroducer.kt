@@ -2,10 +2,8 @@ package io.micronaut.kotlin.processing.aop.introduction
 
 import io.micronaut.aop.MethodInterceptor
 import io.micronaut.aop.MethodInvocationContext
-import org.jspecify.annotations.Nullable
 import jakarta.inject.Singleton
 import java.lang.reflect.Method
-import java.util.ArrayList
 
 @Singleton
 class MyRepoIntroducer : MethodInterceptor<Any, Any> {

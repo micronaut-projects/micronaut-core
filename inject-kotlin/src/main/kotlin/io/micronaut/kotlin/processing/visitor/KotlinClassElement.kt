@@ -44,7 +44,6 @@ import io.micronaut.context.annotation.ConfigurationBuilder
 import io.micronaut.context.annotation.ConfigurationReader
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.Creator
-import org.jspecify.annotations.NonNull
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
 import io.micronaut.inject.ast.ArrayableClassElement

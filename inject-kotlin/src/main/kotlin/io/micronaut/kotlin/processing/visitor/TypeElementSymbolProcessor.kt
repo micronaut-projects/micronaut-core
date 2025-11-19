@@ -30,7 +30,6 @@ import com.google.devtools.ksp.visitor.KSTopDownVisitor
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.annotation.Requires.Sdk
 import io.micronaut.core.annotation.Generated
-import org.jspecify.annotations.NonNull
 import io.micronaut.core.annotation.Vetoed
 import io.micronaut.core.order.OrderUtil
 import io.micronaut.core.util.StringUtils
@@ -39,7 +38,6 @@ import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.ElementModifier
 import io.micronaut.inject.ast.ElementQuery
 import io.micronaut.inject.ast.FieldElement
-import io.micronaut.inject.ast.MemberElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.PropertyElement
 import io.micronaut.inject.processing.ProcessingException

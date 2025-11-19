@@ -2,7 +2,6 @@ package io.micronaut.kotlin.processing.aop.introduction.with_around
 
 import io.micronaut.aop.MethodInterceptor
 import io.micronaut.aop.MethodInvocationContext
-import org.jspecify.annotations.Nullable
 import jakarta.inject.Singleton
 
 @Singleton

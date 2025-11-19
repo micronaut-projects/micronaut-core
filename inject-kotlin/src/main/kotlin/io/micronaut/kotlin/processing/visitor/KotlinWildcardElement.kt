@@ -16,7 +16,6 @@
 package io.micronaut.kotlin.processing.visitor
 
 import io.micronaut.core.annotation.AnnotationMetadata
-import org.jspecify.annotations.NonNull
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
 import io.micronaut.inject.ast.ArrayableClassElement
 import io.micronaut.inject.ast.ClassElement

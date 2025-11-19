@@ -1,7 +1,6 @@
 package io.micronaut.docs.http.client.bind.method;
 
 import io.micronaut.aop.MethodInvocationContext;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.client.bind.ClientRequestUriContext;
 import jakarta.inject.Singleton;
