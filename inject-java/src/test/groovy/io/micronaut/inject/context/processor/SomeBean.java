@@ -15,6 +15,9 @@
  */
 package io.micronaut.inject.context.processor;
 
+import io.micronaut.context.annotation.Requires;
+
+@Requires(property = "spec.name", value = "BeanDefinitionProcessorSpec")
 @ProcessedAnnotation
 public class SomeBean {
 }

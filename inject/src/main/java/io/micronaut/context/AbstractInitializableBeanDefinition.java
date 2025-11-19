@@ -296,8 +296,19 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
 
     @Override
     public String toString() {
-        Class<?> declaringType = constructor == null ? type : constructor.declaringType;
-        return "Definition: " + declaringType.getName();
+        if (constructor == null) {
+            return "Definition: " + type.getName();
+        }
+        if (constructor.declaringType.equals(type)) {
+            return "Definition: " + type.getName();
+        }
+        if (constructor instanceof MethodReference methodConstructor) {
+            return "Definition: " + type.getName() + " Factory: " + constructor.declaringType.getName() + "#" + methodConstructor.methodName;
+        }
+        if (constructor instanceof FieldReference fieldReference) {
+            return "Definition: " + type.getName() + " Factory: " + constructor.declaringType.getName() + "." + fieldReference.argument.getName();
+        }
+        return "Definition: " + type.getName() + " Factory: " + constructor.declaringType.getName();
     }
 
     @Override
@@ -826,7 +837,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
                 }
             }
         }
-        if (bean instanceof LifeCycle lifeCycle) {
+        if (bean instanceof LifeCycle<?> lifeCycle) {
             bean = lifeCycle.start();
         }
         return bean;
@@ -844,7 +855,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     @Internal
     @UsedByGeneratedCode
     protected Object preDestroy(BeanResolutionContext resolutionContext, BeanContext context, Object bean) {
-        if (bean instanceof LifeCycle lifeCycle) {
+        if (bean instanceof LifeCycle<?> lifeCycle) {
             bean = lifeCycle.stop();
         }
         return bean;
@@ -2002,36 +2013,39 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     @Internal
     @UsedByGeneratedCode
     protected final boolean containsPropertiesValue(BeanResolutionContext resolutionContext, BeanContext context, String value) {
-        if (!(context instanceof ApplicationContext applicationContext)) {
+        PropertyResolver propertyResolver = resolutionContext.getPropertyResolver();
+        if (propertyResolver == null) {
             return false;
         }
         value = substituteWildCards(resolutionContext, value);
 
-        return applicationContext.containsProperties(value);
+        return propertyResolver.containsProperties(value);
     }
 
     @Internal
     @UsedByGeneratedCode
     protected final boolean containsPropertyValue(BeanResolutionContext resolutionContext, BeanContext context, String value) {
-        if (!(context instanceof ApplicationContext applicationContext)) {
+        PropertyResolver propertyResolver = resolutionContext.getPropertyResolver();
+        if (propertyResolver == null) {
             return false;
         }
         value = substituteWildCards(resolutionContext, value);
 
-        return applicationContext.containsProperty(value);
+        return propertyResolver.containsProperty(value);
     }
 
     private boolean resolveContainsValue(BeanResolutionContext resolutionContext, BeanContext context, AnnotationMetadata parentAnnotationMetadata, Argument argument, boolean isValuePrefix) {
-        if (!(context instanceof ApplicationContext applicationContext)) {
+        PropertyResolver propertyResolver = resolutionContext.getPropertyResolver();
+        if (propertyResolver == null) {
             return false;
         }
         String valueAnnStr = argument.getAnnotationMetadata().stringValue(Value.class).orElse(null);
         String valString = resolvePropertyValueName(resolutionContext, parentAnnotationMetadata, argument, valueAnnStr);
-        boolean result = isValuePrefix ? applicationContext.containsProperties(valString) : applicationContext.containsProperty(valString);
+        boolean result = isValuePrefix ? propertyResolver.containsProperties(valString) : propertyResolver.containsProperty(valString);
         if (!result && precalculatedInfo.isConfigurationProperties) {
             String cliOption = resolveCliOption(argument.getName());
             if (cliOption != null) {
-                result = applicationContext.containsProperty(cliOption);
+                result = propertyResolver.containsProperty(cliOption);
             }
         }
         return result;

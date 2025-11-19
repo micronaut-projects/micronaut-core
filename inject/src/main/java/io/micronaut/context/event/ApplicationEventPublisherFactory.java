@@ -40,6 +40,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
@@ -74,6 +75,31 @@ public final class ApplicationEventPublisherFactory<T>
             // ignore, might happen if jakarta.inject is not the classpath
         }
         annotationMetadata = metadata;
+    }
+
+    @Override
+    public int getOrder() {
+        return 0;
+    }
+
+    @Override
+    public boolean isParallel() {
+        return false;
+    }
+
+    @Override
+    public boolean isPrimary() {
+        return false;
+    }
+
+    @Override
+    public @NonNull Class<?>[] getIndexes() {
+        return new Class<?>[]{getBeanType()};
+    }
+
+    @Override
+    public Set<Class<?>> getExposedTypes() {
+        return Set.of(getBeanType());
     }
 
     @Override

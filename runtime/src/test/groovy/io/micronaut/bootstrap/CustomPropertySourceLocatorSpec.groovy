@@ -16,7 +16,6 @@
 package io.micronaut.bootstrap
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.Environment
 import io.micronaut.context.env.PropertySource
 import io.micronaut.core.io.ResourceLoader
@@ -26,7 +25,6 @@ import spock.lang.Specification
 import spock.util.environment.RestoreSystemProperties
 
 import java.util.stream.Stream
-
 /**
  * @author graemerocher
  * @since 1.0
@@ -83,7 +81,7 @@ some.bootstrap.config=yyy
             }
         }
 
-        ApplicationContext applicationContext = new DefaultApplicationContext(resourceLoader)
+        ApplicationContext applicationContext = ApplicationContext.builder().resourceResolver(resourceLoader).build()
         applicationContext.environment.addPropertySource(PropertySource.of(
                 'custom.prop.a':'BBB',
                 'some.bootstrap.value':'overridden'
@@ -101,7 +99,7 @@ some.bootstrap.config=yyy
 
     void "test that a PropertySource from a PropertySourceLocator doesn't override application config when not enabled"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext()
+        ApplicationContext applicationContext = ApplicationContext.builder().build()
         applicationContext.environment.addPropertySource(PropertySource.of(
                 'custom.prop.a':'BBB'
         ))

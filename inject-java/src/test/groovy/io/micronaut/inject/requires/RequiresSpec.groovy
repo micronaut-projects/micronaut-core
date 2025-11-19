@@ -2,7 +2,7 @@ package io.micronaut.inject.requires
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.BeanContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.condition.OperatingSystem
 import io.micronaut.context.env.PropertySource
@@ -278,7 +278,7 @@ class MyBean {
 ''')
 
         then:
-        beanDefinition.isEnabled(new DefaultBeanContext())
+        beanDefinition.isEnabled(BeanContext.build())
     }
 
     void "test requires classes with classes not present"() {
@@ -313,7 +313,7 @@ class MyBean {
 ''')
 
         then:
-        !beanDefinition.isEnabled(new DefaultBeanContext())
+        !beanDefinition.isEnabled(BeanContext.build())
     }
 
     void "test meta requires condition satisfied"() {
@@ -358,7 +358,7 @@ class MyBean {
 ''')
 
         then:
-        beanDefinition.isEnabled(new DefaultBeanContext())
+        beanDefinition.isEnabled(BeanContext.build())
     }
 
     void "test requires missing beans with bean present"() {
@@ -398,7 +398,7 @@ class MyBean {
 ''')
 
         then:
-        !beanDefinition.isEnabled(new DefaultBeanContext())
+        !beanDefinition.isEnabled(BeanContext.build())
     }
 
     void "test requires missing classes as string class names when classes not present"() {
@@ -415,7 +415,7 @@ class MyBean {
 ''')
 
         then:
-        beanDefinition.isEnabled(new DefaultBeanContext())
+        beanDefinition.isEnabled(BeanContext.build())
     }
 
     void "test requires missing classes as class when class present"() {
@@ -432,7 +432,7 @@ class MyBean {
 ''')
 
         then:
-        !beanDefinition.isEnabled(new DefaultBeanContext())
+        !beanDefinition.isEnabled(BeanContext.build())
     }
 
     void "test requires beans with no bean present"() {
@@ -449,7 +449,7 @@ class MyBean {
 ''')
 
         then:
-        !beanDefinition.isEnabled(new DefaultBeanContext())
+        !beanDefinition.isEnabled(BeanContext.build())
     }
 
     void "test requires beans with bean present"() {

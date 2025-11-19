@@ -15,16 +15,16 @@
  */
 package io.micronaut.inject;
 
-import static io.micronaut.core.annotation.AnnotationUtil.ANN_ADAPTER;
-import static io.micronaut.core.type.TypeInformation.TypeFormat.getBeanTypeString;
-
-import io.micronaut.context.Qualifier;
+import io.micronaut.context.DefaultReplacesDefinition;
 import io.micronaut.context.annotation.ConfigurationReader;
+import io.micronaut.context.annotation.DefaultImplementation;
 import io.micronaut.context.annotation.DefaultScope;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.EachProperty;
+import io.micronaut.context.annotation.Replaces;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.Named;
@@ -45,6 +45,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
+
+import static io.micronaut.core.annotation.AnnotationUtil.ANN_ADAPTER;
+import static io.micronaut.core.type.TypeInformation.TypeFormat.getBeanTypeString;
 
 /**
  * Defines a bean definition and its requirements. A bean definition must have a singled injectable constructor or a
@@ -456,9 +459,8 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
      * @return An optional {@link ExecutableMethod}
      * @throws IllegalStateException If the method cannot be found
      */
-    @SuppressWarnings("unchecked")
     default <R> ExecutableMethod<T, R> getRequiredMethod(String name, Class<?>... argumentTypes) {
-        return (ExecutableMethod<T, R>) findMethod(name, argumentTypes)
+        return this.<R>findMethod(name, argumentTypes)
             .orElseThrow(() -> ReflectionUtils.newNoSuchMethodError(getBeanType(), name, argumentTypes));
     }
 
@@ -472,23 +474,6 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
     @Override
     default Argument<T> getGenericBeanType() {
         return asArgument();
-    }
-
-    /**
-     * Resolve the declared qualifier for this bean.
-     * @return The qualifier or null if this isn't one
-     */
-    @Override
-    default @Nullable Qualifier<T> getDeclaredQualifier() {
-        return QualifiedBeanType.super.getDeclaredQualifier();
-    }
-
-    /**
-     * @return Method that can be overridden to resolve a dynamic qualifier
-     */
-    @Override
-    default @Nullable Qualifier<T> resolveDynamicQualifier() {
-        return QualifiedBeanType.super.resolveDynamicQualifier();
     }
 
     /**
@@ -647,5 +632,40 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
      */
     default @NonNull String getBeanDescription(@NonNull TypeFormat typeFormat) {
         return getBeanDescription(typeFormat, true);
+    }
+
+    /**
+     * Get the default implementation defined by {@link io.micronaut.context.annotation.DefaultImplementation}.
+     * @return The default implementation
+     * @since 5.0
+     */
+    @Nullable
+    default Class<?> getDefaultImplementation() {
+        return getAnnotationMetadata().classValue(DefaultImplementation.class, "name").orElse(null);
+    }
+
+    /**
+     * Determines if another bean definition can replace this bean definition.
+     * Some bean definitions are not replaceable. See {@link io.micronaut.context.annotation.Infrastructure}.
+     *
+     * @return true if it can be replaced
+     * @since 5.0
+     */
+    default boolean isCanBeReplaced() {
+        return true;
+    }
+
+    /**
+     * The replacement defined by {@link io.micronaut.context.annotation.Replaces}.
+     * @return The bean replacement definition if present, otherwise null.
+     * @since 5.0
+     */
+    @Nullable
+    default ReplacesDefinition<T> getReplacesDefinition() {
+        AnnotationValue<Replaces> annotation = getAnnotation(Replaces.class);
+        if (annotation != null) {
+            return new DefaultReplacesDefinition<T>(getBeanType(), annotation);
+        }
+        return null;
     }
 }

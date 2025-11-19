@@ -1841,6 +1841,29 @@ enum class Test(val number: Int) {
         thrown(ClassNotFoundException)
     }
 
+    void "test basic enum bean properties"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.MyEnum', '''
+package test
+
+import io.micronaut.core.annotation.*
+
+@Introspected
+enum class MyEnum {
+    A, B, C;
+}
+''')
+
+        expect:
+            introspection != null
+            introspection.beanProperties.size() == 0
+
+        when:
+            introspection.instantiate("A")
+
+        then:
+            noExceptionThrown()
+    }
+
     void "test instantiating an enum"() {
         BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
 package test

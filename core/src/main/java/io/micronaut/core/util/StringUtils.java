@@ -71,7 +71,7 @@ public final class StringUtils {
      * @return True if str is empty or null
      */
     public static boolean isEmpty(@Nullable CharSequence str) {
-        return str == null || str.length() == 0;
+        return str == null || str.isEmpty();
     }
 
     /**

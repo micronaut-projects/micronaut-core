@@ -16,7 +16,6 @@
 package io.micronaut.inject.requires
 
 import io.micronaut.context.ApplicationContext
-import junit.framework.TestCase
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test

@@ -179,13 +179,13 @@ class Foo {
 }
 
 class Book {
-    
+
     private String abc;
-    
+
     public String getAbc() {
         return this.abc;
     }
-    
+
     public void setAbc(String abc) {
         this.abc = abc;
     }
@@ -215,13 +215,13 @@ class Foo {
 }
 
 class Book {
-    
+
     private String abc;
-    
+
     public String getAbc() {
         return this.abc;
     }
-    
+
     public void setAbc(String abc) {
         this.abc = abc;
     }
@@ -315,15 +315,15 @@ class Foo {
     String abc(String abc) {
         return "";
     }
-    
+
     @Introspected
-    private static class Bean {
+    private static final class Bean {
 
         @PathVariable
         private String abc;
-        
+
         public String getAbc() { return abc; }
-    
+
     }
 }
 
@@ -347,11 +347,11 @@ class Foo {
     String abc(@RequestBean Bean bean) {
         return "";
     }
-    
+
     @Introspected
-    private static class Bean {
+    private static final class Bean {
     }
-    
+
 }
 
 """)
@@ -377,18 +377,18 @@ class Foo {
     String abc(@RequestBean Bean bean) {
         return "";
     }
-    
+
     @Introspected
-    private static class Bean {
+    private static final class Bean {
 
         @QueryValue("abc")
         private String def;
-        
+
         public String getDef() { return def; }
         public void setDef(String def) { this.def = def; }
-    
+
     }
-    
+
 }
 
 """)
@@ -412,18 +412,18 @@ class Foo {
     String abc(@RequestBean Bean bean) {
         return "";
     }
-    
+
     @Introspected
-    private static class Bean {
+    private static final class Bean {
 
         @PathVariable
         private String abc;
-        
+
         public String getAbc() { return abc; }
         public void setAbc(String abc) { this.abc = abc; }
-    
+
     }
-    
+
 }
 
 """)
@@ -448,18 +448,18 @@ class Foo {
     String abc(@RequestBean Bean bean) {
         return "";
     }
-    
+
     @Introspected
-    private static class Bean {
+    private static final class Bean {
 
         @PathVariable
         @Nullable
         private String abc;
-        
+
         @PathVariable
         @Nullable
         private String def;
-        
+
         public String getAbc() { return abc; }
         public void setAbc(String abc) { this.abc = abc; }
         public String getDef() { return def; }
@@ -488,22 +488,22 @@ class Foo {
     String abc(@Header("pet-name") String name, @QueryValue("name") String pathName) {
         return "abc";
     }
-    
+
     @Introspected
-    private static class Bean {
+    private static final class Bean {
 
         @Header("pet-name")
         private String name;
-        
+
         @QueryValue("name")
         private String pathName;
-        
+
         public String getName() { return name; }
-        
+
         public String pathName() { return pathName; }
-    
+
     }
-    
+
 }
 
 """)

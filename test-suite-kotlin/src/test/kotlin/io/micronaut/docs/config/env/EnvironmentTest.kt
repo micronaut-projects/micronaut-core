@@ -8,6 +8,7 @@ import io.micronaut.context.env.PropertySource
 
 class EnvironmentTest : AnnotationSpec() {
 
+
     @Test
     fun testRunEnvironment() {
         // tag::env[]

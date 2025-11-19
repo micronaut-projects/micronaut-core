@@ -22,7 +22,7 @@ import io.micronaut.core.annotation.NonNull;
  *
  * @param <T> The concrete type
  */
-public interface ApplicationContextLifeCycle<T extends ApplicationContextLifeCycle> extends ApplicationContextProvider, LifeCycle {
+public interface ApplicationContextLifeCycle<T extends ApplicationContextLifeCycle<T>> extends ApplicationContextProvider, LifeCycle<T> {
 
     @SuppressWarnings("unchecked")
     @Override

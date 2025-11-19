@@ -56,8 +56,15 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
         if (bean == null) {
             this.order = beanDefinition == null ? 0 : beanDefinition.getOrder();
         } else {
-            this.order = beanDefinition == null ? OrderUtil.getOrder(bean) : OrderUtil.getOrder(beanDefinition, bean);
+            this.order = beanDefinition == null ? OrderUtil.getOrder(bean) : getOrder(beanDefinition, bean);
         }
+    }
+
+    private static int getOrder(BeanDefinition<?> beanDefinition, Object o) {
+        if (o instanceof Ordered ordered) {
+            return ordered.getOrder();
+        }
+        return beanDefinition.getOrder();
     }
 
     /**

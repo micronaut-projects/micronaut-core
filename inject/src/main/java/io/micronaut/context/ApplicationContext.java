@@ -232,7 +232,7 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
             .propertySources(propertySource)
             .start()
             .getBean(type);
-        if (bean instanceof LifeCycle lifeCycle) {
+        if (bean instanceof LifeCycle<?> lifeCycle) {
             if (!lifeCycle.isRunning()) {
                 lifeCycle.start();
             }
@@ -326,5 +326,15 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
 
         return builder(environments)
                 .mainClass(mainClass);
+    }
+
+    /**
+     * Creates the {@link ApplicationContext} using the given {@link Environment}.
+     *
+     * @return The created {@link ApplicationContext}
+     * @since 5.0
+     */
+    static @NonNull ApplicationContext create(@NonNull Environment environment) {
+        return new DefaultApplicationContext(new DefaultApplicationContextBuilder(), environment);
     }
 }

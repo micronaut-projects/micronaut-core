@@ -293,7 +293,7 @@ public final class AstBeanPropertiesUtils {
         return setterType != null && !existingType.isAssignable(setterType) && !setterType.getName().equals(existingType.getName());
     }
 
-    private static ClassElement unwrapType(ClassElement type) {
+   private static ClassElement unwrapType(ClassElement type) {
         if (type.isOptional()) {
             return type.getOptionalValueType().orElse(type);
         }

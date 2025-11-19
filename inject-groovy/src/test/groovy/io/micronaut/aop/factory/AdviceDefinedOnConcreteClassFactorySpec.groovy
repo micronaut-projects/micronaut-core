@@ -17,8 +17,6 @@ package io.micronaut.aop.factory
 
 import io.micronaut.aop.Intercepted
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Specification
 import spock.lang.Unroll

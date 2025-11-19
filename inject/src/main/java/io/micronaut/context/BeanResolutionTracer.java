@@ -38,7 +38,7 @@ sealed interface BeanResolutionTracer permits ConsoleBeanResolutionTracer {
      */
     default void traceInitialConfiguration(
         @NonNull Environment environment,
-        @NonNull Collection<BeanDefinitionReference<?>> beanReferences,
+        @NonNull Collection<BeanDefinitionReference<Object>> beanReferences,
         @NonNull Collection<DisabledBean<?>> disabledBeans) {
         // no-op
     }

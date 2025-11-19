@@ -29,8 +29,8 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: |
-            17
             21
+            25
       - name: Publish to Sonatype OSSRH
         env:
           SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}

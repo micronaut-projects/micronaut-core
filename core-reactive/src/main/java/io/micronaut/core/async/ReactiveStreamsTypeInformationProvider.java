@@ -17,6 +17,7 @@ package io.micronaut.core.async;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.core.async.publisher.Publishers;
@@ -28,6 +29,7 @@ import io.micronaut.core.type.TypeInformationProvider;
  * @author graemerocher
  * @since 2.4.0
  */
+@Internal
 public final class ReactiveStreamsTypeInformationProvider implements TypeInformationProvider {
 
     @Override

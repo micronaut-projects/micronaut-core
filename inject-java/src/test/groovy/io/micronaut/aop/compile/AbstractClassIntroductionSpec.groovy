@@ -17,7 +17,6 @@ package io.micronaut.aop.compile
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultBeanContext
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.InstantiatableBeanDefinition
 import io.micronaut.inject.writer.BeanDefinitionVisitor
@@ -188,12 +187,12 @@ abstract class AbstractBean implements Foo {
         when:
         ApplicationContext context = ApplicationContext.run()
         def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
-        
+
         then:
         instance.isAbstract() == null
         instance.nonAbstract() == 'good'
         instance.another() == 'good'
-        
+
         cleanup:
         context.close()
     }

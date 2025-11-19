@@ -277,9 +277,8 @@ public class IOUtils {
             }
         }
 
-        FileSystem jrtProvider = null;
         if (uniqueURIs.isEmpty()) {
-            jrtProvider = getJrtProvider(classLoader);
+            FileSystem jrtProvider = getJrtProvider(classLoader);
             if (jrtProvider != null) {
                 Path modulesPath = jrtProvider.getPath("modules");
                 try (Stream<Path> stream = Files.list(modulesPath)) {
@@ -292,7 +291,11 @@ public class IOUtils {
                         .map(Path::toUri)
                         .forEach(uniqueURIs::add);
                 }
-
+                try {
+                    jrtProvider.close();
+                } catch (Throwable ignore) {
+                    // Ignore
+                }
                 // uri will be jrt:/modules/<module>/META-INF/micronaut/<service>, so we can walk through its files as if it was a directory
             }
         }
@@ -306,13 +309,6 @@ public class IOUtils {
             // we ignore this extra ones
             if (!("resource".equals(scheme) && uri.toString().contains("#"))) {
                 uris.add(uri);
-            }
-        }
-        if (jrtProvider != null && jrtProvider.isOpen()) {
-            try {
-                jrtProvider.close();
-            } catch (Throwable ignore) {
-                // Ignore
             }
         }
         return uris;

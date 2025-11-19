@@ -16,7 +16,9 @@
 package io.micronaut.inject.qualifiers.replaces.defaultimpl;
 
 import jakarta.inject.Singleton;
+import io.micronaut.context.annotation.Requires;
 
+@Requires(property = "spec.name", value = "ReplacesDefaultImplSpec")
 @Singleton
 public class B3 implements B {
 }

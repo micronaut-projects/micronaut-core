@@ -57,7 +57,7 @@ public class OptionalValueExtractorTest {
     }
 
     @Introspected(accessKind = Introspected.AccessKind.FIELD, visibility = Introspected.Visibility.ANY)
-    private static class OptionalDoubleHolder {
+    private static final class OptionalDoubleHolder {
         private final @NotNull @DecimalMin("5") OptionalDouble optionalDouble;
 
         private OptionalDoubleHolder(OptionalDouble optionalDouble) {
@@ -66,7 +66,7 @@ public class OptionalValueExtractorTest {
     }
 
     @Introspected(accessKind = Introspected.AccessKind.FIELD, visibility = Introspected.Visibility.ANY)
-    private static class OptionalLongHolder {
+    private static final class OptionalLongHolder {
         private final @NotNull @Min(5L) OptionalLong optionalLong;
 
         private OptionalLongHolder(OptionalLong optionalLong) {
@@ -75,7 +75,7 @@ public class OptionalValueExtractorTest {
     }
 
     @Introspected(accessKind = Introspected.AccessKind.FIELD, visibility = Introspected.Visibility.ANY)
-    private static class OptionalIntHolder {
+    private static final class OptionalIntHolder {
         private final @NotNull @Min(5L) OptionalInt optionalInt;
 
         private OptionalIntHolder(OptionalInt optionalInt) {
@@ -84,7 +84,7 @@ public class OptionalValueExtractorTest {
     }
 
     @Introspected(accessKind = Introspected.AccessKind.FIELD, visibility = Introspected.Visibility.ANY)
-    private static class OptionalHolder {
+    private static final class OptionalHolder {
         private final Optional<@NotNull @NotBlank String> optional;
 
         private OptionalHolder(Optional<String> optional) {

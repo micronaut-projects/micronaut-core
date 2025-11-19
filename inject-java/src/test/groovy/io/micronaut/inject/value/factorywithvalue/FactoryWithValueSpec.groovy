@@ -15,13 +15,11 @@
  */
 package io.micronaut.inject.value.factorywithvalue
 
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
-import io.micronaut.context.annotation.Factory
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Factory
 import io.micronaut.inject.BeanDefinition
-import spock.lang.Specification
+
 /**
  * @author Graeme Rocher
  * @since 1.0

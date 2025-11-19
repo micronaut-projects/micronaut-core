@@ -6,7 +6,9 @@ import io.micronaut.context.annotation.Any;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
+import io.micronaut.context.annotation.Requires;
 
+@Requires(property = "spec.name", value = "AnyProviderSpec")
 @Singleton
 public class PetOwner {
     @Inject @Any Dog<?> dog;

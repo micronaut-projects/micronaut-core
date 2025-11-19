@@ -56,7 +56,7 @@ public class PropertySourcePropertyResolverBenchmark {
         new Runner(opt).run();
     }
 
-    class EnvironmentPropertySource extends MapPropertySource {
+    static class EnvironmentPropertySource extends MapPropertySource {
 
         EnvironmentPropertySource(Map map) {
             super("env", map);

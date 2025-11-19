@@ -16,9 +16,14 @@
 package io.micronaut.annotation.processing.test.support
 
 import java.io.File
+import java.io.FileDescriptor
+import java.io.FileOutputStream
+import java.io.PrintStream
 import java.net.URL
 import java.net.URLClassLoader
+import java.nio.charset.Charset
 import javax.lang.model.SourceVersion
+import okio.Buffer
 
 internal fun <E> MutableCollection<E>.addAll(vararg elems: E) = addAll(elems)
 
@@ -41,21 +46,16 @@ internal val processJdkHome by lazy {
 internal fun isJdk9OrLater(): Boolean
         = SourceVersion.latestSupported().compareTo(SourceVersion.RELEASE_8) > 0
 
-internal fun File.listFilesRecursively(): List<File> {
-    return listFiles().flatMap { file ->
-        if(file.isDirectory)
-            file.listFilesRecursively()
-        else
-            listOf(file)
-    }
-}
+internal fun File.listFilesRecursively(): List<File> = walkTopDown()
+    .filter { it.isFile }
+    .toList()
 
 internal fun File.hasKotlinFileExtension() = hasFileExtension(listOf("kt", "kts"))
 
 internal fun File.hasJavaFileExtension() = hasFileExtension(listOf("java"))
 
 internal fun File.hasFileExtension(extensions: List<String>)
-    = extensions.any{ it.equals(extension, ignoreCase = true) }
+        = extensions.any{ it.equals(extension, ignoreCase = true) }
 
 internal fun URLClassLoader.addUrl(url: URL) {
     val addUrlMethod = URLClassLoader::class.java.getDeclaredMethod("addURL", URL::class.java)
@@ -83,6 +83,19 @@ internal inline fun <T> withSystemProperties(properties: Map<String, String>, f:
                 System.setProperty(key, value)
         }
     }
+}
+
+internal inline fun <R> withSystemOut(stream: PrintStream, crossinline f: () -> R): R {
+    System.setOut(stream)
+    val ret = f()
+    System.setOut(PrintStream(FileOutputStream(FileDescriptor.out)))
+    return ret
+}
+
+internal inline fun <R> captureSystemOut(crossinline f: () -> R): Pair<R, String> {
+    val systemOutBuffer = Buffer()
+    val ret = withSystemOut(PrintStream(systemOutBuffer.outputStream()), f)
+    return Pair(ret, systemOutBuffer.readString(Charset.defaultCharset()))
 }
 
 internal fun File.existsOrNull(): File? = if (exists()) this else null

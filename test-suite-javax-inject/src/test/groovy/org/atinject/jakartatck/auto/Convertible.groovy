@@ -17,9 +17,6 @@ package org.atinject.jakartatck.auto
 
 import groovy.transform.PackageScope
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
-import junit.framework.TestCase
 import org.atinject.jakartatck.auto.accessories.Cupholder
 import org.atinject.jakartatck.auto.accessories.RoundThing
 import org.atinject.jakartatck.auto.accessories.SpareTire

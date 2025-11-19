@@ -26,6 +26,7 @@ import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.codec.CodecConfiguration;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.inject.BeanType;
+import io.micronaut.inject.QualifiedBeanType;
 import io.micronaut.inject.qualifiers.FilteringQualifier;
 import io.micronaut.inject.qualifiers.MatchArgumentQualifier;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -154,6 +155,11 @@ public final class DefaultMessageBodyHandlerRegistry extends AbstractMessageBody
             // Handlers with a media type defined should have a priority
             all.sort(Comparator.comparingInt(this::findOrder).reversed());
             return all;
+        }
+
+        @Override
+        public <BT extends QualifiedBeanType<T>> Collection<BT> filterQualified(Class<T> beanType, Collection<BT> candidates) {
+            return filter(beanType, candidates);
         }
 
         private int findOrder(BeanType<?> beanType) {

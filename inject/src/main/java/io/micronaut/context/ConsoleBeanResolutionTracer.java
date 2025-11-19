@@ -29,6 +29,9 @@ import io.micronaut.core.util.AnsiColour;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.StringWriter;
@@ -36,8 +39,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 abstract sealed class ConsoleBeanResolutionTracer
     implements BeanResolutionTracer {
@@ -54,7 +55,7 @@ abstract sealed class ConsoleBeanResolutionTracer
 
 
     @Override
-    public void traceInitialConfiguration(Environment environment, Collection<BeanDefinitionReference<?>> beanReferences, Collection<DisabledBean<?>> disabledBeans) {
+    public void traceInitialConfiguration(Environment environment, Collection<BeanDefinitionReference<Object>> beanReferences, Collection<DisabledBean<?>> disabledBeans) {
         Collection<PropertySource> propertySources = environment.getPropertySources();
         Set<String> activeNames = environment.getActiveNames();
         StringWriter sw = new StringWriter();
@@ -84,7 +85,7 @@ abstract sealed class ConsoleBeanResolutionTracer
             writer.newLine();
             writer.write(AnsiColour.brightBlue("Configurable Beans: "));
             writer.newLine();
-            List<BeanDefinitionReference<?>> configRefs = beanReferences.stream()
+            List<BeanDefinitionReference<Object>> configRefs = beanReferences.stream()
                 .filter(ref -> ref.hasStereotype(ConfigurationReader.class) &&
                     ref.stringValue(ConfigurationReader.class, "prefix").isPresent())
                 .sorted((b1, b2) ->

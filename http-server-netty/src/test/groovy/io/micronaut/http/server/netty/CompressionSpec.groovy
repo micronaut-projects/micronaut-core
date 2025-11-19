@@ -217,7 +217,7 @@ class CompressionSpec extends Specification {
         }
     }
 
-    private static class ClientCustomizer implements NettyClientCustomizer {
+    private static final class ClientCustomizer implements NettyClientCustomizer {
         final Channel channel
 
         ClientCustomizer(Channel channel) {

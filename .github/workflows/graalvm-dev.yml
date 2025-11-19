@@ -54,6 +54,7 @@ jobs:
         with:
           java: ${{ matrix.java }}
           distribution: ${{ matrix.distribution }}
+          nativeTestTask: ${{ matrix.native_test_task }}
       - name: Build Steps
         uses: micronaut-projects/github-actions/graalvm/build@master
         id: build

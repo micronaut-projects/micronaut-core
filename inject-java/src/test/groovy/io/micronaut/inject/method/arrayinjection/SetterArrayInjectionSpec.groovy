@@ -16,8 +16,6 @@
 package io.micronaut.inject.method.arrayinjection
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 
@@ -33,7 +31,7 @@ import io.micronaut.context.annotation.*;
 
 @Executable
 class MyBean {
-    
+
     @jakarta.inject.Inject
     public void setFoo(Foo foo) {}
 }

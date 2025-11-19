@@ -18,9 +18,12 @@ package io.micronaut.inject;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.DefaultScope;
+import io.micronaut.context.annotation.Parallel;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.Indexes;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import jakarta.inject.Singleton;
 
 /**
@@ -126,5 +129,25 @@ public interface BeanDefinitionReference<T> extends QualifiedBeanType<T> {
      */
     default boolean isProxyTarget() {
         return false;
+    }
+
+    /**
+     * The indexed types for this bean.
+     *
+     * @return An array of indexes.
+     * @since 5.0
+     */
+    @NonNull
+    default Class<?>[] getIndexes() {
+        return getAnnotationMetadata().classValues(Indexes.class);
+    }
+
+    /**
+     * Is parallel initialization enabled for this bean.
+     * @return true if enabled
+     * @since 5.0
+     */
+    default boolean isParallel() {
+        return getAnnotationMetadata().hasDeclaredStereotype(Parallel.class);
     }
 }

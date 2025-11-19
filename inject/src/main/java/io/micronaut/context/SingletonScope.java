@@ -318,7 +318,7 @@ final class SingletonScope {
      * @author Denis Stepanov
      * @since 3.5.0
      */
-    interface BeanDefinitionIdentity {
+    private interface BeanDefinitionIdentity {
 
         static BeanDefinitionIdentity of(BeanDefinition<?> beanDefinition) {
             if (beanDefinition instanceof BeanDefinitionDelegate<?> definitionDelegate) {
@@ -336,7 +336,7 @@ final class SingletonScope {
      *
      * @since 3.5.0
      */
-    static final class BeanDefinitionDelegatedIdentity implements BeanDefinitionIdentity {
+    private static final class BeanDefinitionDelegatedIdentity implements BeanDefinitionIdentity {
 
         private final BeanDefinitionDelegate<?> beanDefinitionDelegate;
 
@@ -370,7 +370,7 @@ final class SingletonScope {
      *
      * @since 3.5.0
      */
-    static final class RuntimeBeanDefinitionIdentity implements BeanDefinitionIdentity {
+    private static final class RuntimeBeanDefinitionIdentity implements BeanDefinitionIdentity {
 
         private final RuntimeBeanDefinition<?> beanDefinition;
 
@@ -405,7 +405,7 @@ final class SingletonScope {
      *
      * @since 3.5.0
      */
-    static final class SimpleBeanDefinitionIdentity implements BeanDefinitionIdentity {
+    private static final class SimpleBeanDefinitionIdentity implements BeanDefinitionIdentity {
 
         private final Class<?> beanDefinitionClass;
 

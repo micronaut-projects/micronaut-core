@@ -15,16 +15,14 @@
  */
 package io.micronaut.inject.qualifiers;
 
-import io.micronaut.context.Qualifier;
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.naming.NameResolver;
-import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanType;
+import io.micronaut.inject.QualifiedBeanType;
 
-import java.lang.annotation.Annotation;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -36,42 +34,36 @@ import java.util.Optional;
  * @since 1.0
  */
 @Internal
-class NameQualifier<T> extends FilteringQualifier<T> implements io.micronaut.core.naming.Named {
+final class NameQualifier<T> extends FilteringQualifier<T> implements io.micronaut.core.naming.Named {
 
-    protected final Class<? extends Annotation> annotationType;
     private final String name;
 
-    NameQualifier(AnnotationMetadata annotationMetadata, String name) {
-        this.annotationType = annotationMetadata != null ? annotationMetadata.getAnnotationType(name).orElse(null) : null;
-        this.name = Objects.requireNonNull(annotationType == null ? name : annotationType.getSimpleName(), "Argument [name] cannot be null");
-    }
-
-    NameQualifier(Class<? extends Annotation> annotationType) {
-        this.name = Objects.requireNonNull(annotationType.getSimpleName(), "Argument [name] cannot be null");
-        this.annotationType = annotationType;
+    NameQualifier(@NonNull String name) {
+        this.name = Objects.requireNonNull(name, "Argument [name] cannot be null");
     }
 
     @Override
     public boolean doesQualify(Class<T> beanType, BeanType<T> candidate) {
-        if (!QualifierUtils.matchType(beanType, candidate)) {
-            return false;
-        }
-        if (QualifierUtils.matchAny(beanType, candidate)) {
+        if (QualifierUtils.match(candidate, this)) {
             return true;
         }
-        AnnotationMetadata annotationMetadata = candidate.getAnnotationMetadata();
+        return match(beanType, candidate);
+    }
+
+    @Override
+    public boolean doesQualify(Class<T> beanType, QualifiedBeanType<T> candidate) {
+        if (QualifierUtils.matchQualified(candidate, this)) {
+            return true;
+        }
+        return match(beanType, candidate);
+    }
+
+    private boolean match(Class<T> beanType, BeanType<T> candidate) {
         // here we resolved the declared Qualifier of the bean
-        String thisName = annotationMetadata
+        String thisName = candidate.getAnnotationMetadata()
             .findDeclaredAnnotation(AnnotationUtil.NAMED)
             .flatMap(AnnotationValue::stringValue)
             .orElse(null);
-
-        if (thisName == null && candidate instanceof BeanDefinition<T> beanDefinition) {
-            Qualifier<T> qualifier = beanDefinition.getDeclaredQualifier();
-            if (qualifier != null && qualifier.contains(this)) {
-                return true;
-            }
-        }
         if (thisName == null) {
             if (candidate instanceof NameResolver) {
                 Optional<String> resolvedName = ((NameResolver) candidate).resolveName();

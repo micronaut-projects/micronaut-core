@@ -77,17 +77,6 @@ class DecompressionConfigTest {
         }
     }
 
-    @Controller("/decompression")
-    @Requires(property = "spec.name", value = SPEC_NAME)
-    static class DecompressionController {
-        @Get("/gzip")
-        HttpResponse<byte[]> gzip() {
-            return HttpResponse.ok(GZIPPED)
-                .header(HttpHeaders.CONTENT_ENCODING, "gzip")
-                .contentLength(GZIPPED.length);
-        }
-    }
-
     private static byte[] gzip(byte[] data) {
         try {
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -99,4 +88,16 @@ class DecompressionConfigTest {
             throw new RuntimeException(e);
         }
     }
+
+    @Controller("/decompression")
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    static class DecompressionController {
+        @Get("/gzip")
+        HttpResponse<byte[]> gzip() {
+            return HttpResponse.ok(GZIPPED)
+                .header(HttpHeaders.CONTENT_ENCODING, "gzip")
+                .contentLength(GZIPPED.length);
+        }
+    }
+
 }

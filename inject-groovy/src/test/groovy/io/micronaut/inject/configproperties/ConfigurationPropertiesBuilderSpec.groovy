@@ -513,7 +513,7 @@ class DefaultConnectionPool implements ConnectionPool {
         return maxConcurrency
     }
 
-    private static class DefaultBuilder implements ConnectionPool.Builder {
+    private static final class DefaultBuilder implements ConnectionPool.Builder {
 
         private int maxConcurrency
 
@@ -585,7 +585,7 @@ class DefaultConnectionPool implements ConnectionPool {
         return maxConcurrency
     }
 
-    private static class DefaultBuilder implements ConnectionPool.Builder {
+    private static final class DefaultBuilder implements ConnectionPool.Builder {
 
         private int maxConcurrency
 

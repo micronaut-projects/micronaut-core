@@ -126,6 +126,7 @@ public final class AnnotationMetadataSupport {
 
     static {
         // some common ones for startup optimization
+        //noinspection removal
         Arrays.asList(
                 Any.class,
                 jakarta.annotation.Nullable.class,
@@ -507,6 +508,7 @@ public final class AnnotationMetadataSupport {
      *
      * @param <A> The annotation type
      */
+
     private static class AnnotationProxyHandler<A extends Annotation> implements InvocationHandler, AnnotationValueProvider<A> {
         private final int hashCode;
         private final Class<A> annotationClass;

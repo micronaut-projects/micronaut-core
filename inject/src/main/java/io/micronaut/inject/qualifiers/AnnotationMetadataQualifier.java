@@ -15,7 +15,6 @@
  */
 package io.micronaut.inject.qualifiers;
 
-import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
@@ -25,10 +24,8 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.core.util.ObjectUtils;
-import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanType;
-import io.micronaut.inject.DelegatingBeanDefinition;
+import io.micronaut.inject.QualifiedBeanType;
 
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
@@ -93,23 +90,21 @@ final class AnnotationMetadataQualifier<T> extends FilteringQualifier<T> {
 
     @Override
     public boolean doesQualify(Class<T> beanType, BeanType<T> candidate) {
-        if (!QualifierUtils.matchType(beanType, candidate)) {
-            return false;
-        }
-        if (QualifierUtils.matchAny(beanType, candidate)) {
+        if (QualifierUtils.match(candidate, this)) {
             return true;
         }
-        if (candidate instanceof BeanDefinition<T> bdCandidate) {
-            Qualifier<T> candidateDeclaredQualifier = bdCandidate.getDeclaredQualifier();
-            if (candidateDeclaredQualifier != null && candidateDeclaredQualifier.contains(this)) {
-                return true;
-            }
-            if (candidate instanceof DelegatingBeanDefinition) {
-                if (matchByAnnotationMetadata(candidate)) {
-                    return true;
-                }
-            }
-        } else if (matchByAnnotationMetadata(candidate)) {
+        if (matchByAnnotationMetadata(candidate)) {
+            return true;
+        }
+        return QualifierUtils.matchByCandidateName(candidate, beanType, annotationSimpleName);
+    }
+
+    @Override
+    public boolean doesQualify(Class<T> beanType, QualifiedBeanType<T> candidate) {
+        if (QualifierUtils.matchQualified(candidate, this)) {
+            return true;
+        }
+        if (matchByAnnotationMetadata(candidate)) {
             return true;
         }
         return QualifierUtils.matchByCandidateName(candidate, beanType, annotationSimpleName);
@@ -179,7 +174,7 @@ final class AnnotationMetadataQualifier<T> extends FilteringQualifier<T> {
 
     @Override
     public int hashCode() {
-        return ObjectUtils.hash(annotationName, qualifierAnn);
+        return annotationName.hashCode();
     }
 
     @Override

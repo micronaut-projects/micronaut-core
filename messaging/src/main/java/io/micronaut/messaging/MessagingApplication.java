@@ -104,7 +104,7 @@ public class MessagingApplication implements EmbeddedApplication<MessagingApplic
 
     @Override
     public @NonNull String getDescription() {
-        Collection<BeanDefinition<?>> beanDefinitions = applicationContext.getBeanDefinitions(Qualifiers.byStereotype(MessageListener.class));
+        Collection<BeanDefinition<Object>> beanDefinitions = applicationContext.getBeanDefinitions(Qualifiers.byStereotype(MessageListener.class));
         return beanDefinitions.size() + " active message listeners.";
     }
 }

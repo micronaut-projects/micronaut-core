@@ -23,9 +23,11 @@ import io.micronaut.context.AbstractExecutableMethod;
 import io.micronaut.context.AbstractInitializableBeanDefinition;
 import io.micronaut.context.AbstractInitializableBeanDefinitionAndReference;
 import io.micronaut.context.BeanContext;
+import io.micronaut.context.BeanLocator;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
-import io.micronaut.context.DefaultBeanContext;
+import io.micronaut.context.DefaultReplacesDefinition;
+import io.micronaut.context.LifeCycle;
 import io.micronaut.context.Qualifier;
 import io.micronaut.context.RequiresCondition;
 import io.micronaut.context.annotation.Any;
@@ -34,14 +36,18 @@ import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.Context;
+import io.micronaut.context.annotation.DefaultImplementation;
 import io.micronaut.context.annotation.DefaultScope;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.EachProperty;
+import io.micronaut.context.annotation.Infrastructure;
 import io.micronaut.context.annotation.InjectScope;
+import io.micronaut.context.annotation.Parallel;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.PropertySource;
+import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requirements;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
@@ -73,6 +79,7 @@ import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Generated;
+import io.micronaut.core.annotation.Indexed;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.core.annotation.NonNull;
@@ -81,7 +88,9 @@ import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.ConversionServiceProvider;
 import io.micronaut.core.expressions.EvaluatedExpressionReference;
+import io.micronaut.core.naming.Described;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.naming.Named;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -105,6 +114,7 @@ import io.micronaut.inject.InjectionPoint;
 import io.micronaut.inject.InstantiatableBeanDefinition;
 import io.micronaut.inject.ParametrizedInstantiatableBeanDefinition;
 import io.micronaut.inject.ProxyBeanDefinition;
+import io.micronaut.inject.ReplacesDefinition;
 import io.micronaut.inject.ValidatedBeanDefinition;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.annotation.AnnotationMetadataGenUtils;
@@ -127,6 +137,7 @@ import io.micronaut.inject.configuration.builder.ConfigurationBuilderDefinition;
 import io.micronaut.inject.configuration.builder.ConfigurationBuilderOfFieldDefinition;
 import io.micronaut.inject.configuration.builder.ConfigurationBuilderOfPropertyDefinition;
 import io.micronaut.inject.configuration.builder.ConfigurationBuilderPropertyDefinition;
+import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.qualifiers.AnyQualifier;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.inject.visitor.BeanElementVisitor;
@@ -145,8 +156,10 @@ import io.micronaut.sourcegen.model.VariableDef;
 import jakarta.inject.Singleton;
 
 import javax.lang.model.element.Modifier;
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.Serializable;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
@@ -158,6 +171,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -415,7 +429,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
         Object[].class
     );
 
-    private static final Method METHOD_GET_BEAN = ReflectionUtils.getRequiredInternalMethod(DefaultBeanContext.class, "getBean", BeanResolutionContext.class, Class.class, Qualifier.class);
+    private static final Method BEAN_LOCATOR_METHOD_GET_BEAN = ReflectionUtils.getRequiredInternalMethod(BeanLocator.class, "getBean", Class.class, Qualifier.class);
     private static final Method COLLECTION_TO_ARRAY = ReflectionUtils.getRequiredInternalMethod(Collection.class, "toArray", Object[].class);
 
     private static final Method DISPOSE_INTERCEPTOR_METHOD =
@@ -450,6 +464,18 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
 
     private static final Method METHOD_INVOKE_INACCESSIBLE_METHOD =
         ReflectionUtils.getRequiredInternalMethod(ReflectionUtils.class, "invokeInaccessibleMethod", Object.class, Method.class, Object[].class);
+
+    private static final Method METHOD_GET_DEFAULT_IMPLEMENTATION =
+        ReflectionUtils.getRequiredInternalMethod(BeanDefinition.class, "getDefaultImplementation");
+
+    private static final Method METHOD_IS_CAN_BE_REPLACED =
+        ReflectionUtils.getRequiredInternalMethod(BeanDefinition.class, "isCanBeReplaced");
+
+    private static final Method METHOD_GET_REPLACES_DEFINITION =
+        ReflectionUtils.getRequiredInternalMethod(BeanDefinition.class, "getReplacesDefinition");
+
+    private static final Constructor<?> CONSTRUCTOR_DEFAULT_REPLACES_DEFINITION =
+        ReflectionUtils.getRequiredInternalConstructor(DefaultReplacesDefinition.class, Class.class, Class.class, Qualifier.class, Class.class);
 
     private static final Optional<Constructor<AbstractInitializableBeanDefinitionAndReference>> BEAN_DEFINITION_CLASS_CONSTRUCTOR1 = ReflectionUtils.findConstructor(
         AbstractInitializableBeanDefinitionAndReference.class,
@@ -500,6 +526,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
     private static final String FIELD_TYPE_ARGUMENTS = "$TYPE_ARGUMENTS";
     private static final String FIELD_INNER_CLASSES = "$INNER_CONFIGURATION_CLASSES";
     private static final String FIELD_EXPOSED_TYPES = "$EXPOSED_TYPES";
+    private static final String FIELD_REPLACES = "$REPLACES";
     private static final String FIELD_FAILED_INITIALIZATION = "$FAILURE";
     private static final String FIELD_PRECALCULATED_INFO = "$INFO";
     private static final String FIELD_PRE_START_CONDITIONS = "$PRE_CONDITIONS";
@@ -529,6 +556,8 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
         ReflectionUtils.getRequiredMethod(Qualifiers.class, "forArgument", Argument.class);
 
     private static final Method METHOD_QUALIFIER_BY_NAME = ReflectionUtils.getRequiredMethod(Qualifiers.class, "byName", String.class);
+
+    private static final Method METHOD_QUALIFIER_BY_STEREOTYPE = ReflectionUtils.getRequiredMethod(Qualifiers.class, "byStereotype", Class.class);
 
     private static final Method METHOD_QUALIFIER_BY_ANNOTATION =
         ReflectionUtils.getRequiredMethod(Qualifiers.class, "byAnnotationSimple", AnnotationMetadata.class, String.class);
@@ -589,6 +618,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
     private static final Method IS_INNER_CONFIGURATION_METHOD = ReflectionUtils.getRequiredMethod(AbstractInitializableBeanDefinition.class, "isInnerConfiguration", Class.class);
     private static final Method CONTAINS_METHOD = ReflectionUtils.getRequiredMethod(Collection.class, "contains", Object.class);
     private static final Method GET_EXPOSED_TYPES_METHOD = ReflectionUtils.getRequiredMethod(AbstractInitializableBeanDefinition.class, "getExposedTypes");
+    private static final Method IS_CANDIDATE_BEAN_METHOD = ReflectionUtils.getRequiredMethod(BeanDefinition.class, "isCandidateBean", Argument.class);
     private static final Method GET_ORDER_METHOD = ReflectionUtils.getRequiredMethod(Ordered.class, "getOrder");
     private static final Constructor<HashSet> HASH_SET_COLLECTION_CONSTRUCTOR = ReflectionUtils.getRequiredInternalConstructor(HashSet.class, Collection.class);
     private static final Method ARRAYS_AS_LIST_METHOD = ReflectionUtils.getRequiredMethod(Arrays.class, "asList", Object[].class);
@@ -602,6 +632,16 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
     private static final Constructor<AbstractExecutableMethod> ABSTRACT_EXECUTABLE_METHOD_CONSTRUCTOR = ReflectionUtils.getRequiredInternalConstructor(AbstractExecutableMethod.class, Class.class, String.class);
     private static final Method GET_TYPE_PARAMETERS_METHOD = ReflectionUtils.getRequiredInternalMethod(TypeVariableResolver.class, "getTypeParameters");
     private static final Method ARGUMENT_OF_METHOD = ReflectionUtils.getRequiredInternalMethod(Argument.class, "of", Class.class);
+    private static final Method GET_INDEXES_METHOD = ReflectionUtils.getRequiredMethod(BeanDefinitionReference.class, "getIndexes");
+    private static final Method IS_PARALLEL_METHOD = ReflectionUtils.getRequiredMethod(BeanDefinitionReference.class, "isParallel");
+    private static final Method IS_ASSIGNABLE_METHOD = ReflectionUtils.getRequiredMethod(Class.class, "isAssignableFrom", Class.class);
+
+    private static final Set<String> IGNORED_EXPOSED_INTERFACES = Set.of(
+        AutoCloseable.class.getName(), LifeCycle.class.getName(), Ordered.class.getName(), Closeable.class.getName(),
+        Named.class.getName(), Described.class.getName(),
+        Record.class.getName(), Enum.class.getName(), Toggleable.class.getName(), Iterable.class.getName(),
+        Serializable.class.getName()
+    );
 
     private final String beanFullClassName;
     private final String beanDefinitionName;
@@ -627,7 +667,8 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
     private Map<String, Map<String, ClassElement>> typeArguments;
     @Nullable
     private String interceptedType;
-
+    @Nullable
+    private Set<ClassElement> exposes;
     private final List<FieldVisitData> fieldInjectionPoints = new ArrayList<>(2);
     private final List<MethodVisitData> methodInjectionPoints = new ArrayList<>(2);
     private final List<MethodVisitData> postConstructMethodVisits = new ArrayList<>(2);
@@ -697,10 +738,10 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
         this.originatingElements = originatingElements;
         this.beanProducingElement = beanProducingElement;
         if (beanProducingElement instanceof ClassElement classElement) {
-            autoApplyNamedToBeanProducingElement(classElement);
             if (classElement.isPrimitive()) {
                 throw new IllegalArgumentException("Primitive beans can only be created from factories");
             }
+            autoApplyNamedToBeanProducingElement(classElement);
             this.beanTypeElement = classElement;
             this.packageName = classElement.getPackageName();
             this.isInterface = classElement.isInterface();
@@ -709,8 +750,8 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
             this.beanSimpleClassName = classElement.getSimpleName();
             this.beanDefinitionName = getBeanDefinitionName(packageName, beanSimpleClassName);
         } else if (beanProducingElement instanceof MethodElement factoryMethodElement) {
-            autoApplyNamedToBeanProducingElement(beanProducingElement);
             final ClassElement producedElement = factoryMethodElement.getGenericReturnType();
+            autoApplyNamedToBeanProducingElement(beanProducingElement);
             this.beanTypeElement = producedElement;
             this.packageName = producedElement.getPackageName();
             this.isInterface = producedElement.isInterface();
@@ -724,8 +765,8 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
             final ClassElement declaringType = factoryMethodElement.getOwningType();
             this.beanDefinitionName = declaringType.getPackageName() + "." + prefixClassName(declaringType.getSimpleName()) + "$" + upperCaseMethodName + uniqueIdentifier + CLASS_SUFFIX;
         } else if (beanProducingElement instanceof PropertyElement factoryPropertyElement) {
-            autoApplyNamedToBeanProducingElement(beanProducingElement);
             final ClassElement producedElement = factoryPropertyElement.getGenericType();
+            autoApplyNamedToBeanProducingElement(beanProducingElement);
             this.beanTypeElement = producedElement;
             this.packageName = producedElement.getPackageName();
             this.isInterface = producedElement.isInterface();
@@ -739,8 +780,8 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
             final ClassElement declaringType = factoryPropertyElement.getOwningType();
             this.beanDefinitionName = declaringType.getPackageName() + "." + prefixClassName(declaringType.getSimpleName()) + "$" + upperCaseMethodName + uniqueIdentifier + CLASS_SUFFIX;
         } else if (beanProducingElement instanceof FieldElement factoryMethodElement) {
-            autoApplyNamedToBeanProducingElement(beanProducingElement);
             final ClassElement producedElement = factoryMethodElement.getGenericField();
+            autoApplyNamedToBeanProducingElement(beanProducingElement);
             this.beanTypeElement = producedElement;
             this.packageName = producedElement.getPackageName();
             this.isInterface = producedElement.isInterface();
@@ -975,6 +1016,11 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
             classDefBuilder.addSuperinterface(TypeDef.of(AdvisedBeanType.class));
         }
         this.interceptedType = typeName;
+    }
+
+    @Override
+    public void setExposes(Set<ClassElement> exposes) {
+        this.exposes = exposes;
     }
 
     @Override
@@ -1255,6 +1301,32 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
         classDefBuilder.addStaticInitializer(staticBlock.statement);
 
         addConstructor(staticBlock);
+
+        boolean isParallel = annotationMetadata.hasStereotype(Parallel.class);
+        // In v6 we can assume everything was recompiled with v5 so we can modify the default method to return false and only add this one on true
+        classDefBuilder.addMethod(
+            MethodDef.override(IS_PARALLEL_METHOD).build((aThis, methodParameters) -> ExpressionDef.constant(isParallel).returning())
+        );
+
+        AnnotationValue<DefaultImplementation> defaultImplementationAnnotationValue = annotationMetadata.getAnnotation(DefaultImplementation.class);
+        if (defaultImplementationAnnotationValue != null) {
+            AnnotationClassValue<?> defaultImplementationClass = defaultImplementationAnnotationValue.annotationClassValue("name").orElse(null);
+            if (defaultImplementationClass != null) {
+                classDefBuilder.addMethod(MethodDef.override(METHOD_GET_DEFAULT_IMPLEMENTATION)
+                    .build((aThis, methodParameters) ->
+                        ExpressionDef.constant(TypeDef.of(defaultImplementationClass.getName()))
+                            .returning()
+                            .doTry()
+                            .doCatch(Throwable.class, exceptionVar -> ExpressionDef.nullValue().returning())
+                    )
+                );
+            }
+        }
+        if (annotationMetadata.hasStereotype(Infrastructure.class)) {
+            classDefBuilder.addMethod(
+                MethodDef.override(METHOD_IS_CAN_BE_REPLACED).build((aThis, methodParameters) -> ExpressionDef.constant(false).returning())
+            );
+        }
 
         loadTypeMethods.values().forEach(classDefBuilder::addMethod);
 
@@ -1648,7 +1720,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                                        BuildMethodDefinition buildMethodDefinition,
                                        Function<ExpressionDef, StatementDef> onBeanInstance,
                                        boolean isParametrized) {
-        StatementDef.DefineAndAssign[] constructorDef = new StatementDef.DefineAndAssign[] { null };
+        StatementDef.DefineAndAssign[] constructorDef = new StatementDef.DefineAndAssign[]{null};
         Supplier<VariableDef> constructorDefSupplier = new Supplier<VariableDef>() {
 
             @Override
@@ -1846,13 +1918,11 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
         );
 
         return StatementDef.multi(
-            parameters.get(1).cast(DefaultBeanContext.class)
-                .invoke(METHOD_GET_BEAN,
-                    // load the first argument of the method (the BeanResolutionContext) to be passed to the method
-                    parameters.get(0),
-                    // second argument is the bean type
+            parameters.get(0)
+                .invoke(BEAN_LOCATOR_METHOD_GET_BEAN,
+                    // first argument is the bean type
                     ExpressionDef.constant(factoryTypeDef),
-                    // third argument is the qualifier for the factory if any
+                    // second argument is the qualifier for the factory if any
                     getQualifier(factoryBuildMethodDefinition.factoryClass, argumentExpression)
                 ).cast(factoryTypeDef).newLocal("factoryBean", factoryBeanVar -> StatementDef.multi(
                     parameters.get(0).invoke(METHOD_BEAN_RESOLUTION_CONTEXT_MARK_FACTORY),
@@ -1902,7 +1972,6 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
             .addModifiers(Modifier.FINAL)
             .superclass(ClassTypeDef.of(AbstractBeanDefinitionBeanConstructor.class))
             .addAnnotation(Generated.class);
-
 
         // for factory methods we have to store the factory instance in a field and modify the constructor pass the factory instance
         ClassTypeDef factoryType = ClassTypeDef.of(factoryBuildMethodDefinition.factoryClass);
@@ -2090,6 +2159,36 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                 )
         );
 
+        AnnotationMetadata declaredAnnotationMetadata;
+        if (beanProducingElement instanceof MethodElement methodElement) {
+            declaredAnnotationMetadata = methodElement.getMethodAnnotationMetadata();
+        } else {
+            declaredAnnotationMetadata = annotationMetadata;
+        }
+
+        List<AnnotationValue<Indexed>> indexes = declaredAnnotationMetadata.getAnnotationValuesByType(Indexed.class);
+        if (!indexes.isEmpty()) {
+            TypeDef.Array arrayOfClasses = TypeDef.Primitive.CLASS.array();
+            FieldDef indexesField = FieldDef.builder("$INDEXES")
+                .ofType(arrayOfClasses)
+                .addModifiers(Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC)
+                .build();
+            initStatements.add(
+                beanDefinitionTypeDef.getStaticField(indexesField).put(
+                    arrayOfClasses.instantiate(
+                        indexes.stream().map(av -> asClassExpression(av.stringValue().orElseThrow())).toArray(ExpressionDef[]::new)
+                    )
+                )
+            );
+
+            classDefBuilder.addField(indexesField);
+            classDefBuilder.addMethod(
+                MethodDef.override(GET_INDEXES_METHOD).build((aThis, methodParameters) -> aThis.type().getStaticField(indexesField).returning())
+            );
+
+            failStatements.add(beanDefinitionTypeDef.getStaticField(indexesField).put(arrayOfClasses.instantiate()));
+        }
+
         statements.add(
             StatementDef.doTry(
                 StatementDef.multi(
@@ -2103,6 +2202,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
 
         statements.add(addInnerConfigurationMethod());
         statements.add(addGetExposedTypes());
+        statements.add(addReplacesDefinition());
 
         FieldDef preStartConditionsField = null;
         FieldDef postStartConditionsField = null;
@@ -2357,24 +2457,170 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
     }
 
     private StatementDef addGetExposedTypes() {
-        if (annotationMetadata.hasDeclaredAnnotation(Bean.class.getName())) {
-            final String[] exposedTypes = annotationMetadata.stringValues(Bean.class.getName(), "typed");
-            if (exposedTypes.length > 0) {
-                FieldDef exposedTypesField = FieldDef.builder(FIELD_EXPOSED_TYPES, Set.class)
-                    .addModifiers(Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC)
-                    .build();
-
-                classDefBuilder.addField(exposedTypesField);
-
-                classDefBuilder.addMethod(
-                    MethodDef.override(GET_EXPOSED_TYPES_METHOD)
-                        .build((aThis, methodParameters) -> aThis.type().getStaticField(exposedTypesField).returning())
-                );
-
-                return beanDefinitionTypeDef.getStaticField(exposedTypesField).put(getClassesAsSetExpression(exposedTypes));
+        AnnotationMetadata producingAnnotationMetadata;
+        if (beanProducingElement instanceof MethodElement methodElement) {
+            producingAnnotationMetadata = methodElement.getMethodAnnotationMetadata();
+        } else {
+            producingAnnotationMetadata = annotationMetadata;
+        }
+        String[] exposedTypes = producingAnnotationMetadata.stringValues(Bean.class.getName(), "typed");
+        Set<String> exposedTypeNames;
+        if (exposedTypes.length != 0) {
+            exposedTypeNames = Set.of(exposedTypes);
+        } else {
+            exposedTypeNames = new LinkedHashSet<>();
+            if (interceptedType != null) {
+                collectExposedTypes(exposedTypeNames, visitorContext.getClassElement(interceptedType).orElseThrow(() -> new IllegalStateException("Intercepted type not found: " + interceptedType)));
+                exposedTypeNames.add(beanProducingElement.getName()); // Allow finding the proxy by it's name
+            } else if (exposes != null) {
+                exposes.forEach(name -> exposedTypeNames.add(name.getName()));
+            } else if (isContainerType()) {
+                if (beanTypeElement.isArray()) {
+                    collectExposedTypes(exposedTypeNames, beanTypeElement.fromArray());
+                } else {
+                    collectExposedTypes(exposedTypeNames, beanTypeElement.getFirstTypeArgument()
+                        .orElseThrow(() -> new IllegalStateException("No type argument found for array type: " + beanTypeElement.getType())));
+                }
+                collectExposedTypes(exposedTypeNames, beanTypeElement);
+            } else {
+                collectExposedTypes(exposedTypeNames, beanTypeElement);
             }
         }
-        return StatementDef.multi();
+        if (exposedTypeNames.isEmpty()) {
+            // This should never happen
+            return StatementDef.multi();
+        }
+        FieldDef exposedTypesField = FieldDef.builder(FIELD_EXPOSED_TYPES, TypeDef.parameterized(Set.class, TypeDef.Primitive.CLASS))
+            .addModifiers(Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC)
+            .build();
+
+        List<StatementDef> statements = new ArrayList<>();
+
+        classDefBuilder.addField(exposedTypesField);
+
+        VariableDef.StaticField staticFieldExposes = beanDefinitionTypeDef.getStaticField(exposedTypesField);
+        statements.add(StatementDef.doTry(
+                staticFieldExposes.put(getClassesAsSetExpression(exposedTypeNames))
+            ).doCatch(Throwable.class,
+                exceptionVar -> staticFieldExposes.put(GenUtils.setOf(List.of())))
+        );
+
+        classDefBuilder.addMethod(
+            MethodDef.override(GET_EXPOSED_TYPES_METHOD)
+                .build((aThis, methodParameters) ->
+                    aThis.type().getStaticField(exposedTypesField).returning())
+        );
+
+        if (!hasTypeArguments() && !isContainerType()) {
+
+            classDefBuilder.addMethod(
+                MethodDef.override(IS_CANDIDATE_BEAN_METHOD)
+                    .build((aThis, methodParameters) -> {
+                            if (exposedTypes.length != 0) { // User-defined exposed types
+                                if (exposedTypeNames.size() == 1) {
+                                    return methodParameters.get(0).newLocal("type", variableDef ->
+                                        variableDef.isNonNull()
+                                            .and(
+                                                ArgumentExpUtils.getTypeExp(variableDef).equalsReferentially(
+                                                    ExpressionDef.constant(TypeDef.of(exposedTypeNames.iterator().next()))
+                                                )
+                                            )
+                                            .returning()
+                                    );
+                                } else {
+                                    return methodParameters.get(0).newLocal("type", variableDef ->
+                                        variableDef.isNonNull().and(
+                                            staticFieldExposes.invoke(CONTAINS_METHOD, ArgumentExpUtils.getTypeExp(variableDef)).isTrue()
+                                        ).returning()
+                                    );
+                                }
+                            } else {
+                                return ArgumentExpUtils.getTypeExp(methodParameters.get(0))
+                                    .invoke(IS_ASSIGNABLE_METHOD, ExpressionDef.constant(beanTypeDef))
+                                    .returning();
+                            }
+                        }
+                    )
+            );
+        }
+        return StatementDef.multi(statements);
+    }
+
+    private StatementDef addReplacesDefinition() {
+        AnnotationMetadata producingAnnotationMetadata = annotationMetadata;
+        AnnotationValue<Replaces> replacesAnnotationValue = producingAnnotationMetadata.getAnnotation(Replaces.class);
+        if (replacesAnnotationValue == null) {
+            classDefBuilder.addMethod(
+                MethodDef.override(METHOD_GET_REPLACES_DEFINITION)
+                    .build((aThis, methodParameters) ->
+                        ExpressionDef.nullValue().returning())
+            );
+            return StatementDef.multi();
+        }
+        TypeDef replacesType = TypeDef.of(ReplacesDefinition.class);
+        FieldDef replacesField = FieldDef.builder(FIELD_REPLACES, replacesType)
+            .addModifiers(Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC)
+            .build();
+
+        List<StatementDef> statements = new ArrayList<>();
+
+        classDefBuilder.addField(replacesField);
+
+        AnnotationClassValue<?> replacesBean = replacesAnnotationValue.annotationClassValue(Replaces.MEMBER_BEAN).orElse(null);
+        String named = replacesAnnotationValue.stringValue(Replaces.MEMBER_NAMED).orElse(null);
+        AnnotationClassValue<?> qualifier = replacesAnnotationValue.annotationClassValue(Replaces.MEMBER_QUALIFIER).orElse(null);
+        AnnotationClassValue<?> replacesFactory = replacesAnnotationValue.annotationClassValue(Replaces.MEMBER_FACTORY).orElse(null);
+
+        if (named != null && qualifier != null) {
+            throw new ProcessingException(beanProducingElement, "Both \"named\" and \"qualifier\" should not be present");
+        }
+
+        ExpressionDef qualifierExpression;
+        if (named != null) {
+            qualifierExpression = TYPE_QUALIFIERS.invokeStatic(METHOD_QUALIFIER_BY_NAME, ExpressionDef.constant(named));
+        } else if (qualifier != null) {
+            qualifierExpression = TYPE_QUALIFIERS.invokeStatic(METHOD_QUALIFIER_BY_STEREOTYPE, ExpressionDef.constant(TypeDef.of(qualifier.getName())));
+        } else {
+            qualifierExpression = ExpressionDef.nullValue();
+        }
+
+        VariableDef.StaticField staticFieldReplaces = beanDefinitionTypeDef.getStaticField(replacesField);
+        statements.add(StatementDef.doTry(
+                staticFieldReplaces.put(
+                    ClassTypeDef.of(DefaultReplacesDefinition.class)
+                        .instantiate(CONSTRUCTOR_DEFAULT_REPLACES_DEFINITION,
+                            ExpressionDef.constant(beanTypeDef),
+                            replacesBean == null ? ExpressionDef.nullValue() : ExpressionDef.constant(TypeDef.of(replacesBean.getName())),
+                            qualifierExpression,
+                            replacesFactory == null ? ExpressionDef.nullValue() : ExpressionDef.constant(TypeDef.of(replacesFactory.getName()))
+                        )
+                )
+            ).doCatch(Throwable.class,
+                exceptionVar -> staticFieldReplaces.put(ExpressionDef.nullValue()))
+        );
+
+        classDefBuilder.addMethod(
+            MethodDef.override(METHOD_GET_REPLACES_DEFINITION)
+                .build((aThis, methodParameters) ->
+                    aThis.type().getStaticField(replacesField).returning())
+        );
+        return StatementDef.multi(statements);
+    }
+
+    private void collectExposedTypes(Set<String> exposedTypeNames, ClassElement element) {
+        String className = getClassName(element);
+        if (!exposedTypeNames.add(className) || IGNORED_EXPOSED_INTERFACES.contains(className)) {
+            return;
+        }
+        element.getSuperType().ifPresent(superType -> collectExposedTypes(exposedTypeNames, superType));
+        element.getInterfaces().forEach(iface -> collectExposedTypes(exposedTypeNames, iface));
+    }
+
+    private String getClassName(ClassElement element) {
+        if (element.isArray()) {
+            return getClassName(element.fromArray()) + "[]";
+        }
+        return element.getName();
     }
 
     @Nullable
@@ -2408,6 +2654,10 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
 
                 asClassExpression(classes[0])
             );
+    }
+
+    private ExpressionDef getClassesAsSetExpression(Collection<String> classes) {
+        return GenUtils.setOf(classes.stream().<ExpressionDef>map(this::asClassExpression).toList());
     }
 
     private boolean hasTypeArguments() {
@@ -2665,11 +2915,11 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
     /**
      * Visit a method that is to be made executable allow invocation of said method without reflection.
      *
-     * @param declaringType                    The declaring type of the method. Either a Class or a string representing the
-     *                                         name of the type
-     * @param methodElement                    The method element
-     * @param interceptedProxyType             The intercepted proxy type
-     * @param interceptedProxyBridgeMethod     The intercepted proxy bridge method name
+     * @param declaringType                The declaring type of the method. Either a Class or a string representing the
+     *                                     name of the type
+     * @param methodElement                The method element
+     * @param interceptedProxyType         The intercepted proxy type
+     * @param interceptedProxyBridgeMethod The intercepted proxy bridge method name
      * @return The index of a new method.
      */
     public int visitExecutableMethod(TypedElement declaringType,
@@ -3166,7 +3416,11 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
     }
 
     private ExpressionDef getArrayOfClasses(String[] byType) {
-        return TypeDef.CLASS.array().instantiate(Arrays.stream(byType).map(this::asClassExpression).toList());
+        return getArrayOfClasses(List.of(byType));
+    }
+
+    private ExpressionDef getArrayOfClasses(Collection<String> byType) {
+        return TypeDef.CLASS.array().instantiate(byType.stream().map(this::asClassExpression).toList());
     }
 
     private ExpressionDef.Constant asClassExpression(String type) {
@@ -4863,7 +5117,8 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
 
     }
 
-    private record ConfigBuilderInjectCommand(ConfigurationBuilderDefinition configurationBuilderDefinition) implements InjectMethodCommand {
+    private record ConfigBuilderInjectCommand(
+        ConfigurationBuilderDefinition configurationBuilderDefinition) implements InjectMethodCommand {
         @Override
         public boolean hasInjectScope() {
             return false;

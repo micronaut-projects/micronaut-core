@@ -19,7 +19,6 @@ import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.AppenderBase
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.PropertySource
 import io.micronaut.http.HttpMethod
 import io.micronaut.http.netty.channel.EventLoopGroupFactory
@@ -46,7 +45,6 @@ import spock.lang.Specification
 import spock.lang.Unroll
 
 import java.time.Duration
-
 /**
  * @author Graeme Rocher
  * @since 1.0
@@ -204,7 +202,7 @@ class NettyHttpServerConfigurationSpec extends Specification {
     @IgnoreIf({ ! Epoll.isAvailable() })
     void "test netty server use native transport configuration"() {
         given:
-        ApplicationContext beanContext = new DefaultApplicationContext("test")
+        ApplicationContext beanContext = ApplicationContext.builder("test").build()
         beanContext.environment.addPropertySource(PropertySource.of("test",
               ['micronaut.server.netty.use-native-transport': true,
                'micronaut.server.netty.childOptions.tcpQuickack': true]
@@ -237,7 +235,7 @@ class NettyHttpServerConfigurationSpec extends Specification {
         Logger l = (Logger) LoggerFactory.getLogger(ServerBootstrap.class)
         l.addAppender(appender)
         appender.start()
-        ApplicationContext beanContext = new DefaultApplicationContext("test")
+        ApplicationContext beanContext = ApplicationContext.builder("test").build()
         beanContext.environment.addPropertySource(PropertySource.of("test",
               ['micronaut.server.netty.use-native-transport': true,
                'micronaut.server.netty.childOptions.tcpQuickack': true]
@@ -288,7 +286,7 @@ class NettyHttpServerConfigurationSpec extends Specification {
 
     void "test netty server configuration"() {
         given:
-        ApplicationContext beanContext = new DefaultApplicationContext("test")
+        ApplicationContext beanContext = ApplicationContext.builder("test").build()
         beanContext.environment.addPropertySource(PropertySource.of("test",
                 ['micronaut.server.netty.childOptions.autoRead'         : 'true',
                  'micronaut.server.netty.worker.threads'                : 8,
@@ -335,7 +333,7 @@ class NettyHttpServerConfigurationSpec extends Specification {
 
     void "test cors configuration"() {
         given:
-        ApplicationContext beanContext = new DefaultApplicationContext("test")
+        ApplicationContext beanContext = ApplicationContext.builder("test").build()
         beanContext.environment.addPropertySource(PropertySource.of("test",
                 ['micronaut.server.cors.enabled'                            : true,
                  'micronaut.server.cors.configurations.foo.allowedOrigins'  : ['foo.com'],
@@ -384,7 +382,7 @@ class NettyHttpServerConfigurationSpec extends Specification {
 
     void "test netty server access logger configuration"() {
         given:
-        ApplicationContext beanContext = new DefaultApplicationContext("test")
+        ApplicationContext beanContext = ApplicationContext.builder("test").build()
         beanContext.environment.addPropertySource(PropertySource.of("test",
               ['micronaut.server.netty.access-logger.enabled': true,
                'micronaut.server.netty.access-logger.logger-name': 'mylogger',
@@ -413,7 +411,7 @@ class NettyHttpServerConfigurationSpec extends Specification {
 
     void "test netty server access logger configuration with timezone"() {
         given:
-        ApplicationContext beanContext = new DefaultApplicationContext("test")
+        ApplicationContext beanContext = ApplicationContext.builder("test").build()
         beanContext.environment.addPropertySource(PropertySource.of("test",
                 ['micronaut.server.netty.access-logger.enabled': true,
                  'micronaut.server.netty.access-logger.logger-name': 'mylogger',
@@ -442,7 +440,7 @@ class NettyHttpServerConfigurationSpec extends Specification {
 
     void "test netty server http2 configuration"() {
         given:
-        ApplicationContext beanContext = new DefaultApplicationContext("test")
+        ApplicationContext beanContext = ApplicationContext.builder("test").build()
         beanContext.environment.addPropertySource(PropertySource.of("test",
               ['micronaut.server.netty.http2.max-frame-size': 20000,
                'micronaut.server.netty.http2.max-concurrent-streams': 100,
@@ -476,7 +474,7 @@ class NettyHttpServerConfigurationSpec extends Specification {
 
     void "test configuring the parent through event-loops"() {
         given:
-        ApplicationContext beanContext = new DefaultApplicationContext("test")
+        ApplicationContext beanContext = ApplicationContext.builder("test").build()
         beanContext.environment.addPropertySource(PropertySource.of("test",
                 [
                  'micronaut.netty.event-loops.parent.shutdown-quiet-period'  : '500ms'
@@ -499,7 +497,7 @@ class NettyHttpServerConfigurationSpec extends Specification {
 
     void "test default keepAlive configuration"() {
         given:
-        ApplicationContext beanContext = new DefaultApplicationContext("test")
+        ApplicationContext beanContext = ApplicationContext.builder("test").build()
         beanContext.start()
 
         when:
@@ -514,7 +512,7 @@ class NettyHttpServerConfigurationSpec extends Specification {
 
     void "test keepAlive configuration set to false"() {
         given:
-        ApplicationContext beanContext = new DefaultApplicationContext("test")
+        ApplicationContext beanContext = ApplicationContext.builder("test").build()
         beanContext.environment.addPropertySource(PropertySource.of("test",
           ['micronaut.server.netty.keepAliveOnServerError': false]
         ))

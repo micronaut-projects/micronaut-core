@@ -16,7 +16,6 @@
 package io.micronaut.docs.config.value;
 
 import io.micronaut.context.ApplicationContext;
-import io.micronaut.context.DefaultApplicationContext;
 import io.micronaut.context.env.PropertySource;
 import org.codehaus.groovy.runtime.DefaultGroovyMethods;
 import org.junit.jupiter.api.Test;
@@ -31,7 +30,7 @@ class VehicleSpec {
     @Test
     void testStartVehicleWithConfiguration() {
         // tag::start[]
-        ApplicationContext applicationContext = new DefaultApplicationContext("test");
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build();
         LinkedHashMap<String, Object> map = new LinkedHashMap(1);
         map.put("my.engine.cylinders", "8");
         applicationContext.getEnvironment().addPropertySource(PropertySource.of("test", map));
@@ -47,7 +46,7 @@ class VehicleSpec {
     @Test
     void testStartVehicleWithoutConfiguration() {
         // tag::start[]
-        ApplicationContext applicationContext = new DefaultApplicationContext("test");
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build();
         applicationContext.start();
 
         Vehicle vehicle = applicationContext.getBean(Vehicle.class);
@@ -60,7 +59,7 @@ class VehicleSpec {
     @Test
     void testStartVehicleWithNonEmptyPlaceholder() {
         // tag::start[]
-        ApplicationContext applicationContext = new DefaultApplicationContext("test");
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build();
         LinkedHashMap<String, Object> map = new LinkedHashMap(1);
         map.put("my.engine.description", "${DESCRIPTION}");
         map.put("DESCRIPTION", "V8 Engine");
@@ -76,7 +75,7 @@ class VehicleSpec {
     @Test
     void testStartVehicleWithEmptyPlaceholder() {
         // tag::start[]
-        ApplicationContext applicationContext = new DefaultApplicationContext("test");
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build();
         LinkedHashMap<String, Object> map = new LinkedHashMap(1);
         map.put("my.engine.description", "${DESCRIPTION}");
         applicationContext.getEnvironment().addPropertySource(PropertySource.of("test", map));

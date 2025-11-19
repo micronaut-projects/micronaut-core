@@ -15,8 +15,8 @@
  */
 package io.micronaut.inject;
 
-import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.Primary;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationUtil;

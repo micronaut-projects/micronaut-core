@@ -26,7 +26,7 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
-import static io.micronaut.scheduling.TaskExecutors.IO
+import io.micronaut.scheduling.TaskExecutors
 
 class ReactorRx2JavaSpec extends Specification {
 
@@ -74,7 +74,7 @@ class ReactorRx2JavaSpec extends Specification {
         private HttpClient reactorHttpClient
 
         @SingleResult
-        @ExecuteOn(IO)
+        @ExecuteOn(TaskExecutors.IO)
         @Post("/enter")
         Publisher<String> test(@Header("X-TrackingId") String tracingId, @Body SomeBody body) {
             LOG.info("enter")
@@ -85,7 +85,7 @@ class ReactorRx2JavaSpec extends Specification {
             )
         }
 
-        @ExecuteOn(IO)
+        @ExecuteOn(TaskExecutors.IO)
         @Get("/test")
         Mono<String> testRxJava2(@Header("X-TrackingId") String tracingId) {
             LOG.info("test")
@@ -96,7 +96,7 @@ class ReactorRx2JavaSpec extends Specification {
             )
         }
 
-        @ExecuteOn(IO)
+        @ExecuteOn(TaskExecutors.IO)
         @Get("/test2")
         String test2RxJava2(@Header("X-TrackingId") String tracingId) {
             LOG.info("test2")

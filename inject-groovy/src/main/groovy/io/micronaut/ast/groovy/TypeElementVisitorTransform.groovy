@@ -114,7 +114,7 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
     }
 
     @CompileStatic
-    private static class ElementVisitor {
+    private static final class ElementVisitor {
 
         final SourceUnit sourceUnit
         final CompilationUnit compilationUnit

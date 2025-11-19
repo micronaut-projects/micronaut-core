@@ -96,7 +96,7 @@ final class NettyResponseLifecycle extends ResponseLifecycle {
         return NettyConcatenatingSubscriber.concatenate(byteBodyFactory(), NettyConcatenatingSubscriber.JSON_NETTY, items);
     }
 
-    private static class NettyConcatenatingSubscriber extends ConcatenatingSubscriber implements BufferConsumer {
+    private static final class NettyConcatenatingSubscriber extends ConcatenatingSubscriber implements BufferConsumer {
         static final Separators JSON_NETTY = Separators.jsonSeparators(NettyReadBufferFactory.of(ByteBufAllocator.DEFAULT));
 
         private final EventLoopFlow flow;

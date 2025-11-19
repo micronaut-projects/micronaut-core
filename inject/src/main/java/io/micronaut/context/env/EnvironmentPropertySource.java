@@ -72,11 +72,11 @@ public class EnvironmentPropertySource extends MapPropertySource {
         return PropertyConvention.ENVIRONMENT_VARIABLE;
     }
 
-    static Map getEnv(@Nullable List<String> includes, @Nullable List<String> excludes) {
+    static Map<String, String> getEnv(@Nullable List<String> includes, @Nullable List<String> excludes) {
         return getEnv(CachedEnvironment.getenv(), includes, excludes);
     }
 
-    static Map getEnv(Map<String, String> env, @Nullable List<String> includes, @Nullable List<String> excludes) {
+    static Map<String, String> getEnv(Map<String, String> env, @Nullable List<String> includes, @Nullable List<String> excludes) {
         if (includes != null || excludes != null) {
             Map<String, String> result = new HashMap<>();
             for (Map.Entry<String, String> entry : env.entrySet()) {

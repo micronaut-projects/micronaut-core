@@ -30,6 +30,7 @@ import io.micronaut.inject.InstantiatableBeanDefinition;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 
 import java.util.Collections;
+import java.util.Set;
 
 /**
  * Registers the {@link InterceptorRegistry} instance.
@@ -45,6 +46,34 @@ public final class InterceptorRegistryBean implements InstantiatableBeanDefiniti
         MutableAnnotationMetadata metadata = new MutableAnnotationMetadata();
         metadata.addDeclaredAnnotation(BootstrapContextCompatible.class.getName(), Collections.emptyMap());
         ANNOTATION_METADATA = metadata;
+    }
+
+    @Override
+    public @NonNull Class<?>[] getIndexes() {
+        return new Class[]{InterceptorRegistry.class};
+    }
+
+    @Override
+    public Set<Class<?>> getExposedTypes() {
+        return Set.of(
+            InterceptorRegistry.class,
+            DefaultInterceptorRegistry.class
+        );
+    }
+
+    @Override
+    public int getOrder() {
+        return 0;
+    }
+
+    @Override
+    public boolean isPrimary() {
+        return false;
+    }
+
+    @Override
+    public boolean isParallel() {
+        return false;
     }
 
     @Override

@@ -46,7 +46,7 @@ spotless {
 }
 
 tasks.withType<Test>().configureEach {
-    if (JavaVersion.current().majorVersion.toInt() >= 17) {
+    if (JavaVersion.current().majorVersion.toInt() >= 21) {
         logger.warn("Opening java.util and java.lang, so SystemLambda can work")
         jvmArgs(
             listOf(

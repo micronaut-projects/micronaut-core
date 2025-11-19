@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanType;
+import io.micronaut.inject.QualifiedBeanType;
 
 /**
  * A qualifier to lookup beans without any qualifier.
@@ -40,6 +41,11 @@ final class NoneQualifier<T> extends FilteringQualifier<T> {
             return beanDefinition.getDeclaredQualifier() == null;
         }
         return !AnnotationUtil.hasDeclaredQualifierAnnotation(candidate.getAnnotationMetadata());
+    }
+
+    @Override
+    public boolean doesQualify(Class<T> beanType, QualifiedBeanType<T> candidate) {
+        return candidate.getDeclaredQualifier() == null;
     }
 
     @Override

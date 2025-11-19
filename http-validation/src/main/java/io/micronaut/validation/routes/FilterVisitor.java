@@ -189,12 +189,12 @@ public final class FilterVisitor implements TypeElementVisitor<Object, Object> {
         return parameterType.isAssignable(byte[].class) || parameterType.isAssignable(ByteBuffer.class) || parameterType.isAssignable(String.class);
     }
 
-    private static ClassElement resolveReturnType(MethodElement element) {
+   private static ClassElement resolveReturnType(MethodElement element) {
         ClassElement returnType = element.getGenericReturnType();
         return resolveType(returnType);
     }
 
-    private static ClassElement resolveType(ClassElement returnType) {
+   private static ClassElement resolveType(ClassElement returnType) {
         if (returnType.isAssignable(Publisher.class) || returnType.isAssignable(CompletionStage.class) || returnType.isOptional()) {
             returnType = returnType.getFirstTypeArgument().orElse(returnType);
         }

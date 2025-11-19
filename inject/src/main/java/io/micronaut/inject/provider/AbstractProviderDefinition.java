@@ -42,6 +42,7 @@ import io.micronaut.inject.qualifiers.Qualifiers;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Abstract bean definition for other providers to extend from.
@@ -70,6 +71,37 @@ public abstract class AbstractProviderDefinition<T> implements InstantiatableBea
             // ignore, might happen if jakarta.inject is not the classpath
         }
         annotationMetadata = metadata;
+    }
+
+    @Override
+    public int getOrder() {
+        return 0;
+    }
+
+    @Override
+    @NonNull
+    public Class<?>[] getIndexes() {
+        try {
+            return new Class<?>[]{getBeanType()};
+        } catch (NoClassDefFoundError e) {
+            // ignore, might happen if jakarta.inject is not the classpath
+        }
+        return new Class<?>[]{};
+    }
+
+    @Override
+    public boolean isPrimary() {
+        return false;
+    }
+
+    @Override
+    public Set<Class<?>> getExposedTypes() {
+        return Set.of(getBeanType());
+    }
+
+    @Override
+    public boolean isParallel() {
+        return false;
     }
 
     @Override
@@ -219,7 +251,7 @@ public abstract class AbstractProviderDefinition<T> implements InstantiatableBea
 
     @Override
     public Qualifier<T> getDeclaredQualifier() {
-        return null;
+        return AnyQualifier.INSTANCE;
     }
 
     @Override

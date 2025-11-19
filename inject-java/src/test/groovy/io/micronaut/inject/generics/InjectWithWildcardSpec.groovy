@@ -16,7 +16,6 @@
 package io.micronaut.inject.generics
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
 import spock.lang.Specification
 
 class InjectWithWildcardSpec extends Specification {

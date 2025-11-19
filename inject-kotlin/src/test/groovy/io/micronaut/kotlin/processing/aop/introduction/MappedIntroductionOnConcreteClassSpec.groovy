@@ -1,6 +1,8 @@
 package io.micronaut.kotlin.processing.aop.introduction
 
+import io.micronaut.aop.Interceptor
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.RuntimeBeanDefinition
 import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.context.event.StartupEvent
 import spock.lang.Specification
@@ -20,7 +22,11 @@ import jakarta.inject.Singleton
 @Singleton
 open class MyBeanWithMappedIntroduction
 ''')
-        applicationContext.registerSingleton(new ListenerAdviceInterceptor())
+        applicationContext.registerBeanDefinition(
+                RuntimeBeanDefinition.builder(new ListenerAdviceInterceptor())
+                .exposedTypes(ListenerAdviceInterceptor.class, Interceptor.class)
+                .build()
+        )
 
         when:
         def beanClass = applicationContext.classLoader.loadClass('test.MyBeanWithMappedIntroduction')

@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.injectionpoint.notlazytarget;
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.scope.BeanCreationContext;
 import io.micronaut.context.scope.CustomScope;
 import io.micronaut.inject.BeanIdentifier;
@@ -22,6 +23,7 @@ import jakarta.inject.Singleton;
 
 import java.util.Optional;
 
+@Requires(property = "spec.name", value = "InjectionPointSpec")
 @Singleton
 public class CustomScopeScope implements CustomScope<io.micronaut.inject.injectionpoint.notlazytarget.CustomScope> {
     @Override

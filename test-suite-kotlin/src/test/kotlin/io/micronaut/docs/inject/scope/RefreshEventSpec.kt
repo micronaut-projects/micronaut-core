@@ -29,11 +29,7 @@ class RefreshEventSpec: AnnotationSpec() {
 
     @BeforeEach
     fun setup() {
-        embeddedServer = ApplicationContext.run(
-            EmbeddedServer::class.java,
-            mapOf("spec.name" to RefreshEventSpec::class.simpleName),
-            Environment.TEST
-        )
+        embeddedServer = ApplicationContext.run(EmbeddedServer::class.java, mapOf("spec.name" to RefreshEventSpec::class.simpleName), Environment.TEST)
         client = HttpClient.create(embeddedServer.url)
     }
 
@@ -56,8 +52,7 @@ class RefreshEventSpec: AnnotationSpec() {
         val response = evictForecast()
 
         // tag::evictResponse[]
-        response shouldBe "{\"msg\":\"OK\"}"
-        // end::evictResponse[]
+        response shouldBe "{\"msg\":\"OK\"}"// end::evictResponse[]
 
         val thirdResponse = fetchForecast()
 
@@ -70,12 +65,10 @@ class RefreshEventSpec: AnnotationSpec() {
     }
 
     fun evictForecast(): String {
-        return client.toBlocking().retrieve(
-            HttpRequest.POST(
+        return client.toBlocking().retrieve(HttpRequest.POST(
                 "/weather/evict",
                 emptyMap<String, String>()
-            )
-        )
+        ))
     }
 
     //tag::weatherService[]
@@ -96,10 +89,7 @@ class RefreshEventSpec: AnnotationSpec() {
 
     @Requires(property = "spec.name", value = "RefreshEventSpec")
     @Controller("/weather")
-    open class WeatherController(
-        @Inject private val weatherService: WeatherService,
-        @Inject private val applicationContext: ApplicationContext
-    ) {
+    open class WeatherController(@Inject private val weatherService: WeatherService, @Inject private val applicationContext: ApplicationContext) {
 
         @Get(value = "/forecast")
         fun index(): MutableHttpResponse<Map<String, String?>>? {

@@ -302,7 +302,7 @@ public class BeanIntrospectionModule extends SimpleModule {
     /**
      * Modifies bean serialization.
      */
-    private class BeanIntrospectionSerializerModifier extends BeanSerializerModifier {
+    private final class BeanIntrospectionSerializerModifier extends BeanSerializerModifier {
         @Override
         public BeanSerializerBuilder updateBuilder(SerializationConfig config, BeanDescription beanDesc, BeanSerializerBuilder builder) {
             final Class<?> beanClass = beanDesc.getBeanClass();
@@ -1116,7 +1116,7 @@ public class BeanIntrospectionModule extends SimpleModule {
     /**
      * A bean introspection setter.
      */
-    private static class BeanIntrospectionSetter extends SettableBeanProperty.Delegating {
+    private static final class BeanIntrospectionSetter extends SettableBeanProperty.Delegating {
 
         final UnsafeBeanProperty<Object, Object> beanProperty;
 

@@ -100,7 +100,7 @@ public final class JdkClientSslBuilder extends SslBuilder<SSLContext> {
     }
 
     @SuppressWarnings("java:S4830") // This is explicitly to turn security off when isInsecureTrustAllCertificates
-    private static class TrustAllTrustManager implements X509TrustManager {
+    private static final class TrustAllTrustManager implements X509TrustManager {
 
         @Override
         public void checkClientTrusted(X509Certificate[] chain, String authType) throws CertificateException {

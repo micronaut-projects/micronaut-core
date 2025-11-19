@@ -485,19 +485,19 @@ class Test
         defaults["value"] == null
         defaults["intArray1"] == new int[] {}
         defaults["intArray2"] == new int[] {1, 2, 3}
-        defaults["intArray3"] == null
+        defaults["intArray3"] == new int[] {}
         defaults["stringArray1"] == new String[] {}
         defaults["stringArray2"] == new String[] {""}
         defaults["stringArray3"] == new String[] {"A"}
-        defaults["stringArray4"] == null
+        defaults["stringArray4"] == new String[] {}
         defaults["boolArray1"] == new boolean[] {}
         defaults["boolArray2"] == new boolean[] {true}
         defaults["boolArray3"] == new boolean[] {false}
-        defaults["boolArray4"] == null
+        defaults["boolArray4"] == new boolean[] {}
         defaults["myEnumArray1"] == new String[] {}
         defaults["myEnumArray2"] == new String[] {"ABC"}
         defaults["myEnumArray3"] == new String[] {"FOO", "BAR"}
-        defaults["myEnumArray4"] == null
+        defaults["myEnumArray4"] == new String[] {}
         defaults["classesArray1"] == new AnnotationClassValue[0]
         defaults["classesArray2"] == new AnnotationClassValue[] {new AnnotationClassValue(String)}
         defaults["ann"] == AnnotationValue.builder(MyAnnotation3).value("foo").build()
@@ -544,19 +544,19 @@ class Test
         defaults["bool"] == false
         defaults["intArray1"] == new int[] {}
         defaults["intArray2"] == new int[] {1, 2, 3}
-        defaults["intArray3"] == null
+        defaults["intArray3"] == new int[] {}
         defaults["stringArray1"] == new String[] {}
         defaults["stringArray2"] == new String[] {""}
         defaults["stringArray3"] == new String[] {"A"}
-        defaults["stringArray4"] == null
+        defaults["stringArray4"] == new String[] {}
         defaults["boolArray1"] == new boolean[] {}
         defaults["boolArray2"] == new boolean[] {true}
         defaults["boolArray3"] == new boolean[] {false}
-        defaults["boolArray4"] == null
+        defaults["boolArray4"] == new boolean[] {}
         defaults["myEnumArray1"] == new String[] {}
         defaults["myEnumArray2"] == new String[] {"ABC"}
         defaults["myEnumArray3"] == new String[] {"FOO", "BAR"}
-        defaults["myEnumArray4"] == null
+        defaults["myEnumArray4"] == new String[] {}
         defaults["classesArray1"] == new AnnotationClassValue[0]
         defaults["classesArray2"] == new AnnotationClassValue[] {new AnnotationClassValue(String)}
         defaults["ann"] == AnnotationValue.builder(MyAnnotation3).value("foo").build()

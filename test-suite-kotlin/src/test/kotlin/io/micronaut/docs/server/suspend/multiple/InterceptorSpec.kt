@@ -57,5 +57,15 @@ class InterceptorSpec : StringSpec() {
                 MyService.events[0] shouldBe "repository-findById"
             }
         }
+
+        "test calling delete method" {
+            runBlocking {
+                MyService.events.clear()
+                // Validate that no bytecode error is produced
+                repository.deleteById(111)
+                MyService.events.size shouldBeExactly 1
+                MyService.events[0] shouldBe "repository-deleteById"
+            }
+        }
     }
 }

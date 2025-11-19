@@ -15,18 +15,14 @@
  */
 package io.micronaut.context.conditions;
 
-import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.context.condition.Condition;
 import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.core.annotation.AnnotationClassValue;
-import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
-import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Objects;
 
 /**
@@ -41,26 +37,15 @@ import java.util.Objects;
 public record MatchesAbsenceOfBeansCondition(AnnotationClassValue<?>[] missingBeans) implements Condition {
     @Override
     public boolean matches(ConditionContext context) {
-        AnnotationMetadataProvider component = context.getComponent();
-        if (component instanceof BeanDefinition<?> bd) {
-            DefaultBeanContext beanContext = (DefaultBeanContext) context.getBeanContext();
-
-            for (AnnotationClassValue<?> bean : missingBeans) {
-                Class<?> type = bean.getType().orElse(null);
-                if (type == null) {
-                    continue;
-                }
-                // remove self by passing definition as filter
-                final Collection<? extends BeanDefinition<?>> beanDefinitions = beanContext.findBeanCandidates(
-                    context.getBeanResolutionContext(),
-                    Argument.of(type),
-                    bd
-                );
-                for (BeanDefinition<?> beanDefinition : beanDefinitions) {
-                    if (!beanDefinition.isAbstract()) {
-                        context.fail("Existing bean [" + beanDefinition.getName() + "] of type [" + type.getName() + "] registered in context");
-                        return false;
-                    }
+        for (AnnotationClassValue<?> bean : missingBeans) {
+            Class<?> type = bean.getType().orElse(null);
+            if (type == null) {
+                continue;
+            }
+            for (BeanDefinition<?> beanDefinition : ((ConditionContext<?>) context).findBeanDefinitions(type)) {
+                if (!beanDefinition.isAbstract()) {
+                    context.fail("Existing bean [" + beanDefinition.getName() + "] of type [" + type.getName() + "] registered in context");
+                    return false;
                 }
             }
         }

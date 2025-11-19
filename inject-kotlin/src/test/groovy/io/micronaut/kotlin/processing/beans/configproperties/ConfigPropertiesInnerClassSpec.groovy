@@ -1,7 +1,6 @@
 package io.micronaut.kotlin.processing.beans.configproperties
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.PropertySource
 import spock.lang.Specification
 
@@ -9,7 +8,7 @@ class ConfigPropertiesInnerClassSpec extends Specification {
 
     void "test configuration properties binding with inner class"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build()
         applicationContext.environment.addPropertySource(PropertySource.of(
                 'test',
                 ['foo.bar.innerVals': [

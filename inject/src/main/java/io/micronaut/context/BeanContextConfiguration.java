@@ -15,14 +15,17 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.context.annotation.ConfigurationReader;
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.inject.QualifiedBeanType;
 import jakarta.inject.Singleton;
 
 import java.lang.annotation.Annotation;
 import java.util.Collections;
 import java.util.Set;
+import java.util.function.Predicate;
 
 /**
  * Configuration for the {@link BeanContext}.
@@ -87,5 +90,38 @@ public interface BeanContextConfiguration {
      */
     default Set<Class<? extends Annotation>> getEagerInitAnnotated() {
         return Collections.emptySet();
+    }
+
+    /**
+     * @return Are eager beans enabled.
+     * @since 5.0
+     */
+    default boolean eagerBeansEnabled() {
+        return true;
+    }
+
+    /**
+     * @return Are events enabled.
+     * @since 5.0
+     */
+    default boolean eventsEnabled() {
+        return true;
+    }
+
+    /**
+     * @return Beans predicate.
+     * @since 5.0
+     */
+    @Nullable
+    default Predicate<QualifiedBeanType<?>> beansPredicate() {
+        return null;
+    }
+
+    /**
+     * @return Bean definitions provider.
+     * @since 5.0
+     */
+    default BeanDefinitionsProvider getBeanDefinitionsProvider() {
+        return new DefaultBeanDefinitionsProvider();
     }
 }

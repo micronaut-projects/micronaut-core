@@ -27,6 +27,7 @@ import io.micronaut.inject.ast.ParameterElement;
  * @param name      The property name
  * @param method    The method
  * @param parameter The parameter
+ * @param type      The type
  * @param path      The property path
  * @author Denis Stepanov
  * @see io.micronaut.context.annotation.ConfigurationBuilder

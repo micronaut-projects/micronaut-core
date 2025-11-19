@@ -15,10 +15,12 @@
  */
 package io.micronaut.context.env;
 
+import io.micronaut.context.ApplicationContextConfiguration;
 import io.micronaut.context.LifeCycle;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.convert.ConversionServiceProvider;
 import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.scan.BeanIntrospectionScanner;
@@ -56,7 +58,7 @@ import java.util.stream.Stream;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface Environment extends PropertyResolver, LifeCycle<Environment>, MutableConversionService, ResourceLoader {
+public interface Environment extends PropertyResolver, LifeCycle<Environment>, ResourceLoader, ConversionServiceProvider {
 
     /**
      * Constant for the name micronaut.
@@ -212,6 +214,19 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, M
      * Environment key for whether to deduce cloud environments.
      */
     String DEDUCE_CLOUD_ENVIRONMENT_ENV = "MICRONAUT_ENV_CLOUD_DEDUCTION";
+
+    /**
+     * Creates and returns a new instance of {@link Environment} using the provided
+     * application context configuration.
+     *
+     * @param configuration the application context configuration, must not be null
+     * @return a new instance of {@link Environment}, never null
+     * @since 5.0
+     */
+    @NonNull
+    static Environment create(@NonNull ApplicationContextConfiguration configuration) {
+        return new DefaultEnvironment(configuration);
+    }
 
     /**
      * Should respect the order as provided.
@@ -376,4 +391,13 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, M
     default Optional<PropertyEntry> getPropertyEntry(@NonNull String name) {
         return Optional.empty();
     }
+
+    /**
+     * Retrieves the conversion service instance associated with the environment.
+     *
+     * @return A {@link io.micronaut.core.convert.ConversionService} that allows adding new type converters.
+     * @since 5.0
+     */
+    @Override
+    MutableConversionService getConversionService();
 }

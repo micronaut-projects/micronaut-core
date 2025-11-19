@@ -25,10 +25,10 @@ import io.micronaut.core.cli.CommandLine;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.order.OrderUtil;
-import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
-
 import io.micronaut.inject.BeanConfiguration;
+import io.micronaut.inject.QualifiedBeanType;
+
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -40,6 +40,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Predicate;
 
 import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
 
@@ -62,6 +63,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private final Collection<String> configurationExcludes = new HashSet<>();
     private final ApplicationContextConfigurer contextConfigurer;
     private Boolean deduceEnvironments = null;
+    private boolean deducePackage = true;
     private boolean deduceCloudEnvironment = false;
     private ClassLoader classLoader = getClass().getClassLoader();
     private boolean envPropertySource = true;
@@ -76,6 +78,10 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private Boolean bootstrapEnvironment = null;
     private boolean enableDefaultPropertySources = true;
     private BeanResolutionTraceConfiguration traceConfiguration = new BeanResolutionTraceConfiguration();
+    private BeanDefinitionsProvider beanDefinitionsProvider = new DefaultBeanDefinitionsProvider();
+    private boolean eagerBeansEnabled = true;
+    private boolean eventsEnabled = true;
+    private Predicate<QualifiedBeanType<?>> beansPredicate;
 
     /**
      * Default constructor.
@@ -174,6 +180,26 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     }
 
     @Override
+    public BeanDefinitionsProvider getBeanDefinitionsProvider() {
+        return beanDefinitionsProvider;
+    }
+
+    @Override
+    public boolean eagerBeansEnabled() {
+        return eagerBeansEnabled;
+    }
+
+    @Override
+    public boolean eventsEnabled() {
+        return eventsEnabled;
+    }
+
+    @Override
+    public Predicate<QualifiedBeanType<?>> beansPredicate() {
+        return beansPredicate;
+    }
+
+    @Override
     public @NonNull ApplicationContextBuilder singletons(Object... beans) {
         if (beans != null) {
             singletons.addAll(Arrays.asList(beans));
@@ -218,6 +244,12 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     @Override
     public @NonNull ApplicationContextBuilder deduceEnvironment(@Nullable Boolean deduceEnvironments) {
         this.deduceEnvironments = deduceEnvironments;
+        return this;
+    }
+
+    @Override
+    public ApplicationContextBuilder deducePackage(boolean deducePackage) {
+        this.deducePackage = deducePackage;
         return this;
     }
 
@@ -295,6 +327,11 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     }
 
     @Override
+    public boolean isDeducePackage() {
+        return deducePackage;
+    }
+
+    @Override
     public boolean isDeduceCloudEnvironment() {
         boolean basicDeduce = getDeduceEnvironments().orElse(true);
         return basicDeduce && this.deduceCloudEnvironment;
@@ -358,6 +395,36 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     @Override
     public @NonNull ApplicationContextBuilder bootstrapEnvironment(boolean bootstrapEnv) {
         this.bootstrapEnvironment = bootstrapEnv;
+        return this;
+    }
+
+    @Override
+    public @NonNull ApplicationContextBuilder beanDefinitionsProvider(BeanDefinitionsProvider provider) {
+        this.beanDefinitionsProvider = provider;
+        return this;
+    }
+
+    @Override
+    public @NonNull ApplicationContextBuilder eagerBeansEnabled(boolean enabled) {
+        this.eagerBeansEnabled = enabled;
+        return this;
+    }
+
+    @Override
+    public @NonNull ApplicationContextBuilder eventsEnabled(boolean enabled) {
+        this.eventsEnabled = enabled;
+        return this;
+    }
+
+    @Override
+    public @NonNull ApplicationContextBuilder beansPredicate(@Nullable Predicate<QualifiedBeanType<?>> predicate) {
+        this.beansPredicate = predicate;
+        return this;
+    }
+
+    @Override
+    public ApplicationContextBuilder resourceResolver(ClassPathResourceLoader resourceResolver) {
+        this.classPathResourceLoader = resourceResolver;
         return this;
     }
 

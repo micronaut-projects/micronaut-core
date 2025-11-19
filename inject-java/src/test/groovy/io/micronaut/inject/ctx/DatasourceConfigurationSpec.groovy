@@ -16,7 +16,6 @@
 package io.micronaut.inject.ctx
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.MapPropertySource
 import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.inject.qualifiers.Qualifiers
@@ -28,7 +27,7 @@ class DatasourceConfigurationSpec extends Specification {
 
     void "test datasource can be disabled and enabled"() {
         given:
-            ApplicationContext applicationContext = new DefaultApplicationContext("test")
+            ApplicationContext applicationContext = ApplicationContext.builder("test").build()
             applicationContext.environment.addPropertySource(MapPropertySource.of(
                     'test',
                     [
@@ -58,7 +57,7 @@ class DatasourceConfigurationSpec extends Specification {
 
     void "test datasource can be disabled and enabled REVERSED"() {
         given:
-            ApplicationContext applicationContext = new DefaultApplicationContext("test")
+            ApplicationContext applicationContext = ApplicationContext.builder("test").build()
             applicationContext.environment.addPropertySource(MapPropertySource.of(
                     'test',
                     [

@@ -356,7 +356,7 @@ final class JsonNodeTraversingParser extends ParserMinimalBase {
         abstract String getText();
     }
 
-    private static class ArrayContext extends Context {
+    private static final class ArrayContext extends Context {
         final Iterator<JsonNode> iterator;
         /**
          * If {@code null}, we're either at the start or the end array token.
@@ -415,7 +415,7 @@ final class JsonNodeTraversingParser extends ParserMinimalBase {
         }
     }
 
-    private static class ObjectContext extends Context {
+    private static final class ObjectContext extends Context {
         final Iterator<Map.Entry<String, JsonNode>> iterator;
         @Nullable
         String currentName = null;
@@ -497,7 +497,7 @@ final class JsonNodeTraversingParser extends ParserMinimalBase {
     /**
      * Used as the singular context when the root object we're traversing is a scalar.
      */
-    private static class SingleContext extends Context {
+    private static final class SingleContext extends Context {
         private final JsonNode value;
 
         SingleContext(JsonNode value) {

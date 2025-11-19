@@ -1,7 +1,8 @@
 plugins {
     id("io.micronaut.build.internal.convention-test-library")
+    id("io.micronaut.build.internal.kotlin-base")
     alias(libs.plugins.managed.kotlin.jvm)
-    alias(libs.plugins.managed.kotlin.kapt)
+    alias(libs.plugins.managed.ksp)
 }
 
 micronautBuild {
@@ -28,23 +29,21 @@ dependencies {
     testImplementation(libs.managed.kotlinx.coroutines.rx2)
     testImplementation(libs.managed.kotlinx.coroutines.slf4j)
     testImplementation(libs.managed.kotlinx.coroutines.reactor)
-    testImplementation(libs.managed.kotlinx.coroutines.reactive)
 
     // Adding these for now since micronaut-test isnt resolving correctly ... probably need to upgrade gradle there too
     testImplementation(libs.junit.jupiter.api)
-    testImplementation(libs.awaitility)
+
     testImplementation(platform(libs.test.boms.micronaut.validation))
-    testImplementation (libs.micronaut.validation) {
-        exclude(group="io.micronaut")
+    testImplementation(libs.micronaut.validation) {
+        exclude(group = "io.micronaut")
     }
     testImplementation(projects.micronautManagement)
     testImplementation(projects.micronautInjectJava)
     testImplementation(projects.micronautInject)
     testImplementation(libs.jcache)
     testImplementation(projects.micronautHttpClient)
-    testImplementation(projects.micronautHttpClientJdk)
-    testImplementation (libs.micronaut.session) {
-        exclude(group="io.micronaut")
+    testImplementation(libs.micronaut.session) {
+        exclude(group = "io.micronaut")
     }
     testImplementation(projects.micronautJacksonDatabind)
     testImplementation(libs.managed.groovy.templates)
@@ -53,13 +52,13 @@ dependencies {
     testImplementation(projects.micronautFunctionWeb)
     testImplementation(libs.kotlin.kotest.junit5)
     testImplementation(libs.logbook.netty)
-    kaptTest(projects.micronautInjectJava)
-    kaptTest(platform(libs.test.boms.micronaut.validation))
-    kaptTest (libs.micronaut.validation.processor) {
-        exclude(group="io.micronaut")
+    kspTest(projects.micronautInjectKotlin)
+    kspTest(platform(libs.test.boms.micronaut.validation))
+    kspTest(libs.micronaut.validation.processor) {
+        exclude(group = "io.micronaut")
     }
-
     testImplementation(libs.javax.inject)
+
     testRuntimeOnly(libs.junit.jupiter.engine)
     testRuntimeOnly(platform(libs.test.boms.micronaut.aws))
     testRuntimeOnly(libs.aws.java.sdk.lambda)
@@ -71,22 +70,22 @@ dependencies {
     testImplementation(libs.jakarta.persistence)
 }
 
-configurations.testRuntimeClasspath {
+configurations.all {
     resolutionStrategy.eachDependency {
         if (requested.group == "org.jetbrains.kotlin") {
             useVersion(libs.versions.managed.kotlin.asProvider().get())
+        } else if (requested.group == "com.google.devtools.ksp") {
+            useVersion(libs.versions.managed.ksp.get())
         }
     }
 }
 
+//kotlin {
+//    kotlinDaemonJvmArgs = ["-Xdebug","-Xrunjdwp:transport=dt_socket,address=5005,server=y,suspend=y"]
+//}
+
 tasks {
     test {
         useJUnitPlatform()
-    }
-}
-
-kotlin {
-    compilerOptions {
-        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
     }
 }

@@ -18,8 +18,6 @@ package io.micronaut.aop.introduction
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.aop.Intercepted
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Min
 import spock.lang.Unroll

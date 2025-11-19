@@ -22,8 +22,7 @@ import io.micronaut.ast.groovy.utils.InMemoryByteCodeGroovyClassLoader
 import io.micronaut.ast.groovy.visitor.GroovyElementFactory
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.ApplicationContextConfiguration
-import io.micronaut.context.DefaultApplicationContext
+import io.micronaut.context.DefaultBeanDefinitionsProvider
 import io.micronaut.context.Qualifier
 import io.micronaut.context.event.ApplicationEventPublisherFactory
 import io.micronaut.core.annotation.AnnotationMetadata
@@ -266,23 +265,20 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
         builder.classLoader(classLoader)
         builder.environments("test")
         builder.properties(properties)
-        def env = builder.build().environment
-        return new DefaultApplicationContext((ApplicationContextConfiguration) builder) {
-            @Override
-            protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
-                def references =  classLoader.generatedClasses.keySet()
+        builder.beanDefinitionsProvider {
+            def references =  classLoader.generatedClasses.keySet()
                     .stream()
                     .filter({ name -> name.endsWith(BeanDefinitionWriter.CLASS_SUFFIX) })
                     .map({ name -> classLoader.loadClass(name) })
                     .filter({ clazz -> BeanDefinitionReference.isAssignableFrom(clazz) })
                     .map({ clazz -> (BeanDefinitionReference) clazz.newInstance() })
                     .collect(Collectors.toList())
-                return references + (includeAllBeans ? super.resolveBeanDefinitionReferences() : [
-                        new InterceptorRegistryBean(),
-                        new BeanProviderDefinition(),
-                        new ApplicationEventPublisherFactory<>()
-                ])
-            }
-        }.start()
+            return references + (includeAllBeans ? new DefaultBeanDefinitionsProvider().provide(it) : [
+                    new InterceptorRegistryBean(),
+                    new BeanProviderDefinition(),
+                    new ApplicationEventPublisherFactory<>()
+            ])
+        }
+        return builder.build().start()
     }
 }

@@ -171,7 +171,7 @@ class FiltersPropagatedContextSpec13 extends Specification {
         }
     }
 
-    private static class MyContext implements PropagatedContextElement {
+    private static final class MyContext implements PropagatedContextElement {
     }
 
 }

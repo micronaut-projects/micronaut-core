@@ -23,7 +23,6 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.annotation.Status
 
-
 @Requires(property = "spec.name", value = "PointControllerTest")
 // tag::class[]
 @Controller("/point")

@@ -182,7 +182,7 @@ public final class SystemFileBodyWriter extends AbstractFileBodyWriter implement
     }
 
     // See https://httpwg.org/specs/rfc9110.html#rule.int-range
-    private static class IntRange {
+    private static final class IntRange {
         private final long firstPos;
         private final long lastPos;
 

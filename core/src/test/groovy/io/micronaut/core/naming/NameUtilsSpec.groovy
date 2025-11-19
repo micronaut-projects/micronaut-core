@@ -53,6 +53,17 @@ class NameUtilsSpec extends Specification {
         "com.bar.\$FooBar"  | "\$FooBar"
     }
 
+    void "test package name"() {
+        expect:
+        NameUtils.getPackageName(value) == result
+
+        where:
+        value               | result
+        "com.fooBar.FooBar" | "com.fooBar"
+        "FooBar"            | ""
+        "com.bar.\$FooBar"  | "com.bar"
+    }
+
     @Unroll
     void "test camel case value #value"() {
         expect:

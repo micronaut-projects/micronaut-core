@@ -20,7 +20,6 @@ import com.fasterxml.jackson.core.JsonFactory
 import com.fasterxml.jackson.core.JsonParseException
 import com.fasterxml.jackson.core.io.JsonEOFException
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.json.JsonStreamConfig
 import io.micronaut.json.tree.JsonNode
 import io.micronaut.jackson.core.tree.JsonNodeTreeCodec
@@ -38,7 +37,7 @@ import java.nio.charset.StandardCharsets
 class JacksonCoreProcessorSpec extends Specification {
     @Shared
     @AutoCleanup
-    ApplicationContext applicationContext = new DefaultApplicationContext("test").start()
+    ApplicationContext applicationContext = ApplicationContext.builder("test").build().start()
 
     void "test big decimal"() {
 

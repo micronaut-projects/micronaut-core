@@ -276,7 +276,7 @@ public final class FormRouteCompleter implements Subscriber<Object> {
         return singleMap;
     }
 
-    private class Claimant  {
+    private final class Claimant  {
         private final Sinks.Many<MicronautHttpData<?>> sink = Sinks.many().unicast().onBackpressureBuffer();
         private long demand;
         private MicronautHttpData<?> last;
@@ -341,7 +341,7 @@ public final class FormRouteCompleter implements Subscriber<Object> {
         }
     }
 
-    private static class FieldSplitter<R> implements Subscriber<MicronautHttpData<?>> {
+    private static final class FieldSplitter<R> implements Subscriber<MicronautHttpData<?>> {
         final BiFunction<? super MicronautHttpData<?>, ? super Flux<PartData>, R> fieldFactory;
 
         Subscription upstream;

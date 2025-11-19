@@ -17,14 +17,13 @@ package io.micronaut.context;
 
 import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.BeanConfiguration;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
-
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ProxyBeanDefinition;
 
 import java.util.Collection;
@@ -277,21 +276,21 @@ public interface BeanDefinitionRegistry {
      * @param qualifier The qualifier
      * @return The bean definitions
      */
-    @NonNull Collection<BeanDefinition<?>> getBeanDefinitions(@NonNull Qualifier<Object> qualifier);
+    @NonNull Collection<BeanDefinition<Object>> getBeanDefinitions(@NonNull Qualifier<Object> qualifier);
 
     /**
      * Get all registered {@link BeanDefinition}.
      *
      * @return The bean definitions
      */
-    @NonNull Collection<BeanDefinition<?>> getAllBeanDefinitions();
+    @NonNull Collection<BeanDefinition<Object>> getAllBeanDefinitions();
 
     /**
      * Get all enabled {@link BeanDefinitionReference}.
      *
      * @return The bean definitions
      */
-    @NonNull Collection<BeanDefinitionReference<?>> getBeanDefinitionReferences();
+    @NonNull Collection<BeanDefinitionReference<Object>> getBeanDefinitionReferences();
 
     /**
      * Get all disabled {@link DisabledBean}.
@@ -443,10 +442,11 @@ public interface BeanDefinitionRegistry {
      */
     default @NonNull <T> Optional<BeanDefinition<T>> findProxyTargetBeanDefinition(@NonNull BeanDefinition<T> proxyBeanDefinition) {
         Objects.requireNonNull(proxyBeanDefinition, "Proxy bean definition cannot be null");
-        if (proxyBeanDefinition instanceof ProxyBeanDefinition) {
-            Class<T> targetType = ((ProxyBeanDefinition<T>) proxyBeanDefinition).getTargetType();
-            Qualifier<T> targetQualifier = proxyBeanDefinition.getDeclaredQualifier();
-            return findProxyTargetBeanDefinition(targetType, targetQualifier);
+        if (proxyBeanDefinition instanceof ProxyBeanDefinition<T> beanDefinition) {
+            return findProxyTargetBeanDefinition(
+                beanDefinition.getTargetType(),
+                proxyBeanDefinition.getDeclaredQualifier()
+            );
         }
         return Optional.empty();
     }
@@ -461,7 +461,9 @@ public interface BeanDefinitionRegistry {
      * @throws io.micronaut.context.exceptions.NonUniqueBeanException When multiple possible bean definitions exist
      *                                                                for the given type
      */
-    @NonNull <T> Optional<BeanDefinition<T>> findProxyBeanDefinition(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier);
+    default @NonNull <T> Optional<BeanDefinition<T>> findProxyBeanDefinition(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier) {
+        return findProxyBeanDefinition(Argument.of(beanType), qualifier);
+    }
 
     /**
      * Obtain the proxy {@link BeanDefinition} for the bean of type and qualifier.
@@ -489,12 +491,11 @@ public interface BeanDefinitionRegistry {
      * @param qualifier The bean qualifier
      * @param <T>       The concrete type
      * @return This bean context
+     * @deprecated Use {@link #registerBeanDefinition(RuntimeBeanDefinition)}
      */
-    default @NonNull <T> BeanDefinitionRegistry registerSingleton(
-        @NonNull Class<T> type,
-        @NonNull T singleton,
-        @Nullable Qualifier<T> qualifier
-    ) {
+    @NonNull
+    @Deprecated(forRemoval = true, since = "5.0")
+    default <T> BeanDefinitionRegistry registerSingleton(@NonNull Class<T> type, @NonNull T singleton, @Nullable Qualifier<T> qualifier) {
         return registerSingleton(type, singleton, qualifier, true);
     }
 
@@ -511,12 +512,60 @@ public interface BeanDefinitionRegistry {
      * @param singleton The singleton bean
      * @param <T>       The concrete type
      * @return This bean context
+     * @deprecated Use {@link #registerBeanDefinition(RuntimeBeanDefinition)}
      */
-    default <T> BeanDefinitionRegistry registerSingleton(
-        @NonNull Class<T> type,
-        @NonNull T singleton
-    ) {
+    @NonNull
+    @Deprecated(forRemoval = true, since = "5.0")
+    default <T> BeanDefinitionRegistry registerSingleton(@NonNull Class<T> type, @NonNull T singleton) {
         return registerSingleton(type, singleton, null);
+    }
+
+    /**
+     * <p>Registers a new singleton bean at runtime. This method expects that the bean definition data will have been
+     * compiled ahead of time.</p>
+     *
+     * <p>If bean definition data is found the method will perform dependency injection on the instance followed by
+     * invoking any {@link jakarta.annotation.PostConstruct} hooks.</p>
+     *
+     * <p>If no bean definition data is found the bean is registered as is.</p>
+     *
+     * @param singleton The singleton bean
+     * @return This bean context
+     * @deprecated Use {@link #registerBeanDefinition(RuntimeBeanDefinition)}
+     */
+    @NonNull
+    @Deprecated(forRemoval = true, since = "5.0")
+    default BeanDefinitionRegistry registerSingleton(@NonNull Object singleton) {
+        ArgumentUtils.requireNonNull("singleton", singleton);
+        Class type = singleton.getClass();
+        return registerSingleton(type, singleton);
+    }
+
+    /**
+     * <p>Registers a new singleton bean at runtime. This method expects that the bean definition data will have been
+     * compiled ahead of time.</p>
+     *
+     * <p>If bean definition data is found the method will perform dependency injection on the instance followed by
+     * invoking any {@link jakarta.annotation.PostConstruct} hooks.</p>
+     *
+     * <p>If no bean definition data is found the bean is registered as is.</p>
+     *
+     * @param singleton The singleton bean
+     * @param inject    Whether the singleton should be injected (defaults to true)
+     * @return This bean context
+     * @deprecated Use {@link #registerBeanDefinition(RuntimeBeanDefinition)}
+     */
+    @NonNull
+    @Deprecated(forRemoval = true, since = "5.0")
+    default BeanDefinitionRegistry registerSingleton(@NonNull Object singleton, boolean inject) {
+        ArgumentUtils.requireNonNull("singleton", singleton);
+        Class type = singleton.getClass();
+        return registerSingleton(
+            type,
+            singleton,
+            null,
+            inject
+        );
     }
 
     /**
@@ -621,48 +670,6 @@ public interface BeanDefinitionRegistry {
      */
     default @NonNull <T> Optional<BeanDefinition<T>> findBeanDefinition(@NonNull Class<T> beanType) {
         return findBeanDefinition(beanType, null);
-    }
-
-    /**
-     * <p>Registers a new singleton bean at runtime. This method expects that the bean definition data will have been
-     * compiled ahead of time.</p>
-     *
-     * <p>If bean definition data is found the method will perform dependency injection on the instance followed by
-     * invoking any {@link jakarta.annotation.PostConstruct} hooks.</p>
-     *
-     * <p>If no bean definition data is found the bean is registered as is.</p>
-     *
-     * @param singleton The singleton bean
-     * @return This bean context
-     */
-    default @NonNull BeanDefinitionRegistry registerSingleton(@NonNull Object singleton) {
-        ArgumentUtils.requireNonNull("singleton", singleton);
-        Class type = singleton.getClass();
-        return registerSingleton(type, singleton);
-    }
-
-    /**
-     * <p>Registers a new singleton bean at runtime. This method expects that the bean definition data will have been
-     * compiled ahead of time.</p>
-     *
-     * <p>If bean definition data is found the method will perform dependency injection on the instance followed by
-     * invoking any {@link jakarta.annotation.PostConstruct} hooks.</p>
-     *
-     * <p>If no bean definition data is found the bean is registered as is.</p>
-     *
-     * @param singleton The singleton bean
-     * @param inject    Whether the singleton should be injected (defaults to true)
-     * @return This bean context
-     */
-    default @NonNull BeanDefinitionRegistry registerSingleton(@NonNull Object singleton, boolean inject) {
-        ArgumentUtils.requireNonNull("singleton", singleton);
-        Class type = singleton.getClass();
-        return registerSingleton(
-            type,
-            singleton,
-            null,
-            inject
-        );
     }
 
     /**

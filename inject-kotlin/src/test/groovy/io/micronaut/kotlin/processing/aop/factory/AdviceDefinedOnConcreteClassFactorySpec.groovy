@@ -2,8 +2,6 @@ package io.micronaut.kotlin.processing.aop.factory
 
 import io.micronaut.aop.Intercepted
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.kotlin.processing.aop.simple.CovariantClass
 import spock.lang.Specification

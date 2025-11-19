@@ -1,5 +1,6 @@
 plugins {
     id("io.micronaut.build.internal.convention-library")
+    id("io.micronaut.build.internal.kotlin-base")
     alias(libs.plugins.managed.kotlin.jvm)
 }
 
@@ -11,13 +12,4 @@ dependencies {
     compileOnly(libs.managed.kotlinx.coroutines.core)
 
     testImplementation(libs.managed.reactor)
-}
-
-tasks {
-    compileKotlin {
-        kotlinOptions {
-            jvmTarget = "17"
-            languageVersion = "1.7"
-        }
-    }
 }

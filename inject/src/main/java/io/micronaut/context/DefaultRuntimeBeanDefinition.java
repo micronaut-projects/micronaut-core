@@ -23,6 +23,7 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.Named;
+import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
@@ -65,6 +66,7 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
     private final Class<? extends Annotation> scope;
     private final Class<?>[] exposedTypes;
     private Map<Class<?>, List<Argument<?>>> typeArguments;
+    private int order;
 
     DefaultRuntimeBeanDefinition(
         @NonNull Argument<T> beanType,
@@ -87,6 +89,12 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
         this.scope = scope;
         this.exposedTypes = exposedTypes;
         this.typeArguments = typeArguments;
+        this.order = annotationMetadata == null ? 0 : OrderUtil.getOrder(this.annotationMetadata);
+    }
+
+    @Override
+    public int getOrder() {
+        return order;
     }
 
     @Override

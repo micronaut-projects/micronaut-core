@@ -6,18 +6,18 @@ import io.kotest.matchers.string.shouldStartWith
 import io.micronaut.context.ApplicationContext
 import io.micronaut.runtime.server.EmbeddedServer
 
-class HeadlineControllerSpec : StringSpec() {
+class HeadlineControllerSpec: StringSpec() {
 
     val embeddedServer = autoClose(
-        ApplicationContext.run(EmbeddedServer::class.java)
+            ApplicationContext.run(EmbeddedServer::class.java)
     )
 
     init {
         // tag::streamingClient[]
         "test client annotations streaming" {
             val headlineClient = embeddedServer
-                .applicationContext
-                .getBean(HeadlineClient::class.java)
+                    .applicationContext
+                    .getBean(HeadlineClient::class.java)
 
             val headline = headlineClient.streamHeadlines().blockFirst()
 

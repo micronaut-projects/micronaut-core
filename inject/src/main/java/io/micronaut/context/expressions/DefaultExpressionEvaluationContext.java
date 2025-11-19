@@ -15,11 +15,11 @@
  */
 package io.micronaut.context.expressions;
 
+import io.micronaut.context.AbstractBeanResolutionContext;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
-import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.context.DefaultBeanResolutionContext;
 import io.micronaut.context.exceptions.ExpressionEvaluationException;
 import io.micronaut.core.annotation.Internal;
@@ -126,24 +126,21 @@ public final class DefaultExpressionEvaluationContext implements ConfigurableExp
         if (beanContext == null) {
             throw new ExpressionEvaluationException("Can not obtain bean of type [" + type + "] since bean context is not set");
         }
-
-        if (beanContext instanceof DefaultBeanContext defaultBeanContext) {
-            if (resolutionContext == null && owningBean != null) {
-                resolutionContext = new DefaultBeanResolutionContext(defaultBeanContext, owningBean);
-            }
-            if (resolutionContext != null) {
-                BeanIdentifier identifier = BeanIdentifier.of(type.getName());
-                BeanRegistration<Object> existing = resolutionContext.getInFlightBean(identifier);
-                if (existing != null) {
-                    return (T) existing.getBean();
-                } else {
-                    Argument<T> t = Argument.of(type);
-                    try (BeanResolutionContext.Path ignored =
-                             resolutionContext.getPath().pushAnnotationResolve(owningBean, t)) {
-                        BeanRegistration<T> beanRegistration = defaultBeanContext.getBeanRegistration(resolutionContext, t, null);
-                        resolutionContext.addInFlightBean(identifier, beanRegistration);
-                        return beanRegistration.getBean();
-                    }
+        if (resolutionContext == null && owningBean != null) {
+            resolutionContext = new DefaultBeanResolutionContext(beanContext, owningBean);
+        }
+        if (resolutionContext instanceof AbstractBeanResolutionContext abstractBeanResolutionContext) {
+            BeanIdentifier identifier = BeanIdentifier.of(type.getName());
+            BeanRegistration<Object> existing = resolutionContext.getInFlightBean(identifier);
+            if (existing != null) {
+                return (T) existing.getBean();
+            } else {
+                Argument<T> t = Argument.of(type);
+                try (BeanResolutionContext.Path ignored =
+                         resolutionContext.getPath().pushAnnotationResolve(owningBean, t)) {
+                    BeanRegistration<T> beanRegistration = abstractBeanResolutionContext.getBeanRegistration(t, null);
+                    resolutionContext.addInFlightBean(identifier, beanRegistration);
+                    return beanRegistration.getBean();
                 }
             }
         }

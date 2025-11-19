@@ -56,7 +56,7 @@ public interface Sort {
      * @param order The order object
      * @return A new sort with the order applied
      */
-    Sort order(Sort.Order order);
+    Sort order(Order order);
 
     /**
      * Orders by the specified property name and direction.
@@ -66,7 +66,7 @@ public interface Sort {
      *
      * @return A new sort with the order applied
      */
-    Sort order(String propertyName, Sort.Order.Direction direction);
+    Sort order(String propertyName, Order.Direction direction);
 
     /**
      * @return The order definitions for this sort.

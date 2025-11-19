@@ -16,7 +16,9 @@
 package io.micronaut.aop.introduction
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.aop.Interceptor
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.RuntimeBeanDefinition
 import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.context.event.StartupEvent
 
@@ -36,7 +38,12 @@ public class MyBeanWithMappedIntroduction {
 }
 
 ''')
-            applicationContext.registerSingleton(new ListenerAdviceInterceptor())
+            applicationContext.registerBeanDefinition(
+                RuntimeBeanDefinition.builder(new ListenerAdviceInterceptor())
+                    .singleton(true)
+                    .exposedTypes(ListenerAdviceInterceptor.class, Interceptor.class)
+                    .build()
+            )
 
         when:
             def beanClass = applicationContext.classLoader.loadClass('test.MyBeanWithMappedIntroduction')

@@ -78,6 +78,7 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
         }
 
         final Environment env = startEnvironment(applicationContext);
+        final ConversionService conversionService = env.getConversionService();
         final String functionName = resolveFunctionName(env);
 
         if (functionName == null) {
@@ -107,7 +108,7 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
                     if (!typeArguments.isEmpty()) {
                         arg = Argument.of(typeArguments.get(0).getType(), arg.getName());
                     }
-                    Object value = decodeInputArgument(env, localFunctionRegistry, arg, input);
+                    Object value = decodeInputArgument(conversionService, localFunctionRegistry, arg, input);
                     result = method.invoke(bean, value);
                     break;
                 case 2:
@@ -118,8 +119,8 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
                         firstArgument = Argument.of(typeArguments.get(0).getType(), firstArgument.getName());
                     }
 
-                    Object first = decodeInputArgument(env, localFunctionRegistry, firstArgument, input);
-                    Object second = decodeContext(env, secondArgument, context);
+                    Object first = decodeInputArgument(conversionService, localFunctionRegistry, firstArgument, input);
+                    Object second = decodeContext(conversionService, secondArgument, context);
                     result = method.invoke(bean, first, second);
                     break;
                 default:
@@ -152,7 +153,7 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
             } else if (result instanceof byte[] bytes) {
                 output.write(bytes);
             } else {
-                byte[] bytes = environment
+                byte[] bytes = environment.getConversionService()
                     .convert(result.toString(), byte[].class)
                     .orElseThrow(() -> new InvocationException("Unable to convert result [" + result + "] for output stream"));
                 output.write(bytes);
@@ -167,7 +168,7 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
                 if (codec.isPresent()) {
                     codec.get().encode(result, output);
                 } else {
-                    byte[] bytes = environment
+                    byte[] bytes = environment.getConversionService()
                         .convert(result, byte[].class)
                         .orElseThrow(() -> new InvocationException("Unable to convert result [" + result + "] for output stream"));
                     output.write(bytes);

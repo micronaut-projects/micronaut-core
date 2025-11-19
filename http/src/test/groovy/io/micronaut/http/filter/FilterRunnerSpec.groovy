@@ -650,7 +650,7 @@ class FilterRunnerSpec extends Specification {
         return CompletableFutureExecutionFlow.just(future).tryComplete()
     }
 
-    private static class LambdaExecutable implements ExecutableMethod<Object, Object> {
+    private static final class LambdaExecutable implements ExecutableMethod<Object, Object> {
         private final Closure<?> closure
         private final Argument<?>[] arguments
         private final ReturnType<?> returnType

@@ -34,7 +34,7 @@ jazzer = "0.24.0"
 jcache = "1.1.1"
 junit5 = "5.12.2"
 junit-platform="1.12.2"
-logback = "1.5.19"
+logback = "1.5.21"
 lombok = "1.18.40"
 logbook-netty = "3.12.2"
 log4j = "2.24.3"
@@ -43,7 +43,7 @@ micronaut-build-plugins="7.6.4"
 micronaut-groovy = "4.7.0"
 micronaut-session = "4.6.0"
 micronaut-sql = "5.3.0"
-micronaut-test = "4.6.2"
+micronaut-test = "4.10.2"
 micronaut-validation = "4.9.0"
 micronaut-rxjava2 = "2.7.0"
 micronaut-rxjava3 = "3.7.0"
@@ -66,6 +66,7 @@ mimepull = "1.10.0"
 micronaut-sourcegen = "1.8.2"
 icu4j = "76.1"
 jfrunit = "1.0.0.Alpha2"
+junit4 = "4.13.2"
 
 #
 # Versions which start with managed- are managed by Micronaut in the sense
@@ -74,11 +75,8 @@ jfrunit = "1.0.0.Alpha2"
 managed-groovy = "4.0.28"
 managed-jakarta-annotation-api = "2.1.1"
 managed-jackson = "2.19.2"
-#@NextMajorVersion @Deprecated Delete in Micronaut Framework 5.
-managed-jackson-databind = "2.18.2"
-managed-kotlin = "1.9.25"
-managed-kotlin2 = "2.1.21"
-managed-kotlin-coroutines = "1.8.1"
+managed-kotlin = "2.2.21"
+managed-kotlin-coroutines = "1.10.2"
 managed-methvin-directory-watcher = "0.19.1"
 managed-netty = "4.2.7.Final"
 managed-netty-tcnative = "2.0.74.Final"
@@ -87,8 +85,7 @@ managed-reactive-streams = "1.0.4"
 managed-reactor = "3.7.12"
 managed-snakeyaml = "2.4"
 managed-java-parser-core = "3.27.0"
-managed-ksp = "1.9.25-1.0.20"
-managed-ksp2 = "2.1.21-2.0.2"
+managed-ksp = "2.2.21-2.0.4"
 managed-jspecify = "1.0.0"
 sonatype-scan = "3.0.0"
 micronaut-docs = "3.0.0"
@@ -240,6 +237,8 @@ junit-platform-engine = { module = "org.junit.platform:junit-platform-suite-engi
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junit-platform" }
 junit-vintage = { module = "org.junit.vintage:junit-vintage-engine", version.ref = "junit5" }
 
+junit4 = { module = "junit:junit", version.ref = "junit4" }
+
 jazzer-junit = { module = "com.code-intelligence:jazzer-junit", version.ref = "jazzer" }
 jazzer-api = { module = "com.code-intelligence:jazzer-api", version.ref = "jazzer" }
 
@@ -312,22 +311,10 @@ mimepull = { module = "org.jvnet.mimepull:mimepull", version.ref = "mimepull" }
 
 wiremock = { module = "com.github.tomakehurst:wiremock-jre8", version.ref = "wiremock" }
 
-ksp2-commonDeps = { module = "com.google.devtools.ksp:symbol-processing-common-deps", version.ref = "managed-ksp2" }
-ksp2-aaEmbeddable = { module = "com.google.devtools.ksp:symbol-processing-aa-embeddable", version.ref = "managed-ksp2" }
+ksp-commonDeps = { module = "com.google.devtools.ksp:symbol-processing-common-deps", version.ref = "managed-ksp" }
+ksp-aaEmbeddable = { module = "com.google.devtools.ksp:symbol-processing-aa-embeddable", version.ref = "managed-ksp" }
 
 jfrunit-core = { module = "org.moditect.jfrunit:jfrunit-core", version.ref = "jfrunit" }
-
-# Kotlin 2 KSP 2 for testing
-
-kotlin2-annotation-processing-embeddable = { module = "org.jetbrains.kotlin:kotlin-annotation-processing-embeddable", version.ref = "managed-kotlin2" }
-kotlin2-compiler-embeddable = { module = "org.jetbrains.kotlin:kotlin-compiler-embeddable", version.ref = "managed-kotlin2" }
-kotlin2-reflect = { module = "org.jetbrains.kotlin:kotlin-reflect", version.ref = "managed-kotlin2" }
-kotlin2-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "managed-kotlin2" }
-kotlin2-stdlib-jdk8 = { module = "org.jetbrains.kotlin:kotlin-stdlib-jdk8", version.ref = "managed-kotlin2" }
-kotlin2-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "managed-kotlin2" }
-
-ksp2-api = { module = "com.google.devtools.ksp:symbol-processing-api", version.ref = "managed-ksp2" }
-ksp2 = { module = "com.google.devtools.ksp:symbol-processing", version.ref = "managed-ksp2" }
 
 [plugins]
 managed-kotlin-allopen = { id = "org.jetbrains.kotlin.plugin.allopen", version.ref = "managed-kotlin" }
@@ -335,6 +322,3 @@ managed-kotlin-noarg = { id = "org.jetbrains.kotlin.plugin.noarg", version.ref =
 managed-kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "managed-kotlin" }
 managed-kotlin-kapt = { id = "org.jetbrains.kotlin.kapt", version.ref = "managed-kotlin" }
 managed-ksp = { id = "com.google.devtools.ksp", version.ref = "managed-ksp" }
-
-kotlin2-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "managed-kotlin2" }
-ksp2 = { id = "com.google.devtools.ksp", version.ref = "managed-ksp2" }

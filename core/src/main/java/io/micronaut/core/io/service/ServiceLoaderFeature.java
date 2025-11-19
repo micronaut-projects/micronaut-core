@@ -40,7 +40,9 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
@@ -53,6 +55,15 @@ import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
  */
 @SuppressWarnings("unused")
 class ServiceLoaderFeature implements Feature {
+
+    private final List<String> INTERNAL_SERVICE = List.of(
+        "io.micronaut.core.convert.TypeConverterRegistrar",
+        "io.micronaut.context.env.PropertySourceLoader",
+        "io.micronaut.core.beans.BeanIntrospectionReference",
+        "io.micronaut.inject.BeanDefinitionReference",
+        "io.micronaut.context.env.PropertyExpressionResolver",
+        "io.micronaut.context.ApplicationContextConfigurer"
+    );
 
     @Override
     @SuppressWarnings("java:S1119")
@@ -196,12 +207,26 @@ class ServiceLoaderFeature implements Feature {
     @NonNull
     protected StaticServiceDefinitions buildStaticServiceDefinitions(BeforeAnalysisAccess access) {
         try {
+            Map<String, Set<String>> services = MicronautMetaServiceLoaderUtils.findAllMicronautMetaServices(getClass().getClassLoader());
+            for (String internalService : INTERNAL_SERVICE) {
+                Set<String> entries = services.computeIfAbsent(internalService, x -> new LinkedHashSet<>());
+                collectDynamicServices(entries, internalService);
+            }
             return new StaticServiceDefinitions(
-                MicronautMetaServiceLoaderUtils.findAllMicronautMetaServices(getClass().getClassLoader())
+                services
             );
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    private void collectDynamicServices(Collection<String> values, String name) {
+        SoftServiceLoader.newCollector(
+            name,
+            line -> true,
+            getClass().getClassLoader(),
+            className -> className
+        ).collect(values, false);
     }
 
     private void configureForReflection(BeforeAnalysisAccess access) {

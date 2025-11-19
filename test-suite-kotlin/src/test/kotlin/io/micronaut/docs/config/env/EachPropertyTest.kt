@@ -4,7 +4,6 @@ import io.kotest.core.spec.style.AnnotationSpec
 import io.kotest.matchers.shouldBe
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.PropertySource
-import io.micronaut.core.util.CollectionUtils
 import io.micronaut.inject.qualifiers.Qualifiers
 import java.net.URI
 import java.net.URISyntaxException
@@ -15,15 +14,13 @@ class EachPropertyTest : AnnotationSpec() {
     @Throws(URISyntaxException::class)
     fun testEachProperty() {
         // tag::config[]
-        val applicationContext = ApplicationContext.run(
-            PropertySource.of(
+        val applicationContext = ApplicationContext.run(PropertySource.of(
                 "test",
                 mapOf(
-                    "test.datasource.one.url" to "jdbc:mysql://localhost/one",
-                    "test.datasource.two.url" to "jdbc:mysql://localhost/two"
+                        "test.datasource.one.url" to "jdbc:mysql://localhost/one",
+                        "test.datasource.two.url" to "jdbc:mysql://localhost/two"
                 )
-            )
-        )
+        ))
         // end::config[]
 
         // tag::beans[]
@@ -31,8 +28,8 @@ class EachPropertyTest : AnnotationSpec() {
         beansOfType.size shouldBe 2 // <1>
 
         val firstConfig = applicationContext.getBean(
-            DataSourceConfiguration::class.java,
-            Qualifiers.byName("one") // <2>
+                DataSourceConfiguration::class.java,
+                Qualifiers.byName("one") // <2>
         )
 
         firstConfig.url shouldBe URI("jdbc:mysql://localhost/one")
@@ -43,16 +40,12 @@ class EachPropertyTest : AnnotationSpec() {
     @Test
     fun testEachPropertyList() {
         val limits: MutableList<Map<*, *>> = ArrayList()
-        limits.add(CollectionUtils.mapOf("period", "10s", "limit", "1000"))
-        limits.add(CollectionUtils.mapOf("period", "1m", "limit", "5000"))
+        limits.add(mapOf("period" to "10s", "limit" to "1000"))
+        limits.add(mapOf("period" to "1m", "limit" to "5000"))
         val applicationContext = ApplicationContext.run(
-            mapOf(
-                "ratelimits" to listOf(
-                    mapOf("period" to "10s", "limit" to "1000"),
-                    mapOf("period" to "1m", "limit" to "5000")
-                )
-            )
-        )
+            mapOf("ratelimits" to listOf(
+                mapOf("period" to "10s", "limit" to "1000"),
+                mapOf("period" to "1m", "limit" to "5000"))))
 
         val beansOfType = applicationContext.streamOfType(RateLimitsConfiguration::class.java).toList()
 

@@ -29,6 +29,7 @@ import io.micronaut.context.EnvironmentConfigurable;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.naming.Described;
@@ -51,8 +52,9 @@ import java.util.List;
  * @author graemerocher
  * @since 3.0.0
  */
-public class DefaultInterceptorRegistry implements InterceptorRegistry {
-    protected static final Logger LOG = LoggerFactory.getLogger(InterceptorChain.class);
+@Internal
+public final class DefaultInterceptorRegistry implements InterceptorRegistry {
+    private static final Logger LOG = LoggerFactory.getLogger(InterceptorChain.class);
     private static final MethodInterceptor<?, ?>[] ZERO_METHOD_INTERCEPTORS = new MethodInterceptor[0];
     private static final Interceptor[] ZERO_INTERCEPTORS = new Interceptor[0];
     private final BeanContext beanContext;

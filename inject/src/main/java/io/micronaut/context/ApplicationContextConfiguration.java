@@ -15,11 +15,15 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.context.env.EnvironmentNamesDeducer;
+import io.micronaut.context.env.EnvironmentPackagesDeducer;
+import io.micronaut.context.env.PropertySourcesLocator;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -60,6 +64,16 @@ public interface ApplicationContextConfiguration extends BeanContextConfiguratio
      */
     default Optional<Boolean> getDeduceEnvironments() {
         return Optional.empty();
+    }
+
+    /**
+     * If set to {@code true} (the default is {@code true}) Micronaut will attempt to automatically deduce the user package.
+     * Alternative is to use {@link io.micronaut.context.env.Environment#addPackage(String)}
+     * @return True if the package should be deduced
+     * @since 5.0
+     */
+    default boolean isDeducePackage() {
+        return true;
     }
 
     /**
@@ -157,4 +171,40 @@ public interface ApplicationContextConfiguration extends BeanContextConfiguratio
     default Boolean isBootstrapEnvironmentEnabled() {
         return null;
     }
+
+    /**
+     * @return The environment names deducer
+     * @since 5.0
+     */
+    @Nullable
+    default EnvironmentNamesDeducer getEnvironmentNamesDeducer() {
+        return null;
+    }
+
+    /**
+     * @return The package deducer
+     * @since 5.0
+     */
+    @Nullable
+    default EnvironmentPackagesDeducer getPackageDeducer() {
+        return null;
+    }
+
+    /**
+     * @return The application name
+     * @since 5.0
+     */
+    @NonNull
+    default String getApplicationName() {
+        return "application";
+    }
+
+    /**
+     * @return The extra property sources locators
+     * @since 5.0
+     */
+    default Collection<PropertySourcesLocator> getPropertySourcesLocators() {
+        return Collections.emptyList();
+    }
+
 }

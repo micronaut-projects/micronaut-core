@@ -17,7 +17,6 @@ package io.micronaut.inject.executable
 
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.annotation.Executable
 import io.micronaut.inject.ExecutableMethod
 import io.micronaut.inject.ExecutionHandle
@@ -33,7 +32,7 @@ class ExecutableSpec extends Specification {
 
     void "test executable metadata"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test").start()
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build().start()
 
         when:
         Optional<MethodExecutionHandle> method = applicationContext.findExecutionHandle(BookController, "show", Long)
@@ -60,7 +59,7 @@ class ExecutableSpec extends Specification {
 
     void "test executable responses"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test").start()
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build().start()
         ExecutionHandle method = applicationContext.findExecutionHandle(BookController, methodName, argTypes as Class[]).get()
 
         expect:

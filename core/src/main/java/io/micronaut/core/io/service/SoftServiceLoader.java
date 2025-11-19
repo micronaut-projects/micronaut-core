@@ -276,7 +276,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
                                                        Predicate<String> lineCondition,
                                                        ClassLoader classLoader,
                                                        Function<String, S> transformer) {
-        return new ServiceScanner<>(classLoader, serviceName, lineCondition, transformer).new DefaultServiceCollector();
+        return new ServiceScanner<>(classLoader, serviceName, lineCondition, transformer).createCollector();
     }
 
     /**

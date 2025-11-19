@@ -5,7 +5,7 @@ import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.beans.BeanMethod
 import io.micronaut.inject.ast.ElementQuery
 
-class NullabilityAnnotationsSpec extends AbstractTypeElementSpec {
+class kNullabilityAnnotationsSpec extends AbstractTypeElementSpec {
 
     void "test map nullable annotation for #packageName in beans"() {
         given:

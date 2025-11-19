@@ -13,6 +13,7 @@ import io.micronaut.runtime.server.EmbeddedServer;
 import jakarta.inject.Inject;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.condition.DisabledIf;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -30,6 +31,14 @@ public class ProxyBackpressureTest {
     private static final int CHUNK_SIZE = 1024 * 1024;
     private static final int TOTAL_CHUNKS = 128;
 
+    private static boolean isNotCiEnvironment() {
+        return System.getenv("CI") == null;
+    }
+
+    private static boolean isCiEnvironment() {
+        return System.getenv("CI") != null;
+    }
+
     @ParameterizedTest
     @CsvSource({
         "false,1,/large",
@@ -41,7 +50,27 @@ public class ProxyBackpressureTest {
         "true,2,/proxy",
         "true,3,/proxy",
     })
+    @DisabledIf("isNotCiEnvironment")
     @Execution(ExecutionMode.CONCURRENT)
+    public void backpressureCi(boolean ssl, int version, String endpoint) throws InterruptedException {
+        backpressure(ssl, version, endpoint);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "false,1,/large",
+        "true,1,/large",
+        "true,3,/large",
+        "false,1,/proxy",
+        "true,1,/proxy",
+        "true,3,/proxy",
+    })
+    @DisabledIf("isCiEnvironment")
+    @Execution(ExecutionMode.CONCURRENT)
+    public void backpressureLocal(boolean ssl, int version, String endpoint) throws InterruptedException {
+        backpressure(ssl, version, endpoint);
+    }
+
     public void backpressure(boolean ssl, int version, String endpoint) throws InterruptedException {
         try (ApplicationContext ctx = ApplicationContext.run(Map.of(
             "spec.name", "ProxyBackpressureTest",

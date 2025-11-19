@@ -45,7 +45,6 @@ public interface LoggersManager<T> {
      */
     Publisher<T> getLogger(ManagedLoggingSystem loggingSystem, @NotBlank String name);
 
-
     /**
      * Set the log level for the named logger in the system.
      *

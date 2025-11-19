@@ -49,7 +49,7 @@ class HealthEndpointSpec extends Specification {
     void "test the beans are available"() {
         given:
         ApplicationContext context = ApplicationContext.builder("test").build()
-        context.registerSingleton(Mock(DataSource))
+        context.registerSingleton(DataSource.class, Mock(DataSource))
         context.start()
 
         expect:

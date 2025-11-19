@@ -16,9 +16,11 @@
 package io.micronaut.inject.qualifiers.replaces;
 
 import io.micronaut.aop.introduction.Stub;
+import io.micronaut.context.annotation.Requires;
 
 import jakarta.inject.Singleton;
 
+@Requires(property = "spec.name", value = "ReplacesSpec")
 @Stub
 @Singleton
 public interface IntroductionA extends IntroductionOperations {
