@@ -74,6 +74,12 @@ Executable methods annotated with `@Parallel` will not trigger parallel executio
 
 `@Scheduled` is no longer processed in parallel, this reduced the complexity of the method processor and removed unnecessary overhead.
 
+==== Jackson Bean Introspection Module removed
+
+Previous versions of Micronaut Core contained a so-called "bean introspection module". This Jackson module hooked into jackson-databind to replace reflective field and method access with Micronaut introspection-based calls. The performance difference is negligible, but the module does allow serialization in native images without having to add reflection metadata.
+
+In version 5, we have removed this module, as it is difficult to maintain. Native image users now have a good alternative to jackson-databind in Micronaut Serialization. Users that do not wish to use Micronaut Serialization will have to add reflection metadata for the objects they serialize.
+
 == 4.0.0
 
 === Core Changes
