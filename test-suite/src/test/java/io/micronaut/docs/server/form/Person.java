@@ -15,10 +15,12 @@
  */
 package io.micronaut.docs.server.form;
 
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.ReflectiveAccess;
+
 import java.util.Objects;
 
-import io.micronaut.core.annotation.Introspected;
-
+@ReflectiveAccess
 @Introspected
 public class Person {
 

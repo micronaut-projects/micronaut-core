@@ -17,6 +17,7 @@ package io.micronaut.http.server.tck.tests;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
@@ -335,6 +336,7 @@ public class NoBodyResponseTest {
     }
 
     @Introspected
+    @ReflectiveAccess
     static class Point {
         private Integer x;
         private Integer y;

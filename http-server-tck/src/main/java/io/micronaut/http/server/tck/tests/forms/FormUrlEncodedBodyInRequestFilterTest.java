@@ -19,8 +19,19 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.http.*;
-import io.micronaut.http.annotation.*;
+import io.micronaut.core.annotation.ReflectiveAccess;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
+import io.micronaut.http.MediaType;
+import io.micronaut.http.annotation.Body;
+import io.micronaut.http.annotation.Consumes;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Post;
+import io.micronaut.http.annotation.Produces;
+import io.micronaut.http.annotation.RequestFilter;
+import io.micronaut.http.annotation.ServerFilter;
+import io.micronaut.http.annotation.Status;
 import io.micronaut.http.server.filter.FilterBodyParser;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
@@ -28,6 +39,7 @@ import io.micronaut.http.tck.TestScenario;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
 import org.junit.jupiter.api.Test;
+
 import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
@@ -121,12 +133,14 @@ public class FormUrlEncodedBodyInRequestFilterTest {
     }
 
     @Introspected
+    @ReflectiveAccess
     record PasswordChange(
             String username,
             String password) {
     }
 
     @Introspected
+    @ReflectiveAccess
     record PasswordChangeForm(
             String username,
             String password,

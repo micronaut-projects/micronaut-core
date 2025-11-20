@@ -17,10 +17,16 @@ package io.micronaut.http.server.tck.tests.binding;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.*;
+import io.micronaut.http.annotation.Body;
+import io.micronaut.http.annotation.Consumes;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.Post;
+import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.BodyAssertion;
 import io.micronaut.http.tck.HttpResponseAssertion;
@@ -107,6 +113,7 @@ public class LocalDateTimeTest {
     }
 
     @Introspected
+    @ReflectiveAccess
     public static class Event {
         private final LocalDateTime eventDate;
 

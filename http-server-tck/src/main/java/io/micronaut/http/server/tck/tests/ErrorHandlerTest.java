@@ -17,6 +17,7 @@ package io.micronaut.http.server.tck.tests;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpHeaders;
@@ -266,6 +267,7 @@ public class ErrorHandlerTest {
     }
 
     @Introspected
+    @ReflectiveAccess
     static class RequestObject {
         @Min(1L)
         private Integer numberField;

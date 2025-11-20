@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
@@ -83,6 +84,7 @@ public class FormsInputNumberOptionalTest {
     }
 
     @Introspected
+    @ReflectiveAccess
     record Book(@NonNull String title, @Nullable Integer pages) {
     }
 

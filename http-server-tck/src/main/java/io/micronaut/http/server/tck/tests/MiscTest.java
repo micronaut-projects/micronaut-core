@@ -18,6 +18,7 @@ package io.micronaut.http.server.tck.tests;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -187,6 +188,7 @@ public class MiscTest {
     }
 
     @Introspected
+    @ReflectiveAccess
     static class MessageCreate {
 
         @NonNull
@@ -204,6 +206,7 @@ public class MiscTest {
     }
 
     @Introspected
+    @ReflectiveAccess
     static class MyResponse {
 
         @NonNull

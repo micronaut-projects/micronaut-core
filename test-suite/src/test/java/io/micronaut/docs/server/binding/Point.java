@@ -1,9 +1,11 @@
 package io.micronaut.docs.server.binding;
 
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.ReflectiveAccess;
 
 import java.util.Objects;
 
+@ReflectiveAccess
 @Introspected
 public class Point {
     private Integer x;
