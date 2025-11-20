@@ -43,6 +43,7 @@ import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.Collection;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Supplier;
 
 /**
  * <p>Decodes {@link MediaType#MULTIPART_FORM_DATA} in a non-blocking manner.</p>
@@ -199,11 +200,11 @@ public final class FormDataHttpContentProcessor {
 
     private RuntimeException mapFormException(RuntimeException original) {
         if (original instanceof HttpPostRequestDecoder.EndOfDataDecoderException ||
-            (!contribCodecMissing && original instanceof io.netty.contrib.multipart.vintage.HttpPostRequestDecoder.EndOfDataDecoderException)) {
+            instanceOfSafe(original, () -> io.netty.contrib.multipart.vintage.HttpPostRequestDecoder.EndOfDataDecoderException.class)) {
             // ok, ignore
             return null;
         } else if (original instanceof HttpPostRequestDecoder.ErrorDataDecoderException ||
-            (!contribCodecMissing && original instanceof io.netty.contrib.multipart.vintage.HttpPostRequestDecoder.ErrorDataDecoderException)) {
+            instanceOfSafe(original, () -> io.netty.contrib.multipart.vintage.HttpPostRequestDecoder.ErrorDataDecoderException.class)) {
             Throwable cause = original.getCause();
             if (cause instanceof IOException && cause.getMessage().equals("Size exceed allowed maximum capacity")) {
                 String partName = decoder.currentPartialHttpData().getName();
@@ -212,14 +213,24 @@ public final class FormDataHttpContentProcessor {
                 return original;
             }
         } else if (original instanceof HttpPostRequestDecoder.TooManyFormFieldsException ||
-            (!contribCodecMissing && original instanceof TooManyFormFieldsException)) {
+            instanceOfSafe(original, () -> TooManyFormFieldsException.class)) {
             return new ContentLengthExceededException("Number of form fields exceeds configured limit of [" + configuration.getFormMaxFields() + "]");
         } else if (original instanceof HttpPostRequestDecoder.TooLongFormFieldException ||
-            (!contribCodecMissing && original instanceof FormDecoderException && original.getMessage().equals("Undecoded data limit exceeded"))) {
+            (instanceOfSafe(original, () -> FormDecoderException.class) && original.getMessage().equals("Undecoded data limit exceeded"))) {
             return new ContentLengthExceededException("Length of buffered form field exceeds configured limit of [" + configuration.getFormMaxBufferedBytes() + "]");
         } else {
             return original;
         }
+    }
+
+    private static <B> boolean instanceOfSafe(B object, Supplier<Class<? extends B>> type) {
+        Class<? extends B> cl;
+        try {
+            cl = type.get();
+        } catch (LinkageError e) {
+            return false;
+        }
+        return cl.isInstance(object);
     }
 
     public void add(ByteBufHolder message, Collection<? super InterfaceHttpData> out) throws Throwable {
