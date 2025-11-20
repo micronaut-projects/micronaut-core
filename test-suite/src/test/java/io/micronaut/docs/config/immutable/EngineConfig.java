@@ -16,6 +16,7 @@
 package io.micronaut.docs.config.immutable;
 
 // tag::imports[]
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.annotation.ConfigurationInject;
@@ -27,6 +28,7 @@ import jakarta.validation.constraints.NotNull;
 import java.util.Optional;
 // end::imports[]
 
+@Requires(property = "spec.name", value = "VehicleImmutableSpec")
 // tag::class[]
 @ConfigurationProperties("my.engine") // <1>
 public class EngineConfig {

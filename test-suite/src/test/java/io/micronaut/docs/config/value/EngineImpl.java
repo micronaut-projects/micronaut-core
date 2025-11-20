@@ -16,12 +16,14 @@
 package io.micronaut.docs.config.value;
 
 // tag::imports[]
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.Nullable;
 
 import jakarta.inject.Singleton;
 // end::imports[]
 
+@Requires(property = "spec.name", value = "VehicleValueSpec")
 // tag::class[]
 @Singleton
 public class EngineImpl implements Engine {

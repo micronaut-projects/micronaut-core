@@ -15,8 +15,10 @@
  */
 package io.micronaut.docs.config.properties;
 
+import io.micronaut.context.annotation.Requires;
 import jakarta.inject.Singleton;
 
+@Requires(property = "spec.name", value = "VehiclePropertiesSpec")
 // tag::class[]
 @Singleton
 public class EngineImpl implements Engine {

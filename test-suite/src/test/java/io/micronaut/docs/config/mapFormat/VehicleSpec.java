@@ -37,6 +37,8 @@ class VehicleSpec {
 
         map.put("my.engine.sensors", map1);
 
+        map.put( "spec.name", "VehicleMapFormatSpec");
+
         ApplicationContext applicationContext = ApplicationContext.run(map, "test");
 
         Vehicle vehicle = applicationContext.getBean(Vehicle.class);

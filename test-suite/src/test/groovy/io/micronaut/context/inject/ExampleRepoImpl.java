@@ -15,10 +15,12 @@
  */
 package io.micronaut.context.inject;
 
+import io.micronaut.context.annotation.Requires;
 import jakarta.annotation.PostConstruct;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
+@Requires(property = "spec.name", value = "CircularBeanResolutionWithPostConstructSpec")
 @Singleton
 public class ExampleRepoImpl implements ExampleRepo {
 

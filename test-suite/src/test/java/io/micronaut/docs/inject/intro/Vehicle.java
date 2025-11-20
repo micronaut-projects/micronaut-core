@@ -15,8 +15,11 @@
  */
 package io.micronaut.docs.inject.intro;
 
+import io.micronaut.context.annotation.Property;
+import io.micronaut.context.annotation.Requires;
 import jakarta.inject.Singleton;
 
+@Requires(property = "spec.name", value = "VehicleIntroSpec")
 // tag::class[]
 @Singleton
 public class Vehicle {

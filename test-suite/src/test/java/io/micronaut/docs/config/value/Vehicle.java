@@ -15,8 +15,10 @@
  */
 package io.micronaut.docs.config.value;
 
+import io.micronaut.context.annotation.Requires;
 import jakarta.inject.Singleton;
 
+@Requires(property = "spec.name", value = "VehicleValueSpec")
 @Singleton
 public class Vehicle {
     public Vehicle(Engine engine) {// <6>

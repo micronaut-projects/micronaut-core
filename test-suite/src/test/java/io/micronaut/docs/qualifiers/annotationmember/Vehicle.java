@@ -1,8 +1,10 @@
 package io.micronaut.docs.qualifiers.annotationmember;
 
+import io.micronaut.context.annotation.Requires;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
+@Requires(property = "spec.name", value = "VehicleAnnotationMemberSpec")
 // tag::class[]
 @Singleton
 public class Vehicle {

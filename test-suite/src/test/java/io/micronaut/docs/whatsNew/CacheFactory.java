@@ -25,7 +25,7 @@ import jakarta.inject.Singleton;
 // end::imports[]
 
 // tag::class[]
-@Factory
+//@Factory
 class CacheFactory {
 
     @Singleton
