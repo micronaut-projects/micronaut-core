@@ -21,11 +21,14 @@ import io.micronaut.context.annotation.Factory;
 import javax.cache.CacheManager;
 import javax.cache.Caching;
 import javax.cache.configuration.MutableConfiguration;
+
+import io.micronaut.context.annotation.Requires;
 import jakarta.inject.Singleton;
 // end::imports[]
 
+@Requires(property = "spec.name", value = "CacheFactoryTest")
 // tag::class[]
-//@Factory
+@Factory
 class CacheFactory {
 
     @Singleton
