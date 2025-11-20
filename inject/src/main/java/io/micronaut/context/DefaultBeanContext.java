@@ -1867,8 +1867,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         if (!eagerBeansEnabled) {
             return;
         }
-        initializeEagerBeans();
         processExecutableMethodsProcessAtStartup();
+        initializeEagerBeans();
         processParallelBeans();
         checkEnabledBeans = ForkJoinPool.commonPool().submit(new ForkJoinTask<>() {
 
