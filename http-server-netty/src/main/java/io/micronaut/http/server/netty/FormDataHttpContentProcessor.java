@@ -24,6 +24,8 @@ import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.contrib.multipart.DecoderQuirk;
+import io.netty.contrib.multipart.FormDecoderException;
+import io.netty.contrib.multipart.TooManyFormFieldsException;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.LastHttpContent;
@@ -178,20 +180,11 @@ public final class FormDataHttpContentProcessor {
                         postRequestDecoder.removeHttpDataFromClean(currentPartialHttpData);
                     }
 
-                } catch (HttpPostRequestDecoder.EndOfDataDecoderException e) {
-                    // ok, ignore
-                } catch (HttpPostRequestDecoder.ErrorDataDecoderException e) {
-                    Throwable cause = e.getCause();
-                    if (cause instanceof IOException && cause.getMessage().equals("Size exceed allowed maximum capacity")) {
-                        String partName = decoder.currentPartialHttpData().getName();
-                        throw new ContentLengthExceededException("The part named [" + partName + "] exceeds the maximum allowed content length [" + partMaxSize + "]");
-                    } else {
-                        throw e;
+                } catch (RuntimeException e) {
+                    RuntimeException mapped = mapFormException(e);
+                    if (mapped != null) {
+                        throw mapped;
                     }
-                } catch (HttpPostRequestDecoder.TooManyFormFieldsException e) {
-                    throw new ContentLengthExceededException("Number of form fields exceeds configured limit of [" + configuration.getFormMaxFields() + "]");
-                } catch (HttpPostRequestDecoder.TooLongFormFieldException e) {
-                    throw new ContentLengthExceededException("Length of buffered form field exceeds configured limit of [" + configuration.getFormMaxBufferedBytes() + "]");
                 } finally {
                     httpContent.release();
                 }
@@ -201,6 +194,31 @@ public final class FormDataHttpContentProcessor {
         } finally {
             inFlight = false;
             destroyIfRequested();
+        }
+    }
+
+    private RuntimeException mapFormException(RuntimeException original) {
+        if (original instanceof HttpPostRequestDecoder.EndOfDataDecoderException ||
+            (!contribCodecMissing && original instanceof io.netty.contrib.multipart.vintage.HttpPostRequestDecoder.EndOfDataDecoderException)) {
+            // ok, ignore
+            return null;
+        } else if (original instanceof HttpPostRequestDecoder.ErrorDataDecoderException ||
+            (!contribCodecMissing && original instanceof io.netty.contrib.multipart.vintage.HttpPostRequestDecoder.ErrorDataDecoderException)) {
+            Throwable cause = original.getCause();
+            if (cause instanceof IOException && cause.getMessage().equals("Size exceed allowed maximum capacity")) {
+                String partName = decoder.currentPartialHttpData().getName();
+                return new ContentLengthExceededException("The part named [" + partName + "] exceeds the maximum allowed content length [" + partMaxSize + "]");
+            } else {
+                return original;
+            }
+        } else if (original instanceof HttpPostRequestDecoder.TooManyFormFieldsException ||
+            (!contribCodecMissing && original instanceof TooManyFormFieldsException)) {
+            return new ContentLengthExceededException("Number of form fields exceeds configured limit of [" + configuration.getFormMaxFields() + "]");
+        } else if (original instanceof HttpPostRequestDecoder.TooLongFormFieldException ||
+            (!contribCodecMissing && original instanceof FormDecoderException && original.getMessage().equals("Undecoded data limit exceeded"))) {
+            return new ContentLengthExceededException("Length of buffered form field exceeds configured limit of [" + configuration.getFormMaxBufferedBytes() + "]");
+        } else {
+            return original;
         }
     }
 
