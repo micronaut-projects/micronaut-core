@@ -533,8 +533,14 @@ class PrintNodeVisitor(ast.NodeVisitor):
             decorator = DecoratorDef(decorator_reference, annotation_name, repeated_name, members,
                                      known_decorator.stereotypes())
         else:
-            # Not a known decorator, use as-is
-            decorator = DecoratorDef(decorator_reference, decorator_reference, None, members, [])
+            # Check if this is an imported type
+            imported_name = self.imported_types.get(decorator_reference)
+            if imported_name:
+                # Use the fully qualified name from the import
+                decorator = DecoratorDef(decorator_reference, imported_name, None, members, [])
+            else:
+                # Not a known decorator or imported type, use as-is
+                decorator = DecoratorDef(decorator_reference, decorator_reference, None, members, [])
         return decorator
 
     def _extract_subscript_args(self, subscript_node):

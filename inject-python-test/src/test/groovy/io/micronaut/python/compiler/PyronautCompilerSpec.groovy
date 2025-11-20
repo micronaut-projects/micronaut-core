@@ -442,7 +442,7 @@ class UserController:
         tempSrcDir.deleteDir()
     }
 
-    def "test relatve import of Python decorator"() {
+    def "test relative import of Python decorator"() {
         given:
         def tempSrcDir = File.createTempDir("pyronaut-test-multi-package-src", "")
         def tempTargetDir = File.createTempDir("pyronaut-test-multi-package-target", "")
