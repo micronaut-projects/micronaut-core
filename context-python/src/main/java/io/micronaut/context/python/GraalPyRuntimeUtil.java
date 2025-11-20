@@ -35,6 +35,8 @@ import org.graalvm.polyglot.Value;
 @Internal
 public final class GraalPyRuntimeUtil {
 
+    public static final String PYTHON = "python";
+
     /**
      * Coerce a map of types that may extend from {@link ValueCoercible} back to a native value map.
      * @param map The map

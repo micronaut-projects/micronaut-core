@@ -59,12 +59,12 @@ public final class ContextHolder {
      * @return The new instance
      */
     public static Value newInstance(String packageName, String simpleName, Object... args) {
-        if (packageName == null || GraalPyContextFactory.PYTHON.equals(packageName)) {
+        if (packageName == null || GraalPyRuntimeUtil.PYTHON.equals(packageName)) {
             return newInstance(simpleName, args);
         } else {
             Context ctx = getContext();
             String source = "from " + packageName + " import " + simpleName + "; " + simpleName;
-            return ctx.eval(GraalPyContextFactory.PYTHON, source)
+            return ctx.eval(GraalPyRuntimeUtil.PYTHON, source)
                 .newInstance(args);
         }
     }
@@ -78,11 +78,11 @@ public final class ContextHolder {
      */
     public static Value newInstance(String simpleName, Object... args) {
         Context ctx = getContext();
-        Value v = ctx.getBindings(GraalPyContextFactory.PYTHON).getMember(simpleName);
+        Value v = ctx.getBindings(GraalPyRuntimeUtil.PYTHON).getMember(simpleName);
         if (v != null && v.canInstantiate()) {
             return v.newInstance(args);
         } else {
-            Value member = ctx.eval(GraalPyContextFactory.PYTHON, "import " + simpleName + "; " + simpleName)
+            Value member = ctx.eval(GraalPyRuntimeUtil.PYTHON, "import " + simpleName + "; " + simpleName)
                 .getMember(simpleName);
             if (member == null) {
                 throw new InstantiationException("Cannot find Python class: " + simpleName);
@@ -102,11 +102,11 @@ public final class ContextHolder {
      * @return The method result
      */
     public static Value invokeStaticMethod(String packageName, String simpleName, String methodName, Object... args) {
-        if (packageName == null || GraalPyContextFactory.PYTHON.equals(packageName)) {
+        if (packageName == null || GraalPyRuntimeUtil.PYTHON.equals(packageName)) {
             return invokeStaticMethod(simpleName, methodName, args);
         } else {
             Context ctx = getContext();
-            Value pythonClass = ctx.eval(GraalPyContextFactory.PYTHON, "from " + packageName + " import " + simpleName + "; " + simpleName);
+            Value pythonClass = ctx.eval(GraalPyRuntimeUtil.PYTHON, "from " + packageName + " import " + simpleName + "; " + simpleName);
             return pythonClass.invokeMember(methodName, args);
         }
     }
@@ -121,11 +121,11 @@ public final class ContextHolder {
      */
     public static Value invokeStaticMethod(String simpleName, String methodName, Object... args) {
         Context ctx = getContext();
-        Value v = ctx.getBindings(GraalPyContextFactory.PYTHON).getMember(simpleName);
+        Value v = ctx.getBindings(GraalPyRuntimeUtil.PYTHON).getMember(simpleName);
         if (v != null) {
             return v.invokeMember(methodName);
         } else {
-            Value member = ctx.eval(GraalPyContextFactory.PYTHON, "import " + simpleName + "; " + simpleName)
+            Value member = ctx.eval(GraalPyRuntimeUtil.PYTHON, "import " + simpleName + "; " + simpleName)
                 .getMember(simpleName);
             if (member == null) {
                 throw new InstantiationException("Cannot find Python class: " + simpleName);

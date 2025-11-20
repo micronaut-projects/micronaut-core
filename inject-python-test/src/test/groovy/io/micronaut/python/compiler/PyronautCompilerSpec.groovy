@@ -466,7 +466,6 @@ def NotNull(func):
         def notNullInterceptor = new File(exampleDir, "NotNullInterceptor.py")
         notNullInterceptor.text = '''
 from micronaut.aop import InterceptorBean, MethodInvocationContext
-from micronaut.context.annotation import Executable
 import java
 from .NotNull import NotNull
 
@@ -483,7 +482,6 @@ class TestAroundInterceptor(MethodInterceptor):
 
         def notNullExample = new File(exampleDir, "NotNullExample.py")
         notNullExample.text = '''
-from micronaut.context.annotation import Executable
 from jakarta.inject import Singleton
 
 from .NotNull import NotNull
@@ -491,7 +489,6 @@ from .NotNull import NotNull
 @Singleton
 class NotNullExample:
     @NotNull
-    @Executable
     def doWork(self, taskName : str):
         print(f"Doing job: {taskName}")
 '''
@@ -520,6 +517,13 @@ class NotNullExample:
 
         then:
         def e = thrown(RuntimeException)
+        e.message == 'Exception: Null parameter [taskName] is not allowed'
+
+        when:
+        bean.asPolyglotValue().invokeMember("doWork", [null] as Object[])
+
+        then:
+        e = thrown(RuntimeException)
         e.message == 'Exception: Null parameter [taskName] is not allowed'
 
         cleanup:

@@ -18,7 +18,6 @@ package io.micronaut.context.python;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
-import io.micronaut.core.util.StringUtils;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.HostAccess;
 import org.graalvm.polyglot.Source;
@@ -41,7 +40,6 @@ import jakarta.inject.Singleton;
  */
 @Factory
 public class GraalPyContextFactory {
-    public static final String PYTHON = "python";
     public static final String APPLICATION_PATH = "META-INF/GRAALPY-VFS/micronaut-application";
     public static final String APPLICATION_LAUNCHER_PATH = APPLICATION_PATH + "/main.py";
     public static final String PYRONAUT_MAIN_CLASS = "pyronaut_application.PyronautMain";
@@ -73,7 +71,7 @@ public class GraalPyContextFactory {
                 .allowHostAccess(HostAccess.ALL)
                 .allowHostClassLookup(name -> true)
                 .build();
-            context.initialize(PYTHON);
+            context.initialize(GraalPyRuntimeUtil.PYTHON);
 
 
 
@@ -83,7 +81,7 @@ public class GraalPyContextFactory {
 
                 if (inputStream != null) {
                     String scriptContent = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
-                    Source source = Source.newBuilder(PYTHON, scriptContent, "main.py")
+                    Source source = Source.newBuilder(GraalPyRuntimeUtil.PYTHON, scriptContent, "main.py")
                         .build();
                     context.eval(source);
                 }
