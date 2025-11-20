@@ -27,6 +27,55 @@ import spock.lang.Specification
  */
 class AroundAdviceSpec extends AbstractPythonTypeElementSpec {
 
+    void "test around advice will decorator defined in Python and invoked from elsewhere"() {
+        given:
+        def pythonCode = '''
+from micronaut.aop import InterceptorBean, MethodInvocationContext, Around
+from micronaut.context.annotation import Executable
+from jakarta.inject import Singleton
+import java
+
+@Around
+def NotNull(func):
+    return func
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+
+@InterceptorBean(NotNull)
+class TestAroundInterceptor(MethodInterceptor):
+    def intercept(self, context : MethodInvocationContext):
+        for param in context.getParameters().values():
+            if (param.getValue() is None):
+                raise Exception(f"Null parameter [{param.getName()}] is not allowed")
+        return context.proceed()
+
+
+@Singleton
+class Test:
+    @NotNull
+    def doWork(self, taskName : str):
+        print(f"Doing job: {taskName}")
+
+@Singleton
+class TestCaller:
+    def __init__(self, test : Test):
+        self.test = test
+
+    @Executable
+    def doTest(self, taskName : str):
+        self.test.doWork(taskName)
+
+'''
+        when:
+        def context = buildContext(pythonCode)
+        def testBean = getBean(context, "python.TestCaller")
+        testBean.doTest(null)
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message == 'Exception: Null parameter [taskName] is not allowed'
+    }
+
     void "test around advice will decorator defined in Python"() {
         given:
         def pythonCode = '''

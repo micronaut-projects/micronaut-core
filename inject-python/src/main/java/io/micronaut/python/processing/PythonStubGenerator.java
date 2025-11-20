@@ -27,6 +27,7 @@ import java.util.Set;
 import javax.lang.model.element.Modifier;
 
 import io.micronaut.aop.Around;
+import io.micronaut.aop.InterceptorBinding;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -93,13 +94,17 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         if (element instanceof AbstractPythonClassElement classElement) {
             SourceGenerator sourceGenerator = SourceGenerators.findByLanguage(VisitorContext.Language.JAVA).orElse(null);
             if (sourceGenerator != null) {
+
                 try {
                     if (classElements.containsKey(classElement.getName())) {
                         return;
                     }
 
                     classElements.put(classElement.getName(), classElement);
+
                     String typeName = element.getName();
+                    boolean isAopProxy = classElement.hasStereotype(InterceptorBinding.class);
+
                     var builder = ClassDef.builder(typeName)
                         .addModifiers(Modifier.PUBLIC);
                     builder.addAnnotation(Vetoed.class);
@@ -138,6 +143,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         for (MethodElement method : methods) {
                             if (methodSet.contains(method)) {
                                 continue;
+                            }
+                            if (method.hasDeclaredStereotype(InterceptorBinding.class)) {
+                                isAopProxy = true;
                             }
                             addBridgeMethod(method, builder, pythonValue, context, false, addedMethodNames);
                             methodSet.add(method);
@@ -255,6 +263,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
 
                     for (MethodElement methodElement : methodsToBridge) {
+                        if (methodElement.hasDeclaredStereotype(InterceptorBinding.class)) {
+                            isAopProxy = true;
+                        }
                         addBridgeMethod(methodElement, builder, pythonValue, context, isJunit5Test, addedMethodNames);
                     }
 
@@ -347,6 +358,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         if (isIntrospected) {
                             addGetter(beanProperty, builder, pythonValue);
                         }
+                    }
+
+                    if (isAopProxy) {
+                        builder.addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.aop.PythonAopSetup"));
                     }
 
                     sourceGenerator.write(builder.build(), context, element);
