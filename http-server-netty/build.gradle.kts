@@ -34,6 +34,7 @@ dependencies {
     compileOnly(projects.micronautWebsocket)
     compileOnly(libs.managed.kotlin.stdlib)
     compileOnly(libs.managed.netty.transport.native.unix.common)
+    compileOnly(libs.managed.netty.contrib.multipart.vintage)
     compileOnly(projects.micronautHttpNettyHttp3)
     compileOnly(libs.brotli4j)
 
@@ -125,6 +126,7 @@ dependencies {
         exclude(group = "io.micronaut")
     }
     testImplementation(libs.junit.jupiter.api)
+    testRuntimeOnly(libs.managed.netty.contrib.multipart.vintage)
 }
 
 tasks.withType<Test>().configureEach {

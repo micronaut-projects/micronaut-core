@@ -280,6 +280,7 @@ public abstract sealed class MicronautHttpData<D extends HttpData> extends Abstr
             } catch (IOException e) {
                 LOG.warn("Failed to close temp file channel", e);
             }
+            channel = null;
         }
         if (path != null) {
             try {
@@ -287,21 +288,23 @@ public abstract sealed class MicronautHttpData<D extends HttpData> extends Abstr
             } catch (IOException e) {
                 LOG.warn("Failed to delete temp file", e);
             }
+            path = null;
         }
         for (Chunk chunk : chunks) {
             chunk.release();
         }
+        chunks.clear();
         if (mmapSegments != null) {
             for (ByteBuf segment : mmapSegments) {
                 segment.release();
             }
+            mmapSegments = null;
         }
     }
 
     @Override
     public void setContent(ByteBuf buffer) throws IOException {
         dealloc0();
-        chunks.clear();
 
         Chunk ch = new Chunk(0);
         chunks.add(ch);

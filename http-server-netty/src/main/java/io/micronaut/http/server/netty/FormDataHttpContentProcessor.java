@@ -15,12 +15,17 @@
  */
 package io.micronaut.http.server.netty;
 
+import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.netty.buffer.ByteBufHolder;
+import io.netty.contrib.multipart.DecoderQuirk;
+import io.netty.contrib.multipart.FormDecoderException;
+import io.netty.contrib.multipart.TooManyFormFieldsException;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.LastHttpContent;
@@ -38,6 +43,7 @@ import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.Collection;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Supplier;
 
 /**
  * <p>Decodes {@link MediaType#MULTIPART_FORM_DATA} in a non-blocking manner.</p>
@@ -49,6 +55,8 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 @Internal
 public final class FormDataHttpContentProcessor {
+
+    private static boolean contribCodecMissing;
 
     protected final NettyHttpRequest<?> nettyHttpRequest;
     protected final long advertisedLength;
@@ -89,12 +97,38 @@ public final class FormDataHttpContentProcessor {
         HttpDataFactory factory = new MicronautHttpData.Factory(multipart, characterEncoding);
         // prevent the decoders from immediately parsing the content
         HttpRequest nativeRequest = nettyHttpRequest.toHttpRequestWithoutBody();
-        if (HttpPostRequestDecoder.isMultipart(nativeRequest)) {
-            this.decoder = new HttpPostMultipartRequestDecoder(factory, nativeRequest, characterEncoding, configuration.getFormMaxFields(), configuration.getFormMaxBufferedBytes());
-        } else {
-            this.decoder = new HttpPostStandardRequestDecoder(factory, nativeRequest, characterEncoding, configuration.getFormMaxFields(), configuration.getFormMaxBufferedBytes());
-        }
+        this.decoder = createDecoder(factory, nativeRequest, characterEncoding, configuration);
         this.partMaxSize = multipart.getMaxFileSize();
+    }
+
+    private static InterfaceHttpPostRequestDecoder createDecoder(HttpDataFactory factory, HttpRequest request, Charset charset, NettyHttpServerConfiguration configuration) {
+        if (!contribCodecMissing) {
+            try {
+                var builder = io.netty.contrib.multipart.vintage.HttpPostRequestDecoder.builder()
+                    .dataFactory(factory)
+                    .charset(charset)
+                    .maxFields(configuration.getFormMaxFields())
+                    .undecodedLimit(configuration.getFormMaxBufferedBytes())
+                    .enableQuirks(configuration.getFormDecoderQuirks().stream()
+                        .map(name -> ConversionService.SHARED.convertRequired(name, DecoderQuirk.class))
+                        .toArray(DecoderQuirk[]::new));
+                if (HttpPostRequestDecoder.isMultipart(request)) {
+                    return builder.buildMultipart(request);
+                } else {
+                    return builder.buildStandard(request);
+                }
+            } catch (LinkageError e) {
+                if (!configuration.getFormDecoderQuirks().isEmpty()) {
+                    throw new ConfigurationException("Configuration contained form-decoder-quirks, but failed to load new decoder implementation", e);
+                }
+                contribCodecMissing = true;
+            }
+        }
+        if (HttpPostRequestDecoder.isMultipart(request)) {
+            return new HttpPostMultipartRequestDecoder(factory, request, charset, configuration.getFormMaxFields(), configuration.getFormMaxBufferedBytes());
+        } else {
+            return new HttpPostStandardRequestDecoder(factory, request, charset, configuration.getFormMaxFields(), configuration.getFormMaxBufferedBytes());
+        }
     }
 
     protected void onData(ByteBufHolder message, Collection<? super InterfaceHttpData> out) {
@@ -147,20 +181,11 @@ public final class FormDataHttpContentProcessor {
                         postRequestDecoder.removeHttpDataFromClean(currentPartialHttpData);
                     }
 
-                } catch (HttpPostRequestDecoder.EndOfDataDecoderException e) {
-                    // ok, ignore
-                } catch (HttpPostRequestDecoder.ErrorDataDecoderException e) {
-                    Throwable cause = e.getCause();
-                    if (cause instanceof IOException && cause.getMessage().equals("Size exceed allowed maximum capacity")) {
-                        String partName = decoder.currentPartialHttpData().getName();
-                        throw new ContentLengthExceededException("The part named [" + partName + "] exceeds the maximum allowed content length [" + partMaxSize + "]");
-                    } else {
-                        throw e;
+                } catch (RuntimeException e) {
+                    RuntimeException mapped = mapFormException(e);
+                    if (mapped != null) {
+                        throw mapped;
                     }
-                } catch (HttpPostRequestDecoder.TooManyFormFieldsException e) {
-                    throw new ContentLengthExceededException("Number of form fields exceeds configured limit of [" + configuration.getFormMaxFields() + "]");
-                } catch (HttpPostRequestDecoder.TooLongFormFieldException e) {
-                    throw new ContentLengthExceededException("Length of buffered form field exceeds configured limit of [" + configuration.getFormMaxBufferedBytes() + "]");
                 } finally {
                     httpContent.release();
                 }
@@ -171,6 +196,41 @@ public final class FormDataHttpContentProcessor {
             inFlight = false;
             destroyIfRequested();
         }
+    }
+
+    private RuntimeException mapFormException(RuntimeException original) {
+        if (original instanceof HttpPostRequestDecoder.EndOfDataDecoderException ||
+            instanceOfSafe(original, () -> io.netty.contrib.multipart.vintage.HttpPostRequestDecoder.EndOfDataDecoderException.class)) {
+            // ok, ignore
+            return null;
+        } else if (original instanceof HttpPostRequestDecoder.ErrorDataDecoderException ||
+            instanceOfSafe(original, () -> io.netty.contrib.multipart.vintage.HttpPostRequestDecoder.ErrorDataDecoderException.class)) {
+            Throwable cause = original.getCause();
+            if (cause instanceof IOException && cause.getMessage().equals("Size exceed allowed maximum capacity")) {
+                String partName = decoder.currentPartialHttpData().getName();
+                return new ContentLengthExceededException("The part named [" + partName + "] exceeds the maximum allowed content length [" + partMaxSize + "]");
+            } else {
+                return original;
+            }
+        } else if (original instanceof HttpPostRequestDecoder.TooManyFormFieldsException ||
+            instanceOfSafe(original, () -> TooManyFormFieldsException.class)) {
+            return new ContentLengthExceededException("Number of form fields exceeds configured limit of [" + configuration.getFormMaxFields() + "]");
+        } else if (original instanceof HttpPostRequestDecoder.TooLongFormFieldException ||
+            (instanceOfSafe(original, () -> FormDecoderException.class) && original.getMessage().equals("Undecoded data limit exceeded"))) {
+            return new ContentLengthExceededException("Length of buffered form field exceeds configured limit of [" + configuration.getFormMaxBufferedBytes() + "]");
+        } else {
+            return original;
+        }
+    }
+
+    private static <B> boolean instanceOfSafe(B object, Supplier<Class<? extends B>> type) {
+        Class<? extends B> cl;
+        try {
+            cl = type.get();
+        } catch (LinkageError e) {
+            return false;
+        }
+        return cl.isInstance(object);
     }
 
     public void add(ByteBufHolder message, Collection<? super InterfaceHttpData> out) throws Throwable {
