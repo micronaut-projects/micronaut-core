@@ -19,10 +19,8 @@ import com.fasterxml.jackson.databind.BeanDescription;
 import com.fasterxml.jackson.databind.DeserializationConfig;
 import com.fasterxml.jackson.databind.deser.BeanDeserializerModifier;
 import com.fasterxml.jackson.databind.introspect.BeanPropertyDefinition;
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.hateoas.Resource;
-import io.micronaut.jackson.modules.BeanIntrospectionModule;
 
 import java.util.List;
 
@@ -31,7 +29,6 @@ import java.util.List;
  * @since 1.0
  */
 @Internal
-@Requires(missingBeans = BeanIntrospectionModule.class)
 public class ResourceDeserializerModifier extends BeanDeserializerModifier {
 
     @Override

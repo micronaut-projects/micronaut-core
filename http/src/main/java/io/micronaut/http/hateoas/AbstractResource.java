@@ -26,7 +26,13 @@ import io.micronaut.core.value.OptionalMultiValues;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * An abstract implementation of {@link Resource}.
@@ -38,6 +44,7 @@ import java.util.*;
 @Produces(MediaType.APPLICATION_HAL_JSON)
 @Introspected
 @SuppressWarnings("java:S119") // Impl is a better name than T
+@ReflectiveAccess // for jackson
 public abstract class AbstractResource<Impl extends AbstractResource<Impl>> implements Resource {
     private final Map<CharSequence, List<Link>> linkMap = new LinkedHashMap<>(1);
     private final Map<CharSequence, List<Resource>> embeddedMap = new LinkedHashMap<>(1);

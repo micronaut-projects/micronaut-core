@@ -20,10 +20,8 @@ import com.fasterxml.jackson.databind.SerializationConfig;
 import com.fasterxml.jackson.databind.ser.BeanPropertyWriter;
 import com.fasterxml.jackson.databind.ser.BeanSerializerModifier;
 import com.fasterxml.jackson.databind.util.NameTransformer;
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.hateoas.Resource;
-import io.micronaut.jackson.modules.BeanIntrospectionModule;
 import jakarta.inject.Singleton;
 
 import java.util.Iterator;
@@ -37,7 +35,6 @@ import java.util.List;
  */
 @Internal
 @Singleton
-@Requires(missingBeans = BeanIntrospectionModule.class)
 class ResourceSerializerModifier extends BeanSerializerModifier {
 
     @Override
