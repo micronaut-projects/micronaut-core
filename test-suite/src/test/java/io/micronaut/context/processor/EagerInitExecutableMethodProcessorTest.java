@@ -6,7 +6,6 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import jakarta.inject.Singleton;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.lang.annotation.Documented;
@@ -16,7 +15,8 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class EagerInitExecutableMethodProcessorTest {
 
@@ -31,7 +31,7 @@ class EagerInitExecutableMethodProcessorTest {
         assertTrue(ctx.getBean(ProcessorConsumer.class).processed);
         ctx.close();
     }
-    
+
     @Test
     void toolAnnotationsTestWithEagerInitialization() {
         Map<String, Object> config = Map.of(
@@ -69,7 +69,7 @@ class EagerInitExecutableMethodProcessorTest {
         public boolean processed;
 
         @Override
-        public void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
+        public <B> void process(BeanDefinition<B> beanDefinition, ExecutableMethod<B, ?> method) {
             processed = true;
         }
     }

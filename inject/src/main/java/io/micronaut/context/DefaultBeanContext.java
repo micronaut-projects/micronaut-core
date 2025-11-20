@@ -1867,31 +1867,33 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         if (!eagerBeansEnabled) {
             return;
         }
-        Iterable<BeanDefinition<Object>> eagerInitBeans = beanDefinitionProvider.getEagerInitBeans(this);
-        if (eagerInitBeans.iterator().hasNext()) {
-            final List<BeanDefinition<Object>> eagerInit = new ArrayList<>(20);
-            for (BeanDefinition<Object> contextScopeBean : eagerInitBeans) {
-                try {
-                    loadEagerBeans(contextScopeBean, eagerInit);
-                } catch (Throwable e) {
-                    throw new BeanInstantiationException(MSG_BEAN_DEFINITION + (contextScopeBean.getName()) + MSG_COULD_NOT_BE_LOADED + e.getMessage(), e);
-                }
-            }
-            filterReplacedBeans(eagerInit);
-            OrderUtil.sortOrdered(eagerInit);
-            for (BeanDefinition<Object> eagerInitDefinition : eagerInit) {
-                try {
-                    initializeEagerBean(eagerInitDefinition);
-                } catch (DisabledBeanException e) {
-                    if (AbstractBeanContextConditional.ConditionLog.LOG.isDebugEnabled()) {
-                        AbstractBeanContextConditional.ConditionLog.LOG.debug("Bean of type [{}] disabled for reason: {}", eagerInitDefinition.getBeanType().getSimpleName(), e.getMessage());
-                    }
-                } catch (Throwable e) {
-                    throw new BeanInstantiationException(MSG_BEAN_DEFINITION + eagerInitDefinition.getName() + MSG_COULD_NOT_BE_LOADED + e.getMessage(), e);
-                }
-            }
-        }
+        initializeEagerBeans();
+        processExecutableMethodsProcessAtStartup();
+        processParallelBeans();
+        checkEnabledBeans = ForkJoinPool.commonPool().submit(new ForkJoinTask<>() {
 
+            @Override
+            public Object getRawResult() {
+                return null;
+            }
+
+            @Override
+            protected void setRawResult(Object value) {
+            }
+
+            @Override
+            protected boolean exec() {
+                for (BeanDefinitionReference<Object> ignore : beanDefinitionProvider.getBeanReferences(DefaultBeanContext.this)) {
+                    if (isCancelled()) {
+                        return true;
+                    }
+                }
+                return true;
+            }
+        });
+    }
+
+    private void processExecutableMethodsProcessAtStartup() {
         Map<Class<? extends Annotation>, Collection<ExecutableMethodProcessor>> processorsByAnnotation = CollectionUtils.newLinkedHashMap(10);
         for (BeanDefinition<Object> definition : beanDefinitionProvider.getProcessedBeans(this)) {
             for (ExecutableMethod<Object, ?> method : definition.getExecutableMethodsForProcessing()) {
@@ -1921,29 +1923,33 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 }
             }
         }
+    }
 
-        processParallelBeans();
-        checkEnabledBeans = ForkJoinPool.commonPool().submit(new ForkJoinTask<>() {
-
-            @Override
-            public Object getRawResult() {
-                return null;
-            }
-
-            @Override
-            protected void setRawResult(Object value) {
-            }
-
-            @Override
-            protected boolean exec() {
-                for (BeanDefinitionReference<Object> ignore : beanDefinitionProvider.getBeanReferences(DefaultBeanContext.this)) {
-                    if (isCancelled()) {
-                        return true;
-                    }
+    private void initializeEagerBeans() {
+        Iterable<BeanDefinition<Object>> eagerInitBeans = beanDefinitionProvider.getEagerInitBeans(this);
+        if (eagerInitBeans.iterator().hasNext()) {
+            final List<BeanDefinition<Object>> eagerInit = new ArrayList<>(20);
+            for (BeanDefinition<Object> contextScopeBean : eagerInitBeans) {
+                try {
+                    loadEagerBeans(contextScopeBean, eagerInit);
+                } catch (Throwable e) {
+                    throw new BeanInstantiationException(MSG_BEAN_DEFINITION + (contextScopeBean.getName()) + MSG_COULD_NOT_BE_LOADED + e.getMessage(), e);
                 }
-                return true;
             }
-        });
+            filterReplacedBeans(eagerInit);
+            OrderUtil.sortOrdered(eagerInit);
+            for (BeanDefinition<Object> eagerInitDefinition : eagerInit) {
+                try {
+                    initializeEagerBean(eagerInitDefinition);
+                } catch (DisabledBeanException e) {
+                    if (AbstractBeanContextConditional.ConditionLog.LOG.isDebugEnabled()) {
+                        AbstractBeanContextConditional.ConditionLog.LOG.debug("Bean of type [{}] disabled for reason: {}", eagerInitDefinition.getBeanType().getSimpleName(), e.getMessage());
+                    }
+                } catch (Throwable e) {
+                    throw new BeanInstantiationException(MSG_BEAN_DEFINITION + eagerInitDefinition.getName() + MSG_COULD_NOT_BE_LOADED + e.getMessage(), e);
+                }
+            }
+        }
     }
 
     /**
