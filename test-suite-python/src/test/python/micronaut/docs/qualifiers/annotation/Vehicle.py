@@ -6,8 +6,10 @@ from typing import Annotated
 # tag::class[]
 @Singleton
 class Vehicle:
-    def __init__(self, engine: Annotated[Engine, V8]): # <4>
+    # tag::constructor[]
+    def __init__(self, engine: Annotated[Engine, V8]):
         self.engine = engine
+    # end::constructor[]
 
     def start(self) -> str:
         return self.engine.start() # <5>

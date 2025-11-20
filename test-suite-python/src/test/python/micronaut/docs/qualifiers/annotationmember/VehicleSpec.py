@@ -10,10 +10,10 @@ class VehicleSpec:
     context : Annotated[ApplicationContext, Inject] = None
 
     @Test
-    @Disabled("Qualifiers defined in Python not working yet")
+    @Disabled("PythonAnnotationMetadataBuilder hasAnnotation needs to handle NonBinding definition in Cylinder")
     def test_start_vehicle(self) -> None:
         # tag::start[]
-        Vehicle = java.type("micronaut.docs.inject.qualifiers.annotation.Vehicle")
+        Vehicle = java.type("micronaut.docs.qualifiers.annotationmember.Vehicle")
         vehicle = self.context.getBean(Vehicle).asPolyglotValue()
         print(vehicle.start())
         # end::start[]
