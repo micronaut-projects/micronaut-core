@@ -22,9 +22,11 @@ import io.micronaut.aop.writer.AopProxyWriter;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Value;
+import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NextMajorVersion;
 import org.jspecify.annotations.NonNull;
@@ -75,6 +77,28 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
     protected DeclaredBeanElementCreator(ClassElement classElement, VisitorContext visitorContext, boolean isAopProxy) {
         super(classElement, visitorContext);
         this.isAopProxy = isAopProxy;
+
+        wantOfIncorrectUseOfExecutableMethodProcessor(classElement, visitorContext);
+    }
+
+    private void wantOfIncorrectUseOfExecutableMethodProcessor(ClassElement classElement, VisitorContext visitorContext) {
+        Map<String, ClassElement> processor = classElement.getTypeArguments(ExecutableMethodProcessor.class);
+        if (processor == null || processor.isEmpty()) {
+            return;
+        }
+        ClassElement annotation = processor.get("A");
+        if (annotation != null) {
+            AnnotationValue<Executable> executable = annotation.getAnnotation(Executable.class);
+            if (executable != null && executable.booleanValue(Executable.MEMBER_PROCESS_ON_STARTUP).orElse(false)) {
+                return; // Correct ExecutableMethodProcessor should have @Executable(processOnStartup=true)
+            }
+        }
+        String message = "ExecutableMethodProcessor is supposed to be used with an annotation that has @Executable(processOnStartup = true). In the future version this will be an error.";
+        visitorContext.warn(
+            message,
+            classElement
+        );
+        classElement.annotate(Deprecated.class, builder -> builder.value(message));
     }
 
     @Override
@@ -395,7 +419,7 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
             return false;
         }
         // This method requires pre-processing. See Executable#processOnStartup()
-        boolean preprocess = methodElement.isTrue(Executable.class, "processOnStartup");
+        boolean preprocess = methodElement.isTrue(Executable.class, Executable.MEMBER_PROCESS_ON_STARTUP);
         if (preprocess) {
             visitor.setRequiresMethodProcessing(true);
         }

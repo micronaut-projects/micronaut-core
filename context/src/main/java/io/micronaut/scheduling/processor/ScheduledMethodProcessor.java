@@ -15,15 +15,14 @@
  */
 package io.micronaut.scheduling.processor;
 
-import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanContext;
-import io.micronaut.context.Qualifier;
 import io.micronaut.context.bind.DefaultExecutableBeanContextBinder;
 import io.micronaut.context.bind.ExecutableBeanContextBinder;
 import io.micronaut.context.event.StartupEvent;
 import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.bind.BoundExecutable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
@@ -46,16 +45,14 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Queue;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * A {@link ExecutableMethodProcessor} for the {@link Scheduled} annotation.
@@ -63,6 +60,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * @author graemerocher
  * @since 1.0
  */
+@Internal
 @Singleton
 public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Scheduled>, Closeable {
 
@@ -78,50 +76,38 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
     private final BeanContext beanContext;
     private final ConversionService conversionService;
     private final Queue<ScheduledFuture<?>> scheduledTasks = new ConcurrentLinkedDeque<>();
-    private final Map<ScheduledDefinition, Runnable> scheduledMethods = new ConcurrentHashMap<>();
+    private final List<ScheduledDefinition<?>> scheduledMethodsDefinitions = new ArrayList<>();
     private final TaskExceptionHandler<?, ?> taskExceptionHandler;
-    private volatile boolean started = false;
 
     /**
      * @param beanContext       The bean context for DI of beans annotated with @Inject
      * @param conversionService To convert one type to another
      * @param taskExceptionHandler The default task exception handler
      */
-    @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
-    public ScheduledMethodProcessor(BeanContext beanContext, Optional<ConversionService> conversionService, TaskExceptionHandler<?, ?> taskExceptionHandler) {
+    public ScheduledMethodProcessor(BeanContext beanContext, ConversionService conversionService, TaskExceptionHandler<?, ?> taskExceptionHandler) {
         this.beanContext = beanContext;
-        this.conversionService = conversionService.orElse(ConversionService.SHARED);
+        this.conversionService = conversionService;
         this.taskExceptionHandler = taskExceptionHandler;
     }
 
     @Override
-    public void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
-        if (beanContext instanceof ApplicationContext) {
-            ScheduledDefinition scheduledDefinition = new ScheduledDefinition(beanDefinition, method);
-            Runnable runnable = new ScheduleTaskRunnable(scheduledDefinition);
-            // process may be called during or after scheduleTasks. we need to guard against that.
-            if (scheduledMethods.putIfAbsent(scheduledDefinition, runnable) == null && started) {
-                runnable.run();
-            }
-        }
+    public <B> void process(BeanDefinition<B> beanDefinition, ExecutableMethod<B, ?> method) {
+        scheduledMethodsDefinitions.add(new ScheduledDefinition(beanDefinition, method));
     }
 
     /**
      * On startup event listener that schedules the active tasks.
-     * @param startupEvent The startup event.
+     * @param ignore The startup event.
      */
     @EventListener
-    void scheduleTasks(@SuppressWarnings("unused") StartupEvent startupEvent) {
-        started = true;
-        for (Runnable runnable : scheduledMethods.values()) {
-            runnable.run();
-        }
+    void scheduleTasks(StartupEvent ignore) {
+        scheduledMethodsDefinitions.parallelStream().forEach(this::scheduleTask);
+        scheduledMethodsDefinitions.clear();
     }
 
-    @SuppressWarnings("unchecked")
-    private void scheduleTask(ScheduledDefinition scheduledDefinition) {
-        ExecutableMethod<?, ?> method = scheduledDefinition.method();
-        BeanDefinition<?> beanDefinition = scheduledDefinition.definition();
+    private <B> void scheduleTask(ScheduledDefinition<B> scheduledDefinition) {
+        ExecutableMethod<B, ?> method = scheduledDefinition.method();
+        BeanDefinition<B> beanDefinition = scheduledDefinition.definition();
         List<AnnotationValue<Scheduled>> scheduledAnnotations = method.getAnnotationValuesByType(Scheduled.class);
         for (AnnotationValue<Scheduled> scheduledAnnotation : scheduledAnnotations) {
             String fixedRate = scheduledAnnotation.stringValue(MEMBER_FIXED_RATE).orElse(null);
@@ -148,8 +134,8 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
             Runnable task = () -> {
                 try {
                     ExecutableBeanContextBinder binder = new DefaultExecutableBeanContextBinder();
-                    BoundExecutable<?, ?> boundExecutable = binder.bind(method, beanContext);
-                    Object bean = beanContext.getBean((Argument<Object>) beanDefinition.asArgument(), (Qualifier<Object>) beanDefinition.getDeclaredQualifier());
+                    BoundExecutable<B, ?> boundExecutable = binder.bind(method, beanContext);
+                    B bean = beanContext.getBean(beanDefinition);
                     AnnotationValue<Scheduled> finalAnnotationValue = scheduledAnnotation;
                     if (finalAnnotationValue instanceof EvaluatedAnnotationValue<Scheduled> evaluated) {
                         finalAnnotationValue = evaluated.withArguments(bean, boundExecutable.getBoundArguments());
@@ -157,9 +143,9 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
                     boolean shouldRun = finalAnnotationValue.booleanValue(MEMBER_CONDITION).orElse(true);
                     if (shouldRun) {
                         try {
-                            ((BoundExecutable<Object, Object>) boundExecutable).invoke(bean);
+                            boundExecutable.invoke(bean);
                         } catch (Throwable e) {
-                            handleException((Class<Object>) beanDefinition.getBeanType(), bean, e);
+                            handleException(beanDefinition.getBeanType(), bean, e);
                         }
                     }
                 } catch (NoSuchBeanException noSuchBeanException) {
@@ -167,7 +153,7 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
                     // is shutdown and available beans cleared then the bean is no longer available. The best thing to do here is just ignore the failure.
                     LOG.debug("Scheduled job skipped for context shutdown: {}.{}", beanDefinition.getBeanType().getSimpleName(), method.getDescription(true));
                 } catch (Exception e) {
-                    TaskExceptionHandler finalHandler = findHandler(beanDefinition.getBeanType(), e);
+                    TaskExceptionHandler<B, Throwable> finalHandler = findHandler(beanDefinition.getBeanType(), e);
                     finalHandler.handleCreationFailure(beanDefinition, e);
                 }
             };
@@ -201,7 +187,6 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
                     new SchedulerConfigurationException(method, "Invalid fixed delay definition: " + fixedDelay)
                 );
 
-
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Scheduling fixed delay task [{}] for method: {}", duration, method);
                 }
@@ -218,13 +203,13 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
         }
     }
 
-    private void handleException(Class<Object> beanType, Object bean, Throwable e) {
-        TaskExceptionHandler<Object, Throwable> finalHandler = findHandler(beanType, e);
+    private <B> void handleException(Class<B> beanType, B bean, Throwable e) {
+        TaskExceptionHandler<B, Throwable> finalHandler = findHandler(beanType, e);
         finalHandler.handle(bean, e);
     }
 
     @SuppressWarnings("unchecked")
-    private TaskExceptionHandler<Object, Throwable> findHandler(Class<?> beanType, Throwable e) {
+    private <B> TaskExceptionHandler<B, Throwable> findHandler(Class<B> beanType, Throwable e) {
         return beanContext.findBean(Argument.of(TaskExceptionHandler.class, beanType, e.getClass()))
                           .orElse(this.taskExceptionHandler);
     }
@@ -239,31 +224,12 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
                 }
             }
         } finally {
-            this.scheduledTasks.clear();
-            this.scheduledMethods.clear();
+            scheduledTasks.clear();
         }
     }
 
-    private record ScheduledDefinition(
-        BeanDefinition<?> definition,
-        ExecutableMethod<?, ?> method) { }
-
-    /**
-     * This Runnable calls {@link #scheduleTask(ScheduledDefinition)} exactly once, even if invoked
-     * multiple times from multiple threads.
-     */
-    private class ScheduleTaskRunnable extends AtomicBoolean implements Runnable {
-        private final ScheduledDefinition definition;
-
-        ScheduleTaskRunnable(ScheduledDefinition definition) {
-            this.definition = definition;
-        }
-
-        @Override
-        public void run() {
-            if (compareAndSet(false, true)) {
-                scheduleTask(definition);
-            }
-        }
+    private record ScheduledDefinition<B>(BeanDefinition<B> definition,
+                                          ExecutableMethod<B, ?> method) {
     }
+
 }

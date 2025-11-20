@@ -240,7 +240,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         return cachedAnnotationMetadata;
     }
 
-    private AnnotationMetadata buildInternal(T element) {
+    protected final AnnotationMetadata buildInternal(T element) {
         MutableAnnotationMetadata annotationMetadata = new MutableAnnotationMetadata();
         try {
             return buildInternalMulti(

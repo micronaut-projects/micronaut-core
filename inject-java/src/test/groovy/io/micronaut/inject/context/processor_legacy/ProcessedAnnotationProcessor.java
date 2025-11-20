@@ -13,32 +13,33 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.inject.context.processor;
+package io.micronaut.inject.context.processor_legacy;
 
-import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.processor.BeanDefinitionProcessor;
+import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.inject.BeanDefinition;
+import io.micronaut.inject.ExecutableMethod;
 
 import java.util.HashSet;
 import java.util.Set;
 
-@Requires(property = "spec.name", value = "BeanDefinitionProcessorSpec")
+@Requires(property = "spec.name", value = "ExecutableMethodProcessorSpec")
 @Context
-public class ProcessedAnnotationProcessor implements BeanDefinitionProcessor<ProcessedAnnotation> {
+public class ProcessedAnnotationProcessor implements ExecutableMethodProcessor<ProcessedAnnotation> {
     private Set<BeanDefinition<?>> beans = new HashSet<>();
 
     public ProcessedAnnotationProcessor() {
         System.out.println("Starting");
     }
 
-    @Override
-    public void process(BeanDefinition<?> beanDefinition, BeanContext beanContext) {
-        beans.add(beanDefinition);
-    }
 
     public Set<BeanDefinition<?>> getBeans() {
         return beans;
+    }
+
+    @Override
+    public <B> void process(BeanDefinition<B> beanDefinition, ExecutableMethod<B, ?> method) {
+        beans.add(beanDefinition);
     }
 }

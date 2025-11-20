@@ -47,7 +47,7 @@ final class MapperMethodProcessor implements ExecutableMethodProcessor<Mapper> {
     }
 
     @Override
-    public void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
+    public <B> void process(BeanDefinition<B> beanDefinition, ExecutableMethod<B, ?> method) {
         Class<?>[] argumentTypes = method.getArgumentTypes();
         if (method.hasDeclaredAnnotation(Mapper.class) && argumentTypes.length == 1) {
             Class<Object> toType = (Class<Object>) method.getReturnType().getType();

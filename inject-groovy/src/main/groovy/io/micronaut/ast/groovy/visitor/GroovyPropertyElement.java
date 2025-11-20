@@ -75,7 +75,7 @@ final class GroovyPropertyElement extends AbstractGroovyElement implements Prope
         this.writeAccessKind = writeAccessKind;
         this.owningElement = owningElement;
         this.excluded = excluded;
-        this.annotationMetadata = new PropertyElementAnnotationMetadata(this, getter, setter, field, null, false);
+        this.annotationMetadata = new PropertyElementAnnotationMetadata(this, getter, setter, field, null, null, false);
     }
 
     @Override

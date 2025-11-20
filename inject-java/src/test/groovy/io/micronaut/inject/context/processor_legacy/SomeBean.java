@@ -13,10 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-/**
- * Contains interfaces related to annotation processing.
- *
- * @author graemerocher
- * @since 1.0
- */
-package io.micronaut.context.processor;
+package io.micronaut.inject.context.processor_legacy;
+
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.context.annotation.Requires;
+
+@Requires(property = "spec.name", value = "ExecutableMethodProcessorSpec")
+@ProcessedAnnotation
+public class SomeBean {
+
+    @Executable
+    void method() {
+
+    }
+
+}

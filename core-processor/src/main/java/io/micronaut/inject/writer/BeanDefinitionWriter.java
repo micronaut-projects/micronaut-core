@@ -41,6 +41,7 @@ import io.micronaut.context.annotation.DefaultScope;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Infrastructure;
+import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.InjectScope;
 import io.micronaut.context.annotation.Parallel;
 import io.micronaut.context.annotation.Parameter;
@@ -632,6 +633,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
     private static final Constructor<AbstractExecutableMethod> ABSTRACT_EXECUTABLE_METHOD_CONSTRUCTOR = ReflectionUtils.getRequiredInternalConstructor(AbstractExecutableMethod.class, Class.class, String.class);
     private static final Method GET_TYPE_PARAMETERS_METHOD = ReflectionUtils.getRequiredInternalMethod(TypeVariableResolver.class, "getTypeParameters");
     private static final Method ARGUMENT_OF_METHOD = ReflectionUtils.getRequiredInternalMethod(Argument.class, "of", Class.class);
+    private static final Method BD_GET_INDEXES_OF_EXECUTABLE_METHODS_FOR_PROCESSING = ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanDefinition.class, "getIndexesOfExecutableMethodsForProcessing");
     private static final Method GET_INDEXES_METHOD = ReflectionUtils.getRequiredMethod(BeanDefinitionReference.class, "getIndexes");
     private static final Method IS_PARALLEL_METHOD = ReflectionUtils.getRequiredMethod(BeanDefinitionReference.class, "isParallel");
     private static final Method IS_ASSIGNABLE_METHOD = ReflectionUtils.getRequiredMethod(Class.class, "isAssignableFrom", Class.class);
@@ -1329,6 +1331,19 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
         }
 
         loadTypeMethods.values().forEach(classDefBuilder::addMethod);
+
+        if (requiresMethodProcessing() && executableMethodsDefinitionWriter != null) {
+            int methodsCount = executableMethodsDefinitionWriter.getMethodsCount();
+            List<ExpressionDef> expressions = new ArrayList<>(methodsCount);
+            for (int i = 0; i < methodsCount; i++) {
+                MethodElement method = executableMethodsDefinitionWriter.getMethodByIndex(i);
+                if (method.booleanValue(Executable.class, Executable.MEMBER_PROCESS_ON_STARTUP).orElse(false)) {
+                    expressions.add(TypeDef.Primitive.INT.constant(i));
+                }
+            }
+            classDefBuilder.addMethod(MethodDef.override(BD_GET_INDEXES_OF_EXECUTABLE_METHODS_FOR_PROCESSING)
+                .build((aThis, methodParameters) -> TypeDef.Primitive.INT.array().instantiate(expressions).returning()));
+        }
 
         output = new LinkedHashMap<>();
         // Generate the bytecode in the round it's being invoked
