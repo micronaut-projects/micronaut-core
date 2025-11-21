@@ -73,11 +73,14 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
     public Collection<ClassElement> getInterfaces() {
         ClassDef nativeType = getNativeType();
         List<TypeRef> bases = nativeType.bases();
-
-        return bases.stream()
-            .flatMap(base -> environment.javaVisitorContext().getClassElement(base.name()).stream())
-            .filter(ClassElement::isInterface)
-            .toList();
+        if (environment.javaVisitorContext() != null) {
+            return bases.stream()
+                .flatMap(base -> environment.javaVisitorContext().getClassElement(base.name()).stream())
+                .filter(ClassElement::isInterface)
+                .toList();
+        } else {
+            return List.of();
+        }
     }
 
     private static @NotNull String qualifiedClassName(ClassDef classDef) {

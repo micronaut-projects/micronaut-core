@@ -47,9 +47,9 @@ import javax.lang.model.element.Element;
  * </p>
  *
  * @author Micronaut Team
- * @since 5.0.0
  * @see FunctionDef
  * @see <a href="https://docs.python.org/3/library/ast.html#ast.FunctionDef">Python AST FunctionDef</a>
+ * @since 5.0.0
  */
 public sealed class PythonMethodElement extends AbstractPythonElement implements MethodElement, ElementProvider permits PythonConstructorElement {
     private final PythonProcessingEnvironment environment;
@@ -64,10 +64,10 @@ public sealed class PythonMethodElement extends AbstractPythonElement implements
     /**
      * Constructs a new {@code PythonMethodElement} from the given {@code FunctionDef}.
      *
-     * @param functionDef the function definition node; must not be {@code null}
-     * @param environment the Python processing environment; must not be {@code null}
-     * @param declaringType the class that declares this method; must not be {@code null}
-     * @param owningType the class that owns this method (may be a subclass); must not be {@code null}
+     * @param functionDef     the function definition node; must not be {@code null}
+     * @param environment     the Python processing environment; must not be {@code null}
+     * @param declaringType   the class that declares this method; must not be {@code null}
+     * @param owningType      the class that owns this method (may be a subclass); must not be {@code null}
      * @param metadataFactory the annotation metadata factory; must not be {@code null}
      * @throws NullPointerException if any parameter is {@code null}
      */
@@ -242,9 +242,13 @@ public sealed class PythonMethodElement extends AbstractPythonElement implements
     private ParameterElement[] createParameters(FunctionDef functionDef) {
         List<ArgumentDef> arguments = functionDef.arguments().arguments();
         boolean isStatic = functionDef.isStatic();
-        List<ParameterElement> parameters = new ArrayList<>(isStatic ? arguments.size() - 1: arguments.size());
+        int size = arguments.size();
+        if (size == 0) {
+            return ParameterElement.ZERO_PARAMETER_ELEMENTS;
+        }
+        List<ParameterElement> parameters = new ArrayList<>(isStatic ? size - 1 : size);
 
-        for (int i = isStatic  ? 1 : 0; i < arguments.size(); i++) {
+        for (int i = isStatic ? 1 : 0; i < size; i++) {
             ArgumentDef argDef = arguments.get(i);
             parameters.add(new PythonParameterElement(argDef, environment, this, getElementAnnotationMetadataFactory()));
         }
