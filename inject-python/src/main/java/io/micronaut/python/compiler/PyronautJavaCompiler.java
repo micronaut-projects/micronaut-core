@@ -15,12 +15,13 @@
  */
 package io.micronaut.python.compiler;
 
-import java.io.File;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.function.Consumer;
+import io.micronaut.annotation.processing.AggregatingTypeElementVisitorProcessor;
+import io.micronaut.annotation.processing.BeanDefinitionInjectProcessor;
+import io.micronaut.annotation.processing.MixinVisitorProcessor;
+import io.micronaut.annotation.processing.PackageElementVisitorProcessor;
+import io.micronaut.annotation.processing.TypeElementVisitorProcessor;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.python.processing.PythonAnnotationProcessor;
 
 import javax.annotation.processing.Processor;
 import javax.tools.DiagnosticCollector;
@@ -30,14 +31,12 @@ import javax.tools.JavaFileObject;
 import javax.tools.StandardJavaFileManager;
 import javax.tools.StandardLocation;
 import javax.tools.ToolProvider;
-
-import io.micronaut.annotation.processing.AggregatingTypeElementVisitorProcessor;
-import io.micronaut.annotation.processing.BeanDefinitionInjectProcessor;
-import io.micronaut.annotation.processing.MixinVisitorProcessor;
-import io.micronaut.annotation.processing.PackageElementVisitorProcessor;
-import io.micronaut.annotation.processing.TypeElementVisitorProcessor;
-import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.python.processing.PythonAnnotationProcessor;
+import java.io.File;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.function.Consumer;
 
 /**
  * Utility class for compiling Java sources with Micronaut annotation processors.
@@ -65,20 +64,31 @@ final class PyronautJavaCompiler {
      *
      * @param sources The Java sources to compile
      * @param classpath Additional classpath entries (null to use system classpath)
+     * @param bootclasspath Boot classpath (null to use the default)
+     * @param annotationProcessorPath Annotation processor path
      * @return The compiled class files
      */
-    Iterable<JavaFileObject> compileInMemory(JavaFileObject[] sources, List<File> classpath) {
+    Iterable<JavaFileObject> compileInMemory(JavaFileObject[] sources, List<File> classpath,
+                                             List<File> bootclasspath,
+                                             List<File> annotationProcessorPath,
+                                             List<String> compilerOptions) {
         DiagnosticCollector<JavaFileObject> diagnosticCollector = new DiagnosticCollector<>();
         InMemoryJavaFileManager inMemoryJavaFileManager = new InMemoryJavaFileManager(
             compiler.getStandardFileManager(diagnosticCollector, null, null));
 
-        compileJava(sources, classpath, inMemoryJavaFileManager, diagnosticCollector);
+        compileJava(sources, classpath, bootclasspath, annotationProcessorPath, compilerOptions, inMemoryJavaFileManager, diagnosticCollector);
 
         return inMemoryJavaFileManager.getOutputFiles();
     }
 
-    private void compileJava(JavaFileObject[] sources, List<File> classpath, JavaFileManager fileManager, DiagnosticCollector<JavaFileObject> diagnosticCollector) {
-        List<String> options = buildCompilerOptions(classpath);
+    private void compileJava(JavaFileObject[] sources,
+                             List<File> classpath,
+                             List<File> bootclasspath,
+                             List<File> annotationProcessorPath,
+                             List<String> compilerOptions,
+                             JavaFileManager fileManager,
+                             DiagnosticCollector<JavaFileObject> diagnosticCollector) {
+        List<String> options = buildCompilerOptions(classpath, bootclasspath, annotationProcessorPath, compilerOptions);
         List<Processor> processors = getAnnotationProcessors();
 
         try {
@@ -95,7 +105,8 @@ final class PyronautJavaCompiler {
 
             boolean success = task.call();
             if (!success) {
-                throw new RuntimeException("Compilation failed: " + diagnosticCollector.getDiagnostics());
+                throw new RuntimeException(
+                    "Compilation failed: " + diagnosticCollector.getDiagnostics());
             }
         } finally {
             shutdownProcessors(processors);
@@ -120,37 +131,60 @@ final class PyronautJavaCompiler {
      * @param targetDir The target directory for compiled classes
      * @param sources The Java sources to compile
      * @param classpath Additional classpath entries (null to use system classpath)
+     * @param bootclasspath Boot classpath (null to use default)
+     * @param annotationProcessorPath Annotation processor path
      */
-    void compileToDisk(File targetDir, JavaFileObject[] sources, List<File> classpath) {
+    void compileToDisk(File targetDir,
+                       JavaFileObject[] sources,
+                       List<File> classpath,
+                       List<File> bootclasspath,
+                       List<File> annotationProcessorPath,
+                       List<String> compilerOptions) {
         DiagnosticCollector<JavaFileObject> diagnosticCollector = new DiagnosticCollector<>();
-        StandardJavaFileManager fileManager = compiler.getStandardFileManager(diagnosticCollector, null, null);
+        StandardJavaFileManager fileManager =
+            compiler.getStandardFileManager(diagnosticCollector, null, null);
 
         // Set the class output location
         try {
-            fileManager.setLocation(StandardLocation.CLASS_OUTPUT, Collections.singletonList(targetDir));
+            fileManager.setLocation(StandardLocation.CLASS_OUTPUT,
+                Collections.singletonList(targetDir));
         } catch (Exception e) {
             throw new RuntimeException("Failed to set output location", e);
         }
 
-        compileJava(sources, classpath, fileManager, diagnosticCollector);
+        compileJava(sources, classpath, bootclasspath, annotationProcessorPath, compilerOptions, fileManager, diagnosticCollector);
     }
 
-    private List<String> buildCompilerOptions(List<File> classpath) {
-        if (classpath == null || classpath.isEmpty()) {
-            return Collections.emptyList();
-        }
-
+    private List<String> buildCompilerOptions(List<File> classpath,
+                                              List<File> bootClasspath,
+                                              List<File> annotationProcessorPath,
+                                              List<String> compilerOptions) {
         List<String> options = new ArrayList<>();
-        options.add("-classpath");
-        StringBuilder cp = new StringBuilder();
+        addClasspathOption("-classpath", classpath, options);
+        addClasspathOption("-bootclasspath", bootClasspath, options);
+        addClasspathOption("-processorpath", annotationProcessorPath, options);
+        if (compilerOptions != null) {
+            options.addAll(compilerOptions);
+        }
+        return options;
+    }
+
+    private static void addClasspathOption(String option,
+                                           List<File> classpath,
+                                           List<String> options) {
+        if (classpath == null || classpath.isEmpty()) {
+            return;
+        }
+        options.add(option);
+        var cp = new StringBuilder();
         for (File file : classpath) {
             if (!cp.isEmpty()) {
                 cp.append(File.pathSeparator);
             }
             cp.append(file.getAbsolutePath());
         }
-        options.add(cp.toString());
-        return options;
+        var classpathString = cp.toString();
+        options.add(classpathString);
     }
 
     /**
