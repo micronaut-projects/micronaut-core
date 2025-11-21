@@ -10,13 +10,13 @@ from typing import Annotated
 @Property(name = "datasource.url", value = "test")
 @MicronautTest
 class BookServiceSpec:
-    bookService : Annotated[BookService, Inject] = None
+    book_service : Annotated[BookService, Inject] = None
 
     @Test
     def test_book_service(self):
-        assert self.bookService is not None, "should have a book service"
-        assert self.bookService.__class__.__name__ == 'JdbcBookService', "should be a JDBC book service"
-        assert self.bookService.data_source != None, "should have a datasource"
+        assert self.book_service is not None, "should have a book service"
+        assert self.book_service.__class__.__name__ == 'JdbcBookService', "should be a JDBC book service"
+        assert self.book_service.data_source is not None, "should have a datasource"
 
     @MockBean
     def test_data_source(self) -> DataSource:
