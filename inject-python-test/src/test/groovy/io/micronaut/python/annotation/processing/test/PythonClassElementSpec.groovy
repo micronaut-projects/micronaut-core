@@ -535,4 +535,24 @@ class TypeTestService(MyBase[$pythonTypeAnnotation]):
 
     }
 
+    def "test __qualname__ attribute resolution in decorator parameters"() {
+        given: "Python code with decorator using __qualname__"
+        def pythonCode = '''
+from micronaut.core.annotation import TypeHint
+
+@TypeHint(value=TestClass.__qualname__)
+class TestClass:
+    pass
+'''
+
+        expect: "The __qualname__ should resolve to the qualified class name"
+        buildClassElement(pythonCode) { ClassElement element ->
+            assert element != null
+            assert element.getSimpleName() == "TestClass"
+            // The annotation value should be the qualified name
+            assert element.stringValue("io.micronaut.core.annotation.TypeHint", "value").get() == "python.TestClass"
+            return element
+        }
+    }
+
 }

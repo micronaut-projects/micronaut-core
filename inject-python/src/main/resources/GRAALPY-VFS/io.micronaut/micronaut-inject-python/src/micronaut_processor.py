@@ -39,9 +39,7 @@ def is_abstract_method(funcdef):
     Returns True if the ast.FunctionDef has an @abstractmethod decorator.
     """
     for dec in funcdef.decorator_list:
-        if isinstance(dec, ast.Name) and dec.id == "abstractmethod":
-            return True
-        elif isinstance(dec, ast.Attribute) and dec.attr == "abstractmethod":
+        if extract_decorator_name(dec) == "abstractmethod":
             return True
     return False
 
@@ -1180,7 +1178,18 @@ def decorator_to_function(visitor, node):
                             resolved_members[key] = resolved_value
                     else:
                         resolved_members[key] = value
-                return DecoratorDef(decorator_name, decorator_name, None, resolved_members, [])
+
+                # Resolve the decorator name
+                resolved_decorator_name = decorator_name
+                if visitor is not None:
+                    imported_name = visitor.imported_types.get(decorator_name)
+                    if imported_name:
+                        resolved_decorator_name = imported_name
+                    else:
+                        resolved_name = visitor.java_type_assignments.get(decorator_name, decorator_name)
+                        resolved_decorator_name = resolved_name
+
+                return DecoratorDef(decorator_name, resolved_decorator_name, None, resolved_members, [])
         case _:
             return None
 
@@ -1220,12 +1229,25 @@ def convert_ast_value(node, visitor=None):
         if isinstance(current, ast.Name):
             names.insert(0, current.id)
 
+        # Special handling for __qualname__ and __name__ attributes on local classes/functions
+        if visitor is not None and len(names) == 2 and names[1] in ('__qualname__', '__name__'):
+            if names[0] in visitor.java_type_assignments:
+                return visitor.java_type_assignments[names[0]]
+            elif names[0] in visitor.local_classes:
+                return f"{visitor.package_name}.{names[0]}"
+
         # Check if this might be a Java constant reference (e.g., StringUtils.TRUE)
         if visitor is not None and len(names) >= 2:
             # Try to resolve as a Java constant
             constant_value = _resolve_java_constant(visitor, names)
             if constant_value is not None:
                 return constant_value
+
+        # Fallback for __qualname__ and __name__ attributes
+        if visitor is not None and len(names) >= 2 and names[-1] in ('__qualname__', '__name__'):
+            base_name = '.'.join(names[:-1])
+            if base_name:
+                return f"{visitor.package_name}.{base_name}"
 
         # Return as qualified name string
         return '.'.join(names)

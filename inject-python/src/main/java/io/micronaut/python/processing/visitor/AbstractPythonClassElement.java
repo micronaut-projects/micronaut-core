@@ -64,6 +64,12 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
     }
 
     @Override
+    public boolean isAbstract() {
+        return getNativeType()
+            .bases().stream().anyMatch(b -> b.name().equals("abc.ABC"));
+    }
+
+    @Override
     public Collection<ClassElement> getInterfaces() {
         ClassDef nativeType = getNativeType();
         List<TypeRef> bases = nativeType.bases();
