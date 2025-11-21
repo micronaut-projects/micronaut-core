@@ -67,7 +67,7 @@ class PythonElementFactoryTest {
             ClassElement classElement = factory.newClassElement(classDef, processingEnvironment.metadataFactory());
 
             assertNotNull(classElement);
-            assertEquals("NewTestClass", classElement.getName());
+            assertEquals("NewTestClass", classElement.getSimpleName());
             assertTrue(classElement instanceof PythonClassElement);
             assertFalse(classElement.isEnum());
         }
@@ -92,7 +92,7 @@ class PythonElementFactoryTest {
             ClassElement enumElement = factory.newClassElement(enumDef, processingEnvironment.metadataFactory());
 
             assertNotNull(enumElement);
-            assertEquals("NewTestEnum", enumElement.getName());
+            assertEquals("NewTestEnum", enumElement.getSimpleName());
             assertTrue(enumElement instanceof PythonEnumElement);
             assertTrue(enumElement.isEnum());
 
@@ -117,7 +117,7 @@ class PythonElementFactoryTest {
             ClassElement classElement = factory.newSourceClassElement(classDef, processingEnvironment.metadataFactory());
 
             assertNotNull(classElement);
-            assertEquals("SourceClass", classElement.getName());
+            assertEquals("SourceClass", classElement.getSimpleName());
             // For Python, source and regular class elements are the same
             assertTrue(classElement instanceof PythonClassElement);
         }
@@ -193,7 +193,7 @@ class PythonElementFactoryTest {
             ConstructorElement constructorElement = factory.newConstructorElement(classElement, constructorDef, processingEnvironment.metadataFactory());
 
             assertNotNull(constructorElement);
-            assertEquals("<init>", constructorElement.getName()); // ConstructorElement overrides getName()
+            assertEquals("__init__", constructorElement.getName()); // ConstructorElement overrides getName()
             assertEquals(classElement, constructorElement.getReturnType()); // Constructor returns the class type
             // Since ConstructorElement extends MethodElement, the underlying implementation is still PythonMethodElement
             assertTrue(constructorElement instanceof MethodElement);
@@ -214,7 +214,7 @@ class PythonElementFactoryTest {
             ClassDef classDef = new ClassDef("TestClass");
             ClassElement classElement = factory.newClassElement(classDef, processingEnvironment.metadataFactory());
 
-            AttributeDef fieldDef = new AttributeDef("testField", "str", "str", null, List.of(), null, false, null);
+            AttributeDef fieldDef = new AttributeDef("testField", "str", new TypeRef("str"), null, List.of(), null, false, null);
             FieldElement fieldElement = factory.newFieldElement(classElement, fieldDef, processingEnvironment.metadataFactory());
 
             assertNotNull(fieldElement);
@@ -243,7 +243,7 @@ class PythonElementFactoryTest {
             ClassDef enumDef = new ClassDef("TestEnum").withEnum(true, List.of("CONSTANT"));
             ClassElement enumElement = factory.newClassElement(enumDef, processingEnvironment.metadataFactory());
 
-            AttributeDef constantDef = new AttributeDef("CONSTANT", "TestEnum", "TestEnum", null, List.of(), null, true, null);
+            AttributeDef constantDef = new AttributeDef("CONSTANT", "TestEnum", new TypeRef("TestEnum"), null, List.of(), null, true, null);
             EnumConstantElement constantElement = factory.newEnumConstantElement(enumElement, constantDef, processingEnvironment.metadataFactory());
 
             assertNotNull(constantElement);

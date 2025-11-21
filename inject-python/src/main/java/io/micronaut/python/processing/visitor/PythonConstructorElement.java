@@ -52,13 +52,16 @@ public final class PythonConstructorElement extends PythonMethodElement implemen
                                     AbstractPythonClassElement owningType,
                                     ElementAnnotationMetadataFactory metadataFactory) {
         super(constructorDef, environment, declaringType, owningType, metadataFactory);
-        List<DecoratorDef> decorators = constructorDef.declaringClass().decorators();
-        for (DecoratorDef decorator : decorators) {
-            if (owningType.hasDeclaredStereotype(ConfigurationReader.class) &&
-                decorator.name().equals("dataclass")) {
-                // data classes usee configuration inject
-                annotate(ConfigurationInject.class);
-                break;
+        ClassDef classDef = constructorDef.declaringClass();
+        if (classDef != null) {
+            List<DecoratorDef> decorators = classDef.decorators();
+            for (DecoratorDef decorator : decorators) {
+                if (owningType.hasDeclaredStereotype(ConfigurationReader.class) &&
+                    decorator.name().equals("dataclass")) {
+                    // data classes usee configuration inject
+                    annotate(ConfigurationInject.class);
+                    break;
+                }
             }
         }
     }
