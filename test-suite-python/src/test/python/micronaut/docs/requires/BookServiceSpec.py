@@ -15,6 +15,8 @@ class BookServiceSpec:
     @Test
     def test_book_service(self):
         assert self.bookService is not None, "should have a book service"
+        assert self.bookService.__class__.__name__ == 'JdbcBookService', "should be a JDBC book service"
+        assert self.bookService.data_source != None, "should have a datasource"
 
     @MockBean
     def test_data_source(self) -> DataSource:
