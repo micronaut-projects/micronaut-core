@@ -28,6 +28,7 @@ import javax.lang.model.element.Modifier;
 
 import io.micronaut.aop.Around;
 import io.micronaut.aop.InterceptorBinding;
+import io.micronaut.aop.Introduction;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -188,12 +189,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     // Check if there's a primary constructor with parameters for dependency injection
                     var pythonConstructor = element.getPrimaryConstructor().orElse(null);
 
+                    String instantiateMethod = element.isAbstract() && isAopProxy && element.hasStereotype(Introduction.class) ? "newIntroduction" : "newInstance";
                     if (pythonConstructor != null && pythonConstructor.getParameters().length > 0) {
                         // Generate constructor with dependency injection parameters
                         MethodDef.MethodDefBuilder constructor = MethodDef.constructor();
                         @NonNull ParameterElement[] parameters = pythonConstructor.getParameters();
                         for (@NonNull ParameterElement parameter : parameters) {
-                            var parameterType = ClassTypeDef.of(parameter.getType().getName());
+                            ClassElement t = parameter.getType();
+                            var parameterType = !t.getTypeArguments().isEmpty() ? ClassTypeDef.of(t.getName()) : TypeDef.of(t);
                             ParameterDef parameterDef = ParameterDef
                                 .builder(parameter.getName(), parameterType).build();
                             constructor.addParameter(parameterDef);
@@ -213,7 +216,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                 }
                                 // Pass constructor parameters directly to newInstance
                                 ExpressionDef pythonInstance = CONTEXT_HOLDER.invokeStatic(
-                                    "newInstance",
+                                    instantiateMethod,
                                     POLYGLOT_VALUE,
                                     arguments
                                 );
@@ -233,7 +236,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         builder.addMethod(
                             constructor.build(((aThis, methodParameters) -> {
                                 ExpressionDef pythonInstance = CONTEXT_HOLDER
-                                    .invokeStatic("newInstance", POLYGLOT_VALUE,
+                                    .invokeStatic(instantiateMethod, POLYGLOT_VALUE,
                                         List.of(
                                             ExpressionDef.constant(element.getPackageName()),
                                             ExpressionDef.constant(element.getSimpleName())

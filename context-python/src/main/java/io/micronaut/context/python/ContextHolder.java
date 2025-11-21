@@ -15,9 +15,18 @@
  */
 package io.micronaut.context.python;
 
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.reflect.exception.InstantiationException;
 import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.TypeLiteral;
 import org.graalvm.polyglot.Value;
+import org.graalvm.polyglot.proxy.ProxyExecutable;
+import org.jetbrains.annotations.NotNull;
+
+import java.util.Set;
+
+import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
 
 /**
  * Static holder for the GraalPy context used by Python bridge classes.
@@ -51,45 +60,103 @@ public final class ContextHolder {
     }
 
     /**
+     * Create an instance that is abstract and fill out the abstract methods with stubs to be later populated.
+     *
+     * @param packageName The package name
+     * @param simpleName  The simple name
+     * @param args        The args
+     * @return The new instance
+     */
+    @UsedByGeneratedCode
+    public static Value newIntroduction(@Nullable String packageName, String simpleName, Object... args) {
+        Value pythonClass = findClass(packageName, simpleName);
+        if (!pythonClass.hasMember("__micronaut_introduction__")) {
+
+            Value abstractMethods = pythonClass.getMember("__abstractmethods__");
+            if (abstractMethods != null && abstractMethods.hasIterator()) {
+                Value iterator = abstractMethods.getIterator();
+                while (iterator.hasIteratorNextElement()) {
+                    String methodName = iterator.getIteratorNextElement().asString();
+                    // populate a stub that will be filled out later by PythonAopSetup
+                    ProxyExecutable stub = (execArgs) -> {
+                        System.out.println("RETURNING NULL ");
+                        return null;
+                    };
+                    pythonClass.putMember(methodName, stub);
+                }
+            }
+            Context context = pythonClass.getContext();
+            if (!context.getBindings(PYTHON).hasMember("update_abstractmethods")) {
+                context.eval(PYTHON, "from abc import update_abstractmethods");
+            }
+
+            Value updateAbstractMethods = context.getBindings(PYTHON).getMember("update_abstractmethods");
+            updateAbstractMethods.execute(pythonClass);
+        }
+        return instantiate(packageName, simpleName, args, pythonClass);
+    }
+
+    /**
      * Create a new instance for the given package name, simple name and args.
      *
      * @param packageName The package name
      * @param simpleName  The simple name
-     * @param args        T he args
+     * @param args        The args
      * @return The new instance
      */
-    public static Value newInstance(String packageName, String simpleName, Object... args) {
-        if (packageName == null || GraalPyRuntimeUtil.PYTHON.equals(packageName)) {
-            return newInstance(simpleName, args);
+    @UsedByGeneratedCode
+    public static Value newInstance(@Nullable String packageName, String simpleName, Object... args) {
+        Value pythonClass = findClass(packageName, simpleName);
+        return instantiate(packageName, simpleName, args, pythonClass);
+    }
+
+    private static Value instantiate(String packageName, String simpleName, Object[] args, Value pythonClass) {
+        if (pythonClass.canInstantiate()) {
+            return pythonClass.newInstance(args);
         } else {
-            Context ctx = getContext();
-            String source = "from " + packageName + " import " + simpleName + "; " + simpleName;
-            return ctx.eval(GraalPyRuntimeUtil.PYTHON, source)
-                .newInstance(args);
+            String qualifiedName = packageName == null || PYTHON.equals(packageName) ? simpleName :  packageName + "." + simpleName;
+            throw new InstantiationException("Cannot instantiate class: " + qualifiedName + ". Ensure the class is a valid Python class and is non-abstract.");
         }
     }
 
     /**
      * Create a new instance for the given simple name and args.
      *
-     * @param simpleName  The simple name
-     * @param args        The args
+     * @param simpleName The simple name
+     * @param args       The args
      * @return The new instance
      */
     public static Value newInstance(String simpleName, Object... args) {
+        Value pythonClass = findClass(simpleName);
+        return instantiate(null, simpleName, args, pythonClass);
+    }
+
+    private static Value findClass(String packageName, String simpleName) {
+        if (packageName == null || PYTHON.equals(packageName)) {
+            return findClass(simpleName);
+        }
+
         Context ctx = getContext();
-        Value v = ctx.getBindings(GraalPyRuntimeUtil.PYTHON).getMember(simpleName);
-        if (v != null && v.canInstantiate()) {
-            return v.newInstance(args);
-        } else {
-            Value member = ctx.eval(GraalPyRuntimeUtil.PYTHON, "import " + simpleName + "; " + simpleName)
+        String source = "from " + packageName + " import " + simpleName + "; " + simpleName;
+        try {
+            return ctx.eval(PYTHON, source);
+        } catch (Exception e) {
+            throw new InstantiationException("Failed to import Python class [" + source + "]: " + e.getMessage());
+        }
+    }
+
+    private static @NotNull Value findClass(String simpleName) {
+        Context ctx = getContext();
+        Value v = ctx.getBindings(PYTHON).getMember(simpleName);
+        if (v == null) {
+            Value member = ctx.eval(PYTHON, "import " + simpleName + "; " + simpleName)
                 .getMember(simpleName);
             if (member == null) {
                 throw new InstantiationException("Cannot find Python class: " + simpleName);
             }
-            return member
-                .newInstance(args);
+            v = member;
         }
+        return v;
     }
 
     /**
@@ -102,11 +169,11 @@ public final class ContextHolder {
      * @return The method result
      */
     public static Value invokeStaticMethod(String packageName, String simpleName, String methodName, Object... args) {
-        if (packageName == null || GraalPyRuntimeUtil.PYTHON.equals(packageName)) {
+        if (packageName == null || PYTHON.equals(packageName)) {
             return invokeStaticMethod(simpleName, methodName, args);
         } else {
             Context ctx = getContext();
-            Value pythonClass = ctx.eval(GraalPyRuntimeUtil.PYTHON, "from " + packageName + " import " + simpleName + "; " + simpleName);
+            Value pythonClass = ctx.eval(PYTHON, "from " + packageName + " import " + simpleName + "; " + simpleName);
             return pythonClass.invokeMember(methodName, args);
         }
     }
@@ -114,18 +181,18 @@ public final class ContextHolder {
     /**
      * Invoke a static method on the given Python class.
      *
-     * @param simpleName  The simple name
+     * @param simpleName The simple name
      * @param methodName The method name
-     * @param args        The args
+     * @param args       The args
      * @return The new instance
      */
     public static Value invokeStaticMethod(String simpleName, String methodName, Object... args) {
         Context ctx = getContext();
-        Value v = ctx.getBindings(GraalPyRuntimeUtil.PYTHON).getMember(simpleName);
+        Value v = ctx.getBindings(PYTHON).getMember(simpleName);
         if (v != null) {
             return v.invokeMember(methodName);
         } else {
-            Value member = ctx.eval(GraalPyRuntimeUtil.PYTHON, "import " + simpleName + "; " + simpleName)
+            Value member = ctx.eval(PYTHON, "import " + simpleName + "; " + simpleName)
                 .getMember(simpleName);
             if (member == null) {
                 throw new InstantiationException("Cannot find Python class: " + simpleName);

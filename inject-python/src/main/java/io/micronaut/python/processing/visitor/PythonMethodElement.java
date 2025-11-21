@@ -90,6 +90,11 @@ public sealed class PythonMethodElement extends AbstractPythonElement implements
     }
 
     @Override
+    public boolean isAbstract() {
+        return getNativeType().isAbstract();
+    }
+
+    @Override
     protected MutableAnnotationMetadataDelegate<?> getAnnotationMetadataToWrite() {
         return helper.getMethodAnnotationMetadata(presetAnnotationMetadata);
     }

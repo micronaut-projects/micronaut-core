@@ -15,13 +15,16 @@
  */
 package io.micronaut.python.processing.util;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 import io.micronaut.core.annotation.AnnotationClassValue;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.expressions.parser.ast.util.TypeDescriptors;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.visitor.VisitorContext;
@@ -34,7 +37,6 @@ import org.graalvm.polyglot.Value;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.python.processing.visitor.PythonVisitorContext;
-import org.jetbrains.annotations.NotNull;
 
 /**
  * Utility class for GraalPy integration, providing type conversion and resolution utilities
@@ -44,6 +46,14 @@ import org.jetbrains.annotations.NotNull;
  * @since 5.0.0
  */
 public final class GraalPyUtil {
+    private static final Set<String> JAVA_KEYWORDS = Set.of(
+        "abstract","assert","boolean","break","byte","case","catch","char","class","const",
+        "continue","default","do","double","else","enum","extends","final","finally","float",
+        "for","goto","if","implements","import","instanceof","int","interface","long","native",
+        "new","package","private","protected","public","return","short","static","strictfp",
+        "super","switch","synchronized","this","throw","throws","transient","try","void","volatile","while"
+    );
+
     /**
      * Utility method to convert GraalPy Value objects to Java types.
      * This extracts the common type conversion logic used for both annotations and attribute values.
@@ -76,6 +86,10 @@ public final class GraalPyUtil {
         } else if (value.isString()) {
             // Handle single character strings -> char conversion
             String strValue = value.asString();
+            if (strValue.isEmpty()) {
+                // ignore empty strings
+                return null;
+            }
             if (strValue.length() == 1) {
                 return strValue.charAt(0);
             }
@@ -680,15 +694,17 @@ public final class GraalPyUtil {
                         return array;
                     } else if ("java.lang.Class".equals(componentType.getName())) {
                         // Handle Class arrays
-                        io.micronaut.core.annotation.AnnotationClassValue<?>[] array =
-                            new io.micronaut.core.annotation.AnnotationClassValue<?>[(int) size];
+                        List<AnnotationClassValue<?>> list = new ArrayList<>();
                         for (int i = 0; i < size; i++) {
                             Value element = value.getArrayElement(i);
                             if (element != null) {
-                                array[i] = toClassValue(element, visitorContext);
+                                AnnotationClassValue<?> classValue = toClassValue(element, visitorContext);
+                                if (classValue != null) {
+                                    list.add(classValue);
+                                }
                             }
                         }
-                        return array;
+                        return list.toArray(AnnotationClassValue[]::new);
                     } else {
                         // Handle object arrays
                         Object[] array = new Object[(int) size];
@@ -733,7 +749,7 @@ public final class GraalPyUtil {
         return convertValueToJava(value, visitorContext);
     }
 
-    private static @NotNull AnnotationClassValue<?> toClassValue(Value value, PythonVisitorContext visitorContext) {
+    private static @Nullable AnnotationClassValue<?> toClassValue(Value value, PythonVisitorContext visitorContext) {
         String typeName = value.asString();
         Class<?> classReference = toClassReference(typeName);
         if (classReference == null && !typeName.contains(".")) {
@@ -744,12 +760,36 @@ public final class GraalPyUtil {
                 return new AnnotationClassValue<>(qualified);
             }
         }
-        String className = classReference != null ? classReference.getCanonicalName() : typeName;
         if (classReference == null) {
-            return new AnnotationClassValue<>(className);
+            ClassElement classElement = visitorContext.getClassElement(typeName).orElse(null);
+            if (classElement != null) {
+                return new AnnotationClassValue<>(classElement.getCanonicalName());
+            } else if (isValidClassName(typeName)) {
+                return new AnnotationClassValue<>(typeName);
+            } else {
+                return null;
+            }
         } else {
             return new AnnotationClassValue<>(classReference);
         }
+    }
+
+    public static boolean isValidClassName(String className) {
+        if (className == null || className.isEmpty()) return false;
+        String[] parts = className.split("\\.");
+        for (String part : parts) {
+            if (part.isEmpty()) return false;
+            if (!Character.isJavaIdentifierStart(part.charAt(0))) return false;
+            for (int i = 1; i < part.length(); i++) {
+                if (!Character.isJavaIdentifierPart(part.charAt(i))) return false;
+            }
+            if (isJavaKeyword(part)) return false; // Optional: check for Java keywords
+        }
+        return true;
+    }
+
+    private static boolean isJavaKeyword(String s) {
+        return JAVA_KEYWORDS.contains(s);
     }
 
     /**

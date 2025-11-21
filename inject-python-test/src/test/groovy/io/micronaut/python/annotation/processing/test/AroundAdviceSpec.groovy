@@ -27,7 +27,7 @@ import spock.lang.Specification
  */
 class AroundAdviceSpec extends AbstractPythonTypeElementSpec {
 
-    void "test around advice will decorator defined in Python and invoked from elsewhere"() {
+    void "test around advice with the decorator defined in Python and invoked from another type"() {
         given:
         def pythonCode = '''
 from micronaut.aop import InterceptorBean, MethodInvocationContext, Around
