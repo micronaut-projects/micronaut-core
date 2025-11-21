@@ -305,7 +305,7 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
         ArgumentUtils.requireNonNull("type", type);
 
         final BeanProperty<T, ?> prop = getProperty(name).orElse(null);
-        if (prop != null && type.isAssignableFrom(ReflectionUtils.getWrapperType(prop.getType()))) {
+        if (prop != null && ReflectionUtils.getWrapperType(type).isAssignableFrom(ReflectionUtils.getWrapperType(prop.getType()))) {
             //noinspection unchecked
             return Optional.of((BeanProperty<T, P>) prop);
         }
@@ -325,7 +325,7 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
         ArgumentUtils.requireNonNull("type", type);
 
         final BeanReadProperty<T, ?> prop = getReadProperty(name).orElse(null);
-        if (prop != null && type.isAssignableFrom(ReflectionUtils.getWrapperType(prop.getType()))) {
+        if (prop != null && ReflectionUtils.getWrapperType(type).isAssignableFrom(ReflectionUtils.getWrapperType(prop.getType()))) {
             //noinspection unchecked
             return Optional.of((BeanReadProperty<T, P>) prop);
         }
@@ -346,7 +346,7 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
         ArgumentUtils.requireNonNull("type", type);
 
         final BeanWriteProperty<T, ?> prop = getWriteProperty(name).orElse(null);
-        if (prop != null && type.isAssignableFrom(ReflectionUtils.getWrapperType(prop.getType()))) {
+        if (prop != null && ReflectionUtils.getWrapperType(type).isAssignableFrom(ReflectionUtils.getWrapperType(prop.getType()))) {
             //noinspection unchecked
             return Optional.of((BeanProperty<T, P>) prop);
         }
