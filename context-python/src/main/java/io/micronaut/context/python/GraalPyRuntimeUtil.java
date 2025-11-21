@@ -255,46 +255,7 @@ public final class GraalPyRuntimeUtil {
             return null;
         }
 
-        // Handle primitives and basic types
-        if (targetType == int.class || targetType == Integer.class) {
-            return (T) (Integer) (int) value.asLong();
-        } else if (targetType == long.class || targetType == Long.class) {
-            return (T) (Long) value.asLong();
-        } else if (targetType == double.class || targetType == Double.class) {
-            return (T) (Double) value.asDouble();
-        } else if (targetType == float.class || targetType == Float.class) {
-            return (T) (Float) (float) value.asDouble();
-        } else if (targetType == boolean.class || targetType == Boolean.class) {
-            return (T) (Boolean) value.asBoolean();
-        } else if (targetType == String.class) {
-            return (T) value.asString();
-        }
-
-        // Handle collections recursively
-        if (List.class.isAssignableFrom(targetType)) {
-            // For List<T>, we need to determine T. For now, use Object
-            return (T) convertList(value, Object.class);
-        } else if (Map.class.isAssignableFrom(targetType)) {
-            // For Map<K,V>, we need to determine K and V. For now, use Object
-            return (T) convertMap(value, Object.class, Object.class);
-        } else if (Set.class.isAssignableFrom(targetType)) {
-            // For Set<T>, we need to determine T. For now, use Object
-            return (T) convertSet(value, Object.class);
-        } else if (java.util.Optional.class.isAssignableFrom(targetType)) {
-            // For Optional<T>, we need to determine T. For now, use Object
-            return (T) convertOptional(value, Object.class);
-        }
-
-        // For other types, try to convert to string as fallback
-        try {
-            if (targetType == Object.class) {
-                return (T) value.as(Object.class);
-            } else {
-                return null;
-            }
-        } catch (Exception e) {
-            return null;
-        }
+        return value.as(targetType);
     }
 
     /**

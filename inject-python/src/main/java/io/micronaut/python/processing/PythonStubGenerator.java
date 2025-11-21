@@ -77,6 +77,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     public static final ClassTypeDef CONTEXT_HOLDER = ClassTypeDef.of("io.micronaut.context.python.ContextHolder");
     public static final String GENERATOR_NAME = "python";
     private static final Set<String> ANNOTATION_PACKAGES_TO_COPY = Set.of("org.junit.jupiter.api", "io.micronaut.test.extensions.junit5.annotation");
+    public static final String JUNIT_TEST = "org.junit.jupiter.api.Test";
 
     private final Map<String, AbstractPythonClassElement> classElements = new LinkedHashMap<>();
 
@@ -153,7 +154,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         }
                     }
 
-                    boolean isJunit5Test = element.getEnclosedElement(ElementQuery.ALL_METHODS.onlyInstance().annotated(ann -> ann.hasDeclaredAnnotation("org.junit.jupiter.api.Test"))).isPresent();
+                    boolean isJunit5Test = element.getEnclosedElement(ElementQuery.ALL_METHODS.onlyInstance().annotated(ann -> ann.hasDeclaredAnnotation(JUNIT_TEST))).isPresent();
 
                     // Only add asPolyglotValue and fromPolyglotValue for root classes
                     if (!extendsPythonClass) {
@@ -196,7 +197,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         @NonNull ParameterElement[] parameters = pythonConstructor.getParameters();
                         for (@NonNull ParameterElement parameter : parameters) {
                             ClassElement t = parameter.getType();
-                            var parameterType = !t.getTypeArguments().isEmpty() ? ClassTypeDef.of(t.getName()) : TypeDef.of(t);
+                            var parameterType = erasedType(t);
                             ParameterDef parameterDef = ParameterDef
                                 .builder(parameter.getName(), parameterType).build();
                             constructor.addParameter(parameterDef);
@@ -269,7 +270,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         if (methodElement.hasDeclaredStereotype(InterceptorBinding.class)) {
                             isAopProxy = true;
                         }
-                        addBridgeMethod(methodElement, builder, pythonValue, context, isJunit5Test, addedMethodNames);
+                        addBridgeMethod(methodElement, builder, pythonValue, context, methodElement.hasDeclaredAnnotation(JUNIT_TEST), addedMethodNames);
                     }
 
                     // Find injection methods (annotated with @Inject)
@@ -376,6 +377,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         }
     }
 
+    private static TypeDef erasedType(ClassElement t) {
+        var parameterType = !t.getTypeArguments().isEmpty() ? ClassTypeDef.of(t.getName()) : TypeDef.of(t);
+        return parameterType;
+    }
+
     private static void coerceParameterToPolyglotValue(
         TypedElement param,
         List<ExpressionDef> parameters,
@@ -406,7 +412,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         AnnotationMetadata annotationMetadata = element.getAnnotationMetadata();
         Set<String> annotationNames = annotationMetadata.getDeclaredAnnotationNames();
         for (String annotationName : annotationNames) {
-            if (annotationPackagesToCopy.stream().anyMatch(annotationName::startsWith)) {
+            if (annotationName.equals("io.micronaut.context.annotation.PropertySource") || annotationPackagesToCopy.stream().anyMatch(annotationName::startsWith)) {
                 AnnotationValue<Annotation> av = annotationMetadata.getAnnotation(annotationName);
                 if (av != null) {
                     builder.addAnnotation(AnnotationDef.of(av, visitorContext));
@@ -417,13 +423,13 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
     private void addBridgeMethod(MethodElement methodElement, ClassDef.ClassDefBuilder builder, FieldDef pythonValue, VisitorContext visitorContext, boolean isJunit5Test, Set<String> addedMethodNames) {
         String pythonFunctionName = methodElement.getName();
-
+        String key = methodElement.getDescription(true);
         // Check if method name has already been added to avoid duplicates
-        if (addedMethodNames.contains(pythonFunctionName)) {
+        if (addedMethodNames.contains(key)) {
             return;
         }
 
-        addedMethodNames.add(pythonFunctionName);
+        addedMethodNames.add(key);
 
         MethodDef.MethodDefBuilder methodBuilder = MethodDef.builder(pythonFunctionName)
             .addModifiers(Modifier.PUBLIC)
@@ -431,7 +437,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
         copyAnnotations(methodElement, methodBuilder, ANNOTATION_PACKAGES_TO_COPY, visitorContext);
         for (@NonNull ParameterElement parameter : methodElement.getParameters()) {
-            var parameterType = TypeDef.of(parameter.getType());
+            var parameterType = erasedType(parameter.getType());
             ParameterDef parameterDef = ParameterDef
                 .builder(parameter.getName(), parameterType).build();
             methodBuilder.addParameter(parameterDef);
