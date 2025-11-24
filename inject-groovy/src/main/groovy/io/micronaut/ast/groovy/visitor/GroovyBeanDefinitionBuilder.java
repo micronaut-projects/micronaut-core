@@ -207,6 +207,7 @@ class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
         AnnotationValue<?>[] interceptorTypes =
             InterceptedMethodUtil.resolveInterceptorBinding(annotationMetadata, InterceptorKind.AROUND);
         return new AopProxyWriter(
+            getBeanType(),
             beanDefinitionWriter,
             annotationMetadata.getValues(Around.class, Boolean.class),
             visitorContext,

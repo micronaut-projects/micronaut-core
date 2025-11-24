@@ -51,12 +51,15 @@ public final class InterceptorBindingQualifier<T> extends FilteringQualifier<T> 
     private final Set<String> supportedInterceptorTypes;
 
     InterceptorBindingQualifier(AnnotationMetadata annotationMetadata) {
-        final Collection<AnnotationValue<?>> annotationValues;
+        Collection<AnnotationValue<Annotation>> annotationValues;
         AnnotationValue<Annotation> av = annotationMetadata.findAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDING_QUALIFIER).orElse(null);
         if (av == null) {
             annotationValues = Collections.emptyList();
         } else {
-            annotationValues = (Collection) av.getAnnotations(AnnotationMetadata.VALUE_MEMBER);
+            annotationValues = av.getAnnotations(AnnotationMetadata.VALUE_MEMBER);
+        }
+        if (annotationValues.isEmpty()) {
+            annotationValues = annotationMetadata.getAnnotationValuesByName(AnnotationUtil.ANN_INTERCEPTOR_BINDING);
         }
         supportedAnnotationNames = findSupportedAnnotations(annotationValues);
         Set<String> supportedInterceptorTypes = CollectionUtils.newHashSet(annotationValues.size());
@@ -70,7 +73,7 @@ public final class InterceptorBindingQualifier<T> extends FilteringQualifier<T> 
      * Interceptor binding qualifiers.
      * @param bindingAnnotations The binding annotations
      */
-    InterceptorBindingQualifier(Collection<AnnotationValue<?>> bindingAnnotations) {
+    InterceptorBindingQualifier(Collection<AnnotationValue<Annotation>> bindingAnnotations) {
         if (CollectionUtils.isNotEmpty(bindingAnnotations)) {
             supportedAnnotationNames = findSupportedAnnotations(bindingAnnotations);
         } else {
@@ -79,7 +82,7 @@ public final class InterceptorBindingQualifier<T> extends FilteringQualifier<T> 
         this.supportedInterceptorTypes = Collections.emptySet();
     }
 
-    private static Map<String, List<AnnotationValue<?>>> findSupportedAnnotations(Collection<AnnotationValue<?>> annotationValues) {
+    private static Map<String, List<AnnotationValue<?>>> findSupportedAnnotations(Collection<AnnotationValue<Annotation>> annotationValues) {
         final Map<String, List<AnnotationValue<?>>> supportedAnnotationNames = CollectionUtils.newHashMap(annotationValues.size());
         for (AnnotationValue<?> annotationValue : annotationValues) {
             final String name = annotationValue.stringValue().orElse(null);

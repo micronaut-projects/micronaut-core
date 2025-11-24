@@ -384,7 +384,7 @@ public class Qualifiers {
      */
     public static @NonNull
     <T> Qualifier<T> byInterceptorBindingValues(@NonNull Collection<AnnotationValue<?>> binding) {
-        return new InterceptorBindingQualifier<>(binding);
+        return new InterceptorBindingQualifier(binding);
     }
 
     @Nullable

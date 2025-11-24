@@ -40,8 +40,8 @@ import io.micronaut.context.annotation.DefaultImplementation;
 import io.micronaut.context.annotation.DefaultScope;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.EachProperty;
-import io.micronaut.context.annotation.Infrastructure;
 import io.micronaut.context.annotation.Executable;
+import io.micronaut.context.annotation.Infrastructure;
 import io.micronaut.context.annotation.InjectScope;
 import io.micronaut.context.annotation.Parallel;
 import io.micronaut.context.annotation.Parameter;
@@ -83,8 +83,6 @@ import io.micronaut.core.annotation.Generated;
 import io.micronaut.core.annotation.Indexed;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NextMajorVersion;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.ConversionServiceProvider;
@@ -155,6 +153,8 @@ import io.micronaut.sourcegen.model.StatementDef;
 import io.micronaut.sourcegen.model.TypeDef;
 import io.micronaut.sourcegen.model.VariableDef;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import javax.lang.model.element.Modifier;
 import java.io.Closeable;
@@ -737,6 +737,23 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                                 OriginatingElements originatingElements,
                                 VisitorContext visitorContext,
                                 @Nullable Integer uniqueIdentifier) {
+        this(beanProducingElement, null, originatingElements, visitorContext, uniqueIdentifier);
+    }
+
+    /**
+     * Creates a bean definition writer.
+     *
+     * @param beanProducingElement     The bean producing element
+     * @param customBeanDefinitionName The custom bean definition name
+     * @param originatingElements      The originating elements
+     * @param visitorContext           The visitor context
+     * @param uniqueIdentifier         An optional unique identifier to include in the bean name
+     */
+    public BeanDefinitionWriter(Element beanProducingElement,
+                                @Nullable String customBeanDefinitionName,
+                                OriginatingElements originatingElements,
+                                VisitorContext visitorContext,
+                                @Nullable Integer uniqueIdentifier) {
         this.originatingElements = originatingElements;
         this.beanProducingElement = beanProducingElement;
         if (beanProducingElement instanceof ClassElement classElement) {
@@ -750,7 +767,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
             this.isAbstract = classElement.isAbstract();
             this.beanFullClassName = classElement.getName();
             this.beanSimpleClassName = classElement.getSimpleName();
-            this.beanDefinitionName = getBeanDefinitionName(packageName, beanSimpleClassName);
+            this.beanDefinitionName = customBeanDefinitionName == null ? getBeanDefinitionName(packageName, beanSimpleClassName) : getCustomBeanDefinitionName(customBeanDefinitionName);
         } else if (beanProducingElement instanceof MethodElement factoryMethodElement) {
             final ClassElement producedElement = factoryMethodElement.getGenericReturnType();
             autoApplyNamedToBeanProducingElement(beanProducingElement);
@@ -765,7 +782,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                 throw new IllegalArgumentException("Factory methods require passing a unique identifier");
             }
             final ClassElement declaringType = factoryMethodElement.getOwningType();
-            this.beanDefinitionName = declaringType.getPackageName() + "." + prefixClassName(declaringType.getSimpleName()) + "$" + upperCaseMethodName + uniqueIdentifier + CLASS_SUFFIX;
+            this.beanDefinitionName = customBeanDefinitionName == null ? declaringType.getPackageName() + "." + prefixClassName(declaringType.getSimpleName()) + "$" + upperCaseMethodName + uniqueIdentifier + CLASS_SUFFIX  : getCustomBeanDefinitionName(customBeanDefinitionName);
         } else if (beanProducingElement instanceof PropertyElement factoryPropertyElement) {
             final ClassElement producedElement = factoryPropertyElement.getGenericType();
             autoApplyNamedToBeanProducingElement(beanProducingElement);
@@ -780,7 +797,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                 throw new IllegalArgumentException("Factory methods require passing a unique identifier");
             }
             final ClassElement declaringType = factoryPropertyElement.getOwningType();
-            this.beanDefinitionName = declaringType.getPackageName() + "." + prefixClassName(declaringType.getSimpleName()) + "$" + upperCaseMethodName + uniqueIdentifier + CLASS_SUFFIX;
+            this.beanDefinitionName = customBeanDefinitionName == null ? declaringType.getPackageName() + "." + prefixClassName(declaringType.getSimpleName()) + "$" + upperCaseMethodName + uniqueIdentifier + CLASS_SUFFIX : getCustomBeanDefinitionName(customBeanDefinitionName);
         } else if (beanProducingElement instanceof FieldElement factoryMethodElement) {
             final ClassElement producedElement = factoryMethodElement.getGenericField();
             autoApplyNamedToBeanProducingElement(beanProducingElement);
@@ -795,7 +812,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                 throw new IllegalArgumentException("Factory fields require passing a unique identifier");
             }
             final ClassElement declaringType = factoryMethodElement.getOwningType();
-            this.beanDefinitionName = declaringType.getPackageName() + "." + prefixClassName(declaringType.getSimpleName()) + "$" + fieldName + uniqueIdentifier + CLASS_SUFFIX;
+            this.beanDefinitionName = customBeanDefinitionName == null ? declaringType.getPackageName() + "." + prefixClassName(declaringType.getSimpleName()) + "$" + fieldName + uniqueIdentifier + CLASS_SUFFIX : getCustomBeanDefinitionName(customBeanDefinitionName);
         } else if (beanProducingElement instanceof BeanElementBuilder beanElementBuilder) {
             this.beanTypeElement = beanElementBuilder.getBeanType();
             this.packageName = this.beanTypeElement.getPackageName();
@@ -807,7 +824,9 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                 throw new IllegalArgumentException("Beans produced by addAssociatedBean(..) require passing a unique identifier");
             }
             final Element originatingElement = beanElementBuilder.getOriginatingElement();
-            if (originatingElement instanceof ClassElement originatingClass) {
+            if (customBeanDefinitionName != null) {
+                this.beanDefinitionName = getCustomBeanDefinitionName(customBeanDefinitionName);
+            } else if (originatingElement instanceof ClassElement originatingClass) {
                 this.beanDefinitionName = getAssociatedBeanName(uniqueIdentifier, originatingClass);
             } else if (originatingElement instanceof MethodElement methodElement) {
                 ClassElement originatingClass = methodElement.getDeclaringType();
@@ -915,6 +934,11 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
     @NonNull
     private static String getBeanDefinitionName(String packageName, String className) {
         return packageName + "." + prefixClassName(className) + CLASS_SUFFIX;
+    }
+
+    @NonNull
+    private static String getCustomBeanDefinitionName(String customBeanDefinitionName) {
+        return NameUtils.getPackageName(customBeanDefinitionName) + "." + prefixClassName(NameUtils.getSimpleName(customBeanDefinitionName)) + CLASS_SUFFIX;
     }
 
     private static String prefixClassName(String className) {
@@ -1781,6 +1805,11 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
             }
             return buildConstructorInstantiate(aThis, methodParameters, onBeanInstance, constructorBuildMethodDefinition, List.of());
         }
+        if (buildMethodDefinition instanceof CustomBuildMethodDefinition customBuildMethodDefinition) {
+            List<? extends ExpressionDef> values = getConstructorArgumentValues(aThis, methodParameters,
+                List.of(buildMethodDefinition.getParameters()), isParametrized, constructorDefSupplier);
+            return buildCustomInstantiate(aThis, methodParameters, onBeanInstance, customBuildMethodDefinition, values);
+        }
         throw new IllegalStateException("Unknown build method definition: " + buildMethodDefinition);
     }
 
@@ -1804,6 +1833,18 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
         return onBeanInstance.apply(
             initializeBean(aThis, methodParameters, constructorBuildMethodDefinition, values)
         );
+    }
+
+    private StatementDef buildCustomInstantiate(VariableDef.This aThis,
+                                                 List<VariableDef.MethodParameter> methodParameters,
+                                                 Function<ExpressionDef, StatementDef> onBeanInstance,
+                                                 CustomBuildMethodDefinition constructorBuildMethodDefinition,
+                                                 List<? extends ExpressionDef> values) {
+        List<StatementDef> statements = new ArrayList<>();
+        statements.add(onBeanInstance.apply(
+            constructorBuildMethodDefinition.builder.build(statements, aThis, methodParameters, values)
+        ));
+        return StatementDef.multi(statements);
     }
 
     private StatementDef buildFactoryGet(VariableDef.This aThis,
@@ -3968,6 +4009,16 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
             ).cast(beanTypeDef).returning();
     }
 
+    public void visitBuildCustomMethodDefinition(CustomInitializerBuilder builder) {
+        BuildMethodDefinition previous = buildMethodDefinition;
+        if (!(previous instanceof ConstructorBuildMethodDefinition constructorBuildMethodDefinition)) {
+            throw new ProcessingException(beanProducingElement, "Only constructor build method is supported");
+        }
+        buildMethodDefinition = new CustomBuildMethodDefinition(builder, constructorBuildMethodDefinition.constructor);
+        buildMethodDefinition.postConstruct = previous.postConstruct;
+        buildMethodDefinition.preDestroy = previous.preDestroy;
+    }
+
     private void visitBuildFactoryMethodDefinition(ClassElement factoryClass, Element factoryElement, ParameterElement... parameters) {
         if (buildMethodDefinition == null) {
             buildMethodDefinition = new FactoryBuildMethodDefinition(factoryClass, factoryElement, parameters);
@@ -4956,6 +5007,27 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
     }
 
     /**
+     * The custom initializer builder.
+     */
+    public interface CustomInitializerBuilder {
+
+        /**
+         * The builder.
+         *
+         * @param statements The statements
+         * @param self       The self
+         * @param parameters The parameters
+         * @param values     The constructor values
+         * @return The built instance
+         */
+        ExpressionDef build(List<StatementDef> statements,
+                            VariableDef.This self,
+                            List<VariableDef.MethodParameter> parameters,
+                            List<? extends ExpressionDef> values);
+
+    }
+
+    /**
      * Data used when visiting method.
      */
     @Internal
@@ -5057,6 +5129,21 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
         }
     }
 
+    private static final class CustomBuildMethodDefinition extends BuildMethodDefinition {
+        private final CustomInitializerBuilder builder;
+        private final MethodElement constructor;
+
+        private CustomBuildMethodDefinition(CustomInitializerBuilder builder, MethodElement constructor) {
+            this.builder = builder;
+            this.constructor = constructor;
+        }
+
+        @Override
+        ParameterElement[] getParameters() {
+            return constructor.getParameters();
+        }
+    }
+
     private static final class ConstructorBuildMethodDefinition extends BuildMethodDefinition {
         private final MethodElement constructor;
         private final boolean requiresReflection;
@@ -5072,7 +5159,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
         }
     }
 
-    private abstract static class BuildMethodDefinition {
+    private abstract static sealed class BuildMethodDefinition {
 
         private BuildMethodLifecycleDefinition postConstruct;
         private BuildMethodLifecycleDefinition preDestroy;

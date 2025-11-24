@@ -29,6 +29,7 @@ import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NextMajorVersion;
+import io.micronaut.inject.writer.ProxyingBeanDefinitionVisitor;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.CollectionUtils;
@@ -70,7 +71,7 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
     private static final String MSG_ADAPTER_METHOD_PREFIX = "Cannot adapt method [";
     private static final String MSG_TARGET_METHOD_PREFIX = "] to target method [";
 
-    protected AopProxyWriter aopProxyVisitor;
+    protected ProxyingBeanDefinitionVisitor aopProxyVisitor;
     protected final boolean isAopProxy;
     private final AtomicInteger adaptedMethodIndex = new AtomicInteger(0);
 
@@ -141,12 +142,13 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
      * @param methodElement the method that is originating the AOP proxy
      * @return The AOP proxy visitor
      */
-    protected AopProxyWriter getAroundAopProxyVisitor(BeanDefinitionVisitor visitor, @Nullable MethodElement methodElement) {
+    protected ProxyingBeanDefinitionVisitor getAroundAopProxyVisitor(BeanDefinitionVisitor visitor, @Nullable MethodElement methodElement) {
         if (aopProxyVisitor == null) {
             if (classElement.isFinal()) {
                 throw new ProcessingException(classElement, "Cannot apply AOP advice to final class. Class must be made non-final to support proxying: " + classElement.getName());
             }
             aopProxyVisitor = createAroundAopProxyWriter(
+                classElement,
                 visitor,
                 isAopProxy || methodElement == null ? classElement.getAnnotationMetadata() : methodElement.getAnnotationMetadata(),
                 visitorContext,
@@ -460,14 +462,14 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
             } else if (methodElement.isStatic()) {
                 throw new ProcessingException(methodElement, "Method defines AOP advice but is declared static");
             }
-            AopProxyWriter aopProxyVisitor = getAroundAopProxyVisitor(visitor, methodElement);
+            ProxyingBeanDefinitionVisitor aopProxyVisitor = getAroundAopProxyVisitor(visitor, methodElement);
             visitAroundMethod(aopProxyVisitor, classElement, methodElement);
             return true;
         }
         return false;
     }
 
-    protected void visitAroundMethod(AopProxyWriter aopProxyWriter, TypedElement beanType, MethodElement methodElement) {
+    protected void visitAroundMethod(ProxyingBeanDefinitionVisitor aopProxyWriter, TypedElement beanType, MethodElement methodElement) {
         aopProxyWriter.visitInterceptorBinding(
             InterceptedMethodUtil.resolveInterceptorBinding(methodElement.getAnnotationMetadata(), InterceptorKind.AROUND)
         );
@@ -611,19 +613,15 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
             throw new ProcessingException(sourceMethod, "Class to adapt [" + interfaceToAdapt.getName() + "] is not an interface");
         }
 
-        String rootName = classElement.getSimpleName() + '$' + interfaceToAdapt.getSimpleName() + '$' + sourceMethod.getSimpleName();
-        String beanClassName = rootName + adaptedMethodIndex.incrementAndGet();
+        String adapterClassName = classElement.getName() + '$' + interfaceToAdapt.getSimpleName() + '$' + sourceMethod.getSimpleName() + adaptedMethodIndex.incrementAndGet();
 
         AopProxyWriter aopProxyWriter = new AopProxyWriter(
-            classElement.getPackageName(),
-            beanClassName,
-            true,
+            ClassElement.of(adapterClassName, true, new AnnotationMetadataHierarchy(classElement.getAnnotationMetadata(), methodAnnotationMetadata)),
             false,
-            sourceMethod,
-            new AnnotationMetadataHierarchy(classElement.getAnnotationMetadata(), methodAnnotationMetadata),
             new ClassElement[]{interfaceToAdapt},
             visitorContext
         );
+        aopProxyWriter.addOriginatingElement(sourceMethod);
 
         aopProxyWriter.visitDefaultConstructor(methodAnnotationMetadata, visitorContext);
 

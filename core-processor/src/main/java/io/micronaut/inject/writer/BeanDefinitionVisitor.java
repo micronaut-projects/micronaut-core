@@ -54,7 +54,6 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
     @Nullable
     Element getOriginatingElement();
 
-
     /**
      * <p>In the case where the produced class is produced by a factory method annotated with
      * {@link io.micronaut.context.annotation.Bean} this method should be called.</p>
