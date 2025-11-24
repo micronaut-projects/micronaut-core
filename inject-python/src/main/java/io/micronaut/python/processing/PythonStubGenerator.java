@@ -37,6 +37,7 @@ import io.micronaut.core.annotation.Vetoed;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.TypedElement;
+import io.micronaut.python.processing.visitor.PythonVisitorContext;
 import io.micronaut.sourcegen.model.AbstractElementBuilder;
 import io.micronaut.sourcegen.model.AnnotationDef;
 import org.graalvm.polyglot.Value;
@@ -80,6 +81,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     public static final String JUNIT_TEST = "org.junit.jupiter.api.Test";
 
     private final Map<String, AbstractPythonClassElement> classElements = new LinkedHashMap<>();
+    private Map<String, ClassElement> allClasses = Map.of();
 
     @Override
     public TypeElementQuery query() {
@@ -92,287 +94,297 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     @Override
+    public void start(VisitorContext visitorContext) {
+        if (visitorContext instanceof PythonVisitorContext pythonVisitorContext) {
+            this.allClasses = pythonVisitorContext.getProcessingEnvironment().classes();
+        }
+    }
+
+    @Override
     public void visitClass(ClassElement element, VisitorContext context) {
-        if (element instanceof AbstractPythonClassElement classElement) {
-            SourceGenerator sourceGenerator = SourceGenerators.findByLanguage(VisitorContext.Language.JAVA).orElse(null);
-            if (sourceGenerator != null) {
+        if (context instanceof PythonVisitorContext pythonVisitorContext) {
 
-                try {
-                    if (classElements.containsKey(classElement.getName())) {
-                        return;
-                    }
+            if (element instanceof AbstractPythonClassElement classElement) {
+                SourceGenerator sourceGenerator = SourceGenerators.findByLanguage(VisitorContext.Language.JAVA).orElse(null);
+                if (sourceGenerator != null) {
 
-                    classElements.put(classElement.getName(), classElement);
-
-                    String typeName = element.getName();
-                    boolean isAopProxy = classElement.hasStereotype(InterceptorBinding.class);
-
-                    var builder = ClassDef.builder(typeName)
-                        .addModifiers(Modifier.PUBLIC);
-                    builder.addAnnotation(Vetoed.class);
-
-                    copyAnnotations(element, builder, ANNOTATION_PACKAGES_TO_COPY, context);
-                    Collection<ClassElement> interfaces = classElement.getInterfaces();
-                    builder.addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.ValueCoercible"));
-
-                    // Check if this class extends another PythonClassElement
-                    ClassElement superType = element.getSuperType().orElse(null);
-                    boolean extendsPythonClass = superType instanceof AbstractPythonClassElement;
-
-                    ClassTypeDef superClassType;
-                    if (extendsPythonClass) {
-                        superClassType = ClassTypeDef.of(superType.getName());
-                        builder.superclass(superClassType);
-                    }
-
-                    FieldDef pythonValue;
-                    if (!extendsPythonClass) {
-                        // Only add the field for root classes (not extending other Python classes)
-                        pythonValue = FieldDef.builder("graalpyInternalValue")
-                            .ofType(POLYGLOT_VALUE).addModifiers(Modifier.FINAL, Modifier.PROTECTED).build();
-                        builder.addField(pythonValue);
-                    } else {
-                        pythonValue = null;
-                    }
-
-                    // Track method names that have been added to avoid duplicates
-                    Set<String> addedMethodNames = new LinkedHashSet<>();
-
-                    for (ClassElement anInterface : interfaces) {
-                        builder.addSuperinterface(TypeDef.of(anInterface));
-                        List<MethodElement> methods = anInterface.getMethods();
-                        Set<MethodElement> methodSet = new LinkedHashSet<>();
-                        for (MethodElement method : methods) {
-                            if (methodSet.contains(method)) {
-                                continue;
-                            }
-                            if (method.hasDeclaredStereotype(InterceptorBinding.class)) {
-                                isAopProxy = true;
-                            }
-                            addBridgeMethod(method, builder, pythonValue, context, false, addedMethodNames);
-                            methodSet.add(method);
+                    try {
+                        if (classElements.containsKey(classElement.getName())) {
+                            return;
                         }
-                    }
 
-                    boolean isJunit5Test = element.getEnclosedElement(ElementQuery.ALL_METHODS.onlyInstance().annotated(ann -> ann.hasDeclaredAnnotation(JUNIT_TEST))).isPresent();
+                        classElements.put(classElement.getName(), classElement);
 
-                    // Only add asPolyglotValue and fromPolyglotValue for root classes
-                    if (!extendsPythonClass) {
+                        String typeName = element.getName();
+                        boolean isAopProxy = classElement.hasStereotype(InterceptorBinding.class);
+
+                        var builder = ClassDef.builder(typeName)
+                            .addModifiers(Modifier.PUBLIC);
+                        builder.addAnnotation(Vetoed.class);
+
+                        copyAnnotations(element, builder, ANNOTATION_PACKAGES_TO_COPY, context);
+                        Collection<ClassElement> interfaces = classElement.getInterfaces();
+                        builder.addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.ValueCoercible"));
+
+                        // Check if this class extends another PythonClassElement
+                        ClassElement superType = element.getSuperType().orElse(null);
+                        boolean extendsPythonClass = superType instanceof AbstractPythonClassElement;
+
+                        ClassTypeDef superClassType;
+                        if (extendsPythonClass) {
+                            superClassType = ClassTypeDef.of(superType.getName());
+                            builder.superclass(superClassType);
+                        }
+
+                        FieldDef pythonValue;
+                        if (!extendsPythonClass) {
+                            // Only add the field for root classes (not extending other Python classes)
+                            pythonValue = FieldDef.builder("graalpyInternalValue")
+                                .ofType(POLYGLOT_VALUE).addModifiers(Modifier.FINAL, Modifier.PROTECTED).build();
+                            builder.addField(pythonValue);
+                        } else {
+                            pythonValue = null;
+                        }
+
+                        // Track method names that have been added to avoid duplicates
+                        Set<String> addedMethodNames = new LinkedHashSet<>();
+
+                        for (ClassElement anInterface : interfaces) {
+                            builder.addSuperinterface(TypeDef.of(anInterface));
+                            List<MethodElement> methods = anInterface.getMethods();
+                            Set<MethodElement> methodSet = new LinkedHashSet<>();
+                            for (MethodElement method : methods) {
+                                if (methodSet.contains(method)) {
+                                    continue;
+                                }
+                                if (method.hasDeclaredStereotype(InterceptorBinding.class)) {
+                                    isAopProxy = true;
+                                }
+                                addBridgeMethod(method, builder, pythonValue, context, false, addedMethodNames);
+                                methodSet.add(method);
+                            }
+                        }
+
+                        boolean isJunit5Test = element.getEnclosedElement(ElementQuery.ALL_METHODS.onlyInstance().annotated(ann -> ann.hasDeclaredAnnotation(JUNIT_TEST))).isPresent();
+
+                        // Only add asPolyglotValue and fromPolyglotValue for root classes
                         if (!isJunit5Test) {
                             builder.addMethod(
                                 MethodDef.constructor()
                                     .addParameter(ParameterDef.of("value", POLYGLOT_VALUE))
-                                    .build(((aThis, methodParameters) ->
-                                            aThis.field(pythonValue).assign(methodParameters.get(0))
-                                        )
+                                    .build(((aThis, methodParameters) -> {
+                                            if (extendsPythonClass) {
+                                                // For child classes, call super with the polyglot value
+                                                return aThis.superRef().invokeConstructor(methodParameters.get(0));
+                                            } else {
+                                                // Assign to field for root classes
+                                                return aThis.field(pythonValue).assign(methodParameters.get(0));
+                                            }
+                                        })
                                     ));
                         }
 
                         // implement asPolygotValue
                         builder.addMethod(MethodDef.builder(AS_POLYGLOT_VALUE)
                             .addModifiers(Modifier.PUBLIC)
-                            .returns(POLYGLOT_VALUE).build(((aThis, methodParameters) -> aThis.field(pythonValue).returning())));
+                            .returns(POLYGLOT_VALUE).build(((aThis, methodParameters) ->
+                                toFieldRef(pythonValue, aThis).returning())
+                            ));
 
                         // implement static factory
                         ClassTypeDef thisType = ClassTypeDef.of(typeName);
 
                         if (!isJunit5Test) {
                             builder.addMethod(MethodDef.builder(FROM_POLYGLOT_VALUE)
-                                .addModifiers(Modifier.PUBLIC,  Modifier.STATIC)
+                                .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
                                 .addParameter(POLYGLOT_VALUE)
                                 .returns(thisType).build(((aThis, methodParameters) ->
                                     thisType.instantiate(methodParameters).returning()))
                             );
                         }
-                    }
 
 
-                    // Check if there's a primary constructor with parameters for dependency injection
-                    var pythonConstructor = element.getPrimaryConstructor().orElse(null);
+                        // Check if there's a primary constructor with parameters for dependency injection
+                        var pythonConstructor = element.getPrimaryConstructor().orElse(null);
 
-                    String instantiateMethod = element.isAbstract() && isAopProxy && element.hasStereotype(Introduction.class) ? "newIntroduction" : "newInstance";
-                    if (pythonConstructor != null && pythonConstructor.getParameters().length > 0) {
-                        // Generate constructor with dependency injection parameters
-                        MethodDef.MethodDefBuilder constructor = MethodDef.constructor();
-                        @NonNull ParameterElement[] parameters = pythonConstructor.getParameters();
-                        for (@NonNull ParameterElement parameter : parameters) {
-                            ClassElement t = parameter.getType();
-                            var parameterType = erasedType(t);
-                            ParameterDef parameterDef = ParameterDef
-                                .builder(parameter.getName(), parameterType).build();
-                            constructor.addParameter(parameterDef);
+                        String instantiateMethod = element.isAbstract() && isAopProxy && element.hasStereotype(Introduction.class) ? "newIntroduction" : "newInstance";
+                        if (pythonConstructor != null && pythonConstructor.getParameters().length > 0) {
+                            // Generate constructor with dependency injection parameters
+                            MethodDef.MethodDefBuilder constructor = MethodDef.constructor();
+                            @NonNull ParameterElement[] parameters = pythonConstructor.getParameters();
+                            for (@NonNull ParameterElement parameter : parameters) {
+                                ClassElement t = parameter.getType();
+                                var parameterType = erasedType(t);
+                                ParameterDef parameterDef = ParameterDef
+                                    .builder(parameter.getName(), parameterType).build();
+                                constructor.addParameter(parameterDef);
+                            }
+
+                            builder.addMethod(
+                                constructor.build(((aThis, methodParameters) -> {
+                                    // Create the Python object by calling constructor with parameters
+                                    List<ExpressionDef> arguments = new ArrayList<>(List.of(
+                                        ExpressionDef.constant(element.getPackageName()),
+                                        ExpressionDef.constant(element.getSimpleName())
+                                    ));
+                                    for (int i = 0; i < parameters.length; i++) {
+                                        @NonNull ParameterElement parameter = parameters[i];
+                                        VariableDef.MethodParameter methodParameter = methodParameters.get(i);
+                                        coerceParameterToPolyglotValue(parameter, arguments, methodParameter);
+                                    }
+                                    // Pass constructor parameters directly to newInstance
+                                    ExpressionDef pythonInstance = CONTEXT_HOLDER.invokeStatic(
+                                        instantiateMethod,
+                                        POLYGLOT_VALUE,
+                                        arguments
+                                    );
+
+                                    if (extendsPythonClass) {
+                                        // For child classes, call super with the polyglot value
+                                        return aThis.superRef().invokeConstructor(pythonInstance);
+                                    } else {
+                                        // Assign to field for root classes
+                                        return aThis.field(pythonValue).assign(pythonInstance);
+                                    }
+                                }))
+                            );
+                        } else {
+                            // Default constructor for classes without __init__ or with no parameters
+                            MethodDef.MethodDefBuilder constructor = MethodDef.constructor();
+                            builder.addMethod(
+                                constructor.build(((aThis, methodParameters) -> {
+                                    ExpressionDef pythonInstance = CONTEXT_HOLDER
+                                        .invokeStatic(instantiateMethod, POLYGLOT_VALUE,
+                                            List.of(
+                                                ExpressionDef.constant(element.getPackageName()),
+                                                ExpressionDef.constant(element.getSimpleName())
+                                            )
+                                        );
+
+                                    if (extendsPythonClass) {
+                                        // For child classes, call super with the polyglot value
+                                        return aThis.superRef().invokeConstructor(pythonInstance);
+                                    } else {
+                                        // Assign to field for root classes
+                                        return aThis.field(pythonValue).assign(pythonInstance);
+                                    }
+                                }))
+                            );
                         }
 
-                        builder.addMethod(
-                            constructor.build(((aThis, methodParameters) -> {
-                                // Create the Python object by calling constructor with parameters
-                                List<ExpressionDef> arguments = new ArrayList<>(List.of(
-                                    ExpressionDef.constant(element.getPackageName()),
-                                    ExpressionDef.constant(element.getSimpleName())
+                        List<MethodElement> methodsToBridge = element.getEnclosedElements(
+                            ElementQuery.ALL_METHODS
+                                .onlyAccessible()
+                                .onlyInstance()
+                                .annotated(ann -> isJunit5Test || ann.hasStereotype(Executable.class) ||
+                                    ann.hasStereotype(Around.class) ||
+                                    element.hasStereotype(Around.class) ||
+                                    ann.hasDeclaredStereotype(AnnotationUtil.SCOPE) ||
+                                    ann.hasDeclaredStereotype(Bean.class)));
+
+
+                        for (MethodElement methodElement : methodsToBridge) {
+                            if (methodElement.hasDeclaredStereotype(InterceptorBinding.class)) {
+                                isAopProxy = true;
+                            }
+                            addBridgeMethod(methodElement, builder, pythonValue, context, methodElement.hasDeclaredAnnotation(JUNIT_TEST), addedMethodNames);
+                        }
+
+                        // Find injection methods (annotated with @Inject)
+                        List<MethodElement> injectionMethods = element.getEnclosedElements(
+                            ElementQuery.ALL_METHODS
+                                .onlyAccessible()
+                                .onlyInstance()
+                                .filter(method -> !methodsToBridge.contains(method))
+                                .annotated(ann ->
+                                    ann.hasStereotype(AnnotationUtil.INJECT)
                                 ));
-                                for (int i = 0; i < parameters.length; i++) {
-                                    @NonNull ParameterElement parameter = parameters[i];
-                                    VariableDef.MethodParameter methodParameter = methodParameters.get(i);
-                                    coerceParameterToPolyglotValue(parameter, arguments, methodParameter);
-                                }
-                                // Pass constructor parameters directly to newInstance
-                                ExpressionDef pythonInstance = CONTEXT_HOLDER.invokeStatic(
-                                    instantiateMethod,
-                                    POLYGLOT_VALUE,
-                                    arguments
-                                );
 
-                                if (extendsPythonClass) {
-                                    // For child classes, call super with the polyglot value
-                                    return aThis.superRef().invokeConstructor(pythonInstance);
-                                } else {
-                                    // Assign to field for root classes
-                                    return aThis.field(pythonValue).assign(pythonInstance);
-                                }
-                            }))
-                        );
-                    } else {
-                        // Default constructor for classes without __init__ or with no parameters
-                        MethodDef.MethodDefBuilder constructor = MethodDef.constructor();
-                        builder.addMethod(
-                            constructor.build(((aThis, methodParameters) -> {
-                                ExpressionDef pythonInstance = CONTEXT_HOLDER
-                                    .invokeStatic(instantiateMethod, POLYGLOT_VALUE,
-                                        List.of(
-                                            ExpressionDef.constant(element.getPackageName()),
-                                            ExpressionDef.constant(element.getSimpleName())
-                                        )
+                        // Generate methods for injection
+                        for (MethodElement injectionMethod : injectionMethods) {
+                            MethodDef.MethodDefBuilder injectionMethodBuilder = MethodDef.builder(injectionMethod.getName());
+                            if (!injectionMethod.getReturnType().isVoid()) {
+                                injectionMethodBuilder.returns(TypeDef.of(injectionMethod.getReturnType()));
+                            }
+
+                            for (@NonNull ParameterElement parameter : injectionMethod.getParameters()) {
+                                var parameterType = TypeDef.of(parameter.getType());
+                                ParameterDef parameterDef = ParameterDef
+                                    .builder(parameter.getName(), parameterType).build();
+                                injectionMethodBuilder.addParameter(parameterDef);
+                            }
+
+                            builder.addMethod(injectionMethodBuilder
+                                .build(((aThis, methodParameters) -> {
+                                    // For child classes, pythonValue will be null, so we need to create a field reference to the inherited field
+                                    VariableDef.Field pythonValueField = toFieldRef(pythonValue, aThis);
+                                    List<ExpressionDef> parameters = new ArrayList<>();
+                                    parameters.add(ExpressionDef.constant(injectionMethod.getName()));
+
+                                    // Handle parameter conversion for Python classes
+                                    for (int i = 0; i < injectionMethod.getParameters().length; i++) {
+                                        ParameterElement param = injectionMethod.getParameters()[i];
+                                        VariableDef.MethodParameter methodParam = methodParameters.get(i);
+                                        coerceParameterToPolyglotValue(param, parameters, methodParam);
+                                    }
+
+                                    // Call the Python injection method
+                                    var invokedValue = pythonValueField.invoke(
+                                        "invokeMember",
+                                        POLYGLOT_VALUE,
+                                        parameters
                                     );
 
-                                if (extendsPythonClass) {
-                                    // For child classes, call super with the polyglot value
-                                    return aThis.superRef().invokeConstructor(pythonInstance);
-                                } else {
-                                    // Assign to field for root classes
-                                    return aThis.field(pythonValue).assign(pythonInstance);
-                                }
-                            }))
+                                    // For injection methods, just invoke without explicit return
+                                    ClassElement returnType = injectionMethod.getReturnType();
+                                    if (returnType.isVoid()) {
+                                        return invokedValue;
+                                    } else {
+                                        return StatementDef.multi(
+                                            invokedValue,
+                                            ExpressionDef.nullValue().returning()
+                                        );
+                                    }
+                                })));
+                        }
+
+                        // Find static factory methods (annotated with @Creator)
+                        List<MethodElement> staticCreatorMethod = element.getEnclosedElements(
+                            ElementQuery.ALL_METHODS
+                                .onlyAccessible()
+                                .onlyStatic()
+                                .annotated(ann -> ann.hasStereotype("io.micronaut.core.annotation.Creator"))
                         );
-                    }
 
-                    List<MethodElement> methodsToBridge = element.getEnclosedElements(
-                        ElementQuery.ALL_METHODS
-                            .onlyAccessible()
-                            .onlyInstance()
-                            .annotated(ann -> isJunit5Test || ann.hasStereotype(Executable.class) ||
-                                ann.hasStereotype(Around.class) ||
-                                element.hasStereotype(Around.class) ||
-                                ann.hasDeclaredStereotype(AnnotationUtil.SCOPE) ||
-                                ann.hasDeclaredStereotype(Bean.class)));
-
-
-                    for (MethodElement methodElement : methodsToBridge) {
-                        if (methodElement.hasDeclaredStereotype(InterceptorBinding.class)) {
-                            isAopProxy = true;
-                        }
-                        addBridgeMethod(methodElement, builder, pythonValue, context, methodElement.hasDeclaredAnnotation(JUNIT_TEST), addedMethodNames);
-                    }
-
-                    // Find injection methods (annotated with @Inject)
-                    List<MethodElement> injectionMethods = element.getEnclosedElements(
-                        ElementQuery.ALL_METHODS
-                            .onlyAccessible()
-                            .onlyInstance()
-                            .filter(method -> !methodsToBridge.contains(method))
-                            .annotated(ann ->
-                                ann.hasStereotype(AnnotationUtil.INJECT)
-                            ));
-
-                    // Generate methods for injection
-                    for (MethodElement injectionMethod : injectionMethods) {
-                        MethodDef.MethodDefBuilder injectionMethodBuilder = MethodDef.builder(injectionMethod.getName());
-                        if (!injectionMethod.getReturnType().isVoid()) {
-                            injectionMethodBuilder.returns(TypeDef.of(injectionMethod.getReturnType()));
+                        // Generate static factory methods for @Creator methods
+                        for (MethodElement creatorMethod : staticCreatorMethod) {
+                            addCreatorFactoryMethod(creatorMethod, builder, element, context);
                         }
 
-                        for (@NonNull ParameterElement parameter : injectionMethod.getParameters()) {
-                            var parameterType = TypeDef.of(parameter.getType());
-                            ParameterDef parameterDef = ParameterDef
-                                .builder(parameter.getName(), parameterType).build();
-                            injectionMethodBuilder.addParameter(parameterDef);
+                        // Find injection fields (with Annotated[Type, Inject] syntax)
+                        // For now, we'll look for fields that have any annotation and check for Inject in metadata
+                        List<PropertyElement> beanProperties = element.getBeanProperties();
+                        for (PropertyElement beanProperty : beanProperties) {
+                            boolean isIntrospected = element.hasStereotype(Introspected.class) || element.hasStereotype(ConfigurationReader.class);
+                            if (isIntrospected || beanProperty.hasStereotype(AnnotationUtil.INJECT)) {
+                                addSetter(beanProperty, builder, pythonValue);
+                            }
+
+                            if (isIntrospected) {
+                                addGetter(beanProperty, builder, pythonValue);
+                            }
                         }
 
-                        builder.addMethod(injectionMethodBuilder
-                            .build(((aThis, methodParameters) -> {
-                                // For child classes, pythonValue will be null, so we need to create a field reference to the inherited field
-                                VariableDef.Field pythonValueField;
-                                if (pythonValue != null) {
-                                    pythonValueField = aThis.field(pythonValue);
-                                } else {
-                                    // For child classes, access the inherited field
-                                    pythonValueField = aThis.field("graalpyInternalValue", POLYGLOT_VALUE);
-                                }
-                                List<ExpressionDef> parameters = new ArrayList<>();
-                                parameters.add(ExpressionDef.constant(injectionMethod.getName()));
-
-                                // Handle parameter conversion for Python classes
-                                for (int i = 0; i < injectionMethod.getParameters().length; i++) {
-                                    ParameterElement param = injectionMethod.getParameters()[i];
-                                    VariableDef.MethodParameter methodParam = methodParameters.get(i);
-                                    coerceParameterToPolyglotValue(param, parameters, methodParam);
-                                }
-
-                                // Call the Python injection method
-                                var invokedValue = pythonValueField.invoke(
-                                    "invokeMember",
-                                    POLYGLOT_VALUE,
-                                    parameters
-                                );
-
-                                // For injection methods, just invoke without explicit return
-                                ClassElement returnType = injectionMethod.getReturnType();
-                                if (returnType.isVoid()) {
-                                    return invokedValue;
-                                } else {
-                                    return StatementDef.multi(
-                                        invokedValue,
-                                        ExpressionDef.nullValue().returning()
-                                    );
-                                }
-                            })));
-                    }
-
-                    // Find static factory methods (annotated with @Creator)
-                    List<MethodElement> staticCreatorMethod = element.getEnclosedElements(
-                        ElementQuery.ALL_METHODS
-                            .onlyAccessible()
-                            .onlyStatic()
-                            .annotated(ann -> ann.hasStereotype("io.micronaut.core.annotation.Creator"))
-                    );
-
-                    // Generate static factory methods for @Creator methods
-                    for (MethodElement creatorMethod : staticCreatorMethod) {
-                        addCreatorFactoryMethod(creatorMethod, builder, element, context);
-                    }
-
-                    // Find injection fields (with Annotated[Type, Inject] syntax)
-                    // For now, we'll look for fields that have any annotation and check for Inject in metadata
-                    List<PropertyElement> beanProperties = element.getBeanProperties();
-                    for (PropertyElement beanProperty : beanProperties) {
-                        boolean isIntrospected = element.hasStereotype(Introspected.class) || element.hasStereotype(ConfigurationReader.class);
-                        if (isIntrospected || beanProperty.hasStereotype(AnnotationUtil.INJECT)) {
-                            addSetter(beanProperty, builder, pythonValue);
+                        if (isAopProxy) {
+                            builder.addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.aop.PythonAopSetup"));
                         }
 
-                        if (isIntrospected) {
-                            addGetter(beanProperty, builder, pythonValue);
-                        }
+                        sourceGenerator.write(builder.build(), context, element);
+                    } catch (Exception e) {
+                        context.fail("Failed to generate stub for Python type [" + element.getSimpleName() + "]: " + e.getMessage(), null);
                     }
 
-                    if (isAopProxy) {
-                        builder.addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.aop.PythonAopSetup"));
-                    }
-
-                    sourceGenerator.write(builder.build(), context, element);
-                } catch (Exception e) {
-                    context.fail("Failed to generate stub for Python type [" + element.getSimpleName() + "]: " + e.getMessage(), null);
                 }
-
             }
         }
     }
@@ -446,13 +458,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         builder.addMethod(methodBuilder
             .build(((aThis, methodParameters) -> {
                 // For child classes, pythonValue will be null, so we need to create a field reference to the inherited field
-                VariableDef.Field pythonValueField;
-                if (pythonValue != null) {
-                    pythonValueField = aThis.field(pythonValue);
-                } else {
-                    // For child classes, access the inherited field
-                    pythonValueField = aThis.field("graalpyInternalValue", POLYGLOT_VALUE);
-                }
+                VariableDef.Field pythonValueField = toFieldRef(pythonValue, aThis);
                 List<ExpressionDef> parameters = new ArrayList<>();
                 parameters.add(ExpressionDef.constant(pythonFunctionName));
                 parameters.addAll(methodParameters);
@@ -473,6 +479,17 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             })));
     }
 
+    private static VariableDef.Field toFieldRef(FieldDef pythonValue, VariableDef.This aThis) {
+        VariableDef.Field pythonValueField;
+        if (pythonValue != null) {
+            pythonValueField = aThis.field(pythonValue);
+        } else {
+            // For child classes, access the inherited field
+            pythonValueField = aThis.field("graalpyInternalValue", POLYGLOT_VALUE);
+        }
+        return pythonValueField;
+    }
+
     private void addGetter(PropertyElement beanProperty, ClassDef.ClassDefBuilder builder, FieldDef pythonValue) {
         TypeDef propertyType = TypeDef.of(beanProperty.getType());
         MethodDef.MethodDefBuilder getterBuilder = MethodDef.builder(beanProperty.getName())
@@ -480,20 +497,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
         builder.addMethod(getterBuilder.build(((aThis, methodParameters) -> {
             // For child classes, pythonValue will be null, so we need to create a field reference to the inherited field
-            VariableDef.Field pythonValueField;
-            if (pythonValue != null) {
-                pythonValueField = aThis.field(pythonValue);
-            } else {
-                // For child classes, access the inherited field
-                pythonValueField = aThis.field("graalpyInternalValue", POLYGLOT_VALUE);
-            }
+            VariableDef.Field pythonValueField = toFieldRef(pythonValue, aThis);
 
             // Get the return type to determine appropriate conversion method
             var invokedValue = pythonValueField.invoke(
                 "getMember",
                 POLYGLOT_VALUE,
                 ExpressionDef.constant(beanProperty.getName()
-            ));
+                ));
 
             return handleReturnType(beanProperty.getType(), invokedValue);
         })));
@@ -511,13 +522,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
         builder.addMethod(propertySetter.build(((aThis, methodParameters) -> {
             // For child classes, pythonValue will be null, so we need to create a field reference to the inherited field
-            VariableDef.Field pythonValueField;
-            if (pythonValue != null) {
-                pythonValueField = aThis.field(pythonValue);
-            } else {
-                // For child classes, access the inherited field
-                pythonValueField = aThis.field("graalpyInternalValue", POLYGLOT_VALUE);
-            }
+            VariableDef.Field pythonValueField = toFieldRef(pythonValue, aThis);
             List<ExpressionDef> parameters = new ArrayList<>();
             parameters.add(ExpressionDef.constant(beanProperty.getName()));
             coerceParameterToPolyglotValue(
@@ -606,7 +611,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                 invokedValue, genericType)
                             .returning();
                     } else {
-                        if (this.classElements.containsKey(returnType.getName())) {
+                        if (allClasses.containsKey(returnType.getName())) {
                             yield ClassTypeDef.of(returnType)
                                 .invokeStatic(FROM_POLYGLOT_VALUE, POLYGLOT_VALUE, invokedValue)
                                 .returning();
