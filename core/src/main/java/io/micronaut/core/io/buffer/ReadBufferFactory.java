@@ -16,7 +16,7 @@
 package io.micronaut.core.io.buffer;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.functional.ThrowingConsumer;
 
 import java.io.ByteArrayOutputStream;
@@ -122,7 +122,7 @@ public class ReadBufferFactory {
      * @return The adapted buffer
      */
     @NonNull
-    public ReadBuffer adapt(@NonNull io.micronaut.core.io.buffer.ByteBuffer<?> buffer) {
+    public ReadBuffer adapt(io.micronaut.core.io.buffer.@NonNull ByteBuffer<?> buffer) {
         byte[] byteArray = buffer.toByteArray();
         if (buffer instanceof ReferenceCounted rc) {
             rc.release();
@@ -178,8 +178,7 @@ public class ReadBufferFactory {
      *
      * @return The {@link ReadBufferFactory.BufferingOutputStream} wrapper
      */
-    @NonNull
-    public ReadBufferFactory.BufferingOutputStream outputStreamBuffer() {
+    public ReadBufferFactory.@NonNull BufferingOutputStream outputStreamBuffer() {
         return outputStreamBuffer(NoCopyByteArrayOutputStream.DEFAULT_CAPACITY);
     }
 

@@ -3,7 +3,7 @@ package io.micronaut.docs.config.immutable;
 // tag::imports[]
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 // end::imports[]

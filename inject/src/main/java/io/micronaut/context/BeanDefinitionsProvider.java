@@ -16,7 +16,7 @@
 package io.micronaut.context;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.BeanDefinitionReference;
 
 import java.util.List;

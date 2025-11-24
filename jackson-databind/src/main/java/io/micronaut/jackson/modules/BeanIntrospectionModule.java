@@ -79,8 +79,8 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanIntrospector;
 import io.micronaut.core.beans.BeanProperty;
@@ -238,8 +238,7 @@ public class BeanIntrospectionModule extends SimpleModule {
         return null;
     }
 
-    @NonNull
-    private JsonFormat.Value parseJsonFormat(@NonNull AnnotationValue<JsonFormat> formatAnnotation) {
+    private JsonFormat.@NonNull Value parseJsonFormat(@NonNull AnnotationValue<JsonFormat> formatAnnotation) {
         return new JsonFormat.Value(
             formatAnnotation.stringValue("pattern").orElse(""),
             formatAnnotation.enumValue("shape", JsonFormat.Shape.class).orElse(JsonFormat.Shape.ANY),

@@ -16,7 +16,7 @@
 package io.micronaut.http.client.tck.tests;
 
 import io.micronaut.core.annotation.Introspected;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 
 import java.util.Objects;
 

@@ -17,7 +17,7 @@ package io.micronaut.docs.server.binding;
 
 import io.micronaut.core.annotation.Introspected;
 
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;

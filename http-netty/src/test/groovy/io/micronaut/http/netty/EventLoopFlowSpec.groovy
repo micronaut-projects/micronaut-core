@@ -1,6 +1,6 @@
 package io.micronaut.http.netty
 
-import io.micronaut.core.annotation.NonNull
+import org.jspecify.annotations.NonNull
 import io.netty.util.concurrent.AbstractEventExecutor
 import io.netty.util.concurrent.Future
 import io.netty.util.concurrent.OrderedEventExecutor

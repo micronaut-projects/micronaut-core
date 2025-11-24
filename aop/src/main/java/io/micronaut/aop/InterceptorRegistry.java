@@ -16,7 +16,7 @@
 package io.micronaut.aop;
 
 import io.micronaut.context.BeanRegistration;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Executable;

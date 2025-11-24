@@ -18,8 +18,8 @@ package io.micronaut.context;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
@@ -36,7 +36,6 @@ import io.micronaut.inject.annotation.EvaluatedAnnotationMetadata;
 
 import java.lang.reflect.Method;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -86,7 +85,7 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
     }
 
     @Override
-    public Collection<ExecutableMethod<T, ?>> getExecutableMethods() {
+    public List<ExecutableMethod<T, ?>> getExecutableMethods() {
         if (executableMethodsList == null) {
             // Initialize the collection
             for (int i = 0, methodsReferencesLength = methodsReferences.length; i < methodsReferencesLength; i++) {
@@ -94,7 +93,7 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
             }
             executableMethodsList = Arrays.asList(executableMethods);
         }
-        return (Collection) executableMethodsList;
+        return (List) executableMethodsList;
     }
 
     @Override
@@ -117,6 +116,7 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
      * @return The {@link ExecutableMethod}
      */
     @UsedByGeneratedCode
+    @Override
     public <R> ExecutableMethod<T, R> getExecutableMethodByIndex(int index) {
         DispatchedExecutableMethod<T, R> executableMethod = (DispatchedExecutableMethod<T, R>) executableMethods[index];
         if (executableMethod == null) {

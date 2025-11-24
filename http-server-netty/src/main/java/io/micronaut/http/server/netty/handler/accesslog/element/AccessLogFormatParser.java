@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.server.netty.handler.accesslog.element;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.order.OrderUtil;
 import io.netty.channel.ChannelHandlerContext;

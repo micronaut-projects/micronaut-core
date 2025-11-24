@@ -18,7 +18,7 @@ import io.micronaut.core.annotation.Nullable;
 class Test {
 
     void test(@Nullable String id) {
-    
+
     }
 }
 ''', 'test', 'id')
@@ -40,7 +40,7 @@ import io.micronaut.core.annotation.NonNull;
 class Test {
 
     void test(@NonNull String id) {
-    
+
     }
 }
 ''', 'test', 'id')
@@ -63,7 +63,7 @@ class Test {
 
     @io.micronaut.context.annotation.Executable
     void test(@NonNull String one, @io.micronaut.core.annotation.Nullable String two) {
-    
+
     }
 }
 ''')

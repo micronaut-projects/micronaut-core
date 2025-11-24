@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.cookie;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 
 import java.time.temporal.TemporalAmount;
 import java.util.Optional;

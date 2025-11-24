@@ -16,7 +16,7 @@
 package io.micronaut.expressions.parser.ast.util;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
 import io.micronaut.sourcegen.model.ClassTypeDef;
 import io.micronaut.sourcegen.model.TypeDef;

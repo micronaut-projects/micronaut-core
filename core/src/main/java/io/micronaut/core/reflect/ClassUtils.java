@@ -16,8 +16,8 @@
 package io.micronaut.core.reflect;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.optim.StaticOptimizations;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;

@@ -16,8 +16,8 @@
 package io.micronaut.http.server.netty.websocket;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.propagation.PropagatedContext;
@@ -124,7 +124,7 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
         this.serverConfiguration = serverConfiguration;
     }
 
-    static boolean isWebSocketUpgrade(@NonNull io.netty.handler.codec.http.HttpRequest request) {
+    static boolean isWebSocketUpgrade(io.netty.handler.codec.http.@NonNull HttpRequest request) {
         HttpHeaders headers = request.headers();
         if (headers.containsValue(HttpHeaderNames.CONNECTION, HttpHeaderValues.UPGRADE, true)) {
             return headers.containsValue(HttpHeaderNames.UPGRADE, WEB_SOCKET_HEADER_VALUE, true);

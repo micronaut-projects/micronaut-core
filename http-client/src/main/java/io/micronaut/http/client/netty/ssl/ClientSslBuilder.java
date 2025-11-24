@@ -16,7 +16,7 @@
 package io.micronaut.http.client.netty.ssl;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.netty.handler.codec.quic.QuicSslContext;

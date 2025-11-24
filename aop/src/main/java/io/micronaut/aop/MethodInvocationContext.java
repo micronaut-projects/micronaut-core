@@ -15,7 +15,7 @@
  */
 package io.micronaut.aop;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.type.Executable;
 import io.micronaut.inject.ExecutableMethod;
 

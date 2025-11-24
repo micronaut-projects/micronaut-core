@@ -16,7 +16,7 @@
 package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;

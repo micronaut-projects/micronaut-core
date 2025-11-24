@@ -17,7 +17,7 @@ package io.micronaut.inject.qualifiers;
 
 import io.micronaut.context.annotation.Type;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.BeanType;
 
 import java.util.ArrayList;

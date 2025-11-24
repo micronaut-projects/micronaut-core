@@ -457,4 +457,25 @@ public class ExecutableMethodsDefinitionWriter implements ClassOutputWriter {
         }
         return name;
     }
+
+    /**
+     * Retrieves the total count of methods.
+     *
+     * @return The number of methods available.
+     * @since 5.0
+     */
+    public int getMethodsCount() {
+        return methodDispatchWriter.getDispatchTargets().size();
+    }
+
+    /**
+     * Retrieves the `MethodElement` at the specified index.
+     *
+     * @param index The index of the method to retrieve.
+     * @return The `MethodElement` corresponding to the specified index.
+     * @since 5.0
+     */
+    public MethodElement getMethodByIndex(int index) {
+        return methodDispatchWriter.getDispatchTargets().get(index).getMethodElement();
+    }
 }

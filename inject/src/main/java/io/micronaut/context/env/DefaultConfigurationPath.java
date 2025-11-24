@@ -17,7 +17,7 @@ package io.micronaut.context.env;
 
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.EachProperty;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.PropertyCatalog;
 import io.micronaut.core.value.PropertyResolver;
@@ -238,9 +238,8 @@ final class DefaultConfigurationPath implements ConfigurationPath {
         }
     }
 
-    @NonNull
     @Override
-    public ConfigurationSegment.ConfigurationKind kind() {
+    public ConfigurationSegment.@NonNull ConfigurationKind kind() {
         ConfigurationSegment segment = peekLast();
         if (segment != null) {
             return segment.kind();

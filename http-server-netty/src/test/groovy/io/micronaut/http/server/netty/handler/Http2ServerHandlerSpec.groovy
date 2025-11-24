@@ -1,7 +1,7 @@
 package io.micronaut.http.server.netty.handler
 
 
-import io.micronaut.core.annotation.NonNull
+import org.jspecify.annotations.NonNull
 import io.micronaut.http.body.CloseableByteBody
 import io.micronaut.http.body.InternalByteBody
 import io.micronaut.http.body.stream.InputStreamByteBody

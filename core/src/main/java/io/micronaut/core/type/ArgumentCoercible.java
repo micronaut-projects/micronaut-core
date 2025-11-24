@@ -15,7 +15,7 @@
  */
 package io.micronaut.core.type;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 
 /**
  * An interface for types that can be represented as an {@link Argument}.

@@ -33,8 +33,8 @@ import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -72,9 +72,11 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalDouble;
@@ -279,6 +281,46 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
             return Stream.empty();
         }
         return executableMethodsDefinition.findPossibleMethods(name);
+    }
+
+    @Override
+    public final Iterable<ExecutableMethod<T, ?>> getExecutableMethodsForProcessing() {
+        int[] indexes =  getIndexesOfExecutableMethodsForProcessing();
+        if (indexes == null) {
+            // Fallback to runtime filtering
+            return InstantiatableBeanDefinition.super.getExecutableMethodsForProcessing();
+        }
+        return new Iterable<>() {
+            private final int length = indexes.length;
+
+            @Override
+            @NonNull
+            public Iterator<ExecutableMethod<T, ?>> iterator() {
+                return new Iterator<>() {
+
+                    private int index = 0;
+
+                    @Override
+                    public boolean hasNext() {
+                        return index < length;
+                    }
+
+                    @Override
+                    public ExecutableMethod<T, ?> next() {
+                        if (hasNext()) {
+                            return executableMethodsDefinition.getExecutableMethodByIndex(indexes[index++]);
+                        }
+                        throw new NoSuchElementException();
+                    }
+                };
+            }
+
+        };
+    }
+
+    @Nullable
+    protected int[] getIndexesOfExecutableMethodsForProcessing() {
+        return null; // Fallback to
     }
 
     @Override

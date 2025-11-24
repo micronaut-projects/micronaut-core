@@ -15,7 +15,7 @@
  */
 package io.micronaut.scheduling.executor;
 
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import jakarta.validation.constraints.Min;
 import java.util.Optional;

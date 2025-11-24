@@ -16,8 +16,8 @@
 package io.micronaut.http.netty;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
@@ -120,7 +120,7 @@ public interface NettyHttpRequestBuilder {
      * @deprecated Go through {@link #toHttpRequestDirect()} and {@link #toHttpRequestWithoutBody()} instead
      */
     @Deprecated(since = "4.0.0", forRemoval = true)
-    static @NonNull HttpRequest toHttpRequest(@NonNull io.micronaut.http.HttpRequest<?> request) {
+    static @NonNull HttpRequest toHttpRequest(io.micronaut.http.@NonNull HttpRequest<?> request) {
         return asBuilder(request).toHttpRequestWithoutBody();
     }
 
@@ -131,7 +131,7 @@ public interface NettyHttpRequestBuilder {
      * @param request The micronaut http request
      * @return The builder for further operations
      */
-    static NettyHttpRequestBuilder asBuilder(@NonNull io.micronaut.http.HttpRequest<?> request) {
+    static NettyHttpRequestBuilder asBuilder(io.micronaut.http.@NonNull HttpRequest<?> request) {
         boolean supportDirect = true;
 
         while (true) {

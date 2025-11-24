@@ -16,8 +16,8 @@
 package io.micronaut.http.body.stream;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.InternalByteBody;
@@ -55,8 +55,7 @@ public abstract class BaseStreamingByteBody<SB extends BaseSharedBuffer> extends
      * @param primary The consumer or {@code null} to discard the data
      * @return The upstream to signal backpressure
      */
-    @NonNull
-    public abstract BufferConsumer.Upstream primary(@Nullable BufferConsumer primary);
+    public abstract BufferConsumer.@NonNull Upstream primary(@Nullable BufferConsumer primary);
 
     /**
      * Create a new body instance on the same shared buffer with the given upstream. This is used
@@ -66,7 +65,7 @@ public abstract class BaseStreamingByteBody<SB extends BaseSharedBuffer> extends
      * @return The body
      */
     @NonNull
-    protected abstract BaseStreamingByteBody<SB> derive(@NonNull BufferConsumer.Upstream upstream);
+    protected abstract BaseStreamingByteBody<SB> derive(BufferConsumer.@NonNull Upstream upstream);
 
     @Override
     public final @NonNull Publisher<ReadBuffer> toReadBufferPublisher() {

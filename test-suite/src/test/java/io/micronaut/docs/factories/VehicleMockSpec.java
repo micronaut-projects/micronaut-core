@@ -9,6 +9,7 @@ import jakarta.inject.Inject;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 // end::imports[]
 
+@Property(name = "spec.name", value = "VehicleFactoriesSpec")
 // tag::class[]
 @MicronautTest
 public class VehicleMockSpec {

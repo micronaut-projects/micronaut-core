@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2025 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,10 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package io.micronaut.module.info;
+
 /**
- * Contains interfaces related to annotation processing.
- *
- * @author graemerocher
- * @since 1.0
+ * The Maven coordinates of a module.
+ * @param groupId the group id
+ * @param artifactId the artifact id
+ * @param version the version
  */
-package io.micronaut.context.processor;
+public record MavenCoordinates(
+    String groupId,
+    String artifactId,
+    String version
+) {
+}

@@ -18,7 +18,7 @@ package io.micronaut.core.type;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationUtil;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.AnsiColour;
@@ -360,7 +360,7 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
          * @return The string
          */
         public static @NonNull String getBeanTypeString(
-            @NonNull TypeInformation.TypeFormat typeFormat, @NonNull Argument<?> argument) {
+            TypeInformation.@NonNull TypeFormat typeFormat, @NonNull Argument<?> argument) {
             return getBeanTypeString(
                 typeFormat,
                 argument.getType(),

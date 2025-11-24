@@ -16,7 +16,7 @@
 package io.micronaut.ast.groovy.scan;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.io.scan.AnnotationScanner;
 import io.micronaut.core.reflect.ClassUtils;
 import org.slf4j.Logger;

@@ -16,7 +16,7 @@
 package io.micronaut.core.beans;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 
 /**
  * A variation of {@link BeanIntrospection} that includes {@link #instantiateUnsafe(Object...)} allowing to skip instantiation validation.

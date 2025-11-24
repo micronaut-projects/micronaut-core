@@ -17,8 +17,8 @@ package io.micronaut.context;
 
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.env.PropertySource;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.BeanConfiguration;
@@ -145,7 +145,7 @@ public interface ApplicationContextBuilder {
     default @NonNull ApplicationContextBuilder beanDefinitions(@NonNull RuntimeBeanDefinition<?>... definitions) {
         return this;
     }
-    
+
     /**
      * Register additional bean configurations.
      * @param configurations The configurations.
@@ -368,7 +368,7 @@ public interface ApplicationContextBuilder {
      * @return This builder
      * @since 5.0
      */
-    @NonNull ApplicationContextBuilder beansPredicate(@Nullable java.util.function.Predicate<io.micronaut.inject.QualifiedBeanType<?>> predicate);
+    @NonNull ApplicationContextBuilder beansPredicate(java.util.function.@Nullable Predicate<io.micronaut.inject.QualifiedBeanType<?>> predicate);
 
     /**
      * Sets the class path resource resolver for the application context builder.

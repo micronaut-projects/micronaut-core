@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.server.exceptions.response;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;

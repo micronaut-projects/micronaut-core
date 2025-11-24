@@ -19,8 +19,8 @@ import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.propagation.PropagatedContext;
@@ -249,7 +249,7 @@ abstract class AbstractJdkHttpClient {
     }
 
     private static HttpCookie toJdkCookie(@NonNull Cookie cookie,
-                                          @NonNull io.micronaut.http.HttpRequest<?> request,
+                                          io.micronaut.http.@NonNull HttpRequest<?> request,
                                           @NonNull String host) {
         HttpCookie newCookie = new HttpCookie(cookie.getName(), cookie.getValue());
         newCookie.setMaxAge(cookie.getMaxAge());
@@ -261,7 +261,7 @@ abstract class AbstractJdkHttpClient {
     }
 
     private HttpClient.Builder configureProxy(
-        @NonNull HttpClient.Builder builder,
+        HttpClient.@NonNull Builder builder,
         @NonNull SocketAddress address,
         @Nullable String username,
         @Nullable String password
@@ -336,7 +336,7 @@ abstract class AbstractJdkHttpClient {
      * @param <I>      The body type
      * @return A JDK request object
      */
-    protected <I> Mono<HttpRequest> mapToHttpRequest(@NonNull io.micronaut.http.HttpRequest<I> request, @Nullable Argument<?> bodyType) {
+    protected <I> Mono<HttpRequest> mapToHttpRequest(io.micronaut.http.@NonNull HttpRequest<I> request, @Nullable Argument<?> bodyType) {
         return resolveRequestUri(request)
             .map(uri -> {
                 cookieDecoder.decode(request).ifPresent(cookies -> cookies.getAll().forEach(cookie -> {
@@ -388,11 +388,11 @@ abstract class AbstractJdkHttpClient {
      * @return A Micronaut response
      */
     @NonNull
-    protected <O> HttpResponse<O> response(@NonNull java.net.http.HttpResponse<byte[]> netResponse, @NonNull Argument<O> bodyType) {
+    protected <O> HttpResponse<O> response(java.net.http.@NonNull HttpResponse<byte[]> netResponse, @NonNull Argument<O> bodyType) {
         return new HttpResponseAdapter<>(netResponse, bodyType, conversionService, mediaTypeCodecRegistry, messageBodyHandlerRegistry);
     }
 
-    protected <I, O> Flux<HttpResponse<O>> exchangeImpl(@NonNull io.micronaut.http.HttpRequest<I> request, @Nullable Argument<O> bodyType) {
+    protected <I, O> Flux<HttpResponse<O>> exchangeImpl(io.micronaut.http.@NonNull HttpRequest<I> request, @Nullable Argument<O> bodyType) {
         var defaultPublisher = responsePublisher(request, bodyType);
         return resolveRequestUri(request)
             .flatMapMany(uri -> applyFilterToResponsePublisher(request, uri, defaultPublisher));
@@ -429,7 +429,7 @@ abstract class AbstractJdkHttpClient {
     }
 
     protected <O> Publisher<io.micronaut.http.HttpResponse<O>> responsePublisher(
-        @NonNull io.micronaut.http.HttpRequest<?> request,
+        io.micronaut.http.@NonNull HttpRequest<?> request,
         @Nullable Argument<O> bodyType
     ) {
         if (clientId != null && BasicHttpAttributes.getServiceId(request).isEmpty()) {

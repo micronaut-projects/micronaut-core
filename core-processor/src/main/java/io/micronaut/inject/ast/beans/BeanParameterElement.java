@@ -16,8 +16,8 @@
 package io.micronaut.inject.ast.beans;
 
 import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.ast.ParameterElement;
 
 /**

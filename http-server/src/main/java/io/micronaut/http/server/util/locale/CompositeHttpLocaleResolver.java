@@ -16,7 +16,7 @@
 package io.micronaut.http.server.util.locale;
 
 import io.micronaut.context.annotation.Primary;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.http.HttpRequest;
 import jakarta.inject.Singleton;
 

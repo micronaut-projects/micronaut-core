@@ -18,7 +18,6 @@ package io.micronaut.kotlin.processing.beans.configproperties.inheritance
 import io.micronaut.context.annotation.ConfigurationProperties
 import io.micronaut.context.annotation.EachProperty
 import io.micronaut.context.annotation.Parameter
-import io.micronaut.core.annotation.Nullable
 
 @EachProperty("teams")
 class ParentEachPropsCtor internal constructor(

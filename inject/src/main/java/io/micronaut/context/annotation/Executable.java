@@ -15,13 +15,13 @@
  */
 package io.micronaut.context.annotation;
 
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Inherited;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * <p>Annotation applied to the method or type indicating that a {@link io.micronaut.inject.ExecutableMethod} should be
@@ -39,6 +39,11 @@ import java.lang.annotation.Target;
 @Target({ElementType.METHOD, ElementType.TYPE, ElementType.ANNOTATION_TYPE})
 @Inherited
 public @interface Executable {
+
+    /**
+     * A constant representing the property name "processOnStartup".
+     */
+    String MEMBER_PROCESS_ON_STARTUP = "processOnStartup";
 
     /**
      * Whether the {@link io.micronaut.inject.ExecutableMethod} should be processed at startup by the registered

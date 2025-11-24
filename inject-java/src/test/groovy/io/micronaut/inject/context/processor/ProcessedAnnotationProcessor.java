@@ -34,7 +34,7 @@ public class ProcessedAnnotationProcessor implements BeanDefinitionProcessor<Pro
     }
 
     @Override
-    public void process(BeanDefinition<?> beanDefinition, BeanContext object) {
+    public void process(BeanDefinition<?> beanDefinition, BeanContext beanContext) {
         beans.add(beanDefinition);
     }
 

@@ -18,7 +18,7 @@ package io.micronaut.inject.ast.beans;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.ast.MethodElement;
 
 import java.util.Objects;
@@ -68,7 +68,7 @@ public interface BeanMethodElement extends MethodElement {
     default @NonNull
     BeanMethodElement executable(boolean processOnStartup) {
         annotate(Executable.class, (builder) ->
-            builder.member("processOnStartup", processOnStartup)
+            builder.member(Executable.MEMBER_PROCESS_ON_STARTUP, processOnStartup)
         );
         return this;
     }

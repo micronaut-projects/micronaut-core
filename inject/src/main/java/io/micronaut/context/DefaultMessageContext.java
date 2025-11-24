@@ -17,8 +17,8 @@ package io.micronaut.context;
 
 import io.micronaut.core.annotation.Internal;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import java.util.Collections;
 import java.util.Locale;
 import java.util.Map;

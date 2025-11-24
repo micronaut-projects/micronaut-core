@@ -17,7 +17,7 @@ package io.micronaut.annotation.processing;
 
 import io.micronaut.core.annotation.Generated;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.processing.JavaModelUtils;
 
 import javax.lang.model.element.Element;

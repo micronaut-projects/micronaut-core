@@ -17,8 +17,8 @@ package io.micronaut.context;
 
 import io.micronaut.context.exceptions.NoSuchMessageException;
 import io.micronaut.core.annotation.Indexed;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.util.ArgumentUtils;
 import jakarta.inject.Singleton;

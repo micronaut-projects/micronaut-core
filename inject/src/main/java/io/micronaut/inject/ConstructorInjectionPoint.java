@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 
 /**
  * A constructor injection point.

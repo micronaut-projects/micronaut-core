@@ -1,5 +1,6 @@
 package io.micronaut.context.inject
 
+import io.micronaut.context.annotation.Property
 import io.micronaut.test.annotation.MockBean
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import spock.lang.Issue
@@ -7,6 +8,7 @@ import spock.lang.Specification
 
 import jakarta.inject.Inject
 
+@Property(name = "spec.name", value = "CircularBeanResolutionWithPostConstructSpec")
 @MicronautTest
 class CircularBeanResolutionWithPostConstructSpec extends Specification {
 

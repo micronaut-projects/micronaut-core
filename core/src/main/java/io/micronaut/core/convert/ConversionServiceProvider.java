@@ -15,7 +15,7 @@
  */
 package io.micronaut.core.convert;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 
 /**
  * Interface for a component to provide the access to its {@link ConversionService}.

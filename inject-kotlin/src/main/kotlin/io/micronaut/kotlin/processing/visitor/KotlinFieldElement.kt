@@ -51,7 +51,7 @@ internal class KotlinFieldElement(
 
     override fun isReflectionRequired() = true // all Kotlin fields are private
 
-    override fun isReflectionRequired(callingType: ClassElement?) =
+    override fun isReflectionRequired(callingType: ClassElement) =
         true // all Kotlin fields are private
 
     override fun isPublic() = if (hasDeclaredAnnotation(JvmField::class.java)) {

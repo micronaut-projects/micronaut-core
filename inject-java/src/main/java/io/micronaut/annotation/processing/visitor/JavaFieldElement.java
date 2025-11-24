@@ -17,7 +17,7 @@ package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
@@ -77,9 +77,8 @@ class JavaFieldElement extends AbstractJavaMemberElement implements FieldElement
         return getType().getTypeAnnotationMetadata();
     }
 
-    @NonNull
     @Override
-    public JavaNativeElement.Variable getNativeType() {
+    public JavaNativeElement.@NonNull Variable getNativeType() {
         return (JavaNativeElement.Variable) super.getNativeType();
     }
 

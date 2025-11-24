@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.body;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.http.MediaType;
 
 /**

@@ -882,4 +882,45 @@ record ProductDTO(String name, String price, String distributor) {
         definition.getExecutableMethods()[0].hasDeclaredAnnotation(Mapper)
         definition.getExecutableMethods()[0].hasDeclaredAnnotation(Mapper.Mapping)
     }
+
+    void "test executable method on startup"() {
+        given:
+        def definition = buildBeanDefinition('test.MyService', '''
+package test;
+
+import io.micronaut.context.annotation.Executable;
+import jakarta.inject.Singleton;
+
+@Singleton
+class MyService {
+
+    public void simple() {
+    }
+
+    @Executable
+    public void abc() {
+    }
+
+    @Executable(processOnStartup = true)
+    public void foo() {
+    }
+
+    @Executable(processOnStartup = true)
+    public void bar() {
+    }
+
+    @Executable
+    public void some() {
+    }
+
+}
+
+''')
+
+        expect:
+        definition.getExecutableMethods().size() == 4
+        definition.getExecutableMethods().collect { it.name } == ["abc", "foo", "bar", "some"]
+        definition.requiresMethodProcessing()
+        definition.getExecutableMethodsForProcessing().collect { it.name } == ["foo", "bar"]
+    }
 }

@@ -20,8 +20,8 @@ import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.validation.BeanDefinitionValidator;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A bean definition that is validated with jakarta.validation.
