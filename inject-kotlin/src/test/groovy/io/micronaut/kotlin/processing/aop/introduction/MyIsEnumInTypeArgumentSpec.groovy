@@ -29,7 +29,7 @@ interface MyInterface {
 
     @Get
     @Produces(MediaType.TEXT_PLAIN)
-    fun index(@Nullable @QueryValue("channels") channels: Collection<Channel?>?)
+    fun index(@QueryValue("channels") channels: @Nullable Collection<Channel?>?)
 
     @Introspected
     enum class Channel {

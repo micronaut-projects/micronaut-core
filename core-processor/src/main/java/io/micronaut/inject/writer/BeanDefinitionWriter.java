@@ -1437,7 +1437,6 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                 injectMethodSignature,
                 injectFieldInjectCommand.declaringType,
                 injectFieldInjectCommand.fieldElement,
-                injectFieldInjectCommand.fieldElement.getAnnotationMetadata(),
                 injectFieldInjectCommand.requiresReflection
             );
         }
@@ -1598,15 +1597,14 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                                        FieldElement fieldElement,
                                        boolean requiresReflection,
                                        boolean isOptional) {
-        AnnotationMetadata annotationMetadata = fieldElement.getAnnotationMetadata();
-        StatementDef setFieldValueStatement = setFieldValue(injectMethodSignature, fieldElement, isOptional, declaringType, requiresReflection, annotationMetadata);
+        StatementDef setFieldValueStatement = setFieldValue(injectMethodSignature, fieldElement, isOptional, declaringType, requiresReflection);
 
         if (isOptional) {
             return getPropertyContainsCheck(
                 injectMethodSignature,
                 fieldElement.getType(),
                 fieldElement.getName(),
-                annotationMetadata
+                fieldElement.getAnnotationMetadata()
             ).ifTrue(setFieldValueStatement);
         }
         return setFieldValueStatement;
@@ -1616,10 +1614,9 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                                        FieldElement fieldElement,
                                        boolean isOptional,
                                        TypedElement declaringType,
-                                       boolean requiresReflection,
-                                       AnnotationMetadata annotationMetadata) {
+                                       boolean requiresReflection) {
         if (isInnerType(fieldElement.getGenericType())) {
-            return injectField(injectMethodSignature, declaringType, fieldElement, annotationMetadata, requiresReflection);
+            return injectField(injectMethodSignature, declaringType, fieldElement, requiresReflection);
         }
         if (!isConfigurationProperties || requiresReflection) {
             boolean isRequired = fieldElement
@@ -1629,7 +1626,6 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                 injectMethodSignature,
                 declaringType,
                 fieldElement,
-                annotationMetadata,
                 requiresReflection,
                 GET_VALUE_FOR_FIELD,
                 isOptional,
@@ -1637,16 +1633,16 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                 isRequired
             );
         }
-        fieldInjectionPoints.add(new FieldVisitData(declaringType, fieldElement, annotationMetadata, false));
+        fieldInjectionPoints.add(new FieldVisitData(declaringType, fieldElement, false));
         int fieldIndex = fieldInjectionPoints.size() - 1;
         ExpressionDef value;
-        Optional<String> property = annotationMetadata.stringValue(Property.class, "name");
+        Optional<String> property = fieldElement.getAnnotationMetadata().stringValue(Property.class, "name");
         if (property.isPresent()) {
-            value = getInvokeGetPropertyValueForField(injectMethodSignature, fieldElement, annotationMetadata, property.get(), fieldIndex);
+            value = getInvokeGetPropertyValueForField(injectMethodSignature, fieldElement, fieldElement.getAnnotationMetadata(), property.get(), fieldIndex);
         } else {
-            Optional<String> valueValue = annotationMetadata.stringValue(Value.class);
+            Optional<String> valueValue = fieldElement.getAnnotationMetadata().stringValue(Value.class);
             if (valueValue.isPresent()) {
-                value = getInvokeGetPropertyPlaceholderValueForField(injectMethodSignature, fieldElement, annotationMetadata, valueValue.get(), fieldIndex);
+                value = getInvokeGetPropertyPlaceholderValueForField(injectMethodSignature, fieldElement, valueValue.get(), fieldIndex);
             } else {
                 // ???
                 value = ExpressionDef.nullValue();
@@ -2083,7 +2079,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
 
             initStatements.add(beanDefinitionTypeDef.getStaticField(injectionFieldsField)
                 .put(fieldReferenceArray.instantiate(fieldInjectionPoints.stream()
-                    .map(fd -> getNewFieldReference(fd.beanType, fd.fieldElement, fd.annotationMetadata))
+                    .map(fd -> getNewFieldReference(fd.beanType, fd.fieldElement))
                     .toList())));
             failStatements.add(beanDefinitionTypeDef.getStaticField(injectionFieldsField).put(ExpressionDef.nullValue()));
         }
@@ -2265,7 +2261,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
 
             return getNewMethodReference(methodElement.getDeclaringType(), methodElement, methodElement.getAnnotationMetadata(), false, false);
         } else if (constructor instanceof FieldElement fieldConstructor) {
-            return getNewFieldReference(fieldConstructor.getDeclaringType(), fieldConstructor, fieldConstructor.getAnnotationMetadata());
+            return getNewFieldReference(fieldConstructor.getDeclaringType(), fieldConstructor);
         } else {
             throw new IllegalArgumentException("Unexpected constructor: " + constructor);
         }
@@ -3029,7 +3025,6 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
     private StatementDef injectField(InjectMethodSignature injectMethodSignature,
                                      TypedElement declaringType,
                                      FieldElement fieldElement,
-                                     AnnotationMetadata annotationMetadata,
                                      boolean requiresReflection) {
 
         boolean isRequired = fieldElement
@@ -3073,7 +3068,6 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
             injectMethodSignature,
             declaringType,
             fieldElement,
-            annotationMetadata,
             requiresReflection,
             methodToInvoke,
             isArray,
@@ -3173,10 +3167,9 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
 
     private ExpressionDef getInvokeGetPropertyPlaceholderValueForField(InjectMethodSignature injectMethodSignature,
                                                                        FieldElement fieldElement,
-                                                                       AnnotationMetadata annotationMetadata,
                                                                        String value,
                                                                        int fieldIndex) {
-        annotationMetadata = MutableAnnotationMetadata.of(annotationMetadata);
+        AnnotationMetadata annotationMetadata = MutableAnnotationMetadata.of(fieldElement.getAnnotationMetadata());
         removeAnnotations(annotationMetadata, PropertySource.class.getName(), Property.class.getName());
 
         return injectMethodSignature.aThis
@@ -3243,17 +3236,16 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
     private StatementDef visitFieldInjectionPointInternal(InjectMethodSignature injectMethodSignature,
                                                           TypedElement declaringType,
                                                           FieldElement fieldElement,
-                                                          AnnotationMetadata annotationMetadata,
                                                           boolean requiresReflection,
                                                           Method methodToInvoke,
                                                           boolean isArray,
                                                           boolean requiresGenericType,
                                                           boolean isRequired) {
-        evaluatedExpressionProcessor.processEvaluatedExpressions(annotationMetadata, null);
+        evaluatedExpressionProcessor.processEvaluatedExpressions(fieldElement.getAnnotationMetadata(), null);
 
-        autoApplyNamedIfPresent(fieldElement, annotationMetadata);
+        autoApplyNamedIfPresent(fieldElement, fieldElement.getAnnotationMetadata());
 
-        fieldInjectionPoints.add(new FieldVisitData(declaringType, fieldElement, annotationMetadata, requiresReflection));
+        fieldInjectionPoints.add(new FieldVisitData(declaringType, fieldElement, requiresReflection));
 
         int fieldIndex = fieldInjectionPoints.size() - 1;
 
@@ -4628,7 +4620,13 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
         }
     }
 
-    private ExpressionDef getNewFieldReference(TypedElement declaringType, FieldElement fieldElement, AnnotationMetadata annotationMetadata) {
+    private ExpressionDef getNewFieldReference(TypedElement declaringType, FieldElement fieldElement) {
+        MutableAnnotationMetadata fieldAnnotationMetadata = MutableAnnotationMetadata.of(
+            new AnnotationMetadataHierarchy(
+                fieldElement.getType().getTypeAnnotationMetadata(),
+                fieldElement.getAnnotationMetadata()
+            )
+        );
         return ClassTypeDef.of(AbstractInitializableBeanDefinition.FieldReference.class)
             .instantiate(
                 FIELD_REFERENCE_CONSTRUCTOR,
@@ -4642,7 +4640,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                     beanDefinitionTypeDef,
                     fieldElement.getName(),
                     fieldElement.getGenericType(),
-                    annotationMetadata,
+                    fieldAnnotationMetadata,
                     fieldElement.getGenericType().getTypeArguments(),
                     loadClassValueExpressionFn
                 )
@@ -4944,17 +4942,14 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
     private static final class FieldVisitData {
         final TypedElement beanType;
         final FieldElement fieldElement;
-        final AnnotationMetadata annotationMetadata;
         final boolean requiresReflection;
 
         FieldVisitData(
             TypedElement beanType,
             FieldElement fieldElement,
-            AnnotationMetadata annotationMetadata,
             boolean requiresReflection) {
             this.beanType = beanType;
             this.fieldElement = fieldElement;
-            this.annotationMetadata = annotationMetadata;
             this.requiresReflection = requiresReflection;
         }
 
