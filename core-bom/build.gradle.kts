@@ -16,6 +16,8 @@ micronautBom {
         acceptedVersionRegressions.add("netty-http3")
         acceptedLibraryRegressions.add("netty-incubator-codec-http3")
         acceptedVersionRegressions.add("jackson-databind") // version is already defined with jackson
+        acceptedVersionRegressions.add("netty-contrib-multipart")
+        acceptedLibraryRegressions.add("netty-contrib-multipart-vintage")
 
         // Kotlin 2 is now the only supported release
         acceptedVersionRegressions.add("kotlin2")
