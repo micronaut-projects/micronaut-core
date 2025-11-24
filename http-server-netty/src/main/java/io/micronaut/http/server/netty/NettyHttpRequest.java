@@ -45,8 +45,11 @@ import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.body.stream.AvailableByteArrayBody;
+import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
+import io.micronaut.http.form.FormCapableHttpRequest;
+import io.micronaut.http.form.RawFormField;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.NettyHttpParameters;
 import io.micronaut.http.netty.NettyHttpRequestBuilder;
@@ -58,7 +61,9 @@ import io.micronaut.http.netty.stream.DefaultStreamedHttpRequest;
 import io.micronaut.http.netty.stream.DelegateStreamedHttpRequest;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
+import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.handler.Http2ServerHandler;
+import io.micronaut.http.server.netty.multipart.FormDemuxer;
 import io.micronaut.http.server.netty.multipart.NettyCompletedFileUpload;
 import io.micronaut.web.router.DefaultUriRouteMatch;
 import io.micronaut.web.router.RouteAttributes;
@@ -68,6 +73,7 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
+import io.netty.contrib.multipart.PostBodyDecoder;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
@@ -76,6 +82,7 @@ import io.netty.handler.codec.http.DefaultLastHttpContent;
 import io.netty.handler.codec.http.EmptyHttpHeaders;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.handler.codec.http.cookie.ClientCookieEncoder;
 import io.netty.handler.codec.http2.DefaultHttp2PushPromiseFrame;
@@ -90,6 +97,7 @@ import io.netty.handler.ssl.SslHandler;
 import io.netty.util.ReferenceCounted;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
+import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -113,7 +121,7 @@ import java.util.function.Supplier;
  * @since 1.0
  */
 @Internal
-public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements HttpRequest<T>, PushCapableHttpRequest<T>, io.micronaut.http.FullHttpRequest<T>, ServerHttpRequest<T> {
+public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements HttpRequest<T>, PushCapableHttpRequest<T>, io.micronaut.http.FullHttpRequest<T>, ServerHttpRequest<T>, FormCapableHttpRequest<T> {
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpRequest.class);
 
     /**
@@ -712,6 +720,64 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         return immediateByteBody.peek().toByteBuffer();
     }
 
+    @Override
+    public @NonNull Publisher<RawFormField> getRawFormFields() throws IllegalStateException {
+        NettyHttpServerConfiguration nhsc = (NettyHttpServerConfiguration) serverConfiguration;
+        PostBodyDecoder.Builder builder = PostBodyDecoder.builder()
+            .charset(getCharacterEncoding())
+            .maxFields(nhsc.getFormMaxFields())
+            //.enableQuirks(nhsc.getFormDecoderQuirks()) // TODO
+            .undecodedLimit(nhsc.getFormMaxBufferedBytes());
+
+        FormType formType = parseFormType();
+        PostBodyDecoder decoder = switch (formType) {
+            case null ->
+                throw new IllegalStateException("Not a form Content-Type. Please check hasFormBody() before calling this method.");
+            case NettyHttpRequest.FormTypeMultipart formTypeMultipart ->
+                builder.forMultipartBoundary(formTypeMultipart.boundary());
+            case NettyHttpRequest.FormTypeUrlEncoded ignored -> builder.forUrlEncodedData();
+        };
+
+        return new FormDemuxer(
+            decoder,
+            channelHandlerContext.channel(),
+            BodySizeLimits.UNLIMITED, // TODO
+            byteBody()
+        ).fields();
+    }
+
+    @Override
+    public boolean hasFormBody() {
+        return parseFormType() != null;
+    }
+
+    @Nullable
+    private FormType parseFormType() {
+        Optional<MediaType> contentType = getContentType();
+        if (contentType.isEmpty()) {
+            return null;
+        }
+        MediaType ct = contentType.get();
+        if (ct.matches(MediaType.APPLICATION_FORM_URLENCODED_TYPE)) {
+            return FormTypeUrlEncoded.INSTANCE;
+        } else if (ct.matches(MediaType.MULTIPART_FORM_DATA_TYPE)) {
+            Optional<String> boundary = ct.getParameters().get(HttpHeaderValues.BOUNDARY);
+            return boundary.map(FormTypeMultipart::new).orElse(null);
+        } else {
+            return null;
+        }
+    }
+
+    private sealed interface FormType {
+    }
+
+    private static final class FormTypeUrlEncoded implements FormType {
+        static final FormTypeUrlEncoded INSTANCE = new FormTypeUrlEncoded();
+    }
+
+    private static record FormTypeMultipart(String boundary) implements FormType {
+    }
+
     /**
      * Mutable version of the request.
      */
@@ -815,10 +881,10 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         @NonNull
         @Override
         @Deprecated
-        public io.netty.handler.codec.http.FullHttpRequest toFullHttpRequest() {
+        public FullHttpRequest toFullHttpRequest() {
             io.netty.handler.codec.http.HttpRequest nr = NettyHttpRequest.this.nettyRequest;
-            if (nr instanceof io.netty.handler.codec.http.FullHttpRequest) {
-                return (io.netty.handler.codec.http.FullHttpRequest) NettyHttpRequest.this.nettyRequest;
+            if (nr instanceof FullHttpRequest) {
+                return (FullHttpRequest) NettyHttpRequest.this.nettyRequest;
             } else {
                 return new DefaultFullHttpRequest(
                     nr.protocolVersion(),
@@ -838,7 +904,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
             if (isStream()) {
                 return (StreamedHttpRequest) NettyHttpRequest.this.nettyRequest;
             } else {
-                io.netty.handler.codec.http.FullHttpRequest fullHttpRequest = toFullHttpRequest();
+                FullHttpRequest fullHttpRequest = toFullHttpRequest();
                 DefaultStreamedHttpRequest request = new DefaultStreamedHttpRequest(
                     fullHttpRequest.protocolVersion(),
                     fullHttpRequest.method(),

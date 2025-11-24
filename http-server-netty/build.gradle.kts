@@ -34,7 +34,8 @@ dependencies {
     compileOnly(projects.micronautWebsocket)
     compileOnly(libs.managed.kotlin.stdlib)
     compileOnly(libs.managed.netty.transport.native.unix.common)
-    compileOnly(libs.managed.netty.contrib.multipart.vintage)
+    implementation(libs.managed.netty.contrib.multipart.vintage) // todo: depend on core only
+    testImplementation(libs.managed.netty.contrib.multipart.vintage)
     compileOnly(projects.micronautHttpNettyHttp3)
     compileOnly(libs.brotli4j)
 

@@ -126,7 +126,7 @@ public final class NettyByteBodyFactory extends ByteBodyFactory {
 
     @Override
     public StreamingNettyByteBody toStreaming(ByteBody body) {
-        if (body instanceof StreamingNettyByteBody snbb) {
+        if (body instanceof StreamingNettyByteBody snbb && snbb.isCompatible(loop)) {
             return snbb;
         }
         NettyBodyAdapter adapter = new NettyBodyAdapter(loop, body.toReadBufferPublisher(), null);
