@@ -18,8 +18,30 @@ dependencies {
 }
 
 application {
-//    mainClass = "io.micronaut.python.cli.PyronautCliCompiler"
+    mainClass = "io.micronaut.python.cli.PyronautCliCompiler"
+}
+
+val createStartScriptsForPyronaut = tasks.register<CreateStartScripts>("createStartScriptsForPyronaut") {
     mainClass = "io.micronaut.python.cli.PyronautMainCommand"
+    applicationName = "pyronaut"
+    outputDir = layout.buildDirectory.dir("pyronaut/scripts").get().asFile
+    classpath = files(configurations.runtimeClasspath, tasks.named("jar"))
+}
+
+distributions {
+    create("pyronaut") {
+        contents {
+            from(createStartScriptsForPyronaut) {
+                into("bin")
+            }
+            from(tasks.named("jar")) {
+                into("lib")
+            }
+            from(configurations.runtimeClasspath) {
+                into("lib")
+            }
+        }
+    }
 }
 
 graalvmNative {

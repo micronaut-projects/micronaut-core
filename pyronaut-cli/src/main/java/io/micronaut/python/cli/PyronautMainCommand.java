@@ -15,17 +15,11 @@
  */
 package io.micronaut.python.cli;
 
-import io.micronaut.python.compiler.PyronautCompiler;
-import io.micronaut.runtime.Micronaut;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
 
 import java.io.File;
-import java.io.IOException;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.Callable;
@@ -49,61 +43,28 @@ public class PyronautMainCommand implements Callable<Integer> {
 
         @Override
         public Integer call() throws Exception {
-            var sourceDirectory = this.sourceDirectory == null ? new File(".") : this.sourceDirectory;
+            var sourceDirectory = (this.sourceDirectory == null ? new File(".") : this.sourceDirectory).getCanonicalFile().getAbsoluteFile();
             var tmpDir = Path.of(System.getProperty("java.io.tmpdir")).resolve("pyronaut");
             var outputDirectory = tmpDir.resolve("classes");
             Files.createDirectories(outputDirectory);
-            var code = compile(sourceDirectory, outputDirectory);
-            if (code != 0) {
-                return code;
-            }
-            return runApp(outputDirectory, sourceDirectory);
-        }
 
-        private int runApp(Path outputDirectory, File sourceDirectory)
-            throws IOException {
-            try (
-                var cl = new URLClassLoader(buildUrls(outputDirectory, sourceDirectory.toPath()))) {
-                var ctx = Micronaut.build(parameters)
-                    .args(parameters)
-                    .classLoader(cl)
-                    .start();
-                // The following line prevents the server from immediately
-                // shutting down. Should be redundant but for some reason,
-                // start() doesn't block
-                Thread.currentThread().join();
-            } catch (RuntimeException ex) {
-                ex.printStackTrace(System.err);
-                return -1;
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-            return 0;
-        }
+            // Start file watcher instead of running once
+            PyronautFileWatcher watcher = new PyronautFileWatcher(sourceDirectory, outputDirectory, parameters);
+            Thread watcherThread = new Thread(watcher);
+            watcherThread.start();
 
-        private static int compile(File sourceDirectory, Path outputDirectory) {
-            var compiler = PyronautCompiler.builder()
-                .pythonSrc(sourceDirectory.getAbsolutePath())
-                .targetDir(outputDirectory.toFile())
-                .build();
+            // Handle shutdown gracefully
+            Runtime.getRuntime().addShutdownHook(new Thread(watcher::stop));
+
             try {
-                compiler.compile();
-            } catch (RuntimeException ex) {
-                ex.printStackTrace(System.err);
-                return -1;
+                watcherThread.join();
+            } catch (InterruptedException e) {
+                watcher.stop();
+                Thread.currentThread().interrupt();
             }
+
             return 0;
         }
-
-    }
-
-    private static URL[] buildUrls(Path... paths) throws MalformedURLException {
-        var result = new URL[paths.length];
-        for (int i = 0; i < paths.length; i++) {
-            var path = paths[i];
-            result[i] = path.toUri().toURL();
-        }
-        return result;
     }
 
     public static void main(String[] args) {

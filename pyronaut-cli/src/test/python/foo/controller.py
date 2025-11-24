@@ -1,13 +1,11 @@
 from micronaut.http.annotation import Controller, Get
 
-@Controller("/hello")
-class HelloController:
-    @Get(produces = "text/plain")
+@Controller
+class MyController:
+    @Get(value="/", produces="text/plain")
     def index(self) -> str:
-        return "Hello World"
+        return "Hello World!"
 
-@Controller("/")
-class HomeController:
-    @Get(produces = "text/plain")
-    def index(self) -> str:
-        return "Home controller"
+    @Get(value="/hello")
+    def hello(self) -> dict:
+        return {"Hello": "Pyronaut!"}

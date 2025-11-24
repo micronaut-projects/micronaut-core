@@ -1,9 +1,9 @@
 from micronaut.runtime.event.annotation import EventListener
-from micronaut.runtime.event import StartupEvent
+from micronaut.context.event import StartupEvent
 from jakarta.inject import Singleton
 
 @Singleton
 class MyListener:
     @EventListener
     def start(self, event: StartupEvent):
-        print("Application started")
+        print("Hello from listener")

@@ -15,20 +15,19 @@
  */
 package io.micronaut.context.python;
 
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
-
-import org.graalvm.polyglot.Context;
-import org.graalvm.polyglot.HostAccess;
-import org.graalvm.polyglot.Source;
-import org.graalvm.python.embedding.GraalPyResources;
-import org.graalvm.python.embedding.VirtualFileSystem;
-
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.runtime.exceptions.ApplicationStartupException;
 import jakarta.annotation.PreDestroy;
 import jakarta.inject.Singleton;
+import org.graalvm.polyglot.HostAccess;
+import org.graalvm.polyglot.Source;
+import org.graalvm.python.embedding.GraalPyResources;
+import org.graalvm.python.embedding.VirtualFileSystem;
+
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 
 /**
  * Factory bean that creates and initializes the GraalPy context.
@@ -62,15 +61,20 @@ public class GraalPyContextFactory {
         try {
             ClassLoader classLoader = applicationContext.getClassLoader();
 
-            Context context = GraalPyResources.contextBuilder(VirtualFileSystem.newBuilder()
+            var builder = GraalPyResources.contextBuilder(VirtualFileSystem.newBuilder()
                     .resourceDirectory(APPLICATION_PATH)
                     .resourceLoadingClass(classLoader.loadClass(PYRONAUT_MAIN_CLASS)).build())
                 // restrict in future?
 //                .option("python.ExposeInternalSources", StringUtils.TRUE)
 //                .allowExperimentalOptions(true)
                 .allowHostAccess(HostAccess.ALL)
-                .allowHostClassLookup(name -> true)
-                .build();
+                .allowHostClassLookup(name -> true);
+            var pyEnv = System.getenv("PYENV_VERSION");
+            var venv = System.getenv("VIRTUAL_ENV");
+            if (pyEnv != null && venv != null && pyEnv.startsWith("graalpy")) {
+                builder.option("python.Executable", Path.of(venv).resolve("bin/python").toString());
+            }
+            var context = builder.build();
             context.initialize(GraalPyRuntimeUtil.PYTHON);
 
 
