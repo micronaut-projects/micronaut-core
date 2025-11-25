@@ -276,7 +276,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             ElementQuery.ALL_METHODS
                                 .onlyAccessible()
                                 .onlyInstance()
-                                .annotated(ann -> isJunit5Test || ann.hasStereotype(Executable.class) ||
+                                .annotated(ann -> isJunit5Test ||
+                                    ann.hasStereotype(Executable.class) ||
+                                    ann.hasAnnotation(AnnotationUtil.PRE_DESTROY) ||
+                                    ann.hasAnnotation(AnnotationUtil.POST_CONSTRUCT) ||
                                     ann.hasStereotype(Around.class) ||
                                     element.hasStereotype(Around.class) ||
                                     ann.hasDeclaredStereotype(AnnotationUtil.SCOPE) ||
