@@ -6,7 +6,7 @@ import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.i18n.ResourceBundleMessageSource;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;

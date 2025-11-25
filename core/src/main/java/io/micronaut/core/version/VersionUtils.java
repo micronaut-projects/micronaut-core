@@ -15,7 +15,7 @@
  */
 package io.micronaut.core.version;
 
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.InputStreamReader;

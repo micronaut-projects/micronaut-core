@@ -17,7 +17,7 @@ package io.micronaut.http.client.retry
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
-import io.micronaut.core.annotation.NonNull
+import org.jspecify.annotations.NonNull
 import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.http.MutableHttpRequest
 import io.micronaut.http.annotation.Body

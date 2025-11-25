@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.server.netty.ssl;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.netty.NettyTlsUtils;

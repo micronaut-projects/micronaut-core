@@ -21,8 +21,8 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.InjectionPoint;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Interface to integrate bean validation into the construction of beans within the {@link io.micronaut.context.BeanContext}.

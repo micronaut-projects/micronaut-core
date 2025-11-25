@@ -18,7 +18,7 @@ package io.micronaut.http.client;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.context.ClientContextPathProvider;
 import io.micronaut.http.ssl.AbstractClientSslConfiguration;
@@ -157,7 +157,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
             @Parameter String serviceId,
             @Nullable ServiceConnectionPoolConfiguration connectionPoolConfiguration,
             @Nullable ServiceWebSocketCompressionConfiguration webSocketCompressionConfiguration,
-            @Nullable ServiceHttpClientConfiguration.ServiceHttp2ClientConfiguration http2Configuration,
+            ServiceHttpClientConfiguration.@Nullable ServiceHttp2ClientConfiguration http2Configuration,
             @Nullable ServiceSslClientConfiguration sslConfiguration,
             HttpClientConfiguration defaultHttpClientConfiguration) {
         super(defaultHttpClientConfiguration);

@@ -16,7 +16,7 @@
 package io.micronaut.core.propagation;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A {@link PropagatedContextElement} that bridges to code that uses thread local storage instead of

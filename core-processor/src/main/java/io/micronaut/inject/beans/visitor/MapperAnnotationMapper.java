@@ -19,7 +19,7 @@ import io.micronaut.aop.InterceptorBinding;
 import io.micronaut.aop.InterceptorKind;
 import io.micronaut.context.annotation.Mapper;
 import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.annotation.TypedAnnotationMapper;
 import io.micronaut.inject.visitor.VisitorContext;
 

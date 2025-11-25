@@ -1,7 +1,7 @@
 package io.micronaut.docs.server.form;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.*;

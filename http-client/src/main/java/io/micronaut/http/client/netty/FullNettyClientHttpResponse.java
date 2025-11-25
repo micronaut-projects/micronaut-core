@@ -17,7 +17,7 @@ package io.micronaut.http.client.netty;
 
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
@@ -247,9 +247,8 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, NettyHtt
         return copy;
     }
 
-    @NonNull
     @Override
-    public io.netty.handler.codec.http.HttpResponse toHttpResponse() {
+    public io.netty.handler.codec.http.@NonNull HttpResponse toHttpResponse() {
         return nettyHttpResponse;
     }
 

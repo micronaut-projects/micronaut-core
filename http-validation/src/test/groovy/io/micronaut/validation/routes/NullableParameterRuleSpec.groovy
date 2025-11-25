@@ -163,7 +163,7 @@ class Foo {
 package test;
 
 import io.micronaut.http.annotation.*;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 @Controller("/foo")
 class Foo {
@@ -209,7 +209,7 @@ class Foo {
 package test;
 
 import io.micronaut.http.annotation.*;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 @Controller("/foo")
 class Foo {
@@ -315,7 +315,7 @@ class Foo {
 package test;
 
 import io.micronaut.http.annotation.*;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 @Controller("/foo")
 class Foo {
@@ -340,7 +340,7 @@ package test;
 
 import io.micronaut.http.annotation.*;
 import io.micronaut.core.annotation.*;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 @Controller("/foo")
 class Foo {
@@ -375,7 +375,7 @@ package test;
 
 import io.micronaut.http.annotation.*;
 import io.micronaut.core.annotation.*;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.util.Optional;
 
 @Controller("/foo")
@@ -590,7 +590,7 @@ package test;
 
 import io.micronaut.http.annotation.*;
 import io.micronaut.core.annotation.*;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 @Controller("/foo")
 class Foo {
@@ -667,7 +667,7 @@ package test;
 
 import io.micronaut.http.annotation.*;
 import io.micronaut.core.annotation.*;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 @Controller("/foo")
 class Foo {

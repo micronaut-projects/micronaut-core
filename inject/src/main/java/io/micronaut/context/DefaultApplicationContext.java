@@ -32,8 +32,8 @@ import io.micronaut.context.exceptions.DependencyInjectionException;
 import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.DefaultMutableConversionService;
 import io.micronaut.core.convert.MutableConversionService;
@@ -438,7 +438,6 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
         return chain;
     }
 
-    @NonNull
     private <T> void appendEachPropertyMissingBeanMessage(String linePrefix,
                                                           StringBuilder messageBuilder,
                                                           String lineSeparator,

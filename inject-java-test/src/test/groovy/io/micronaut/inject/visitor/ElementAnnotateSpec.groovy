@@ -6,7 +6,7 @@ import io.micronaut.annotation.processing.test.JavaParser
 import io.micronaut.aop.Introduction
 import io.micronaut.core.annotation.AnnotationValueBuilder
 import io.micronaut.core.annotation.Introspected
-import io.micronaut.core.annotation.NonNull
+import org.jspecify.annotations.NonNull
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.MethodElement

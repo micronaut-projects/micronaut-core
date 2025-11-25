@@ -18,7 +18,7 @@ package io.micronaut.core.beans;
 import io.micronaut.core.beans.exceptions.IntrospectionException;
 import io.micronaut.core.util.ArgumentUtils;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
 import java.util.Collection;

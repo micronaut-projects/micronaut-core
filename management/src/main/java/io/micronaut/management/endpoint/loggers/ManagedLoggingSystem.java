@@ -15,7 +15,7 @@
  */
 package io.micronaut.management.endpoint.loggers;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import jakarta.validation.constraints.NotBlank;
 
 import java.util.Collection;

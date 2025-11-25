@@ -20,7 +20,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.inject.ExecutableMethod;
 import kotlin.Unit;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 
 import static io.micronaut.core.util.KotlinUtils.KOTLIN_COROUTINES_SUPPORTED;
 

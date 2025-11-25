@@ -23,7 +23,7 @@ import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
 import io.micronaut.inject.InstantiatableBeanDefinition;

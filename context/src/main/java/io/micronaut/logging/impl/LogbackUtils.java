@@ -20,7 +20,7 @@ import ch.qos.logback.classic.spi.Configurator;
 import ch.qos.logback.classic.util.DefaultJoranConfigurator;
 import ch.qos.logback.core.joran.spi.JoranException;
 import ch.qos.logback.core.status.InfoStatus;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.logging.LoggingSystemException;
 

@@ -18,7 +18,7 @@ package io.micronaut.web.router.version;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.BeanCreatedEvent;
 import io.micronaut.context.event.BeanCreatedEventListener;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.filter.FilteredRouter;

@@ -16,7 +16,7 @@
 package io.micronaut.http.client.bind;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.type.Argument;
 
 import java.util.Optional;

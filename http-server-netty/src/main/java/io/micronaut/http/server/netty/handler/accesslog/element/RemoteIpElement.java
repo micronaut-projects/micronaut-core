@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.server.netty.handler.accesslog.element;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.http.HttpHeaders;
 
 import java.util.Locale;

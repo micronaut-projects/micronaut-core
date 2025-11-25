@@ -16,7 +16,7 @@
 package io.micronaut.core.beans;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 
 /**
  * Unsafe bean property interface adds read methods which don't validate the input/output.

@@ -4,7 +4,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Bean
 import io.micronaut.context.annotation.Factory
 import io.micronaut.context.annotation.Requires
-import io.micronaut.core.annotation.NonNull
+import org.jspecify.annotations.NonNull
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller

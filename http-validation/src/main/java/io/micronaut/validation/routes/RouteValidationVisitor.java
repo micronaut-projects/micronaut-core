@@ -19,7 +19,7 @@ import io.micronaut.context.env.DefaultPropertyPlaceholderResolver;
 import io.micronaut.context.env.DefaultPropertyPlaceholderResolver.RawSegment;
 import io.micronaut.context.env.DefaultPropertyPlaceholderResolver.Segment;
 import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.uri.UriMatchTemplate;

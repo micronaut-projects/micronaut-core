@@ -16,7 +16,7 @@
 package io.micronaut.http.context;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.propagation.PropagatedContextElement;
 import io.micronaut.http.HttpRequest;

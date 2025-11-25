@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.server.netty.handler;
 
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.http.server.netty.DefaultHttpCompressionStrategy;
 import io.micronaut.http.server.netty.HttpCompressionStrategy;
 import io.netty.buffer.ByteBuf;

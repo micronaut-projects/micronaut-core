@@ -30,7 +30,7 @@ import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.naming.Described;
 import io.micronaut.core.order.OrderUtil;

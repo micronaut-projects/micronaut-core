@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.context;
 
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A contract for providing a context path to a server.

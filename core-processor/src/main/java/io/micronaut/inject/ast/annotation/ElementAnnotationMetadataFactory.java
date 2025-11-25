@@ -16,7 +16,7 @@
 package io.micronaut.inject.ast.annotation;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.GenericElement;

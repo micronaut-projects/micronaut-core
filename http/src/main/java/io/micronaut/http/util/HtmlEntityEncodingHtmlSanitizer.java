@@ -16,7 +16,7 @@
 package io.micronaut.http.util;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import jakarta.annotation.Nullable;
 import jakarta.inject.Singleton;
 

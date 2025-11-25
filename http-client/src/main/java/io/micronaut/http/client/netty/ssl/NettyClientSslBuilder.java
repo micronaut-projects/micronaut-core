@@ -17,7 +17,7 @@ package io.micronaut.http.client.netty.ssl;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Secondary;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.client.HttpVersionSelection;

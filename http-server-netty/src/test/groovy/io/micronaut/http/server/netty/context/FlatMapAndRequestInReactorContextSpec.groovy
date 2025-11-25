@@ -5,8 +5,8 @@ import groovy.transform.EqualsAndHashCode
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Introspected
-import io.micronaut.core.annotation.NonNull
-import io.micronaut.core.annotation.Nullable
+import org.jspecify.annotations.NonNull
+import org.jspecify.annotations.Nullable
 import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest

@@ -71,7 +71,7 @@ package test;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Header;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Inherited;

@@ -18,7 +18,7 @@ package io.micronaut.docs.config.immutable;
 // tag::imports[]
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.bind.annotation.Bindable;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.context.annotation.ConfigurationInject;
 import io.micronaut.context.annotation.ConfigurationProperties;
 

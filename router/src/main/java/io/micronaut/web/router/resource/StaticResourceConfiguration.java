@@ -24,7 +24,7 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.http.context.ServerContextPathProvider;
 
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;

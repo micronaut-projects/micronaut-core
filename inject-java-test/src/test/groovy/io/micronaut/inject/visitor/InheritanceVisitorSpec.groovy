@@ -3,7 +3,7 @@ package io.micronaut.inject.visitor
 import io.micronaut.annotation.processing.TypeElementVisitorProcessor
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.annotation.processing.test.JavaParser
-import io.micronaut.core.annotation.NonNull
+import org.jspecify.annotations.NonNull
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
 

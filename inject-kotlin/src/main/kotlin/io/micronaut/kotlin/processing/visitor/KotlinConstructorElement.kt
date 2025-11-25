@@ -46,11 +46,11 @@ internal class KotlinConstructorElement(
         return false
     }
 
-    override fun hides(memberElement: MemberElement?): Boolean {
+    override fun hides(memberElement: MemberElement): Boolean {
         return false
     }
 
-    override fun hides(hiddenMethod: MethodElement?): Boolean {
+    override fun hides(hiddenMethod: MethodElement): Boolean {
         return false
     }
 

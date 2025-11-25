@@ -39,6 +39,5 @@ class StubIntroducer implements MethodInterceptor<Object, Object> {
         if (iterator.hasNext())
             return iterator.next().getValue()
         return null
-
     }
 }

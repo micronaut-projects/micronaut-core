@@ -8,7 +8,7 @@ import io.micronaut.context.annotation.Factory
 import io.micronaut.context.annotation.Replaces
 import io.micronaut.core.annotation.AnnotationClassValue
 import io.micronaut.core.annotation.AnnotationMetadata
-import io.micronaut.core.annotation.NonNull
+import org.jspecify.annotations.NonNull
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.visitor.TypeElementVisitor

@@ -16,7 +16,7 @@
 package io.micronaut.http.bind.binders;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanIntrospector;
 import io.micronaut.core.bind.annotation.AbstractArgumentBinder;

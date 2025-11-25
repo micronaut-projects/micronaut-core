@@ -18,7 +18,7 @@ package io.micronaut.context;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
@@ -28,7 +28,7 @@ import io.micronaut.inject.FieldInjectionPoint;
 import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.util.Objects;

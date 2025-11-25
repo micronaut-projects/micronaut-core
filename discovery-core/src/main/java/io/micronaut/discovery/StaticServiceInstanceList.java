@@ -15,7 +15,7 @@
  */
 package io.micronaut.discovery;
 
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.health.HealthStatus;
 
 import java.net.URI;

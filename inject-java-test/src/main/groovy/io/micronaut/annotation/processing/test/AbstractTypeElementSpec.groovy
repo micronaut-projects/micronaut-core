@@ -33,8 +33,8 @@ import io.micronaut.context.event.ApplicationEventPublisherFactory
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationMetadataProvider
 import io.micronaut.core.annotation.Experimental
-import io.micronaut.core.annotation.NonNull
-import io.micronaut.core.annotation.Nullable
+import org.jspecify.annotations.NonNull
+import org.jspecify.annotations.Nullable
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap
 import io.micronaut.core.graal.GraalReflectionConfigurer

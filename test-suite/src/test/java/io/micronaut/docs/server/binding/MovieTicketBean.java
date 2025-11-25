@@ -17,7 +17,7 @@ package io.micronaut.docs.server.binding;
 
 // tag::imports[]
 import io.micronaut.core.annotation.Introspected;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.annotation.PathVariable;
 import io.micronaut.http.annotation.QueryValue;

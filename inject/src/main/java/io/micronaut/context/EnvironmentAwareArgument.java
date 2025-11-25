@@ -22,7 +22,7 @@ import io.micronaut.core.type.DefaultArgument;
 import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * An argument that is aware of the environment to resolve property placeholders

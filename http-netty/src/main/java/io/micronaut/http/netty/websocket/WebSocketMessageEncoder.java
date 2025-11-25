@@ -17,7 +17,7 @@ package io.micronaut.http.netty.websocket;
 
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;

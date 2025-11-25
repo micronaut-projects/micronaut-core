@@ -17,7 +17,7 @@ package io.micronaut.inject;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 
 import java.util.function.Predicate;
 

@@ -16,7 +16,7 @@
 package io.micronaut.http.hateoas;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
 

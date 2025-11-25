@@ -16,7 +16,7 @@
 package io.micronaut.expressions.parser;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.ast.collection.OneDimensionalArray;
 import io.micronaut.expressions.parser.ast.literal.StringLiteral;

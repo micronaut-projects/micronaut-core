@@ -29,7 +29,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;

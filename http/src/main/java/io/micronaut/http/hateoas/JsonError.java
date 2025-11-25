@@ -21,7 +21,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
 
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.util.Optional;
 
 /**

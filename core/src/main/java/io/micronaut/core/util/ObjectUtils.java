@@ -16,7 +16,7 @@
 package io.micronaut.core.util;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collection;
 import java.util.Map;
