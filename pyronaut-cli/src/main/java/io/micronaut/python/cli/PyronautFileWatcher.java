@@ -17,10 +17,13 @@ package io.micronaut.python.cli;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.python.ContextHolder;
+import io.micronaut.core.naming.Described;
 import io.micronaut.python.compiler.PyronautCompiler;
-import io.micronaut.runtime.Micronaut;
+import io.micronaut.runtime.EmbeddedApplication;
+import io.micronaut.runtime.server.EmbeddedServer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.io.File;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -34,46 +37,55 @@ import java.nio.file.StandardWatchEventKinds;
 import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import static io.micronaut.python.cli.FileUtils.recurseDelete;
+import static java.nio.file.Files.createDirectories;
 
 /**
  * File watcher for Pyronaut applications that recompiles and restarts
  * the application when source files change.
  */
 public class PyronautFileWatcher implements Runnable {
+    private static final Logger LOGGER = LoggerFactory.getLogger(PyronautFileWatcher.class);
 
     public static final int SUCCESS = 0;
     public static final int ERROR = -1;
 
-    private final File sourceDirectory;
+    private final Path sourceDirectory;
     private final Path outputDirectory;
     private final String[] parameters;
     private final AtomicBoolean running = new AtomicBoolean(true);
-    private volatile ApplicationContext currentContext;
+    private final AtomicBoolean starting = new AtomicBoolean(false);
 
-    public PyronautFileWatcher(File sourceDirectory, Path outputDirectory, String[] parameters) {
-        this.sourceDirectory = sourceDirectory;
-        this.outputDirectory = outputDirectory;
+    public PyronautFileWatcher(Path sourceDirectory, String[] parameters) {
+        this.sourceDirectory = sourceDirectory.toAbsolutePath();
+        this.outputDirectory = FileUtils.resolveOutputDirectory(sourceDirectory);
         this.parameters = parameters;
+    }
+
+    private static void async(Runnable action) {
+        new Thread(action).start();
     }
 
     @Override
     public void run() {
+        ApplicationContext currentContext = null;
         try {
             // Initial compilation and start
             if (compile() != SUCCESS) {
                 System.err.println("Initial compilation failed");
                 return;
             }
-            startApplication();
+            currentContext = startApplication();
 
             // Set up file watching
             var watchService = FileSystems.getDefault().newWatchService();
-            registerAll(sourceDirectory.toPath(), watchService);
+            registerAll(sourceDirectory, watchService);
 
-            System.out.println("Watching for changes in " + sourceDirectory.getAbsolutePath());
-
+            System.out.println("Watching for changes in " + sourceDirectory);
+            var outputPath = outputDirectory.toAbsolutePath();
             while (running.get()) {
                 WatchKey key;
                 try {
@@ -90,32 +102,40 @@ public class PyronautFileWatcher implements Runnable {
                         continue;
                     }
 
-                    var changed = (Path) event.context();
-                    System.out.println("File changed: " + changed + " (" + kind + ")");
+                    var changed = ((Path) key.watchable()).resolve((Path) event.context());
+                    if (Files.isHidden(changed) ||
+                        changed.toAbsolutePath().startsWith(outputPath)) {
+                        continue;
+                    }
+                    System.out.println(
+                        "File changed: " + changed.toAbsolutePath() + " (" + kind + ")");
 
                     hasChanges = true;
                 }
 
                 if (hasChanges) {
-                    System.out.println("Changes detected, recompiling and restarting...");
-                    if (compile() == SUCCESS) {
-                        stopApplication();
-                        startApplication();
-                    } else {
-                        System.err.println("Compilation failed, application not restarted");
+                    if (starting.compareAndSet(false, true)) {
+                        // TODO: ideally we should keep the existing app alive until
+                        // we know that all files are compiled properly. This is difficult
+                        // to implement because the generated classes contain an absolute
+                        // path to where the files are generated, which makes it impossible
+                        // to use a different directory for compilation and runtime.
+                        stopApplication(currentContext);
+                        System.out.println("Changes detected, recompiling and restarting...");
+                        if (compile() == SUCCESS) {
+                            currentContext = startApplication();
+                        } else {
+                            System.err.println("Compilation failed, application not restarted");
+                        }
                     }
                 }
 
-                var valid = key.reset();
-                if (!valid) {
-                    break;
-                }
+                key.reset();
             }
-
-        } catch (IOException e) {
-            System.err.println("Error setting up file watcher: " + e.getMessage());
+        } catch (Exception e) {
+            e.printStackTrace(System.err);
         } finally {
-            stopApplication();
+            stopApplication(currentContext);
         }
     }
 
@@ -124,7 +144,8 @@ public class PyronautFileWatcher implements Runnable {
             @Override
             public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
                 throws IOException {
-                dir.register(watchService, StandardWatchEventKinds.ENTRY_CREATE,
+                dir.register(watchService,
+                    StandardWatchEventKinds.ENTRY_CREATE,
                     StandardWatchEventKinds.ENTRY_DELETE,
                     StandardWatchEventKinds.ENTRY_MODIFY);
                 return FileVisitResult.CONTINUE;
@@ -132,13 +153,15 @@ public class PyronautFileWatcher implements Runnable {
         });
     }
 
-    private int compile() {
+    private int compile() throws IOException {
         var compiler = PyronautCompiler.builder()
-            .pythonSrc(sourceDirectory.getAbsolutePath())
-            .targetDir(outputDirectory.toFile())
+            .pythonSrc(sourceDirectory.toString())
+            .targetDir(classesDirectory().toFile())
             .build();
 
         try {
+            recurseDelete(classesDirectory());
+            createDirectories(classesDirectory());
             compiler.compile();
             return SUCCESS;
         } catch (RuntimeException ex) {
@@ -147,41 +170,74 @@ public class PyronautFileWatcher implements Runnable {
         }
     }
 
-    private void startApplication() {
+    private Path classesDirectory() {
+        return outputDirectory.resolve("classes");
+    }
+
+    /**
+     * Reproduces what Micronaut.run() does, WITHOUT adding a shutdown hook
+     */
+    private ApplicationContext startApplication() {
+        long start = System.nanoTime();
+        ApplicationContext currentContext = null;
         try {
-            var classLoader =
-                new URLClassLoader(buildUrls(outputDirectory, sourceDirectory.toPath()));
-            currentContext = Micronaut.build(parameters)
+            var classLoader = new URLClassLoader(buildUrls(classesDirectory(), sourceDirectory));
+            currentContext = ApplicationContext.builder()
                 .args(parameters)
-                .properties(Map.of("micronaut.lifecycle.graceful-shutdown.enabled", "true"))
                 .classLoader(classLoader)
                 .start();
+            currentContext.findBean(EmbeddedApplication.class).ifPresent(embeddedApplication -> {
+                embeddedApplication.start();
+                if (embeddedApplication instanceof Described described) {
+                    if (LOGGER.isInfoEnabled()) {
+                        long took = elapsedMillis(start);
+                        String desc = described.getDescription();
+                        LOGGER.info("Startup completed in {}ms. Server Running: {}", took, desc);
+                    }
+                } else {
+                    if (embeddedApplication instanceof EmbeddedServer embeddedServer) {
+                        if (LOGGER.isInfoEnabled()) {
+                            long took = elapsedMillis(start);
+                            Object uri;
+                            try {
+                                uri = embeddedServer.getContextURI();
+                            } catch (UnsupportedOperationException e) {
+                                uri = "<URI display not available: " + e.getMessage() + ">";
+                            }
+                            LOGGER.info("Startup completed in {}ms. Server Running: {}", took, uri);
+                        }
+                    } else {
+                        if (LOGGER.isInfoEnabled()) {
+                            long took = elapsedMillis(start);
+                            LOGGER.info("Startup completed in {}ms.", took);
+                        }
+                    }
+                }
+            });
             System.out.println("Application started");
+            starting.set(false);
         } catch (Exception e) {
             System.err.println("Failed to start application: " + e.getMessage());
             e.printStackTrace();
         }
+        return currentContext;
     }
 
-    private void stopApplication() {
+    private void stopApplication(ApplicationContext currentContext) {
         if (currentContext != null && currentContext.isRunning()) {
             try {
-                while (currentContext.isRunning()) {
-                    System.out.println(".");
-                    Thread.sleep(10);
-                    if (Thread.currentThread().isInterrupted()) {
-                        Thread.currentThread().interrupt();
-                        break;
-                    }
-                }
+                currentContext.findBean(EmbeddedApplication.class).ifPresentOrElse(EmbeddedApplication::stop, currentContext::stop);
                 System.out.println("Application stopped");
             } catch (Exception e) {
                 System.err.println("Error stopping application: " + e.getMessage());
             } finally {
-                currentContext = null;
                 ContextHolder.resetContext();
             }
         }
+    }
+
+    private static long elapsedMillis(long startNanos) {
+        return TimeUnit.MILLISECONDS.convert(System.nanoTime() - startNanos, TimeUnit.NANOSECONDS);
     }
 
     public void stop() {

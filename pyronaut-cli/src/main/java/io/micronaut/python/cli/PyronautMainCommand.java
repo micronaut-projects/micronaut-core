@@ -20,12 +20,12 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
 
 import java.io.File;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.concurrent.Callable;
 
 @Command(name = "pyronaut", description = "The Pyronaut CLI", subcommands = {
-    PyronautMainCommand.PyronautRunCommand.class})
+    PyronautMainCommand.PyronautCleanCommand.class,
+    PyronautMainCommand.PyronautRunCommand.class
+})
 public class PyronautMainCommand implements Callable<Integer> {
 
     @Override
@@ -33,24 +33,34 @@ public class PyronautMainCommand implements Callable<Integer> {
         return 0;
     }
 
-    @Command(name = "run", description = "Runs a Pyronaut application", mixinStandardHelpOptions = true)
-    static class PyronautRunCommand implements Callable<Integer> {
+    abstract static class BaseSourceCommand implements Callable<Integer> {
         @Parameters(index = "0", description = "The source directory", defaultValue = ".")
-        private File sourceDirectory;
+        protected File sourceDirectory;
+    }
 
+    @Command(name = "clean", description = "Deletes the temporary files", mixinStandardHelpOptions = true)
+    static class PyronautCleanCommand extends BaseSourceCommand {
+        @Override
+        public Integer call() throws Exception {
+            var sourceDirectory = (this.sourceDirectory == null ? new File(".") : this.sourceDirectory).getCanonicalFile().toPath();
+            FileUtils.recurseDelete(
+                FileUtils.resolveOutputDirectory(sourceDirectory)
+            );
+            return 0;
+        }
+    }
+
+    @Command(name = "run", description = "Runs a Pyronaut application", mixinStandardHelpOptions = true)
+    static class PyronautRunCommand extends BaseSourceCommand {
         @Parameters(index = "1..*", description = "Application parameters")
         private String[] parameters;
 
         @Override
         public Integer call() throws Exception {
-            var sourceDirectory = (this.sourceDirectory == null ? new File(".") : this.sourceDirectory).getCanonicalFile().getAbsoluteFile();
-            var tmpDir = Path.of(System.getProperty("java.io.tmpdir")).resolve("pyronaut");
-            var outputDirectory = tmpDir.resolve("classes");
-            Files.createDirectories(outputDirectory);
+            var sourceDirectory = (this.sourceDirectory == null ? new File(".") : this.sourceDirectory).getCanonicalFile().toPath();
 
-            // Start file watcher instead of running once
-            PyronautFileWatcher watcher = new PyronautFileWatcher(sourceDirectory, outputDirectory, parameters);
-            Thread watcherThread = new Thread(watcher);
+            var watcher = new PyronautFileWatcher(sourceDirectory, parameters);
+            var watcherThread = new Thread(watcher);
             watcherThread.start();
 
             // Handle shutdown gracefully
@@ -68,7 +78,7 @@ public class PyronautMainCommand implements Callable<Integer> {
     }
 
     public static void main(String[] args) {
-        int exitCode = new CommandLine(new PyronautMainCommand())
+        var exitCode = new CommandLine(new PyronautMainCommand())
             .execute(args);
         System.exit(exitCode);
     }

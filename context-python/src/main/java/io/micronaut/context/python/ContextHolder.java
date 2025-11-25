@@ -19,12 +19,12 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.reflect.exception.InstantiationException;
 import org.graalvm.polyglot.Context;
-import org.graalvm.polyglot.TypeLiteral;
+import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.Value;
 import org.graalvm.polyglot.proxy.ProxyExecutable;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
 
@@ -37,6 +37,7 @@ import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
  */
 public final class ContextHolder {
 
+    private static final AtomicBoolean REUSE_CONTEXT = new AtomicBoolean();
     private static volatile Context context;
 
     private ContextHolder() {
@@ -223,6 +224,35 @@ public final class ContextHolder {
      * to ensure proper cleanup and prevent memory leaks.
      */
     public static void resetContext() {
+        if (REUSE_CONTEXT.get()) {
+            // Not sufficient for now, probably because of use of Class as resourceLoader
+            context.eval(Source.create("python", """
+                import importlib
+                import sys
+                for module in sys.modules.values():
+                    try:
+                        importlib.reload(module)
+                    except:
+                        pass
+                """));
+            return;
+        }
         context = null;
+    }
+
+    /**
+     * If context reuse is set to true, then the context will never be cleared.
+     * @param reuse tells if the context should be reused
+     */
+    public static void setReuseContext(boolean reuse) {
+        REUSE_CONTEXT.set(reuse);
+    }
+
+    /**
+     * Returns true if the context should be reused
+     * @return the reuse flag
+     */
+    public static boolean isReuseContext() {
+        return REUSE_CONTEXT.get();
     }
 }

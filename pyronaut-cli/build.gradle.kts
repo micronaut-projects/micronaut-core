@@ -5,6 +5,7 @@ plugins {
 }
 
 dependencies {
+    annotationProcessor(projects.micronautInjectJava)
     annotationProcessor(libs.picocli.codegen)
     implementation(libs.picocli)
     implementation(projects.micronautInjectPython)
