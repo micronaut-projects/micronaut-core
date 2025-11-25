@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.tck.tests.binding;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.ReflectiveAccess;
@@ -117,7 +118,9 @@ public class LocalDateTimeTest {
     public static class Event {
         private final LocalDateTime eventDate;
 
-        public Event(LocalDateTime eventDate) {
+        public Event(
+            @JsonProperty("eventDate") LocalDateTime eventDate // @JsonProperty for JacksonDatabind
+        ) {
             this.eventDate = eventDate;
         }
 

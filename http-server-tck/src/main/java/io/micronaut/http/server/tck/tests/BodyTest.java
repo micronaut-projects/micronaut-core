@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.tck.tests;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.ReflectiveAccess;
@@ -283,7 +284,10 @@ public class BodyTest {
         private Integer x;
         private Integer y;
 
-        public Point(Integer x, Integer y) {
+        public Point(
+            @JsonProperty("x") Integer x, // @JsonProperty annotation for Jackson Databind
+            @JsonProperty("y") Integer y // @JsonProperty annotation for Jackson Databind
+        ) {
             this.x = x;
             this.y = y;
         }

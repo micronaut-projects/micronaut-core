@@ -1,5 +1,6 @@
 package io.micronaut.docs.server.binding;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.ReflectiveAccess;
 
@@ -11,7 +12,10 @@ public class Point {
     private Integer x;
     private Integer y;
 
-    public Point(Integer x, Integer y) {
+    public Point(
+        @JsonProperty("x") Integer x, // @JsonProperty for jackson databind
+        @JsonProperty("y") Integer y // @JsonProperty for jackson databind
+    ) {
         this.x = x;
         this.y = y;
     }

@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.tck.tests.constraintshandler;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Introspected;
 import org.jspecify.annotations.NonNull;
@@ -207,7 +208,9 @@ public class ControllerConstraintHandlerTest {
         @NotBlank
         private final String password;
 
-        CredentialsWithoutNullabilityAnnotation(String username, String password) {
+        CredentialsWithoutNullabilityAnnotation(@JsonProperty("username") String username, // @JsonProperty for JacksonDatabind
+                                                @JsonProperty("password") String password // @JsonProperty for JacksonDatabind
+        ) {
             this.username = username;
             this.password = password;
         }
@@ -233,7 +236,9 @@ public class ControllerConstraintHandlerTest {
         @Nullable
         private final String password;
 
-        CredentialsWithNullable(@Nullable String username, @Nullable String password) {
+        CredentialsWithNullable(@JsonProperty("username") @Nullable String username, // @JsonProperty for JacksonDatabind
+                                @JsonProperty("password") @Nullable String password // @JsonProperty for JacksonDatabind
+        ) {
             this.username = username;
             this.password = password;
         }
@@ -261,7 +266,9 @@ public class ControllerConstraintHandlerTest {
         @NonNull
         private final String password;
 
-        CredentialsWithNonNull(@NonNull String username, @NonNull String password) {
+        CredentialsWithNonNull(@JsonProperty("username") @NonNull String username, // @JsonProperty for JacksonDatabind
+                               @JsonProperty("password") @NonNull String password // @JsonProperty for JacksonDatabind
+        ) {
             this.username = username;
             this.password = password;
         }

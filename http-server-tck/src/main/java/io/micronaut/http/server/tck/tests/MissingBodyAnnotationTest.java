@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.tck.tests;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.ReflectiveAccess;
@@ -88,7 +89,9 @@ public class MissingBodyAnnotationTest {
 
         private final String value;
 
-        public Dto(String value) {
+        public Dto(
+            @JsonProperty("value") String value // @JsonProperty for JacksonDatabind
+        ) {
             this.value = value;
         }
 

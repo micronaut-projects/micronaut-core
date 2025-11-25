@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.tck.tests;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.ReflectiveAccess;
@@ -270,9 +271,11 @@ public class ErrorHandlerTest {
     @ReflectiveAccess
     static class RequestObject {
         @Min(1L)
-        private Integer numberField;
+        private final Integer numberField;
 
-        public RequestObject(Integer numberField) {
+        public RequestObject(
+            @JsonProperty("numberField") Integer numberField // @JsonProperty required for jackson databind
+        ) {
             this.numberField = numberField;
         }
 

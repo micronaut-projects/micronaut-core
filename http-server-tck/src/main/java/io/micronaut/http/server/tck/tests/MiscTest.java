@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.tck.tests;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Introspected;
 import org.jspecify.annotations.NonNull;
@@ -195,7 +196,9 @@ public class MiscTest {
         @NotBlank
         private final String message;
 
-        MessageCreate(@NonNull String message) {
+        MessageCreate(
+            @JsonProperty("message") @NonNull String message  // @JsonProperty annotation for Jackson Databind
+        ) {
             this.message = message;
         }
 

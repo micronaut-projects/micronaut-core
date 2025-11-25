@@ -31,7 +31,6 @@ import io.micronaut.core.naming.Named;
 abstract sealed class AbstractCertificateFileConfig implements Named permits FileCertificateProvider.Config, ResourceCertificateProvider.Config {
     final String name;
 
-
     FileCertificateProvider.@Nullable Format format;
     @Nullable
     String password;
