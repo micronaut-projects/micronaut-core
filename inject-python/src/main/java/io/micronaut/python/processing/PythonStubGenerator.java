@@ -369,11 +369,12 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         List<PropertyElement> beanProperties = element.getBeanProperties();
                         for (PropertyElement beanProperty : beanProperties) {
                             boolean isIntrospected = element.hasStereotype(Introspected.class) || element.hasStereotype(ConfigurationReader.class);
-                            if (isIntrospected || beanProperty.hasStereotype(AnnotationUtil.INJECT)) {
+                            if (isIntrospected ||
+                                beanProperty.hasStereotype(AnnotationUtil.INJECT)) {
                                 addSetter(beanProperty, builder, pythonValue);
                             }
 
-                            if (isIntrospected) {
+                            if (isIntrospected || beanProperty.hasStereotype(Bean.class)) {
                                 addGetter(beanProperty, builder, pythonValue);
                             }
                         }

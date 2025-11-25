@@ -24,6 +24,36 @@ import jakarta.inject.Singleton
 import spock.lang.PendingFeature
 
 class FactoryBeanMethodSpec extends AbstractPythonTypeElementSpec {
+    void "test a factory bean with attribute"() {
+        given:
+        def context = buildContext('''\
+from micronaut.context.annotation import Factory, Bean, Prototype
+from typing import Annotated
+
+class Bar1:
+    pass
+
+@Factory
+class TestFactory:
+    bar : Annotated[Bar1, Bean, Prototype] = Bar1()
+
+
+''')
+
+        when:
+        def bar1BeanDefinition = context.getBeanDefinitions(context.classLoader.loadClass('python.Bar1'))
+                .find {it.getDeclaringType().get().simpleName.contains("TestFactory")}
+
+        def bar1 = getBean(context, 'python.Bar1')
+
+        then:
+        bar1BeanDefinition.getBeanDescription(TypeInformation.TypeFormat.SHORTENED) == '@i.m.c.a.Prototype p.Bar1 p.TestFactory.bar()'
+        bar1 != null
+        bar1BeanDefinition.getScope().get() == Prototype.class
+
+        cleanup:
+        context?.close()
+    }
 
     void "test a factory bean with method"() {
         given:
