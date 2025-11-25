@@ -16,7 +16,7 @@
 package io.micronaut.context.scope;
 
 import io.micronaut.context.exceptions.BeanDestructionException;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
 

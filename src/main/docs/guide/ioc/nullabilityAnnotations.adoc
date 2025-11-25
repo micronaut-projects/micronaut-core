@@ -1,5 +1,7 @@
 In Java, you can use annotations showing whether a variable can or cannot be null. Such annotations aren't part of the standard library.
 
+NOTE: Since Micronaut Framework 5, we recommend you use <<jspecify, JSpecify Annotations>> instead of the Micronaut Nullability Annotations for better [Kotlin interoperability](https://kotlinlang.org/docs/whatsnew21.html#change-of-jspecify-nullability-mismatch-diagnostics-severity-to-strict) and [IDE](https://www.jetbrains.com/idea/whatsnew/#page__content-jspecify-support)/Tooling support. Indeed, since 5.0 Micronaut's APIs use JSpecify annotations.
+
 == Micronaut’s Nullability Annotations
 
 Micronaut framework provides first-class nullability annotations:

@@ -17,7 +17,7 @@ package io.micronaut.management.endpoint.env;
 
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.annotation.Read;
 import io.micronaut.management.endpoint.annotation.Selector;

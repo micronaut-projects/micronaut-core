@@ -16,8 +16,8 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -812,10 +812,9 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
             return NettyHttpRequest.this.getUri();
         }
 
-        @NonNull
         @Override
         @Deprecated
-        public io.netty.handler.codec.http.FullHttpRequest toFullHttpRequest() {
+        public io.netty.handler.codec.http.@NonNull FullHttpRequest toFullHttpRequest() {
             io.netty.handler.codec.http.HttpRequest nr = NettyHttpRequest.this.nettyRequest;
             if (nr instanceof io.netty.handler.codec.http.FullHttpRequest) {
                 return (io.netty.handler.codec.http.FullHttpRequest) NettyHttpRequest.this.nettyRequest;
@@ -851,10 +850,9 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
             }
         }
 
-        @NonNull
         @Override
         @Deprecated
-        public io.netty.handler.codec.http.HttpRequest toHttpRequest() {
+        public io.netty.handler.codec.http.@NonNull HttpRequest toHttpRequest() {
             if (isStream()) {
                 return toStreamHttpRequest();
             }

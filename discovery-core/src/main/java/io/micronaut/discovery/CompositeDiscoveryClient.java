@@ -15,7 +15,7 @@
  */
 package io.micronaut.discovery;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
 import org.reactivestreams.Publisher;

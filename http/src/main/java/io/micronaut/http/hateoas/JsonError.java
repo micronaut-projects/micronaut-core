@@ -17,12 +17,11 @@ package io.micronaut.http.hateoas;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
-
+import org.jspecify.annotations.Nullable;
 import java.util.Optional;
 
 /**

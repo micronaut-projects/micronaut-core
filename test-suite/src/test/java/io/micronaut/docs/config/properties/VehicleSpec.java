@@ -16,6 +16,7 @@
 package io.micronaut.docs.config.properties;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.annotation.Requires;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
@@ -30,6 +31,7 @@ class VehicleSpec {
         // tag::start[]
         Map<String, Object> map = new LinkedHashMap<>(1);
         map.put("my.engine.cylinders", "8");
+        map.put("spec.name", "VehiclePropertiesSpec");
         ApplicationContext applicationContext = ApplicationContext.run(map, "test");
 
         Vehicle vehicle = applicationContext.getBean(Vehicle.class);

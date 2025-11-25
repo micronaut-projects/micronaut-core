@@ -2,7 +2,7 @@ package io.micronaut.http.client
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
-import io.micronaut.core.annotation.Nullable
+import org.jspecify.annotations.Nullable
 import io.micronaut.core.async.publisher.Publishers
 import io.micronaut.core.util.StringUtils
 import io.micronaut.discovery.ServiceInstance

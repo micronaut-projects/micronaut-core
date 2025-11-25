@@ -16,8 +16,8 @@
 package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.io.buffer.ReadBufferFactory;
 import io.micronaut.http.body.stream.BaseSharedBuffer;
@@ -137,8 +137,7 @@ public class ConcatenatingSubscriber implements BufferConsumer.Upstream, CoreSub
      * component backpressure, or {@code null} if all bytes were written immediately (as is the
      * case for an {@link AvailableByteBody})
      */
-    @Nullable
-    protected final BufferConsumer.Upstream forward(ByteBody body) {
+    protected final BufferConsumer.@Nullable Upstream forward(ByteBody body) {
         if (body instanceof AvailableByteBody abb) {
             add(abb.toReadBuffer());
             complete();

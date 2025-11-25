@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.client.jdk.cookie;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.cookie.Cookies;

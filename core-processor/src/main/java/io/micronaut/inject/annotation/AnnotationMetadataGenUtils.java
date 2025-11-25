@@ -21,8 +21,8 @@ import io.micronaut.core.annotation.AnnotationDefaultValuesProvider;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.expressions.EvaluatedExpressionReference;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.CollectionUtils;
@@ -307,8 +307,7 @@ public final class AnnotationMetadataGenUtils {
         }
     }
 
-    @NonNull
-    private static ExpressionDef.InvokeStaticMethod invokeLoadClassValueMethod(ClassTypeDef declaringType,
+    private static ExpressionDef.@NonNull InvokeStaticMethod invokeLoadClassValueMethod(ClassTypeDef declaringType,
                                                                                Map<String, MethodDef> loadTypeMethods,
                                                                                String typeName) {
         final MethodDef loadTypeGeneratorMethod = loadTypeMethods.computeIfAbsent(typeName, type -> {
@@ -378,7 +377,6 @@ public final class AnnotationMetadataGenUtils {
         }
     }
 
-    @NonNull
     private static void addAnnotationDefaultsInternal(List<StatementDef> statements,
                                                       Set<String> writtenAnnotations,
                                                       String annotationName,

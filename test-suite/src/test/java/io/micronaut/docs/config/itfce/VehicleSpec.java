@@ -20,6 +20,8 @@ import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.core.util.CollectionUtils;
 import org.junit.jupiter.api.Test;
 
+import java.util.Map;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -29,7 +31,8 @@ class VehicleSpec {
     @Test
     void testStartVehicle() {
         // tag::start[]
-        ApplicationContext applicationContext = ApplicationContext.run(CollectionUtils.mapOf(
+        ApplicationContext applicationContext = ApplicationContext.run(Map.of(
+            "spec.name", "VehicleItfceSpec",
                 "my.engine.cylinders", "8",
                 "my.engine.crank-shaft.rod-length", "7.0"
         ));
@@ -47,7 +50,8 @@ class VehicleSpec {
         ApplicationContext applicationContext = null;
         try {
             applicationContext = ApplicationContext.run(CollectionUtils.mapOf(
-                    "my.engine.cylinders", "-10",
+                "spec.name", "VehicleItfceSpec",
+                "my.engine.cylinders", "-10",
                     "my.engine.crank-shaft.rod-length", "7.0"
             ));
 

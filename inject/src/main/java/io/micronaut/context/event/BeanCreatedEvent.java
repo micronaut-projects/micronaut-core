@@ -16,7 +16,7 @@
 package io.micronaut.context.event;
 
 import io.micronaut.context.BeanContext;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;

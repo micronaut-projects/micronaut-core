@@ -15,7 +15,7 @@
  */
 package io.micronaut.buffer.netty;
 
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Interface for the Netty bytebuf allocator configuration.

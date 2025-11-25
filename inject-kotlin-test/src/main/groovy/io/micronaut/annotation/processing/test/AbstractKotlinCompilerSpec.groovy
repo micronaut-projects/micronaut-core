@@ -18,7 +18,7 @@ package io.micronaut.annotation.processing.test
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.Qualifier
 import io.micronaut.core.annotation.Experimental
-import io.micronaut.core.annotation.NonNull
+import org.jspecify.annotations.NonNull
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.BeanDefinition

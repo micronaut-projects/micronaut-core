@@ -19,7 +19,7 @@ import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertyEntry;
 import io.micronaut.context.env.PropertySource;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.order.OrderUtil;

@@ -1,9 +1,11 @@
 package io.micronaut.docs.ioc.injection.optional;
 
 //import io.micronaut.context.annotation.Autowired;
+import io.micronaut.context.annotation.Requires;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
+@Requires(property = "spec.name", value = "VehicleIocInjectionOptionalSpec")
 @Singleton
 class Vehicle {
     //@Autowired(required = false) // <1>

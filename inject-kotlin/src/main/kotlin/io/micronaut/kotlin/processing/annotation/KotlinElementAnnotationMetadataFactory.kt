@@ -63,7 +63,7 @@ internal class KotlinElementAnnotationMetadataFactory(
         return if (element is AbstractKotlinElement<*>) element.nativeType.element else empty
     }
 
-    override fun buildGenericTypeAnnotations(element: GenericElement?): ElementAnnotationMetadata {
+    override fun buildGenericTypeAnnotations(element: GenericElement): ElementAnnotationMetadata {
         if (element is KotlinTypeArgumentElement) {
             return buildTypeAnnotationsForTypeArgument(element)
         }

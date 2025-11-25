@@ -15,7 +15,7 @@
  */
 package io.micronaut.web.router;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.bind.binders.RequestArgumentBinder;
 import io.micronaut.inject.MethodExecutionHandle;

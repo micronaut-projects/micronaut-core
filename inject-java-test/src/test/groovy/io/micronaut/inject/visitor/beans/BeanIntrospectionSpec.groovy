@@ -12,8 +12,8 @@ import io.micronaut.context.annotation.Executable
 import io.micronaut.context.visitor.ConfigurationReaderVisitor
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.annotation.NextMajorVersion
-import io.micronaut.core.annotation.NonNull
-import io.micronaut.core.annotation.Nullable
+import org.jspecify.annotations.NonNull
+import org.jspecify.annotations.Nullable
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.BeanIntrospectionReference
 import io.micronaut.core.beans.BeanIntrospector
@@ -58,7 +58,7 @@ class BeanIntrospectionSpec extends AbstractTypeElementSpec {
 package test;
 
 import io.micronaut.core.annotation.Introspected;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
 import java.util.Date;
@@ -477,7 +477,7 @@ package test;
 
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.context.annotation.Executable;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.util.Optional;
 
 import java.util.Collections;
@@ -526,7 +526,7 @@ package test;
 
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.context.annotation.Executable;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.util.Optional;
 
 import java.util.Collections;
@@ -575,7 +575,7 @@ package mixed;
 
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.context.annotation.Value;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.util.Optional;
 import java.lang.annotation.*;
 import static java.lang.annotation.ElementType.*;
@@ -619,7 +619,7 @@ package mixed;
 
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.context.annotation.Value;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.util.Optional;
 import java.lang.annotation.*;
 
@@ -651,7 +651,7 @@ package mixed;
 
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.context.annotation.Value;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.util.Optional;
 import java.lang.annotation.*;
 
@@ -691,7 +691,7 @@ package mixed;
 
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.context.annotation.Executable;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.util.Optional;
 
 @Introspected
@@ -739,7 +739,7 @@ package mixed;
 
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.context.annotation.Executable;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.util.Optional;
 
 @Introspected
@@ -771,7 +771,7 @@ class Test {
 package mixed;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.context.annotation.Executable;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.util.Optional;
 @Introspected
 class Test {
@@ -903,7 +903,7 @@ package test;
 
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.context.annotation.Executable;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.util.Optional;
 
 @Introspected(accessKind = {Introspected.AccessKind.METHOD, Introspected.AccessKind.FIELD})
@@ -928,7 +928,7 @@ package test;
 
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.context.annotation.Executable;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.util.Optional;
 
 @Introspected(accessKind = {Introspected.AccessKind.METHOD, Introspected.AccessKind.FIELD})
@@ -955,7 +955,7 @@ package test;
 
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.context.annotation.Executable;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.util.Optional;
 
 @Introspected(accessKind = {Introspected.AccessKind.METHOD, Introspected.AccessKind.FIELD})
@@ -981,7 +981,7 @@ package test;
 
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.context.annotation.Executable;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.util.*;
 
 @Introspected
@@ -1049,7 +1049,7 @@ package test;
 
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.context.annotation.Executable;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.util.Optional;
 
 @Introspected(accessKind = {Introspected.AccessKind.METHOD, Introspected.AccessKind.FIELD})

@@ -1,6 +1,6 @@
 package io.micronaut.http.server.stack;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.netty.util.concurrent.FastThreadLocalThread;
 
 import java.util.concurrent.SynchronousQueue;

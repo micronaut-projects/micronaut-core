@@ -18,7 +18,7 @@ package io.micronaut.inject.annotation;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.inject.visitor.VisitorContext;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
 import java.util.Collections;

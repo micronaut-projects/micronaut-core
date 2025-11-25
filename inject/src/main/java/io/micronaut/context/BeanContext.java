@@ -17,8 +17,8 @@ package io.micronaut.context;
 
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.attr.MutableAttributeHolder;
 import io.micronaut.core.convert.ConversionServiceProvider;
 import io.micronaut.core.type.Argument;
@@ -231,7 +231,6 @@ public interface BeanContext extends
      * @param <T>  The bean type
      * @since 3.5.0
      */
-    @NonNull
     <T> void destroyBean(@NonNull BeanRegistration<T> beanRegistration);
 
     /**
@@ -259,7 +258,6 @@ public interface BeanContext extends
      * @param <T>              The concrete class
      * @since 3.5.0
      */
-    @NonNull
     <T> void refreshBean(@NonNull BeanRegistration<T> beanRegistration);
 
     /**

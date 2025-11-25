@@ -18,8 +18,8 @@ package io.micronaut.http.client;
 import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NextMajorVersion;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.Toggleable;
@@ -811,8 +811,7 @@ public abstract class HttpClientConfiguration {
      * @return The plaintext connection mode.
      * @since 4.0.0
      */
-    @NonNull
-    public HttpVersionSelection.PlaintextMode getPlaintextMode() {
+    public HttpVersionSelection.@NonNull PlaintextMode getPlaintextMode() {
         return plaintextMode;
     }
 
@@ -824,7 +823,7 @@ public abstract class HttpClientConfiguration {
      * @param plaintextMode The plaintext connection mode.
      * @since 4.0.0
      */
-    public void setPlaintextMode(@NonNull HttpVersionSelection.PlaintextMode plaintextMode) {
+    public void setPlaintextMode(HttpVersionSelection.@NonNull PlaintextMode plaintextMode) {
         this.plaintextMode = Objects.requireNonNull(plaintextMode, "plaintextMode");
     }
 
@@ -933,8 +932,7 @@ public abstract class HttpClientConfiguration {
      * @return The HTTP/2 configuration.
      * @since 4.6.0
      */
-    @Nullable
-    public HttpClientConfiguration.Http2ClientConfiguration getHttp2Configuration() {
+    public HttpClientConfiguration.@Nullable Http2ClientConfiguration getHttp2Configuration() {
         return null;
     }
 
@@ -987,8 +985,7 @@ public abstract class HttpClientConfiguration {
 
         private boolean enabled = DEFAULT_ENABLED;
 
-        @NonNull
-        private HttpClientConfiguration.ConnectionPoolConfiguration.ConnectionLocality connectionLocality = ConnectionLocality.PREFERRED;
+        private HttpClientConfiguration.ConnectionPoolConfiguration.@NonNull ConnectionLocality connectionLocality = ConnectionLocality.PREFERRED;
 
         @NonNull
         private PoolVersion version = PoolVersion.V4_9;
@@ -1139,7 +1136,7 @@ public abstract class HttpClientConfiguration {
          * @return The locality configuration
          * @since 4.8.0
          */
-        public @NonNull HttpClientConfiguration.ConnectionPoolConfiguration.ConnectionLocality getConnectionLocality() {
+        public HttpClientConfiguration.ConnectionPoolConfiguration.@NonNull ConnectionLocality getConnectionLocality() {
             return connectionLocality;
         }
 
@@ -1150,7 +1147,7 @@ public abstract class HttpClientConfiguration {
          * @param connectionLocality The locality configuration
          * @since 4.8.0
          */
-        public void setConnectionLocality(@NonNull HttpClientConfiguration.ConnectionPoolConfiguration.ConnectionLocality connectionLocality) {
+        public void setConnectionLocality(HttpClientConfiguration.ConnectionPoolConfiguration.@NonNull ConnectionLocality connectionLocality) {
             this.connectionLocality = connectionLocality;
         }
 

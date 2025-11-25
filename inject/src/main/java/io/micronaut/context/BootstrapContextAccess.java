@@ -17,7 +17,7 @@ package io.micronaut.context;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 
 /**
  * Interface for accessing aspects of the main context from the bootstrap context.

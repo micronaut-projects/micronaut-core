@@ -16,7 +16,7 @@
 package io.micronaut.expressions.parser.token;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.expressions.parser.exception.ExpressionParsingException;
 

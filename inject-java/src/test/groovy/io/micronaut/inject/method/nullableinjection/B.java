@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.method.nullableinjection;
 
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 

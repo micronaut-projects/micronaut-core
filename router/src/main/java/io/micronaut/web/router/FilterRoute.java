@@ -15,8 +15,8 @@
  */
 package io.micronaut.web.router;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.annotation.FilterMatcher;
 import io.micronaut.http.filter.FilterPatternStyle;

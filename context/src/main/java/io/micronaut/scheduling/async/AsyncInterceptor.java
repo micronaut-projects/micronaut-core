@@ -22,7 +22,7 @@ import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.inject.qualifiers.Qualifiers;

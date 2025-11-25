@@ -22,7 +22,7 @@ import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.inject.annotation.NamedAnnotationMapper;
 import io.micronaut.inject.visitor.VisitorContext;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
 import java.util.List;

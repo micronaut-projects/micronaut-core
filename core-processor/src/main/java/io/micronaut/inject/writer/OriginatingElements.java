@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.writer;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.ast.Element;
 
 /**

@@ -15,7 +15,7 @@
  */
 package io.micronaut.context;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 
 import java.util.HashMap;
 import java.util.Map;

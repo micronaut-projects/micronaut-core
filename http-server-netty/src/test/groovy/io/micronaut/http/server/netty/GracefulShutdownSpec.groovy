@@ -2,7 +2,7 @@ package io.micronaut.http.server.netty
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
-import io.micronaut.core.annotation.NonNull
+import org.jspecify.annotations.NonNull
 import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get

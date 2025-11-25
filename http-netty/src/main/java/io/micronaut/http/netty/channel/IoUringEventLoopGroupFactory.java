@@ -18,7 +18,7 @@ package io.micronaut.http.netty.channel;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.Order;
 import io.netty.channel.Channel;
 import io.netty.channel.IoHandlerFactory;

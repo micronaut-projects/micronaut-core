@@ -16,9 +16,8 @@
 package io.micronaut.http.client.tck.tests;
 
 import io.micronaut.core.annotation.Introspected;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.annotation.ReflectiveAccess;
-
 import java.util.Objects;
 
 @Introspected

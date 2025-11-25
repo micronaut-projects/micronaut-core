@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.client.multipart;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 
 /**
  * A class representing a String {@link Part} in {@link MultipartBody} to build a Netty multipart request.

@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.server.exceptions;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.bind.exceptions.UnsatisfiedArgumentException;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.server.exceptions.response.Error;

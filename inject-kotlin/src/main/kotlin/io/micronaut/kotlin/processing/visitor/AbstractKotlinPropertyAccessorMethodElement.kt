@@ -59,11 +59,11 @@ internal abstract class AbstractKotlinPropertyAccessorMethodElement<T : KotlinNa
 
     override fun isPrivate() = visibility == Visibility.PRIVATE
 
-    override fun hides(memberElement: MemberElement?) =
+    override fun hides(memberElement: MemberElement) =
         // not sure how to implement this correctly for Kotlin
         false
 
-    override fun hides(hiddenMethod: MethodElement?) =
+    override fun hides(hiddenMethod: MethodElement) =
         // not sure how to implement this correctly for Kotlin
         false
 

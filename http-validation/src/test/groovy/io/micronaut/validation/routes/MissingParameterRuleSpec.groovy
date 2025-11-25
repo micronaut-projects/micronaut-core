@@ -439,7 +439,7 @@ package test;
 
 import io.micronaut.http.annotation.*;
 import io.micronaut.core.annotation.*;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 @Controller("/foo")
 class Foo {

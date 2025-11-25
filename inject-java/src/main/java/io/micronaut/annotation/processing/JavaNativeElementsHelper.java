@@ -16,7 +16,7 @@
 package io.micronaut.annotation.processing;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.utils.NativeElementsHelper;
 
 import javax.lang.model.element.Element;

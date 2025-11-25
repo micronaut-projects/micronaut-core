@@ -2,7 +2,7 @@ package io.micronaut.http.server.exceptions.response
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
-import io.micronaut.core.annotation.NonNull
+import org.jspecify.annotations.NonNull
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MutableHttpResponse
 import spock.lang.Specification

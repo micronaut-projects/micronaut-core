@@ -1,6 +1,6 @@
 package io.micronaut.docs.netty
 
-import io.micronaut.core.annotation.NonNull
+import org.jspecify.annotations.NonNull
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.CompositeByteBuf
 import io.netty.channel.ChannelDuplexHandler

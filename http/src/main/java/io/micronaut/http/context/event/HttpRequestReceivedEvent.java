@@ -18,7 +18,7 @@ package io.micronaut.http.context.event;
 import io.micronaut.context.event.ApplicationEvent;
 import io.micronaut.http.HttpRequest;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 
 /**
  * An event fired when an {@link HttpRequest} is received by the server. Not that the event is fired in a

@@ -15,7 +15,7 @@
  */
 package io.micronaut.scheduling.instrument;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.*;

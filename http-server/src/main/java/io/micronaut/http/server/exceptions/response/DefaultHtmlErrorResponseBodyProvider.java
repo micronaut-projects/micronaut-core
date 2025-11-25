@@ -18,7 +18,7 @@ package io.micronaut.http.server.exceptions.response;
 import io.micronaut.context.MessageSource;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.LocaleResolver;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpRequest;

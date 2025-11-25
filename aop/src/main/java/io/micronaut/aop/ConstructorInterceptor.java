@@ -15,7 +15,7 @@
  */
 package io.micronaut.aop;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 
 /**
  * A {@link ConstructorInterceptor} extends the default {@link Interceptor} interface and allows intercepting constructors.
