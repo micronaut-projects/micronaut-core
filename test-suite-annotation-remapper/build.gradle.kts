@@ -10,6 +10,7 @@ tasks.withType<Test>().configureEach {
 }
 
 dependencies {
+    testAnnotationProcessor(projects.micronautGraal)
     testAnnotationProcessor(projects.testSuiteAnnotationRemapperVisitor)
     testAnnotationProcessor(projects.micronautInjectJava)
     testImplementation(projects.micronautHttpServerNetty)
