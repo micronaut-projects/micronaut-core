@@ -20,6 +20,6 @@ class ExampleTest:
     @Test
     def test_get_message(self, example_service : ExampleService) -> None:
         # fix this in JUnit
-        msg = example_service.asPolyglotValue().say_hello()
+        msg = example_service.say_hello()
         assert msg is not None
 

@@ -562,8 +562,15 @@ public final class GraalPyUtil {
         }
 
         // Handle primitive types
-        if (classElement.isPrimitive() && !classElement.isArray()) {
-            if (classElement.equals(PrimitiveElement.BOOLEAN)) {
+        if (isAnnotationPrimitive(classElement)
+            && !classElement.isArray()) {
+            if (classElement.getName().equals(String.class.getName())) {
+                if (value.isString()) {
+                    return value.asString();
+                } else {
+                    return value.as(Object.class).toString();
+                }
+            } else if (classElement.equals(PrimitiveElement.BOOLEAN)) {
                 return value.asBoolean();
             } else if (classElement == PrimitiveElement.BYTE) {
                 if (value.fitsInByte()) {
@@ -747,6 +754,11 @@ public final class GraalPyUtil {
 
         // Fall back to the original conversion logic
         return convertValueToJava(value, visitorContext);
+    }
+
+    private static boolean isAnnotationPrimitive(ClassElement classElement) {
+        // should enums be primitives?
+        return classElement.isPrimitive() || classElement.getName().equals(String.class.getName());
     }
 
     private static @Nullable AnnotationClassValue<?> toClassValue(Value value, PythonVisitorContext visitorContext) {

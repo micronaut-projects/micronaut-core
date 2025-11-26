@@ -90,6 +90,27 @@ public sealed class PythonMethodElement extends AbstractPythonElement implements
     }
 
     @Override
+    public String getDescription(boolean simple) {
+        ClassElement owner = getOwningType();
+        StringBuilder description = new StringBuilder();
+        String indent = "";
+        if (owner != null) {
+            description.append("class ");
+            description.append(owner.getDescription(simple)).append(":").append(System.lineSeparator());
+            indent = "      ";
+        }
+        ClassElement genericReturnType = getGenericReturnType();
+        description
+            .append(indent)
+            .append("def ").append(getName())
+            .append("(")
+            .append(isStatic() ? "cls" : "self")
+            .append(")")
+            .append(genericReturnType.isVoid() ? "" : " -> " + genericReturnType.getDescription(simple));
+        return description.toString();
+    }
+
+    @Override
     public boolean isAbstract() {
         return getNativeType().isAbstract();
     }

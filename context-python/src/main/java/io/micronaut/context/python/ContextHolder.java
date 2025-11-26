@@ -141,7 +141,7 @@ public final class ContextHolder {
         try {
             return ctx.eval(PYTHON, source);
         } catch (Exception e) {
-            throw new InstantiationException("Failed to import Python class [" + source + "]: " + e.getMessage());
+            throw new InstantiationException("Failed to import Python class [" + source + "]: " + e.getMessage(), e);
         }
     }
 
