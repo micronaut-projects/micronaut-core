@@ -90,7 +90,7 @@ class HttpMethodDeleteTest {
                 AssertionUtils.assertDoesNotThrow(server, request,
                     HttpResponseAssertion.builder()
                         .status(HttpStatus.OK)
-                        .body(BodyAssertion.builder().body("{\"age\":49,\"name\":\"Tim\"}").equals())
+                        .body(BodyAssertion.builder().body("{\"name\":\"Tim\",\"age\":49}").equals())
                         .build())
         );
     }
