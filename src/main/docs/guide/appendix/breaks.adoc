@@ -80,9 +80,106 @@ Executable methods annotated with `@Parallel` will not trigger parallel executio
 
 ==== Jackson Bean Introspection Module removed
 
-Previous versions of Micronaut Core contained a so-called "bean introspection module". This Jackson module hooked into jackson-databind to replace reflective field and method access with Micronaut introspection-based calls. The performance difference is negligible, but the module does allow serialization in native images without having to add reflection metadata.
+NOTE: This change only affects users using <<serializationUsingJacksonDatabind, Micronaut Jackson Databind>>
 
-In version 5, we have removed this module, as it is difficult to maintain. Native image users now have a good alternative to jackson-databind in Micronaut Serialization. Users that do not wish to use Micronaut Serialization will have to add reflection metadata for the objects they serialize.
+Previous versions of Micronaut Core contained a so-called "bean introspection module". This Jackson module hooked into jackson-databind to replace reflective field and method access with Micronaut introspection-based calls. The performance difference is negligible, but the module allows serialization in native images without having to add reflection metadata.
+
+In version 5, we removed this module because it is difficult to maintain. Native image users now have a good alternative to <<serializationUsingJacksonDatabind, Micronaut Jackson Databind>> in https://micronaut-projects.github.io/micronaut-serialization/latest/guide[Micronaut Serialization].
+
+Users who do not wish to use Micronaut Serialization will have to add reflection metadata for the objects they serialize.
+
+If you want to keep using <<serializationUsingJacksonDatabind, Micronaut Jackson Databind>>, beware that deserialization of such class works in Micronaut 4:
+
+[source, java]
+----
+package example;
+
+import java.util.Objects;
+
+public class Person {
+    private final String name;
+    private final int age;
+
+    public Person(String name, int age) {
+        this.name = name;
+        this.age = age;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public int getAge() {
+        return age;
+    }
+}
+----
+
+In Micronaut 5, you will need to add `@JsonProperty` annotations to the constructor parameters. This is standard Jackson databind deserialization behavior.
+
+[source, java]
+----
+package example;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+import java.util.Objects;
+
+public class Person {
+    private final String name;
+    private final int age;
+
+    public Person(@JsonProperty("name") String name,
+                  @JsonProperty("age") int age) {
+        this.name = name;
+        this.age = age;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public int getAge() {
+        return age;
+    }
+}
+----
+
+To generate a GraalVM Native Image, where you need to de/serialize such as class, you can add the following dependency:
+
+dependency:micronaut-graal[scope="annotationProcessor",groupId="io.micronaut.graal"]
+
+and annotate it with api:core.annotation.ReflectiveAccess[]. Read <<graal, Graal>> section of the Micronaut core documentation.
+
+
+[source, java]
+----
+package example;
+
+import java.util.Objects;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.micronaut.core.annotation.ReflectiveAccess;
+
+@ReflectiveAccess
+public class Person {
+    private final String name;
+    private final int age;
+
+    public Person(@JsonProperty("name") String name,
+                  @JsonProperty("age") int age) {
+        this.name = name;
+        this.age = age;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public int getAge() {
+        return age;
+    }
+}
+----
 
 == 4.0.0
 
