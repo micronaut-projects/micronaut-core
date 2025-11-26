@@ -16,8 +16,8 @@
 package io.micronaut.http.ssl;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
 import org.slf4j.Logger;

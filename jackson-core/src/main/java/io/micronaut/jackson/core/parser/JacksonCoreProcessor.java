@@ -16,7 +16,7 @@
 package io.micronaut.jackson.core.parser;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.async.processor.SingleThreadedBufferingProcessor;
 import io.micronaut.jackson.core.tree.JsonNodeTreeCodec;
 import io.micronaut.jackson.core.tree.JsonStreamTransfer;

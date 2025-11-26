@@ -15,8 +15,8 @@
  */
 package io.micronaut.http;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.http.cachecontrol.CacheControl;
 import io.micronaut.http.cookie.Cookie;
 

@@ -20,10 +20,8 @@ import tools.jackson.databind.SerializationConfig;
 import tools.jackson.databind.ser.BeanPropertyWriter;
 import tools.jackson.databind.ser.ValueSerializerModifier;
 import tools.jackson.databind.util.NameTransformer;
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.hateoas.Resource;
-import io.micronaut.jackson.modules.BeanIntrospectionModule;
 import jakarta.inject.Singleton;
 
 import java.util.Iterator;
@@ -37,9 +35,7 @@ import java.util.List;
  */
 @Internal
 @Singleton
-@Requires(missingBeans = BeanIntrospectionModule.class)
 class ResourceSerializerModifier extends ValueSerializerModifier {
-
     @Override
     public List<BeanPropertyWriter> changeProperties(SerializationConfig config, BeanDescription.Supplier supplier, List<BeanPropertyWriter> beanProperties) {
         if (Resource.class.isAssignableFrom(supplier.getBeanClass())) {

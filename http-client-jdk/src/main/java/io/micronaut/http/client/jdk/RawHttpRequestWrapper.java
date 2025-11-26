@@ -16,7 +16,7 @@
 package io.micronaut.http.client.jdk;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpRequestWrapper;

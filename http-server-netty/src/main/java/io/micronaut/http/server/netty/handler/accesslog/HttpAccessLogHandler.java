@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.server.netty.handler.accesslog;
 
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.http.server.netty.handler.accesslog.element.AccessLog;
 import io.micronaut.http.server.netty.handler.accesslog.element.AccessLogFormatParser;
 import io.micronaut.http.server.netty.handler.accesslog.element.ConnectionMetadata;

@@ -1,5 +1,6 @@
 package io.micronaut.docs.inject.generics;
 
+import io.micronaut.context.annotation.Property;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import org.junit.jupiter.api.Test;
 
@@ -9,6 +10,7 @@ import java.util.stream.Collectors;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 
+@Property(name = "spec.name", value = "VehicleGenericsSpec")
 @MicronautTest
 public class VehicleSpec {
     private final Vehicle vehicle;

@@ -17,7 +17,7 @@ package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.NextMajorVersion;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.annotation.ReflectiveAccess;
 
 import java.util.Collections;

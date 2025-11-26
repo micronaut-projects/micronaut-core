@@ -22,7 +22,7 @@ import io.micronaut.aop.util.DelegatingContextContinuation;
 import io.micronaut.aop.util.KotlinInterceptedMethodHelper;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.async.propagation.KotlinCoroutinePropagation;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;

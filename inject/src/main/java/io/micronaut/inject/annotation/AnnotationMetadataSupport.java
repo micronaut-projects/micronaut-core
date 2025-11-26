@@ -54,8 +54,8 @@ import io.micronaut.core.annotation.Indexed;
 import io.micronaut.core.annotation.Indexes;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.Order;
 import io.micronaut.core.annotation.ReflectionConfig;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
@@ -181,7 +181,7 @@ public final class AnnotationMetadataSupport {
         );
         coreAnnotationsDefaults.put(
             Executable.class.getName(),
-            Map.of("processOnStartup", false)
+            Map.of(Executable.MEMBER_PROCESS_ON_STARTUP, false)
         );
         coreAnnotationsDefaults.put(
             ConfigurationProperties.class.getName(),

@@ -17,8 +17,8 @@ package io.micronaut.management.endpoint.beans.impl;
 
 import io.micronaut.context.Qualifier;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.management.endpoint.beans.BeanDefinitionData;
 import io.micronaut.management.endpoint.beans.BeansEndpoint;

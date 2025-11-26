@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.bind.binders;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.bind.TypeArgumentBinder;
 import io.micronaut.http.HttpRequest;
 

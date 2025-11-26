@@ -17,8 +17,8 @@ package io.micronaut.inject.annotation;
 
 import io.micronaut.core.annotation.AnnotatedElement;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import java.util.Set;
 
 /**

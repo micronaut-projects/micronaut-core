@@ -18,7 +18,7 @@ package io.micronaut.http.client.jdk.cookie;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;

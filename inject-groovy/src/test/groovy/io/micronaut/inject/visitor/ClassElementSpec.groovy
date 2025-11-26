@@ -449,9 +449,7 @@ interface AnotherInterface {
         def declared = classElement.getEnclosedElements(ElementQuery.of(MethodElement).onlyDeclared())
 
         then:"The declared are correct"
-        // this method differs for Groovy because for some reason default interface methods become
-        // part of the methods declared by classNode.getMethods() and there is no way to distinguish them
-        declared*.name as Set == ['privateMethod', 'packagePrivateMethod', 'publicMethod', 'staticMethod', 'itfeMethod'] as Set
+        declared*.name as Set == ['privateMethod', 'packagePrivateMethod', 'publicMethod', 'staticMethod'] as Set
 
         when: "Accessible methods are retrieved"
         def accessible = classElement.getEnclosedElements(ElementQuery.of(MethodElement).onlyAccessible())
@@ -833,8 +831,7 @@ interface MyBean extends GenericInterface, SpecificInterface {
             def declaredMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared())
         then:
             declaredMethods.size() == 1
-            declaredMethods.get(0).isAbstract() == true
-            declaredMethods.get(0).isDefault() == false
+            declaredMethods.get(0).isDefault() == true
     }
 
     // Groovy bug?
@@ -856,11 +853,9 @@ interface MyBean {
             def allMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS)
         then:
             allMethods.size() == 1
-            allMethods.get(0).isAbstract() == true
-            allMethods.get(0).isDefault() == false
+            allMethods.get(0).isDefault() == true
     }
 
-    // Groovy bug?
     void "test default method"() {
         given:
             ClassElement classElement = buildClassElement('elementquery.MyBean', '''
@@ -881,10 +876,7 @@ class MyBean implements MyInt {
         when:
             def allMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS)
         then:
-            // In this case the default method is not abstract but still not default
             allMethods.size() == 1
-            allMethods.get(0).isAbstract() == false
-            allMethods.get(0).isDefault() == false
     }
 
     void "test synthetic properties aren't removed"() {

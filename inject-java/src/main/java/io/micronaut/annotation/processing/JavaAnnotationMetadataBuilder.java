@@ -17,9 +17,10 @@ package io.micronaut.annotation.processing;
 
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.core.annotation.AnnotationClassValue;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -35,6 +36,7 @@ import javax.lang.model.element.AnnotationValue;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.RecordComponentElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.ArrayType;
@@ -239,6 +241,16 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
         } else {
             return super.isExcludedAnnotation(element, annotationName);
         }
+    }
+
+    /**
+     * Build the record component annotation metadata.
+     * @param recordComponentElement The element
+     * @return The annotation metadata
+     * @since 4.10
+     */
+    public final AnnotationMetadata build(RecordComponentElement recordComponentElement) {
+        return buildInternal(recordComponentElement);
     }
 
     @Override

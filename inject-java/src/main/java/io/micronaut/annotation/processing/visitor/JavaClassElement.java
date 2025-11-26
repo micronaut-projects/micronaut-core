@@ -22,9 +22,9 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Creator;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.annotation.NullMarked;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
@@ -467,12 +467,24 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
     }
 
     private JavaPropertyElement mapToPropertyElement(AstBeanPropertiesUtils.BeanPropertyData value) {
+        AnnotationMetadata propertyAnnotationMetadata = null;
+        if (isRecord()) {
+            for (Element enclosedElement : classElement.getEnclosedElements()) {
+                if (JavaModelUtils.isRecordComponent(enclosedElement) && enclosedElement instanceof RecordComponentElement recordComponentElement) {
+                    if (recordComponentElement.getSimpleName().toString().equals(value.propertyName)) {
+                        propertyAnnotationMetadata = visitorContext.getAnnotationMetadataBuilder().build(recordComponentElement);
+                        break;
+                    }
+                }
+            }
+        }
         return new JavaPropertyElement(
             JavaClassElement.this,
             value.type,
             value.readAccessKind == null ? null : value.getter,
             value.writeAccessKind == null ? null : value.setter,
             value.field,
+            propertyAnnotationMetadata,
             elementAnnotationMetadataFactory,
             value.propertyName,
             value.readAccessKind == null ? PropertyElement.AccessKind.METHOD : PropertyElement.AccessKind.valueOf(value.readAccessKind.name()),

@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.multipart;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import org.reactivestreams.Publisher;
 
 import java.io.File;

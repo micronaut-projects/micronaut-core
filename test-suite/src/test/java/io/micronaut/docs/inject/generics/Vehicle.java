@@ -1,9 +1,11 @@
 package io.micronaut.docs.inject.generics;
 
+import io.micronaut.context.annotation.Requires;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import java.util.List;
 
+@Requires(property = "spec.name", value = "VehicleGenericsSpec")
 @Singleton
 public class Vehicle {
     private final Engine<V8> engine;

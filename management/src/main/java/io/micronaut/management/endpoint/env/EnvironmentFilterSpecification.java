@@ -15,7 +15,7 @@
  */
 package io.micronaut.management.endpoint.env;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.SupplierUtil;
 
 import java.util.ArrayList;

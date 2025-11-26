@@ -17,7 +17,7 @@ package io.micronaut.web.router.version;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.exceptions.ConfigurationException;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import jakarta.inject.Singleton;
 
 import java.util.Optional;

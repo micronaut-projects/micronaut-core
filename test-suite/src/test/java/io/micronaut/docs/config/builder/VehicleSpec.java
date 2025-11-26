@@ -29,6 +29,7 @@ class VehicleSpec {
     void testStartVehicle() {
         // tag::start[]
         Map<String, Object> properties = new HashMap<>();
+        properties.put("spec.name", "VehicleBuilderSpec");
         properties.put("my.engine.cylinders"             ,"4");
         properties.put("my.engine.manufacturer"          , "Subaru");
         properties.put("my.engine.crank-shaft.rod-length", 4);
@@ -40,9 +41,9 @@ class VehicleSpec {
         Vehicle vehicle = applicationContext.getBean(Vehicle.class);
         System.out.println(vehicle.start());
         // end::start[]
-        
+
         assertEquals("Subaru Engine Starting V4 [rodLength=4.0, sparkPlug=Iridium(NGK 6619 LFR6AIX)]", vehicle.start());
-                
+
         applicationContext.close();
     }
 }

@@ -21,12 +21,13 @@ import io.micronaut.context.annotation.DefaultImplementation;
 import io.micronaut.context.annotation.DefaultScope;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.EachProperty;
+import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
@@ -39,6 +40,7 @@ import jakarta.inject.Singleton;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Modifier;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -667,5 +669,27 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
             return new DefaultReplacesDefinition<T>(getBeanType(), annotation);
         }
         return null;
+    }
+
+    /**
+     * When {@link #requiresMethodProcessing()} is true, this method returns the methods that require processing.
+     * Executable methods with {@link io.micronaut.context.annotation.Executable#processOnStartup()} set to true.
+     *
+     * @return The methods that require processing.
+     * @see io.micronaut.context.annotation.Executable#processOnStartup()
+     * @since 5.0
+     */
+    default Iterable<ExecutableMethod<T, ?>> getExecutableMethodsForProcessing() {
+        if (!requiresMethodProcessing()) {
+            return List.of();
+        }
+        Collection<ExecutableMethod<T, ?>> executableMethods = getExecutableMethods();
+        List<ExecutableMethod<T, ?>> methodsToProcess = new ArrayList<>(executableMethods.size());
+        for (ExecutableMethod<T, ?> executableMethod : executableMethods) {
+            if (executableMethod.booleanValue(Executable.class, Executable.MEMBER_PROCESS_ON_STARTUP).orElse(false)) {
+                methodsToProcess.add(executableMethod);
+            }
+        }
+        return methodsToProcess;
     }
 }

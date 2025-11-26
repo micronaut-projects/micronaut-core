@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.simple.cookies;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.SameSite;

@@ -97,4 +97,5 @@ micronautBuild {
     useStandardizedProjectNames = true
     nonStandardProjectNamePrefixes.addAll(["test-", "benchmarks"])
     importMicronautCatalog("boms-micronaut-sourcegen")
+    addSnapshotRepository()
 }

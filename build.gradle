@@ -5,6 +5,16 @@ plugins {
     id "io.micronaut.build.internal.convention-quality"
 }
 
+repositories {
+    mavenCentral()
+    maven {
+        url 'https://central.sonatype.com/repository/maven-snapshots/'
+        mavenContent {
+            snapshotsOnly()
+        }
+    }
+}
+
 tasks.named("updateVersionCatalogs") {
     // we set the list to empty because we accept upgrades which improve the status
     rejectedQualifiers = []

@@ -2,7 +2,7 @@ package io.micronaut.http.server.netty.http2
 
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
-import io.micronaut.core.annotation.NonNull
+import org.jspecify.annotations.NonNull
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.PushCapableHttpRequest

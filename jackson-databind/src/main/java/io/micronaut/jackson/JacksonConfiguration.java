@@ -28,8 +28,7 @@ import tools.jackson.databind.PropertyNamingStrategy;
 import tools.jackson.databind.SerializationFeature;
 import tools.jackson.databind.type.TypeFactory;
 import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
@@ -70,13 +69,8 @@ public class JacksonConfiguration implements JsonConfiguration {
      * The property used to enable module scan.
      */
     public static final String PROPERTY_MODULE_SCAN = "jackson.module-scan";
-    /**
-     * The property used to enable bean introspection.
-     */
-    public static final String PROPERTY_USE_BEAN_INTROSPECTION = "jackson.bean-introspection-module";
 
     private boolean moduleScan = true;
-    private boolean beanIntrospectionModule = true;
     private String dateFormat;
     private Locale locale;
     private TimeZone timeZone;
@@ -92,26 +86,6 @@ public class JacksonConfiguration implements JsonConfiguration {
     private PropertyNamingStrategy propertyNamingStrategy = null;
     private boolean alwaysSerializeErrorsAsList = true;
     private boolean trimStrings = false;
-
-    /**
-     * Whether the {@link io.micronaut.core.beans.BeanIntrospection} should be used for reflection free object serialialization/deserialialization.
-     *
-     * @return True if it should
-     */
-    @Experimental
-    public boolean isBeanIntrospectionModule() {
-        return beanIntrospectionModule;
-    }
-
-    /**
-     * Whether the {@link io.micronaut.core.beans.BeanIntrospection} should be used for reflection free object serialialization/deserialialization.
-     *
-     * @param beanIntrospectionModule True if it should
-     */
-    @Experimental
-    public void setBeanIntrospectionModule(boolean beanIntrospectionModule) {
-        this.beanIntrospectionModule = beanIntrospectionModule;
-    }
 
     /**
      * Whether Jackson modules should be scanned for.

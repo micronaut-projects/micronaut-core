@@ -42,11 +42,11 @@ internal class KotlinEnumConstructorElement(private val classElement: ClassEleme
         return arrayOf(ParameterElement.of(String::class.java, "s"))
     }
 
-    override fun withNewParameters(vararg newParameters: ParameterElement?): MethodElement {
+    override fun withNewParameters(vararg newParameters: ParameterElement): MethodElement {
         throw UnsupportedOperationException("Cannot replace parameters of a kotlin enum static constructor")
     }
 
-    override fun withParameters(vararg newParameters: ParameterElement?): MethodElement {
+    override fun withParameters(vararg newParameters: ParameterElement): MethodElement {
         throw UnsupportedOperationException("Cannot replace parameters of a kotlin enum static constructor")
     }
 }

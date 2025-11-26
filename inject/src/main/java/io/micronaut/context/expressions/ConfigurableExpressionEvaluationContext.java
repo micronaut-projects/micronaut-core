@@ -17,8 +17,8 @@ package io.micronaut.context.expressions;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.expressions.ExpressionEvaluationContext;
 import io.micronaut.inject.BeanDefinition;
 

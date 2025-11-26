@@ -56,7 +56,6 @@ ioc:
     introspectedAnnotationOnAConfigurationClass: Use the @Introspected Annotation on a Configuration Class
     introspectExistingAnnotations: Write an AnnotationMapper to Introspect Existing Annotations
     beanWrapperApi: The BeanWrapper API
-    jacksonAndBeanIntrospection: Jackson and Bean Introspection
     kotlinAndBeanIntrospection: Kotlin and Bean Introspection
   beanMappers:
     title: Bean Mappers

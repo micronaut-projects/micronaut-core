@@ -15,7 +15,7 @@
  */
 package io.micronaut.buffer.netty;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.io.buffer.ReadBufferFactory;
 import io.micronaut.core.util.functional.ThrowingConsumer;
@@ -113,7 +113,7 @@ public final class NettyReadBufferFactory extends ReadBufferFactory {
 
     @Override
     @NonNull
-    public ReadBuffer adapt(@NonNull io.micronaut.core.io.buffer.ByteBuffer<?> buffer) {
+    public ReadBuffer adapt(io.micronaut.core.io.buffer.@NonNull ByteBuffer<?> buffer) {
         if (buffer.asNativeBuffer() instanceof ByteBuf bb) {
             return adapt(bb);
         }
@@ -177,7 +177,7 @@ public final class NettyReadBufferFactory extends ReadBufferFactory {
     }
 
     @Override
-    public @NonNull ReadBufferFactory.BufferingOutputStream outputStreamBuffer() {
+    public ReadBufferFactory.@NonNull BufferingOutputStream outputStreamBuffer() {
         return new ReadBufferFactory.BufferingOutputStream() {
             ByteBufOutputStream out = new ByteBufOutputStream(allocator.buffer());
 

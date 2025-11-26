@@ -18,7 +18,7 @@ package io.micronaut.web.router;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.PathMatcher;
 import io.micronaut.core.util.StringUtils;

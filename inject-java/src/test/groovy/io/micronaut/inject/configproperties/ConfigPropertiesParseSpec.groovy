@@ -272,7 +272,7 @@ class RedisHttpSessionConfiguration extends
 package test;
 
 import io.micronaut.context.annotation.*;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.time.Duration;
 import java.util.Optional;
 
@@ -303,7 +303,7 @@ class MyConfig {
 package test;
 
 import io.micronaut.context.annotation.*;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.Set;

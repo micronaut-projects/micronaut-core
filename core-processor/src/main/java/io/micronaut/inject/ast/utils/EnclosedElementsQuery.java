@@ -17,8 +17,8 @@ package io.micronaut.inject.ast.utils;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.Vetoed;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
@@ -440,7 +440,7 @@ public abstract class EnclosedElementsQuery<C, N> {
      * @param result The result
      * @return the collection of excluded elements
      */
-    protected Set<N> getExcludedNativeElements(@NonNull ElementQuery.Result<?> result) {
+    protected Set<N> getExcludedNativeElements(ElementQuery.@NonNull Result<?> result) {
         return Collections.emptySet();
     }
 
@@ -518,8 +518,7 @@ public abstract class EnclosedElementsQuery<C, N> {
      * @param elementType The result type
      * @return The AST element
      */
-    @NonNull
-    protected abstract io.micronaut.inject.ast.Element toAstElement(N nativeType, Class<?> elementType);
+    protected abstract io.micronaut.inject.ast.@NonNull Element toAstElement(N nativeType, Class<?> elementType);
 
     private record CacheKey(Class<?> elementType, Object nativeType) {
     }

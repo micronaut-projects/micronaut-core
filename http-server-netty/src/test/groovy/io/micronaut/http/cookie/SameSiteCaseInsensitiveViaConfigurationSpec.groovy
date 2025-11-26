@@ -3,7 +3,7 @@ package io.micronaut.http.cookie
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.ConfigurationProperties
 import io.micronaut.context.annotation.Requires
-import io.micronaut.core.annotation.Nullable
+import org.jspecify.annotations.Nullable
 import spock.lang.Specification
 import spock.lang.Unroll
 

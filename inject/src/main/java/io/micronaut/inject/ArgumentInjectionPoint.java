@@ -17,7 +17,7 @@ package io.micronaut.inject;
 
 import io.micronaut.core.type.Argument;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.type.ArgumentCoercible;
 
 /**

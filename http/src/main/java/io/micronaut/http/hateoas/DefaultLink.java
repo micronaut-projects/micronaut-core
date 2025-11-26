@@ -15,7 +15,8 @@
  */
 package io.micronaut.http.hateoas;
 
-import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.annotation.ReflectiveAccess;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.MediaType;
@@ -30,6 +31,7 @@ import java.util.Optional;
  * @since 1.1
  */
 @Introspected
+@ReflectiveAccess // for Jackson
 public class DefaultLink implements Link, Link.Builder {
 
     final String href;

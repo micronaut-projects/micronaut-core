@@ -15,7 +15,7 @@
  */
 package io.micronaut.json.tree;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 
 /**
  * JsonNode implementation for boolean values, two singletons.

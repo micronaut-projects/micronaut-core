@@ -403,7 +403,7 @@ class NestedConfig {
 package test;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.core.annotation.Nullable;import jakarta.inject.Inject;
+import org.jspecify.annotations.Nullable;import jakarta.inject.Inject;
 
 @ConfigurationProperties("product-aggregator")
 class NestedConfig {

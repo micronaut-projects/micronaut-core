@@ -15,10 +15,12 @@
  */
 package io.micronaut.docs.config.mapFormat;
 
+import io.micronaut.context.annotation.Requires;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import java.util.Map;
 
+@Requires(property = "spec.name", value = "VehicleMapFormatSpec")
 // tag::class[]
 @Singleton
 public class EngineImpl implements Engine {

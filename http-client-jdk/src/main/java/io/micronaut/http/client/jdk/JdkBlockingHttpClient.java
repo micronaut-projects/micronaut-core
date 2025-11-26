@@ -17,8 +17,8 @@ package io.micronaut.http.client.jdk;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.bind.RequestBinderRegistry;
@@ -79,7 +79,7 @@ public class JdkBlockingHttpClient extends AbstractJdkHttpClient implements Bloc
     }
 
     @Override
-    public <I, O, E> io.micronaut.http.HttpResponse<O> exchange(@NonNull io.micronaut.http.HttpRequest<I> request,
+    public <I, O, E> io.micronaut.http.HttpResponse<O> exchange(io.micronaut.http.@NonNull HttpRequest<I> request,
                                                                 @Nullable Argument<O> bodyType,
                                                                 @Nullable Argument<E> errorType) {
         return exchangeImpl(request, bodyType).blockFirst();

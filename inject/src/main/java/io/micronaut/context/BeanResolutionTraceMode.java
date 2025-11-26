@@ -17,7 +17,7 @@ package io.micronaut.context;
 
 import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.naming.NameUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -20,7 +20,7 @@ import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.exceptions.ConfigurationException;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.io.ResourceResolver;
 import org.reactivestreams.Publisher;

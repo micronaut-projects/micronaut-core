@@ -20,8 +20,8 @@ import com.github.javaparser.javadoc.Javadoc;
 import com.github.javaparser.javadoc.JavadocBlockTag;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
@@ -112,9 +112,8 @@ public class JavaMethodElement extends AbstractJavaMemberElement implements Meth
         return helper.getAnnotationMetadata(presetAnnotationMetadata);
     }
 
-    @NonNull
     @Override
-    public JavaNativeElement.Method getNativeType() {
+    public JavaNativeElement.@NonNull Method getNativeType() {
         return (JavaNativeElement.Method) super.getNativeType();
     }
 

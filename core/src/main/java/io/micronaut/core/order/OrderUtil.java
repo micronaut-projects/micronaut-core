@@ -16,7 +16,7 @@
 package io.micronaut.core.order;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.annotation.Order;
 
 import java.util.ArrayList;

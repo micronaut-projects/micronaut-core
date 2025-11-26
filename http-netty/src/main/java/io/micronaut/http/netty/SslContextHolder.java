@@ -16,7 +16,7 @@
 package io.micronaut.http.netty;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.netty.handler.codec.quic.QuicSslContext;
 import io.netty.handler.ssl.SslContext;
 import io.netty.util.ReferenceCountUtil;

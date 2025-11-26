@@ -22,7 +22,7 @@ import io.micronaut.context.annotation.Parallel;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.ApplicationEventPublisher;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.scheduling.io.watch.DefaultWatchThread;
 import io.micronaut.scheduling.io.watch.FileWatchCondition;

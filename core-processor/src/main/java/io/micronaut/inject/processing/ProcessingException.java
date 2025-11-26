@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.processing;
 
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.ast.Element;
 
 /**

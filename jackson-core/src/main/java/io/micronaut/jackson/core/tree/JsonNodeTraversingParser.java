@@ -26,7 +26,7 @@ import tools.jackson.core.JsonToken;
 import tools.jackson.core.ObjectReadContext;
 import tools.jackson.core.Version;
 import tools.jackson.core.base.ParserMinimalBase;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.json.tree.JsonNode;
 
 import java.io.IOException;

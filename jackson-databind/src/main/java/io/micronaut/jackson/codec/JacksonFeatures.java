@@ -20,7 +20,7 @@ import tools.jackson.databind.JacksonModule;
 import tools.jackson.databind.SerializationFeature;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.json.JsonFeatures;

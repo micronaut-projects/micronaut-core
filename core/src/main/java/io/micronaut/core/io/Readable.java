@@ -18,7 +18,7 @@ package io.micronaut.core.io;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.util.ArgumentUtils;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 
 import java.io.File;
 import java.io.IOException;

@@ -18,7 +18,7 @@ package io.micronaut.context.visitor;
 import java.util.Collections;
 import java.util.Set;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
 import io.micronaut.inject.visitor.VisitorContext;
 

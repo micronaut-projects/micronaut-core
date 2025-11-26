@@ -17,7 +17,7 @@ package io.micronaut.http.client.bind.binders;
 
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.annotation.RequestAttribute;

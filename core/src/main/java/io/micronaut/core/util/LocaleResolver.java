@@ -15,7 +15,7 @@
  */
 package io.micronaut.core.util;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.order.Ordered;
 
 import java.util.Locale;

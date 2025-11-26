@@ -30,7 +30,7 @@ import tools.jackson.core.TreeNode;
 import tools.jackson.core.Version;
 import tools.jackson.core.util.JacksonFeatureSet;
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.json.JsonStreamConfig;
 import io.micronaut.json.tree.JsonNode;
 

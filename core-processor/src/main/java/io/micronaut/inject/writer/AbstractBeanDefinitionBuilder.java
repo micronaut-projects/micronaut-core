@@ -25,8 +25,8 @@ import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.InjectionPoint;
@@ -743,7 +743,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
                 executableMethod,
                 visitorContext
             );
-            if (executableMethod.getAnnotationMetadata().isTrue(Executable.class, "processOnStartup")) {
+            if (executableMethod.getAnnotationMetadata().isTrue(Executable.class, Executable.MEMBER_PROCESS_ON_STARTUP)) {
                 beanDefinitionWriter.setRequiresMethodProcessing(true);
             }
         }

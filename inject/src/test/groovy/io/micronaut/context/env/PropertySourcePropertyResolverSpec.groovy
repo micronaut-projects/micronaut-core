@@ -18,7 +18,7 @@ package io.micronaut.context.env
 import com.github.stefanbirkner.systemlambda.SystemLambda
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.ConfigurationException
-import io.micronaut.core.annotation.NonNull
+import org.jspecify.annotations.NonNull
 import io.micronaut.core.convert.ConversionService
 import io.micronaut.core.convert.format.MapFormat
 import io.micronaut.core.naming.conventions.StringConvention

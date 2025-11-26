@@ -10,6 +10,7 @@ tasks.withType<Test>().configureEach {
 }
 
 dependencies {
+    testAnnotationProcessor(projects.micronautGraal)
     testAnnotationProcessor(projects.testSuiteAnnotationRemapperVisitor)
     testAnnotationProcessor(projects.micronautInjectJava)
     testAnnotationProcessor(projects.micronautGraal)
@@ -32,6 +33,7 @@ graalvmNative {
     binaries {
         configureEach {
             if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_21)) {
+                buildArgs.add("--initialize-at-build-time=org.junit.platform.commons.logging.LoggerFactory\$DelegatingLogger")
                 buildArgs.add("--initialize-at-build-time=org.junit.platform.suite.engine.IsSuiteClass")
                 buildArgs.add("--initialize-at-build-time=org.junit.platform.suite.engine.IsPotentialTestContainer")
                 buildArgs.add("--strict-image-heap")

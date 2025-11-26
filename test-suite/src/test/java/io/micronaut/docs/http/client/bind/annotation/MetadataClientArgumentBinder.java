@@ -1,7 +1,7 @@
 package io.micronaut.docs.http.client.bind.annotation;
 
 //tag::clazz[]
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.StringUtils;

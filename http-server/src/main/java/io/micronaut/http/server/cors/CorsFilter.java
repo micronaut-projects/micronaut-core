@@ -16,8 +16,8 @@
 package io.micronaut.http.server.cors;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ImmutableArgumentConversionContext;
@@ -456,7 +456,6 @@ public class CorsFilter implements Ordered, ConditionalFilter {
         return HttpResponse.status(HttpStatus.FORBIDDEN);
     }
 
-    @NonNull
     private void decorateResponseWithHeadersForPreflightRequest(@NonNull HttpRequest<?> request,
                                                                 @NonNull MutableHttpResponse<?> response,
                                                                 @NonNull CorsOriginConfiguration config) {
@@ -470,7 +469,6 @@ public class CorsFilter implements Ordered, ConditionalFilter {
         setMaxAge(config.getMaxAge(), response);
     }
 
-    @NonNull
     private void decorateResponseWithHeaders(@NonNull HttpRequest<?> request,
                                              @NonNull MutableHttpResponse<?> response,
                                              @NonNull CorsOriginConfiguration config) {

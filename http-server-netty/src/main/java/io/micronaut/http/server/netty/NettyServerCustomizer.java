@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.server.netty;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.netty.channel.Channel;
 
 /**

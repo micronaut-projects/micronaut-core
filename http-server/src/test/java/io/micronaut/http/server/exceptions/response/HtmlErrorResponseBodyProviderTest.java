@@ -1,6 +1,6 @@
 package io.micronaut.http.server.exceptions.response;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.http.*;
 import io.micronaut.http.simple.SimpleHttpRequest;

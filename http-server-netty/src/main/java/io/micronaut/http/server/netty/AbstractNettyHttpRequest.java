@@ -16,7 +16,7 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.HttpMethod;
@@ -80,15 +80,13 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
         this.httpMethod = HttpMethod.parse(httpMethodName);
     }
 
-    @NonNull
     @Override
-    public io.netty.handler.codec.http.HttpRequest toHttpRequest() {
+    public io.netty.handler.codec.http.@NonNull HttpRequest toHttpRequest() {
         return this.nettyRequest;
     }
 
-    @NonNull
     @Override
-    public io.netty.handler.codec.http.FullHttpRequest toFullHttpRequest() {
+    public io.netty.handler.codec.http.@NonNull FullHttpRequest toFullHttpRequest() {
         if (this.nettyRequest instanceof io.netty.handler.codec.http.FullHttpRequest request) {
             return request;
         }

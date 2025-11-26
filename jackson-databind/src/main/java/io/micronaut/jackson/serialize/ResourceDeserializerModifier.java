@@ -15,14 +15,13 @@
  */
 package io.micronaut.jackson.serialize;
 
+
 import tools.jackson.databind.BeanDescription;
 import tools.jackson.databind.DeserializationConfig;
 import tools.jackson.databind.deser.ValueDeserializerModifier;
 import tools.jackson.databind.introspect.BeanPropertyDefinition;
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.hateoas.Resource;
-import io.micronaut.jackson.modules.BeanIntrospectionModule;
 
 import java.util.List;
 
@@ -31,7 +30,6 @@ import java.util.List;
  * @since 1.0
  */
 @Internal
-@Requires(missingBeans = BeanIntrospectionModule.class)
 public class ResourceDeserializerModifier extends ValueDeserializerModifier {
 
     @Override

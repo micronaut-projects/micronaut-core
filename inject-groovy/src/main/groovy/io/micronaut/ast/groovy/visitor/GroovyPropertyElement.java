@@ -17,8 +17,8 @@ package io.micronaut.ast.groovy.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
@@ -75,7 +75,7 @@ final class GroovyPropertyElement extends AbstractGroovyElement implements Prope
         this.writeAccessKind = writeAccessKind;
         this.owningElement = owningElement;
         this.excluded = excluded;
-        this.annotationMetadata = new PropertyElementAnnotationMetadata(this, getter, setter, field, null, false);
+        this.annotationMetadata = new PropertyElementAnnotationMetadata(this, getter, setter, field, null, null, false);
     }
 
     @Override

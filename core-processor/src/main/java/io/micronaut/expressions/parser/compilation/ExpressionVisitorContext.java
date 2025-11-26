@@ -16,7 +16,7 @@
 package io.micronaut.expressions.parser.compilation;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.expressions.context.ExpressionEvaluationContext;
 import io.micronaut.inject.visitor.VisitorContext;
 
