@@ -20,6 +20,7 @@ bin/
 */META-INF/
 *.ipr
 *.iws
+.kotlin/
 .kotlintest
 */.kotlintest/
 
