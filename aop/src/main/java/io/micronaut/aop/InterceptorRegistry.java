@@ -16,10 +16,10 @@
 package io.micronaut.aop;
 
 import io.micronaut.context.BeanRegistration;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Executable;
+import org.jspecify.annotations.NullMarked;
 
 import java.util.Collection;
 
@@ -29,6 +29,7 @@ import java.util.Collection;
  * @author graemerocher
  * @since 3.0.0
  */
+@NullMarked
 public interface InterceptorRegistry {
     /**
      * Constant for bean lookup.
@@ -44,11 +45,10 @@ public interface InterceptorRegistry {
      * @param <T> the bean type
      * @return An array of interceptors
      */
-    @NonNull
     <T> Interceptor<T, ?>[] resolveInterceptors(
-        @NonNull Executable<T, ?> method,
-        @NonNull Collection<BeanRegistration<Interceptor<T, ?>>> interceptors,
-        @NonNull InterceptorKind interceptorKind
+        Executable<T, ?> method,
+        Collection<BeanRegistration<Interceptor<T, ?>>> interceptors,
+        InterceptorKind interceptorKind
     );
 
     /**
@@ -59,9 +59,8 @@ public interface InterceptorRegistry {
      * @param <T> The bean type
      * @return An array of interceptors
      */
-    @NonNull
     <T> Interceptor<T, T>[] resolveConstructorInterceptors(
-        @NonNull BeanConstructor<T> constructor,
-        @NonNull Collection<BeanRegistration<Interceptor<T, T>>> interceptors
+        BeanConstructor<T> constructor,
+        Collection<BeanRegistration<Interceptor<T, T>>> interceptors
     );
 }
