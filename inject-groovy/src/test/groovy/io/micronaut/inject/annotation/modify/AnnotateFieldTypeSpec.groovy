@@ -135,7 +135,7 @@ class MyBean1 {
     void validate(BeanDefinition definition) {
         def myField1 = definition.getInjectedFields()[0]
         assert myField1.name == "myField1"
-        assert !myField1.asArgument().getAnnotationMetadata().hasAnnotation(MyAnnotation)
+        assert myField1.asArgument().getAnnotationMetadata().hasAnnotation(MyAnnotation)
 
         def myField2 = definition.getInjectedFields()[1]
         assert myField2.name == "myField2"
