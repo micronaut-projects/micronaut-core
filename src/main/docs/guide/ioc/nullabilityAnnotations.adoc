@@ -35,7 +35,7 @@ class GreetingController {
 ----
 <1> Defines a controller mapped to the /greet path.
 <2> Exposes an HTTP GET endpoint.
-<3> Marks the query parameter as optional with ann:core.annotation.Nullable[]; requests may omit it.
+<3> Marks the query parameter as optional with `org.jspecify.annotations.Nullable[]` requests may omit it.
 <4> Null-safe handling when the parameter is not provided.
 
 .Optional dependency in a factory-produced bean
@@ -72,7 +72,7 @@ interface OptionalDependency {}
 ----
 <1> Declares a factory class that produces beans.
 <2> Defines a bean-producing method with singleton scope.
-<3> The dependency is optional and annotated with ann:core.annotation.Nullable[]; if no bean of that type exists, injection does not fail and null is injected.
+<3> The dependency is optional and annotated with `org.jspecify.annotations.Nullable`; if no bean of that type exists, injection does not fail and null is injected.
 <4> The produced bean is created regardless of whether the optional dependency is present.
 <5> The consumer explicitly declares the constructor parameter as nullable and handles a potential null value.
 
