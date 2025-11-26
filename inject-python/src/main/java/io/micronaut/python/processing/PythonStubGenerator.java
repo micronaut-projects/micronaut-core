@@ -37,6 +37,7 @@ import io.micronaut.core.annotation.Vetoed;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.TypedElement;
+import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.python.processing.visitor.PythonVisitorContext;
 import io.micronaut.sourcegen.model.AbstractElementBuilder;
 import io.micronaut.sourcegen.model.AnnotationDef;
@@ -384,6 +385,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         }
 
                         sourceGenerator.write(builder.build(), context, element);
+                    } catch (ProcessingException e) {
+                        throw e;
                     } catch (Exception e) {
                         context.fail("Failed to generate stub for Python type [" + element.getSimpleName() + "]: " + e.getMessage(), null);
                     }
@@ -447,12 +450,22 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
         addedMethodNames.add(key);
 
+        if (methodElement.hasDeclaredStereotype(Bean.class)) {
+            // verify return type exists
+            ClassElement genericReturnType = methodElement.getGenericReturnType();
+            if (genericReturnType.isVoid()) {
+                throw new ProcessingException(methodElement, "Factory methods declared with @Bean must specify a return type. For example: @Bean\n" +
+                    "    def foo(self) -> Foo:");
+            }
+        }
+
         MethodDef.MethodDefBuilder methodBuilder = MethodDef.builder(pythonFunctionName)
             .addModifiers(Modifier.PUBLIC)
             .returns(isJunit5Test ? TypeDef.Primitive.VOID : TypeDef.of(methodElement.getReturnType()));
 
         copyAnnotations(methodElement, methodBuilder, ANNOTATION_PACKAGES_TO_COPY, visitorContext);
-        for (@NonNull ParameterElement parameter : methodElement.getParameters()) {
+        @NonNull ParameterElement[] parameters = methodElement.getParameters();
+        for (@NonNull ParameterElement parameter : parameters) {
             var parameterType = erasedType(parameter.getType());
             ParameterDef parameterDef = ParameterDef
                 .builder(parameter.getName(), parameterType).build();
@@ -463,16 +476,20 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             .build(((aThis, methodParameters) -> {
                 // For child classes, pythonValue will be null, so we need to create a field reference to the inherited field
                 VariableDef.Field pythonValueField = toFieldRef(pythonValue, aThis);
-                List<ExpressionDef> parameters = new ArrayList<>();
-                parameters.add(ExpressionDef.constant(pythonFunctionName));
-                parameters.addAll(methodParameters);
+                List<ExpressionDef> parameterExpressions = new ArrayList<>();
+                parameterExpressions.add(ExpressionDef.constant(pythonFunctionName));
+                for (int i = 0; i < parameters.length; i++) {
+                    @NonNull ParameterElement parameter = parameters[i];
+                    VariableDef.MethodParameter methodParameter = methodParameters.get(i);
+                    coerceParameterToPolyglotValue(parameter, parameterExpressions, methodParameter);
+                }
 
                 // Get the return type to determine appropriate conversion method
                 var returnType = methodElement.getReturnType();
                 var invokedValue = pythonValueField.invoke(
                     "invokeMember",
                     POLYGLOT_VALUE,
-                    parameters
+                    parameterExpressions
                 );
 
                 if (isJunit5Test) {

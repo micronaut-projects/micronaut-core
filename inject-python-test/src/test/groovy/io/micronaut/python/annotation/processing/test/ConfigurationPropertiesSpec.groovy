@@ -17,6 +17,8 @@ package io.micronaut.python.annotation.processing.test
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
+import io.micronaut.inject.qualifiers.Qualifiers
+import spock.lang.PendingFeature
 
 /**
  * Tests for Python @ConfigurationProperties annotation.
@@ -25,6 +27,156 @@ import io.micronaut.context.env.Environment
  * @since 4.8.0
  */
 class ConfigurationPropertiesSpec extends AbstractPythonTypeElementSpec {
+    @PendingFeature(reason = "Fails with 'Non writable or non-existent member key 'cylinders' which is likely a GraalPy bug")
+    void "test each property on Python class tht implements Java interface"() {
+        given:
+        def pythonCode = '''
+from micronaut.context.annotation import EachProperty
+from micronaut.core.util import Toggleable
+
+@EachProperty("engines")
+class EngineConfiguration(Toggleable):
+    cylinders : int
+    enabled : bool = True
+'''
+
+        when:
+        def properties = [
+                "engines.ferrari.cylinders": "8",
+                "engines.ferrari.enabled": false,
+                "engines.ford.cylinders": "6"
+        ]
+        def context = buildContext(pythonCode, false, properties)
+        def ferrariBean = getBean(context, "python.EngineConfiguration", Qualifiers.byName("ferrari"))
+        def fordBean = getBean(context, "python.EngineConfiguration", Qualifiers.byName("ford"))
+
+        then:
+        ferrariBean != null
+        ferrariBean.cylinders() == 8
+        ferrariBean.enabled() == false
+        fordBean.cylinders() == 6
+        fordBean.enabled() == true
+    }
+
+    void "test each property on Python class"() {
+        given:
+        def pythonCode = '''
+from micronaut.context.annotation import EachProperty
+#from micronaut.core.util import Toggleable
+
+@EachProperty("engines")
+class EngineConfiguration:
+    cylinders : int
+    enabled : bool = True
+'''
+
+        when:
+        def properties = [
+                "engines.ferrari.cylinders": "8",
+                "engines.ferrari.enabled": false,
+                "engines.ford.cylinders": "6"
+        ]
+        def context = buildContext(pythonCode, false, properties)
+        def ferrariBean = getBean(context, "python.EngineConfiguration", Qualifiers.byName("ferrari"))
+        def fordBean = getBean(context, "python.EngineConfiguration", Qualifiers.byName("ford"))
+
+        then:
+        ferrariBean != null
+        ferrariBean.cylinders() == 8
+        ferrariBean.enabled() == false
+        fordBean.cylinders() == 6
+        fordBean.enabled() == true
+    }
+
+    void "test each property with each bean on Python factory"() {
+        given:
+        def pythonCode = '''
+from micronaut.context.annotation import EachProperty, EachBean, Executable, Factory
+#from micronaut.core.util import Toggleable
+
+@EachProperty("engines")
+class EngineConfiguration:
+    cylinders : int
+    enabled : bool = True
+
+class Engine:
+    def __init__(self, config : EngineConfiguration):
+        self.config = config
+
+    def enabled(self) -> bool:
+        return self.config.enabled
+
+    def cylinders(self) -> int:
+        return self.config.cylinders
+
+@Factory
+class EngineFactory:
+    @EachBean(EngineConfiguration.__qualname__)
+    def engine(self, config : EngineConfiguration) -> Engine:
+        return Engine(config)
+
+'''
+
+        when:
+        def properties = [
+                "engines.ferrari.cylinders": "8",
+                "engines.ferrari.enabled": false,
+                "engines.ford.cylinders": "6"
+        ]
+        def context = buildContext(pythonCode, false, properties)
+        def ferrariBean = getBean(context, "python.Engine", Qualifiers.byName("ferrari")).asPolyglotValue()
+        def fordBean = getBean(context, "python.Engine", Qualifiers.byName("ford")).asPolyglotValue()
+
+        then:
+        ferrariBean != null
+        ferrariBean.invokeMember("cylinders").asInt() == 8
+        ferrariBean.invokeMember("enabled").asBoolean() == false
+        fordBean.invokeMember("cylinders").asInt() == 6
+        fordBean.invokeMember("enabled").asBoolean() == true
+    }
+
+    void "test each property with each bean on Python class"() {
+        given:
+        def pythonCode = '''
+from micronaut.context.annotation import EachProperty, EachBean, Executable
+#from micronaut.core.util import Toggleable
+
+@EachProperty("engines")
+class EngineConfiguration:
+    cylinders : int
+    enabled : bool = True
+
+@EachBean(EngineConfiguration.__qualname__)
+class Engine:
+    def __init__(self, config : EngineConfiguration):
+        self.config = config
+
+    @Executable
+    def enabled(self) -> bool:
+        return self.config.enabled
+
+    @Executable
+    def cylinders(self) -> int:
+        return self.config.cylinders
+'''
+
+        when:
+        def properties = [
+                "engines.ferrari.cylinders": "8",
+                "engines.ferrari.enabled": false,
+                "engines.ford.cylinders": "6"
+        ]
+        def context = buildContext(pythonCode, false, properties)
+        def ferrariBean = getBean(context, "python.Engine", Qualifiers.byName("ferrari"))
+        def fordBean = getBean(context, "python.Engine", Qualifiers.byName("ford"))
+
+        then:
+        ferrariBean != null
+        ferrariBean.cylinders() == 8
+        ferrariBean.enabled() == false
+        fordBean.cylinders() == 6
+        fordBean.enabled() == true
+    }
 
     void "test @ConfigurationProperties on Python @dataclass"() {
         given:

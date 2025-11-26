@@ -248,7 +248,11 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                 allDecorators.putAll(decorators);
 
                 Map<String, List<Map<String, String>>> javaClassImports = transformResult.javaClassImports();
-                allImports.putAll(javaClassImports);
+                javaClassImports.forEach((pkg, imports) -> {
+                    allImports.computeIfAbsent(pkg, (k) -> new ArrayList<>())
+                        .addAll(imports);
+                });
+
             }
             writeAllToVFS(filesList, allDecorators, allImports, originatingElement);
 
@@ -285,7 +289,14 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                 environment.decorators().size() + " decorators");
 
         } catch (ProcessingException e) {
-            error(e.getMessage());
+            String ls = System.lineSeparator();
+            io.micronaut.inject.ast.Element el = e.getElement();
+            if (el != null) {
+                String description = el.getDescription(true);
+                error(e.getMessage() + ls + ls + " -> " + description + ls + ls);
+            } else {
+                error(e.getMessage());
+            }
         } catch (Exception e) {
             StringWriter sw = new StringWriter();
             PrintWriter pw = new PrintWriter(sw);
@@ -394,13 +405,14 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         // Process Java class imports
         if (javaClassImports != null && !javaClassImports.isEmpty()) {
             javaClassImports.forEach((packageName, imports) -> {
-                Map<String, String> classMappings = new LinkedHashMap<>();
+                Map<String, String> classMappings = javaClassesByPackage.computeIfAbsent(packageName, (k) ->
+                    new LinkedHashMap<>()
+                );
                 for (Map<String, String> importInfo : imports) {
                     String variable = importInfo.get("variable");
                     String className = importInfo.get("class_name");
                     classMappings.put(variable, className);
                 }
-                javaClassesByPackage.put(packageName, classMappings);
             });
         }
 

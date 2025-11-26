@@ -42,7 +42,7 @@ class TestFactory:
 
         when:
         def bar1BeanDefinition = context.getBeanDefinitions(context.classLoader.loadClass('python.Bar1'))
-                .find {it.getDeclaringType().get().simpleName.contains("TestFactory")}
+                .find { it.getDeclaringType().get().simpleName.contains("TestFactory") }
 
         def bar1 = getBean(context, 'python.Bar1')
 
@@ -76,7 +76,7 @@ class TestFactory:
 
         when:
         def bar1BeanDefinition = context.getBeanDefinitions(context.classLoader.loadClass('python.Bar1'))
-                .find {it.getDeclaringType().get().simpleName.contains("TestFactory")}
+                .find { it.getDeclaringType().get().simpleName.contains("TestFactory") }
 
         def bar1 = getBean(context, 'python.Bar1')
 
@@ -87,6 +87,31 @@ class TestFactory:
 
         cleanup:
         context.close()
+    }
+
+    void "test a factory bean with method and no return type"() {
+        when:
+        def context = buildContext('''\
+from micronaut.context.annotation import Factory, Bean, Prototype
+
+class Bar1:
+    pass
+
+@Factory
+class TestFactory:
+
+    @Bean
+    @Prototype
+    def bar(self):
+        return Bar1()
+
+
+''')
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains("Factory methods declared with @Bean must specify a return type")
+        e.message.contains("def bar(self)")
     }
 
     @PendingFeature(reason = "support static methods")
@@ -110,7 +135,7 @@ class TestFactory:
 
         when:
         def bar1BeanDefinition = context.getBeanDefinitions(context.classLoader.loadClass('python.Bar1'))
-                .find {it.getDeclaringType().get().simpleName.contains("TestFactory")}
+                .find { it.getDeclaringType().get().simpleName.contains("TestFactory") }
 
         def bar1 = getBean(context, 'python.Bar1')
 
