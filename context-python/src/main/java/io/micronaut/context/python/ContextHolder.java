@@ -79,7 +79,6 @@ public final class ContextHolder {
                     String methodName = iterator.getIteratorNextElement().asString();
                     // populate a stub that will be filled out later by PythonAopSetup
                     ProxyExecutable stub = (execArgs) -> {
-                        System.out.println("RETURNING NULL ");
                         return null;
                     };
                     pythonClass.putMember(methodName, stub);
