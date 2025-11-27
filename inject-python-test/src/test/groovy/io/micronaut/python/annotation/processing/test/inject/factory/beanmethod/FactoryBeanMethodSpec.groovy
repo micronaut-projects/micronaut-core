@@ -24,6 +24,48 @@ import jakarta.inject.Singleton
 import spock.lang.PendingFeature
 
 class FactoryBeanMethodSpec extends AbstractPythonTypeElementSpec {
+    void "test factory bean with preDestroy"() {
+        given:
+        def context = buildContext('''\
+from micronaut.context.annotation import Factory, Bean, Prototype
+from jakarta.inject import Singleton
+
+class Bar1:
+    stopped : bool = False
+
+    def close(self):
+        self.stopped = True
+        pass
+    pass
+
+@Factory
+class TestFactory:
+
+    @Bean(preDestroy="close")
+    @Singleton
+    def bar(self) -> Bar1:
+        return Bar1()
+
+
+''')
+
+        when:
+        def bar1BeanDefinition = context.getBeanDefinitions(context.classLoader.loadClass('python.Bar1'))
+                .find { it.getDeclaringType().get().simpleName.contains("TestFactory") }
+
+        def bar1 = getBean(context, 'python.Bar1').asPolyglotValue()
+
+        then:
+        bar1 != null
+        bar1.getMember('stopped').asBoolean() == false
+
+        when:
+        context.close()
+
+        then:
+        bar1.getMember('stopped').asBoolean() == true
+    }
+
     void "test a factory bean with attribute"() {
         given:
         def context = buildContext('''\
