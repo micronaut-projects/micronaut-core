@@ -49,7 +49,7 @@ import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.form.FormCapableHttpRequest;
-import io.micronaut.http.form.RawFormField;
+import io.micronaut.http.multipart.RawFormField;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.NettyHttpParameters;
 import io.micronaut.http.netty.NettyHttpRequestBuilder;
@@ -61,13 +61,10 @@ import io.micronaut.http.netty.stream.DefaultStreamedHttpRequest;
 import io.micronaut.http.netty.stream.DelegateStreamedHttpRequest;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
+import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.handler.Http2ServerHandler;
 import io.micronaut.http.server.netty.multipart.FormDemuxer;
-import io.micronaut.http.server.netty.multipart.NettyCompletedFileUpload;
-import io.micronaut.web.router.DefaultUriRouteMatch;
-import io.micronaut.web.router.RouteAttributes;
-import io.micronaut.web.router.RouteMatch;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFutureListener;
@@ -100,6 +97,7 @@ import io.netty.util.concurrent.GenericFutureListener;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.publisher.Flux;
 
 import javax.net.ssl.SSLSession;
 import java.net.InetSocketAddress;
@@ -181,9 +179,6 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     private MutableConvertibleValues<Object> attributes;
     private NettyCookies nettyCookies;
     private final CloseableByteBody body;
-    @Nullable
-    private FormRouteCompleter formRouteCompleter;
-    private ExecutionFlow<?> routeWaitsFor = ExecutionFlow.just(null);
     private Object legacyBody;
 
     private final BodyConvertor bodyConvertor = newBodyConvertor();
@@ -224,26 +219,6 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
 
     public void setLegacyBody(Object legacyBody) {
         this.legacyBody = legacyBody;
-    }
-
-    public void addRouteWaitsFor(ExecutionFlow<?> executionFlow) {
-        routeWaitsFor = routeWaitsFor.then(() -> executionFlow);
-    }
-
-    public ExecutionFlow<?> getRouteWaitsFor() {
-        return routeWaitsFor;
-    }
-
-    public FormRouteCompleter formRouteCompleter() {
-        assert isFormOrMultipartData();
-        if (formRouteCompleter == null) {
-            formRouteCompleter = new FormRouteCompleter(RouteAttributes.getRouteMatch(this).get(), getChannelHandlerContext().channel().eventLoop());
-        }
-        return formRouteCompleter;
-    }
-
-    public boolean hasFormRouteCompleter() {
-        return formRouteCompleter != null;
     }
 
     @Override
@@ -373,8 +348,9 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     @SuppressWarnings("unchecked")
     @Override
     public Optional<T> getBody() {
-        if (hasFormRouteCompleter()) {
-            return Optional.of((T) formRouteCompleter().asMap(serverConfiguration.getDefaultCharset()));
+        io.micronaut.http.server.multipart.FormRouteCompleter frc = FormFactory.getCompleterOrNull(this);
+        if (frc != null) {
+            return Optional.of((T) frc.mapForGetBody(serverConfiguration.getDefaultCharset()));
         } else {
             return Optional.ofNullable((T) legacyBody);
         }
@@ -397,9 +373,6 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     @Internal
     public void release() {
         body.close();
-        if (formRouteCompleter != null) {
-            formRouteCompleter.release();
-        }
         if (attributes != null) {
             attributes.forEach(NettyHttpRequest::cleanup);
         }
@@ -408,22 +381,6 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     private static void cleanup(String k, Object v) {
         //noinspection StringEquality
         if (k == HttpAttributes.ROUTE_MATCH.toString()) {
-            // usually this is a DefaultUriRouteMatch, avoid scalability issues here
-            RouteMatch<?> routeMatch = v instanceof DefaultUriRouteMatch<?, ?> urm ? urm : (RouteMatch<?>) v;
-            if (routeMatch != null) {
-                // discard parameters that have already been bound
-                for (Object toDiscard : routeMatch.getVariableValues().values()) {
-                    if (toDiscard instanceof io.micronaut.core.io.buffer.ReferenceCounted rc) {
-                        rc.release();
-                    }
-                    if (toDiscard instanceof ReferenceCounted rc) {
-                        rc.release();
-                    }
-                    if (toDiscard instanceof NettyCompletedFileUpload fu) {
-                        fu.discard();
-                    }
-                }
-            }
             // perf: avoid an instanceof in releaseIfNecessary
             return;
         }
@@ -629,15 +586,6 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         return serverConfiguration.isSemicolonIsNormalChar();
     }
 
-    /**
-     * @return Return true if the request is form data.
-     */
-    @Internal
-    public boolean isFormOrMultipartData() {
-        MediaType ct = getContentType().orElse(null);
-        return ct != null && (ct.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE) || ct.equals(MediaType.MULTIPART_FORM_DATA_TYPE));
-    }
-
     @Override
     @Deprecated
     public io.netty.handler.codec.http.HttpRequest toHttpRequest() {
@@ -722,6 +670,10 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
 
     @Override
     public @NonNull Publisher<RawFormField> getRawFormFields() throws IllegalStateException {
+        return getRawFormFields(byteBody());
+    }
+
+    public @NonNull Flux<RawFormField> getRawFormFields(ByteBody byteBody) {
         NettyHttpServerConfiguration nhsc = (NettyHttpServerConfiguration) serverConfiguration;
         PostBodyDecoder.Builder builder = PostBodyDecoder.builder()
             .charset(getCharacterEncoding())
@@ -742,7 +694,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
             decoder,
             channelHandlerContext.channel(),
             BodySizeLimits.UNLIMITED, // TODO
-            byteBody()
+            byteBody
         ).fields();
     }
 

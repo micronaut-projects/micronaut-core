@@ -16,6 +16,7 @@
 package io.micronaut.buffer.netty;
 
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.io.buffer.ReadBufferFactory;
 import io.micronaut.core.util.functional.ThrowingConsumer;
@@ -31,6 +32,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
+import java.nio.channels.ScatteringByteChannel;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 
@@ -88,6 +90,27 @@ public final class NettyReadBufferFactory extends ReadBufferFactory {
             if (free) {
                 buffer.release();
             }
+        }
+    }
+
+    @Override
+    public @Nullable ReadBuffer copyOf(@NonNull ScatteringByteChannel channel, int n) throws IOException {
+        ByteBuf bb = allocator.buffer(n);
+        int actual;
+        try {
+            actual = bb.writeBytes(channel, n);
+        } catch (Throwable e) {
+            bb.release();
+            throw e;
+        }
+        if (actual < 0) {
+            bb.release();
+            return null;
+        } else if (actual > 0) {
+            return adapt(bb);
+        } else {
+            bb.release();
+            return createEmpty();
         }
     }
 

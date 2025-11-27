@@ -15,7 +15,9 @@
  */
 package io.micronaut.http;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.http.uri.UriMatchInfo;
 
 import java.util.Optional;
@@ -28,6 +30,8 @@ import java.util.Optional;
  */
 @SuppressWarnings("removal")
 public final class BasicHttpAttributes {
+    private static final String ROUTE_WAITS_FOR = BasicHttpAttributes.class.getName() + ".ROUTE_WAITS_FOR";
+
     private BasicHttpAttributes() {
     }
 
@@ -71,5 +75,38 @@ public final class BasicHttpAttributes {
     @NonNull
     public static Optional<String> getServiceId(@NonNull HttpRequest<?> request) {
         return request.getAttribute(HttpAttributes.SERVICE_ID, String.class);
+    }
+
+    /**
+     * A condition that must be awaited before executing controllers for the given request. This is
+     * used to delay execution for argument binding.
+     *
+     * @param request The request
+     * @return The condition to wait for
+     */
+    @NonNull
+    @Experimental
+    public static ExecutionFlow<?> getRouteWaitsFor(@NonNull HttpRequest<?> request) {
+        @SuppressWarnings("rawtypes")
+        Optional<ExecutionFlow> attr = request.getAttribute(ROUTE_WAITS_FOR, ExecutionFlow.class);
+        return attr.orElseGet(ExecutionFlow::empty);
+    }
+
+    /**
+     * Add a condition that must be awaited before executing controllers for the given request.
+     * This is used to delay execution for argument binding.
+     *
+     * @param request The request
+     * @param flowToAdd The condition to wait for
+     */
+    @Experimental
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    public static void addRouteWaitsFor(@NonNull HttpRequest<?> request, @NonNull ExecutionFlow<?> flowToAdd) {
+        Optional<ExecutionFlow> attr = request.getAttribute(ROUTE_WAITS_FOR, ExecutionFlow.class);
+        if (attr.isPresent()) {
+            request.setAttribute(ROUTE_WAITS_FOR, attr.get().then(() -> flowToAdd));
+        } else {
+            request.setAttribute(ROUTE_WAITS_FOR, flowToAdd);
+        }
     }
 }

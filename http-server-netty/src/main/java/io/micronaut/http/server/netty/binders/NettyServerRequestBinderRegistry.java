@@ -26,9 +26,9 @@ import io.micronaut.http.bind.DefaultRequestBinderRegistry;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.bind.binders.RequestArgumentBinder;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
+import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.multipart.MultipartBodyArgumentBinder;
-import io.micronaut.http.server.netty.multipart.NettyStreamingFileUpload;
 import io.micronaut.scheduling.TaskExecutors;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
@@ -55,9 +55,10 @@ public final class NettyServerRequestBinderRegistry implements RequestBinderRegi
                                             BeanProvider<NettyHttpServerConfiguration> httpServerConfiguration,
                                             @Named(TaskExecutors.BLOCKING)
                                             BeanProvider<ExecutorService> executorService,
-                                            MessageBodyHandlerRegistry bodyHandlerRegistry) {
+                                            MessageBodyHandlerRegistry bodyHandlerRegistry,
+                                            BeanProvider<FormFactory> formFactory) {
 
-        NettyBodyAnnotationBinder<Object> nettyBodyAnnotationBinder = new NettyBodyAnnotationBinder<>(conversionService, httpServerConfiguration.get(), bodyHandlerRegistry);
+        NettyBodyAnnotationBinder<Object> nettyBodyAnnotationBinder = new NettyBodyAnnotationBinder<>(conversionService, httpServerConfiguration.get(), bodyHandlerRegistry, formFactory);
 
         internalRequestBinderRegistry = new DefaultRequestBinderRegistry(conversionService, binders, nettyBodyAnnotationBinder);
 
@@ -66,22 +67,19 @@ public final class NettyServerRequestBinderRegistry implements RequestBinderRegi
         internalRequestBinderRegistry.addArgumentBinder(new NettyPublisherBodyBinder(
             nettyBodyAnnotationBinder));
         internalRequestBinderRegistry.addArgumentBinder(new MultipartBodyArgumentBinder(
-            httpServerConfiguration
+            formFactory
         ));
         internalRequestBinderRegistry.addArgumentBinder(new NettyInputStreamBodyBinder());
-        NettyStreamingFileUpload.Factory fileUploadFactory = new NettyStreamingFileUpload.Factory(
-            httpServerConfiguration.get().getMultipart(),
-            executorService.get()
-        );
-        internalRequestBinderRegistry.addArgumentBinder(new NettyStreamingFileUploadBinder(fileUploadFactory));
-        NettyCompletedFileUploadBinder completedFileUploadBinder = new NettyCompletedFileUploadBinder(conversionService);
+        internalRequestBinderRegistry.addArgumentBinder(new NettyStreamingFileUploadBinder(formFactory));
+        NettyCompletedFileUploadBinder completedFileUploadBinder = new NettyCompletedFileUploadBinder(conversionService, formFactory);
         internalRequestBinderRegistry.addArgumentBinder(completedFileUploadBinder);
-        NettyPublisherPartUploadBinder publisherPartUploadBinder = new NettyPublisherPartUploadBinder(conversionService, fileUploadFactory);
+        NettyPublisherPartUploadBinder publisherPartUploadBinder = new NettyPublisherPartUploadBinder(conversionService, formFactory);
         internalRequestBinderRegistry.addArgumentBinder(publisherPartUploadBinder);
         NettyPartUploadAnnotationBinder<Object> partUploadAnnotationBinder = new NettyPartUploadAnnotationBinder<>(
             conversionService,
             completedFileUploadBinder,
-            publisherPartUploadBinder
+            publisherPartUploadBinder,
+            formFactory
         );
         internalRequestBinderRegistry.addArgumentBinder(partUploadAnnotationBinder);
 

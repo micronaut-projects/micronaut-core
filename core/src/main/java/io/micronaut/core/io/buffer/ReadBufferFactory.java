@@ -17,6 +17,7 @@ package io.micronaut.core.io.buffer;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.functional.ThrowingConsumer;
 
 import java.io.ByteArrayOutputStream;
@@ -26,6 +27,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.ScatteringByteChannel;
 import java.nio.charset.Charset;
 
 /**
@@ -83,6 +85,26 @@ public class ReadBufferFactory {
      */
     public @NonNull ReadBuffer copyOf(@NonNull InputStream stream) throws IOException {
         return adapt(stream.readAllBytes());
+    }
+
+    /**
+     * Read some bytes from a {@link ScatteringByteChannel}. This is a blocking operation.
+     *
+     * @param channel The channel to read from
+     * @param n The maximum number of bytes to read
+     * @return The bytes read, or {@code null} if we hit EOF
+     */
+    public @Nullable ReadBuffer copyOf(@NonNull ScatteringByteChannel channel, int n) throws IOException {
+        ByteBuffer buffer = ByteBuffer.allocate(n);
+        int read = channel.read(buffer);
+        if (read < 0) {
+            return null;
+        } else if (read > 0) {
+            buffer.flip();
+            return adapt(buffer);
+        } else {
+            return createEmpty();
+        }
     }
 
     /**

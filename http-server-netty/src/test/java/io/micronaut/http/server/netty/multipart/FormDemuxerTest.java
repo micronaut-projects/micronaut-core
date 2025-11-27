@@ -5,7 +5,7 @@ import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.stream.BaseSharedBuffer;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
-import io.micronaut.http.form.RawFormField;
+import io.micronaut.http.multipart.RawFormField;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.contrib.multipart.DecoderQuirk;

@@ -25,6 +25,7 @@ import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -42,6 +43,7 @@ import io.micronaut.http.server.exceptions.NotFoundException;
 import io.micronaut.http.server.exceptions.NotWebSocketRequestException;
 import io.micronaut.http.server.exceptions.UnsupportedMediaException;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
+import io.micronaut.http.server.multipart.FormRouteCompleter;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
@@ -589,7 +591,16 @@ public class RequestLifecycle {
         try {
             // try to fulfill the argument requirements of the route
             routeExecutor.requestArgumentSatisfier.fulfillArgumentRequirementsBeforeFilters(routeMatch, request);
-            return ExecutionFlow.just(routeMatch);
+
+            FormRouteCompleter frc = routeExecutor.formFactory.getCompleterOrNull(request);
+            if (frc != null) {
+                // this subscribes to the byteBody and forwards any data to the argument binders
+                frc.start();
+            }
+
+            // check if any argument binders are still waiting for data
+            ExecutionFlow<?> routeWaitsFor = BasicHttpAttributes.getRouteWaitsFor(request);
+            return routeWaitsFor.then(() -> ExecutionFlow.just(routeMatch));
         } catch (Throwable e) {
             return ExecutionFlow.error(e);
         }

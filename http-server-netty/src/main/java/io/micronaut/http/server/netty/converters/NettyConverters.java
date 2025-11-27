@@ -23,6 +23,7 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.TypeConverterRegistrar;
+import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
@@ -31,8 +32,8 @@ import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
+import io.micronaut.http.multipart.PartData;
 import io.micronaut.http.netty.channel.converters.ChannelOptionFactory;
-import io.micronaut.http.server.netty.multipart.NettyPartData;
 import io.micronaut.http.simple.SimpleHttpHeaders;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
@@ -132,7 +133,7 @@ public final class NettyConverters implements TypeConverterRegistrar {
         );
 
         conversionService.addConverter(
-                NettyPartData.class,
+                PartData.class,
                 Object.class,
                 (object, targetType, context) -> {
                     try {
@@ -141,11 +142,8 @@ public final class NettyConverters implements TypeConverterRegistrar {
                         } else if (targetType.isAssignableFrom(InputStream.class)) {
                             return Optional.of(object.getInputStream());
                         } else {
-                            ByteBuf byteBuf = object.getByteBuf();
-                            try {
+                            try (ReadBuffer byteBuf = object.readBuffer()) {
                                 return this.conversionService.convert(byteBuf, targetType, context);
-                            } finally {
-                                byteBuf.release();
                             }
                         }
                     } catch (IOException e) {

@@ -15,15 +15,22 @@
  */
 package io.micronaut.http.server.netty.binders;
 
+import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.execution.CompletableFutureExecutionFlow;
+import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.type.Argument;
+import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.bind.binders.PendingRequestBindingResult;
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
 import io.micronaut.http.multipart.CompletedFileUpload;
 import io.micronaut.http.multipart.FileUpload;
+import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
+import io.micronaut.http.server.multipart.FormFactory;
+import io.micronaut.http.server.multipart.FormRouteCompleter;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import reactor.core.publisher.Mono;
 
@@ -43,9 +50,11 @@ final class NettyCompletedFileUploadBinder implements TypedRequestArgumentBinder
     private static final Argument<CompletedFileUpload> STREAMING_FILE_UPLOAD_ARGUMENT = Argument.of(CompletedFileUpload.class);
 
     private final ConversionService conversionService;
+    private final BeanProvider<FormFactory> formFactory;
 
-    NettyCompletedFileUploadBinder(ConversionService conversionService) {
+    NettyCompletedFileUploadBinder(ConversionService conversionService, BeanProvider<FormFactory> formFactory) {
         this.conversionService = conversionService;
+        this.formFactory = formFactory;
     }
 
     @Override
@@ -56,16 +65,20 @@ final class NettyCompletedFileUploadBinder implements TypedRequestArgumentBinder
     @Override
     public BindingResult<CompletedFileUpload> bindForNettyRequest(ArgumentConversionContext<CompletedFileUpload> context,
                                                                   NettyHttpRequest<?> request) {
-        if (request.getContentType().isEmpty() || !request.isFormOrMultipartData()) {
+        if (request.getContentType().isEmpty() || !request.hasFormBody()) {
             return BindingResult.unsatisfied();
         }
 
         Argument<CompletedFileUpload> argument = context.getArgument();
         String inputName = argument.getAnnotationMetadata().stringValue(Bindable.NAME).orElse(argument.getName());
 
-        CompletableFuture<CompletedFileUpload> completableFuture = Mono.from(request.formRouteCompleter().claimFieldsComplete(inputName))
-            .map(d -> conversionService.convertRequired(d, CompletedFileUpload.class))
+        FormRouteCompleter frc = formFactory.get().getOrCreateCompleter(request);
+        // we implicitly just use the first field of this name.
+        CompletableFuture<CompletedFileUpload> completableFuture = Mono.from(frc.subscribeField(inputName))
+            .flatMap(raw -> Mono.from(ReactiveExecutionFlow.toPublisher(formFactory.get().completeFileUpload(request, raw))))
             .toFuture();
+
+        BasicHttpAttributes.addRouteWaitsFor(request, CompletableFutureExecutionFlow.just(completableFuture).onErrorResume(t -> ExecutionFlow.empty()));
 
         return new PendingRequestBindingResult<>() {
 

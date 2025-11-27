@@ -13,17 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.form;
+package io.micronaut.http.multipart;
 
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.http.ServerHttpRequest;
-import io.micronaut.http.multipart.RawFormField;
-import org.reactivestreams.Publisher;
+import io.micronaut.http.body.CloseableByteBody;
+
+import java.io.Closeable;
 
 // TODO: docs
-public interface FormCapableHttpRequest<B> extends ServerHttpRequest<B> {
-    @NonNull
-    Publisher<RawFormField> getRawFormFields() throws IllegalStateException;
-
-    boolean hasFormBody();
+public record RawFormField(@NonNull FormFieldMetadata metadata,
+                           @NonNull CloseableByteBody byteBody) implements Closeable {
+    @Override
+    public void close() {
+        byteBody.close();
+    }
 }

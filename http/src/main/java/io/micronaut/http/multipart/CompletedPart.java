@@ -15,16 +15,58 @@
  */
 package io.micronaut.http.multipart;
 
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.io.buffer.LeakTracker;
+import io.micronaut.core.io.buffer.ReadBuffer;
+
+import java.io.Closeable;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Objects;
+
 /**
  * Represents a completed part of a multipart request.
  *
  * @author James Kleeh
  * @since 1.3.0
  */
-public interface CompletedPart extends PartData {
+public abstract sealed class CompletedPart implements Closeable permits CompletedAttribute, CompletedFileUpload {
+    private static final LeakTracker.Factory<CompletedPart> TRACKER_FACTORY = LeakTracker.Factory.forClass(CompletedPart.class);
 
-    /**
-     * @return The name of the part
-     */
-    String getName();
+    private final LeakTracker<CompletedPart> tracker = TRACKER_FACTORY.track(this);
+
+    @NonNull
+    private final FormFieldMetadata metadata;
+
+    CompletedPart(@NonNull FormFieldMetadata metadata) {
+        this.metadata = metadata;
+    }
+
+    @NonNull
+    public final FormFieldMetadata getMetadata() {
+        return metadata;
+    }
+
+    @NonNull
+    public final String getName() {
+        return Objects.requireNonNull(metadata.name(), "Field name not given");
+    }
+
+    final void closeTracker() {
+        if (tracker != null) {
+            tracker.close(this);
+        }
+    }
+
+    public abstract long getSize();
+
+    public abstract InputStream getInputStream() throws IOException;
+
+    public abstract ReadBuffer toReadBuffer() throws IOException;
+
+    public final byte[] getBytes() throws IOException {
+        try (ReadBuffer rb = toReadBuffer()) {
+            return rb.toArray();
+        }
+    }
 }

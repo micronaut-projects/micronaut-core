@@ -15,8 +15,11 @@
  */
 package io.micronaut.http.multipart;
 
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.MediaType;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -28,7 +31,7 @@ import java.util.Optional;
  * @author James Kleeh
  * @since 1.0
  */
-public interface PartData {
+public record PartData(@NonNull FormFieldMetadata fieldMetadata, @NonNull ReadBuffer readBuffer) implements Closeable {
 
     /**
      * Gets the content of this chunk as an {@code InputStream}.
@@ -36,7 +39,9 @@ public interface PartData {
      * @return The content of this chunk as an {@code InputStream}
      * @throws IOException If an error occurs in retrieving the content
      */
-    InputStream getInputStream() throws IOException;
+    public InputStream getInputStream() throws IOException {
+        return readBuffer.toInputStream();
+    }
 
     /**
      * Gets the content of this chunk as a {@code byte[]}.
@@ -44,7 +49,9 @@ public interface PartData {
      * @return The content of this chunk as a {@code byte[]}
      * @throws IOException If an error occurs in retrieving the content
      */
-    byte[] getBytes() throws IOException;
+    public byte[] getBytes() throws IOException {
+        return readBuffer.toArray();
+    }
 
     /**
      * Gets the content of this chunk as a {@code ByteBuffer}.
@@ -52,13 +59,21 @@ public interface PartData {
      * @return The content of this chunk as a {@code ByteBuffer}
      * @throws IOException If an error occurs in retrieving the content
      */
-    ByteBuffer getByteBuffer() throws IOException;
+    public ByteBuffer getByteBuffer() throws IOException {
+        return ByteBuffer.wrap(getBytes());
+    }
 
     /**
      * Gets the content type of this chunk.
      *
      * @return The content type of this chunk.
      */
-    Optional<MediaType> getContentType();
+    public Optional<MediaType> getContentType() {
+        return Optional.ofNullable(fieldMetadata.mediaType());
+    }
 
+    @Override
+    public void close() {
+        readBuffer.close();
+    }
 }

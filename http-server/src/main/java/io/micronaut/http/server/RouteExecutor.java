@@ -52,6 +52,7 @@ import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
+import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.inject.BeanType;
 import io.micronaut.inject.MethodReference;
 import io.micronaut.scheduling.executor.ExecutorSelector;
@@ -110,6 +111,7 @@ public final class RouteExecutor {
     final RequestArgumentSatisfier requestArgumentSatisfier;
     final HttpServerConfiguration serverConfiguration;
     final ErrorResponseProcessor<?> errorResponseProcessor;
+    final FormFactory formFactory;
     private final ExecutorSelector executorSelector;
     private final Optional<CoroutineHelper> coroutineHelper;
     private final ConversionService conversionService;
@@ -135,6 +137,7 @@ public final class RouteExecutor {
         this.requestArgumentSatisfier = requestArgumentSatisfier;
         this.serverConfiguration = serverConfiguration;
         this.errorResponseProcessor = errorResponseProcessor;
+        this.formFactory = beanContext.getBean(FormFactory.class);
         this.executorSelector = executorSelector;
         this.coroutineHelper = beanContext.findBean(CoroutineHelper.class);
         this.conversionService = beanContext.getConversionService();

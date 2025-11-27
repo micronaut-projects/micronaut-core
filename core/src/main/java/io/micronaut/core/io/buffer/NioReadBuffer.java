@@ -32,6 +32,10 @@ import java.nio.ByteBuffer;
  */
 @Internal
 final class NioReadBuffer extends ReadBuffer {
+    private static final LeakTracker.Factory<NioReadBuffer> TRACKER_FACTORY = LeakTracker.Factory.forClass(NioReadBuffer.class);
+
+    private final LeakTracker<NioReadBuffer> tracker = TRACKER_FACTORY.track(this);
+
     private final ByteBuffer buffer;
     private boolean closed;
 
@@ -71,14 +75,14 @@ final class NioReadBuffer extends ReadBuffer {
     @Override
     public ReadBuffer move() {
         checkOpen();
-        closed = true;
+        close();
         return new NioReadBuffer(buffer);
     }
 
     @Override
     public void toArray(byte @NonNull [] destination, int offset) {
         checkOpen();
-        closed = true;
+        close();
         if (offset > destination.length || destination.length - offset < buffer.remaining()) {
             throw new IndexOutOfBoundsException();
         }
@@ -89,7 +93,7 @@ final class NioReadBuffer extends ReadBuffer {
     public byte @NonNull [] toArray() {
         checkOpen();
         if (buffer.hasArray() && buffer.arrayOffset() == 0 && buffer.position() == 0 && buffer.remaining() == buffer.array().length) {
-            closed = true;
+            close();
             return buffer.array();
         } else {
             return super.toArray();
@@ -100,7 +104,7 @@ final class NioReadBuffer extends ReadBuffer {
     public InputStream toInputStream() {
         checkOpen();
         if (buffer.hasArray()) {
-            closed = true;
+            close();
             return new ByteArrayInputStream(buffer.array(), buffer.arrayOffset() + buffer.position(), buffer.remaining());
         } else {
             return super.toInputStream();
@@ -111,7 +115,7 @@ final class NioReadBuffer extends ReadBuffer {
     public void transferTo(@NonNull OutputStream stream) throws IOException {
         checkOpen();
         if (buffer.hasArray()) {
-            closed = true;
+            close();
             stream.write(buffer.array(), buffer.arrayOffset() + buffer.position(), buffer.remaining());
         } else {
             super.transferTo(stream);
@@ -121,6 +125,9 @@ final class NioReadBuffer extends ReadBuffer {
     @Override
     public void close() {
         closed = true;
+        if (tracker != null) {
+            tracker.close(this);
+        }
     }
 
     @Override

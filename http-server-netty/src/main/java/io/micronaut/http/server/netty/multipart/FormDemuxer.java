@@ -1,3 +1,18 @@
+/*
+ * Copyright 2017-2025 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.http.server.netty.multipart;
 
 import io.micronaut.buffer.netty.NettyReadBufferFactory;
@@ -14,8 +29,8 @@ import io.micronaut.http.body.stream.BaseSharedBuffer;
 import io.micronaut.http.body.stream.BaseStreamingByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
-import io.micronaut.http.form.FormFieldMetadata;
-import io.micronaut.http.form.RawFormField;
+import io.micronaut.http.multipart.FormFieldMetadata;
+import io.micronaut.http.multipart.RawFormField;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.netty.body.StreamingNettyByteBody;
 import io.netty.buffer.ByteBuf;
@@ -44,7 +59,7 @@ public final class FormDemuxer implements BufferConsumer {
     private final PostBodyDecoder decoder;
     private final NettyByteBodyFactory byteBodyFactory;
     private final EventLoop eventLoop;
-    private final BodySizeLimits fieldLimits;
+    private final BodySizeLimits fieldLimits; // todo: share one limit between fields
     @Nullable
     private final Upstream upstream;
 
