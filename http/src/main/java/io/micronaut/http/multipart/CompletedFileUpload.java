@@ -19,7 +19,6 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.io.buffer.ReadBufferFactory;
-import io.micronaut.core.io.buffer.ReferenceCountedWrapper;
 import io.micronaut.http.MediaType;
 
 import java.io.IOException;
@@ -72,7 +71,7 @@ public abstract sealed class CompletedFileUpload extends CompletedPart {
      */
     @NonNull
     @Experimental
-    public static CompletedFileUpload ofFile(@NonNull FormFieldMetadata metadata, @NonNull ReferenceCountedWrapper<Path> path, long size) {
+    public static CompletedFileUpload ofFile(@NonNull FormFieldMetadata metadata, @NonNull Path path, long size) {
         return new File(metadata, path, size);
     }
 
@@ -146,23 +145,26 @@ public abstract sealed class CompletedFileUpload extends CompletedPart {
     }
 
     static final class File extends CompletedFileUpload {
-        private final ReferenceCountedWrapper<Path> path;
+        private Path path;
         private final long actualSize;
 
-        File(@NonNull FormFieldMetadata metadata, @NonNull ReferenceCountedWrapper<Path> path, long actualSize) {
+        File(@NonNull FormFieldMetadata metadata, @NonNull Path path, long actualSize) {
             super(metadata);
             this.path = path;
             this.actualSize = actualSize;
         }
 
         @NonNull Path getPath() {
-            return path.get();
+            return path;
         }
 
         @Override
-        public void close() {
-            closeTracker();
-            path.close();
+        public void close() throws IOException {
+            if (path != null) {
+                closeTracker();
+                Files.delete(path);
+                path = null;
+            }
         }
 
         @Override
@@ -172,7 +174,7 @@ public abstract sealed class CompletedFileUpload extends CompletedPart {
 
         @Override
         public InputStream getInputStream() throws IOException {
-            return Files.newInputStream(path.get());
+            return Files.newInputStream(path);
         }
 
         @Override
@@ -182,9 +184,9 @@ public abstract sealed class CompletedFileUpload extends CompletedPart {
 
         @Override
         public void transferTo(Path destination) throws IOException {
-            Files.move(path.get(), destination);
+            Files.move(path, destination);
             closeTracker();
-            path.close();
+            path = null;
         }
     }
 }

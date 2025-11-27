@@ -16,71 +16,50 @@
 package io.micronaut.http.multipart;
 
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
-import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.LeakTracker;
+import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.core.util.functional.ThrowingSupplier;
 import io.micronaut.http.body.CloseableByteBody;
-import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import org.reactivestreams.Publisher;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Flux;
+import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
 import reactor.core.publisher.Sinks;
-import reactor.core.scheduler.Schedulers;
 
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.concurrent.Executor;
 
 /**
- * A form file upload that is being streamed to the server. Like {@link CompletedFileUpload}, this
- * object may be backed by memory or by a file, depending on server configuration. However, when
- * using {@link StreamingFileUpload} as a controller parameter, the controller will run
- * immediately, even if the file upload is still in progress. This allows you to start streaming
- * the file upload before it's done.
+ * A form file upload that is being streamed to the server. Unlike {@link CompletedFileUpload},
+ * this class is never backed by a file. It exerts backpressure on the HTTP connection: If you read
+ * slowly or not at all, the upload will slow down on the client.
  * <p>
- * Unlike a normal {@link Publisher}, a {@link StreamingFileUpload} <i>does not</i> exert
- * backpressure on the upload. That means that even if you consume the data very slowly or not at
- * all, the upload will not be affected. Data will be buffered to disk until it's used.
- * <p>
- * A {@link StreamingFileUpload} <b>must be closed</b> after use to clean up any remaining files
- * and resources.
+ * Must be closed after use.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 public final class StreamingFileUpload implements Closeable {
-    private static final Logger LOG = LoggerFactory.getLogger(StreamingFileUpload.class);
     private static final LeakTracker.Factory<StreamingFileUpload> TRACKER_FACTORY = LeakTracker.Factory.forClass(StreamingFileUpload.class);
 
     private final LeakTracker<StreamingFileUpload> tracker = TRACKER_FACTORY.track(this);
 
     @NonNull
-    private final FormFieldMetadata metadata;
-    @Nullable
-    private ExecutionFlow<CompletedFileUpload> completedFileUpload;
-    @NonNull
-    private final CloseableByteBody streamingByteBody;
+    private final RawFormField field;
     @NonNull
     private final Executor ioExecutor;
 
     public StreamingFileUpload(
-        @NonNull FormFieldMetadata metadata,
-        @NonNull ExecutionFlow<CompletedFileUpload> completedFileUpload,
-        @NonNull CloseableByteBody streamingByteBody,
+        @NonNull RawFormField field,
         @NonNull Executor ioExecutor
     ) {
-        this.metadata = metadata;
-        this.completedFileUpload = completedFileUpload;
-        this.streamingByteBody = streamingByteBody;
+        this.field = field;
         this.ioExecutor = ioExecutor;
     }
 
@@ -90,7 +69,7 @@ public final class StreamingFileUpload implements Closeable {
      * @return The metadata
      */
     public @NonNull FormFieldMetadata metadata() {
-        return metadata;
+        return field.metadata();
     }
 
     /**
@@ -101,7 +80,7 @@ public final class StreamingFileUpload implements Closeable {
      */
     @NonNull
     public CloseableByteBody streamingBody() {
-        return streamingByteBody.move();
+        return field.byteBody().move();
     }
 
     /**
@@ -111,7 +90,7 @@ public final class StreamingFileUpload implements Closeable {
      */
     @NonNull
     public OptionalLong getDefinedSize() {
-        return streamingByteBody.expectedLength();
+        return field.byteBody().expectedLength();
     }
 
     /**
@@ -122,7 +101,7 @@ public final class StreamingFileUpload implements Closeable {
      */
     @NonNull
     public String getName() {
-        String name = metadata.name();
+        String name = metadata().name();
         if (name == null) {
             throw new IllegalStateException("Name not specified");
         }
@@ -137,51 +116,23 @@ public final class StreamingFileUpload implements Closeable {
      */
     @NonNull
     public String getFilename() {
-        String name = metadata.fileName();
+        String name = metadata().fileName();
         if (name == null) {
             throw new IllegalStateException("File name not specified");
         }
         return name;
     }
 
-    private ExecutionFlow<CompletedFileUpload> claimCompleted() {
-        ExecutionFlow<CompletedFileUpload> cfu = completedFileUpload;
-        completedFileUpload = null;
-        streamingByteBody.close();
-        return cfu;
-    }
-
     /**
      * Close this form field, deleting any associated resources and files. If you called
-     * {@link #streamingBody()}, {@link #completedFile()} or other methods before, the returned
-     * objects will still function.
+     * {@link #streamingBody()} before, the returned object will still function.
      */
     @Override
     public void close() {
-        ExecutionFlow<CompletedFileUpload> cfu = claimCompleted();
-        if (cfu != null) {
-            cfu.cancel(cf -> {
-                try {
-                    cf.close();
-                } catch (IOException e) {
-                    LOG.debug("Failed to close completed upload");
-                }
-            });
-        }
-        streamingByteBody.close();
+        field.close();
         if (tracker != null) {
             tracker.close(this);
         }
-    }
-
-    /**
-     * Get a publisher that completes when this file is fully uploaded. The caller must take care
-     * to close the returned {@link CompletedFileUpload}. This method may only be called once.
-     *
-     * @return The publisher
-     */
-    public Publisher<CompletedFileUpload> completedFile() {
-        return ReactiveExecutionFlow.toPublisher(Objects.requireNonNull(claimCompleted(), "Already claimed"));
     }
 
     /**
@@ -201,29 +152,7 @@ public final class StreamingFileUpload implements Closeable {
      * @return A {@link Publisher} that outputs whether the transfer was successful
      */
     public Publisher<?> transferTo(Path destination) {
-        Sinks.One<?> sink = Sinks.one();
-        claimCompleted().onComplete((cf, t) -> {
-            if (t != null) {
-                sink.tryEmitError(t);
-            } else {
-                if (cf instanceof CompletedFileUpload.File cff) {
-                    try {
-                        Files.move(cff.getPath(), destination);
-                    } catch (IOException e) {
-                        try {
-                            Files.deleteIfExists(cff.getPath());
-                        } catch (IOException ex) {
-                            e.addSuppressed(ex);
-                        }
-                        sink.tryEmitError(e);
-                    } finally {
-                        cff.closeTracker();
-                    }
-                }
-                sink.tryEmitEmpty();
-            }
-        });
-        return sink.asMono();
+        return transferTo(() -> Files.newOutputStream(destination));
     }
 
     /**
@@ -234,16 +163,72 @@ public final class StreamingFileUpload implements Closeable {
      * @since 3.1.0
      */
     public Publisher<?> transferTo(OutputStream outputStream) {
-        return Flux.from(streamingByteBody.toReadBufferPublisher())
-            .publishOn(Schedulers.fromExecutor(ioExecutor))
-            .doOnNext(rb -> {
-                try {
-                    rb.transferTo(outputStream);
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                }
-            })
-            .ignoreElements();
+        return transferTo(() -> outputStream);
+    }
+
+    private Publisher<?> transferTo(ThrowingSupplier<OutputStream, IOException> supplier) {
+        Sinks.One<Object> sink = Sinks.one();
+        field.byteBody().toReadBufferPublisher().subscribe(new Subscriber<>() {
+            Subscription subscription;
+            OutputStream outputStream;
+
+            @Override
+            public void onSubscribe(Subscription s) {
+                this.subscription = s;
+                ioExecutor.execute(() -> {
+                    try {
+                        outputStream = supplier.get();
+                        subscription.request(1);
+                    } catch (Exception e) {
+                        subscription.cancel();
+                        sink.tryEmitError(e);
+                    }
+                });
+            }
+
+            @Override
+            public void onNext(ReadBuffer readBuffer) {
+                ioExecutor.execute(() -> {
+                    try (readBuffer) {
+                        readBuffer.transferTo(outputStream);
+                        subscription.request(1);
+                    } catch (Exception e) {
+                        try {
+                            outputStream.close();
+                        } catch (IOException ex) {
+                            e.addSuppressed(ex);
+                        }
+                        subscription.cancel();
+                        sink.tryEmitError(e);
+                    }
+                });
+            }
+
+            @Override
+            public void onError(Throwable t) {
+                ioExecutor.execute(() -> {
+                    try {
+                        outputStream.close();
+                    } catch (IOException ex) {
+                        t.addSuppressed(ex);
+                    }
+                    sink.tryEmitError(t);
+                });
+            }
+
+            @Override
+            public void onComplete() {
+                ioExecutor.execute(() -> {
+                    try {
+                        outputStream.close();
+                        sink.tryEmitEmpty();
+                    } catch (IOException ex) {
+                        sink.tryEmitError(ex);
+                    }
+                });
+            }
+        });
+        return sink.asMono();
     }
 
     /**
@@ -255,6 +240,6 @@ public final class StreamingFileUpload implements Closeable {
      */
     @NonNull
     public InputStream asInputStream() {
-        return streamingByteBody.toInputStream();
+        return field.byteBody().toInputStream();
     }
 }

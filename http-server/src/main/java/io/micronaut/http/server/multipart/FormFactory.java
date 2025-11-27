@@ -23,15 +23,10 @@ import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.io.buffer.ReadBufferFactory;
-import io.micronaut.core.io.buffer.ReferenceCountedWrapper;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.body.ByteBodyFactory;
-import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.InternalByteBody;
-import io.micronaut.http.body.stream.BaseSharedBuffer;
-import io.micronaut.http.body.stream.BodySizeLimits;
-import io.micronaut.http.body.stream.BufferConsumer;
 import io.micronaut.http.form.FormCapableHttpRequest;
 import io.micronaut.http.multipart.CompletedAttribute;
 import io.micronaut.http.multipart.CompletedFileUpload;
@@ -53,19 +48,14 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 
 // TODO: docs
 @Internal
@@ -125,27 +115,14 @@ public final class FormFactory {
      */
     @NonNull
     public ExecutionFlow<CompletedFileUpload> completeFileUpload(@Nullable HttpRequest<?> request, @NonNull RawFormField formField) {
-        ToDiskSubscriber tds = new ToDiskSubscriber(formField.metadata(), bodyFactory(request).readBufferFactory(), null);
+        ToDiskSubscriber tds = new ToDiskSubscriber(formField.metadata(), bodyFactory(request).readBufferFactory());
         Flux.from(formField.byteBody().toReadBufferPublisher()).subscribe(tds);
         return tds.result;
     }
 
-    /**
-     * Similar to {@link #completeFileUpload}, except you also get a live view of the data that is
-     * written to disk, in form of a {@link CloseableByteBody}. This body will either forward data
-     * directly as it arrives if consumers are fast enough, or replay it from disk if necessary.
-     *
-     * @param request   Optional request, used to get at the ReadBufferFactory
-     * @param formField The form field to stream
-     * @return The streaming upload
-     */
     @NonNull
     public StreamingFileUpload streamFileUpload(@Nullable HttpRequest<?> request, @NonNull RawFormField formField) {
-        LiveUploadObserver live = new LiveUploadObserver(bodyFactory(request));
-        formField.byteBody().expectedLength().ifPresent(live.sharedBuffer::setExpectedLength);
-        ToDiskSubscriber tds = new ToDiskSubscriber(formField.metadata(), bodyFactory(request).readBufferFactory(), live);
-        Flux.from(formField.byteBody().toReadBufferPublisher()).subscribe(tds);
-        return new StreamingFileUpload(formField.metadata(), tds.result, live.rootBody, diskWriteExecutor);
+        return new StreamingFileUpload(formField, diskWriteExecutor);
     }
 
     public void discardAsync(CompletedPart part) {
@@ -166,7 +143,7 @@ public final class FormFactory {
         }
     }
 
-    private PathAndStream moveToDisk(List<ReadBuffer> memory, @Nullable LiveUploadObserver liveUploadObserver) {
+    private PathAndStream moveToDisk(List<ReadBuffer> memory) {
         Path tmp = null;
         OutputStream out = null;
         try {
@@ -180,17 +157,7 @@ public final class FormFactory {
             for (ReadBuffer rb : memory) {
                 rb.transferTo(out);
             }
-            var refs = ReferenceCountedWrapper.wrap(tmp, p -> diskWriteExecutor.execute(() -> {
-                try {
-                    Files.delete(p);
-                } catch (IOException e) {
-                    LOG.debug("Failed to delete file upload buffer file", e);
-                }
-            }), liveUploadObserver == null ? 1 : 2);
-            if (liveUploadObserver != null) {
-                liveUploadObserver.path = refs.getLast();
-            }
-            return new PathAndStream(refs.getFirst(), out);
+            return new PathAndStream(tmp, out);
         } catch (IOException e) {
             closeSafe(e, memory, out, tmp);
             throw new CompletionException(e);
@@ -238,13 +205,9 @@ public final class FormFactory {
         private CompletableFuture<PathAndStream> file;
         private CompletableFuture<PathAndStream> latestPieceWritten;
 
-        @Nullable
-        private final LiveUploadObserver live;
-
-        ToDiskSubscriber(FormFieldMetadata metadata, ReadBufferFactory bufferFactory, @Nullable LiveUploadObserver live) {
+        ToDiskSubscriber(FormFieldMetadata metadata, ReadBufferFactory bufferFactory) {
             this.metadata = metadata;
             this.bufferFactory = bufferFactory;
-            this.live = live;
         }
 
         @Override
@@ -269,13 +232,10 @@ public final class FormFactory {
                     List<ReadBuffer> memory = this.memory;
                     this.memory = null;
                     // transfer asynchronously
-                    file = CompletableFuture.supplyAsync(() -> moveToDisk(memory, live), diskWriteExecutor);
+                    file = CompletableFuture.supplyAsync(() -> moveToDisk(memory), diskWriteExecutor);
                     latestPieceWritten = file;
                 } else {
                     // no transfer, just save to memory
-                    if (live != null) {
-                        live.receivedNoFile(buffer.duplicate());
-                    }
                     memory.add(buffer);
                     subscription.request(1);
                     return;
@@ -291,17 +251,7 @@ public final class FormFactory {
                     return;
                 }
                 try {
-                    if (live == null) {
-                        buffer.transferTo(p.out);
-                    } else {
-                        try {
-                            buffer.duplicate().transferTo(p.out);
-                        } catch (Throwable u) {
-                            buffer.close();
-                            throw u;
-                        }
-                        live.receivedWithFile(buffer);
-                    }
+                    buffer.transferTo(p.out);
                     // transfer complete, request the next piece
                     subscription.request(1);
                 } catch (IOException e) {
@@ -335,9 +285,6 @@ public final class FormFactory {
                 return;
             }
             completed = true;
-            if (live != null) {
-                live.upstreamComplete(t);
-            }
             if (latestPieceWritten != null) {
                 // also asynchronously close the disk file
                 latestPieceWritten.whenCompleteAsync((p, t2) -> {
@@ -365,9 +312,6 @@ public final class FormFactory {
             if (completed) {
                 return;
             }
-            if (live != null) {
-                live.upstreamComplete(null);
-            }
             assert (file == null) == (latestPieceWritten == null);
             if (latestPieceWritten == null) {
                 // all in-memory
@@ -385,7 +329,11 @@ public final class FormFactory {
                         ps.out.close();
                     } catch (IOException e) {
                         // failed to close, also delete the file
-                        ps.path.close();
+                        try {
+                            Files.deleteIfExists(ps.path);
+                        } catch (IOException ex) {
+                            e.addSuppressed(ex);
+                        }
                         result.tryCompleteExceptionally(e);
                         return;
                     }
@@ -403,256 +351,20 @@ public final class FormFactory {
         }
     }
 
-    private class LiveUploadObserver implements BufferConsumer.Upstream {
-
-        private final BaseSharedBuffer sharedBuffer;
-        private final CloseableByteBody rootBody;
-        private final ReadBufferFactory readBufferFactory;
-
-        private final AtomicReference<State> state = new AtomicReference<>(State.INITIAL);
-
-        private final Lock readerLock = new ReentrantLock();
-
-        private Throwable upstreamError;
-
-        LiveUploadObserver(ByteBodyFactory bbf) {
-            var streamingBody = bbf.createStreamingBody(BodySizeLimits.UNLIMITED, this);
-            sharedBuffer = streamingBody.sharedBuffer();
-            rootBody = streamingBody.rootBody();
-            readBufferFactory = bbf.readBufferFactory();
-        }
-
-        void receivedNoFile(ReadBuffer rb) {
-            State st = state.updateAndGet(s -> s.addForwarded(rb.readable()).addLength(rb.readable()));
-
-            if (st.allowDiscard) {
-                rb.close();
-            } else {
-                sharedBuffer.add(rb);
-            }
-        }
-
-        private boolean receivedWithFileTryOtherThread(int bytesReceived) {
-            while (true) {
-                State s = state.get();
-                if (s.allowDiscard) {
-                    return true;
-                }
-                if (s.canForwardImmediately()) {
-                    return false;
-                }
-                if (state.compareAndSet(s, s.addLength(bytesReceived))) {
-                    // another thread will read the data from disk once it's ready to forward.
-                    return true;
-                }
-            }
-        }
-
-        void receivedWithFile(ReadBuffer rb) {
-            int n = rb.readable();
-
-            if (receivedWithFileTryOtherThread(n)) {
-                rb.close();
-                return;
-            }
-
-            sharedBuffer.add(rb);
-            state.updateAndGet(s -> s.addLength(n).addForwarded(n));
-        }
-
-        void upstreamComplete(Throwable error) {
-            this.upstreamError = error;
-            State s = state.updateAndGet(State::withComplete);
-            if (s.canForwardImmediately()) {
-                forwardComplete();
-            }
-        }
-
-        private void forwardComplete() {
-            // todo: close file channel
-            if (upstreamError == null) {
-                sharedBuffer.complete();
-            } else {
-                sharedBuffer.error(upstreamError);
-            }
-        }
-
-        @Override
-        public void start() {
-            onBytesConsumed(1024);
-        }
-
-        @Override
-        public void onBytesConsumed(long bytesConsumed) {
-            State upd = state.updateAndGet(s -> s.addConsumed(bytesConsumed));
-            if (!upd.canReplay()) {
-                return;
-            }
-
-            // todo: could be avoided by detecting whether another thread is already in the loop below
-            // asynchronously replay some data from the file.
-            diskWriteExecutor.execute(() -> {
-                readerLock.lock();
-                try {
-                    State st = state.get();
-                    // loop until we can't replay any further
-                    while (true) {
-                        if (!st.canReplay()) {
-                            break;
-                        }
-                        if (st.replayable() <= 0) {
-                            if (st.channel != null) {
-                                st.channel.close();
-                            }
-                            if (st.path != null) {
-                                st.path.close();
-                            }
-                            assert st.complete;
-                            forwardComplete();
-                            break;
-                        }
-
-                        if (st.channel == null) {
-                            assert st.path != null : "we shouldn't be replayable without a path";
-                            assert !st.allowDiscard : "we shouldn't be replayable when discarding";
-                            FileChannel channel = FileChannel.open(st.path.get(), StandardOpenOption.READ);
-                            // save the channel into the state.
-                            while (true) {
-                                State old = st;
-                                st = st.withChannel(channel);
-                                if (state.compareAndSet(old, st)) {
-                                    break;
-                                }
-                                st = state.get();
-                                if (st.allowDiscard) {
-                                    // we raced with allowDiscard.
-                                    channel.close();
-                                    return;
-                                }
-                            }
-                        }
-
-                        st.channel.position(st.forwarded);
-                        int toReplay = Math.toIntExact(Math.min(st.replayable(), 128 * 1024));
-
-                        ReadBuffer data = readBufferFactory.copyOf(st.channel, toReplay);
-                        if (data == null) {
-                            throw new IOException("Hit end-of-file at " + st.forwarded + " even though file size was supposed to be " + st.length);
-                        }
-
-                        int actual = data.readable();
-                        sharedBuffer.add(data);
-
-                        st = state.updateAndGet(s -> s.addForwarded(actual));
-                    }
-                } catch (IOException e) {
-                    allowDiscard();
-                    sharedBuffer.error(e);
-                } finally {
-                    readerLock.unlock();
-                }
-            });
-        }
-
-        @Override
-        public void allowDiscard() {
-            State old = state.getAndUpdate(State::withAllowDiscard);
-            diskWriteExecutor.execute(() -> {
-                readerLock.lock();
-                try {
-                    if (readerChannel != null) {
-                        try {
-                            readerChannel.close();
-                        } catch (IOException e) {
-                            LOG.debug("Failed to close reader channel", e);
-                        }
-                        readerChannel = null;
-                    }
-                    if (path != null) {
-                        // todo: what if this is called before path is set
-                        path.close();
-                    }
-                } finally {
-                    readerLock.unlock();
-                }
-            });
-        }
-
-        private record State(
-            long forwarded,
-            long consumed,
-            long length,
-            boolean allowDiscard,
-            boolean complete,
-            ReferenceCountedWrapper<Path> path,
-            FileChannel channel
-        ) {
-            static final State INITIAL = new State(0, 0, 0, false, false, null, null);
-
-            long replayable() {
-                return Math.min(length - forwarded, consumed - length);
-            }
-
-            boolean canForwardImmediately() {
-                return canForward() && replayable() <= 0;
-            }
-
-            boolean canReplay() {
-                return canForward() && (replayable() > 0 || complete);
-            }
-
-            boolean canForward() {
-                return consumed >= length && !allowDiscard;
-            }
-
-            State addLength(int n) {
-                return new State(forwarded, consumed, length + n, allowDiscard, complete, path, channel);
-            }
-
-            State addForwarded(int n) {
-                return new State(forwarded + n, consumed, length, allowDiscard, complete, path, channel);
-            }
-
-            private static long addClamp(long a, long b) {
-                long sum = a + b;
-                if (sum < a) {
-                    sum = Long.MAX_VALUE;
-                }
-                return sum;
-            }
-
-            State addConsumed(long n) {
-                return new State(forwarded, addClamp(consumed, n), length, allowDiscard, complete, path, channel);
-            }
-
-            State withAllowDiscard() {
-                return new State(forwarded, consumed, length, true, complete, path, channel);
-            }
-
-            State withComplete() {
-                return new State(forwarded, consumed, length, allowDiscard, true, path, channel);
-            }
-
-            State withPath(ReferenceCountedWrapper<Path> path) {
-                return new State(forwarded, consumed, length, allowDiscard, complete, path, channel);
-            }
-
-            State withChannel(FileChannel channel) {
-                return new State(forwarded, consumed, length, allowDiscard, complete, path, channel);
-            }
-        }
-    }
-
-    private record PathAndStream(ReferenceCountedWrapper<Path> path, OutputStream out) implements Closeable {
+    private record PathAndStream(Path path, OutputStream out) implements Closeable {
         @Override
         public void close() throws IOException {
             try {
                 out.close();
             } catch (IOException e) {
-                path.close();
+                try {
+                    Files.deleteIfExists(path);
+                } catch (IOException ex) {
+                    e.addSuppressed(ex);
+                }
                 throw e;
             }
-            path.close();
+            Files.deleteIfExists(path);
         }
     }
 }

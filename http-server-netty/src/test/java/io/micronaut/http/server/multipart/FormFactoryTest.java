@@ -3,7 +3,6 @@ package io.micronaut.http.server.multipart;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.ExecutionFlow;
-import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.body.ByteBodyFactory;
@@ -87,32 +86,6 @@ class FormFactoryTest {
             try (var upload = flow.toCompletableFuture().get()) {
                 assertEquals(metadata, upload.getMetadata());
                 assertEquals("fizzbuzz", new String(upload.getBytes(), UTF_8));
-            }
-        }
-    }
-
-    @ParameterizedTest
-    @EnumSource
-    public void streamingLive(StorageMode mode) throws Exception {
-        try (ApplicationContext ctx = ApplicationContext.run(mode.config)) {
-            var factory = ctx.getBean(FormFactory.class);
-            FormFieldMetadata metadata = new FormFieldMetadata("foo", "bar.txt", MediaType.TEXT_PLAIN_TYPE);
-            ByteBodyFactory.StreamingBody streamingBody = bodyFactory().createStreamingBody(BodySizeLimits.UNLIMITED, new MockUpstream());
-            try (var upload = factory.streamFileUpload(mockRequest, new RawFormField(
-                metadata,
-                streamingBody.rootBody()
-            )); var live = upload.streamingBody()) {
-                streamingBody.sharedBuffer().add(bodyFactory().readBufferFactory().copyOf("foo", UTF_8));
-                var sub = new BlockingSubscriber<ReadBuffer>();
-                live.toReadBufferPublisher().subscribe(sub);
-
-                assertEquals("foo", sub.next().toString(UTF_8));
-
-                streamingBody.sharedBuffer().add(bodyFactory().readBufferFactory().copyOf("bar", UTF_8));
-                assertEquals("bar", sub.next().toString(UTF_8));
-
-                streamingBody.sharedBuffer().complete();
-                sub.expectComplete();
             }
         }
     }
