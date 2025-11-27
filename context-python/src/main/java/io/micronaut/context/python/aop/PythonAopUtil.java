@@ -42,9 +42,7 @@ import functools
 def _wrap_micronaut_aop_method(method, java_target_method):
     @functools.wraps(method)
     def wrapper(*args, **kwargs):
-        result = java_target_method(method, args, kwargs)
-        print(f"RESULT FROM JAVA WRAP {result}")
-        return result
+        return java_target_method(method, args, kwargs)
     return wrapper
 """);
 
