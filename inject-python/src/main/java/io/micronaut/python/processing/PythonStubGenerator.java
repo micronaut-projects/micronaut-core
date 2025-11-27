@@ -30,6 +30,7 @@ import javax.lang.model.element.Modifier;
 import io.micronaut.aop.Around;
 import io.micronaut.aop.InterceptorBinding;
 import io.micronaut.aop.Introduction;
+import io.micronaut.aop.runtime.RuntimeProxy;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -182,6 +183,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     if (!isJunit5Test) {
                         builder.addMethod(
                             MethodDef.constructor()
+                                .addModifiers(Modifier.PUBLIC)
                                 .addParameter(ParameterDef.of("value", POLYGLOT_VALUE))
                                 .build(((aThis, methodParameters) -> {
                                         if (extendsPythonClass) {
@@ -389,10 +391,6 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         if (isIntrospected || beanProperty.hasStereotype(Bean.class)) {
                             addGetter(beanProperty, builder, pythonValue);
                         }
-                    }
-
-                    if (isAopProxy) {
-                        builder.addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.aop.PythonAopSetup"));
                     }
 
                 } catch (ProcessingException e) {

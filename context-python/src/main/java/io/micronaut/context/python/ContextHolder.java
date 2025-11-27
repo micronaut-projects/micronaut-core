@@ -128,7 +128,7 @@ public final class ContextHolder {
         return instantiate(null, simpleName, args, pythonClass);
     }
 
-    private static Value findClass(String packageName, String simpleName) {
+    public static Value findClass(String packageName, String simpleName) {
         if (packageName == null || PYTHON.equals(packageName)) {
             return findClass(simpleName);
         }
@@ -142,7 +142,7 @@ public final class ContextHolder {
         }
     }
 
-    private static @NotNull Value findClass(String simpleName) {
+    public static @NotNull Value findClass(String simpleName) {
         Context ctx = getContext();
         Value v = ctx.getBindings(PYTHON).getMember(simpleName);
         if (v == null) {
