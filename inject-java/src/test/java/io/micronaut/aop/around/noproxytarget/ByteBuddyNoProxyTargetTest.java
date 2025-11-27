@@ -1,5 +1,6 @@
 package io.micronaut.aop.around.noproxytarget;
 
+import io.micronaut.aop.InterceptedProxy;
 import io.micronaut.context.ApplicationContext;
 import org.junit.jupiter.api.Test;
 
@@ -8,6 +9,8 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ByteBuddyNoProxyTargetTest {
@@ -28,15 +31,24 @@ class ByteBuddyNoProxyTargetTest {
         }
     }
 
+    @Test
+    void testForceProxyTarget() {
+        try (ApplicationContext context = ApplicationContext.run(Map.of("spec.name", "RuntimeProxyTest"))) {
+            ByteBuddyForceProxyTargetProxyingClass<String> proxyingClass = context.getBean(ByteBuddyForceProxyTargetProxyingClass.class);
+            assertBean(proxyingClass);
+            assertInstanceOf(InterceptedProxy.class, proxyingClass);
+            InterceptedProxy<?> interceptedProxy = (InterceptedProxy<?>) proxyingClass;
+            assertTrue(interceptedProxy.hasCachedInterceptedTarget());
+            assertNotNull(interceptedProxy.interceptedTarget());
+        }
+    }
+
     private void assertBean(NoProxyTargetClass<String> proxyingClass) {
-        // Assert @PostConstruct init() was invoked exactly once
-        assertEquals(1, proxyingClass.lifeCycleCount, "PostConstruct init() should increment lifeCycleCount once");
-        // Invocation count should be zero before any method calls
-        assertEquals(0, proxyingClass.invocationCount, "invocationCount should be zero before invoking test(String)");
-        // Assert parameter was mutated by runtime proxy and result is correct
-        assertEquals("Name is changed", proxyingClass.test("test"));
-        // Assert invocation count is incremented by test(String)
-        assertEquals(1, proxyingClass.invocationCount, "invocationCount should be incremented after test(String)");
+        if (proxyingClass instanceof InterceptedProxy<?> interceptedProxy) {
+            assertLifeCycle(proxyingClass, (NoProxyTargetClass<String>) interceptedProxy.interceptedTarget());
+        } else {
+            assertLifeCycle(proxyingClass, proxyingClass);
+        }
         // Assert primitive overloads and return types are correctly proxied
         assertEquals("Age is 10", proxyingClass.test(5));
         assertEquals("Name is changed and age is 5", proxyingClass.test("test", 5));
@@ -65,5 +77,16 @@ class ByteBuddyNoProxyTargetTest {
         assertEquals(List.of("changed"), proxyingClass.testListWithWildCardSuper("test", List.of("a")));
         assertEquals(List.of("changed"), proxyingClass.testListWithWildCardExtends("test", List.of("a")));
         assertEquals("Name is changed", proxyingClass.testGenericsFromType("test", 5));
+    }
+
+    private void assertLifeCycle(NoProxyTargetClass<String> original, NoProxyTargetClass<String> target) {
+        // Assert @PostConstruct init() was invoked exactly once
+        assertEquals(1, target.lifeCycleCount, "PostConstruct init() should increment lifeCycleCount once");
+        // Invocation count should be zero before any method calls
+        assertEquals(0, target.invocationCount, "invocationCount should be zero before invoking test(String)");
+        // Assert parameter was mutated by runtime proxy and result is correct
+        assertEquals("Name is changed", original.test("test"));
+        // Assert invocation count is incremented by test(String)
+        assertEquals(1, target.invocationCount, "invocationCount should be incremented after test(String)");
     }
 }

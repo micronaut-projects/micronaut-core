@@ -63,6 +63,7 @@ public class RuntimeProxyBeanDefinitionWriter extends ProxyingBeanDefinitionWrit
         DefaultRuntimeProxyDefinition.class,
         "introduction",
         BeanResolutionContext.class, BeanDefinition.class);
+
     public static final String RUNTIME_PROXY_SUFFIX = "$RuntimeProxy";
 
     public RuntimeProxyBeanDefinitionWriter(ClassElement targetType, BeanDefinitionWriter parent, OptionalValues<Boolean> settings, VisitorContext visitorContext, AnnotationValue<?>... interceptorBinding) {
@@ -75,6 +76,11 @@ public class RuntimeProxyBeanDefinitionWriter extends ProxyingBeanDefinitionWrit
 
     public RuntimeProxyBeanDefinitionWriter(String suffix, ClassElement targetType, boolean implementInterface, ClassElement[] interfaceTypes, VisitorContext visitorContext, AnnotationValue<?>... interceptorBinding) {
         super(suffix + RUNTIME_PROXY_SUFFIX, targetType, targetType, implementInterface, interfaceTypes, visitorContext, interceptorBinding);
+    }
+
+    @Override
+    protected boolean getProxyTarget(ClassElement targetType, BeanDefinitionWriter parent, OptionalValues<Boolean> settings) {
+        return super.getProxyTarget(targetType, parent, settings) || targetType.isTrue(RuntimeProxy.class, "proxyTarget");
     }
 
     @Override

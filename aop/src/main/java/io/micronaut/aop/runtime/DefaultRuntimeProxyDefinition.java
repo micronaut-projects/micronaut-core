@@ -54,6 +54,16 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
                                                boolean proxyTarget,
                                                Object[] constructorValues) implements RuntimeProxyDefinition<T> {
 
+    /**
+     * Creates a new instance for around advice.
+     *
+     * @param resolutionContext   The resolution context
+     * @param proxyBeanDefinition The proxy bean definition
+     * @param isProxyTarget       Is proxy target bean
+     * @param constructorValues   The constructor values
+     * @param <T>                 The proxy type
+     * @return The definition
+     */
     public static <T> DefaultRuntimeProxyDefinition<T> around(BeanResolutionContext resolutionContext,
                                                               BeanDefinition<T> proxyBeanDefinition,
                                                               boolean isProxyTarget,
@@ -89,6 +99,14 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
         return new DefaultRuntimeProxyDefinition<>(proxyBeanDefinition, resolutionContext, interceptedMethods, false, isProxyTarget, constructorValues);
     }
 
+    /**
+     * Creates a new instance for introduction advice.
+     *
+     * @param resolutionContext   The resolution context
+     * @param proxyBeanDefinition The proxy bean definition
+     * @param <T>                 The proxy type
+     * @return The definition
+     */
     public static <T> DefaultRuntimeProxyDefinition<T> introduction(BeanResolutionContext resolutionContext,
                                                                     BeanDefinition<T> proxyBeanDefinition) {
 

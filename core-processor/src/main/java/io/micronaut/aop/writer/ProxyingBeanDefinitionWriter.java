@@ -104,7 +104,7 @@ public abstract class ProxyingBeanDefinitionWriter implements ProxyingBeanDefini
         this.proxyType = proxyType;
         this.targetType = targetType;
         this.parentWriter = parent;
-        this.isProxyTarget = settings.get(Interceptor.PROXY_TARGET).orElse(false) || parent.isInterface();
+        this.isProxyTarget = getProxyTarget(targetType, parent, settings);
         parent.setProxiedBean(true, isProxyTarget);
         this.isIntroduction = false;
         this.implementInterface = true;
@@ -176,6 +176,16 @@ public abstract class ProxyingBeanDefinitionWriter implements ProxyingBeanDefini
         if (interfaceTypes != null && interfaceTypes.length > 0) {
             proxyBeanDefinitionWriter.setExposes(Set.of(interfaceTypes));
         }
+    }
+
+    /**
+     * @param targetType The target type
+     * @param parent The parent
+     * @param settings The settings
+     * @return is proxy target
+     */
+    protected boolean getProxyTarget(ClassElement targetType, BeanDefinitionWriter parent, OptionalValues<Boolean> settings) {
+        return settings.get(Interceptor.PROXY_TARGET).orElse(false) || parent.isInterface();
     }
 
     /**

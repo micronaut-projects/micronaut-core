@@ -39,4 +39,17 @@ public @interface RuntimeProxy {
      * @return The runtime proxy creator bean class
      */
     Class<? extends RuntimeProxyCreator> value();
+
+        /**
+     * <p>By default Micronaut will compile subclasses of the target class and call super.foo(..) to invoke the original method since
+     * this is more efficient and allows proxied methods to work for calls from within the class.</p>
+     *
+     * <p>However certain cases it may be useful to be able to to instead proxy all public methods of the original implementation.
+     * By setting the value here to <code>true</code> the {@link io.micronaut.aop.Interceptor} can specify that it requires proxying of the class</p>
+     *
+     * <p>Generated subclasses will implement {@link io.micronaut.aop.InterceptedProxy} if this attribute is set to true</p>
+     *
+     * @return True if the original implementation should be proxied. Defaults to false.
+     */
+    boolean proxyTarget() default false;
 }
