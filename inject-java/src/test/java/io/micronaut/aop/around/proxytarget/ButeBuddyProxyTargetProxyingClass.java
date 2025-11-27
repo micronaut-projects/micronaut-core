@@ -1,7 +1,7 @@
 package io.micronaut.aop.around.proxytarget;
 
 import io.micronaut.aop.ByteBuddyRuntimeProxy;
-import io.micronaut.aop.RuntimeProxy;
+import io.micronaut.aop.runtime.RuntimeProxy;
 import jakarta.inject.Singleton;
 
 @Singleton

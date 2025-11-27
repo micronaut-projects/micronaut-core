@@ -13,13 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.aop;
+package io.micronaut.aop.runtime;
 
+import io.micronaut.aop.Interceptor;
 import io.micronaut.context.BeanContext;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
+import org.jspecify.annotations.NullMarked;
 
 import java.util.List;
 
@@ -30,6 +32,7 @@ import java.util.List;
  * @author Denis Stepanov
  * @since 5.0
  */
+@NullMarked
 @Internal
 public interface RuntimeProxyDefinition<T> {
 
@@ -84,6 +87,7 @@ public interface RuntimeProxyDefinition<T> {
      * @param interceptors     The interceptors
      * @param <K>              The proxy target type
      */
+    @NullMarked
     record InterceptedMethod<K>(ExecutableMethod<K, Object> executableMethod,
                                 Interceptor<K, Object>[] interceptors) {
     }

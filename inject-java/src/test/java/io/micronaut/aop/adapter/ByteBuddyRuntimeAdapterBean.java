@@ -17,10 +17,9 @@ package io.micronaut.aop.adapter;
 
 import io.micronaut.aop.Adapter;
 import io.micronaut.aop.ByteBuddyRuntimeProxy;
-import io.micronaut.aop.RuntimeProxy;
+import io.micronaut.aop.bytebuddy.ByteBuddyStacktraceVerified;
+import io.micronaut.aop.runtime.RuntimeProxy;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.event.ApplicationEventListener;
-import io.micronaut.context.event.StartupEvent;
 import jakarta.inject.Singleton;
 
 @Requires(property = "spec.name", value = "RuntimeProxyAdapterTest")
@@ -28,14 +27,15 @@ import jakarta.inject.Singleton;
 @RuntimeProxy(ByteBuddyRuntimeProxy.class)
 public class ByteBuddyRuntimeAdapterBean {
 
-    private boolean invoked = false;
+    private String message;
 
-    @Adapter(ApplicationEventListener.class)
-    void onStartup(StartupEvent event) {
-        invoked = true;
+    @ByteBuddyStacktraceVerified
+    @Adapter(MyAdapter.class)
+    void onMessage(String message) {
+        this.message = message;
     }
 
-    public boolean isInvoked() {
-        return invoked;
+    public String getMessage() {
+        return message;
     }
 }

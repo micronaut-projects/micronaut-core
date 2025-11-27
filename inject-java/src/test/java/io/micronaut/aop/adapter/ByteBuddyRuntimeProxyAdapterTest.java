@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ByteBuddyRuntimeProxyAdapterTest {
 
@@ -20,7 +21,10 @@ class ByteBuddyRuntimeProxyAdapterTest {
     void test() {
         try (ApplicationContext context = ApplicationContext.run(Map.of("spec.name", "RuntimeProxyAdapterTest"))) {
             ByteBuddyRuntimeAdapterBean repo = context.getBean(ByteBuddyRuntimeAdapterBean.class);
-            assertEquals(true, repo.isInvoked());
+            MyAdapter myAdapter = context.getBean(MyAdapter.class);
+            myAdapter.receive("Hello World");
+            assertEquals("Hello World", repo.getMessage());
+            assertTrue(repo.getClass().getName().contains("$ByteBuddyProxy"));
         }
     }
 }

@@ -1,6 +1,8 @@
 package io.micronaut.aop;
 
 import io.micronaut.aop.chain.MethodInterceptorChain;
+import io.micronaut.aop.runtime.RuntimeProxyCreator;
+import io.micronaut.aop.runtime.RuntimeProxyDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.NullMarked;

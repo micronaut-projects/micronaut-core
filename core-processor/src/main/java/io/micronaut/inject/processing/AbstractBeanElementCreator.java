@@ -18,7 +18,7 @@ package io.micronaut.inject.processing;
 import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.InterceptorKind;
 import io.micronaut.aop.Introduction;
-import io.micronaut.aop.RuntimeProxy;
+import io.micronaut.aop.runtime.RuntimeProxy;
 import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
 import io.micronaut.aop.writer.AopProxyWriter;
 import io.micronaut.aop.writer.RuntimeProxyBeanDefinitionWriter;

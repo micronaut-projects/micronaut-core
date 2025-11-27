@@ -1,6 +1,8 @@
 package io.micronaut.aop;
 
 import io.micronaut.aop.chain.MethodInterceptorChain;
+import io.micronaut.aop.runtime.RuntimeProxyCreator;
+import io.micronaut.aop.runtime.RuntimeProxyDefinition;
 import io.micronaut.context.Qualifier;
 import io.micronaut.core.type.TypeInformation;
 import io.micronaut.inject.ExecutableMethod;

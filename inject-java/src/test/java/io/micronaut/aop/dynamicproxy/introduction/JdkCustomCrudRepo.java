@@ -1,7 +1,7 @@
 package io.micronaut.aop.dynamicproxy.introduction;
 
 import io.micronaut.aop.JdkRuntimeProxy;
-import io.micronaut.aop.RuntimeProxy;
+import io.micronaut.aop.runtime.RuntimeProxy;
 import io.micronaut.aop.introduction.CrudRepo;
 import io.micronaut.aop.introduction.RepoDef;
 

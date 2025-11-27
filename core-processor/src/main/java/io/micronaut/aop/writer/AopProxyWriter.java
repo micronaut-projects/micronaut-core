@@ -237,6 +237,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                           VisitorContext visitorContext,
                           AnnotationValue<?>... interceptorBinding) {
         super(
+            null,
             ClassElement.of(parent.getBeanDefinitionName() + PROXY_SUFFIX, parent.isInterface(), parent.getAnnotationMetadata()),
             targetType,
             parent,
@@ -302,6 +303,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                           VisitorContext visitorContext,
                           AnnotationValue<?>... interceptorBinding) {
         super(
+            null,
             ClassElement.of(targetType.getName() + PROXY_SUFFIX, targetType.isInterface(), targetType.getAnnotationMetadata()),
             targetType,
             implementInterface,
@@ -330,7 +332,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
     }
 
     @Override
-    protected BeanDefinitionWriter createAdviceProxyBeanDefinitionWriter() {
+    protected BeanDefinitionWriter createAdviceProxyBeanDefinitionWriter(String suffix) {
         return new BeanDefinitionWriter(
             proxyType,
             parentWriter,
@@ -339,7 +341,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
     }
 
     @Override
-    protected BeanDefinitionWriter createIntroductionProxyBeanDefinitionWriter() {
+    protected BeanDefinitionWriter createIntroductionProxyBeanDefinitionWriter(String suffix) {
         return new BeanDefinitionWriter(
             proxyType,
             this,

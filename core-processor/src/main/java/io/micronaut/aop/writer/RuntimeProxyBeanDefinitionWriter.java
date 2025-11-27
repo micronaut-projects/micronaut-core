@@ -15,10 +15,10 @@
  */
 package io.micronaut.aop.writer;
 
-import io.micronaut.aop.DefaultRuntimeProxyDefinition;
-import io.micronaut.aop.RuntimeProxy;
-import io.micronaut.aop.RuntimeProxyCreator;
-import io.micronaut.aop.RuntimeProxyDefinition;
+import io.micronaut.aop.runtime.DefaultRuntimeProxyDefinition;
+import io.micronaut.aop.runtime.RuntimeProxy;
+import io.micronaut.aop.runtime.RuntimeProxyCreator;
+import io.micronaut.aop.runtime.RuntimeProxyDefinition;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
@@ -63,20 +63,25 @@ public class RuntimeProxyBeanDefinitionWriter extends ProxyingBeanDefinitionWrit
         DefaultRuntimeProxyDefinition.class,
         "introduction",
         BeanResolutionContext.class, BeanDefinition.class);
+    public static final String RUNTIME_PROXY_SUFFIX = "$RuntimeProxy";
 
     public RuntimeProxyBeanDefinitionWriter(ClassElement targetType, BeanDefinitionWriter parent, OptionalValues<Boolean> settings, VisitorContext visitorContext, AnnotationValue<?>... interceptorBinding) {
-        super(targetType, targetType, parent, settings, visitorContext, interceptorBinding);
+        super(RUNTIME_PROXY_SUFFIX, targetType, targetType, parent, settings, visitorContext, interceptorBinding);
     }
 
     public RuntimeProxyBeanDefinitionWriter(ClassElement targetType, ClassElement[] interfaceTypes, VisitorContext visitorContext, AnnotationValue<?>... interceptorBinding) {
-        super(targetType, targetType, interfaceTypes, visitorContext, interceptorBinding);
+        super(RUNTIME_PROXY_SUFFIX, targetType, targetType, interfaceTypes, visitorContext, interceptorBinding);
+    }
+
+    public RuntimeProxyBeanDefinitionWriter(String suffix, ClassElement targetType, boolean implementInterface, ClassElement[] interfaceTypes, VisitorContext visitorContext, AnnotationValue<?>... interceptorBinding) {
+        super(suffix + RUNTIME_PROXY_SUFFIX, targetType, targetType, implementInterface, interfaceTypes, visitorContext, interceptorBinding);
     }
 
     @Override
-    protected BeanDefinitionWriter createAdviceProxyBeanDefinitionWriter() {
+    protected BeanDefinitionWriter createAdviceProxyBeanDefinitionWriter(String suffix) {
         return new BeanDefinitionWriter(
             ClassElement.of(parentWriter.getPackageName() + '.' + parentWriter.getBeanSimpleName(), parentWriter.isInterface(), parentWriter.getAnnotationMetadata()),
-            targetType.getName() + "$RuntimeProxy",
+            targetType.getName() + suffix,
             parentWriter,
             visitorContext,
             null
@@ -84,14 +89,14 @@ public class RuntimeProxyBeanDefinitionWriter extends ProxyingBeanDefinitionWrit
     }
 
     @Override
-    protected BeanDefinitionWriter createIntroductionProxyBeanDefinitionWriter() {
+    protected BeanDefinitionWriter createIntroductionProxyBeanDefinitionWriter(String suffix) {
         return new BeanDefinitionWriter(
             ClassElement.of(
                 targetType.getName(),
                 targetType.isInterface(),
                 targetType.getAnnotationMetadata()
             ),
-            targetType.getName() + "$RuntimeProxy",
+            targetType.getName() + suffix,
             this,
             visitorContext,
             null

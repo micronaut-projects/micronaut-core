@@ -84,6 +84,7 @@ public abstract class ProxyingBeanDefinitionWriter implements ProxyingBeanDefini
      *
      * <p>Additional {@link Interceptor} types can be added downstream with {@link #visitInterceptorBinding(AnnotationValue[])} .</p>
      *
+     * @param suffix             The proxy name suffix
      * @param proxyType          The proxyType
      * @param targetType          The targetType
      * @param parent             The parent {@link BeanDefinitionWriter}
@@ -91,7 +92,8 @@ public abstract class ProxyingBeanDefinitionWriter implements ProxyingBeanDefini
      * @param visitorContext     The visitor context
      * @param interceptorBinding The interceptor binding of the {@link Interceptor} instances to be injected
      */
-    public ProxyingBeanDefinitionWriter(ClassElement proxyType,
+    public ProxyingBeanDefinitionWriter(@Nullable String suffix,
+                                        ClassElement proxyType,
                                         ClassElement targetType,
                                         BeanDefinitionWriter parent,
                                         OptionalValues<Boolean> settings,
@@ -108,7 +110,7 @@ public abstract class ProxyingBeanDefinitionWriter implements ProxyingBeanDefini
         this.implementInterface = true;
         this.interceptorBinding = toInterceptorBindingMap(interceptorBinding);
         this.visitorContext = visitorContext;
-        this.proxyBeanDefinitionWriter = createAdviceProxyBeanDefinitionWriter();
+        this.proxyBeanDefinitionWriter = createAdviceProxyBeanDefinitionWriter(suffix);
         proxyBeanDefinitionWriter.setRequiresMethodProcessing(parent.requiresMethodProcessing());
         proxyBeanDefinitionWriter.setInterceptedType(targetType.getName());
     }
@@ -116,23 +118,26 @@ public abstract class ProxyingBeanDefinitionWriter implements ProxyingBeanDefini
     /**
      * Constructs a new {@link ProxyingBeanDefinitionWriter} for the purposes of writing {@link io.micronaut.aop.Introduction} advise.
      *
+     * @param suffix             The proxy name suffix
      * @param proxyType          The proxy type
      * @param targetType         The target type
      * @param interfaceTypes     The additional interfaces to implement
      * @param visitorContext     The visitor context
      * @param interceptorBinding The interceptor types
      */
-    public ProxyingBeanDefinitionWriter(ClassElement proxyType,
+    public ProxyingBeanDefinitionWriter(@Nullable String suffix,
+                                        ClassElement proxyType,
                                         ClassElement targetType,
                                         ClassElement[] interfaceTypes,
                                         VisitorContext visitorContext,
                                         AnnotationValue<?>... interceptorBinding) {
-        this(proxyType, targetType, true, interfaceTypes, visitorContext, interceptorBinding);
+        this(suffix, proxyType, targetType, true, interfaceTypes, visitorContext, interceptorBinding);
     }
 
     /**
      * Constructs a new {@link ProxyingBeanDefinitionWriter} for the purposes of writing {@link io.micronaut.aop.Introduction} advise.
      *
+     * @param suffix             The proxy name suffix
      * @param proxyType          The proxy type
      * @param targetType         The target type
      * @param implementInterface Whether the interface should be implemented. If false the {@code interfaceTypes} argument should contain at least one entry
@@ -140,7 +145,8 @@ public abstract class ProxyingBeanDefinitionWriter implements ProxyingBeanDefini
      * @param visitorContext     The visitor context
      * @param interceptorBinding The interceptor binding
      */
-    public ProxyingBeanDefinitionWriter(ClassElement proxyType,
+    public ProxyingBeanDefinitionWriter(@Nullable String suffix,
+                                        ClassElement proxyType,
                                         ClassElement targetType,
                                         boolean implementInterface,
                                         ClassElement[] interfaceTypes,
@@ -159,7 +165,7 @@ public abstract class ProxyingBeanDefinitionWriter implements ProxyingBeanDefini
         this.interceptorBinding = toInterceptorBindingMap(interceptorBinding);
         this.isIntroduction = true;
         this.visitorContext = visitorContext;
-        this.proxyBeanDefinitionWriter = createIntroductionProxyBeanDefinitionWriter();
+        this.proxyBeanDefinitionWriter = createIntroductionProxyBeanDefinitionWriter(suffix);
         if (targetType.isInterface()) {
             if (implementInterface) {
                 proxyBeanDefinitionWriter.setInterceptedType(targetType.getName());
@@ -173,14 +179,16 @@ public abstract class ProxyingBeanDefinitionWriter implements ProxyingBeanDefini
     }
 
     /**
+     * @param suffix The name suffix
      * @return Create the advice bean definition writer
      */
-    protected abstract BeanDefinitionWriter createAdviceProxyBeanDefinitionWriter();
+    protected abstract BeanDefinitionWriter createAdviceProxyBeanDefinitionWriter(String suffix);
 
     /**
+     * @param suffix The name suffix
      * @return Create the introduction bean definition writer
      */
-    protected abstract BeanDefinitionWriter createIntroductionProxyBeanDefinitionWriter();
+    protected abstract BeanDefinitionWriter createIntroductionProxyBeanDefinitionWriter(String suffix);
 
     @Override
     public boolean isEnabled() {

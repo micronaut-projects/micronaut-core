@@ -18,7 +18,9 @@ package io.micronaut.inject.processing;
 import io.micronaut.aop.Adapter;
 import io.micronaut.aop.InterceptorKind;
 import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
+import io.micronaut.aop.runtime.RuntimeProxy;
 import io.micronaut.aop.writer.AopProxyWriter;
+import io.micronaut.aop.writer.RuntimeProxyBeanDefinitionWriter;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Value;
@@ -613,14 +615,26 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
             throw new ProcessingException(sourceMethod, "Class to adapt [" + interfaceToAdapt.getName() + "] is not an interface");
         }
 
-        String adapterClassName = classElement.getName() + '$' + interfaceToAdapt.getSimpleName() + '$' + sourceMethod.getSimpleName() + adaptedMethodIndex.incrementAndGet();
+        String suffix = '$' + interfaceToAdapt.getSimpleName() + '$' + sourceMethod.getSimpleName() + adaptedMethodIndex.incrementAndGet();
+        String adapterClassName = classElement.getName() + suffix;
 
-        AopProxyWriter aopProxyWriter = new AopProxyWriter(
-            ClassElement.of(adapterClassName, true, new AnnotationMetadataHierarchy(classElement.getAnnotationMetadata(), methodAnnotationMetadata)),
-            false,
-            new ClassElement[]{interfaceToAdapt},
-            visitorContext
-        );
+        ProxyingBeanDefinitionVisitor aopProxyWriter;
+        if (sourceMethod.hasStereotype(RuntimeProxy.class)) {
+            aopProxyWriter = new RuntimeProxyBeanDefinitionWriter(
+                suffix,
+                ClassElement.of(interfaceToAdapt.getName(), true, new AnnotationMetadataHierarchy(classElement.getAnnotationMetadata(), methodAnnotationMetadata)),
+                false,
+                new ClassElement[]{interfaceToAdapt},
+                visitorContext
+            );
+        } else {
+            aopProxyWriter = new AopProxyWriter(
+                ClassElement.of(adapterClassName, true, new AnnotationMetadataHierarchy(classElement.getAnnotationMetadata(), methodAnnotationMetadata)),
+                false,
+                new ClassElement[]{interfaceToAdapt},
+                visitorContext
+            );
+        }
         aopProxyWriter.addOriginatingElement(sourceMethod);
 
         aopProxyWriter.visitDefaultConstructor(methodAnnotationMetadata, visitorContext);
