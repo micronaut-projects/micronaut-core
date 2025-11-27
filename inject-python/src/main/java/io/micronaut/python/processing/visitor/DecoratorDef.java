@@ -55,7 +55,7 @@ import java.util.Objects;
  * <h2>Usage in Processing Pipeline</h2>
  * <p>
  * {@code DecoratorDef} instances are typically produced during AST traversal
- * (e.g., by the embedded Python {@code PrintNodeVisitor}) and are used to construct
+ * (e.g., by the embedded Python {@code MicronautAstVisitor}) and are used to construct
  * higher-level Java elements such as {@link ClassDef} and {@link FunctionDef}.
  * </p>
  *

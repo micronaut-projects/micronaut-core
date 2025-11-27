@@ -237,10 +237,10 @@ public final class PythonAstParser {
         return """
             import ast
             import java
-            from micronaut_processor import PrintNodeVisitor
+            from micronaut_processor import MicronautAstVisitor
 
             tree = ast.parse(src)
-            PrintNodeVisitor(callback, package_name, visitor_context).visit(tree)
+            MicronautAstVisitor(callback, package_name, visitor_context).visit(tree)
             """;
     }
 

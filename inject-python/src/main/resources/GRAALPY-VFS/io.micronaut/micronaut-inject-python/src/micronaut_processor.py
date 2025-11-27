@@ -57,7 +57,7 @@ def is_static_method(func_node):
     return False
 
 
-class PrintNodeVisitor(ast.NodeVisitor):
+class MicronautAstVisitor(ast.NodeVisitor):
 
     def __init__(self, callback, package_name="", visitor_context=None):
         self.callback = callback
