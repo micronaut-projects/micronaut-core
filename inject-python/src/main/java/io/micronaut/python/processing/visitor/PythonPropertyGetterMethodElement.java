@@ -30,6 +30,7 @@ import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.annotation.MethodElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
+import org.jspecify.annotations.NonNull;
 
 /**
  * A synthetic getter method element for Python properties.
@@ -61,6 +62,11 @@ public final class PythonPropertyGetterMethodElement extends AbstractPythonEleme
         this.environment = environment;
         this.declaringType = declaringType;
         this.owningType = owningType;
+    }
+
+    @Override
+    public @NonNull MutableAnnotationMetadataDelegate<AnnotationMetadata> getMethodAnnotationMetadata() {
+        return propertyElement.getElementAnnotationMetadata();
     }
 
     @Override

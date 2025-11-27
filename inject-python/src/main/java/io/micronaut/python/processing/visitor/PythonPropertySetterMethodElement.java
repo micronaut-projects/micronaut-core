@@ -33,6 +33,7 @@ import io.micronaut.inject.ast.annotation.MethodElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.MethodElementAnnotationsHelper;
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
+import org.jspecify.annotations.NonNull;
 
 /**
  * A synthetic setter method element for Python properties.
@@ -70,6 +71,11 @@ public final class PythonPropertySetterMethodElement extends AbstractPythonEleme
             propertyElement,
             metadataFactory
         );
+    }
+
+    @Override
+    public @NonNull MutableAnnotationMetadataDelegate<AnnotationMetadata> getMethodAnnotationMetadata() {
+        return propertyElement.getElementAnnotationMetadata();
     }
 
     @Override
