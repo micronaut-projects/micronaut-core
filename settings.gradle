@@ -2,12 +2,11 @@ pluginManagement {
     repositories {
         gradlePluginPortal()
         mavenCentral()
-        mavenLocal()
     }
 }
 
 plugins {
-    id 'io.micronaut.build.shared.settings' version '8.0.0-SNAPSHOT'
+    id 'io.micronaut.build.shared.settings' version '8.0.0-M10'
 }
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
