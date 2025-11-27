@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.LeakTracker;
 import io.micronaut.http.body.CloseableByteBody;
+import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,21 +36,23 @@ import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.concurrent.Executor;
 
 /**
- * <p>Represents a part of a {@link io.micronaut.http.MediaType#MULTIPART_FORM_DATA} request.</p>
- *
- * <p>The {@code StreamingFileUpload} may be incomplete when first received, in which case the consumer can subscribe
- * to the file upload to process the data a chunk at a time.</p>
- *
- * <p>The {@link #transferTo(String)} method can be used whether the upload is complete or not. If it is not complete
- * the framework will automatically subscribe to the upload and transfer the data chunk by chunk in a non-blocking
- * manner</p>
- *
- * <p>All I/O operation return a {@link Publisher} that runs on the the configured I/O
- * {@link java.util.concurrent.ExecutorService}</p>
+ * A form file upload that is being streamed to the server. Like {@link CompletedFileUpload}, this
+ * object may be backed by memory or by a file, depending on server configuration. However, when
+ * using {@link StreamingFileUpload} as a controller parameter, the controller will run
+ * immediately, even if the file upload is still in progress. This allows you to start streaming
+ * the file upload before it's done.
+ * <p>
+ * Unlike a normal {@link Publisher}, a {@link StreamingFileUpload} <i>does not</i> exert
+ * backpressure on the upload. That means that even if you consume the data very slowly or not at
+ * all, the upload will not be affected. Data will be buffered to disk until it's used.
+ * <p>
+ * A {@link StreamingFileUpload} <b>must be closed</b> after use to clean up any remaining files
+ * and resources.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -81,16 +84,42 @@ public final class StreamingFileUpload implements Closeable {
         this.ioExecutor = ioExecutor;
     }
 
+    /**
+     * Get the user-supplied metadata for this form field.
+     *
+     * @return The metadata
+     */
+    public @NonNull FormFieldMetadata metadata() {
+        return metadata;
+    }
+
+    /**
+     * Stream the data as a {@link CloseableByteBody} as it comes in. This method may only be
+     * called once. The returned body must be closed by the caller.
+     *
+     * @return The streaming data
+     */
     @NonNull
-    public CloseableByteBody streamingByteBody() {
+    public CloseableByteBody streamingBody() {
         return streamingByteBody.move();
     }
 
+    /**
+     * Get the final size of the upload, if given by the user.
+     *
+     * @return The final upload size
+     */
     @NonNull
     public OptionalLong getDefinedSize() {
         return streamingByteBody.expectedLength();
     }
 
+    /**
+     * Get the name of the form field.
+     *
+     * @return The form field name
+     * @see FormFieldMetadata#name()
+     */
     @NonNull
     public String getName() {
         String name = metadata.name();
@@ -100,6 +129,12 @@ public final class StreamingFileUpload implements Closeable {
         return name;
     }
 
+    /**
+     * Get the user-specified file name of the uploaded file.
+     *
+     * @return The file name
+     * @see FormFieldMetadata#fileName()
+     */
     @NonNull
     public String getFilename() {
         String name = metadata.fileName();
@@ -112,9 +147,15 @@ public final class StreamingFileUpload implements Closeable {
     private ExecutionFlow<CompletedFileUpload> claimCompleted() {
         ExecutionFlow<CompletedFileUpload> cfu = completedFileUpload;
         completedFileUpload = null;
+        streamingByteBody.close();
         return cfu;
     }
 
+    /**
+     * Close this form field, deleting any associated resources and files. If you called
+     * {@link #streamingBody()}, {@link #completedFile()} or other methods before, the returned
+     * objects will still function.
+     */
     @Override
     public void close() {
         ExecutionFlow<CompletedFileUpload> cfu = claimCompleted();
@@ -134,7 +175,17 @@ public final class StreamingFileUpload implements Closeable {
     }
 
     /**
-     * <p>A convenience method to write this uploaded item to disk.</p>
+     * Get a publisher that completes when this file is fully uploaded. The caller must take care
+     * to close the returned {@link CompletedFileUpload}. This method may only be called once.
+     *
+     * @return The publisher
+     */
+    public Publisher<CompletedFileUpload> completedFile() {
+        return ReactiveExecutionFlow.toPublisher(Objects.requireNonNull(claimCompleted(), "Already claimed"));
+    }
+
+    /**
+     * A convenience method to write this uploaded item to disk.
      *
      * @param destination the destination of the file to which the stream will be written.
      * @return A {@link Publisher} that outputs whether the transfer was successful
@@ -144,14 +195,13 @@ public final class StreamingFileUpload implements Closeable {
     }
 
     /**
-     * <p>A convenience method to write this uploaded item to disk.</p>
+     * A convenience method to write this uploaded item to disk.
      *
      * @param destination the destination of the file to which the stream will be written.
      * @return A {@link Publisher} that outputs whether the transfer was successful
      */
     public Publisher<?> transferTo(Path destination) {
         Sinks.One<?> sink = Sinks.one();
-        streamingByteBody.close();
         claimCompleted().onComplete((cf, t) -> {
             if (t != null) {
                 sink.tryEmitError(t);

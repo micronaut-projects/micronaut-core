@@ -65,6 +65,7 @@ import java.util.function.Supplier;
  *
  * @param <D> This {@link HttpData} type, for {@code return (D) this} on various methods
  */
+// TODO delete
 @Internal
 public abstract sealed class MicronautHttpData<D extends HttpData> extends AbstractReferenceCounted implements HttpData {
     @SuppressWarnings("rawtypes")

@@ -20,15 +20,25 @@ import io.micronaut.core.io.buffer.ReadBuffer;
 
 import java.io.InputStream;
 
-// TODO: docs
+/**
+ * A form field that is not a file upload.
+ */
 public final class CompletedAttribute extends CompletedPart {
     private final ReadBuffer readBuffer;
 
-    public CompletedAttribute(@NonNull FormFieldMetadata metadata, ReadBuffer readBuffer) {
+    private CompletedAttribute(@NonNull FormFieldMetadata metadata, ReadBuffer readBuffer) {
         super(metadata);
         this.readBuffer = readBuffer;
     }
 
+    /**
+     * Create a new memory-backed attribute. Ownership of the data buffer transfers to the
+     * attribute object. Closing the attribute object will close the memory.
+     *
+     * @param metadata The field metadata
+     * @param readBuffer The attribute memory
+     * @return The attribute
+     */
     @NonNull
     public static CompletedAttribute create(@NonNull FormFieldMetadata metadata, @NonNull ReadBuffer readBuffer) {
         return new CompletedAttribute(metadata, readBuffer);

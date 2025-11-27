@@ -19,10 +19,13 @@ import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpVersion;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedClass;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
+
+import java.util.Map;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -51,9 +54,10 @@ class FormFactoryTest {
         return FormFactory.bodyFactory(mockRequest);
     }
 
-    @Test
-    public void completedSimple() throws Exception {
-        try (ApplicationContext ctx = ApplicationContext.run()) {
+    @ParameterizedTest
+    @EnumSource
+    public void completedSimple(StorageMode mode) throws Exception {
+        try (ApplicationContext ctx = ApplicationContext.run(mode.config)) {
             var factory = ctx.getBean(FormFactory.class);
             FormFieldMetadata metadata = new FormFieldMetadata("foo", "bar.txt", MediaType.TEXT_PLAIN_TYPE);
             try (var upload = factory.completeFileUpload(mockRequest, new RawFormField(
@@ -66,9 +70,10 @@ class FormFactoryTest {
         }
     }
 
-    @Test
-    public void completedMulti() throws Exception {
-        try (ApplicationContext ctx = ApplicationContext.run()) {
+    @ParameterizedTest
+    @EnumSource
+    public void completedMulti(StorageMode mode) throws Exception {
+        try (ApplicationContext ctx = ApplicationContext.run(mode.config)) {
             var factory = ctx.getBean(FormFactory.class);
             FormFieldMetadata metadata = new FormFieldMetadata("foo", "bar.txt", MediaType.TEXT_PLAIN_TYPE);
             ByteBodyFactory.StreamingBody streamingBody = bodyFactory().createStreamingBody(BodySizeLimits.UNLIMITED, new MockUpstream());
@@ -86,16 +91,17 @@ class FormFactoryTest {
         }
     }
 
-    @Test
-    public void streamingLive() throws Exception {
-        try (ApplicationContext ctx = ApplicationContext.run()) {
+    @ParameterizedTest
+    @EnumSource
+    public void streamingLive(StorageMode mode) throws Exception {
+        try (ApplicationContext ctx = ApplicationContext.run(mode.config)) {
             var factory = ctx.getBean(FormFactory.class);
             FormFieldMetadata metadata = new FormFieldMetadata("foo", "bar.txt", MediaType.TEXT_PLAIN_TYPE);
             ByteBodyFactory.StreamingBody streamingBody = bodyFactory().createStreamingBody(BodySizeLimits.UNLIMITED, new MockUpstream());
             try (var upload = factory.streamFileUpload(mockRequest, new RawFormField(
                 metadata,
                 streamingBody.rootBody()
-            )); var live = upload.streamingByteBody()) {
+            )); var live = upload.streamingBody()) {
                 streamingBody.sharedBuffer().add(bodyFactory().readBufferFactory().copyOf("foo", UTF_8));
                 var sub = new BlockingSubscriber<ReadBuffer>();
                 live.toReadBufferPublisher().subscribe(sub);
@@ -129,6 +135,18 @@ class FormFactoryTest {
         @Override
         public void disregardBackpressure() {
             disregardBackpressure = true;
+        }
+    }
+
+    enum StorageMode {
+        STANDARD(Map.of()),
+        MIXED(Map.of("micronaut.server.multipart.mixed", true, "micronaut.server.multipart.threshold", 4)),
+        DISK(Map.of("micronaut.server.multipart.disk", true));
+
+        final Map<String, Object> config;
+
+        StorageMode(Map<String, Object> config) {
+            this.config = config;
         }
     }
 }

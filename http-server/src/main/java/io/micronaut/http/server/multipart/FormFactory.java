@@ -23,6 +23,7 @@ import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.io.buffer.ReadBufferFactory;
+import io.micronaut.core.io.buffer.ReferenceCountedWrapper;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.body.ByteBodyFactory;
@@ -165,7 +166,7 @@ public final class FormFactory {
         }
     }
 
-    private PathAndStream moveToDisk(List<ReadBuffer> memory) {
+    private PathAndStream moveToDisk(List<ReadBuffer> memory, @Nullable LiveUploadObserver liveUploadObserver) {
         Path tmp = null;
         OutputStream out = null;
         try {
@@ -179,7 +180,17 @@ public final class FormFactory {
             for (ReadBuffer rb : memory) {
                 rb.transferTo(out);
             }
-            return new PathAndStream(tmp, out);
+            var refs = ReferenceCountedWrapper.wrap(tmp, p -> diskWriteExecutor.execute(() -> {
+                try {
+                    Files.delete(p);
+                } catch (IOException e) {
+                    LOG.debug("Failed to delete file upload buffer file", e);
+                }
+            }), liveUploadObserver == null ? 1 : 2);
+            if (liveUploadObserver != null) {
+                liveUploadObserver.path = refs.getLast();
+            }
+            return new PathAndStream(refs.getFirst(), out);
         } catch (IOException e) {
             closeSafe(e, memory, out, tmp);
             throw new CompletionException(e);
@@ -230,7 +241,7 @@ public final class FormFactory {
         @Nullable
         private final LiveUploadObserver live;
 
-        ToDiskSubscriber(FormFieldMetadata metadata, ReadBufferFactory bufferFactory, LiveUploadObserver live) {
+        ToDiskSubscriber(FormFieldMetadata metadata, ReadBufferFactory bufferFactory, @Nullable LiveUploadObserver live) {
             this.metadata = metadata;
             this.bufferFactory = bufferFactory;
             this.live = live;
@@ -258,13 +269,7 @@ public final class FormFactory {
                     List<ReadBuffer> memory = this.memory;
                     this.memory = null;
                     // transfer asynchronously
-                    file = CompletableFuture.supplyAsync(() -> {
-                        PathAndStream ps = moveToDisk(memory);
-                        if (live != null) {
-                            live.path = ps.path;
-                        }
-                        return ps;
-                    }, diskWriteExecutor);
+                    file = CompletableFuture.supplyAsync(() -> moveToDisk(memory, live), diskWriteExecutor);
                     latestPieceWritten = file;
                 } else {
                     // no transfer, just save to memory
@@ -380,11 +385,7 @@ public final class FormFactory {
                         ps.out.close();
                     } catch (IOException e) {
                         // failed to close, also delete the file
-                        try {
-                            Files.deleteIfExists(ps.path);
-                        } catch (IOException ex) {
-                            e.addSuppressed(ex);
-                        }
+                        ps.path.close();
                         result.tryCompleteExceptionally(e);
                         return;
                     }
@@ -410,10 +411,7 @@ public final class FormFactory {
 
         private final AtomicReference<State> state = new AtomicReference<>(State.INITIAL);
 
-        private Path path;
-
         private final Lock readerLock = new ReentrantLock();
-        private FileChannel readerChannel;
 
         private Throwable upstreamError;
 
@@ -503,19 +501,41 @@ public final class FormFactory {
                             break;
                         }
                         if (st.replayable() <= 0) {
+                            if (st.channel != null) {
+                                st.channel.close();
+                            }
+                            if (st.path != null) {
+                                st.path.close();
+                            }
                             assert st.complete;
                             forwardComplete();
                             break;
                         }
 
-                        if (readerChannel == null) {
-                            readerChannel = FileChannel.open(path, StandardOpenOption.READ);
+                        if (st.channel == null) {
+                            assert st.path != null : "we shouldn't be replayable without a path";
+                            assert !st.allowDiscard : "we shouldn't be replayable when discarding";
+                            FileChannel channel = FileChannel.open(st.path.get(), StandardOpenOption.READ);
+                            // save the channel into the state.
+                            while (true) {
+                                State old = st;
+                                st = st.withChannel(channel);
+                                if (state.compareAndSet(old, st)) {
+                                    break;
+                                }
+                                st = state.get();
+                                if (st.allowDiscard) {
+                                    // we raced with allowDiscard.
+                                    channel.close();
+                                    return;
+                                }
+                            }
                         }
 
-                        readerChannel.position(st.forwarded);
+                        st.channel.position(st.forwarded);
                         int toReplay = Math.toIntExact(Math.min(st.replayable(), 128 * 1024));
 
-                        ReadBuffer data = readBufferFactory.copyOf(readerChannel, toReplay);
+                        ReadBuffer data = readBufferFactory.copyOf(st.channel, toReplay);
                         if (data == null) {
                             throw new IOException("Hit end-of-file at " + st.forwarded + " even though file size was supposed to be " + st.length);
                         }
@@ -536,7 +556,7 @@ public final class FormFactory {
 
         @Override
         public void allowDiscard() {
-            state.getAndUpdate(State::withAllowDiscard);
+            State old = state.getAndUpdate(State::withAllowDiscard);
             diskWriteExecutor.execute(() -> {
                 readerLock.lock();
                 try {
@@ -547,6 +567,10 @@ public final class FormFactory {
                             LOG.debug("Failed to close reader channel", e);
                         }
                         readerChannel = null;
+                    }
+                    if (path != null) {
+                        // todo: what if this is called before path is set
+                        path.close();
                     }
                 } finally {
                     readerLock.unlock();
@@ -559,9 +583,11 @@ public final class FormFactory {
             long consumed,
             long length,
             boolean allowDiscard,
-            boolean complete
+            boolean complete,
+            ReferenceCountedWrapper<Path> path,
+            FileChannel channel
         ) {
-            static final State INITIAL = new State(0, 0, 0, false, false);
+            static final State INITIAL = new State(0, 0, 0, false, false, null, null);
 
             long replayable() {
                 return Math.min(length - forwarded, consumed - length);
@@ -580,11 +606,11 @@ public final class FormFactory {
             }
 
             State addLength(int n) {
-                return new State(forwarded, consumed, length + n, allowDiscard, complete);
+                return new State(forwarded, consumed, length + n, allowDiscard, complete, path, channel);
             }
 
             State addForwarded(int n) {
-                return new State(forwarded + n, consumed, length, allowDiscard, complete);
+                return new State(forwarded + n, consumed, length, allowDiscard, complete, path, channel);
             }
 
             private static long addClamp(long a, long b) {
@@ -596,33 +622,37 @@ public final class FormFactory {
             }
 
             State addConsumed(long n) {
-                return new State(forwarded, addClamp(consumed, n), length, allowDiscard, complete);
+                return new State(forwarded, addClamp(consumed, n), length, allowDiscard, complete, path, channel);
             }
 
             State withAllowDiscard() {
-                return new State(forwarded, consumed, length, true, complete);
+                return new State(forwarded, consumed, length, true, complete, path, channel);
             }
 
             State withComplete() {
-                return new State(forwarded, consumed, length, allowDiscard, true);
+                return new State(forwarded, consumed, length, allowDiscard, true, path, channel);
+            }
+
+            State withPath(ReferenceCountedWrapper<Path> path) {
+                return new State(forwarded, consumed, length, allowDiscard, complete, path, channel);
+            }
+
+            State withChannel(FileChannel channel) {
+                return new State(forwarded, consumed, length, allowDiscard, complete, path, channel);
             }
         }
     }
 
-    private record PathAndStream(Path path, OutputStream out) implements Closeable {
+    private record PathAndStream(ReferenceCountedWrapper<Path> path, OutputStream out) implements Closeable {
         @Override
         public void close() throws IOException {
             try {
                 out.close();
             } catch (IOException e) {
-                try {
-                    Files.deleteIfExists(path);
-                } catch (IOException ex) {
-                    e.addSuppressed(ex);
-                }
+                path.close();
                 throw e;
             }
-            Files.deleteIfExists(path);
+            path.close();
         }
     }
 }
