@@ -39,7 +39,6 @@ lombok = "1.18.42"
 logbook-netty = "3.12.3"
 log4j = "2.24.3"
 micronaut-aws = "4.11.0"
-micronaut-build-plugins="8.0.0-M10"
 micronaut-groovy = "4.7.0"
 micronaut-session = "4.6.0"
 micronaut-sql = "5.3.0"
@@ -256,7 +255,6 @@ logbook-netty = { module = "org.zalando:logbook-netty", version.ref = "logbook-n
 lombok = { module = "org.projectlombok:lombok", version.ref = "lombok" }
 
 micronaut-docs = { module = "io.micronaut.docs:micronaut-docs-asciidoc-config-props", version.ref = "micronaut-docs" }
-micronaut-build-plugins = { module = "io.micronaut.build.internal:micronaut-gradle-plugins", version.ref="micronaut-build-plugins"}
 micronaut-runtime-groovy = { module = "io.micronaut.groovy:micronaut-runtime-groovy", version.ref = "micronaut-groovy" }
 micronaut-session = { module = "io.micronaut.session:micronaut-session", version.ref = "micronaut-session" }
 micronaut-test-bom = { module = "io.micronaut.test:micronaut-test-bom", version.ref = "micronaut-test" }
