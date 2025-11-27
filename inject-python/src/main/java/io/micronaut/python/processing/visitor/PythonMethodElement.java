@@ -51,7 +51,7 @@ import javax.lang.model.element.Element;
  * @see <a href="https://docs.python.org/3/library/ast.html#ast.FunctionDef">Python AST FunctionDef</a>
  * @since 5.0.0
  */
-public sealed class PythonMethodElement extends AbstractPythonElement implements MethodElement, ElementProvider permits PythonConstructorElement {
+public non-sealed class PythonMethodElement extends AbstractPythonElement implements MethodElement, ElementProvider {
     private final PythonProcessingEnvironment environment;
     private final AbstractPythonClassElement declaringType;
     private final AbstractPythonClassElement owningType;
@@ -172,14 +172,18 @@ public sealed class PythonMethodElement extends AbstractPythonElement implements
     public MethodElement withParameters(ParameterElement... newParameters) {
         // Since PythonMethodElement is based on parsed Python code,
         // we create a synthetic MethodElement with the new parameters
-        return MethodElement.of(
-            getOwningType(),
-            getAnnotationMetadata(),
-            getReturnType(),
-            getGenericReturnType(),
-            getName(),
-            newParameters
-        );
+        return new PythonMethodElement(
+            getNativeType(),
+            environment,
+            declaringType,
+            owningType,
+            elementAnnotationMetadataFactory
+        ) {
+            @Override
+            public ParameterElement[] getParameters() {
+                return newParameters;
+            }
+        };
     }
 
     @Override

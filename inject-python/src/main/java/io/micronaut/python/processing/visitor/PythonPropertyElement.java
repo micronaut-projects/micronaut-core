@@ -108,7 +108,7 @@ public final class PythonPropertyElement extends AbstractPythonElement implement
             owningType,
             metadataFactory
         ) : (isWritable() ? createSyntheticSetter() : null);
-        this.annotationMetadata = new PropertyElementAnnotationMetadata(this, readMethod, writeMethod, field, null, false);
+        this.annotationMetadata = new PropertyElementAnnotationMetadata(this, readMethod, writeMethod, field, null, null, false);
     }
 
     @Override
