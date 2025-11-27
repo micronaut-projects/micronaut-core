@@ -9,7 +9,7 @@ from micronaut.context.annotation import Executable
 from jakarta.inject import Singleton
 from abc import ABC, abstractmethod
 from datetime import datetime
-import java
+import javaScheduled
 
 MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
 
