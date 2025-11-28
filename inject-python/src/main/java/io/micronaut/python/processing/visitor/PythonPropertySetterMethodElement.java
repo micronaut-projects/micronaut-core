@@ -22,6 +22,7 @@ import javax.lang.model.element.Element;
 
 import io.micronaut.annotation.processing.visitor.ElementProvider;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
@@ -70,6 +71,13 @@ public final class PythonPropertySetterMethodElement extends AbstractPythonEleme
         this.parameter = new PythonPropertyParameterElement(
             propertyElement,
             metadataFactory
+        );
+    }
+
+    @Override
+    public String getName() {
+        return NameUtils.setterNameFor(
+            super.getName()
         );
     }
 

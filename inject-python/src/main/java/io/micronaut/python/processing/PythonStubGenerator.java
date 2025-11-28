@@ -547,7 +547,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
     private void addGetter(PropertyElement beanProperty, ClassDef.ClassDefBuilder builder, FieldDef pythonValue) {
         TypeDef propertyType = TypeDef.of(beanProperty.getType());
-        MethodDef.MethodDefBuilder getterBuilder = MethodDef.builder(beanProperty.getName())
+        String getterName = beanProperty.getReadMethod().map(MethodElement::getName).orElse(beanProperty.getName());
+        MethodDef.MethodDefBuilder getterBuilder = MethodDef
+            .builder(getterName)
+            .addModifiers(Modifier.PUBLIC)
             .returns(propertyType);
 
         builder.addMethod(getterBuilder.build(((aThis, methodParameters) -> {
@@ -569,8 +572,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         TypeDef returnType = beanProperty.getWriteMethod()
             .map(MethodElement::getReturnType)
             .map(TypeDef::of).orElse(TypeDef.VOID);
+        String setterName = beanProperty.getWriteMethod().map(MethodElement::getName).orElse(beanProperty.getName());
         MethodDef.MethodDefBuilder propertySetter = MethodDef
-            .builder(beanProperty.getName())
+            .builder(setterName)
+            .addModifiers(Modifier.PUBLIC)
             .returns(returnType);
 
         propertySetter.addParameter(TypeDef.of(beanProperty.getType()));

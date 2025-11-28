@@ -89,7 +89,7 @@ class TestFactory:
         def bar1 = getBean(context, 'python.Bar1')
 
         then:
-        bar1BeanDefinition.getBeanDescription(TypeInformation.TypeFormat.SHORTENED) == '@i.m.c.a.Prototype p.Bar1 p.TestFactory.bar()'
+        bar1BeanDefinition.getBeanDescription(TypeInformation.TypeFormat.SHORTENED) == '@i.m.c.a.Prototype p.Bar1 p.TestFactory.getBar()'
         bar1 != null
         bar1BeanDefinition.getScope().get() == Prototype.class
 

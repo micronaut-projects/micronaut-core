@@ -136,9 +136,6 @@ def micronaut_annotation(name, repeated=None):
     Decorator to mark functions as Micronaut annotations.
     """
     def decorator(func):
-        func._micronaut_annotation_name = name
-        if repeated:
-            func._micronaut_repeatable_container = repeated
         return func
     return decorator
 '''
@@ -393,9 +390,6 @@ def micronaut_annotation(name, repeated=None):
     Decorator to mark functions as Micronaut annotations.
     """
     def decorator(func):
-        func._micronaut_annotation_name = name
-        if repeated:
-            func._micronaut_repeatable_container = repeated
         return func
     return decorator
 
@@ -455,9 +449,6 @@ def micronaut_annotation(name, repeated=None):
     Decorator to mark functions as Micronaut annotations.
     """
     def decorator(func):
-        func._micronaut_annotation_name = name
-        if repeated:
-            func._micronaut_repeatable_container = repeated
         return func
     return decorator
 
@@ -625,13 +616,3 @@ def {decorator_name}({param_signature}):
         return self.exported_types
 
 
-def micronaut_annotation(name: str, repeated: Optional[str] = None):
-    """
-    Decorator to mark functions as Micronaut annotations.
-    """
-    def decorator(func):
-        func._micronaut_annotation_name = name
-        if repeated:
-            func._micronaut_repeatable_container = repeated
-        return func
-    return decorator

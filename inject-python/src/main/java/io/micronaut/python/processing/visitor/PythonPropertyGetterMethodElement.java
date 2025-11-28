@@ -22,9 +22,11 @@ import javax.lang.model.element.Element;
 
 import io.micronaut.annotation.processing.visitor.ElementProvider;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.annotation.MethodElementAnnotationMetadata;
@@ -111,7 +113,15 @@ public final class PythonPropertyGetterMethodElement extends AbstractPythonEleme
 
     @Override
     public ParameterElement[] getParameters() {
-        return new ParameterElement[0]; // Getter has no parameters
+        return ParameterElement.ZERO_PARAMETER_ELEMENTS; // Getter has no parameters
+    }
+
+    @Override
+    public String getName() {
+        return NameUtils.getterNameFor(
+            super.getName(),
+            getGenericReturnType().equals(PrimitiveElement.BOOLEAN)
+        );
     }
 
     @Override
