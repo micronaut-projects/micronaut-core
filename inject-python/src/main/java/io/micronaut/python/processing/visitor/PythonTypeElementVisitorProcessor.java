@@ -122,7 +122,7 @@ public class PythonTypeElementVisitorProcessor {
                 if (loadedVisitor.matchesClass(element)) {
                     if (isAopProxy(element)) {
                         element.annotate(RuntimeProxy.class, builder ->
-                            builder.value("io.micronaut.context.python.aop.Python   ProxyCreator")
+                            builder.value("io.micronaut.context.python.aop.PythonProxyCreator")
                                 .member("proxyTarget", true)
                         );
                     }
