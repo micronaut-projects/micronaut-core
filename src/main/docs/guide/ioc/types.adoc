@@ -1,4 +1,29 @@
-In addition to being able to inject beans, Micronaut framework natively supports injecting the following types:
+In addition to being able to inject beans, Micronaut framework natively supports injecting other language types.
+
+[.lang-python]
+--
+For Python these include:
+.Injectable Container Types
+|===
+|Type |Description |Example
+
+|https://docs.python.org/3/library/typing.html#typing.Optional[typing.Optional]
+|An `Optional` of a bean. `None` is injected if the bean doesn't exist
+|`Optional[Engine]`
+
+|https://docs.python.org/3/library/typing.html#typing.List[typing.List or list]
+|A Python native `list`
+|`list[Engine] or List[Engine]`
+
+|https://docs.python.org/3/library/typing.html#typing.Dict[typing.Dict or dict]
+|A Python native dictionary type `dict`
+|`dict[str, Engine] or Dict[str, Engine]`
+
+--
+
+[.lang-kotlin.lang-java.lang-groovy]
+--
+For Java, Groovy and Kotlin these include:
 
 .Injectable Container Types
 |===
@@ -58,6 +83,7 @@ In this example, the injected member variable `engines` will not contain an inst
 ====
 
 TIP: A prototype bean will have one instance created per place the bean is injected. When a prototype bean is injected as a provider, each call to `get()` creates a new instance.
+--
 
 === Collection Ordering
 

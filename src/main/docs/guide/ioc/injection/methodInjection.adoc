@@ -5,6 +5,9 @@ snippet::io.micronaut.docs.ioc.injection.method.Vehicle[indent="0"]
 
 <1> The method is annotated with `jakarta.inject.Inject` and will therefore be injected
 
+[.lang-kotlin.lang-java.lang-groovy]
+--
 WARNING: If the method is `private` scope or inaccessible then the method will be injected using the Java reflection API which is not recommended.
+--
 
 Method injection can be useful if you need post construction initializers, however in general should be avoided in favour of constructor injection where possible.
