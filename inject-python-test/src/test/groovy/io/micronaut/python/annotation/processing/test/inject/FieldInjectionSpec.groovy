@@ -40,8 +40,8 @@ class MainService:
 
         then: "Field setter method parameter types should be resolved correctly"
         // Field injection generates setter methods, so check injectedMethods
-        def serverSetter = definition.injectedMethods.find { it.methodName == 'server' }
-        def clientSetter = definition.injectedMethods.find { it.methodName == 'client' }
+        def serverSetter = definition.injectedMethods.find { it.methodName == 'setServer' }
+        def clientSetter = definition.injectedMethods.find { it.methodName == 'setClient' }
 
         serverSetter != null
         // Check that the setter method parameter has correct type

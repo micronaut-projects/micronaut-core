@@ -82,10 +82,10 @@ class EngineConfiguration:
 
         then:
         ferrariBean != null
-        ferrariBean.cylinders() == 8
-        ferrariBean.enabled() == false
-        fordBean.cylinders() == 6
-        fordBean.enabled() == true
+        ferrariBean.cylinders == 8
+        ferrariBean.enabled == false
+        fordBean.cylinders == 6
+        fordBean.enabled == true
     }
 
     void "test each property with each bean on Python factory"() {
@@ -203,9 +203,9 @@ class AppConfig:
 
         then:
         configBean != null
-        configBean.name() == "MyApp"
-        configBean.port() == 9090
-        configBean.enabled() == false
+        configBean.name == "MyApp"
+        configBean.port == 9090
+        configBean.enabled == false
 
         cleanup:
         context?.close()
@@ -239,8 +239,8 @@ class DatabaseConfig:
 
         then:
         configBean != null
-        configBean.host() == "db.example.com"
-        configBean.port() == 5432
+        configBean.host == "db.example.com"
+        configBean.port == 5432
         configBean.has_env()
 
         cleanup:
