@@ -405,14 +405,6 @@ def {decorator_name}({param_signature}):
     Micronaut annotation decorator for {annotation_name}.
     """
     def decorator(func):
-        # Store annotation metadata on the decorated function
-        if not hasattr(func, '_micronaut_annotations'):
-            func._micronaut_annotations = []
-        annotation_data = {{
-            'name': '{annotation_name}'
-        }}
-        {param_handling}
-        func._micronaut_annotations.append(annotation_data)
         return func
 
     # Handle both @Annotation and @Annotation() usage patterns
@@ -475,14 +467,6 @@ def {decorator_name}({param_signature}):
     Micronaut annotation decorator for {custom_annotation_name}.
     """
     def decorator(func):
-        # Store annotation metadata on the decorated function
-        if not hasattr(func, '_micronaut_annotations'):
-            func._micronaut_annotations = []
-        annotation_data = {{
-            'name': '{custom_annotation_name}'
-        }}
-        {param_handling}
-        func._micronaut_annotations.append(annotation_data)
         return func
 
     # Handle both @Annotation and @Annotation() usage patterns
@@ -601,28 +585,6 @@ def {decorator_name}({param_signature}):
                                                     self.transformed_code.append(nested_decorator_code)
         except Exception as e:
             print(f"Error generating nested decorators for {class_element.getName()}: {e}")
-
-    def _generate_test_decorator(self, import_name: str, full_name: str) -> str:
-        """
-        Generate a test decorator for debugging purposes.
-        """
-        return f'''
-@micronaut_annotation("{full_name}")
-def {import_name}(*args, **kwargs):
-    """
-    Test Micronaut annotation decorator for {full_name}.
-    """
-    def decorator(func):
-        if not hasattr(func, '_micronaut_annotations'):
-            func._micronaut_annotations = []
-        func._micronaut_annotations.append({{
-            'name': '{full_name}',
-            'args': args,
-            'kwargs': kwargs
-        }})
-        return func
-    return decorator
-'''
 
     def _collect_java_class_import(self, package_name: str, variable_name: str, full_class_name: str):
         """
