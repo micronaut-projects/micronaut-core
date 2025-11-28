@@ -15,6 +15,8 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import io.micronaut.aop.InterceptorBinding;
+import io.micronaut.aop.runtime.RuntimeProxy;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -23,6 +25,7 @@ import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.version.VersionUtils;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 
@@ -117,6 +120,12 @@ public class PythonTypeElementVisitorProcessor {
             TypeElementVisitor<?, ?> visitor = loadedVisitor.getVisitor();
             for (ClassElement element : classes.values()) {
                 if (loadedVisitor.matchesClass(element)) {
+                    if (isAopProxy(element)) {
+                        element.annotate(RuntimeProxy.class, builder ->
+                            builder.value("io.micronaut.context.python.aop.Python   ProxyCreator")
+                                .member("proxyTarget", true)
+                        );
+                    }
                     visitor.visitClass(element, pythonVisitorContext);
                 }
             }
@@ -125,6 +134,18 @@ public class PythonTypeElementVisitorProcessor {
         for (LoadedVisitor loadedVisitor : loadedVisitors) {
             loadedVisitor.getVisitor().finish(pythonVisitorContext);
         }
+    }
+
+    private boolean isAopProxy(ClassElement element) {
+        if (element.hasStereotype(InterceptorBinding.class)) {
+            return true;
+        }
+        for (MethodElement method : element.getMethods()) {
+            if (method.hasStereotype(InterceptorBinding.class)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private TypeElementVisitor.VisitorKind getIncrementalProcessorKind() {

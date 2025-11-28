@@ -96,25 +96,33 @@ class TestAroundInterceptor(MethodInterceptor):
         for param in context.getParameters().values():
             if (param.getValue() is None):
                 raise Exception(f"Null parameter [{param.getName()}] is not allowed")
-        return context.proceed()
+        return context.proceed() + " processed"
 
 
 @Singleton
 class Test:
     @NotNull
     @Executable
-    def doWork(self, taskName : str):
+    def doWork(self, taskName : str) -> str:
         print(f"Doing job: {taskName}")
+        return taskName
 
 '''
-        when:
         def context = buildContext(pythonCode)
         def testBean = getBean(context, "python.Test")
+
+        when:
         testBean.doWork(null)
 
         then:
         def e = thrown(RuntimeException)
         e.message == 'Exception: Null parameter [taskName] is not allowed'
+
+        when:
+        def result = testBean.doWork("Hello world")
+
+        then:
+        result == "Hello world processed"
     }
 
     void "test @TestAround on Python method modifies arguments"() {
@@ -129,6 +137,7 @@ MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
 @InterceptorBean(TestAround)
 class TestAroundInterceptor(MethodInterceptor):
     def intercept(self, context : MethodInvocationContext):
+        print("Hello World")
         # Modify string arguments to "intercepted"
         # Double numeric arguments
         for param_name, param_value in context.getParameters().items():
@@ -205,4 +214,50 @@ class TestClass:
         cleanup:
         context?.close()
     }
+
+    void "test @TestAround with a constructor"() {
+        given:
+        def pythonCode = '''
+from micronaut.python.aop import TestAround
+from micronaut.aop import InterceptorBean, MethodInvocationContext
+from jakarta.inject import Singleton
+
+import java
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+
+@Singleton
+class FooBar:
+    def hello(self):
+        return "World"
+
+@InterceptorBean(TestAround)
+class TestAroundInterceptor(MethodInterceptor):
+    def intercept(self, context : MethodInvocationContext):
+        return f"intercepted: {context.proceed()}"
+
+@TestAround
+class TestClass:
+
+    def __init__(self, fooBar: FooBar):
+        self.fooBar = fooBar
+
+    def greet(self, name: str):
+        return f"Hello, {name}!"
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+
+        then:
+        // Verify the bean is created and intercepted
+        def testBean = getBean(context, "python.TestClass")
+        testBean.greet("World") == "intercepted: Hello, World!"
+        testBean.$unbox().getMember("fooBar") != null
+
+        cleanup:
+        context?.close()
+    }
+
+
 }
