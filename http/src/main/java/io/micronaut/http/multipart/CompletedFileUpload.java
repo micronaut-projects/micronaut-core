@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.io.buffer.ReadBufferFactory;
 import io.micronaut.http.MediaType;
+import reactor.core.scheduler.Schedulers;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -160,6 +161,9 @@ public abstract sealed class CompletedFileUpload extends CompletedPart {
 
         @Override
         public void close() throws IOException {
+            if (Schedulers.isInNonBlockingThread()) {
+                throw new IllegalStateException("CompletedFileUpload.close called in non-blocking thread. This is a blocking operation (it deletes the file). You may want to annotate your controller with @ExecuteOn(TaskExecutors.BLOCKING).");
+            }
             if (path != null) {
                 closeTracker();
                 Files.delete(path);
@@ -174,16 +178,25 @@ public abstract sealed class CompletedFileUpload extends CompletedPart {
 
         @Override
         public InputStream getInputStream() throws IOException {
+            if (Schedulers.isInNonBlockingThread()) {
+                throw new IllegalStateException("CompletedFileUpload.getInputStream called in non-blocking thread. This is a blocking operation. You may want to annotate your controller with @ExecuteOn(TaskExecutors.BLOCKING).");
+            }
             return Files.newInputStream(path);
         }
 
         @Override
         public ReadBuffer toReadBuffer() throws IOException {
+            if (Schedulers.isInNonBlockingThread()) {
+                throw new IllegalStateException("CompletedFileUpload.toReadBuffer called in non-blocking thread. This is a blocking operation. You may want to annotate your controller with @ExecuteOn(TaskExecutors.BLOCKING).");
+            }
             return ReadBufferFactory.getJdkFactory().copyOf(getInputStream());
         }
 
         @Override
         public void transferTo(Path destination) throws IOException {
+            if (Schedulers.isInNonBlockingThread()) {
+                throw new IllegalStateException("CompletedFileUpload.transferTo called in non-blocking thread. This is a blocking operation. You may want to annotate your controller with @ExecuteOn(TaskExecutors.BLOCKING).");
+            }
             Files.move(path, destination);
             closeTracker();
             path = null;

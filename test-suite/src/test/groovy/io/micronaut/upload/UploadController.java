@@ -44,6 +44,7 @@ import reactor.core.scheduler.Schedulers;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.security.Principal;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -81,11 +82,11 @@ public class UploadController {
     }
 
     @Post(value = "/receive-file-upload", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
-    public Publisher<MutableHttpResponse<?>> receiveFileUpload(StreamingFileUpload data, String title) {
-        long size = data.getDefinedSize();
-        return Flux.from(data.transferTo(title + ".json"))
-                       .map(success -> success ? HttpResponse.ok( "Uploaded " + size ) :  HttpResponse.status(HttpStatus.INTERNAL_SERVER_ERROR, "Something bad happened"))
-                .onErrorReturn((MutableHttpResponse<?>) HttpResponse.status(HttpStatus.INTERNAL_SERVER_ERROR, "Something bad happened"));
+    public Publisher<? extends MutableHttpResponse<?>> receiveFileUpload(StreamingFileUpload data, String title) {
+        long size = data.getDefinedSize().orElseThrow();
+        return Mono.from(data.transferTo(Path.of(title + ".json")))
+            .thenReturn(HttpResponse.ok("Uploaded " + size))
+            .onErrorReturn(HttpResponse.status(HttpStatus.INTERNAL_SERVER_ERROR, "Something bad happened"));
     }
 
     @Post(value = "/receive-file-upload-input-stream", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
@@ -97,8 +98,9 @@ public class UploadController {
     }
 
     @Post(value = "/receive-completed-file-upload", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
-    public String receiveCompletedFileUpload(CompletedFileUpload data) {
-        try {
+    @ExecuteOn(TaskExecutors.BLOCKING)
+    public String receiveCompletedFileUpload(CompletedFileUpload data) throws IOException {
+        try (data) {
             return data.getFilename() + ": " + data.getBytes().length;
         } catch (IOException e) {
             return e.getMessage();
@@ -106,8 +108,9 @@ public class UploadController {
     }
 
     @Post(value = "/receive-completed-file-upload-huge", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
+    @ExecuteOn(TaskExecutors.BLOCKING)
     public String receiveCompletedFileUploadHuge(CompletedFileUpload data) {
-        try (InputStream is = data.getInputStream()) {
+        try (data; InputStream is = data.getInputStream()) {
             long n = 0;
             byte[] arr = new byte[4096];
             while (true) {
@@ -123,7 +126,7 @@ public class UploadController {
 
     @Post(value = "/receive-completed-file-upload-stream", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
     public String receiveCompletedFileUploadStream(CompletedFileUpload data) {
-        try {
+        try (data) {
             InputStream is = data.getInputStream();
             int size = 1024;
             byte[] buf = new byte[size];
@@ -227,7 +230,7 @@ public class UploadController {
         List<Map> results = new ArrayList<>();
 
         ReplayProcessor<HttpResponse> subject = ReplayProcessor.create();
-        Flux.from(data).subscribeOn(Schedulers.boundedElastic())
+        Flux.from(data).publishOn(Schedulers.boundedElastic())
                 .subscribe(new Subscriber<CompletedFileUpload>() {
                     Subscription subscription;
                     @Override
@@ -241,6 +244,11 @@ public class UploadController {
                         Map<String, Object> result = new LinkedHashMap<>();
                         result.put("name", upload.getFilename());
                         result.put("size", upload.getSize());
+                        try {
+                            upload.close();
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
                         results.add(result);
                         subscription.request(1);
                     }
@@ -267,14 +275,7 @@ public class UploadController {
     public Publisher<HttpResponse> receiveMultipleStreaming(
             Publisher<StreamingFileUpload> data) {
         return Flux.from(data).subscribeOn(Schedulers.boundedElastic()).flatMap((StreamingFileUpload upload) -> {
-            return Flux.from(upload)
-                    .map((pd) -> {
-                        try {
-                            return pd.getBytes();
-                        } catch (IOException e) {
-                            throw Exceptions.propagate(e);
-                        }
-                    });
+            return Flux.from(upload.streamingBody().toByteArrayPublisher());
         }).collect(LongAdder::new, (adder, bytes) -> adder.add((long)bytes.length))
                 .map((adder) -> {
                     return HttpResponse.ok(adder.longValue());
@@ -389,7 +390,7 @@ public class UploadController {
     @SingleResult
     public Publisher<String> go(@Body MultipartBody multipartBody) {
         return Mono.create(emitter -> {
-            multipartBody.subscribe(new Subscriber<CompletedPart>() {
+            Flux.from(multipartBody).publishOn(Schedulers.boundedElastic()).subscribe(new Subscriber<>() {
                 private Subscription s;
                 List<String> datas = new ArrayList<>();
                 @Override
@@ -400,7 +401,7 @@ public class UploadController {
 
                 @Override
                 public void onNext(CompletedPart data) {
-                    try {
+                    try (data) {
                         datas.add(new String(data.getBytes(), StandardCharsets.UTF_8));
                         s.request(1);
                     } catch (IOException e) {
@@ -426,7 +427,7 @@ public class UploadController {
     @SingleResult
     public Publisher<String> multipartBodyWithPrincipal(Principal principal, @Body MultipartBody multipartBody) {
         return Mono.create(emitter -> {
-            multipartBody.subscribe(new Subscriber<CompletedPart>() {
+            Flux.from(multipartBody).publishOn(Schedulers.boundedElastic()).subscribe(new Subscriber<CompletedPart>() {
                 private Subscription s;
                 List<String> datas = new ArrayList<>();
                 @Override
@@ -437,7 +438,7 @@ public class UploadController {
 
                 @Override
                 public void onNext(CompletedPart data) {
-                    try {
+                    try (data) {
                         datas.add(new String(data.getBytes(), StandardCharsets.UTF_8));
                         s.request(1);
                     } catch (IOException e) {
@@ -463,7 +464,7 @@ public class UploadController {
     @SingleResult
     public Publisher<String> publisherCompletedPart(Publisher<CompletedPart> recipients) {
         return Mono.create(emitter -> {
-            recipients.subscribe(new Subscriber<CompletedPart>() {
+            Flux.from(recipients).publishOn(Schedulers.boundedElastic()).subscribe(new Subscriber<CompletedPart>() {
                 private Subscription s;
                 List<String> datas = new ArrayList<>();
                 @Override
@@ -474,7 +475,7 @@ public class UploadController {
 
                 @Override
                 public void onNext(CompletedPart data) {
-                    try {
+                    try (data) {
                         datas.add(new String(data.getBytes(), StandardCharsets.UTF_8));
                         s.request(1);
                     } catch (IOException e) {

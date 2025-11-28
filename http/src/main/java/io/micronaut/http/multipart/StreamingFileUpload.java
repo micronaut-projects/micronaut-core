@@ -80,7 +80,9 @@ public final class StreamingFileUpload implements Closeable {
      */
     @NonNull
     public CloseableByteBody streamingBody() {
-        return field.byteBody().move();
+        CloseableByteBody bb = field.byteBody().move();
+        close();
+        return bb;
     }
 
     /**
@@ -228,6 +230,7 @@ public final class StreamingFileUpload implements Closeable {
                 });
             }
         });
+        close();
         return sink.asMono();
     }
 
@@ -240,6 +243,8 @@ public final class StreamingFileUpload implements Closeable {
      */
     @NonNull
     public InputStream asInputStream() {
-        return field.byteBody().toInputStream();
+        InputStream s = field.byteBody().toInputStream();
+        close();
+        return s;
     }
 }

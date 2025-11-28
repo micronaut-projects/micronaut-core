@@ -58,7 +58,7 @@ final class NettyStreamingFileUploadBinder implements TypedRequestArgumentBinder
 
         CompletableFuture<? extends StreamingFileUpload> completableFuture =
             Mono.from(formFactory.get().getOrCreateCompleter(request).subscribeField(inputName))
-                .map(raw -> formFactory.get().streamFileUpload(request, raw))
+                .map(raw -> formFactory.get().streamFileUpload(raw))
                 .toFuture();
         BasicHttpAttributes.addRouteWaitsFor(request, CompletableFutureExecutionFlow.just(completableFuture));
 

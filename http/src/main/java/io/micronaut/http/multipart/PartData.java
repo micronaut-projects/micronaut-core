@@ -39,6 +39,7 @@ public record PartData(@NonNull FormFieldMetadata fieldMetadata, @NonNull ReadBu
      * @return The content of this chunk as an {@code InputStream}
      * @throws IOException If an error occurs in retrieving the content
      */
+    @NonNull
     public InputStream getInputStream() throws IOException {
         return readBuffer.toInputStream();
     }
@@ -49,7 +50,7 @@ public record PartData(@NonNull FormFieldMetadata fieldMetadata, @NonNull ReadBu
      * @return The content of this chunk as a {@code byte[]}
      * @throws IOException If an error occurs in retrieving the content
      */
-    public byte[] getBytes() throws IOException {
+    public byte @NonNull [] getBytes() throws IOException {
         return readBuffer.toArray();
     }
 
@@ -59,6 +60,7 @@ public record PartData(@NonNull FormFieldMetadata fieldMetadata, @NonNull ReadBu
      * @return The content of this chunk as a {@code ByteBuffer}
      * @throws IOException If an error occurs in retrieving the content
      */
+    @NonNull
     public ByteBuffer getByteBuffer() throws IOException {
         return ByteBuffer.wrap(getBytes());
     }
@@ -68,6 +70,7 @@ public record PartData(@NonNull FormFieldMetadata fieldMetadata, @NonNull ReadBu
      *
      * @return The content type of this chunk.
      */
+    @NonNull
     public Optional<MediaType> getContentType() {
         return Optional.ofNullable(fieldMetadata.mediaType());
     }

@@ -121,7 +121,7 @@ public final class FormFactory {
     }
 
     @NonNull
-    public StreamingFileUpload streamFileUpload(@Nullable HttpRequest<?> request, @NonNull RawFormField formField) {
+    public StreamingFileUpload streamFileUpload(@NonNull RawFormField formField) {
         return new StreamingFileUpload(formField, diskWriteExecutor);
     }
 

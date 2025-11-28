@@ -522,11 +522,11 @@ class MaxRequestSizeSpec extends Specification {
                          CompletedFileUpload c,
                          CompletedFileUpload d,
                          CompletedFileUpload e) {
-            a.discard()
-            b.discard()
-            c.discard()
-            d.discard()
-            e.discard()
+            a.close()
+            b.close()
+            c.close()
+            d.close()
+            e.close()
             "OK"
         }
 

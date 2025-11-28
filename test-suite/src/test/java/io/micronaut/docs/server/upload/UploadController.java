@@ -48,17 +48,11 @@ public class UploadController {
         } catch (IOException e) {
             return Mono.error(e);
         }
-        Publisher<Boolean> uploadPublisher = file.transferTo(tempFile); // <3>
+        Publisher<?> uploadPublisher = file.transferTo(tempFile); // <3>
 
         return Mono.from(uploadPublisher)  // <4>
-            .map(success -> {
-                if (success) {
-                    return HttpResponse.ok("Uploaded");
-                } else {
-                    return HttpResponse.<String>status(CONFLICT)
-                                       .body("Upload Failed");
-                }
-            });
+            .<HttpResponse<String>>thenReturn(HttpResponse.ok("Uploaded"))
+            .onErrorReturn(HttpResponse.<String>status(CONFLICT).body("Upload Failed"));
     }
     // end::file[]
 
@@ -72,14 +66,8 @@ public class UploadController {
         Publisher<Boolean> uploadPublisher = file.transferTo(outputStream); // <4>
 
         return Mono.from(uploadPublisher)  // <5>
-                .map(success -> {
-                    if (success) {
-                        return HttpResponse.ok("Uploaded");
-                    } else {
-                        return HttpResponse.<String>status(CONFLICT)
-                                .body("Upload Failed");
-                    }
-                });
+            .<HttpResponse<String>>thenReturn(HttpResponse.ok("Uploaded"))
+            .onErrorReturn(HttpResponse.<String>status(CONFLICT).body("Upload Failed"));
     }
     // end::outputStream[]
 
