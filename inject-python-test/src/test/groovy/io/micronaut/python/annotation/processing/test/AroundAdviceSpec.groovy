@@ -242,7 +242,7 @@ class TestClass:
     def __init__(self, fooBar: FooBar):
         self.fooBar = fooBar
 
-    def greet(self, name: str):
+    def greet(self, name: str) -> str:
         return f"Hello, {name}!"
 '''
 
