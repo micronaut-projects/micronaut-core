@@ -81,6 +81,7 @@ import io.netty.handler.codec.http2.Http2HeadersFrame;
 import io.netty.handler.codec.http2.Http2MultiplexActiveStreamsException;
 import io.netty.handler.codec.http2.Http2MultiplexHandler;
 import io.netty.handler.codec.http2.Http2PingFrame;
+import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.codec.http2.Http2SettingsAckFrame;
 import io.netty.handler.codec.http2.Http2SettingsFrame;
 import io.netty.handler.codec.http2.Http2StreamChannel;
@@ -654,7 +655,13 @@ public class ConnectionManager {
     }
 
     private Http2FrameCodec makeFrameCodec() {
-        Http2FrameCodecBuilder builder = Http2FrameCodecBuilder.forClient();
+        Http2Settings defaultSettings = Http2Settings.defaultSettings();
+
+        defaultSettings.maxHeaderListSize(configuration.getHttp2Configuration().getMaxHeaderListSize());
+
+        Http2FrameCodecBuilder builder = Http2FrameCodecBuilder.forClient()
+            .initialSettings(defaultSettings);
+
         configuration.getLogLevel().ifPresent(logLevel -> {
             try {
                 final LogLevel nettyLevel =
