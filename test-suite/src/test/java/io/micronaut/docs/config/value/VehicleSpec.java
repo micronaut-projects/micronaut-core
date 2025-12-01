@@ -16,21 +16,25 @@
 package io.micronaut.docs.config.value;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.PropertySource;
 import org.codehaus.groovy.runtime.DefaultGroovyMethods;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 class VehicleSpec {
 
+    private final static Map<String, Object> CONFIG =Map.of("spec.name", "VehicleValueSpec");
+
     @Test
     void testStartVehicleWithConfiguration() {
         // tag::start[]
-        ApplicationContext applicationContext = ApplicationContext.builder("test").build();
+        ApplicationContext applicationContext = ApplicationContext.builder("test").properties(CONFIG).build();
         LinkedHashMap<String, Object> map = new LinkedHashMap(1);
         map.put("my.engine.cylinders", "8");
         applicationContext.getEnvironment().addPropertySource(PropertySource.of("test", map));
@@ -46,7 +50,7 @@ class VehicleSpec {
     @Test
     void testStartVehicleWithoutConfiguration() {
         // tag::start[]
-        ApplicationContext applicationContext = ApplicationContext.builder("test").build();
+        ApplicationContext applicationContext = ApplicationContext.builder("test").properties(CONFIG).build();
         applicationContext.start();
 
         Vehicle vehicle = applicationContext.getBean(Vehicle.class);
@@ -59,7 +63,7 @@ class VehicleSpec {
     @Test
     void testStartVehicleWithNonEmptyPlaceholder() {
         // tag::start[]
-        ApplicationContext applicationContext = ApplicationContext.builder("test").build();
+        ApplicationContext applicationContext = ApplicationContext.builder("test").properties(CONFIG).build();
         LinkedHashMap<String, Object> map = new LinkedHashMap(1);
         map.put("my.engine.description", "${DESCRIPTION}");
         map.put("DESCRIPTION", "V8 Engine");
@@ -75,7 +79,7 @@ class VehicleSpec {
     @Test
     void testStartVehicleWithEmptyPlaceholder() {
         // tag::start[]
-        ApplicationContext applicationContext = ApplicationContext.builder("test").build();
+        ApplicationContext applicationContext = ApplicationContext.builder("test").properties(CONFIG).build();
         LinkedHashMap<String, Object> map = new LinkedHashMap(1);
         map.put("my.engine.description", "${DESCRIPTION}");
         applicationContext.getEnvironment().addPropertySource(PropertySource.of("test", map));

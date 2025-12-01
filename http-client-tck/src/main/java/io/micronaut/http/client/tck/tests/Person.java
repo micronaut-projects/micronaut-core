@@ -16,11 +16,13 @@
 package io.micronaut.http.client.tck.tests;
 
 import io.micronaut.core.annotation.Introspected;
-import io.micronaut.core.annotation.NonNull;
-
+import org.jspecify.annotations.NonNull;
+import io.micronaut.core.annotation.ReflectiveAccess;
 import java.util.Objects;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 @Introspected
+@ReflectiveAccess
 class Person {
 
     @NonNull
@@ -28,7 +30,7 @@ class Person {
 
     private final int age;
 
-    Person(String name, int age) {
+    Person(@JsonProperty("name") String name, @JsonProperty("age") int age) {
         this.name = name;
         this.age = age;
     }

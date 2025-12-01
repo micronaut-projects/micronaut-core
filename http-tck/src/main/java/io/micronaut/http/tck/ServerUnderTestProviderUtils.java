@@ -17,7 +17,7 @@ package io.micronaut.http.tck;
 
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 
 import java.util.Iterator;
 import java.util.ServiceLoader;

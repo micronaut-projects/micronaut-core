@@ -18,7 +18,7 @@ package io.micronaut.inject.visitor;
 import java.util.Collections;
 import java.util.List;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.order.OrderUtil;
 

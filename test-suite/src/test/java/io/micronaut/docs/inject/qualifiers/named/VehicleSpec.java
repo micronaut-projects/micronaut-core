@@ -19,6 +19,8 @@ import io.micronaut.context.ApplicationContext;
 import org.codehaus.groovy.runtime.DefaultGroovyMethods;
 import org.junit.jupiter.api.Test;
 
+import java.util.Map;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class VehicleSpec {
@@ -26,7 +28,7 @@ class VehicleSpec {
     @Test
     void testStartVehicle() {
         // tag::start[]
-        final ApplicationContext context = ApplicationContext.run();
+        final ApplicationContext context = ApplicationContext.run(Map.of("spec.name", "VehicleQualifiersNamedSpec"));
         Vehicle vehicle = context.getBean(Vehicle.class);
         DefaultGroovyMethods.println(this, vehicle.start());
         // end::start[]

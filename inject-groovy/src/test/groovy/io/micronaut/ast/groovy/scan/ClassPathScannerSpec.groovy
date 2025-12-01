@@ -15,14 +15,14 @@
  */
 package io.micronaut.ast.groovy.scan
 
-import groovy.transform.AutoClone
+
+import groovy.transform.KnownImmutable
 import io.micronaut.ast.groovy.scan.nested.Foo2
 import io.micronaut.ast.groovy.scan2.Foo3
 import org.codehaus.groovy.transform.GroovyASTTransformation
 import spock.lang.Specification
 
 import java.util.stream.Collectors
-
 /**
  * @author Graeme Rocher
  * @since 1.0
@@ -34,7 +34,7 @@ class ClassPathScannerSpec extends Specification {
         ClassPathAnnotationScanner scanner = new ClassPathAnnotationScanner()
 
         when:
-        def classes = scanner.scan(AutoClone, getClass().getPackage())
+        def classes = scanner.scan(KnownImmutable, getClass().getPackage())
         def results = classes.collect(Collectors.toList())
 
         then:
@@ -48,7 +48,7 @@ class ClassPathScannerSpec extends Specification {
         ClassPathAnnotationScanner scanner = new ClassPathAnnotationScanner()
 
         when:
-        def classes = scanner.scan(AutoClone, getClass().getPackage().getName(), "io.micronaut.ast.groovy.scan2")
+        def classes = scanner.scan(KnownImmutable, getClass().getPackage().getName(), "io.micronaut.ast.groovy.scan2")
         def results = classes.collect(Collectors.toList())
 
         then:
@@ -70,7 +70,8 @@ class ClassPathScannerSpec extends Specification {
     }
 }
 
-@AutoClone
+// Must use a RUNTIME retention annotation
+@KnownImmutable
 class Foo {
     String name
 }

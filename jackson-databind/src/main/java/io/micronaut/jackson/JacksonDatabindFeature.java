@@ -15,8 +15,7 @@
  */
 package io.micronaut.jackson;
 
-import com.fasterxml.jackson.databind.PropertyNamingStrategies;
-import com.fasterxml.jackson.databind.PropertyNamingStrategy;
+import tools.jackson.databind.PropertyNamingStrategies;
 import io.micronaut.core.annotation.Internal;
 import org.graalvm.nativeimage.hosted.Feature;
 import org.graalvm.nativeimage.hosted.RuntimeReflection;
@@ -41,13 +40,7 @@ final class JacksonDatabindFeature implements Feature {
             PropertyNamingStrategies.UpperSnakeCaseStrategy.class,
             PropertyNamingStrategies.LowerCaseStrategy.class,
             PropertyNamingStrategies.KebabCaseStrategy.class,
-            PropertyNamingStrategies.LowerDotCaseStrategy.class,
-
-            PropertyNamingStrategy.UpperCamelCaseStrategy.class,
-            PropertyNamingStrategy.SnakeCaseStrategy.class,
-            PropertyNamingStrategy.LowerCaseStrategy.class,
-            PropertyNamingStrategy.KebabCaseStrategy.class,
-            PropertyNamingStrategy.LowerDotCaseStrategy.class
+            PropertyNamingStrategies.LowerDotCaseStrategy.class
         ).forEach(RuntimeReflection::registerForReflectiveInstantiation);
     }
 }

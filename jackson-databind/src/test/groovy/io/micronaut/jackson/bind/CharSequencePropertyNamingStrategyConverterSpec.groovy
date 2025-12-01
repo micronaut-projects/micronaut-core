@@ -15,8 +15,8 @@
  */
 package io.micronaut.jackson.bind
 
-import com.fasterxml.jackson.databind.PropertyNamingStrategies
-import com.fasterxml.jackson.databind.PropertyNamingStrategy
+import tools.jackson.databind.PropertyNamingStrategies
+import tools.jackson.databind.PropertyNamingStrategy
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.convert.ConversionContext
 import io.micronaut.core.convert.ConversionError

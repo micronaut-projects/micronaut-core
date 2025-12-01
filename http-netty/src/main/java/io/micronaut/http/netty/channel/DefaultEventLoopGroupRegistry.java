@@ -25,7 +25,7 @@ import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.http.netty.channel.loom.LoomCarrierGroup;
 import io.micronaut.inject.qualifiers.Qualifiers;

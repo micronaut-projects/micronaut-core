@@ -15,8 +15,10 @@
  */
 package io.micronaut.docs.events.factory;
 
+import io.micronaut.context.annotation.Requires;
 import jakarta.inject.Singleton;
 
+@Requires(property = "spec.name", value = "VehicleEventsFactory")
 @Singleton
 public class Vehicle {
     public Vehicle(Engine engine) {

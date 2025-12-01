@@ -4,6 +4,7 @@ import io.micronaut.context.annotation.Mapper;
 import io.micronaut.context.annotation.Mapper.Mapping;
 import io.micronaut.context.annotation.Mapper.MergeStrategy;
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.docs.ioc.mappers.ChristmasTypes.ChristmasPresent;
 import io.micronaut.docs.ioc.mappers.ChristmasTypes.Present;
 import io.micronaut.docs.ioc.mappers.ChristmasTypes.PresentPackaging;
@@ -43,6 +44,7 @@ public interface AdditionalMappers {
         }
     }
 
+    @ReflectiveAccess
     @Introspected
     record Card(
         String greetingCard

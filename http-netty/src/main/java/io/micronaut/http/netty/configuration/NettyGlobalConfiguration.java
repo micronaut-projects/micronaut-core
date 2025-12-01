@@ -17,7 +17,7 @@ package io.micronaut.http.netty.configuration;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.netty.util.ResourceLeakDetector;
 
 /**
@@ -53,8 +53,7 @@ public class NettyGlobalConfiguration {
      *
      * @return the resource leak detection level
      */
-    @Nullable
-    public ResourceLeakDetector.Level getResourceLeakDetectorLevel() {
+    public ResourceLeakDetector.@Nullable Level getResourceLeakDetectorLevel() {
         return resourceLeakDetectorLevel;
     }
 

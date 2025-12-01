@@ -15,8 +15,10 @@
  */
 package io.micronaut.docs.config.immutable;
 
+import io.micronaut.context.annotation.Requires;
 import jakarta.inject.Singleton;
 
+@Requires(property = "spec.name", value = "VehicleImmutableSpec")
 // tag::class[]
 @Singleton
 public class Engine {

@@ -15,7 +15,7 @@
  */
 package io.micronaut.web.router.version;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 
 /**
  * Defines a provider of a default Version.

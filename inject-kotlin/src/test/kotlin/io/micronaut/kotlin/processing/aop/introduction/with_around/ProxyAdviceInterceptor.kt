@@ -18,14 +18,12 @@ package io.micronaut.kotlin.processing.aop.introduction.with_around
 import io.micronaut.aop.MethodInterceptor
 import io.micronaut.aop.MethodInvocationContext
 import io.micronaut.context.BeanContext
-import io.micronaut.core.annotation.Nullable
 import jakarta.inject.Singleton
 import java.lang.RuntimeException
 
 @Singleton
 class ProxyAdviceInterceptor(private val beanContext: BeanContext) : MethodInterceptor<Any, Any> {
 
-    @Nullable
     override fun intercept(context: MethodInvocationContext<Any, Any>): Any? {
         if (context.methodName.equals("getId", ignoreCase = true)) {
             // Test invocation delegation

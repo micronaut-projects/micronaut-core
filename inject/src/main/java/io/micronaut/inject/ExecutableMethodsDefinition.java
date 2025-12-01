@@ -16,8 +16,8 @@
 package io.micronaut.inject;
 
 import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.annotation.NextMajorVersion;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.CollectionUtils;
 
 import java.util.List;

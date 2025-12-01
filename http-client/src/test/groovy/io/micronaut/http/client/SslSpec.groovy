@@ -16,7 +16,7 @@
 package io.micronaut.http.client
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.core.annotation.NonNull
+import org.jspecify.annotations.NonNull
 import io.micronaut.http.ssl.ClientSslConfiguration
 import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.bootstrap.Bootstrap

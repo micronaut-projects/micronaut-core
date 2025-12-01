@@ -16,8 +16,8 @@
 package io.micronaut.http.netty;
 
 import io.micronaut.context.exceptions.ConfigurationException;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.http.ssl.ClientAuthentication;
 import io.netty.handler.codec.http2.Http2SecurityUtil;
 import io.netty.handler.codec.http3.Http3;

@@ -33,8 +33,8 @@ import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -609,7 +609,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     }
 
     @Override
-    public final Collection<ExecutableMethod<T, ?>> getExecutableMethods() {
+    public final List<ExecutableMethod<T, ?>> getExecutableMethods() {
         if (executableMethodsDefinition == null) {
             return Collections.emptyList();
         }

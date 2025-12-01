@@ -81,7 +81,6 @@ class DefaultEnvironmentSpec extends Specification {
         env.getProperty("test.foo", Map.class).get() == [bar: "10", baz: "20"]
     }
 
-    @RestoreSystemProperties
     void "test environment refresh and diff"() {
         given:
         System.setProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY, StringUtils.TRUE)
@@ -315,7 +314,6 @@ class DefaultEnvironmentSpec extends Specification {
         System.clearProperty("micronaut.config.files")
     }
 
-    @RestoreSystemProperties
     void "test invalid config file location"() {
         when: "loading properties sources from both system properties and environment variables"
         System.setProperty("micronaut.config.files", "/does/not/exist.yaml")
@@ -340,7 +338,6 @@ class DefaultEnvironmentSpec extends Specification {
         envNames == ["test", "cloud", "ec2", "foo", "bar", "baz", "x", "y"]
     }
 
-    @RestoreSystemProperties
     void "test environments supplied should be a higher priority than deduced and system property"() {
         when:
         def env = new DefaultEnvironment({ [] })
@@ -382,7 +379,6 @@ class DefaultEnvironmentSpec extends Specification {
     }
     // end::disableEnvDeduction[]
 
-    @RestoreSystemProperties
     void "test disable environment deduction via system property"() {
         when:
         System.setProperty(Environment.CLOUD_PLATFORM_PROPERTY, "GOOGLE_COMPUTE")
@@ -458,7 +454,6 @@ class DefaultEnvironmentSpec extends Specification {
         env.close()
     }
 
-    @RestoreSystemProperties
     void "test property source order"() {
         when:
         System.setProperty("micronaut.config.files", "classpath:config-files.yml,classpath:config-files2.yml")
@@ -530,7 +525,6 @@ class DefaultEnvironmentSpec extends Specification {
             applicationContext.stop()
     }
 
-    @RestoreSystemProperties
     void "test custom config locations used in bootstrap environment"() {
         given:
         System.setProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY, StringUtils.TRUE)

@@ -15,7 +15,7 @@
  */
 package io.micronaut.context;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 
 /**
  * An interface for classes that manage the {@link ApplicationContext} life cycle and shut it down when the class is shutdown.

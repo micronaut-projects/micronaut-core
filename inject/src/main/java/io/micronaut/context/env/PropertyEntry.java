@@ -16,7 +16,7 @@
 package io.micronaut.context.env;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 
 /**
  * A property entry models a configuration property registration within a
@@ -48,6 +48,5 @@ public interface PropertyEntry {
     /**
      * @return The origin of the property.
      */
-    @NonNull
-    PropertySource.Origin origin();
+    PropertySource.@NonNull Origin origin();
 }

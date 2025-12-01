@@ -16,7 +16,7 @@
 package io.micronaut.core.type;
 
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.CollectionUtils;
 
 import java.util.Collection;

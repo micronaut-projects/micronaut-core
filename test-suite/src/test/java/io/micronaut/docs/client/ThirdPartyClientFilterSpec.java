@@ -96,6 +96,7 @@ class ThirdPartyClientFilterSpec {
 
     }
 
+    @Requires(property = "spec.name", value = "ThirdPartyClientFilterSpec")
     @Controller("/repos")
     static class HeaderController {
 
@@ -106,6 +107,7 @@ class ThirdPartyClientFilterSpec {
     }
 }
 
+@Requires(property = "spec.name", value = "ThirdPartyClientFilterSpec")
 //tag::bintrayService[]
 @Singleton
 class BintrayService {

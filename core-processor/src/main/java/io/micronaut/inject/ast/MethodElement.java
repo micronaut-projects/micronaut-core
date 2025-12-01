@@ -21,8 +21,8 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NextMajorVersion;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
@@ -546,6 +546,38 @@ public interface MethodElement extends MemberElement {
                     @Override
                     public AnnotationMetadata getAnnotationMetadata() {
                         return getMethodAnnotationMetadata0();
+                    }
+
+                    @SuppressWarnings("java:S1192")
+                    public <T extends Annotation> AnnotationMetadata annotate(@NonNull String annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
+                        AnnotationValueBuilder<T> builder = AnnotationValue.builder(annotationType, metadataBuilder.getRetentionPolicy(annotationType));
+                        //noinspection ConstantConditions
+                        if (consumer != null) {
+                            consumer.accept(builder);
+                            AnnotationValue<T> av = builder.build();
+                            return metadataBuilder.annotate(getAnnotationMetadata(), av);
+                        }
+                        return getAnnotationMetadata();
+                    }
+
+                    @Override
+                    public <T extends Annotation> AnnotationMetadata annotate(AnnotationValue<T> annotationValue) {
+                        return metadataBuilder.annotate(getAnnotationMetadata(), annotationValue);
+                    }
+
+                    @Override
+                    public AnnotationMetadata removeAnnotation(@NonNull String annotationType) {
+                        return metadataBuilder.removeAnnotation(getAnnotationMetadata(), annotationType);
+                    }
+
+                    @Override
+                    public <T extends Annotation> AnnotationMetadata removeAnnotationIf(@NonNull Predicate<AnnotationValue<T>> predicate) {
+                        return metadataBuilder.removeAnnotationIf(getAnnotationMetadata(), predicate);
+                    }
+
+                    @Override
+                    public AnnotationMetadata removeStereotype(@NonNull String annotationType) {
+                        return metadataBuilder.removeStereotype(getAnnotationMetadata(), annotationType);
                     }
                 };
             }

@@ -80,7 +80,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         then:
         HttpClientResponseException e = thrown()
         e.message == """Invalid JSON: Unrecognized token 'The': was expecting (JSON String, Number, Array, Object or token 'null', 'true' or 'false')
- at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION` disabled); line: 1, column: 14]"""
+ at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION` disabled); byte offset: #13]"""
         e.response.status == HttpStatus.BAD_REQUEST
 
         when:
@@ -164,7 +164,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
 
     void "test simple POGO body parse and return"() {
         when:
-        String json = '{"name":"Fred","age":10}'
+        String json = '{"age":10,"name":"Fred"}'
         HttpResponse<String> response = Flux.from(httpClient.exchange(
                 HttpRequest.POST('/json/object-to-object', json), String
         )).blockFirst()
@@ -186,7 +186,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
 
     void "test array POGO body parsing and return"() {
         when:
-        String json = '[{"name":"Fred","age":10},{"name":"Barney","age":11}]'
+        String json = '[{"age":10,"name":"Fred"},{"age":11,"name":"Barney"}]'
         HttpResponse<String> response = Flux.from(httpClient.exchange(
                 HttpRequest.POST('/json/array-to-array', json), String
         )).blockFirst()

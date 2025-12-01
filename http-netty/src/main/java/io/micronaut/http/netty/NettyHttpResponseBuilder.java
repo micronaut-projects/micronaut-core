@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.netty;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.http.HttpResponseWrapper;
 import io.micronaut.http.netty.stream.DefaultStreamedHttpResponse;
@@ -84,7 +84,7 @@ public interface NettyHttpResponseBuilder {
      * @param response The response
      * @return The full response.
      */
-    static @NonNull HttpResponse toHttpResponse(@NonNull io.micronaut.http.HttpResponse<?> response) {
+    static @NonNull HttpResponse toHttpResponse(io.micronaut.http.@NonNull HttpResponse<?> response) {
         Objects.requireNonNull(response, "The response cannot be null");
         while (response instanceof HttpResponseWrapper<?> wrapper) {
             response = wrapper.getDelegate();
@@ -123,7 +123,7 @@ public interface NettyHttpResponseBuilder {
      * @deprecated Unused
      */
     @Deprecated
-    static @NonNull FullHttpResponse toFullHttpResponse(@NonNull io.micronaut.http.HttpResponse<?> response, @NonNull ByteBuf byteBuf) {
+    static @NonNull FullHttpResponse toFullHttpResponse(io.micronaut.http.@NonNull HttpResponse<?> response, @NonNull ByteBuf byteBuf) {
         while (response instanceof HttpResponseWrapper<?> wrapper) {
             response = wrapper.getDelegate();
         }
@@ -142,7 +142,7 @@ public interface NettyHttpResponseBuilder {
      * @param response The response
      * @return The full response.
      */
-    static @NonNull StreamedHttpResponse toStreamResponse(@NonNull io.micronaut.http.HttpResponse<?> response) {
+    static @NonNull StreamedHttpResponse toStreamResponse(io.micronaut.http.@NonNull HttpResponse<?> response) {
         Objects.requireNonNull(response, "The response cannot be null");
         while (response instanceof HttpResponseWrapper<?> wrapper) {
             response = wrapper.getDelegate();

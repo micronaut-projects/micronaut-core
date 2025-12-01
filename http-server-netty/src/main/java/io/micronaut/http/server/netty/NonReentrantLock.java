@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.server.netty;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;

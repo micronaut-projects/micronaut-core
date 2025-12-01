@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.ast;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 
 /**
  * Element for constructors.

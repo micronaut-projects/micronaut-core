@@ -16,7 +16,7 @@
 package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 
 /**
  * Combination of {@link CloseableByteBody} and {@link AvailableByteBody}. See their

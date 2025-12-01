@@ -20,7 +20,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.Toggleable;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;

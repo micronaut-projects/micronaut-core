@@ -18,8 +18,8 @@ package io.micronaut.inject.ast.annotation;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
@@ -47,8 +47,8 @@ public final class PropertyElementAnnotationMetadata implements ElementAnnotatio
     private final AnnotationMetadata propertyReadAnnotationMetadata;
     private final AnnotationMetadata propertyWriteAnnotationMetadata;
 
-    public PropertyElementAnnotationMetadata(@NonNull
-                                             io.micronaut.inject.ast.Element thisElement,
+    public PropertyElementAnnotationMetadata(
+                                             io.micronaut.inject.ast.@NonNull Element thisElement,
                                              @Nullable
                                              MethodElement getter,
                                              @Nullable

@@ -16,7 +16,7 @@
 package io.micronaut.http.server.netty.handler.accesslog.element;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.netty.channel.Channel;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.unix.DomainSocketAddress;

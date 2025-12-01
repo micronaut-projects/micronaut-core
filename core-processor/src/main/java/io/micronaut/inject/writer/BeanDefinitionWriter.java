@@ -40,8 +40,8 @@ import io.micronaut.context.annotation.DefaultImplementation;
 import io.micronaut.context.annotation.DefaultScope;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.EachProperty;
-import io.micronaut.context.annotation.Infrastructure;
 import io.micronaut.context.annotation.Executable;
+import io.micronaut.context.annotation.Infrastructure;
 import io.micronaut.context.annotation.InjectScope;
 import io.micronaut.context.annotation.Parallel;
 import io.micronaut.context.annotation.Parameter;
@@ -83,8 +83,6 @@ import io.micronaut.core.annotation.Generated;
 import io.micronaut.core.annotation.Indexed;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NextMajorVersion;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.ConversionServiceProvider;
@@ -155,6 +153,8 @@ import io.micronaut.sourcegen.model.StatementDef;
 import io.micronaut.sourcegen.model.TypeDef;
 import io.micronaut.sourcegen.model.VariableDef;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import javax.lang.model.element.Modifier;
 import java.io.Closeable;
@@ -737,6 +737,23 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                                 OriginatingElements originatingElements,
                                 VisitorContext visitorContext,
                                 @Nullable Integer uniqueIdentifier) {
+        this(beanProducingElement, null, originatingElements, visitorContext, uniqueIdentifier);
+    }
+
+    /**
+     * Creates a bean definition writer.
+     *
+     * @param beanProducingElement     The bean producing element
+     * @param customBeanDefinitionName The custom bean definition name
+     * @param originatingElements      The originating elements
+     * @param visitorContext           The visitor context
+     * @param uniqueIdentifier         An optional unique identifier to include in the bean name
+     */
+    public BeanDefinitionWriter(Element beanProducingElement,
+                                @Nullable String customBeanDefinitionName,
+                                OriginatingElements originatingElements,
+                                VisitorContext visitorContext,
+                                @Nullable Integer uniqueIdentifier) {
         this.originatingElements = originatingElements;
         this.beanProducingElement = beanProducingElement;
         if (beanProducingElement instanceof ClassElement classElement) {
@@ -750,7 +767,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
             this.isAbstract = classElement.isAbstract();
             this.beanFullClassName = classElement.getName();
             this.beanSimpleClassName = classElement.getSimpleName();
-            this.beanDefinitionName = getBeanDefinitionName(packageName, beanSimpleClassName);
+            this.beanDefinitionName = customBeanDefinitionName == null ? getBeanDefinitionName(packageName, beanSimpleClassName) : getCustomBeanDefinitionName(customBeanDefinitionName);
         } else if (beanProducingElement instanceof MethodElement factoryMethodElement) {
             final ClassElement producedElement = factoryMethodElement.getGenericReturnType();
             autoApplyNamedToBeanProducingElement(beanProducingElement);
@@ -765,7 +782,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                 throw new IllegalArgumentException("Factory methods require passing a unique identifier");
             }
             final ClassElement declaringType = factoryMethodElement.getOwningType();
-            this.beanDefinitionName = declaringType.getPackageName() + "." + prefixClassName(declaringType.getSimpleName()) + "$" + upperCaseMethodName + uniqueIdentifier + CLASS_SUFFIX;
+            this.beanDefinitionName = customBeanDefinitionName == null ? declaringType.getPackageName() + "." + prefixClassName(declaringType.getSimpleName()) + "$" + upperCaseMethodName + uniqueIdentifier + CLASS_SUFFIX  : getCustomBeanDefinitionName(customBeanDefinitionName);
         } else if (beanProducingElement instanceof PropertyElement factoryPropertyElement) {
             final ClassElement producedElement = factoryPropertyElement.getGenericType();
             autoApplyNamedToBeanProducingElement(beanProducingElement);
@@ -780,7 +797,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                 throw new IllegalArgumentException("Factory methods require passing a unique identifier");
             }
             final ClassElement declaringType = factoryPropertyElement.getOwningType();
-            this.beanDefinitionName = declaringType.getPackageName() + "." + prefixClassName(declaringType.getSimpleName()) + "$" + upperCaseMethodName + uniqueIdentifier + CLASS_SUFFIX;
+            this.beanDefinitionName = customBeanDefinitionName == null ? declaringType.getPackageName() + "." + prefixClassName(declaringType.getSimpleName()) + "$" + upperCaseMethodName + uniqueIdentifier + CLASS_SUFFIX : getCustomBeanDefinitionName(customBeanDefinitionName);
         } else if (beanProducingElement instanceof FieldElement factoryMethodElement) {
             final ClassElement producedElement = factoryMethodElement.getGenericField();
             autoApplyNamedToBeanProducingElement(beanProducingElement);
@@ -795,7 +812,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                 throw new IllegalArgumentException("Factory fields require passing a unique identifier");
             }
             final ClassElement declaringType = factoryMethodElement.getOwningType();
-            this.beanDefinitionName = declaringType.getPackageName() + "." + prefixClassName(declaringType.getSimpleName()) + "$" + fieldName + uniqueIdentifier + CLASS_SUFFIX;
+            this.beanDefinitionName = customBeanDefinitionName == null ? declaringType.getPackageName() + "." + prefixClassName(declaringType.getSimpleName()) + "$" + fieldName + uniqueIdentifier + CLASS_SUFFIX : getCustomBeanDefinitionName(customBeanDefinitionName);
         } else if (beanProducingElement instanceof BeanElementBuilder beanElementBuilder) {
             this.beanTypeElement = beanElementBuilder.getBeanType();
             this.packageName = this.beanTypeElement.getPackageName();
@@ -807,7 +824,9 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                 throw new IllegalArgumentException("Beans produced by addAssociatedBean(..) require passing a unique identifier");
             }
             final Element originatingElement = beanElementBuilder.getOriginatingElement();
-            if (originatingElement instanceof ClassElement originatingClass) {
+            if (customBeanDefinitionName != null) {
+                this.beanDefinitionName = getCustomBeanDefinitionName(customBeanDefinitionName);
+            } else if (originatingElement instanceof ClassElement originatingClass) {
                 this.beanDefinitionName = getAssociatedBeanName(uniqueIdentifier, originatingClass);
             } else if (originatingElement instanceof MethodElement methodElement) {
                 ClassElement originatingClass = methodElement.getDeclaringType();
@@ -915,6 +934,11 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
     @NonNull
     private static String getBeanDefinitionName(String packageName, String className) {
         return packageName + "." + prefixClassName(className) + CLASS_SUFFIX;
+    }
+
+    @NonNull
+    private static String getCustomBeanDefinitionName(String customBeanDefinitionName) {
+        return NameUtils.getPackageName(customBeanDefinitionName) + "." + prefixClassName(NameUtils.getSimpleName(customBeanDefinitionName)) + CLASS_SUFFIX;
     }
 
     private static String prefixClassName(String className) {
@@ -1437,7 +1461,6 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                 injectMethodSignature,
                 injectFieldInjectCommand.declaringType,
                 injectFieldInjectCommand.fieldElement,
-                injectFieldInjectCommand.fieldElement.getAnnotationMetadata(),
                 injectFieldInjectCommand.requiresReflection
             );
         }
@@ -1598,15 +1621,14 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                                        FieldElement fieldElement,
                                        boolean requiresReflection,
                                        boolean isOptional) {
-        AnnotationMetadata annotationMetadata = fieldElement.getAnnotationMetadata();
-        StatementDef setFieldValueStatement = setFieldValue(injectMethodSignature, fieldElement, isOptional, declaringType, requiresReflection, annotationMetadata);
+        StatementDef setFieldValueStatement = setFieldValue(injectMethodSignature, fieldElement, isOptional, declaringType, requiresReflection);
 
         if (isOptional) {
             return getPropertyContainsCheck(
                 injectMethodSignature,
                 fieldElement.getType(),
                 fieldElement.getName(),
-                annotationMetadata
+                fieldElement.getAnnotationMetadata()
             ).ifTrue(setFieldValueStatement);
         }
         return setFieldValueStatement;
@@ -1616,10 +1638,9 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                                        FieldElement fieldElement,
                                        boolean isOptional,
                                        TypedElement declaringType,
-                                       boolean requiresReflection,
-                                       AnnotationMetadata annotationMetadata) {
+                                       boolean requiresReflection) {
         if (isInnerType(fieldElement.getGenericType())) {
-            return injectField(injectMethodSignature, declaringType, fieldElement, annotationMetadata, requiresReflection);
+            return injectField(injectMethodSignature, declaringType, fieldElement, requiresReflection);
         }
         if (!isConfigurationProperties || requiresReflection) {
             boolean isRequired = fieldElement
@@ -1629,7 +1650,6 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                 injectMethodSignature,
                 declaringType,
                 fieldElement,
-                annotationMetadata,
                 requiresReflection,
                 GET_VALUE_FOR_FIELD,
                 isOptional,
@@ -1637,16 +1657,16 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                 isRequired
             );
         }
-        fieldInjectionPoints.add(new FieldVisitData(declaringType, fieldElement, annotationMetadata, false));
+        fieldInjectionPoints.add(new FieldVisitData(declaringType, fieldElement, false));
         int fieldIndex = fieldInjectionPoints.size() - 1;
         ExpressionDef value;
-        Optional<String> property = annotationMetadata.stringValue(Property.class, "name");
+        Optional<String> property = fieldElement.getAnnotationMetadata().stringValue(Property.class, "name");
         if (property.isPresent()) {
-            value = getInvokeGetPropertyValueForField(injectMethodSignature, fieldElement, annotationMetadata, property.get(), fieldIndex);
+            value = getInvokeGetPropertyValueForField(injectMethodSignature, fieldElement, fieldElement.getAnnotationMetadata(), property.get(), fieldIndex);
         } else {
-            Optional<String> valueValue = annotationMetadata.stringValue(Value.class);
+            Optional<String> valueValue = fieldElement.getAnnotationMetadata().stringValue(Value.class);
             if (valueValue.isPresent()) {
-                value = getInvokeGetPropertyPlaceholderValueForField(injectMethodSignature, fieldElement, annotationMetadata, valueValue.get(), fieldIndex);
+                value = getInvokeGetPropertyPlaceholderValueForField(injectMethodSignature, fieldElement, valueValue.get(), fieldIndex);
             } else {
                 // ???
                 value = ExpressionDef.nullValue();
@@ -1785,6 +1805,11 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
             }
             return buildConstructorInstantiate(aThis, methodParameters, onBeanInstance, constructorBuildMethodDefinition, List.of());
         }
+        if (buildMethodDefinition instanceof CustomBuildMethodDefinition customBuildMethodDefinition) {
+            List<? extends ExpressionDef> values = getConstructorArgumentValues(aThis, methodParameters,
+                List.of(buildMethodDefinition.getParameters()), isParametrized, constructorDefSupplier);
+            return buildCustomInstantiate(aThis, methodParameters, onBeanInstance, customBuildMethodDefinition, values);
+        }
         throw new IllegalStateException("Unknown build method definition: " + buildMethodDefinition);
     }
 
@@ -1808,6 +1833,18 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
         return onBeanInstance.apply(
             initializeBean(aThis, methodParameters, constructorBuildMethodDefinition, values)
         );
+    }
+
+    private StatementDef buildCustomInstantiate(VariableDef.This aThis,
+                                                 List<VariableDef.MethodParameter> methodParameters,
+                                                 Function<ExpressionDef, StatementDef> onBeanInstance,
+                                                 CustomBuildMethodDefinition constructorBuildMethodDefinition,
+                                                 List<? extends ExpressionDef> values) {
+        List<StatementDef> statements = new ArrayList<>();
+        statements.add(onBeanInstance.apply(
+            constructorBuildMethodDefinition.builder.build(statements, aThis, methodParameters, values)
+        ));
+        return StatementDef.multi(statements);
     }
 
     private StatementDef buildFactoryGet(VariableDef.This aThis,
@@ -2083,7 +2120,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
 
             initStatements.add(beanDefinitionTypeDef.getStaticField(injectionFieldsField)
                 .put(fieldReferenceArray.instantiate(fieldInjectionPoints.stream()
-                    .map(fd -> getNewFieldReference(fd.beanType, fd.fieldElement, fd.annotationMetadata))
+                    .map(fd -> getNewFieldReference(fd.beanType, fd.fieldElement))
                     .toList())));
             failStatements.add(beanDefinitionTypeDef.getStaticField(injectionFieldsField).put(ExpressionDef.nullValue()));
         }
@@ -2265,7 +2302,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
 
             return getNewMethodReference(methodElement.getDeclaringType(), methodElement, methodElement.getAnnotationMetadata(), false, false);
         } else if (constructor instanceof FieldElement fieldConstructor) {
-            return getNewFieldReference(fieldConstructor.getDeclaringType(), fieldConstructor, fieldConstructor.getAnnotationMetadata());
+            return getNewFieldReference(fieldConstructor.getDeclaringType(), fieldConstructor);
         } else {
             throw new IllegalArgumentException("Unexpected constructor: " + constructor);
         }
@@ -3029,7 +3066,6 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
     private StatementDef injectField(InjectMethodSignature injectMethodSignature,
                                      TypedElement declaringType,
                                      FieldElement fieldElement,
-                                     AnnotationMetadata annotationMetadata,
                                      boolean requiresReflection) {
 
         boolean isRequired = fieldElement
@@ -3073,7 +3109,6 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
             injectMethodSignature,
             declaringType,
             fieldElement,
-            annotationMetadata,
             requiresReflection,
             methodToInvoke,
             isArray,
@@ -3173,10 +3208,9 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
 
     private ExpressionDef getInvokeGetPropertyPlaceholderValueForField(InjectMethodSignature injectMethodSignature,
                                                                        FieldElement fieldElement,
-                                                                       AnnotationMetadata annotationMetadata,
                                                                        String value,
                                                                        int fieldIndex) {
-        annotationMetadata = MutableAnnotationMetadata.of(annotationMetadata);
+        AnnotationMetadata annotationMetadata = MutableAnnotationMetadata.of(fieldElement.getAnnotationMetadata());
         removeAnnotations(annotationMetadata, PropertySource.class.getName(), Property.class.getName());
 
         return injectMethodSignature.aThis
@@ -3243,17 +3277,16 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
     private StatementDef visitFieldInjectionPointInternal(InjectMethodSignature injectMethodSignature,
                                                           TypedElement declaringType,
                                                           FieldElement fieldElement,
-                                                          AnnotationMetadata annotationMetadata,
                                                           boolean requiresReflection,
                                                           Method methodToInvoke,
                                                           boolean isArray,
                                                           boolean requiresGenericType,
                                                           boolean isRequired) {
-        evaluatedExpressionProcessor.processEvaluatedExpressions(annotationMetadata, null);
+        evaluatedExpressionProcessor.processEvaluatedExpressions(fieldElement.getAnnotationMetadata(), null);
 
-        autoApplyNamedIfPresent(fieldElement, annotationMetadata);
+        autoApplyNamedIfPresent(fieldElement, fieldElement.getAnnotationMetadata());
 
-        fieldInjectionPoints.add(new FieldVisitData(declaringType, fieldElement, annotationMetadata, requiresReflection));
+        fieldInjectionPoints.add(new FieldVisitData(declaringType, fieldElement, requiresReflection));
 
         int fieldIndex = fieldInjectionPoints.size() - 1;
 
@@ -3976,6 +4009,16 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
             ).cast(beanTypeDef).returning();
     }
 
+    public void visitBuildCustomMethodDefinition(CustomInitializerBuilder builder) {
+        BuildMethodDefinition previous = buildMethodDefinition;
+        if (!(previous instanceof ConstructorBuildMethodDefinition constructorBuildMethodDefinition)) {
+            throw new ProcessingException(beanProducingElement, "Only constructor build method is supported");
+        }
+        buildMethodDefinition = new CustomBuildMethodDefinition(builder, constructorBuildMethodDefinition.constructor);
+        buildMethodDefinition.postConstruct = previous.postConstruct;
+        buildMethodDefinition.preDestroy = previous.preDestroy;
+    }
+
     private void visitBuildFactoryMethodDefinition(ClassElement factoryClass, Element factoryElement, ParameterElement... parameters) {
         if (buildMethodDefinition == null) {
             buildMethodDefinition = new FactoryBuildMethodDefinition(factoryClass, factoryElement, parameters);
@@ -4628,7 +4671,13 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
         }
     }
 
-    private ExpressionDef getNewFieldReference(TypedElement declaringType, FieldElement fieldElement, AnnotationMetadata annotationMetadata) {
+    private ExpressionDef getNewFieldReference(TypedElement declaringType, FieldElement fieldElement) {
+        MutableAnnotationMetadata fieldAnnotationMetadata = MutableAnnotationMetadata.of(
+            new AnnotationMetadataHierarchy(
+                fieldElement.getType().getTypeAnnotationMetadata(),
+                fieldElement.getAnnotationMetadata()
+            )
+        );
         return ClassTypeDef.of(AbstractInitializableBeanDefinition.FieldReference.class)
             .instantiate(
                 FIELD_REFERENCE_CONSTRUCTOR,
@@ -4642,7 +4691,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                     beanDefinitionTypeDef,
                     fieldElement.getName(),
                     fieldElement.getGenericType(),
-                    annotationMetadata,
+                    fieldAnnotationMetadata,
                     fieldElement.getGenericType().getTypeArguments(),
                     loadClassValueExpressionFn
                 )
@@ -4944,19 +4993,37 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
     private static final class FieldVisitData {
         final TypedElement beanType;
         final FieldElement fieldElement;
-        final AnnotationMetadata annotationMetadata;
         final boolean requiresReflection;
 
         FieldVisitData(
             TypedElement beanType,
             FieldElement fieldElement,
-            AnnotationMetadata annotationMetadata,
             boolean requiresReflection) {
             this.beanType = beanType;
             this.fieldElement = fieldElement;
-            this.annotationMetadata = annotationMetadata;
             this.requiresReflection = requiresReflection;
         }
+
+    }
+
+    /**
+     * The custom initializer builder.
+     */
+    public interface CustomInitializerBuilder {
+
+        /**
+         * The builder.
+         *
+         * @param statements The statements
+         * @param self       The self
+         * @param parameters The parameters
+         * @param values     The constructor values
+         * @return The built instance
+         */
+        ExpressionDef build(List<StatementDef> statements,
+                            VariableDef.This self,
+                            List<VariableDef.MethodParameter> parameters,
+                            List<? extends ExpressionDef> values);
 
     }
 
@@ -5062,6 +5129,21 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
         }
     }
 
+    private static final class CustomBuildMethodDefinition extends BuildMethodDefinition {
+        private final CustomInitializerBuilder builder;
+        private final MethodElement constructor;
+
+        private CustomBuildMethodDefinition(CustomInitializerBuilder builder, MethodElement constructor) {
+            this.builder = builder;
+            this.constructor = constructor;
+        }
+
+        @Override
+        ParameterElement[] getParameters() {
+            return constructor.getParameters();
+        }
+    }
+
     private static final class ConstructorBuildMethodDefinition extends BuildMethodDefinition {
         private final MethodElement constructor;
         private final boolean requiresReflection;
@@ -5077,7 +5159,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
         }
     }
 
-    private abstract static class BuildMethodDefinition {
+    private abstract static sealed class BuildMethodDefinition {
 
         private BuildMethodLifecycleDefinition postConstruct;
         private BuildMethodLifecycleDefinition preDestroy;

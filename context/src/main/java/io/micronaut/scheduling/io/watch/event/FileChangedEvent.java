@@ -18,7 +18,7 @@ package io.micronaut.scheduling.io.watch.event;
 import io.micronaut.context.event.ApplicationEvent;
 import io.micronaut.core.util.ArgumentUtils;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import java.nio.file.Path;
 import java.nio.file.WatchEvent;
 
@@ -53,7 +53,7 @@ public class FileChangedEvent extends ApplicationEvent {
      * @param path The path
      * @param eventType The event type
      */
-    public FileChangedEvent(@NonNull Path path, @NonNull WatchEvent.Kind eventType) {
+    public FileChangedEvent(@NonNull Path path, WatchEvent.@NonNull Kind eventType) {
         this(path, WatchEventType.of(eventType));
     }
 

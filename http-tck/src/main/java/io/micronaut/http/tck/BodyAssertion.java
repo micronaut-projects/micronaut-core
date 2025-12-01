@@ -16,7 +16,7 @@
 package io.micronaut.http.tck;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Arrays;
 import java.util.function.BiPredicate;

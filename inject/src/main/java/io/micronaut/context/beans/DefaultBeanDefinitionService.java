@@ -29,8 +29,8 @@ import io.micronaut.context.event.BeanInitializedEventListener;
 import io.micronaut.context.event.BeanPreDestroyEventListener;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
@@ -148,7 +148,6 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
     }
 
     @Override
-    @NonNull
     public void addBeanDefinition(@NonNull RuntimeBeanDefinition<?> definition) {
         Objects.requireNonNull(definition, "Bean definition cannot be null");
         BeanDefinitionProducer producer = new BeanDefinitionProducer(definition);
@@ -402,7 +401,6 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
         return refs != null && !refs.isEmpty();
     }
 
-    @NonNull
     private void readBeanDefinitionReferences(BeanContext beanContext) {
         if (beans == null) {
             beans = createBeans(resolveBeanDefinitionReferences(), additionalBeanConfigurations);

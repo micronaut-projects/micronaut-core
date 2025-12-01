@@ -15,8 +15,8 @@
  */
 package io.micronaut.http.server.netty.jackson
 
-import com.fasterxml.jackson.core.JsonFactory
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.core.json.JsonFactory
+import tools.jackson.databind.ObjectMapper
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.MapPropertySource
 import io.micronaut.context.env.PropertySource
@@ -43,7 +43,7 @@ class JsonFactorySetupSpec extends Specification {
         given:
         ApplicationContext applicationContext = ApplicationContext.builder("test").build()
         applicationContext.environment.addPropertySource((MapPropertySource) PropertySource.of(
-                'jackson.factory.use-thread-local-for-buffer-recycling': false
+                'jackson.factory.fail-on-symbol-hash-overflow': false
         ))
         applicationContext.start()
 
@@ -54,7 +54,7 @@ class JsonFactorySetupSpec extends Specification {
         ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper)
 
         then:
-        !objectMapper.getFactory().isEnabled(JsonFactory.Feature.USE_THREAD_LOCAL_FOR_BUFFER_RECYCLING)
+        !objectMapper.tokenStreamFactory().isEnabled(JsonFactory.Feature.FAIL_ON_SYMBOL_HASH_OVERFLOW)
 
     }
 }

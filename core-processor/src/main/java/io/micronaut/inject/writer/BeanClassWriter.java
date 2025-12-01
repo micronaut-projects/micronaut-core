@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.writer;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 
 /**
  * Extended version of {@link ClassWriterOutputVisitor} for types that write beans.

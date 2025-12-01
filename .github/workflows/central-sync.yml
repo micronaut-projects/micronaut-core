@@ -20,7 +20,7 @@ jobs:
           unset JAVA_HOME
           export PATH=$(echo "$PATH" | tr ':' '\n' | grep -v '/usr/lib/jvm' | paste -sd:)
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           ref: v${{ github.event.inputs.release_version }}
       - uses: gradle/actions/wrapper-validation@v5

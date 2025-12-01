@@ -15,17 +15,16 @@
  */
 package io.micronaut.jackson.serialize;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JavaType;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.core.serialize.ObjectSerializer;
 import io.micronaut.core.serialize.exceptions.SerializationException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.jackson.JacksonConfiguration;
 import jakarta.inject.Singleton;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JavaType;
+import tools.jackson.databind.ObjectMapper;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Optional;
@@ -53,7 +52,7 @@ public class JacksonObjectSerializer implements ObjectSerializer {
     public Optional<byte[]> serialize(Object object) throws SerializationException {
         try {
             return Optional.of(objectMapper.writeValueAsBytes(object));
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new SerializationException("Error serializing object to JSON: " + e.getMessage(), e);
         }
     }
@@ -62,7 +61,7 @@ public class JacksonObjectSerializer implements ObjectSerializer {
     public void serialize(Object object, OutputStream outputStream) throws SerializationException {
         try {
             objectMapper.writeValue(outputStream, object);
-        } catch (IOException e) {
+        } catch (JacksonException e) {
             throw new SerializationException("Error serializing object to JSON: " + e.getMessage(), e);
         }
     }
@@ -71,7 +70,7 @@ public class JacksonObjectSerializer implements ObjectSerializer {
     public <T> Optional<T> deserialize(byte[] bytes, Class<T> requiredType) throws SerializationException {
         try {
             return Optional.ofNullable(objectMapper.readValue(bytes, requiredType));
-        } catch (IOException e) {
+        } catch (JacksonException e) {
             throw new SerializationException("Error deserializing object from JSON: " + e.getMessage(), e);
         }
     }
@@ -80,7 +79,7 @@ public class JacksonObjectSerializer implements ObjectSerializer {
     public <T> Optional<T> deserialize(InputStream inputStream, Class<T> requiredType) throws SerializationException {
         try {
             return Optional.ofNullable(objectMapper.readValue(inputStream, requiredType));
-        } catch (IOException e) {
+        } catch (JacksonException e) {
             throw new SerializationException("Error deserializing object from JSON: " + e.getMessage(), e);
         }
     }
@@ -90,7 +89,7 @@ public class JacksonObjectSerializer implements ObjectSerializer {
         try {
             JavaType javaType = JacksonConfiguration.constructType(requiredType, objectMapper.getTypeFactory());
             return Optional.ofNullable(objectMapper.readValue(bytes, javaType));
-        } catch (IOException e) {
+        } catch (JacksonException e) {
             throw new SerializationException("Error deserializing object from JSON: " + e.getMessage(), e);
         }
     }
@@ -100,7 +99,7 @@ public class JacksonObjectSerializer implements ObjectSerializer {
         try {
             JavaType javaType = JacksonConfiguration.constructType(requiredType, objectMapper.getTypeFactory());
             return Optional.ofNullable(objectMapper.readValue(inputStream, javaType));
-        } catch (IOException e) {
+        } catch (JacksonException e) {
             throw new SerializationException("Error deserializing object from JSON: " + e.getMessage(), e);
         }
     }

@@ -15,8 +15,8 @@
  */
 package io.micronaut.jackson.core.env;
 
-import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.core.JsonParser;
+import tools.jackson.core.json.JsonFactory;
+import tools.jackson.core.JsonParser;
 import io.micronaut.context.env.AbstractPropertySourceLoader;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.jackson.core.tree.JsonNodeTreeCodec;

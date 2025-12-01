@@ -16,8 +16,8 @@
 package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ast.ClassElement;
@@ -53,7 +53,6 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
      */
     @Nullable
     Element getOriginatingElement();
-
 
     /**
      * <p>In the case where the produced class is produced by a factory method annotated with

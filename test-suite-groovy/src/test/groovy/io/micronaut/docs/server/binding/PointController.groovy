@@ -31,14 +31,14 @@ class PointController {
     @Post(uri = "/no-body-json")
     @Status(HttpStatus.CREATED)
     Point noBodyJson(Integer x, Integer y) { // (1)
-        new Point(x,y)
+        new Point(x: x,y: y)
     }
 
     @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
     @Post("/no-body-form")
     @Status(HttpStatus.CREATED)
     Point noBodyForm(Integer x, Integer y) {  // (2)
-        new Point(x,y)
+        new Point(x: x, y: y)
     }
 }
 // end::class[]

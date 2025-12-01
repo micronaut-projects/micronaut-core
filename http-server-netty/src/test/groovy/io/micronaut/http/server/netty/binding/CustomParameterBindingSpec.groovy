@@ -1,5 +1,6 @@
 package io.micronaut.http.server.netty.binding
 
+import com.fasterxml.jackson.annotation.JsonProperty
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.convert.format.Format
@@ -206,7 +207,8 @@ class CustomParameterBindingSpec extends AbstractMicronautSpec {
             private String title
             private String author
 
-            Book(String title, @Nullable String author) {
+            Book(@JsonProperty("title") String title,
+                 @JsonProperty("author") @Nullable String author) {
                 this.title = title
                 this.author = author
             }

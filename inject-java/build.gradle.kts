@@ -51,6 +51,7 @@ dependencies {
     testImplementation(libs.graal)
     testImplementation(libs.managed.snakeyaml)
     testImplementation(libs.managed.jspecify)
+    testImplementation(libs.bytebuddy)
     testRuntimeOnly(libs.jakarta.el.impl)
     testRuntimeOnly(libs.jakarta.el)
 }

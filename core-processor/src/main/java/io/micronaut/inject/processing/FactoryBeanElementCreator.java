@@ -16,7 +16,6 @@
 package io.micronaut.inject.processing;
 
 import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
-import io.micronaut.aop.writer.AopProxyWriter;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.EachProperty;
@@ -40,6 +39,7 @@ import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.BeanDefinitionVisitor;
 import io.micronaut.inject.writer.BeanDefinitionWriter;
 import io.micronaut.inject.writer.OriginatingElements;
+import io.micronaut.inject.writer.ProxyingBeanDefinitionVisitor;
 
 import java.util.List;
 import java.util.Optional;
@@ -230,7 +230,7 @@ final class FactoryBeanElementCreator extends DeclaredBeanElementCreator {
                 }
             }
 
-            AopProxyWriter aopProxyWriter = createAroundAopProxyWriter(producedBeanDefinitionWriter, producedAnnotationMetadata, visitorContext, true);
+            ProxyingBeanDefinitionVisitor aopProxyWriter = createAroundAopProxyWriter(producedType, producedBeanDefinitionWriter, producedAnnotationMetadata, visitorContext, true);
             if (constructorElement != null) {
                 aopProxyWriter.visitBeanDefinitionConstructor(constructorElement, constructorElement.isReflectionRequired(), visitorContext);
             } else {

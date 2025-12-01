@@ -18,7 +18,7 @@ package io.micronaut.inject.ast.beans;
 import java.util.Objects;
 import java.util.function.Consumer;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.ast.ConstructorElement;
 
 /**

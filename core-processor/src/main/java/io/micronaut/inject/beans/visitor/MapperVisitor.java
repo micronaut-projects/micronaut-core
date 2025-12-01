@@ -17,7 +17,7 @@ package io.micronaut.inject.beans.visitor;
 
 import io.micronaut.context.annotation.Mapper;
 import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;

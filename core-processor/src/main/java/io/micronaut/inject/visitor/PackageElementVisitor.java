@@ -16,7 +16,7 @@
 package io.micronaut.inject.visitor;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.util.Toggleable;
@@ -69,7 +69,7 @@ public interface PackageElementVisitor<A> extends Ordered, Toggleable {
     /**
      * @return The visitor kind.
      */
-    default @NonNull TypeElementVisitor.VisitorKind getVisitorKind() {
+    default TypeElementVisitor.@NonNull VisitorKind getVisitorKind() {
         return TypeElementVisitor.VisitorKind.AGGREGATING;
     }
 

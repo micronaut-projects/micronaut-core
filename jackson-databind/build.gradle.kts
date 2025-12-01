@@ -15,15 +15,10 @@ dependencies {
     }
 
     api(libs.managed.jackson.databind)
-    api(libs.managed.jackson.datatype.jdk8)
-    api(libs.managed.jackson.datatype.jsr310)
     compileOnly(libs.managed.jackson.module.kotlin) {
         isTransitive = false
     }
     compileOnly(libs.managed.jackson.module.afterburner) {
-        isTransitive = false
-    }
-    compileOnly(libs.managed.jackson.module.parameterNames) {
         isTransitive = false
     }
 
@@ -31,7 +26,7 @@ dependencies {
     testImplementation(projects.micronautInjectJava)
     testImplementation(projects.micronautInjectJavaTest)
     testImplementation(projects.micronautInjectGroovy)
-    testImplementation("com.fasterxml.jackson.dataformat:jackson-dataformat-xml")
+    testImplementation(libs.managed.jackson.dataformat.xml)
     testImplementation(libs.managed.snakeyaml)
     testImplementation(libs.micronaut.test.junit5) {
         exclude(group = "io.micronaut")

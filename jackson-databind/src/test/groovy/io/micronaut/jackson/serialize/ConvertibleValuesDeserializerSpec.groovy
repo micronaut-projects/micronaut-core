@@ -1,6 +1,6 @@
 package io.micronaut.jackson.serialize
 
-import com.fasterxml.jackson.databind.exc.MismatchedInputException
+import tools.jackson.databind.exc.MismatchedInputException
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.convert.value.ConvertibleValues
 import io.micronaut.core.type.Argument

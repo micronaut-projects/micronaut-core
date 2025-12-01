@@ -15,7 +15,7 @@
  */
 package io.micronaut.http;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.http.cookie.Cookies;
 
 import javax.net.ssl.SSLSession;

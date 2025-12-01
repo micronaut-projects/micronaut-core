@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.multipart;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.io.buffer.LeakTracker;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.util.functional.ThrowingSupplier;

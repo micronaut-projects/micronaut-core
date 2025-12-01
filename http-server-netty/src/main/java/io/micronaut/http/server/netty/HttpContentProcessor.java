@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.server.netty;
 
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.Toggleable;
 import io.netty.buffer.ByteBuf;

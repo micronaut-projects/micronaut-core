@@ -24,8 +24,8 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NextMajorVersion;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
@@ -1244,7 +1244,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     }
 
     /**
-     * Allows configuration of properties for the {@link io.micronaut.http.server.netty.body.AbstractFileBodyWriter}.
+     * Allows configuration of properties for the {@link io.micronaut.http.server.body.FileBodyWriter}.
      *
      * @author James Kleeh
      * @author graemerocher

@@ -17,7 +17,7 @@ package io.micronaut.docs.aop.introduction;
 
 // tag::imports[]
 import io.micronaut.aop.*;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import jakarta.inject.Singleton;
 // end::imports[]
 

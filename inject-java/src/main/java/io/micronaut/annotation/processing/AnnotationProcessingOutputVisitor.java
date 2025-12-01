@@ -16,7 +16,7 @@
 package io.micronaut.annotation.processing;
 
 import io.micronaut.annotation.processing.visitor.JavaNativeElement;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.writer.AbstractClassWriterOutputVisitor;
 import io.micronaut.inject.writer.ClassGenerationException;
@@ -76,7 +76,7 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
     }
 
     @Override
-    public OutputStream visitClass(String classname, @Nullable io.micronaut.inject.ast.Element originatingElement) throws IOException {
+    public OutputStream visitClass(String classname, io.micronaut.inject.ast.@Nullable Element originatingElement) throws IOException {
         return visitClass(classname, new io.micronaut.inject.ast.Element[] {originatingElement});
     }
 

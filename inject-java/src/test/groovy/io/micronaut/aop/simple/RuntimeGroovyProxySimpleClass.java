@@ -13,10 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-/**
- * Contains factories for modules.
- *
- * @author graemerocher
- * @since 1.1
- */
-package io.micronaut.jackson.modules;
+package io.micronaut.aop.simple;
+
+import io.micronaut.aop.runtime.RuntimeProxy;
+import jakarta.inject.Singleton;
+
+@RuntimeProxy(value = RuntimeGroovyProxyCreator.class, proxyTarget = true)
+@Singleton
+public class RuntimeGroovyProxySimpleClass {
+
+    @Mutating("name")
+    public String test(String name) {
+        return "Name is " + name;
+    }
+}

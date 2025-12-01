@@ -16,8 +16,8 @@
 package io.micronaut.web.router.version;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.annotation.Nullable;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.version.annotation.Version;
 import io.micronaut.http.HttpHeaders;

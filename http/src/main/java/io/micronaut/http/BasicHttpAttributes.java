@@ -16,7 +16,7 @@
 package io.micronaut.http;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.http.uri.UriMatchInfo;
 

@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.codec;
 
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.http.MediaType;
 
 import java.util.Collection;

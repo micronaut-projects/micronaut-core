@@ -15,8 +15,9 @@
  */
 package io.micronaut.jackson.annotation;
 
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.SerializationFeature;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.JacksonModule;
+import tools.jackson.databind.SerializationFeature;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -59,5 +60,5 @@ public @interface JacksonFeatures {
     /**
      * @return Additional modules to add to the jackson mapper
      */
-    Class<? extends com.fasterxml.jackson.databind.Module>[] additionalModules() default {};
+    Class<? extends JacksonModule>[] additionalModules() default {};
 }

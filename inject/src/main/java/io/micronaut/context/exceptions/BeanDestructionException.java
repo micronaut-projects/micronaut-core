@@ -15,7 +15,7 @@
  */
 package io.micronaut.context.exceptions;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.BeanType;
 
 /**

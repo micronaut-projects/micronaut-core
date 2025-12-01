@@ -9,8 +9,8 @@ class NullabilityFutureAnnotationsSpec extends AbstractTypeElementSpec {
         given:
         def element = buildClassElement("""
 package test;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import java.util.concurrent.CompletionStage;
 
 @jakarta.inject.Singleton

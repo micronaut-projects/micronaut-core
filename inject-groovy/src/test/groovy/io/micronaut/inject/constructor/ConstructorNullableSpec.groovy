@@ -17,7 +17,7 @@ package io.micronaut.inject.constructor
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.DependencyInjectionException
-import io.micronaut.core.annotation.Nullable
+import org.jspecify.annotations.Nullable
 import jakarta.inject.Inject
 import jakarta.inject.Provider
 import spock.lang.Specification

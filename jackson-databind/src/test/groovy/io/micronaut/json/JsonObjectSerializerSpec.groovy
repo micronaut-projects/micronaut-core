@@ -1,6 +1,6 @@
 package io.micronaut.json
 
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.ObjectMapper
 import io.micronaut.jackson.ObjectMapperFactory
 import io.micronaut.jackson.databind.JacksonDatabindMapper
 import spock.lang.Issue

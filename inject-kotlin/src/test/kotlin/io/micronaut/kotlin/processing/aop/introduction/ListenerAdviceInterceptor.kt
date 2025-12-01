@@ -17,9 +17,7 @@ package io.micronaut.kotlin.processing.aop.introduction
 
 import io.micronaut.aop.MethodInterceptor
 import io.micronaut.aop.MethodInvocationContext
-import io.micronaut.core.annotation.Nullable
 import jakarta.inject.Singleton
-import java.util.HashSet
 
 /**
  * @author graemerocher
@@ -38,7 +36,6 @@ class ListenerAdviceInterceptor : MethodInterceptor<Any, Any> {
         return recievedMessages
     }
 
-    @Nullable
     override fun intercept(context: MethodInvocationContext<Any, Any>): Any? {
         return if (context.methodName == "onApplicationEvent") {
             val v = context.parameterValues[0]

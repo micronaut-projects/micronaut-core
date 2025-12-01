@@ -27,6 +27,7 @@ class EngineSpec {
     @Test
     void testStartVehicleWithConfiguration() {
         LinkedHashMap<String, Object> map = new LinkedHashMap<>(1);
+        map.put("spec.name", "VehicleConfigPropertySpec");
         map.put("my.engine.cylinders", "8");
         map.put("my.engine.manufacturer", "Honda");
         ApplicationContext ctx = ApplicationContext.run(map);

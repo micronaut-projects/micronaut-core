@@ -19,7 +19,7 @@ import java.util.Map;
 import java.util.Set;
 
 import io.micronaut.context.event.ApplicationEventListener;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.util.CollectionUtils;
 

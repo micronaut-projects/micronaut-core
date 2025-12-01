@@ -16,20 +16,19 @@
 package io.micronaut.jackson;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.JavaType;
-import com.fasterxml.jackson.databind.MapperFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.PropertyNamingStrategies;
-import com.fasterxml.jackson.databind.PropertyNamingStrategy;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.databind.type.TypeFactory;
+import tools.jackson.core.json.JsonFactory;
+import tools.jackson.core.json.JsonReadFeature;
+import tools.jackson.core.json.JsonWriteFeature;
+import tools.jackson.databind.DefaultTyping;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.JavaType;
+import tools.jackson.databind.MapperFeature;
+import tools.jackson.databind.PropertyNamingStrategies;
+import tools.jackson.databind.PropertyNamingStrategy;
+import tools.jackson.databind.SerializationFeature;
+import tools.jackson.databind.type.TypeFactory;
 import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
@@ -70,13 +69,8 @@ public class JacksonConfiguration implements JsonConfiguration {
      * The property used to enable module scan.
      */
     public static final String PROPERTY_MODULE_SCAN = "jackson.module-scan";
-    /**
-     * The property used to enable bean introspection.
-     */
-    public static final String PROPERTY_USE_BEAN_INTROSPECTION = "jackson.bean-introspection-module";
 
     private boolean moduleScan = true;
-    private boolean beanIntrospectionModule = true;
     private String dateFormat;
     private Locale locale;
     private TimeZone timeZone;
@@ -84,34 +78,14 @@ public class JacksonConfiguration implements JsonConfiguration {
     private Map<SerializationFeature, Boolean> serialization = Collections.emptyMap();
     private Map<DeserializationFeature, Boolean> deserialization = Collections.emptyMap();
     private Map<MapperFeature, Boolean> mapper = Collections.emptyMap();
-    private Map<JsonParser.Feature, Boolean> parser = Collections.emptyMap();
-    private Map<JsonGenerator.Feature, Boolean> generator = Collections.emptyMap();
+    private Map<JsonReadFeature, Boolean> parser = Collections.emptyMap();
+    private Map<JsonWriteFeature, Boolean> generator = Collections.emptyMap();
     private Map<JsonFactory.Feature, Boolean> factory = Collections.emptyMap();
     private JsonInclude.Include serializationInclusion = JsonInclude.Include.NON_EMPTY;
-    private ObjectMapper.DefaultTyping defaultTyping = null;
+    private DefaultTyping defaultTyping = null;
     private PropertyNamingStrategy propertyNamingStrategy = null;
     private boolean alwaysSerializeErrorsAsList = true;
     private boolean trimStrings = false;
-
-    /**
-     * Whether the {@link io.micronaut.core.beans.BeanIntrospection} should be used for reflection free object serialialization/deserialialization.
-     *
-     * @return True if it should
-     */
-    @Experimental
-    public boolean isBeanIntrospectionModule() {
-        return beanIntrospectionModule;
-    }
-
-    /**
-     * Whether the {@link io.micronaut.core.beans.BeanIntrospection} should be used for reflection free object serialialization/deserialialization.
-     *
-     * @param beanIntrospectionModule True if it should
-     */
-    @Experimental
-    public void setBeanIntrospectionModule(boolean beanIntrospectionModule) {
-        this.beanIntrospectionModule = beanIntrospectionModule;
-    }
 
     /**
      * Whether Jackson modules should be scanned for.
@@ -141,7 +115,7 @@ public class JacksonConfiguration implements JsonConfiguration {
     /**
      * @return The global defaultTyping using for Polymorphic handling
      */
-    public ObjectMapper.DefaultTyping getDefaultTyping() {
+    public DefaultTyping getDefaultTyping() {
         return defaultTyping;
     }
 
@@ -190,14 +164,14 @@ public class JacksonConfiguration implements JsonConfiguration {
     /**
      * @return Settings for the parser
      */
-    public Map<JsonParser.Feature, Boolean> getParserSettings() {
+    public Map<JsonReadFeature, Boolean> getParserSettings() {
         return parser;
     }
 
     /**
      * @return Settings for the generator
      */
-    public Map<JsonGenerator.Feature, Boolean> getGeneratorSettings() {
+    public Map<JsonWriteFeature, Boolean> getGeneratorSettings() {
         return generator;
     }
 
@@ -318,7 +292,7 @@ public class JacksonConfiguration implements JsonConfiguration {
      *
      * @param parser The parser features
      */
-    public void setParser(Map<JsonParser.Feature, Boolean> parser) {
+    public void setParser(Map<JsonReadFeature, Boolean> parser) {
         if (CollectionUtils.isNotEmpty(parser)) {
             this.parser = parser;
         }
@@ -329,7 +303,7 @@ public class JacksonConfiguration implements JsonConfiguration {
      *
      * @param generator The generator features
      */
-    public void setGenerator(Map<JsonGenerator.Feature, Boolean> generator) {
+    public void setGenerator(Map<JsonWriteFeature, Boolean> generator) {
         if (CollectionUtils.isNotEmpty(generator)) {
             this.generator = generator;
         }
@@ -362,7 +336,7 @@ public class JacksonConfiguration implements JsonConfiguration {
      *
      * @param defaultTyping The defaultTyping
      */
-    public void setDefaultTyping(ObjectMapper.DefaultTyping defaultTyping) {
+    public void setDefaultTyping(DefaultTyping defaultTyping) {
         this.defaultTyping = defaultTyping;
     }
 

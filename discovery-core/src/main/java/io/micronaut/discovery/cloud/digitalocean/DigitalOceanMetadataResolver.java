@@ -15,11 +15,10 @@
  */
 package io.micronaut.discovery.cloud.digitalocean;
 
-import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.json.JsonFactory;
+import tools.jackson.databind.ObjectMapper;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
-import io.micronaut.core.annotation.Experimental;
 import io.micronaut.discovery.cloud.ComputeInstanceMetadata;
 import io.micronaut.discovery.cloud.ComputeInstanceMetadataResolver;
 import io.micronaut.discovery.cloud.NetworkInterface;
@@ -87,7 +86,6 @@ public class DigitalOceanMetadataResolver implements ComputeInstanceMetadataReso
      * @param mapper Mapper to use for deserialization
      */
     @Inject
-    @Experimental
     public DigitalOceanMetadataResolver(
         DigitalOceanMetadataConfiguration configuration,
         JsonFactory jsonFactory,
@@ -100,7 +98,10 @@ public class DigitalOceanMetadataResolver implements ComputeInstanceMetadataReso
 
     /**
      * Construct with default settings.
+     *
+     * @deprecated Prefer dependency injection. Use {@link #DigitalOceanMetadataResolver(DigitalOceanMetadataConfiguration, JsonFactory, JsonMapper)} instead.
      */
+    @Deprecated
     public DigitalOceanMetadataResolver() {
         configuration = new DigitalOceanMetadataConfiguration();
         jsonFactory = new JsonFactory();
@@ -110,9 +111,11 @@ public class DigitalOceanMetadataResolver implements ComputeInstanceMetadataReso
     /**
      * @param objectMapper To read and write JSON
      * @param configuration Digital Ocean Metadata configuration
+     * @deprecated Prefer dependency injection of {@link JsonMapper} and {@link JsonFactory}; use {@link #DigitalOceanMetadataResolver(DigitalOceanMetadataConfiguration, JsonFactory, JsonMapper)}.
      */
+    @Deprecated
     public DigitalOceanMetadataResolver(ObjectMapper objectMapper, DigitalOceanMetadataConfiguration configuration) {
-        this(configuration, objectMapper.getFactory(), new JacksonDatabindMapper(objectMapper));
+        this(configuration, (JsonFactory) objectMapper.tokenStreamFactory(), new JacksonDatabindMapper(objectMapper));
     }
 
     @Override

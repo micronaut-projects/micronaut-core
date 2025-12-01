@@ -15,9 +15,9 @@
  */
 package io.micronaut.discovery.cloud;
 
-import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.json.JsonFactory;
+import tools.jackson.core.JsonParser;
+import tools.jackson.databind.ObjectMapper;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
@@ -54,7 +54,7 @@ public class ComputeInstanceMetadataResolverUtils {
      * @return a {@link JsonNode} instance
      * @throws IOException if any I/O error occurs
      */
-    public static com.fasterxml.jackson.databind.JsonNode readMetadataUrl(URL url, int connectionTimeoutMs, int readTimeoutMs, ObjectMapper objectMapper, Map<String, String> requestProperties) throws IOException {
+    public static tools.jackson.databind.JsonNode readMetadataUrl(URL url, int connectionTimeoutMs, int readTimeoutMs, ObjectMapper objectMapper, Map<String, String> requestProperties) throws IOException {
         try (InputStream in = openMetadataUrl(url, connectionTimeoutMs, readTimeoutMs, requestProperties)) {
             return objectMapper.readTree(in);
         }
@@ -143,8 +143,8 @@ public class ComputeInstanceMetadataResolverUtils {
      * @param key The key
      * @return An optional value
      */
-    public static Optional<String> stringValue(com.fasterxml.jackson.databind.JsonNode json, String key) {
-        return Optional.ofNullable(json.findValue(key)).map(com.fasterxml.jackson.databind.JsonNode::asText);
+    public static Optional<String> stringValue(tools.jackson.databind.JsonNode json, String key) {
+        return Optional.ofNullable(json.findValue(key)).map(tools.jackson.databind.JsonNode::asText);
     }
 
     /**

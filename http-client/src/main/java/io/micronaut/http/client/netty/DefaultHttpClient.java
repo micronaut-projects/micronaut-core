@@ -20,8 +20,8 @@ import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.async.propagation.ReactivePropagation;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.beans.BeanMap;
@@ -651,12 +651,12 @@ public class DefaultHttpClient implements
 
     @SuppressWarnings("SubscriberImplementation")
     @Override
-    public <I> Publisher<Event<ByteBuffer<?>>> eventStream(@NonNull io.micronaut.http.HttpRequest<I> request) {
+    public <I> Publisher<Event<ByteBuffer<?>>> eventStream(io.micronaut.http.@NonNull HttpRequest<I> request) {
         setupConversionService(request);
         return eventStreamOrError(request, null);
     }
 
-    private <I> Publisher<Event<ByteBuffer<?>>> eventStreamOrError(@NonNull io.micronaut.http.HttpRequest<I> request, @NonNull Argument<?> errorType) {
+    private <I> Publisher<Event<ByteBuffer<?>>> eventStreamOrError(io.micronaut.http.@NonNull HttpRequest<I> request, @NonNull Argument<?> errorType) {
 
         if (request instanceof MutableHttpRequest<?> httpRequest) {
             httpRequest.accept(MediaType.TEXT_EVENT_STREAM_TYPE);
@@ -781,14 +781,14 @@ public class DefaultHttpClient implements
     }
 
     @Override
-    public <I, B> Publisher<Event<B>> eventStream(@NonNull io.micronaut.http.HttpRequest<I> request,
+    public <I, B> Publisher<Event<B>> eventStream(io.micronaut.http.@NonNull HttpRequest<I> request,
                                                   @NonNull Argument<B> eventType) {
         setupConversionService(request);
         return eventStream(request, eventType, DEFAULT_ERROR_TYPE);
     }
 
     @Override
-    public <I, B> Publisher<Event<B>> eventStream(@NonNull io.micronaut.http.HttpRequest<I> request, @NonNull Argument<B> eventType, @NonNull Argument<?> errorType) {
+    public <I, B> Publisher<Event<B>> eventStream(io.micronaut.http.@NonNull HttpRequest<I> request, @NonNull Argument<B> eventType, @NonNull Argument<?> errorType) {
         setupConversionService(request);
         MessageBodyReader<B> reader = handlerRegistry.getReader(eventType, List.of(MediaType.APPLICATION_JSON_TYPE));
         return Flux.from(eventStreamOrError(request, errorType)).map(byteBufferEvent -> {
@@ -800,13 +800,13 @@ public class DefaultHttpClient implements
     }
 
     @Override
-    public <I> Publisher<ByteBuffer<?>> dataStream(@NonNull io.micronaut.http.HttpRequest<I> request) {
+    public <I> Publisher<ByteBuffer<?>> dataStream(io.micronaut.http.@NonNull HttpRequest<I> request) {
         setupConversionService(request);
         return dataStream(request, DEFAULT_ERROR_TYPE);
     }
 
     @Override
-    public <I> Publisher<ByteBuffer<?>> dataStream(@NonNull io.micronaut.http.HttpRequest<I> request, @NonNull Argument<?> errorType) {
+    public <I> Publisher<ByteBuffer<?>> dataStream(io.micronaut.http.@NonNull HttpRequest<I> request, @NonNull Argument<?> errorType) {
         setupConversionService(request);
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
         return new MicronautFlux<>(toMono(resolveRequestURI(request), propagatedContext)
@@ -834,12 +834,12 @@ public class DefaultHttpClient implements
     }
 
     @Override
-    public <I> Publisher<HttpResponse<ByteBuffer<?>>> exchangeStream(@NonNull io.micronaut.http.HttpRequest<I> request) {
+    public <I> Publisher<HttpResponse<ByteBuffer<?>>> exchangeStream(io.micronaut.http.@NonNull HttpRequest<I> request) {
         return exchangeStream(request, DEFAULT_ERROR_TYPE);
     }
 
     @Override
-    public <I> Publisher<HttpResponse<ByteBuffer<?>>> exchangeStream(@NonNull io.micronaut.http.HttpRequest<I> request, @NonNull Argument<?> errorType) {
+    public <I> Publisher<HttpResponse<ByteBuffer<?>>> exchangeStream(io.micronaut.http.@NonNull HttpRequest<I> request, @NonNull Argument<?> errorType) {
         setupConversionService(request);
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
         return new MicronautFlux<>(toMono(resolveRequestURI(request), propagatedContext)
@@ -853,12 +853,12 @@ public class DefaultHttpClient implements
     }
 
     @Override
-    public <I, O> Publisher<O> jsonStream(@NonNull io.micronaut.http.HttpRequest<I> request, @NonNull Argument<O> type) {
+    public <I, O> Publisher<O> jsonStream(io.micronaut.http.@NonNull HttpRequest<I> request, @NonNull Argument<O> type) {
         return jsonStream(request, type, DEFAULT_ERROR_TYPE);
     }
 
     @Override
-    public <I, O> Publisher<O> jsonStream(@NonNull io.micronaut.http.HttpRequest<I> request, @NonNull Argument<O> type, @NonNull Argument<?> errorType) {
+    public <I, O> Publisher<O> jsonStream(io.micronaut.http.@NonNull HttpRequest<I> request, @NonNull Argument<O> type, @NonNull Argument<?> errorType) {
         setupConversionService(request);
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
         return Flux.from(toMono(resolveRequestURI(request), propagatedContext)
@@ -867,18 +867,18 @@ public class DefaultHttpClient implements
 
     @SuppressWarnings("unchecked")
     @Override
-    public <I> Publisher<Map<String, Object>> jsonStream(@NonNull io.micronaut.http.HttpRequest<I> request) {
+    public <I> Publisher<Map<String, Object>> jsonStream(io.micronaut.http.@NonNull HttpRequest<I> request) {
         return (Publisher) jsonStream(request, Map.class);
     }
 
     @Override
-    public <I, O> Publisher<O> jsonStream(@NonNull io.micronaut.http.HttpRequest<I> request, @NonNull Class<O> type) {
+    public <I, O> Publisher<O> jsonStream(io.micronaut.http.@NonNull HttpRequest<I> request, @NonNull Class<O> type) {
         setupConversionService(request);
         return jsonStream(request, Argument.of(type));
     }
 
     @Override
-    public <I, O, E> Publisher<HttpResponse<O>> exchange(@NonNull io.micronaut.http.HttpRequest<I> request, @NonNull Argument<O> bodyType, @NonNull Argument<E> errorType) {
+    public <I, O, E> Publisher<HttpResponse<O>> exchange(io.micronaut.http.@NonNull HttpRequest<I> request, @NonNull Argument<O> bodyType, @NonNull Argument<E> errorType) {
         return exchange(request, bodyType, errorType, null)
             // some tests expect flux...
             .flux();
@@ -1193,12 +1193,12 @@ public class DefaultHttpClient implements
     }
 
     @Override
-    public Publisher<MutableHttpResponse<?>> proxy(@NonNull io.micronaut.http.HttpRequest<?> request) {
+    public Publisher<MutableHttpResponse<?>> proxy(io.micronaut.http.@NonNull HttpRequest<?> request) {
         return proxy(request, ProxyRequestOptions.getDefault());
     }
 
     @Override
-    public Publisher<MutableHttpResponse<?>> proxy(@NonNull io.micronaut.http.HttpRequest<?> request, @NonNull ProxyRequestOptions options) {
+    public Publisher<MutableHttpResponse<?>> proxy(io.micronaut.http.@NonNull HttpRequest<?> request, @NonNull ProxyRequestOptions options) {
         Objects.requireNonNull(options, "options");
         setupConversionService(request);
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
@@ -2065,7 +2065,7 @@ public class DefaultHttpClient implements
         return result;
     }
 
-    private static void setRedirectHeaders(@Nullable io.micronaut.http.HttpRequest<?> request, MutableHttpRequest<Object> redirectRequest) {
+    private static void setRedirectHeaders(io.micronaut.http.@Nullable HttpRequest<?> request, MutableHttpRequest<Object> redirectRequest) {
         if (request != null) {
             for (Map.Entry<String, List<String>> originalHeader : request.getHeaders()) {
                 if (!REDIRECT_HEADER_BLOCKLIST.contains(originalHeader.getKey())) {

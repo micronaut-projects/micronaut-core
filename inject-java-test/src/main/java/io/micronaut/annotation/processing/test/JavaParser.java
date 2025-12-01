@@ -21,8 +21,8 @@ import io.micronaut.annotation.processing.BeanDefinitionInjectProcessor;
 import io.micronaut.annotation.processing.MixinVisitorProcessor;
 import io.micronaut.annotation.processing.PackageElementVisitorProcessor;
 import io.micronaut.annotation.processing.TypeElementVisitorProcessor;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.CollectionUtils;
 import spock.util.environment.Jvm;
 

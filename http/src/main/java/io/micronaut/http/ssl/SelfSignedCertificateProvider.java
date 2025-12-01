@@ -20,7 +20,7 @@ import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.naming.Named;
 import io.micronaut.scheduling.TaskExecutors;
 import io.netty.pkitesting.CertificateBuilder;
@@ -71,7 +71,7 @@ public final class SelfSignedCertificateProvider implements CertificateProvider 
         bundleFlux = sink.asFlux();
     }
 
-    private static void update(@NonNull Config config, @NonNull Sinks.Many<KeyStore> sink) throws Exception {
+    private static void update(@NonNull Config config, Sinks.@NonNull Many<KeyStore> sink) throws Exception {
         X509Bundle bundle = new CertificateBuilder()
             .algorithm(config.algorithm)
             .subject(config.subject)
@@ -118,7 +118,7 @@ public final class SelfSignedCertificateProvider implements CertificateProvider 
          * parameters used by {@link io.netty.pkitesting.CertificateBuilder}. Defaults to {@code rsa4096}.
          * @return the certificate generation algorithm
          */
-        public @NonNull CertificateBuilder.Algorithm getAlgorithm() {
+        public CertificateBuilder.@NonNull Algorithm getAlgorithm() {
             return algorithm;
         }
 
@@ -127,7 +127,7 @@ public final class SelfSignedCertificateProvider implements CertificateProvider 
          * parameters used by {@link io.netty.pkitesting.CertificateBuilder}. Defaults to {@code rsa4096}.
          * @param algorithm the certificate generation algorithm
          */
-        public void setAlgorithm(@NonNull CertificateBuilder.Algorithm algorithm) {
+        public void setAlgorithm(CertificateBuilder.@NonNull Algorithm algorithm) {
             this.algorithm = algorithm;
         }
 

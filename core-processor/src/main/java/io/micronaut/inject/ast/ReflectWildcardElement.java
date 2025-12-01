@@ -16,7 +16,7 @@
 package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 
 import java.lang.reflect.WildcardType;
 import java.util.Arrays;
