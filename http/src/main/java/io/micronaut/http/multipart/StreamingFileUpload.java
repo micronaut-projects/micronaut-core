@@ -40,7 +40,8 @@ import java.util.concurrent.Executor;
  * this class is never backed by a file. It exerts backpressure on the HTTP connection: If you read
  * slowly or not at all, the upload will slow down on the client.
  * <p>
- * Must be closed after use.
+ * This object is closed when the request terminates. If you wish to use the data for longer, you
+ * need to call one of the consumption methods before that happens.
  *
  * @author Graeme Rocher
  * @since 1.0

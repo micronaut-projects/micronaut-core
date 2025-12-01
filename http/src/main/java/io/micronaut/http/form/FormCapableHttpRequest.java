@@ -16,12 +16,13 @@
 package io.micronaut.http.form;
 
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.http.LifecycleHttpRequest;
 import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.multipart.RawFormField;
 import org.reactivestreams.Publisher;
 
 // TODO: docs
-public interface FormCapableHttpRequest<B> extends ServerHttpRequest<B> {
+public interface FormCapableHttpRequest<B> extends ServerHttpRequest<B>, LifecycleHttpRequest<B> {
     @NonNull
     Publisher<RawFormField> getRawFormFields() throws IllegalStateException;
 

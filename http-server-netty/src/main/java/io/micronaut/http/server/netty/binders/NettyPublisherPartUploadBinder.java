@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty.binders;
 
 import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
@@ -29,6 +30,7 @@ import io.micronaut.http.multipart.PartData;
 import io.micronaut.http.multipart.StreamingFileUpload;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.server.multipart.FormFactory;
+import io.micronaut.http.server.multipart.FormRouteCompleter;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
@@ -45,7 +47,6 @@ import java.util.Optional;
 final class NettyPublisherPartUploadBinder implements TypedRequestArgumentBinder<Publisher<?>>, NettyRequestArgumentBinder<Publisher<?>> {
 
     private static final Argument<Publisher<?>> PUBLISHER_ARGUMENT = (Argument) Argument.of(Publisher.class);
-    private static final Argument<PartData> PART_DATA_ARGUMENT = Argument.of(PartData.class);
 
     private final ConversionService conversionService;
     private final BeanProvider<FormFactory> formFactory;
@@ -71,35 +72,37 @@ final class NettyPublisherPartUploadBinder implements TypedRequestArgumentBinder
         Flux<?> publisher;
         if (contentTypeClass == StreamingFileUpload.class) {
             // Publisher<StreamingFileUpload>
-            publisher = Flux.from(formFactory.get().getOrCreateCompleter(request).subscribeField(inputName))
+            publisher = Flux.from(formFactory.get().getOrCreateCompleter(request).subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.ASYNC, argument)))
                 .map(f -> formFactory.get().streamFileUpload(f))
                 .doOnDiscard(StreamingFileUpload.class, StreamingFileUpload::close);
         } else if (contentTypeClass == Publisher.class) {
             // Publisher<Publisher<…>>
             Argument<?> nestedType = contentArgument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
-            publisher = Flux.from(formFactory.get().getOrCreateCompleter(request).subscribeField(inputName))
+            publisher = Flux.from(formFactory.get().getOrCreateCompleter(request).subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.ASYNC, argument)))
                 .mapNotNull(f -> conversionService.convert(f.byteBody(), nestedType).orElse(null));
         } else if (contentTypeClass == CompletedPart.class) {
             // Publisher<CompletedPart>
-            publisher = Flux.from(formFactory.get().getOrCreateCompleter(request).subscribeField(inputName))
-                .flatMap(f -> ReactiveExecutionFlow.toPublisher(formFactory.get().completePart(request, f)));
+            // these objects consume little memory, and accept writing to disk anyway, so we
+            // subscribe eagerly here to avoid backpressure.
+            publisher = Publishers.bufferNow(Flux.from(formFactory.get().getOrCreateCompleter(request).subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.ASYNC_NO_BACKPRESSURE, argument)))
+                .flatMap(f -> ReactiveExecutionFlow.toPublisher(formFactory.get().completePart(request, f))));
         } else if (contentTypeClass == CompletedAttribute.class) {
             // Publisher<CompletedAttribute>
-            publisher = Flux.from(formFactory.get().getOrCreateCompleter(request).subscribeField(inputName))
-                .flatMap(f -> ReactiveExecutionFlow.toPublisher(FormFactory.completeAttribute(f)));
+            publisher = Publishers.bufferNow(Flux.from(formFactory.get().getOrCreateCompleter(request).subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.ASYNC_NO_BACKPRESSURE, argument)))
+                .flatMap(f -> ReactiveExecutionFlow.toPublisher(formFactory.get().completeAttribute(request, f))));
         } else if (contentTypeClass == CompletedFileUpload.class) {
-            // Publisher<CompletedAttribute>
-            publisher = Flux.from(formFactory.get().getOrCreateCompleter(request).subscribeField(inputName))
+            // Publisher<CompletedFileUpload>
+            publisher = Publishers.bufferNow(Flux.from(formFactory.get().getOrCreateCompleter(request).subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.ASYNC_NO_BACKPRESSURE, argument)))
                 .flatMap(f -> {
                     if (f.metadata().fileName() == null) {
                         f.close();
                         return Flux.error(new IllegalStateException("Field was not a file upload (no filename parameter)"));
                     }
                     return ReactiveExecutionFlow.toPublisher(formFactory.get().completePart(request, f));
-                });
+                }));
         } else {
             // any other: create Publisher<PartData> and then convert
-            publisher = Flux.from(formFactory.get().getOrCreateCompleter(request).subscribeField(inputName))
+            publisher = Flux.from(formFactory.get().getOrCreateCompleter(request).subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.ASYNC, argument)))
                 .concatMap(raw -> Flux.from(raw.byteBody().toReadBufferPublisher())
                     .map(rb -> new PartData(raw.metadata(), rb)))
                 .doOnDiscard(PartData.class, PartData::close)

@@ -449,7 +449,11 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
 
         @Override
         ExecutionFlow<E> apply(ExecutionFlow<E> input) {
-            input.cancel(discard);
+            if (discard == null) {
+                input.cancel();
+            } else {
+                input.cancel(discard);
+            }
             return ERR;
         }
     }

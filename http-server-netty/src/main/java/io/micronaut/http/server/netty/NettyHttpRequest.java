@@ -79,7 +79,6 @@ import io.netty.handler.codec.http.DefaultLastHttpContent;
 import io.netty.handler.codec.http.EmptyHttpHeaders;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpHeaderNames;
-import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.handler.codec.http.cookie.ClientCookieEncoder;
 import io.netty.handler.codec.http2.DefaultHttp2PushPromiseFrame;
@@ -104,8 +103,10 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.Charset;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -180,6 +181,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     private NettyCookies nettyCookies;
     private final CloseableByteBody body;
     private Object legacyBody;
+    private List<Runnable> disposalResources;
 
     private final BodyConvertor bodyConvertor = newBodyConvertor();
 
@@ -375,6 +377,11 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         body.close();
         if (attributes != null) {
             attributes.forEach(NettyHttpRequest::cleanup);
+        }
+        if (disposalResources != null) {
+            for (Runnable r : disposalResources) {
+                r.run();
+            }
         }
     }
 
@@ -713,11 +720,25 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         if (ct.matches(MediaType.APPLICATION_FORM_URLENCODED_TYPE)) {
             return FormTypeUrlEncoded.INSTANCE;
         } else if (ct.matches(MediaType.MULTIPART_FORM_DATA_TYPE)) {
-            Optional<String> boundary = ct.getParameters().get(HttpHeaderValues.BOUNDARY);
-            return boundary.map(FormTypeMultipart::new).orElse(null);
+            Optional<String> boundary = ct.getParameters().get("boundary");
+            return boundary.map(b -> {
+                // remove quotes
+                if (b.length() >= 2 && b.charAt(0) == '"' && b.charAt(b.length() - 1) == '"') {
+                    b = b.substring(1, b.length() - 1);
+                }
+                return new FormTypeMultipart(b);
+            }).orElse(null);
         } else {
             return null;
         }
+    }
+
+    @Override
+    public synchronized void addDisposalResource(@NonNull Runnable dispose) {
+        if (disposalResources == null) {
+            disposalResources = new ArrayList<>(1);
+        }
+        disposalResources.add(dispose);
     }
 
     private sealed interface FormType {

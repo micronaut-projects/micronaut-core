@@ -17,7 +17,11 @@ package io.micronaut.http.server.multipart;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.bind.exceptions.UnsatisfiedArgumentException;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.core.type.Argument;
+import io.micronaut.http.body.AvailableByteBody;
 import io.micronaut.http.body.CloseableAvailableByteBody;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.InternalByteBody;
@@ -60,17 +64,20 @@ public final class FormRouteCompleter {
     private Map<String, Object> stringsForGetBody;
     private Throwable exceptionForGetBody;
 
+    private volatile boolean deadlockDetection = true;
+
     FormRouteCompleter(FormCapableHttpRequest<?> request) {
         this.request = request;
     }
 
-    public Publisher<RawFormField> subscribeField(String name) {
+    public Publisher<RawFormField> subscribeField(String name, SubscriptionMetadata metadata) {
         if (started) {
             throw new IllegalStateException("FormRouteCompleter already started");
         }
-        Unicast unicast = new Unicast();
-        if (fieldUnicasts.putIfAbsent(name, unicast) != null) {
-            throw new IllegalStateException("Field already claimed: " + name);
+        Unicast unicast = new Unicast(metadata);
+        Unicast existing = fieldUnicasts.putIfAbsent(name, unicast);
+        if (existing != null) {
+            throw new IllegalStateException("Field '" + name + "' is claimed by multiple parameters:\n  [" + existing.metadata.argument + "]\n  [" + metadata.argument + "]");
         }
         downstreamCount++;
         return unicast;
@@ -89,6 +96,10 @@ public final class FormRouteCompleter {
         }
         started = true;
         request.getRawFormFields().subscribe(new SubscriberImpl());
+    }
+
+    public void stopDeadlockDetection() {
+        deadlockDetection = false;
     }
 
     public Map<String, Object> mapForGetBody(Charset charset) {
@@ -212,20 +223,66 @@ public final class FormRouteCompleter {
     }
 
     private final class Unicast implements Publisher<RawFormField>, Subscription {
+        final SubscriptionMetadata metadata;
+
         private Subscriber<? super RawFormField> subscriber;
         private volatile RawFormField queued = null;
         private final AtomicLong demand = new AtomicLong(0);
-        private final AtomicReference<State> state = new AtomicReference<>();
+        private final AtomicReference<State> state = new AtomicReference<>(State.CLEAN);
         private boolean endForwarded;
         private volatile boolean cancelled;
+        private Throwable ownError;
+
+        Unicast(SubscriptionMetadata metadata) {
+            this.metadata = metadata;
+        }
 
         @Override
         public void subscribe(Subscriber<? super RawFormField> s) {
             if (subscriber != null) {
                 throw new IllegalStateException("Only one subscriber allowed");
             }
-            this.subscriber = s;
+            // onSubscribe first to make sure that no other onX method is called before we're done
             s.onSubscribe(this);
+            this.subscriber = s;
+            markDirty();
+        }
+
+        @Nullable
+        private Exception predictDeadlock(RawFormField field) {
+            if (!deadlockDetection) {
+                return null;
+            }
+
+            if (metadata.mode == SubscriptionMode.WAITS_FOR_FULL || metadata.mode == SubscriptionMode.ASYNC_NO_BACKPRESSURE) {
+                // the subscriber can consume data before the route executes, so we're fine.
+                return null;
+            } else if (metadata.mode == SubscriptionMode.WAITS_FOR_START && field.byteBody() instanceof AvailableByteBody) {
+                // the subscriber will consume the available data, and we can move on to the next field immediately.
+                return null;
+            }
+
+            // the subscriber won't read the input data until the route executes. let's check if
+            // any other subscriber is preventing that.
+
+            List<SubscriptionMetadata> blocked = null;
+            for (Unicast unicast : fieldUnicasts.values()) {
+                if (unicast.cancelled ||
+                    unicast.metadata.mode == SubscriptionMode.ASYNC ||
+                    unicast.metadata.mode == SubscriptionMode.ASYNC_NO_BACKPRESSURE ||
+                    unicast == this) {
+                    continue;
+                }
+                if (blocked == null) {
+                    blocked = new ArrayList<>();
+                }
+                blocked.add(unicast.metadata);
+            }
+            if (blocked == null) {
+                return null;
+            } else {
+                return new FormBindingDeadlockException(metadata, blocked);
+            }
         }
 
         void emit(RawFormField field) {
@@ -277,21 +334,43 @@ public final class FormRouteCompleter {
         }
 
         private void work() {
-            while (queued != null && demand.get() > 0) {
-                demand.decrementAndGet();
+            Subscriber<? super RawFormField> s = subscriber;
+            while (queued != null) {
+                Exception deadlock = predictDeadlock(queued);
+                if (deadlock != null) {
+                    // we detected a deadlock. cancel this subscription and forward the error
+                    cancelled = true;
+                    ownError = deadlock;
+                    demand.set(Long.MAX_VALUE);
+                    // fall through to cancelled branch to consume the item
+                }
+                if (demand.get() <= 0) {
+                    break;
+                }
                 if (cancelled) {
                     queued.close();
-                } else {
-                    subscriber.onNext(queued);
+                    queued = null;
+                    upstream.request(1);
+                    break;
                 }
+                if (s == null) {
+                    // we're still in onSubscribe, wait
+                    break;
+                }
+
+                demand.decrementAndGet();
+                s.onNext(queued);
+                queued = null;
                 upstream.request(1);
             }
-            if (!endForwarded && queued == null && (globalComplete || globalError != null)) {
+            if (!endForwarded && queued == null && (globalComplete || globalError != null || ownError != null) && s != null) {
                 endForwarded = true;
                 if (globalError != null) {
-                    subscriber.onError(globalError);
+                    s.onError(globalError);
+                } else if (ownError != null) {
+                    s.onError(ownError);
                 } else {
-                    subscriber.onComplete();
+                    s.onComplete();
                 }
             }
         }
@@ -312,6 +391,51 @@ public final class FormRouteCompleter {
             CLEAN,
             WORKING_CLEAN,
             WORKING_DIRTY,
+        }
+    }
+
+    public record SubscriptionMetadata(
+        SubscriptionMode mode,
+        Argument<?> argument
+    ) {
+    }
+
+    public enum SubscriptionMode {
+        /**
+         * Before the route can execute, these form fields must have been fully received, including
+         * all their data. Note that if the caller cancels their subscription at some point, that
+         * means it doesn't stand in the way of executing the route anymore.
+         */
+        WAITS_FOR_FULL,
+        /**
+         * Before the route can execute, the headers of the first form field of this name must be
+         * received, but the field body will not be consumed until the route actually executes.
+         */
+        WAITS_FOR_START,
+        /**
+         * This parameter does not need to be waited for the route to execute, but at the same
+         * time, the parameter will not be consumed until the route does execute.
+         */
+        ASYNC,
+        /**
+         * This parameter does not need to be waited for the route to execute, and it applies no
+         * backpressure, meaning it won't block other fields.
+         */
+        ASYNC_NO_BACKPRESSURE,
+    }
+
+    public static final class FormBindingDeadlockException extends UnsatisfiedArgumentException {
+        public FormBindingDeadlockException(SubscriptionMetadata blockingMetadata, List<SubscriptionMetadata> blockedMetadata) {
+            super(blockingMetadata.argument, makeMessage(blockedMetadata));
+        }
+
+        private static String makeMessage(List<SubscriptionMetadata> blockedMetadata) {
+            StringBuilder sb = new StringBuilder();
+            sb.append("This argument won't consume posted data until you subscribe to it in the controller. This prevents the following arguments from being bound:");
+            for (SubscriptionMetadata blocked : blockedMetadata) {
+                sb.append("\n  [").append(blocked.argument).append("] has not yet been received.");
+            }
+            return sb.toString();
         }
     }
 }

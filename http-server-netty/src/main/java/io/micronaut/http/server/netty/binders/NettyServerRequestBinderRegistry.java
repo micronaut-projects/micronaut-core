@@ -29,13 +29,10 @@ import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.multipart.MultipartBodyArgumentBinder;
-import io.micronaut.scheduling.TaskExecutors;
-import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.ExecutorService;
 
 /**
  * A Netty request binder registry.
@@ -53,8 +50,6 @@ public final class NettyServerRequestBinderRegistry implements RequestBinderRegi
     public NettyServerRequestBinderRegistry(ConversionService conversionService,
                                             List<RequestArgumentBinder> binders,
                                             BeanProvider<NettyHttpServerConfiguration> httpServerConfiguration,
-                                            @Named(TaskExecutors.BLOCKING)
-                                            BeanProvider<ExecutorService> executorService,
                                             MessageBodyHandlerRegistry bodyHandlerRegistry,
                                             BeanProvider<FormFactory> formFactory) {
 

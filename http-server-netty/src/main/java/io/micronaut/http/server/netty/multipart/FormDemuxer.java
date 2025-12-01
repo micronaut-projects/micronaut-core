@@ -49,9 +49,13 @@ import reactor.core.publisher.Sinks;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
- * This class parses a {@link ByteBody} into a sequence of form {@link Field}s.
+ * This class parses a {@link ByteBody} into a sequence of {@link RawFormField}s.
+ *
+ * @since 5.0.0
+ * @author Jonas Konrad
  */
 @Internal
 public final class FormDemuxer implements BufferConsumer {
@@ -94,7 +98,7 @@ public final class FormDemuxer implements BufferConsumer {
     public Flux<RawFormField> fields() {
         return sink.asFlux()
             .doOnCancel(this::cancel)
-            .doOnDiscard(Field.class, f -> f.body.close());
+            .doOnDiscard(RawFormField.class, RawFormField::close);
     }
 
     private void cancel() {
@@ -172,10 +176,10 @@ public final class FormDemuxer implements BufferConsumer {
         }
     }
 
-    private void emit(FieldMetadata metadata, ByteBody content) {
+    private void emit(FormFieldMetadata metadata, ByteBody content) {
         assert eventLoop.inEventLoop();
         CloseableByteBody moved = content.move();
-        Sinks.EmitResult result = sink.tryEmitNext(new RawFormField(new FormFieldMetadata(metadata.name, metadata.filename, metadata.mediaType), moved));
+        Sinks.EmitResult result = sink.tryEmitNext(new RawFormField(metadata, moved));
         if (result.isFailure()) {
             moved.close();
         }
@@ -242,34 +246,12 @@ public final class FormDemuxer implements BufferConsumer {
             }
             state = null;
             decoder.close();
+            sink.tryEmitComplete();
         }
     }
 
     private static @NonNull RuntimeException unexpectedEvent(PostBodyDecoder.Event event) {
         return new IllegalStateException("Unexpected event " + event);
-    }
-
-    public record Field( // TODO: replace
-        FieldMetadata metadata,
-        CloseableByteBody body
-    ) {
-    }
-
-    public record FieldMetadata( // TODO: replace
-        @Nullable String name,
-        @Nullable String filename,
-        @Nullable Long length,
-        @Nullable MediaType mediaType
-    ) {
-        FieldMetadata inheritFromMixed(FieldMetadata mixedMetadata) {
-            // we inherit the name and media type, but not the filename or length.
-            return new FieldMetadata(
-                this.name == null ? mixedMetadata.name : this.name,
-                this.filename,
-                this.length,
-                this.mediaType == null ? mixedMetadata.mediaType : this.mediaType
-            );
-        }
     }
 
     private abstract static sealed class State {
@@ -306,17 +288,13 @@ public final class FormDemuxer implements BufferConsumer {
             this.mixedHeaders = mixedHeaders;
         }
 
-        FieldMetadata computeMetadata() {
-            FieldMetadata computed = new FieldMetadata(
-                disposition == null ? null : disposition.name(),
+        FormFieldMetadata computeMetadata() {
+            FormFieldMetadata fromMixed = mixedHeaders == null ? FormFieldMetadata.EMPTY : mixedHeaders.computeMetadata();
+            return new FormFieldMetadata(
+                Optional.ofNullable(disposition).map(ContentDisposition::name).orElse(fromMixed.name()),
                 disposition == null ? null : disposition.fileName(),
-                contentLength,
-                mediaType
+                Optional.ofNullable(mediaType).orElse(fromMixed.mediaType())
             );
-            if (mixedHeaders != null) {
-                computed = computed.inheritFromMixed(mixedHeaders.computeMetadata());
-            }
-            return computed;
         }
 
         @Override
@@ -371,7 +349,7 @@ public final class FormDemuxer implements BufferConsumer {
                     }
                     combined = composite;
                 }
-                FieldMetadata metadata = headers.computeMetadata();
+                FormFieldMetadata metadata = headers.computeMetadata();
                 try (CloseableByteBody body = byteBodyFactory.createChecked(fieldLimits, combined)) {
                     emit(metadata, body);
                 }
@@ -413,13 +391,13 @@ public final class FormDemuxer implements BufferConsumer {
             this.mixedHeaders = headers.mixedHeaders;
 
             // do this early in case there's an error
-            FieldMetadata metadata = headers.computeMetadata();
+            FormFieldMetadata metadata = headers.computeMetadata();
 
             ByteBodyFactory.StreamingBody streamingBody = byteBodyFactory.createStreamingBody(fieldLimits, this);
             try (BaseStreamingByteBody<?> rb = streamingBody.rootBody()) {
                 this.baseSharedBuffer = streamingBody.sharedBuffer();
-                if (metadata.length != null) {
-                    baseSharedBuffer.setExpectedLength(metadata.length);
+                if (headers.contentLength != null) {
+                    baseSharedBuffer.setExpectedLength(headers.contentLength);
                 }
                 emit(metadata, rb);
             }

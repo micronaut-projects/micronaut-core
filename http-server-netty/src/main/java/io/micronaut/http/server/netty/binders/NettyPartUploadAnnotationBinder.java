@@ -33,7 +33,6 @@ import io.micronaut.http.form.FormCapableHttpRequest;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.http.server.multipart.FormRouteCompleter;
-import io.micronaut.http.server.netty.NettyHttpRequest;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
@@ -66,7 +65,7 @@ final class NettyPartUploadAnnotationBinder<T> implements AnnotatedRequestArgume
 
     @Override
     public BindingResult<T> bind(ArgumentConversionContext<T> context, HttpRequest<?> request) {
-        if (!(request instanceof NettyHttpRequest<?> nettyRequest) || !nettyRequest.hasFormBody()) {
+        if (!(request instanceof FormCapableHttpRequest<?> nettyRequest) || !nettyRequest.hasFormBody()) {
             return BindingResult.unsatisfied();
         }
         if (completedFileUploadBinder.matches(context.getArgument().getType())) {
@@ -88,7 +87,7 @@ final class NettyPartUploadAnnotationBinder<T> implements AnnotatedRequestArgume
         if (skipClaimed && completer.isClaimed(inputName)) {
             return BindingResult.unsatisfied();
         }
-        CompletableFuture<Optional<T>> completableFuture = Mono.from(completer.subscribeField(inputName))
+        CompletableFuture<Optional<T>> completableFuture = Mono.from(completer.subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.WAITS_FOR_FULL, context.getArgument())))
             .flatMap(rff -> Mono.from(ReactiveExecutionFlow.toPublisher(formFactory.completePart(nettyRequest, rff))))
             .map(d -> conversionService.convert(d, context))
             .toFuture();

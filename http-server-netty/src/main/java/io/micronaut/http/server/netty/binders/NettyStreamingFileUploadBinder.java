@@ -26,6 +26,7 @@ import io.micronaut.http.bind.binders.PendingRequestBindingResult;
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
 import io.micronaut.http.multipart.StreamingFileUpload;
 import io.micronaut.http.server.multipart.FormFactory;
+import io.micronaut.http.server.multipart.FormRouteCompleter;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import reactor.core.publisher.Mono;
 
@@ -57,7 +58,7 @@ final class NettyStreamingFileUploadBinder implements TypedRequestArgumentBinder
         String inputName = argument.getAnnotationMetadata().stringValue(Bindable.NAME).orElse(argument.getName());
 
         CompletableFuture<? extends StreamingFileUpload> completableFuture =
-            Mono.from(formFactory.get().getOrCreateCompleter(request).subscribeField(inputName))
+            Mono.from(formFactory.get().getOrCreateCompleter(request).subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.WAITS_FOR_START, argument)))
                 .map(raw -> formFactory.get().streamFileUpload(raw))
                 .toFuture();
         BasicHttpAttributes.addRouteWaitsFor(request, CompletableFutureExecutionFlow.just(completableFuture));

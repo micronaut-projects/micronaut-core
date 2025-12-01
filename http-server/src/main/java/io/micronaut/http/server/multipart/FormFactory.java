@@ -20,12 +20,10 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
-import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.io.buffer.ReadBufferFactory;
+import io.micronaut.core.io.file.TemporaryFileResource;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.ServerHttpRequest;
-import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.form.FormCapableHttpRequest;
 import io.micronaut.http.multipart.CompletedAttribute;
@@ -56,6 +54,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicReference;
 
 // TODO: docs
 @Internal
@@ -92,17 +91,21 @@ public final class FormFactory {
         return completer;
     }
 
-    public ExecutionFlow<? extends CompletedPart> completePart(@Nullable HttpRequest<?> request, @NonNull RawFormField formField) {
+    public ExecutionFlow<? extends CompletedPart> completePart(@NonNull FormCapableHttpRequest<?> request, @NonNull RawFormField formField) {
         if (formField.metadata().fileName() == null) {
-            return completeAttribute(formField);
+            return completeAttribute(request, formField);
         } else {
             return completeFileUpload(request, formField);
         }
     }
 
     @NonNull
-    public static ExecutionFlow<CompletedAttribute> completeAttribute(@NonNull RawFormField formField) {
-        return InternalByteBody.bufferFlow(formField.byteBody()).map(av -> CompletedAttribute.create(formField.metadata(), av.toReadBuffer()));
+    public ExecutionFlow<CompletedAttribute> completeAttribute(@NonNull FormCapableHttpRequest<?> request, @NonNull RawFormField formField) {
+        return InternalByteBody.bufferFlow(formField.byteBody()).map(av -> {
+            CompletedAttribute attr = CompletedAttribute.create(formField.metadata(), av.toReadBuffer());
+            request.addDisposalResource(attr::close);
+            return attr;
+        });
     }
 
     /**
@@ -114,9 +117,10 @@ public final class FormFactory {
      * @return The flow with the uploaded file
      */
     @NonNull
-    public ExecutionFlow<CompletedFileUpload> completeFileUpload(@Nullable HttpRequest<?> request, @NonNull RawFormField formField) {
-        ToDiskSubscriber tds = new ToDiskSubscriber(formField.metadata(), bodyFactory(request).readBufferFactory());
+    public ExecutionFlow<CompletedFileUpload> completeFileUpload(@NonNull FormCapableHttpRequest<?> request, @NonNull RawFormField formField) {
+        ToDiskSubscriber tds = new ToDiskSubscriber(formField.metadata(), request.byteBodyFactory().readBufferFactory());
         Flux.from(formField.byteBody().toReadBufferPublisher()).subscribe(tds);
+        request.addDisposalResource(tds::cleanup);
         return tds.result;
     }
 
@@ -135,14 +139,6 @@ public final class FormFactory {
         });
     }
 
-    static ByteBodyFactory bodyFactory(@Nullable HttpRequest<?> request) {
-        if (request instanceof ServerHttpRequest<?> shr) {
-            return shr.byteBodyFactory();
-        } else {
-            return ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE);
-        }
-    }
-
     private PathAndStream moveToDisk(List<ReadBuffer> memory) {
         Path tmp = null;
         OutputStream out = null;
@@ -157,7 +153,7 @@ public final class FormFactory {
             for (ReadBuffer rb : memory) {
                 rb.transferTo(out);
             }
-            return new PathAndStream(tmp, out);
+            return new PathAndStream(new TemporaryFileResource(tmp), out);
         } catch (IOException e) {
             closeSafe(e, memory, out, tmp);
             throw new CompletionException(e);
@@ -193,6 +189,8 @@ public final class FormFactory {
      * This subscriber collects form data and saves it to disk when necessary.
      */
     private final class ToDiskSubscriber implements Subscriber<ReadBuffer> {
+        private static final Object CLOSED_SENTINEL = new Object();
+
         private final FormFieldMetadata metadata;
         private final ReadBufferFactory bufferFactory;
 
@@ -205,6 +203,19 @@ public final class FormFactory {
         private CompletableFuture<PathAndStream> file;
         private CompletableFuture<PathAndStream> latestPieceWritten;
 
+        /**
+         * Contains the current high-level resource that we will close at the end of the request
+         * lifecycle.
+         *
+         * <ol>
+         *     <li>Starts with {@code null} while we're still in memory.</li>
+         *     <li>When we move to disk, this changes to a {@link TemporaryFileResource}.</li>
+         *     <li>When we're done uploading, this becomes the {@link CompletedFileUpload}.</li>
+         *     <li>When the request lifecyle ends, this becomes {@link #CLOSED_SENTINEL}.</li>
+         * </ol>
+         */
+        private final AtomicReference<Object> closeResource = new AtomicReference<>();
+
         ToDiskSubscriber(FormFieldMetadata metadata, ReadBufferFactory bufferFactory) {
             this.metadata = metadata;
             this.bufferFactory = bufferFactory;
@@ -214,6 +225,18 @@ public final class FormFactory {
         public void onSubscribe(Subscription s) {
             this.subscription = s;
             s.request(1);
+        }
+
+        private RuntimeException concurrentClose(@Nullable Closeable cl) {
+            RuntimeException e = new IllegalStateException("Request terminated with upload in progress");
+            if (cl != null) {
+                try {
+                    cl.close();
+                } catch (IOException ex) {
+                    e.addSuppressed(ex);
+                }
+            }
+            return e;
         }
 
         @Override
@@ -232,7 +255,13 @@ public final class FormFactory {
                     List<ReadBuffer> memory = this.memory;
                     this.memory = null;
                     // transfer asynchronously
-                    file = CompletableFuture.supplyAsync(() -> moveToDisk(memory), diskWriteExecutor);
+                    file = CompletableFuture.supplyAsync(() -> {
+                        PathAndStream ps = moveToDisk(memory);
+                        if (!closeResource.compareAndSet(null, ps.path)) {
+                            throw concurrentClose(ps);
+                        }
+                        return ps;
+                    }, diskWriteExecutor);
                     latestPieceWritten = file;
                 } else {
                     // no transfer, just save to memory
@@ -315,7 +344,12 @@ public final class FormFactory {
             assert (file == null) == (latestPieceWritten == null);
             if (latestPieceWritten == null) {
                 // all in-memory
-                result.complete(CompletedFileUpload.ofMemory(metadata, bufferFactory.compose(memory)));
+                CompletedFileUpload cfu = CompletedFileUpload.ofMemory(metadata, bufferFactory.compose(memory));
+                if (closeResource.compareAndSet(null, cfu)) {
+                    result.complete(cfu);
+                } else {
+                    result.completeExceptionally(concurrentClose(null));
+                }
             } else {
                 // wait for last piece to be written
                 latestPieceWritten.whenCompleteAsync((ps, t) -> {
@@ -330,7 +364,7 @@ public final class FormFactory {
                     } catch (IOException e) {
                         // failed to close, also delete the file
                         try {
-                            Files.deleteIfExists(ps.path);
+                            ps.path.close();
                         } catch (IOException ex) {
                             e.addSuppressed(ex);
                         }
@@ -339,7 +373,9 @@ public final class FormFactory {
                     }
                     // done!
                     CompletedFileUpload cfu = CompletedFileUpload.ofFile(metadata, ps.path, total);
-                    if (!result.tryComplete(cfu)) {
+                    if (!closeResource.compareAndSet(ps.path, cfu)) {
+                        result.tryCompleteExceptionally(concurrentClose(cfu));
+                    } else if (!result.tryComplete(cfu)) {
                         try {
                             cfu.close();
                         } catch (IOException e) {
@@ -349,22 +385,42 @@ public final class FormFactory {
                 }, diskWriteExecutor);
             }
         }
+
+        void cleanup() {
+            Object pr = closeResource.getAndSet(CLOSED_SENTINEL);
+            if (pr != null && pr != CLOSED_SENTINEL) {
+                if (pr instanceof CompletedPart cp) {
+                    cp.closeAsync(diskWriteExecutor);
+                } else {
+                    TemporaryFileResource resource = (TemporaryFileResource) pr;
+                    if (resource.isOpen()) {
+                        diskWriteExecutor.execute(() -> {
+                            try {
+                                resource.close();
+                            } catch (IOException e) {
+                                LOG.debug("Failed to close uploaded temporary file at end of request", e);
+                            }
+                        });
+                    }
+                }
+            }
+        }
     }
 
-    private record PathAndStream(Path path, OutputStream out) implements Closeable {
+    private record PathAndStream(TemporaryFileResource path, OutputStream out) implements Closeable {
         @Override
         public void close() throws IOException {
             try {
                 out.close();
             } catch (IOException e) {
                 try {
-                    Files.deleteIfExists(path);
+                    path.close();
                 } catch (IOException ex) {
                     e.addSuppressed(ex);
                 }
                 throw e;
             }
-            Files.deleteIfExists(path);
+            path.close();
         }
     }
 }

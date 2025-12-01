@@ -418,7 +418,9 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      */
     public void error(Throwable e) {
         if (error != null) {
-            error.addSuppressed(e);
+            if (error != e) {
+                error.addSuppressed(e);
+            }
             return;
         }
 

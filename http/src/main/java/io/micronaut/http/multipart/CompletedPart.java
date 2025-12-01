@@ -23,6 +23,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Objects;
+import java.util.concurrent.Executor;
 
 /**
  * Represents a completed part of a multipart request.
@@ -68,6 +69,14 @@ public abstract sealed class CompletedPart implements Closeable permits Complete
             tracker.close(this);
         }
     }
+
+    /**
+     * {@link #close()} may be a blocking operation. This method closes this part asynchronously
+     * instead, on the given executor, if a blocking operation needs to be performed.
+     *
+     * @param ioExecutor The executor
+     */
+    public abstract void closeAsync(@NonNull Executor ioExecutor);
 
     /**
      * Get the definite size in bytes of the form field value.

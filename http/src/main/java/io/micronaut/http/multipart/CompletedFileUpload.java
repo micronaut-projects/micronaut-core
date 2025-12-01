@@ -19,7 +19,10 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.io.buffer.ReadBufferFactory;
+import io.micronaut.core.io.file.TemporaryFileResource;
 import io.micronaut.http.MediaType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.scheduler.Schedulers;
 
 import java.io.IOException;
@@ -29,6 +32,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.Executor;
 
 /**
  * Represents a completed part of a multipart request. May be backed by a file or memory depending
@@ -38,12 +42,15 @@ import java.util.Optional;
  * is not executed until the part has been fully received. Provides access to metadata about the file as
  * well as the contents.
  * <p>
- * Instances of this class <i>must</i> be closed after you're done using them.
+ * This object is closed when the request terminates. If you wish to use the data for longer, you
+ * need to call one of the consumption methods before that happens.
  *
  * @author Zachary Klein
  * @since 1.0.0
  */
 public abstract sealed class CompletedFileUpload extends CompletedPart {
+    private static final Logger LOG = LoggerFactory.getLogger(CompletedFileUpload.class);
+
     CompletedFileUpload(@NonNull FormFieldMetadata metadata) {
         super(metadata);
     }
@@ -72,7 +79,7 @@ public abstract sealed class CompletedFileUpload extends CompletedPart {
      */
     @NonNull
     @Experimental
-    public static CompletedFileUpload ofFile(@NonNull FormFieldMetadata metadata, @NonNull Path path, long size) {
+    public static CompletedFileUpload ofFile(@NonNull FormFieldMetadata metadata, @NonNull TemporaryFileResource path, long size) {
         return new File(metadata, path, size);
     }
 
@@ -122,6 +129,11 @@ public abstract sealed class CompletedFileUpload extends CompletedPart {
         }
 
         @Override
+        public void closeAsync(@NonNull Executor ioExecutor) {
+            close();
+        }
+
+        @Override
         public long getSize() {
             return buffer.readable();
         }
@@ -146,17 +158,13 @@ public abstract sealed class CompletedFileUpload extends CompletedPart {
     }
 
     static final class File extends CompletedFileUpload {
-        private Path path;
+        private final TemporaryFileResource path;
         private final long actualSize;
 
-        File(@NonNull FormFieldMetadata metadata, @NonNull Path path, long actualSize) {
+        File(@NonNull FormFieldMetadata metadata, @NonNull TemporaryFileResource path, long actualSize) {
             super(metadata);
             this.path = path;
             this.actualSize = actualSize;
-        }
-
-        @NonNull Path getPath() {
-            return path;
         }
 
         @Override
@@ -164,10 +172,22 @@ public abstract sealed class CompletedFileUpload extends CompletedPart {
             if (Schedulers.isInNonBlockingThread()) {
                 throw new IllegalStateException("CompletedFileUpload.close called in non-blocking thread. This is a blocking operation (it deletes the file). You may want to annotate your controller with @ExecuteOn(TaskExecutors.BLOCKING).");
             }
-            if (path != null) {
+            closeTracker();
+            path.close();
+        }
+
+        @Override
+        public void closeAsync(@NonNull Executor ioExecutor) {
+            TemporaryFileResource p = path;
+            if (p.isOpen()) {
                 closeTracker();
-                Files.delete(path);
-                path = null;
+                ioExecutor.execute(() -> {
+                    try {
+                        p.close();
+                    } catch (IOException e) {
+                        LOG.debug("Failed to close file upload");
+                    }
+                });
             }
         }
 
@@ -181,7 +201,7 @@ public abstract sealed class CompletedFileUpload extends CompletedPart {
             if (Schedulers.isInNonBlockingThread()) {
                 throw new IllegalStateException("CompletedFileUpload.getInputStream called in non-blocking thread. This is a blocking operation. You may want to annotate your controller with @ExecuteOn(TaskExecutors.BLOCKING).");
             }
-            return Files.newInputStream(path);
+            return Files.newInputStream(path.getPath());
         }
 
         @Override
@@ -197,9 +217,8 @@ public abstract sealed class CompletedFileUpload extends CompletedPart {
             if (Schedulers.isInNonBlockingThread()) {
                 throw new IllegalStateException("CompletedFileUpload.transferTo called in non-blocking thread. This is a blocking operation. You may want to annotate your controller with @ExecuteOn(TaskExecutors.BLOCKING).");
             }
-            Files.move(path, destination);
             closeTracker();
-            path = null;
+            path.moveFile(destination);
         }
     }
 }

@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.buffer.ReadBuffer;
 
 import java.io.InputStream;
+import java.util.concurrent.Executor;
 
 /**
  * A form field that is not a file upload.
@@ -60,7 +61,13 @@ public final class CompletedAttribute extends CompletedPart {
     }
 
     @Override
+    public void closeAsync(@NonNull Executor ioExecutor) {
+        close();
+    }
+
+    @Override
     public void close() {
         readBuffer.close();
+        closeTracker();
     }
 }

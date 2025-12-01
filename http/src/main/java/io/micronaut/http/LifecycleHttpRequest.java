@@ -13,16 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.multipart;
+package io.micronaut.http;
 
-import io.micronaut.core.annotation.Nullable;
-import io.micronaut.http.MediaType;
+import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.NonNull;
 
-// TODO: docs
-public record FormFieldMetadata(
-    @Nullable String name,
-    @Nullable String fileName,
-    @Nullable MediaType mediaType
-) {
-    public static final FormFieldMetadata EMPTY = new FormFieldMetadata(null, null, null);
+@Experimental
+public interface LifecycleHttpRequest<B> extends HttpRequest<B> {
+    /**
+     * Mark a resource for disposal when the request lifecycle ends. The task must be non-blocking.
+     *
+     * @param dispose The task to run for disposal
+     */
+    void addDisposalResource(@NonNull Runnable dispose);
 }
