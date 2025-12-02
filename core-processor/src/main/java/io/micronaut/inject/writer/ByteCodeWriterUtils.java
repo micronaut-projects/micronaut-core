@@ -22,6 +22,7 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.sourcegen.bytecode.ByteCodeWriter;
 import io.micronaut.sourcegen.model.ObjectDef;
+import io.micronaut.core.reflect.ClassUtils;
 import org.objectweb.asm.ClassWriter;
 
 /**
@@ -48,17 +49,24 @@ public final class ByteCodeWriterUtils {
 
                 @Override
                 protected String getCommonSuperClass(String type1, String type2) {
-                    ClassLoader classLoader = getClassLoader();
-                    Class<?> class1;
-                    try {
-                        class1 = Class.forName(type1.replace('/', '.'), false, classLoader);
-                    } catch (ClassNotFoundException e) {
+                    // Input validation to prevent unsafe class name injection
+                    if (!isValidClassName(type1) || !isValidClassName(type2)) {
                         return getCommonSuperClassUsingVisitorContext(type1, type2);
                     }
-                    Class<?> class2;
-                    try {
-                        class2 = Class.forName(type2.replace('/', '.'), false, classLoader);
-                    } catch (ClassNotFoundException e) {
+                    
+                    ClassLoader classLoader = getClassLoader();
+                    
+                    // Use ClassUtils.forName for safer class loading
+                    String normalizedType1 = type1.replace('/', '.');
+                    String normalizedType2 = type2.replace('/', '.');
+                    
+                    Class<?> class1 = ClassUtils.forName(normalizedType1, classLoader).orElse(null);
+                    if (class1 == null) {
+                        return getCommonSuperClassUsingVisitorContext(type1, type2);
+                    }
+                    
+                    Class<?> class2 = ClassUtils.forName(normalizedType2, classLoader).orElse(null);
+                    if (class2 == null) {
                         return getCommonSuperClassUsingVisitorContext(type1, type2);
                     }
                     if (class1.isAssignableFrom(class2)) {
@@ -102,6 +110,45 @@ public final class ByteCodeWriterUtils {
                 private ClassElement getClassElement(String type) {
                     return visitorContext.getClassElement(type.replace('/', '.'))
                         .orElseThrow(() -> new TypeNotPresentException("Type " + type + " not found", null));
+                }
+                
+                /**
+                 * Validates that the given string represents a valid Java class name.
+                 * This helps prevent class name injection attacks.
+                 * 
+                 * @param className the class name to validate
+                 * @return true if the class name is valid, false otherwise
+                 */
+                private boolean isValidClassName(String className) {
+                    if (className == null || className.isEmpty()) {
+                        return false;
+                    }
+                    
+                    // Normalize the class name (convert ASM format to Java format)
+                    String normalizedName = className.replace('/', '.');
+                    
+                    // Basic validation: should not contain dangerous characters
+                    if (normalizedName.contains(";") || normalizedName.contains("[") || 
+                        normalizedName.contains("<") || normalizedName.contains(">")) {
+                        return false;
+                    }
+                    
+                    // Should not be empty after normalization
+                    if (normalizedName.trim().isEmpty()) {
+                        return false;
+                    }
+                    
+                    // Should not start or end with dots
+                    if (normalizedName.startsWith(".") || normalizedName.endsWith(".")) {
+                        return false;
+                    }
+                    
+                    // Should not contain consecutive dots
+                    if (normalizedName.contains("..")) {
+                        return false;
+                    }
+                    
+                    return true;
                 }
             };
         } else {
