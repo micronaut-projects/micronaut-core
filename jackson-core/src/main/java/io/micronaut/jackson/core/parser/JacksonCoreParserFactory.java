@@ -39,7 +39,7 @@ import java.util.function.Function;
  * @deprecated Implement {@link io.micronaut.json.JsonMapper#readValue(ReadBuffer, Argument)} instead. The implementation can use {@link ReadBuffer#useFastHeapBuffer(Function)}.
  */
 @Internal
-@Deprecated
+@Deprecated(since = "5.0.0")
 public final class JacksonCoreParserFactory {
 
     private static final boolean HAS_NETTY_BUFFER;
@@ -67,7 +67,7 @@ public final class JacksonCoreParserFactory {
      * @throws IOException On failure of jackson createParser methods
      * @deprecated Use method with {@link ObjectReadContext} instead
      */
-    @Deprecated
+    @Deprecated(since = "5.0.0")
     public static JsonParser createJsonParser(JsonFactory factory, ByteBuffer<?> buffer) throws IOException {
         if (!HAS_NETTY_BUFFER || !(buffer.asNativeBuffer() instanceof ByteBuf byteBuf)) {
             return factory.createParser(buffer.toByteArray());

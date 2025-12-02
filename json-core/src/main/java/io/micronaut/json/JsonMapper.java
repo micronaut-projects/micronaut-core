@@ -128,7 +128,7 @@ public interface JsonMapper {
      * @throws IOException IOException
      * @deprecated Prefer {@link #readValue(ReadBuffer, Argument)}
      */
-    @Deprecated
+    @Deprecated(since = "5.0.0")
     default <T> T readValue(@NonNull ByteBuffer<?> byteBuffer, @NonNull Argument<T> type) throws IOException {
         return readValue(byteBuffer.toByteArray(), type);
     }
