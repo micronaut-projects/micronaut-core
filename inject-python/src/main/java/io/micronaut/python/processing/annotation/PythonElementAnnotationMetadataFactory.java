@@ -15,10 +15,14 @@
  */
 package io.micronaut.python.processing.annotation;
 
+import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
+import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.annotation.AbstractElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
+import io.micronaut.python.processing.visitor.AbstractPythonClassElement;
 import io.micronaut.python.processing.visitor.ElementDef;
 import io.micronaut.python.processing.visitor.DecoratorDef;
+import io.micronaut.python.processing.visitor.FunctionDef;
 
 /**
  * Factory for creating and managing annotation metadata for Python elements.
@@ -64,4 +68,29 @@ public class PythonElementAnnotationMetadataFactory extends AbstractElementAnnot
     public ElementAnnotationMetadataFactory readOnly() {
         return new PythonElementAnnotationMetadataFactory(true, (PythonAnnotationMetadataBuilder) metadataBuilder);
     }
+
+    @Override
+    protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupTypeAnnotationsForClass(ClassElement classElement) {
+        if (classElement instanceof AbstractPythonClassElement pythonClassElement) {
+            ElementDef typeAnnotationsKey = pythonClassElement.getTypeAnnotationsKey();
+            if (typeAnnotationsKey != null) {
+                if (typeAnnotationsKey instanceof FunctionDef functionDef) {
+                    return metadataBuilder.lookupOrBuild(
+                        new FunctionTypeAnnotationKey(classElement.getNativeType(), functionDef.name()),
+                        functionDef.returnType()
+                    );
+                }
+                return metadataBuilder.lookupOrBuild(
+                    new TypeAnnotationKey(classElement.getNativeType(), typeAnnotationsKey),
+                    typeAnnotationsKey
+                );
+            }
+
+        }
+        return super.lookupTypeAnnotationsForClass(classElement);
+    }
+
+    private record TypeAnnotationKey(Object nativeType, Object typeAnnotationsKey) {}
+
+    private record FunctionTypeAnnotationKey(Object nativeType, String functionName) {}
 }

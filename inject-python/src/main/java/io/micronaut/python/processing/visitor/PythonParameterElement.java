@@ -40,6 +40,7 @@ public final class PythonParameterElement extends AbstractPythonElement implemen
     private final PythonProcessingEnvironment environment;
     private final ClassElement type;
     private final PythonMethodElement methodElement;
+    private final ArgumentDef argumentDef;
 
     public PythonParameterElement(ArgumentDef argumentDef,
                                   PythonProcessingEnvironment environment,
@@ -55,6 +56,7 @@ public final class PythonParameterElement extends AbstractPythonElement implemen
 
         // Resolve parameter type
         this.type = resolveType(argumentDef);
+        this.argumentDef = argumentDef;
     }
 
     @Override
@@ -72,17 +74,25 @@ public final class PythonParameterElement extends AbstractPythonElement implemen
         Map<String, Map<String, ClassElement>> allGenerics = methodElement.getOwningType().getAllTypeArguments();
         ClassDef classDef = methodElement.getNativeType().declaringClass();
         Map<String, ClassElement> boundGenerics = classDef != null ? allGenerics.getOrDefault(classDef.qualifiedName(), Map.of()) : Map.of();
-        return GraalPyUtil.resolvePythonTypeToJava(
+        ClassElement classElement = GraalPyUtil.resolvePythonTypeToJava(
             getNativeType().typeAnnotation(),
             environment.visitorContext(),
             boundGenerics
         );
+        if (classElement instanceof AbstractPythonClassElement pythonClassElement) {
+            pythonClassElement.typeAnnotationsKey = argumentDef;
+        }
+        return classElement;
     }
 
     private ClassElement resolveType(ArgumentDef argumentDef) {
         if (argumentDef.typeAnnotation() != null) {
             // Use the same type resolution logic as fields
-            return GraalPyUtil.resolvePythonTypeToJava(argumentDef.typeAnnotation(), environment.visitorContext(), Map.of());
+            ClassElement classElement = GraalPyUtil.resolvePythonTypeToJava(argumentDef.typeAnnotation(), environment.visitorContext(), Map.of());
+            if (classElement instanceof AbstractPythonClassElement pythonClassElement) {
+                pythonClassElement.typeAnnotationsKey = argumentDef;
+            }
+            return classElement;
         }
 
         // Fall back to Object when no type annotation

@@ -23,8 +23,6 @@ import io.micronaut.aop.InterceptorRegistry;
 import io.micronaut.aop.Introduced;
 import io.micronaut.aop.chain.InterceptorChain;
 import io.micronaut.aop.chain.MethodInterceptorChain;
-import io.micronaut.aop.internal.ProxySetupAware;
-import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanDefinitionRegistry;
 import io.micronaut.context.BeanLocator;
@@ -799,35 +797,8 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                         }
                     ).toList()
                 )
-            ),
-            invokeProxySetupAwareIfNecessary(aThis, parameters)
+            )
         ));
-    }
-
-    private StatementDef invokeProxySetupAwareIfNecessary(VariableDef.This aThis, List<VariableDef.MethodParameter> parameters) {
-        return aThis.newLocal("$proxyTarget", (proxyTarget) -> {
-            StatementDef assignment;
-            if (targetField != null) {
-                assignment = aThis.field(targetField).isNonNull().ifTrue(
-                    proxyTarget.assign(aThis.field(targetField)),
-                    proxyTarget.assign(aThis)
-                );
-            } else {
-                assignment = proxyTarget.assign(aThis);
-            }
-
-            return StatementDef.multi(
-                assignment,
-                proxyTarget.instanceOf(ClassTypeDef.of(ProxySetupAware.class)).ifTrue(
-                    proxyTarget.cast(ClassTypeDef.of(ProxySetupAware.class))
-                        .invoke("$proxyInitialized", TypeDef.VOID, ClassTypeDef.of(ProxySetupAware.ProxySetup.class).instantiate(
-                            aThis.field(proxyMethodsField),
-                            aThis.field(interceptorsField),
-                            parameters.get(beanContextArgumentIndex)
-                        ))
-                )
-            );
-        });
     }
 
     private StatementDef initializeProxyTargetMethodsAndInterceptors(VariableDef.This aThis,
