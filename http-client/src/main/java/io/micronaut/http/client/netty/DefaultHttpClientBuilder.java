@@ -294,6 +294,6 @@ public final class DefaultHttpClientBuilder {
      */
     @NonNull
     public DefaultHttpClient build() {
-        return new DefaultHttpClient(this);
+        return DefaultHttpClient.createFromBuilder(this);
     }
 }
