@@ -238,6 +238,9 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
                 // Fall back to void/Object
                 resolvedGenericReturnType = PrimitiveElement.VOID;
             }
+            if (resolvedGenericReturnType instanceof AbstractPythonClassElement pythonClassElement) {
+                pythonClassElement.typeAnnotationsKey = functionDef;
+            }
         }
         return resolvedGenericReturnType;
     }
@@ -256,6 +259,9 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
                 io.micronaut.core.annotation.AnnotationMetadata annotationMetadata =
                     environment.visitorContext().getAnnotationMetadataBuilder().buildDeclared(returnDef);
                 return baseType.withAnnotationMetadata(annotationMetadata);
+            }
+            if (baseType instanceof AbstractPythonClassElement pythonClassElement) {
+                pythonClassElement.typeAnnotationsKey = functionDef;
             }
 
             return baseType;
