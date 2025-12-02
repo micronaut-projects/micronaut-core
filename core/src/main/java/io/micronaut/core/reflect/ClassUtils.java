@@ -170,6 +170,91 @@ public class ClassUtils {
     }
 
     /**
+     * Validates if a class name is safe for dynamic loading to prevent unsafe reflection attacks.
+     * This method implements an allowlist approach, only permitting known safe packages and patterns.
+     *
+     * @param className The class name to validate
+     * @return true if the class name is safe to load, false otherwise
+     */
+    private static boolean isAllowedClassName(String className) {
+        if (className == null || className.trim().isEmpty()) {
+            return false;
+        }
+        
+        // Normalize the class name
+        String normalizedName = className.trim();
+        
+        // Block obviously dangerous patterns
+        if (normalizedName.contains("..") || 
+            normalizedName.startsWith(".") || 
+            normalizedName.endsWith(".") ||
+            normalizedName.contains("//") ||
+            normalizedName.contains("\\")) {
+            return false;
+        }
+        
+        // Allow primitive types and arrays
+        if (PRIMITIVE_TYPE_MAP.containsKey(normalizedName) || 
+            PRIMITIVE_ARRAY_MAP.containsKey(normalizedName)) {
+            return true;
+        }
+        
+        // Allow common safe classes that are already in our maps
+        if (COMMON_CLASS_MAP.containsKey(normalizedName) || 
+            BASIC_TYPE_MAP.containsKey(normalizedName)) {
+            return true;
+        }
+        
+        // Allow standard Java platform packages
+        if (normalizedName.startsWith("java.") ||
+            normalizedName.startsWith("javax.") ||
+            normalizedName.startsWith("sun.") ||
+            normalizedName.startsWith("com.sun.") ||
+            normalizedName.startsWith("jdk.")) {
+            return true;
+        }
+        
+        // Allow Micronaut framework packages
+        if (normalizedName.startsWith("io.micronaut.")) {
+            return true;
+        }
+        
+        // Allow common safe third-party packages used by Micronaut
+        if (normalizedName.startsWith("org.slf4j.") ||
+            normalizedName.startsWith("ch.qos.logback.") ||
+            normalizedName.startsWith("org.apache.") ||
+            normalizedName.startsWith("com.fasterxml.jackson.") ||
+            normalizedName.startsWith("org.springframework.") ||
+            normalizedName.startsWith("org.jetbrains.annotations.") ||
+            normalizedName.startsWith("org.jspecify.annotations.") ||
+            normalizedName.startsWith("jakarta.") ||
+            normalizedName.startsWith("reactor.") ||
+            normalizedName.startsWith("io.reactivex.") ||
+            normalizedName.startsWith("kotlinx.") ||
+            normalizedName.startsWith("kotlin.") ||
+            normalizedName.startsWith("groovy.") ||
+            normalizedName.startsWith("org.junit.") ||
+            normalizedName.startsWith("org.testng.") ||
+            normalizedName.startsWith("org.spockframework.") ||
+            normalizedName.startsWith("spock.")) {
+            return true;
+        }
+        
+        // Allow test classes (common pattern in test environments)
+        if (normalizedName.startsWith("test.") || 
+            normalizedName.contains(".test.") ||
+            normalizedName.endsWith("Test") ||
+            normalizedName.endsWith("Tests") ||
+            normalizedName.endsWith("Spec") ||
+            normalizedName.endsWith("TestCase")) {
+            return true;
+        }
+        
+        // Block everything else by default
+        return false;
+    }
+
+    /**
      * Special case {@code getLogger} method that should be used by classes that are used in the annotation processor.
      *
      * @param type The type
@@ -294,6 +379,15 @@ public class ClassUtils {
             if (MISSING_TYPES.contains(name)) {
                 return Optional.empty();
             }
+            
+            // Validate class name to prevent unsafe reflection
+            if (!isAllowedClassName(name)) {
+                if (REFLECTION_LOGGER.isDebugEnabled()) {
+                    REFLECTION_LOGGER.debug("Class name {} is not allowed for dynamic loading", name);
+                }
+                return Optional.empty();
+            }
+            
             if (classLoader == null) {
                 classLoader = Thread.currentThread().getContextClassLoader();
             }
