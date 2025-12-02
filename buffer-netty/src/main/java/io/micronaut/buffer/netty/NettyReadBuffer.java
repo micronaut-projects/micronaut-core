@@ -16,16 +16,18 @@
 package io.micronaut.buffer.netty;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.Charset;
+import java.util.function.Function;
 
 /**
  * Netty {@link ReadBuffer} implementation.
@@ -108,6 +110,17 @@ final class NettyReadBuffer extends ReadBuffer {
         ByteBuf b = getBuf();
         buf = null;
         return new ByteBufInputStream(b, true);
+    }
+
+    @Override
+    public <R> @Nullable R useFastHeapBuffer(@NonNull Function<java.nio.ByteBuffer, @NonNull R> function) {
+        ByteBuf b = getBuf();
+        if (b.hasArray()) {
+            buf = null;
+            return function.apply(java.nio.ByteBuffer.wrap(b.array(), b.arrayOffset() + b.readerIndex(), b.readableBytes()));
+        } else {
+            return super.useFastHeapBuffer(function);
+        }
     }
 
     @Override

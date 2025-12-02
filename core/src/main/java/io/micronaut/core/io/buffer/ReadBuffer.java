@@ -17,12 +17,14 @@ package io.micronaut.core.io.buffer;
 
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.Charset;
+import java.util.function.Function;
 
 /**
  * A buffer of bytes. Can be read from exactly once. Must be either consumed fully, or
@@ -163,6 +165,30 @@ public abstract class ReadBuffer implements AutoCloseable {
     }
 
     /**
+     * Access the contents of this buffer as a {@link java.nio.ByteBuffer} with
+     * {@link java.nio.ByteBuffer#hasArray()}, if doing so is possible without copying the data.
+     * The lifetime of the buffer is limited to the function scope, user code must not keep it
+     * around. User code must also never modify the backing array of the buffer.
+     *
+     * <p>This is useful for performing operations on the data that can take a (array, offset,
+     * length) parameter, such as {@link OutputStream#write(byte[], int, int)} or serialization.
+     *
+     * <p>This is a <a href="#consuming">consuming operation</a> if the function is called.
+     *
+     * @param function A function to call with a nio buffer view of this {@link ReadBuffer}, if
+     *                 possible
+     * @return The return value of the function, or {@code null} if this buffer cannot be accessed
+     * using a nio buffer
+     * @param <R> The return type of the function
+     * @throws IllegalStateException If this buffer is already closed or consumed
+     * @since 5.0.0
+     */
+    @Nullable
+    public <R> R useFastHeapBuffer(@NonNull Function<java.nio.@NonNull ByteBuffer, @NonNull R> function) {
+        return null;
+    }
+
+    /**
      * Write this buffer to the given {@link OutputStream}.
      *
      * <p>This is a <a href="#consuming">consuming operation</a>.
@@ -172,7 +198,22 @@ public abstract class ReadBuffer implements AutoCloseable {
      * @throws IOException           If the {@link OutputStream} throws an exception
      */
     public void transferTo(@NonNull OutputStream stream) throws IOException {
-        stream.write(toArray());
+        // if possible, write using array directly
+        if (useFastHeapBuffer(bb -> {
+            try {
+                stream.write(bb.array(), bb.arrayOffset() + bb.position(), bb.remaining());
+            } catch (IOException e) {
+                sneakyThrow(e);
+            }
+            return true;
+        }) == null) {
+            // fall back to copying
+            stream.write(toArray());
+        }
+    }
+
+    private static <T extends Throwable, R> R sneakyThrow(Throwable t) throws T {
+        throw (T) t;
     }
 
     /**

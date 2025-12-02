@@ -20,9 +20,8 @@ import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.jackson.JacksonConfiguration;
@@ -41,6 +40,8 @@ import io.micronaut.json.JsonSyntaxException;
 import io.micronaut.json.tree.JsonNode;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Processor;
 import org.reactivestreams.Subscriber;
 import tools.jackson.core.JsonParser;
@@ -227,8 +228,24 @@ public final class JacksonDatabindMapper implements JsonMapper {
 
     @Override
     public <T> T readValue(@NonNull ByteBuffer<?> byteBuffer, @NonNull Argument<T> type) throws IOException {
-        try (JsonParser parser = JacksonCoreParserFactory.createJsonParser((JsonFactory) objectMapper.tokenStreamFactory(), byteBuffer)) {
+        try (JsonParser parser = JacksonCoreParserFactory.createJsonParser((JsonFactory) objectMapper.tokenStreamFactory(), objectMapper._deserializationContext(), byteBuffer)) {
             return createReader(type).readValue(parser);
+        } catch (StreamReadException pe) {
+            throw new JsonSyntaxException(pe);
+        }
+    }
+
+    @Override
+    public <T> T readValue(@NonNull ReadBuffer readBuffer, @NonNull Argument<T> type) throws IOException {
+        try {
+            ObjectReader reader = createReader(type);
+            Optional<T> direct = readBuffer.useFastHeapBuffer(bb -> Optional.ofNullable(reader.readValue(bb.array(), bb.arrayOffset() + bb.position(), bb.remaining())));
+            //noinspection OptionalAssignedToNull (intentional)
+            if (direct != null) {
+                return direct.orElse(null);
+            }
+
+            return reader.readValue(readBuffer.toInputStream());
         } catch (StreamReadException pe) {
             throw new JsonSyntaxException(pe);
         }
