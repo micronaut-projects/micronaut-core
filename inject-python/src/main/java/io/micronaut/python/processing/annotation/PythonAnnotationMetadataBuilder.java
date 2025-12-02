@@ -28,6 +28,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.python.processing.visitor.ReturnDef;
 import org.graalvm.polyglot.Value;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import io.micronaut.core.annotation.AnnotationValue;
@@ -300,11 +301,27 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
 
     @Override
     protected Optional<ElementDef> getAnnotationMirror(String annotationName) {
-        return Optional.ofNullable(decorators.get(annotationName))
-            .map(decoratorDef -> new ClassDef(
-                decoratorDef.annotationName(),
-                decoratorDef.stereotypes()
+        DecoratorDef value = decorators.get(annotationName);
+        if (value != null) {
+            return Optional.of(value)
+                .map(decoratorDef -> new ClassDef(
+                    decoratorDef.annotationName(),
+                    decoratorDef.stereotypes()
+                ));
+        }
+        Optional<AnnotationValue<?>> annotationValue = visitorContext.getJavaVisitorContext().getAnnotationMetadataBuilder().buildAnnotation(annotationName);
+        if (annotationValue.isPresent()) {
+            AnnotationValue<?> av = annotationValue.get();
+            return Optional.of(new ClassDef(
+                av.getAnnotationName(),
+                av.getStereotypes().stream().map(this::toDecoratorDef).toList()
             ));
+        }
+        return Optional.empty();
+    }
+
+    private DecoratorDef toDecoratorDef(AnnotationValue<?> av) {
+        return new DecoratorDef(av.getAnnotationName(), av.getAnnotationName(), null, Map.of(), av.getStereotypes().stream().map(this::toDecoratorDef).toList());
     }
 
     @Override
