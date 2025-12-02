@@ -124,4 +124,14 @@ public abstract sealed class CompletedPart implements Closeable permits Complete
             return rb.toArray();
         }
     }
+
+    /**
+     * The completed part objects passed to a controller are closed when the associated request
+     * ends. If you want to keep them around for longer, you can use this method to create a new
+     * {@link CompletedPart} with the same data. You are responsible for closing the new part.
+     *
+     * @return A new completed part
+     */
+    @NonNull
+    public abstract CompletedPart moveResource();
 }

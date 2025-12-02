@@ -51,8 +51,9 @@ import io.micronaut.http.server.netty.converters.NettyConverters;
 import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteInfo;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
-import io.netty.buffer.CompositeByteBuf;
+import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
+import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -163,7 +164,7 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
         }
         if (reader == null && nhr.hasFormBody()) {
             Map<String, List<CloseableByteBody>> bodies = new LinkedHashMap<>();
-            for (RawFormField rff : nhr.getRawFormFields(imm).toIterable()) {
+            for (RawFormField rff : toListNow(nhr.getRawFormFields(imm))) {
                 bodies.computeIfAbsent(rff.metadata().name(), k -> new ArrayList<>(1)).add(rff.byteBody());
             }
             Object intermediate = io.micronaut.http.server.multipart.FormRouteCompleter.mapForGetBody(bodies, nhr.getCharacterEncoding());
@@ -183,12 +184,41 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
         return converted;
     }
 
-    private static CompositeByteBuf coerceToComposite(List<?> objects, ByteBufAllocator alloc) {
-        CompositeByteBuf composite = alloc.compositeBuffer();
-        for (Object object : objects) {
-            composite.addComponent(true, (ByteBuf) object);
+    private static <T> List<T> toListNow(Flux<T> flux) {
+        var sub = new Subscriber<T>() {
+            final List<T> list = new ArrayList<>();
+            boolean complete = false;
+            Throwable error = null;
+
+            @Override
+            public void onSubscribe(Subscription s) {
+                s.request(Long.MAX_VALUE);
+            }
+
+            @Override
+            public void onNext(T t) {
+                list.add(t);
+            }
+
+            @Override
+            public void onError(Throwable t) {
+                error = t;
+                complete = true;
+            }
+
+            @Override
+            public void onComplete() {
+                complete = true;
+            }
+        };
+        flux.subscribe(sub);
+        if (!sub.complete) {
+            throw new IllegalStateException("Flux did not finish immediately");
         }
-        return composite;
+        if (sub.error != null) {
+            throw new IllegalStateException("Failed to load form fields", sub.error);
+        }
+        return sub.list;
     }
 
     private T read(ArgumentConversionContext<T> context, MessageBodyReader<T> reader, HttpHeaders headers, MediaType mediaType, ByteBuffer<?> byteBuffer) {

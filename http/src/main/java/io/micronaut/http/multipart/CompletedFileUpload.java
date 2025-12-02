@@ -55,6 +55,9 @@ public abstract sealed class CompletedFileUpload extends CompletedPart {
         super(metadata);
     }
 
+    @Override
+    public abstract @NonNull CompletedFileUpload moveResource();
+
     /**
      * Create a new memory-backed file upload. Ownership of the data buffer transfers to the file
      * upload object. Closing the file upload object will close the memory.
@@ -149,6 +152,11 @@ public abstract sealed class CompletedFileUpload extends CompletedPart {
         }
 
         @Override
+        public @NonNull CompletedFileUpload moveResource() {
+            return new Memory(getMetadata(), toReadBuffer());
+        }
+
+        @Override
         public void transferTo(Path destination) throws IOException {
             try (OutputStream os = Files.newOutputStream(destination)) {
                 // buffer is intentionally consumed to match file-backed impl
@@ -210,6 +218,11 @@ public abstract sealed class CompletedFileUpload extends CompletedPart {
                 throw new IllegalStateException("CompletedFileUpload.toReadBuffer called in non-blocking thread. This is a blocking operation. You may want to annotate your controller with @ExecuteOn(TaskExecutors.BLOCKING).");
             }
             return ReadBufferFactory.getJdkFactory().copyOf(getInputStream());
+        }
+
+        @Override
+        public @NonNull CompletedFileUpload moveResource() {
+            return new File(getMetadata(), path.moveResource(), actualSize);
         }
 
         @Override

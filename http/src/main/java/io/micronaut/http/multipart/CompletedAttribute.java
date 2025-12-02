@@ -61,6 +61,11 @@ public final class CompletedAttribute extends CompletedPart {
     }
 
     @Override
+    public @NonNull CompletedPart moveResource() {
+        return create(getMetadata(), toReadBuffer());
+    }
+
+    @Override
     public void closeAsync(@NonNull Executor ioExecutor) {
         close();
     }

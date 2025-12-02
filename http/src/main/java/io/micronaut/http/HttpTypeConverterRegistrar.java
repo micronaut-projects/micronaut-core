@@ -18,8 +18,10 @@ package io.micronaut.http;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.TypeConverterRegistrar;
+import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.cookie.SameSite;
+import io.micronaut.http.multipart.CompletedAttribute;
 
 import java.util.Map;
 import java.util.Optional;
@@ -60,6 +62,23 @@ public final class HttpTypeConverterRegistrar implements TypeConverterRegistrar 
                     return Optional.empty();
                 }
             });
+        });
+
+        conversionService.addConverter(CompletedAttribute.class, Object.class, (object, targetType, context) -> {
+            try (ReadBuffer rb = object.toReadBuffer()) {
+                if (targetType.isAssignableFrom(ReadBuffer.class)) {
+                    return Optional.of(rb);
+                }
+                Optional<Object> direct = conversionService.convert(rb, targetType, context);
+                if (direct.isPresent()) {
+                    return direct;
+                }
+                String s = rb.toString(context.getCharset());
+                if (targetType.isAssignableFrom(String.class)) {
+                    return Optional.of(s);
+                }
+                return conversionService.convert(s, targetType, context);
+            }
         });
     }
 }

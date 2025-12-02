@@ -23,10 +23,6 @@ import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NextMajorVersion;
-import io.micronaut.core.annotation.NextMajorVersion;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
@@ -34,10 +30,13 @@ import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.netty.channel.ChannelOption;
+import io.netty.contrib.multipart.DecoderQuirk;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.ssl.ApplicationProtocolNames;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -225,8 +224,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private int formMaxFields = DEFAULT_FORM_MAX_FIELDS;
     private int formMaxBufferedBytes = DEFAULT_FORM_MAX_BUFFERED_BYTES;
     private boolean requestDecompressionEnabled = true;
-    @NextMajorVersion("Move to DecoderQuirk enum once it becomes mandatory")
-    private Set<String> formDecoderQuirks = Collections.emptySet();
+    private Set<DecoderQuirk> formDecoderQuirks = Collections.emptySet();
 
     /**
      * Default empty constructor.
@@ -886,7 +884,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * @return The decoder quirks
      */
     @Experimental
-    public Set<String> getFormDecoderQuirks() {
+    public Set<DecoderQuirk> getFormDecoderQuirks() {
         return formDecoderQuirks;
     }
 
@@ -898,7 +896,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * @param formDecoderQuirks The decoder quirks
      */
     @Experimental
-    public void setFormDecoderQuirks(Set<String> formDecoderQuirks) {
+    public void setFormDecoderQuirks(Set<DecoderQuirk> formDecoderQuirks) {
         this.formDecoderQuirks = formDecoderQuirks;
     }
 

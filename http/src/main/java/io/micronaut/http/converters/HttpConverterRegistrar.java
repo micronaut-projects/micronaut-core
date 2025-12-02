@@ -18,14 +18,23 @@ package io.micronaut.http.converters;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.context.exceptions.ConfigurationException;
+import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.io.Readable;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.ResourceResolver;
+import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.core.type.Argument;
+import io.micronaut.http.MediaType;
+import io.micronaut.http.body.MessageBodyHandlerRegistry;
+import io.micronaut.http.body.MessageBodyReader;
+import io.micronaut.http.multipart.CompletedFileUpload;
+import io.micronaut.http.simple.SimpleHttpHeaders;
 import jakarta.inject.Inject;
-import jakarta.inject.Provider;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URL;
 import java.util.Optional;
 
@@ -39,31 +48,18 @@ import java.util.Optional;
 public class HttpConverterRegistrar implements TypeConverterRegistrar {
 
     private final BeanProvider<ResourceResolver> resourceResolver;
+    private final BeanProvider<MessageBodyHandlerRegistry> messageBodyHandlerRegistry;
 
     /**
      * Default constructor.
      *
      * @param resourceResolver The resource resolver
+     * @param messageBodyHandlerRegistry Message body handler registry for file upload decoding
      */
     @Inject
-    protected HttpConverterRegistrar(BeanProvider<ResourceResolver> resourceResolver) {
+    protected HttpConverterRegistrar(BeanProvider<ResourceResolver> resourceResolver, BeanProvider<MessageBodyHandlerRegistry> messageBodyHandlerRegistry) {
         this.resourceResolver = resourceResolver;
-    }
-
-    /**
-     * The constructor.
-     *
-     * @param resourceResolver The resource resolver
-     * @deprecated Replaced by {@link #HttpConverterRegistrar(BeanProvider)}.
-     */
-    @Deprecated(forRemoval = true)
-    protected HttpConverterRegistrar(Provider<ResourceResolver> resourceResolver) {
-        this.resourceResolver = new BeanProvider<>() {
-            @Override
-            public ResourceResolver get() {
-                return resourceResolver.get();
-            }
-        };
+        this.messageBodyHandlerRegistry = messageBodyHandlerRegistry;
     }
 
     @Override
@@ -88,8 +84,25 @@ public class HttpConverterRegistrar implements TypeConverterRegistrar {
                             return Optional.empty();
                         }
                     }
-
                 }
         );
+        conversionService.addConverter(CompletedFileUpload.class, Object.class, (object, targetType, context) -> {
+            Argument<Object> argument = context instanceof ArgumentConversionContext<?> ctx ? (Argument<Object>) ctx.getArgument() : Argument.of(targetType);
+            MediaType mediaType = object.getContentType().orElse(null);
+            Optional<MessageBodyReader<Object>> reader = messageBodyHandlerRegistry.get().findReader(argument, mediaType);
+            try {
+                if (reader.isPresent()) {
+                    try (InputStream is = object.getInputStream()) {
+                        return Optional.ofNullable(reader.get().read(argument, mediaType, new SimpleHttpHeaders(), is));
+                    }
+                } else {
+                    try (ReadBuffer rb = object.toReadBuffer()) { // TODO: limit size
+                        return conversionService.convert(rb, targetType, context);
+                    }
+                }
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        });
     }
 }

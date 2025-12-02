@@ -79,7 +79,11 @@ final class NettyPublisherPartUploadBinder implements TypedRequestArgumentBinder
             // Publisher<Publisher<…>>
             Argument<?> nestedType = contentArgument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
             publisher = Flux.from(formFactory.get().getOrCreateCompleter(request).subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.ASYNC, argument)))
-                .mapNotNull(f -> conversionService.convert(f.byteBody(), nestedType).orElse(null));
+                .mapNotNull(f -> {
+                    try (f) {
+                        return conversionService.convert(f.byteBody(), nestedType).orElse(null);
+                    }
+                });
         } else if (contentTypeClass == CompletedPart.class) {
             // Publisher<CompletedPart>
             // these objects consume little memory, and accept writing to disk anyway, so we
@@ -106,7 +110,11 @@ final class NettyPublisherPartUploadBinder implements TypedRequestArgumentBinder
                 .concatMap(raw -> Flux.from(raw.byteBody().toReadBufferPublisher())
                     .map(rb -> new PartData(raw.metadata(), rb)))
                 .doOnDiscard(PartData.class, PartData::close)
-                .mapNotNull(it -> conversionService.convert(it, contentArgument).orElse(null));
+                .mapNotNull(it -> {
+                    try (it) {
+                        return conversionService.convert(it, contentArgument).orElse(null);
+                    }
+                });
         }
 
         return () -> Optional.of(publisher);

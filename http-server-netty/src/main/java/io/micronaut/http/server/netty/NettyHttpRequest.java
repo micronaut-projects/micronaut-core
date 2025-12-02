@@ -16,8 +16,6 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -70,6 +68,7 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
+import io.netty.contrib.multipart.DecoderQuirk;
 import io.netty.contrib.multipart.PostBodyDecoder;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.DefaultHttpContent;
@@ -93,6 +92,8 @@ import io.netty.handler.ssl.SslHandler;
 import io.netty.util.ReferenceCounted;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -685,7 +686,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         PostBodyDecoder.Builder builder = PostBodyDecoder.builder()
             .charset(getCharacterEncoding())
             .maxFields(nhsc.getFormMaxFields())
-            //.enableQuirks(nhsc.getFormDecoderQuirks()) // TODO
+            .enableQuirks(nhsc.getFormDecoderQuirks().toArray(new DecoderQuirk[0]))
             .undecodedLimit(nhsc.getFormMaxBufferedBytes());
 
         FormType formType = parseFormType();

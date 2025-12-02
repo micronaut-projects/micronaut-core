@@ -29,6 +29,7 @@ import io.micronaut.http.body.stream.BaseSharedBuffer;
 import io.micronaut.http.body.stream.BaseStreamingByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
+import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.multipart.FormFieldMetadata;
 import io.micronaut.http.multipart.RawFormField;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
@@ -39,8 +40,10 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.EventLoop;
 import io.netty.contrib.multipart.ContentDisposition;
+import io.netty.contrib.multipart.FormDecoderException;
 import io.netty.contrib.multipart.ParsedHeaderValue;
 import io.netty.contrib.multipart.PostBodyDecoder;
+import io.netty.contrib.multipart.TooManyFormFieldsException;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -82,8 +85,15 @@ public final class FormDemuxer implements BufferConsumer {
         this.fieldLimits = fieldLimits;
         if (byteBody instanceof AvailableByteBody abb) {
             upstream = null;
-            add(abb.toReadBuffer());
-            complete();
+            if (eventLoop.inEventLoop()) {
+                add(abb.toReadBuffer());
+                complete();
+            } else {
+                eventLoop.execute(() -> {
+                    add(abb.toReadBuffer());
+                    complete();
+                });
+            }
         } else {
             try (StreamingNettyByteBody s = byteBodyFactory.toStreaming(byteBody)) {
                 this.upstream = s.primary(this);
@@ -114,6 +124,13 @@ public final class FormDemuxer implements BufferConsumer {
     private void handleDecoderException(Exception e) {
         assert eventLoop.inEventLoop();
         decodeFailure = true;
+
+        if (e instanceof TooManyFormFieldsException) {
+            e = new ContentLengthExceededException("Number of form fields exceeds configured limit");
+        } else if (e instanceof FormDecoderException && e.getMessage().equals("Undecoded data limit exceeded")) { // todo: specific exception in next codec-multipart release
+            e = new ContentLengthExceededException("Length of buffered form field exceeds configured limit");
+        }
+
         if (state instanceof StreamingContent sc) {
             sc.baseSharedBuffer.error(e);
         }
@@ -350,6 +367,7 @@ public final class FormDemuxer implements BufferConsumer {
                     combined = composite;
                 }
                 FormFieldMetadata metadata = headers.computeMetadata();
+                buffers.clear(); // avoid double release
                 try (CloseableByteBody body = byteBodyFactory.createChecked(fieldLimits, combined)) {
                     emit(metadata, body);
                 }

@@ -27,14 +27,12 @@ import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.bind.binders.PendingRequestBindingResult;
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
 import io.micronaut.http.multipart.CompletedFileUpload;
-import io.micronaut.http.multipart.FileUpload;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.http.server.multipart.FormRouteCompleter;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import reactor.core.publisher.Mono;
 
-import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
@@ -55,11 +53,6 @@ final class NettyCompletedFileUploadBinder implements TypedRequestArgumentBinder
     NettyCompletedFileUploadBinder(ConversionService conversionService, BeanProvider<FormFactory> formFactory) {
         this.conversionService = conversionService;
         this.formFactory = formFactory;
-    }
-
-    @Override
-    public List<Class<?>> superTypes() {
-        return List.of(FileUpload.class);
     }
 
     @Override

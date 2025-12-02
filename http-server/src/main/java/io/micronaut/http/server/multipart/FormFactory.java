@@ -25,6 +25,7 @@ import io.micronaut.core.io.buffer.ReadBufferFactory;
 import io.micronaut.core.io.file.TemporaryFileResource;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.body.InternalByteBody;
+import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.form.FormCapableHttpRequest;
 import io.micronaut.http.multipart.CompletedAttribute;
 import io.micronaut.http.multipart.CompletedFileUpload;
@@ -69,6 +70,10 @@ public final class FormFactory {
     FormFactory(@Named(TaskExecutors.BLOCKING) Executor diskWriteExecutor, HttpServerConfiguration configuration) {
         this.diskWriteExecutor = diskWriteExecutor;
         this.configuration = configuration;
+    }
+
+    public Executor getDiskWriteExecutor() {
+        return diskWriteExecutor;
     }
 
     public static FormRouteCompleter getCompleterOrNull(HttpRequest<?> request) {
@@ -246,7 +251,7 @@ public final class FormFactory {
             // check size
             if (total > mc.getMaxFileSize()) {
                 buffer.close();
-                onError(new IOException("Size exceed allowed maximum capacity"));
+                onError(new ContentLengthExceededException("The part named [" + metadata.name() + "] exceeds the maximum allowed content length [" + mc.getMaxFileSize() + "]"));
                 return;
             }
             if (file == null) {

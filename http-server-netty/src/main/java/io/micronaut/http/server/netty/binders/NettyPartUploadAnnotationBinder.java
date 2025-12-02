@@ -16,7 +16,6 @@
 package io.micronaut.http.server.netty.binders;
 
 import io.micronaut.context.BeanProvider;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionError;
@@ -33,6 +32,7 @@ import io.micronaut.http.form.FormCapableHttpRequest;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.http.server.multipart.FormRouteCompleter;
+import org.jspecify.annotations.NonNull;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
@@ -89,7 +89,13 @@ final class NettyPartUploadAnnotationBinder<T> implements AnnotatedRequestArgume
         }
         CompletableFuture<Optional<T>> completableFuture = Mono.from(completer.subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.WAITS_FOR_FULL, context.getArgument())))
             .flatMap(rff -> Mono.from(ReactiveExecutionFlow.toPublisher(formFactory.completePart(nettyRequest, rff))))
-            .map(d -> conversionService.convert(d, context))
+            .map(d -> {
+                try {
+                    return conversionService.convert(d, context);
+                } finally {
+                    d.closeAsync(formFactory.getDiskWriteExecutor());
+                }
+            })
             .toFuture();
         BasicHttpAttributes.addRouteWaitsFor(nettyRequest, CompletableFutureExecutionFlow.just(completableFuture));
 
