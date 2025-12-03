@@ -144,14 +144,16 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     }
 
     void reset() {
-        refreshing = true;
-        try {
-            Arrays.fill(nonGenerated, null);
-            Arrays.fill(rawCatalog, null);
-            Arrays.fill(catalog, null);
-            resetCaches();
-        } finally {
-            refreshing = false;
+        synchronized (catalog) {
+            refreshing = true;
+            try {
+                Arrays.fill(nonGenerated, null);
+                Arrays.fill(rawCatalog, null);
+                Arrays.fill(catalog, null);
+                resetCaches();
+            } finally {
+                refreshing = false;
+            }
         }
     }
 
