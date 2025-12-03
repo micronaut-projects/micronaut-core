@@ -10,6 +10,8 @@ This section documents breaking changes between Micronaut versions
 Micronaut Jackson Databind uses https://github.com/FasterXML/jackson/wiki/Jackson-Release-3.0[Jackson 3].
 If you use Micronaut Jackson Databind, check the https://github.com/FasterXML/jackson/blob/main/jackson3/MIGRATING_TO_JACKSON_3.md[Jackson 3 Migration Guide].
 
+Micronaut configuration properties for various Jackson features have been renamed. Please check the https://docs.micronaut.io/latest/guide/configurationreference.html#io.micronaut.jackson.JacksonConfiguration[configuration reference]. Also note that Jackson has renamed a few features upstream, and that various defaults have changed.
+
 ==== Update to Apache Groovy 5
 
 Micronaut 5 uses http://groovy-lang.org/releasenotes/groovy-5.0.html[Apache Groovy 5].

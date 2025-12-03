@@ -22,7 +22,6 @@ import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Type;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.util.StringUtils;
@@ -30,6 +29,7 @@ import io.micronaut.jackson.serialize.MicronautDeserializers;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 import tools.jackson.core.JsonParser;
 import tools.jackson.core.json.JsonFactory;
 import tools.jackson.core.json.JsonFactoryBuilder;
@@ -105,7 +105,7 @@ public class ObjectMapperFactory {
     @BootstrapContextCompatible
     public JsonFactory jsonFactory(JacksonConfiguration jacksonConfiguration) {
         final JsonFactoryBuilder jsonFactoryBuilder = JsonFactory.builder();
-        jacksonConfiguration.getFactorySettings().forEach(jsonFactoryBuilder::configure);
+        jacksonConfiguration.getJsonFactoryFeatures().forEach(jsonFactoryBuilder::configure);
         return jsonFactoryBuilder.build();
     }
 
@@ -249,11 +249,16 @@ public class ObjectMapperFactory {
                 builder.propertyNamingStrategy(propertyNamingStrategy);
             }
 
-            jacksonConfiguration.getSerializationSettings().forEach(builder::configure);
-            jacksonConfiguration.getDeserializationSettings().forEach(builder::configure);
-            jacksonConfiguration.getMapperSettings().forEach(builder::configure);
-            jacksonConfiguration.getParserSettings().forEach(builder::configure);
-            jacksonConfiguration.getGeneratorSettings().forEach(builder::configure);
+            jacksonConfiguration.getStreamReadFeatures().forEach(builder::configure);
+            jacksonConfiguration.getStreamWriteFeatures().forEach(builder::configure);
+            jacksonConfiguration.getMapperFeatures().forEach(builder::configure);
+            jacksonConfiguration.getJsonReadFeatures().forEach(builder::configure);
+            jacksonConfiguration.getJsonWriteFeatures().forEach(builder::configure);
+            jacksonConfiguration.getDateTimeFeatures().forEach(builder::configure);
+            jacksonConfiguration.getEnumFeatures().forEach(builder::configure);
+            jacksonConfiguration.getJsonNodeFeatures().forEach(builder::configure);
+            jacksonConfiguration.getDeserializationFeatures().forEach(builder::configure);
+            jacksonConfiguration.getSerializationFeatures().forEach(builder::configure);
         }
 
         return builder.build();
