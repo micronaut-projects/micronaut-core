@@ -146,11 +146,11 @@ public class ObjectMapperFactory {
     }
 
     /**
-     * Builds the core Jackson {@link ObjectMapper} from the optional configuration and {@link JsonFactory}.
+     * Builds the core Jackson {@link JsonMapper.Builder} from the optional configuration and {@link JsonFactory}.
      *
      * @param jacksonConfiguration The configuration
      * @param jsonFactory The JSON factory
-     * @return The {@link ObjectMapper}
+     * @return The {@link JsonMapper.Builder}
      */
     @Prototype
     public JsonMapper.Builder jsonMapperBuilder(@Nullable JacksonConfiguration jacksonConfiguration,
