@@ -99,6 +99,8 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     private final Map<ConversionCacheKey, Object> resolvedValueCache = new ConcurrentHashMap<>(20);
     private final EnvironmentProperties environmentProperties = EnvironmentProperties.fork(CURRENT_ENV);
 
+    private volatile boolean refreshing = false;
+
     /**
      * Creates a new, initially empty, {@link PropertySourcePropertyResolver} for the given {@link ConversionService}.
      *
@@ -142,9 +144,14 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     }
 
     void reset() {
-        synchronized (catalog) {
+        refreshing = true;
+        try {
+            Arrays.fill(nonGenerated, null);
+            Arrays.fill(rawCatalog, null);
             Arrays.fill(catalog, null);
             resetCaches();
+        } finally {
+            refreshing = false;
         }
     }
 
@@ -283,7 +290,9 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             if (result == null) {
                 result = false;
             }
-            containsCache.put(name, result);
+            if (!refreshing) {
+                containsCache.put(name, result);
+            }
         }
         return result;
     }
@@ -488,12 +497,15 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                 }
             }
 
+            boolean inRefresh = refreshing;
             if (value != null) {
                 Optional<T> converted;
                 if (entries != null) {
                     // iff entries is null, the value is from placeholderResolutionCache and doesn't need this step
                     value = resolvePlaceHoldersIfNecessary(value);
-                    placeholderResolutionCache.put(name, value);
+                    if (!inRefresh) {
+                        placeholderResolutionCache.put(name, value);
+                    }
                 }
                 if (requiredType.isInstance(value) && !CollectionUtils.isIterableOrMap(requiredType)) {
                     converted = (Optional<T>) Optional.of(value);
@@ -509,12 +521,14 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                     }
                 }
 
-                if (cacheableType) {
+                if (cacheableType && !inRefresh) {
                     resolvedValueCache.put(cacheKey, converted.orElse((T) NO_VALUE));
                 }
                 return converted;
             } else if (cacheableType) {
-                resolvedValueCache.put(cacheKey, NO_VALUE);
+                if (!inRefresh) {
+                    resolvedValueCache.put(cacheKey, NO_VALUE);
+                }
                 return Optional.empty();
             } else if (Properties.class.isAssignableFrom(requiredType)) {
                 Properties properties = resolveSubProperties(name, entries, conversionContext);

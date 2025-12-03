@@ -26,6 +26,7 @@ import spock.lang.Issue
 import spock.lang.Specification
 import spock.util.environment.RestoreSystemProperties
 
+import java.util.concurrent.Executors
 import java.util.function.Function
 
 /**
@@ -93,6 +94,39 @@ class DefaultEnvironmentSpec extends Specification {
 
         then:
         diff.isEmpty()
+    }
+
+    void "test cache related issue when refresh method is executed"() {
+        given:
+        def propertyMap = ['testPropKey': 'testPropValueOld']
+        def propertySource = new MapPropertySource('CustomPS', propertyMap)
+        def env = new DefaultEnvironment({['test']})
+        env.addPropertySource(propertySource)
+        env.start()
+
+        expect:
+        env.getRequiredProperty("testPropKey", String.class) == 'testPropValueOld'
+
+        and:
+        def testFinished = false
+        def executor = Executors.newSingleThreadExecutor()
+        executor.submit(new Runnable() {
+            @Override
+            void run() {
+                while (!testFinished) {
+                    env.getRequiredProperty("testPropKey", String.class)
+                }
+            }
+        })
+
+        when:
+        propertyMap.put('testPropKey', 'testPropValueNew')
+        def diff = env.refreshAndDiff()
+        testFinished = true
+
+        then:
+        env.getRequiredProperty("testPropKey", String.class) == 'testPropValueNew'
+        diff.get('test-prop-key') == 'testPropValueOld'
     }
 
     void "test environment system property refresh"() {
