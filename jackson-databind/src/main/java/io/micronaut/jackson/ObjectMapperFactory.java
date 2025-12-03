@@ -20,6 +20,7 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Primary;
+import io.micronaut.context.annotation.Prototype;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Type;
 import io.micronaut.core.convert.ConversionService;
@@ -29,6 +30,7 @@ import io.micronaut.jackson.serialize.MicronautDeserializers;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.core.JsonParser;
 import tools.jackson.core.json.JsonFactory;
@@ -130,18 +132,29 @@ public class ObjectMapperFactory {
     }
 
     /**
+     * Builds the core Jackson {@link JsonMapper} from a {@link JsonMapper.Builder}
+     *
+     * @param jsonMapperBuilder JsonMapper Builder
+     * @return The {@link JsonMapper}
+     */
+    @Singleton
+    @Primary
+    @Named("json")
+    @BootstrapContextCompatible
+    public JsonMapper jsonMapper(JsonMapper.@NonNull Builder jsonMapperBuilder) {
+        return jsonMapperBuilder.build();
+    }
+
+    /**
      * Builds the core Jackson {@link ObjectMapper} from the optional configuration and {@link JsonFactory}.
      *
      * @param jacksonConfiguration The configuration
      * @param jsonFactory The JSON factory
      * @return The {@link ObjectMapper}
      */
-    @Singleton
-    @Primary
-    @Named("json")
-    @BootstrapContextCompatible
-    public JsonMapper objectMapper(@Nullable JacksonConfiguration jacksonConfiguration,
-                                     @Nullable JsonFactory jsonFactory) {
+    @Prototype
+    public JsonMapper.Builder jsonMapperBuilder(@Nullable JacksonConfiguration jacksonConfiguration,
+                                   @Nullable JsonFactory jsonFactory) {
         JsonMapper.Builder builder = jsonFactory != null ? JsonMapper.builder(jsonFactory) : JsonMapper.builder();
 
         final boolean hasConfiguration = jacksonConfiguration != null;
@@ -261,6 +274,6 @@ public class ObjectMapperFactory {
             jacksonConfiguration.getSerializationFeatures().forEach(builder::configure);
         }
 
-        return builder.build();
+        return builder;
     }
 }

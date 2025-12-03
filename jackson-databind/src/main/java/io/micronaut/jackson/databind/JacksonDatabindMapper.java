@@ -132,7 +132,7 @@ public final class JacksonDatabindMapper implements JsonMapper {
         var objectMapperFactory = new ObjectMapperFactory();
         objectMapperFactory.setDeserializers(new JsonNodeDeserializer());
         objectMapperFactory.setSerializers(new JsonNodeSerializer());
-        return objectMapperFactory.objectMapper(null, null);
+        return objectMapperFactory.jsonMapperBuilder(null, null).build();
     }
 
     @Internal
