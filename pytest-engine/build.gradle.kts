@@ -24,4 +24,15 @@ dependencies {
 
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
+    val pyEnv = providers.environmentVariable("PYENV_VERSION")
+    val vEnv = providers.environmentVariable("VIRTUAL_ENV")
+    if (pyEnv.isPresent() && vEnv.isPresent()) {
+        environment("PYENV_VERSION", pyEnv.get())
+        environment("VIRTUAL_ENV", vEnv.get())
+    } else {
+        println("==================================================================")
+        println("= WARNING: Disabling tests because not running under virtual env =")
+        println("==================================================================")
+        enabled = false
+    }
 }
