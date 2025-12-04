@@ -151,6 +151,7 @@ public class ObjectMapperFactory {
      * @param jsonFactory The JSON factory
      * @return The {@link JsonMapper.Builder}
      */
+    @BootstrapContextCompatible
     @Prototype
     public JsonMapper.Builder jsonMapperBuilder(@Nullable JacksonConfiguration jacksonConfiguration,
                                    @Nullable JsonFactory jsonFactory) {
