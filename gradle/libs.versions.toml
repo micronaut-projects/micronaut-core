@@ -72,7 +72,7 @@ junit4 = "4.13.2"
 # Versions which start with managed- are managed by Micronaut in the sense
 # that they will appear in the Micronaut BOM as <properties>
 #
-managed-groovy = "5.0.2"
+managed-groovy = "5.0.3"
 managed-jakarta-annotation-api = "2.1.1"
 managed-jackson = "3.0.1"
 managed-jackson-annotations = "2.20"
