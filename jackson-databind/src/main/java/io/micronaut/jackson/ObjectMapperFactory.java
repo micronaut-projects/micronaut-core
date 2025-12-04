@@ -40,7 +40,6 @@ import tools.jackson.databind.DeserializationContext;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.JacksonModule;
 import tools.jackson.databind.KeyDeserializer;
-import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.PropertyNamingStrategy;
 import tools.jackson.databind.ValueDeserializer;
 import tools.jackson.databind.ValueSerializer;
@@ -132,7 +131,7 @@ public class ObjectMapperFactory {
     }
 
     /**
-     * Builds the core Jackson {@link JsonMapper} from a {@link JsonMapper.Builder}
+     * Builds the core Jackson {@link JsonMapper} from a {@link JsonMapper.Builder}.
      *
      * @param jsonMapperBuilder JsonMapper Builder
      * @return The {@link JsonMapper}
