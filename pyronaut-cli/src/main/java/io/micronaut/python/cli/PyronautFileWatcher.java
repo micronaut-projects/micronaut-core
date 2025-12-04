@@ -18,12 +18,14 @@ package io.micronaut.python.cli;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.python.ContextHolder;
 import io.micronaut.core.naming.Described;
+import io.micronaut.python.cli.util.FileUtils;
 import io.micronaut.python.compiler.PyronautCompiler;
 import io.micronaut.runtime.EmbeddedApplication;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -37,10 +39,11 @@ import java.nio.file.StandardWatchEventKinds;
 import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static io.micronaut.python.cli.FileUtils.recurseDelete;
+import static io.micronaut.python.cli.util.FileUtils.recurseDelete;
 import static java.nio.file.Files.createDirectories;
 
 /**
@@ -54,14 +57,21 @@ public class PyronautFileWatcher implements Runnable {
     public static final int ERROR = -1;
 
     private final Path sourceDirectory;
+    private final List<File> annotationProcessorPath;
+    private final List<File> compileClassPath;
     private final Path outputDirectory;
     private final String[] parameters;
     private final AtomicBoolean running = new AtomicBoolean(true);
     private final AtomicBoolean starting = new AtomicBoolean(false);
 
-    public PyronautFileWatcher(Path sourceDirectory, String[] parameters) {
+    public PyronautFileWatcher(Path sourceDirectory,
+                               List<File> annotationProcessorPath,
+                               List<File> compileClassPath,
+                               String[] parameters) {
         this.sourceDirectory = sourceDirectory.toAbsolutePath();
         this.outputDirectory = FileUtils.resolveOutputDirectory(sourceDirectory);
+        this.annotationProcessorPath = annotationProcessorPath;
+        this.compileClassPath = compileClassPath;
         this.parameters = parameters;
     }
 
@@ -154,10 +164,15 @@ public class PyronautFileWatcher implements Runnable {
     }
 
     private int compile() throws IOException {
-        var compiler = PyronautCompiler.builder()
-            .pythonSrc(sourceDirectory.toString())
-            .targetDir(classesDirectory().toFile())
-            .build();
+        var builder = PyronautCompiler.builder()
+            .pythonSrc(sourceDirectory.toString());
+        if (!annotationProcessorPath.isEmpty()) {
+            builder.annotationProcessorPath(annotationProcessorPath);
+        }
+        if (!compileClassPath.isEmpty()) {
+            builder.classpath(compileClassPath);
+        }
+        var compiler = builder.targetDir(classesDirectory().toFile()).build();
 
         try {
             recurseDelete(classesDirectory());

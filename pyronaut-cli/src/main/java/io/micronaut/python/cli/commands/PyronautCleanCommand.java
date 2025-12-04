@@ -13,31 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.python.cli;
+package io.micronaut.python.cli.commands;
 
-import io.micronaut.python.cli.commands.PyronautCleanCommand;
-import io.micronaut.python.cli.commands.PyronautInstallCommand;
-import io.micronaut.python.cli.commands.PyronautRunCommand;
+import io.micronaut.python.cli.util.FileUtils;
 import picocli.CommandLine;
-import picocli.CommandLine.Command;
 
-import java.util.concurrent.Callable;
-
-@Command(name = "pyronaut", description = "The Pyronaut CLI", subcommands = {
-    PyronautCleanCommand.class,
-    PyronautRunCommand.class,
-    PyronautInstallCommand.class
-})
-public class PyronautMainCommand implements Callable<Integer> {
-
+@CommandLine.Command(name = "clean", description = "Deletes the temporary files", mixinStandardHelpOptions = true)
+public class PyronautCleanCommand extends BaseSourceCommand {
     @Override
     public Integer call() throws Exception {
+        var sourceDirectory = resolveSourceDir();
+        FileUtils.recurseDelete(
+            FileUtils.resolveOutputDirectory(sourceDirectory)
+        );
         return 0;
-    }
-
-    public static void main(String[] args) {
-        var exitCode = new CommandLine(new PyronautMainCommand())
-            .execute(args);
-        System.exit(exitCode);
     }
 }

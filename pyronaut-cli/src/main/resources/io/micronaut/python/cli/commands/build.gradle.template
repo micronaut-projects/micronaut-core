@@ -1,0 +1,17 @@
+plugins {
+   id("java")
+}
+
+repositories {
+    mavenCentral()
+    mavenLocal()
+}
+
+dependencies {
+%DEPENDENCIES%
+}
+
+tasks.register("resolvePyronautDependencies", Sync) {
+    from(configurations.runtimeClasspath)
+    destinationDir = file("%DESTINATION_DIR%")
+}

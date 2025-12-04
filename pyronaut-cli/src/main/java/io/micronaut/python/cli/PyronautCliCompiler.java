@@ -20,8 +20,13 @@ import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
+import javax.tools.DiagnosticCollector;
+import javax.tools.JavaFileManager;
+import javax.tools.JavaFileObject;
+import javax.tools.ToolProvider;
 import java.io.File;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
 
@@ -70,6 +75,71 @@ public class PyronautCliCompiler implements Callable<Integer> {
             return -1;
         }
         return 0;
+    }
+
+
+    private void compileJava(JavaFileObject[] sources,
+                             List<File> classpath,
+                             List<File> bootclasspath,
+                             List<File> annotationProcessorPath,
+                             List<String> compilerOptions,
+                             JavaFileManager fileManager,
+                             DiagnosticCollector<JavaFileObject> diagnosticCollector) {
+        List<String> options = buildCompilerOptions(classpath, bootclasspath, annotationProcessorPath, compilerOptions);
+
+        try {
+            var compiler = ToolProvider.getSystemJavaCompiler();
+            var task = compiler.getTask(
+                null, // Writer for additional output
+                fileManager, // File manager
+                diagnosticCollector, // Diagnostic collector
+                options, // Compiler options
+                List.of(), // Classes to process (none)
+                Arrays.asList(sources) // Source files
+            );
+
+            task.setProcessors(processors);
+
+            boolean success = task.call();
+            if (!success) {
+                throw new RuntimeException(
+                    "Compilation failed: " + diagnosticCollector.getDiagnostics());
+            }
+        } finally {
+            shutdownProcessors(processors);
+        }
+    }
+
+    private List<String> buildCompilerOptions(List<File> classpath,
+                                              List<File> bootClasspath,
+                                              List<File> annotationProcessorPath,
+                                              List<String> compilerOptions) {
+        List<String> options = new ArrayList<>();
+        addClasspathOption("-classpath", classpath, options);
+        addClasspathOption("-bootclasspath", bootClasspath, options);
+        addClasspathOption("-processorpath", annotationProcessorPath, options);
+        if (compilerOptions != null) {
+            options.addAll(compilerOptions);
+        }
+        return options;
+    }
+
+    private static void addClasspathOption(String option,
+                                           List<File> classpath,
+                                           List<String> options) {
+        if (classpath == null || classpath.isEmpty()) {
+            return;
+        }
+        options.add(option);
+        var cp = new StringBuilder();
+        for (File file : classpath) {
+            if (!cp.isEmpty()) {
+                cp.append(File.pathSeparator);
+            }
+            cp.append(file.getAbsolutePath());
+        }
+        var classpathString = cp.toString();
+        options.add(classpathString);
     }
 
     public static void main(String[] args) {

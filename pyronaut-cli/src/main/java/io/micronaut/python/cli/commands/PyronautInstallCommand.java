@@ -1,0 +1,103 @@
+/*
+ * Copyright 2003-2021 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.micronaut.python.cli.commands;
+
+import org.gradle.tooling.GradleConnector;
+import org.gradle.tooling.events.OperationType;
+import org.tomlj.Toml;
+import org.tomlj.TomlParseResult;
+import picocli.CommandLine;
+import picocli.CommandLine.Command;
+import picocli.CommandLine.Parameters;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+@Command(name = "install", description = "Installs Pyronaut dependencies", mixinStandardHelpOptions = true)
+public class PyronautInstallCommand extends BaseSourceCommand {
+    @CommandLine.Option(names = {"--scope"}, required = false)
+    String scope;
+
+    @Parameters(index = "0..*", description = "Dependencies to install")
+    List<String> extraDependencies = List.of();
+
+    @Override
+    public Integer call() {
+        var sourceDirectory = resolveSourceDir();
+        var tomlFile = sourceDirectory.resolve("pyproject.toml");
+        if (Files.exists(tomlFile)) {
+            installDependencies(tomlFile);
+        } else {
+            System.out.println("No pyproject.toml file found.");
+        }
+        return 0;
+    }
+
+    private void installDependencies(Path tomlFile) {
+        var outputDir = pyronautVenvCacheDir().resolve("dependencies").toAbsolutePath();
+        try (var templateSource = PyronautInstallCommand.class.getResourceAsStream(
+            "build.gradle.template")) {
+            var pyProject = Toml.parse(tomlFile);
+            var scopes = this.scope != null ? List.of(scope) :
+                List.copyOf(pyProject.getTableOrEmpty("tool.pyronaut.dependencies").keySet());
+            var template = new String(templateSource.readAllBytes(), StandardCharsets.UTF_8);
+            for (var scope : scopes) {
+                var destination = outputDir.resolve(scope);
+                System.out.println("Resolving " + scope + " dependencies into " + destination);
+                var buildScript = template.replace("%DESTINATION_DIR%", destination.toString())
+                    .replace("%DEPENDENCIES%",
+                        buildDependenciesList(pyProject, extraDependencies, scope));
+                var tmpDir = Files.createTempDirectory("pyronaut");
+                Files.write(tmpDir.resolve("settings.gradle"),
+                    List.of("rootProject.name = \"pyronaut-resolution\""));
+                Files.writeString(tmpDir.resolve("build.gradle"), buildScript);
+                try (var connector = GradleConnector.newConnector()
+                    .useGradleVersion("9.2.1")
+                    .forProjectDirectory(tmpDir.toFile())
+                    .connect()) {
+                    connector.newBuild()
+                        .forTasks("resolvePyronautDependencies")
+                        .addProgressListener(event -> System.out.println(event.getDisplayName()),
+                            Set.of(OperationType.FILE_DOWNLOAD, OperationType.TASK))
+                        .run();
+                }
+            }
+
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private String buildDependenciesList(TomlParseResult pyProject, List<String> extraDependencies,
+                                         String scope) throws IOException {
+        var depsArray = pyProject.getArray("tool.pyronaut.dependencies." + scope);
+        if (depsArray == null && extraDependencies.isEmpty()) {
+            return "";
+        }
+        var allDependencies = depsArray == null ? extraDependencies.stream() :
+            Stream.concat(depsArray.toList().stream(), extraDependencies.stream());
+        return allDependencies
+            .map(d -> "    implementation(\"" + d + "\")")
+            .collect(Collectors.joining("\n"));
+    }
+
+}

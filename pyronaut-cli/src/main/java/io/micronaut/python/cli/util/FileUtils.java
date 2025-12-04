@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.python.cli;
+package io.micronaut.python.cli.util;
 
 import io.micronaut.core.annotation.Internal;
 
@@ -25,14 +25,14 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 
 @Internal
-final class FileUtils {
+public final class FileUtils {
 
     /**
      * Recursively deletes a directory and its content
      * @param directory the directory
      * @throws IOException thrown in case deletion fails
      */
-    static void recurseDelete(Path directory) throws IOException {
+    public static void recurseDelete(Path directory) throws IOException {
         if (Files.isDirectory(directory)) {
             Files.walkFileTree(directory, new SimpleFileVisitor<>() {
                 @Override
@@ -58,7 +58,7 @@ final class FileUtils {
      * @param sourceDirectory the directory where sources are found
      * @return the resolved directory
      */
-    static Path resolveOutputDirectory(Path sourceDirectory) {
+    public static Path resolveOutputDirectory(Path sourceDirectory) {
         return sourceDirectory.resolve(".pyronaut").toAbsolutePath();
     }
 }
