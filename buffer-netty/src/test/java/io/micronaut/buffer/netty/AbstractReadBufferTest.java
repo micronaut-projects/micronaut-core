@@ -143,6 +143,20 @@ abstract class AbstractReadBufferTest {
     }
 
     @Test
+    public void transferToNio() throws IOException {
+        ByteBuffer nio = ByteBuffer.allocateDirect(3);
+        nio.put((byte) 1);
+        nio.put((byte) 2);
+        nio.put((byte) 3);
+        nio.flip();
+        try (ReadBuffer rb = factory.adapt(nio)) {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            rb.transferTo(baos);
+            assertArrayEquals(new byte[]{1, 2, 3}, baos.toByteArray());
+        }
+    }
+
+    @Test
     public void createEmpty() {
         try (ReadBuffer rb = factory.createEmpty()) {
             assertEquals(0, rb.readable());
