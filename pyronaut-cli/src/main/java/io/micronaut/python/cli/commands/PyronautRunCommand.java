@@ -29,7 +29,10 @@ public class PyronautRunCommand extends BaseSourceCommand {
         var sourceDirectory = resolveSourceDir();
         var annotationProcessorPath = asClasspath(annotationProcessorDependenciesDir());
         var compileClassPath = asClasspath(compileDependenciesDir());
-
+        if (compileClassPath.isEmpty()) {
+            System.err.println("Pyronaut dependencies not found. Did you run `pyronaut install`?");
+            return -1;
+        }
         var watcher = new PyronautFileWatcher(sourceDirectory, annotationProcessorPath, compileClassPath, parameters);
         var watcherThread = new Thread(watcher);
         watcherThread.start();

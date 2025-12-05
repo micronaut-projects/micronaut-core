@@ -15,18 +15,18 @@
  */
 package io.micronaut.python.cli;
 
-import io.micronaut.context.ApplicationContext;
-import io.micronaut.context.python.ContextHolder;
-import io.micronaut.core.naming.Described;
+//import io.micronaut.context.ApplicationContext;
+//import io.micronaut.core.naming.Described;
+
 import io.micronaut.python.cli.util.FileUtils;
-import io.micronaut.python.compiler.PyronautCompiler;
-import io.micronaut.runtime.EmbeddedApplication;
-import io.micronaut.runtime.server.EmbeddedServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -39,8 +39,9 @@ import java.nio.file.StandardWatchEventKinds;
 import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static io.micronaut.python.cli.util.FileUtils.recurseDelete;
@@ -75,21 +76,20 @@ public class PyronautFileWatcher implements Runnable {
         this.parameters = parameters;
     }
 
-    private static void async(Runnable action) {
-        new Thread(action).start();
-    }
-
     @Override
     public void run() {
-        ApplicationContext currentContext = null;
+        ApplicationManager appManager = null;
         try {
+            var truffleClassloader = createTruffleClassLoader(compileClassPath);
             // Initial compilation and start
-            if (compile() != SUCCESS) {
+            if (compile(truffleClassloader) != SUCCESS) {
                 System.err.println("Initial compilation failed");
                 return;
             }
-            currentContext = startApplication();
-
+            var classpath = buildUrls(classesDirectory(), sourceDirectory);
+            var classLoader = new URLClassLoader(classpath, truffleClassloader);
+            appManager = new ApplicationManagerInvoker(classLoader);
+            appManager.startApplication(parameters);
             // Set up file watching
             var watchService = FileSystems.getDefault().newWatchService();
             registerAll(sourceDirectory, watchService);
@@ -130,14 +130,15 @@ public class PyronautFileWatcher implements Runnable {
                         // to implement because the generated classes contain an absolute
                         // path to where the files are generated, which makes it impossible
                         // to use a different directory for compilation and runtime.
-                        stopApplication(currentContext);
+                        appManager.stopApplication();
                         System.out.println("Changes detected, recompiling and restarting...");
-                        if (compile() == SUCCESS) {
-                            currentContext = startApplication();
+                        if (compile(truffleClassloader) == SUCCESS) {
+                            appManager.startApplication(parameters);
                         } else {
                             System.err.println("Compilation failed, application not restarted");
                         }
                     }
+                    starting.set(false);
                 }
 
                 key.reset();
@@ -145,12 +146,54 @@ public class PyronautFileWatcher implements Runnable {
         } catch (Exception e) {
             e.printStackTrace(System.err);
         } finally {
-            stopApplication(currentContext);
+            if (appManager != null) {
+                appManager.stopApplication();
+            }
         }
     }
 
+    private URLClassLoader createTruffleClassLoader(List<File> classpath) {
+        var urls = classpath.stream()
+            .map(f -> {
+                var name = f.getName();
+                if (isTruffleJar(name)) {
+                    try {
+                        return f.toURI().toURL();
+                    } catch (MalformedURLException e) {
+                        return null;
+                    }
+                }
+                return null;
+            })
+            .filter(Objects::nonNull)
+            .toList()
+            .toArray(new URL[0]);
+        return new URLClassLoader(urls, this.getClass().getClassLoader().getParent());
+    }
+
+    /**
+     * A hackish way to put the Truffle and GraalVM Polyglot jars
+     * into a parent classloader which is used as the parent of both
+     * the compiler and the runtime. This is done because Truffle
+     * doesn't support loading in different classloaders without
+     * falling back to interpreted mode.
+     * @param name the name of a file
+     * @return true if it belongs to the Truffle runtime
+     */
+    private static boolean isTruffleJar(String name) {
+        return name.startsWith("truffle-") ||
+               name.startsWith("python-") ||
+               name.startsWith("polyglot-") ||
+               name.startsWith("icu4j-") ||
+               name.startsWith("regex-") ||
+               name.startsWith("nativeimage-") ||
+               name.startsWith("jniutils-") ||
+               name.startsWith("xz-") ||
+               name.startsWith("word-");
+    }
+
     private void registerAll(Path start, WatchService watchService) throws IOException {
-        Files.walkFileTree(start, new SimpleFileVisitor<Path>() {
+        Files.walkFileTree(start, new SimpleFileVisitor<>() {
             @Override
             public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
                 throws IOException {
@@ -163,107 +206,99 @@ public class PyronautFileWatcher implements Runnable {
         });
     }
 
-    private int compile() throws IOException {
-        var builder = PyronautCompiler.builder()
-            .pythonSrc(sourceDirectory.toString());
-        if (!annotationProcessorPath.isEmpty()) {
-            builder.annotationProcessorPath(annotationProcessorPath);
-        }
-        if (!compileClassPath.isEmpty()) {
-            builder.classpath(compileClassPath);
-        }
-        var compiler = builder.targetDir(classesDirectory().toFile()).build();
+    private int compile(ClassLoader truffleClassloader) {
+        var compiler = new PyronautCliCompiler();
+        compiler.classLoader = truffleClassloader;
+        compiler.sourceDirectory = sourceDirectory.toFile();
+        compiler.outputDirectory = outputDirectory.toFile();
+        compiler.annotationProcessorPath = annotationProcessorPath;
+        compiler.classpath = compileClassPath;
 
         try {
             recurseDelete(classesDirectory());
             createDirectories(classesDirectory());
-            compiler.compile();
-            return SUCCESS;
-        } catch (RuntimeException ex) {
+            return compiler.call();
+        } catch (Exception ex) {
             ex.printStackTrace(System.err);
             return ERROR;
         }
     }
 
     private Path classesDirectory() {
-        return outputDirectory.resolve("classes");
-    }
-
-    /**
-     * Reproduces what Micronaut.run() does, WITHOUT adding a shutdown hook
-     */
-    private ApplicationContext startApplication() {
-        long start = System.nanoTime();
-        ApplicationContext currentContext = null;
-        try {
-            var classLoader = new URLClassLoader(buildUrls(classesDirectory(), sourceDirectory));
-            currentContext = ApplicationContext.builder()
-                .args(parameters)
-                .classLoader(classLoader)
-                .start();
-            currentContext.findBean(EmbeddedApplication.class).ifPresent(embeddedApplication -> {
-                embeddedApplication.start();
-                if (embeddedApplication instanceof Described described) {
-                    if (LOGGER.isInfoEnabled()) {
-                        long took = elapsedMillis(start);
-                        String desc = described.getDescription();
-                        LOGGER.info("Startup completed in {}ms. Server Running: {}", took, desc);
-                    }
-                } else {
-                    if (embeddedApplication instanceof EmbeddedServer embeddedServer) {
-                        if (LOGGER.isInfoEnabled()) {
-                            long took = elapsedMillis(start);
-                            Object uri;
-                            try {
-                                uri = embeddedServer.getContextURI();
-                            } catch (UnsupportedOperationException e) {
-                                uri = "<URI display not available: " + e.getMessage() + ">";
-                            }
-                            LOGGER.info("Startup completed in {}ms. Server Running: {}", took, uri);
-                        }
-                    } else {
-                        if (LOGGER.isInfoEnabled()) {
-                            long took = elapsedMillis(start);
-                            LOGGER.info("Startup completed in {}ms.", took);
-                        }
-                    }
-                }
-            });
-            System.out.println("Application started");
-            starting.set(false);
-        } catch (Exception e) {
-            System.err.println("Failed to start application: " + e.getMessage());
-            e.printStackTrace();
-        }
-        return currentContext;
-    }
-
-    private void stopApplication(ApplicationContext currentContext) {
-        if (currentContext != null && currentContext.isRunning()) {
-            try {
-                currentContext.findBean(EmbeddedApplication.class).ifPresentOrElse(EmbeddedApplication::stop, currentContext::stop);
-                System.out.println("Application stopped");
-            } catch (Exception e) {
-                System.err.println("Error stopping application: " + e.getMessage());
-            } finally {
-                ContextHolder.resetContext();
-            }
-        }
-    }
-
-    private static long elapsedMillis(long startNanos) {
-        return TimeUnit.MILLISECONDS.convert(System.nanoTime() - startNanos, TimeUnit.NANOSECONDS);
+        return outputDirectory;
     }
 
     public void stop() {
         running.set(false);
     }
 
-    private static URL[] buildUrls(Path... paths) throws MalformedURLException {
-        var result = new URL[paths.length];
-        for (var i = SUCCESS; i < paths.length; i++) {
-            result[i] = paths[i].toUri().toURL();
+    private URL[] buildUrls(Path... paths) throws MalformedURLException {
+        var result = new ArrayList<URL>(1+paths.length + compileClassPath.size());
+        for (var path : paths) {
+            result.add(path.toUri().toURL());
         }
-        return result;
+        for (var file : compileClassPath) {
+            var url = file.toURI().toURL();
+            if (!isTruffleJar(file.getName())) {
+                result.add(url);
+            }
+        }
+        // This is a hack, so that the launcher is on classpath of the user app
+        result.add(PyronautFileWatcher.class.getProtectionDomain().getCodeSource().getLocation());
+        return result.toArray(new URL[0]);
+    }
+
+    /**
+     * This application manager is used to invoke an application "reflectively"
+     * using method handles. This is done because we have to isolate the classloader
+     * of the compiler from the application classloader. Therefore, we cannot use
+     * types from Micronaut Context (e.g ApplicationContext) directly, because they
+     * would be loaded from different classloaders.
+     */
+    private static class ApplicationManagerInvoker implements ApplicationManager {
+        private final MethodHandle constructor;
+        private final MethodHandle startMethod;
+        private final MethodHandle stoptMethod;
+        private final Object applicationManager;
+
+        private ApplicationManagerInvoker(ClassLoader classLoader) {
+            try {
+                var clazz = classLoader.loadClass("io.micronaut.python.cli.DefaultApplicationManager");
+                var lookup = MethodHandles.privateLookupIn(clazz, MethodHandles.lookup());
+                var voidType = MethodType.methodType(void.class);
+                constructor = lookup.findConstructor(clazz, voidType);
+                startMethod = lookup.findVirtual(clazz, "startApplication", MethodType.methodType(void.class, String[].class));
+                stoptMethod = lookup.findVirtual(clazz, "stopApplication", voidType);
+            } catch (Throwable e) {
+                throw new RuntimeException(e);
+            }
+            applicationManager = newManager();
+        }
+
+        private Object newManager() {
+            try {
+                return constructor.invoke();
+            } catch (Throwable e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        @Override
+        public void startApplication(String[] args) {
+            try {
+                startMethod.invoke(applicationManager, args);
+            } catch (Throwable e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        @Override
+        public void stopApplication() {
+            try {
+                stoptMethod.invoke(applicationManager);
+            } catch (Throwable e) {
+                throw new RuntimeException(e);
+            }
+        }
     }
 }

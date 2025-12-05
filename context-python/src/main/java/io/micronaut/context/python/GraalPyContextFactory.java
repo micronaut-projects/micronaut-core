@@ -61,11 +61,11 @@ public class GraalPyContextFactory {
         }
 
         try {
-            ClassLoader classLoader = applicationContext.getClassLoader();
-
+            var classLoader = applicationContext.getClassLoader();
+            var beacon = classLoader.loadClass(PYRONAUT_MAIN_CLASS);
             var builder = GraalPyResources.contextBuilder(VirtualFileSystem.newBuilder()
                     .resourceDirectory(APPLICATION_PATH)
-                    .resourceLoadingClass(classLoader.loadClass(PYRONAUT_MAIN_CLASS)).build())
+                    .resourceLoadingClass(beacon).build())
                 // restrict in future?
 //                .option("python.ExposeInternalSources", StringUtils.TRUE)
 //                .allowExperimentalOptions(true)

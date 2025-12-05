@@ -17,10 +17,11 @@ package io.micronaut.python.cli.commands;
 
 import org.gradle.tooling.GradleConnector;
 import org.gradle.tooling.events.OperationType;
+import org.gradle.tooling.events.ProgressEvent;
 import org.tomlj.Toml;
 import org.tomlj.TomlParseResult;
-import picocli.CommandLine;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 
 import java.io.IOException;
@@ -34,7 +35,7 @@ import java.util.stream.Stream;
 
 @Command(name = "install", description = "Installs Pyronaut dependencies", mixinStandardHelpOptions = true)
 public class PyronautInstallCommand extends BaseSourceCommand {
-    @CommandLine.Option(names = {"--scope"}, required = false)
+    @Option(names = {"--scope"}, required = false)
     String scope;
 
     @Parameters(index = "0..*", description = "Dependencies to install")
@@ -57,9 +58,11 @@ public class PyronautInstallCommand extends BaseSourceCommand {
         try (var templateSource = PyronautInstallCommand.class.getResourceAsStream(
             "build.gradle.template")) {
             var pyProject = Toml.parse(tomlFile);
+            var repositories = buildRepositoriesBlock(pyProject);
             var scopes = this.scope != null ? List.of(scope) :
                 List.copyOf(pyProject.getTableOrEmpty("tool.pyronaut.dependencies").keySet());
-            var template = new String(templateSource.readAllBytes(), StandardCharsets.UTF_8);
+            var template = new String(templateSource.readAllBytes(), StandardCharsets.UTF_8)
+                .replace("%REPOSITORIES%", repositories);
             for (var scope : scopes) {
                 var destination = outputDir.resolve(scope);
                 System.out.println("Resolving " + scope + " dependencies into " + destination);
@@ -76,7 +79,7 @@ public class PyronautInstallCommand extends BaseSourceCommand {
                     .connect()) {
                     connector.newBuild()
                         .forTasks("resolvePyronautDependencies")
-                        .addProgressListener(event -> System.out.println(event.getDisplayName()),
+                        .addProgressListener(PyronautInstallCommand::logEvent,
                             Set.of(OperationType.FILE_DOWNLOAD, OperationType.TASK))
                         .run();
                 }
@@ -87,17 +90,54 @@ public class PyronautInstallCommand extends BaseSourceCommand {
         }
     }
 
+    private static void logEvent(ProgressEvent event) {
+        System.out.println(event.getDisplayName());
+    }
+
+    private String buildRepositoriesBlock(TomlParseResult pyProject) {
+        var sb = new StringBuilder();
+        var repos = pyProject.getArray("tool.pyronaut.repositories");
+        if (repos == null || repos.isEmpty()) {
+            sb.append("    mavenCentral()\n");
+        } else {
+            for (var repo : repos.toList()) {
+                if (repo instanceof String repoName) {
+                    if ("mavenCentral".equals(repoName)) {
+                        sb.append("    mavenCentral()\n");
+                    } else if ("mavenLocal".equals(repoName)) {
+                        sb.append("    mavenLocal()\n");
+                    } else {
+                        sb.append("    maven { url =\"").append(repoName).append("\" }\n");
+                    }
+                }
+            }
+        }
+        return sb.toString();
+    }
+
     private String buildDependenciesList(TomlParseResult pyProject, List<String> extraDependencies,
                                          String scope) throws IOException {
         var depsArray = pyProject.getArray("tool.pyronaut.dependencies." + scope);
         if (depsArray == null && extraDependencies.isEmpty()) {
             return "";
         }
+        var bomVersion = pyProject.getString("tool.pyronaut.version");
+        String platform = null;
+        if (bomVersion != null) {
+            // TODO: Should be replaced with platform BOM, not core BOM, when we have a milestone
+            platform =
+                "    implementation(platform(\"io.micronaut:micronaut-core-bom:" + bomVersion + "\"))\n"+
+                "    implementation(platform(\"io.micronaut.platform:micronaut-platform:4.10.2\"))\n";
+        }
         var allDependencies = depsArray == null ? extraDependencies.stream() :
             Stream.concat(depsArray.toList().stream(), extraDependencies.stream());
-        return allDependencies
+        var deps = allDependencies
             .map(d -> "    implementation(\"" + d + "\")")
             .collect(Collectors.joining("\n"));
+        if (platform != null) {
+            return platform + "\n" + deps;
+        }
+        return deps;
     }
 
 }

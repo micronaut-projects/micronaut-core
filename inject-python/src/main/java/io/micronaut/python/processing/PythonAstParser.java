@@ -15,13 +15,11 @@
  */
 package io.micronaut.python.processing;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.function.Function;
-
+import io.micronaut.core.util.StringUtils;
+import io.micronaut.inject.processing.ProcessingException;
+import io.micronaut.inject.visitor.VisitorContext;
+import io.micronaut.python.processing.visitor.ClassDef;
+import io.micronaut.python.processing.visitor.DecoratorDef;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.HostAccess;
 import org.graalvm.polyglot.Source;
@@ -31,11 +29,12 @@ import org.graalvm.python.embedding.VirtualFileSystem;
 import org.intellij.lang.annotations.Language;
 import org.jetbrains.annotations.NotNull;
 
-import io.micronaut.core.util.StringUtils;
-import io.micronaut.inject.processing.ProcessingException;
-import io.micronaut.inject.visitor.VisitorContext;
-import io.micronaut.python.processing.visitor.ClassDef;
-import io.micronaut.python.processing.visitor.DecoratorDef;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
 
 public final class PythonAstParser {
 
@@ -46,9 +45,11 @@ public final class PythonAstParser {
     public PythonAstParser() {
         this.context = GraalPyResources.contextBuilder(VirtualFileSystem.newBuilder()
                 .resourceDirectory(INJECT_RESOURCES)
+                .resourceLoadingClass(PythonAstParser.class)
                 .build())
             // TODO: constrain this in future
             .allowHostAccess(HostAccess.ALL)
+            .hostClassLoader(PythonAstParser.class.getClassLoader())
             .allowHostClassLookup(name -> name.startsWith("io.micronaut"))
             .build();
         context.initialize(PYTHON);

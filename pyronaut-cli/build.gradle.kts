@@ -1,6 +1,7 @@
 plugins {
     id("io.micronaut.build.internal.convention-library")
     id("application")
+    id("org.graalvm.buildtools.native")
 }
 
 repositories {
@@ -13,16 +14,10 @@ dependencies {
     annotationProcessor(projects.micronautInjectJava)
     annotationProcessor(libs.picocli.codegen)
     implementation(libs.picocli)
-    implementation(projects.micronautInjectPython)
-    implementation(projects.micronautContextPython)
+    compileOnly(projects.micronautContext)
     implementation(libs.tomlj)
     implementation(libs.gradle.tapi)
-    // For tests only, this is a temporary hack until we find how
-    // to express script dependencies
-//    runtimeOnly(projects.micronautHttpServerNetty)
-//    runtimeOnly(projects.micronautJsonCore)
-//    runtimeOnly(projects.micronautJacksonDatabind)
-//    runtimeOnly(libs.logback.classic)
+    runtimeOnly(libs.logback.classic)
 }
 
 application {
@@ -35,5 +30,20 @@ tasks {
     }
     installDist {
         destinationDir = layout.buildDirectory.dir("install/pyronaut").get().asFile
+    }
+}
+
+graalvmNative {
+    binaries {
+        named("main") {
+            imageName = "pyronaut"
+            // workaround because of the use of the library plugin
+            sharedLibrary = false
+            buildArgs.addAll(listOf(
+                "-H:+AllowJRTFileSystem",
+                "--initialize-at-run-time=com.sun.tools.javac.file.Locations",
+                "--initialize-at-run-time=jdk.internal.jrtfs.SystemImage"
+            ))
+        }
     }
 }

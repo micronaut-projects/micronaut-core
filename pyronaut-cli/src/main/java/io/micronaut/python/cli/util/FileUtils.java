@@ -15,7 +15,7 @@
  */
 package io.micronaut.python.cli.util;
 
-import io.micronaut.core.annotation.Internal;
+//import io.micronaut.core.annotation.Internal;
 
 import java.io.IOException;
 import java.nio.file.FileVisitResult;
@@ -24,7 +24,7 @@ import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 
-@Internal
+//@Internal
 public final class FileUtils {
 
     /**
