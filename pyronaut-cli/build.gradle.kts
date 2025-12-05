@@ -39,11 +39,22 @@ graalvmNative {
             imageName = "pyronaut"
             // workaround because of the use of the library plugin
             sharedLibrary = false
-            buildArgs.addAll(listOf(
-                "-H:+AllowJRTFileSystem",
-                "--initialize-at-run-time=com.sun.tools.javac.file.Locations",
-                "--initialize-at-run-time=jdk.internal.jrtfs.SystemImage"
-            ))
+            buildArgs.addAll(
+                listOf(
+                    "-H:+UnlockExperimentalVMOptions",
+                    "-H:+AllowJRTFileSystem",
+                    "--initialize-at-run-time=com.sun.tools.javac.file.Locations",
+                    "--initialize-at-run-time=jdk.internal.jrtfs.SystemImage",
+                    // crema
+                    "-H:+RuntimeClassLoading",
+                    "-H:Preserve=package=java.util",
+                    "-H:Preserve=package=java.lang",
+                    "-H:Preserve=package=java.io",
+                    "-H:Preserve=package=java.lang.invoke",
+                    "-H:Preserve=package=java.lang.constant",
+                    "-H:-InterpreterTraceSupport"
+                )
+            )
         }
     }
 }

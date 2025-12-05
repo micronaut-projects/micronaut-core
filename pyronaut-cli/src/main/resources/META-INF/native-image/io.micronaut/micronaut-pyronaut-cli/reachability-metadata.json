@@ -1,0 +1,45 @@
+{
+  "reflection": [
+    {
+      "type": "javax.tools.JavaCompiler$CompilationTask"
+    },
+    {
+      "type": "io.micronaut.python.cli.DefaultApplicationManager"
+    },
+    {
+      "type": {
+        "proxy": [
+          "io.micronaut.python.processing.annotation.PythonApplication"
+        ]
+      }
+    },
+    {
+      "type": "com.sun.tools.javac.api.JavacTrees",
+      "methods": [
+        {
+          "name": "instance",
+          "parameterTypes": [
+            "javax.tools.JavaCompiler$CompilationTask"
+          ]
+        }
+      ]
+    }
+  ],
+  "resources": [
+    {
+      "glob": "META-INF/services/**"
+    },
+    {
+      "glob": "GRAALPY-VFS/**"
+    },
+    {
+      "bundle": "com.sun.tools.javac.resources.compiler"
+    },
+    {
+      "bundle": "com.sun.tools.javac.resources.launcher"
+    },
+    {
+      "bundle": "com.sun.tools.javac.resources.javac"
+    }
+  ]
+}

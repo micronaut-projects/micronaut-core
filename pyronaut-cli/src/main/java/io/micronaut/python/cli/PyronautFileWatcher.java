@@ -244,6 +244,7 @@ public class PyronautFileWatcher implements Runnable {
             }
         }
         // This is a hack, so that the launcher is on classpath of the user app
+        // and it won't work in a native image
         result.add(PyronautFileWatcher.class.getProtectionDomain().getCodeSource().getLocation());
         return result.toArray(new URL[0]);
     }
