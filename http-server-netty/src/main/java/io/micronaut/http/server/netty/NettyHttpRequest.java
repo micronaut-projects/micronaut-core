@@ -701,7 +701,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         return new FormDemuxer(
             decoder,
             channelHandlerContext.channel(),
-            BodySizeLimits.UNLIMITED, // TODO
+            new BodySizeLimits(Long.MAX_VALUE, nhsc.getFormMaxBufferedBytes()), // TODO
             byteBody
         ).fields();
     }

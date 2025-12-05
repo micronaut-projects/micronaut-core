@@ -388,11 +388,19 @@ public final class FormDemuxer implements BufferConsumer {
         void devolveToStreaming() {
             StreamingContent sc = new StreamingContent(headers);
             state = sc;
-            try {
+            try (sc.rootBody) {
+                // do this early in case there's an error
+                FormFieldMetadata metadata = headers.computeMetadata();
+
                 for (ByteBuf buffer : buffers) {
                     sc.add(buffer);
                 }
                 buffers.clear();
+
+                if (headers.contentLength != null) {
+                    sc.baseSharedBuffer.setExpectedLength(headers.contentLength);
+                }
+                emit(metadata, sc.rootBody);
             } finally {
                 close();
             }
@@ -402,23 +410,16 @@ public final class FormDemuxer implements BufferConsumer {
     private final class StreamingContent extends State implements Upstream {
         private final @Nullable Headers mixedHeaders;
         private final BaseSharedBuffer baseSharedBuffer;
+        private final BaseStreamingByteBody<?> rootBody;
         private long unacknowledged = 0;
         private boolean cancelled = false;
 
         StreamingContent(Headers headers) {
             this.mixedHeaders = headers.mixedHeaders;
 
-            // do this early in case there's an error
-            FormFieldMetadata metadata = headers.computeMetadata();
-
             ByteBodyFactory.StreamingBody streamingBody = byteBodyFactory.createStreamingBody(fieldLimits, this);
-            try (BaseStreamingByteBody<?> rb = streamingBody.rootBody()) {
-                this.baseSharedBuffer = streamingBody.sharedBuffer();
-                if (headers.contentLength != null) {
-                    baseSharedBuffer.setExpectedLength(headers.contentLength);
-                }
-                emit(metadata, rb);
-            }
+            this.baseSharedBuffer = streamingBody.sharedBuffer();
+            this.rootBody = streamingBody.rootBody();
         }
 
         void add(ByteBuf content) {
