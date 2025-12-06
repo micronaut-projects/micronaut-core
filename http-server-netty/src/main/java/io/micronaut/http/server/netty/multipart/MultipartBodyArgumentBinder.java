@@ -17,7 +17,6 @@ package io.micronaut.http.server.netty.multipart;
 
 import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
@@ -62,7 +61,7 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
         }
         Flux<? extends CompletedPart> parts = Flux.from(fchr.getRawFormFields())
             .flatMap(raw -> ReactiveExecutionFlow.toPublisher(formFactory.get().completePart(fchr, raw)))
-            .doOnDiscard(CompletedPart.class, formFactory.get()::discardAsync);
+            .doOnDiscard(CompletedPart.class, p -> p.closeAsync(formFactory.get().getDiskWriteExecutor()));
         return () -> Optional.of(parts::subscribe);
     }
 }

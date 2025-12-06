@@ -18,7 +18,15 @@ package io.micronaut.http.multipart;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.MediaType;
 
-// TODO: docs
+/**
+ * Form field metadata provided by a client. This is untrusted data! Each attribute is optional.
+ *
+ * @param name      The field name
+ * @param fileName  The file upload file name
+ * @param mediaType The file upload content type
+ * @since 5.0.0
+ * @author Jonas Konrad
+ */
 public record FormFieldMetadata(
     @Nullable String name,
     @Nullable String fileName,

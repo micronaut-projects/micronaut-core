@@ -15,6 +15,7 @@
  */
 package io.micronaut.core.io.file;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.buffer.LeakTracker;
@@ -26,17 +27,35 @@ import java.nio.file.Path;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 
-// TODO: docs
+/**
+ * Closeable resource class representing a temporary file. When this resource is closed, the file
+ * is deleted.
+ *
+ * @since 5.0.0
+ * @author Jonas Konrad
+ */
+@Internal
 public final class TemporaryFileResource implements Closeable {
     private static final LeakTracker.Factory<TemporaryFileResource> TRACKER_FACTORY = LeakTracker.Factory.forClass(TemporaryFileResource.class);
 
     private final LeakTracker<TemporaryFileResource> tracker = TRACKER_FACTORY.track(this);
     private final AtomicReference<Path> path;
 
-    public TemporaryFileResource(Path path) {
+    /**
+     * Create a new file resource. Ownership of the path is transferred to the resource.
+     *
+     * @param path The path
+     */
+    public TemporaryFileResource(@NonNull Path path) {
         this.path = new AtomicReference<>(Objects.requireNonNull(path, "path"));
     }
 
+    /**
+     * Get the path.
+     *
+     * @return The path
+     * @throws IllegalStateException if this resource is closed or has been moved
+     */
     @NonNull
     public Path getPath() {
         Path path = this.path.get();
@@ -67,12 +86,28 @@ public final class TemporaryFileResource implements Closeable {
         return p;
     }
 
+    /**
+     * Move this <i>resource</i>. The returned resource will have ownership of the path, and the
+     * original resource will lose ownership, meaning it is essentially closed. No actual file
+     * system operation is done.
+     *
+     * @return The new resource managing this path
+     * @throws IllegalStateException if this resource is already closed or has been moved
+     */
     @NonNull
     public TemporaryFileResource moveResource() {
         return new TemporaryFileResource(claimPath());
     }
 
-    public void moveFile(Path destination) throws IOException {
+    /**
+     * Move this <i>file</i> to a new location. This resource loses ownership of the file, you'll
+     * have to manage it from now on.
+     *
+     * @param destination The destination to move to
+     * @throws IOException If the file cannot be moved. Note that the file will be deleted in this
+     * case, the resource still becomes invalid
+     */
+    public void moveFile(@NonNull Path destination) throws IOException {
         Path p = claimPath();
         try {
             Files.move(p, destination);
@@ -86,10 +121,21 @@ public final class TemporaryFileResource implements Closeable {
         }
     }
 
+    /**
+     * Check whether this resource is still open and has ownership of the path.
+     *
+     * @return {@code true} if this resource is still open
+     */
     public boolean isOpen() {
         return path.get() != null;
     }
 
+    /**
+     * Close this resource, deleting the underlying file. If this resource is already closed or has
+     * been moved, this method does nothing.
+     *
+     * @throws IOException Failure deleting the file
+     */
     @Override
     public void close() throws IOException {
         Path p = claimPathOrNull();

@@ -1,0 +1,63 @@
+The lowest-level form API in the Micronaut HTTP server is the api:io.micronaut.http.form.FormCapableHttpRequest[]. It provides a reactive Publisher of the form fields. This publisher can be subscribed to at most once. Each field is represented by a api:io.micronaut.http.multipart.RawFormField[] containing the field metadata and field body as a api:io.micronaut.http.body.ByteBody[].
+
+=== Field Metadata
+
+The most important information in the field metadata is the field name. This corresponds to the `name` attribute on a form `input` element.
+
+File uploads contain additional metadata: The file name, and optionally, the file content type.
+
+Note that there is no restriction on this metadata. Multiple fields may have the same name (browsers will do this when uploading multiple files), and any of the metadata fields may be missing entirely.
+
+=== Field Body
+
+The field body is represented by a api:io.micronaut.http.body.ByteBody[], which is an asynchronous, streaming API. Large form fields may be processed lazily: As long as you do not consume the data from the `ByteBody`, the form data will not be read from the client, and e.g. an upload may stall. You will also not see any other fields on the main publisher, since they can only be received once all data for the current form field has arrived.
+
+For short form fields, the `ByteBody` may be fully buffered internally, but you should not rely on this.
+
+=== CompletedFileUpload
+
+A api:io.micronaut.http.multipart.CompletedFileUpload[] is similar to a `byte[]` parameter, except that the upload can be buffered to disk instead of memory. This allows you to receive even large files without consuming a lot of memory. This behavior needs to be configured, though.
+
+// TODO: example with `mixed` config properties
+
+The controller is called once the entire file has been uploaded.
+
+NOTE: The uploaded file is automatically deleted when the controller terminates, so if you want to keep it around, you need to move or copy it elsewhere beforehand. You can also call `CompletedFileUpload.moveResource()` to get a new `CompletedFileUpload` instance that sticks around after the controller lifetime.
+
+=== StreamingFileUpload
+
+A api:io.micronaut.http.multipart.StreamingFileUpload[] _lazily_ streams a form field. Your controller can be called before the full content is received. Similar to `RawFormField`, you must consume the input data so that the upload does not stall.
+
+The advantage of `StreamingFileUpload` over `CompletedFileUpload` is that you do not need any disk space, and that you can start streaming the data immediately to e.g. e.g. forward it to a backend service. If the backend is slow to receive the uploaded data, this backpressure will also apply to the browser upload, and that upload will slow down – there is no (significant) buffering in the Micronaut service, unlike with `CompletedFileUpload`.
+
+Note that using `StreamingFileUpload` in combination with other form fields can be tricky. To run your controller, all "normal" form field parameters must have been received, but a `StreamingFileUpload` will pause the request until you consume it in your controller. If the normal parameters actually come _after_ the file upload in the request, this creates a "deadlock". The Micronaut HTTP server will produce an error in this scenario. One possible solution is to replace the "normal" form parameters with publisher-based parameters so that the controller can be executed before those fields are received.
+
+=== Publishers
+
+Publisher parameters let you handle various special scenarios, such as asynchronous binding or handling multiple form fields of the same name.
+
+==== … of completed parts
+
+A publisher of api:io.micronaut.http.multipart.CompletedPart[], api:io.micronaut.http.multipart.CompletedAttribute[] or api:io.micronaut.http.multipart.CompletedFileUpload[] contains the buffered content of the form field. The publisher can produce multiple items if there are multiple values for the same field name.
+
+Note that there is _no backpressure_ on this publisher. To avoid deadlocks with other parameters, the fields will be read in their entirety immediately, even if you haven't subscribed to the publisher yet. Configured form field count and size limits still apply.
+
+// TODO: configurable max file size _shared across multiple files_
+
+==== … of StreamingFileUpload
+
+Similar to the `StreamingFileUpload` parameter described above, except that the controller can be called before the `StreamingFileUpload` is received, and that the publisher can contain multiple uploads of the same name.
+
+Once again, the `StreamingFileUpload` instances exert backpressure on the request, so you must consume them in their entirety before other fields can be processed.
+
+==== … of Publisher
+
+A `Publisher<Publisher<…>>>` behaves similar to `Publisher<StreamingFileUpload>` as described above, allowing you to stream individual fields.
+
+==== … of PartData or anything else
+
+A api:io.micronaut.http.multipart.PartData[] object represents a _piece_ of a form field, containing the field metadata and a piece of the field value buffered in memory. This can also be converted to a `String` or similar type automatically.
+
+For large fields and file uploads, a single field may produce multiple `PartData` objects. If there are multiple fields of the same name, they will also produce multiple `PartData` instances.
+
+This publisher exerts backpressure as described for `StreamingFileUpload`.

@@ -21,10 +21,26 @@ import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.multipart.RawFormField;
 import org.reactivestreams.Publisher;
 
-// TODO: docs
+/**
+ * A request that is <i>capable</i> of parsing form data, though the request does not necessarily
+ * have to contain form data.
+ *
+ * @param <B> The body type
+ */
 public interface FormCapableHttpRequest<B> extends ServerHttpRequest<B>, LifecycleHttpRequest<B> {
+    /**
+     * Get the raw form field publisher. Can only be subscribed to once.
+     *
+     * @return The raw form fields
+     * @throws IllegalStateException If this request does not contain a form body
+     */
     @NonNull
     Publisher<RawFormField> getRawFormFields() throws IllegalStateException;
 
+    /**
+     * Check whether this request contains a form body (url encoded or multipart).
+     *
+     * @return {@code true} if this is a form request
+     */
     boolean hasFormBody();
 }

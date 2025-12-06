@@ -1,0 +1,17 @@
+For a typical web application, the low-level form API is unnecessary. Instead, you will _bind_ individual form fields to controller parameters of different types.
+
+When you bind at least one form field to a controller parameter, the framework will take over the FormCapableHttpRequest, making the body only available through controller argument binding.
+
+There are various buffered and streaming types you can bind form fields to.
+
+=== Standard Types
+
+The simplest binding is a `String`. The framework will wait for the form field to arrive, and then call your controller with the full value of the form field.
+
+// TODO: example from test suite
+
+It is also possible to bind to other simple types, such as `int` or `byte[]`.
+
+Note that if there are multiple form fields of the same name, only the first one is bound. Any later fields are discarded.
+
+===

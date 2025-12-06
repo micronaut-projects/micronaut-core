@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.bind.exceptions.UnsatisfiedArgumentException;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.type.Argument;
+import io.micronaut.http.HttpRequest;
 import io.micronaut.http.body.AvailableByteBody;
 import io.micronaut.http.body.CloseableAvailableByteBody;
 import io.micronaut.http.body.CloseableByteBody;
@@ -34,16 +35,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.charset.Charset;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
-// TODO: docs
+/**
+ * This class distributes fields from {@link FormCapableHttpRequest#getRawFormFields()} to
+ * different argument binders by name.
+ *
+ * @since 5.0.0
+ * @author Jonas Konrad
+ */
 @Internal
 public final class FormRouteCompleter {
     private static final Logger LOG = LoggerFactory.getLogger(FormRouteCompleter.class);
@@ -70,7 +73,15 @@ public final class FormRouteCompleter {
         this.request = request;
     }
 
-    public Publisher<RawFormField> subscribeField(String name, SubscriptionMetadata metadata) {
+    /**
+     * Subscribe to a field of a particular name.
+     *
+     * @param name The field name
+     * @param metadata The subscription metadata, used for detecting and reporting deadlocks
+     * @return The publisher
+     */
+    @NonNull
+    public Publisher<@NonNull RawFormField> subscribeField(@NonNull String name, @NonNull SubscriptionMetadata metadata) {
         if (started) {
             throw new IllegalStateException("FormRouteCompleter already started");
         }
@@ -90,6 +101,10 @@ public final class FormRouteCompleter {
         return fieldUnicasts.containsKey(inputName);
     }
 
+    /**
+     * Start reading the form data. After this method is called, no more fields may be subscribed
+     * to.
+     */
     public void start() {
         if (started) {
             throw new IllegalStateException("FormRouteCompleter already started");
@@ -98,10 +113,21 @@ public final class FormRouteCompleter {
         request.getRawFormFields().subscribe(new SubscriberImpl());
     }
 
+    /**
+     * Stop deadlock detection. This is called immediately before the controller is called. After
+     * this, it's up to the user to properly relieve backpressure on the parameters we've passed to
+     * her.
+     */
     public void stopDeadlockDetection() {
         deadlockDetection = false;
     }
 
+    /**
+     * Convert the full form data into a {@link Map} for {@link HttpRequest#getBody()}.
+     *
+     * @param charset The charset
+     * @return The map
+     */
     public Map<String, Object> mapForGetBody(Charset charset) {
         if (bufferedForGetBody != null) {
             Map<String, List<CloseableByteBody>> b = bufferedForGetBody;

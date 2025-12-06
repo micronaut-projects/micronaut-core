@@ -27,12 +27,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.form.FormCapableHttpRequest;
-import io.micronaut.http.multipart.CompletedAttribute;
-import io.micronaut.http.multipart.CompletedFileUpload;
-import io.micronaut.http.multipart.CompletedPart;
-import io.micronaut.http.multipart.FormFieldMetadata;
-import io.micronaut.http.multipart.RawFormField;
-import io.micronaut.http.multipart.StreamingFileUpload;
+import io.micronaut.http.multipart.*;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.scheduling.TaskExecutors;
 import jakarta.inject.Named;
@@ -57,7 +52,12 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicReference;
 
-// TODO: docs
+/**
+ * Global utility class for form data access.
+ *
+ * @author Jonas Konrad
+ * @since 5.0.0
+ */
 @Internal
 @Singleton
 public final class FormFactory {
@@ -76,11 +76,26 @@ public final class FormFactory {
         return diskWriteExecutor;
     }
 
-    public static FormRouteCompleter getCompleterOrNull(HttpRequest<?> request) {
+    /**
+     * Get the completer for the given request, if it has been created by
+     * {@link #getOrCreateCompleter(HttpRequest)}.
+     *
+     * @param request The request
+     * @return The completer
+     */
+    @Nullable
+    public static FormRouteCompleter getCompleterOrNull(@NonNull HttpRequest<?> request) {
         return request.getAttribute(COMPLETER, FormRouteCompleter.class).orElse(null);
     }
 
-    public FormRouteCompleter getOrCreateCompleter(HttpRequest<?> request) {
+    /**
+     * Create the completer for the given request if necessary.
+     *
+     * @param request The request
+     * @return The completer
+     */
+    @NonNull
+    public FormRouteCompleter getOrCreateCompleter(@NonNull HttpRequest<?> request) {
         if (!(request instanceof FormCapableHttpRequest<?> fchr)) {
             throw new IllegalStateException("Request class " + request + " does not support form binding");
         }
@@ -96,6 +111,14 @@ public final class FormFactory {
         return completer;
     }
 
+    /**
+     * Asynchronously buffer the given field. If the field is determined to be a file upload, data
+     * may be buffered to disk.
+     *
+     * @param request   The request this field came in on
+     * @param formField The field
+     * @return A flow that completes when the full field has been buffered
+     */
     public ExecutionFlow<? extends CompletedPart> completePart(@NonNull FormCapableHttpRequest<?> request, @NonNull RawFormField formField) {
         if (formField.metadata().fileName() == null) {
             return completeAttribute(request, formField);
@@ -104,6 +127,13 @@ public final class FormFactory {
         }
     }
 
+    /**
+     * Asynchronously buffer the given attribute.
+     *
+     * @param request   The request this field came in on
+     * @param formField The field
+     * @return A flow that completes when the full field has been buffered
+     */
     @NonNull
     public ExecutionFlow<CompletedAttribute> completeAttribute(@NonNull FormCapableHttpRequest<?> request, @NonNull RawFormField formField) {
         return InternalByteBody.bufferFlow(formField.byteBody()).map(av -> {
@@ -129,19 +159,15 @@ public final class FormFactory {
         return tds.result;
     }
 
+    /**
+     * Create a new {@link StreamingFileUpload} from the given raw data.
+     *
+     * @param formField The field
+     * @return The streaming upload
+     */
     @NonNull
     public StreamingFileUpload streamFileUpload(@NonNull RawFormField formField) {
         return new StreamingFileUpload(formField, diskWriteExecutor);
-    }
-
-    public void discardAsync(CompletedPart part) {
-        diskWriteExecutor.execute(() -> {
-            try {
-                part.close();
-            } catch (IOException e) {
-                LOG.debug("Failed to close discarded part", e);
-            }
-        });
     }
 
     private PathAndStream moveToDisk(List<ReadBuffer> memory) {
@@ -412,7 +438,8 @@ public final class FormFactory {
         }
     }
 
-    private record PathAndStream(TemporaryFileResource path, OutputStream out) implements Closeable {
+    private record PathAndStream(TemporaryFileResource path,
+                                 OutputStream out) implements Closeable {
         @Override
         public void close() throws IOException {
             try {

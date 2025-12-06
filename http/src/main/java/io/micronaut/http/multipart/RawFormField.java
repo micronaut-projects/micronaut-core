@@ -20,7 +20,13 @@ import io.micronaut.http.body.CloseableByteBody;
 
 import java.io.Closeable;
 
-// TODO: docs
+/**
+ * A raw, streamed form field. Note that processing of other form fields may be stalled until you
+ * consume the {@link #byteBody}!
+ *
+ * @param metadata The field metadata provided by the user
+ * @param byteBody The field bytes
+ */
 public record RawFormField(@NonNull FormFieldMetadata metadata,
                            @NonNull CloseableByteBody byteBody) implements Closeable {
     @Override

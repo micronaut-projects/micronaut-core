@@ -21,14 +21,37 @@ import io.netty.util.ResourceLeakDetector;
 import io.netty.util.ResourceLeakDetectorFactory;
 import io.netty.util.ResourceLeakTracker;
 
-// TODO: docs
+/**
+ * Platform agnostic leak tracking API. Currently only implemented when netty is available.
+ *
+ * @param <T>
+ * @since 5.0.0
+ */
 public interface LeakTracker<T> {
+    /**
+     * Close this tracker. May be called multiple times (idempotent).
+     *
+     * @param trackedObject The tracked object, must match the one passed to
+     * {@link Factory#track(Object)}
+     */
     void close(@NonNull T trackedObject);
 
     interface Factory<T> {
+        /**
+         * Create a new leak tracker.
+         *
+         * @param object The tracked object
+         * @return The leak tracker, o {@code null} if this object should not be tracked
+         */
         @Nullable
         LeakTracker<T> track(@NonNull T object);
 
+        /**
+         * Create a new leak tracker factory for the given tracked object type.
+         *
+         * @param trackedClass The type to track
+         * @return The tracker factory
+         */
         @NonNull
         static <T> Factory<T> forClass(@NonNull Class<T> trackedClass) {
             if (LeakTrackerFactoryHolder.nettyAvailable) {
