@@ -39,6 +39,7 @@ import java.nio.file.StandardWatchEventKinds;
 import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -125,6 +126,7 @@ public class PyronautFileWatcher implements Runnable {
 
                 if (hasChanges) {
                     if (starting.compareAndSet(false, true)) {
+                        long sd = System.nanoTime();
                         // TODO: ideally we should keep the existing app alive until
                         // we know that all files are compiled properly. This is difficult
                         // to implement because the generated classes contain an absolute
@@ -134,6 +136,9 @@ public class PyronautFileWatcher implements Runnable {
                         System.out.println("Changes detected, recompiling and restarting...");
                         if (compile(truffleClassloader) == SUCCESS) {
                             appManager.startApplication(parameters);
+                            long ed = System.nanoTime();
+                            var dur = Duration.ofNanos(ed-sd).toMillis();
+                            System.out.println("Restart done in " + dur + "ms");
                         } else {
                             System.err.println("Compilation failed, application not restarted");
                         }
@@ -177,6 +182,7 @@ public class PyronautFileWatcher implements Runnable {
      * the compiler and the runtime. This is done because Truffle
      * doesn't support loading in different classloaders without
      * falling back to interpreted mode.
+     *
      * @param name the name of a file
      * @return true if it belongs to the Truffle runtime
      */
@@ -213,7 +219,7 @@ public class PyronautFileWatcher implements Runnable {
         compiler.outputDirectory = outputDirectory.toFile();
         compiler.annotationProcessorPath = annotationProcessorPath;
         compiler.classpath = compileClassPath;
-
+        System.out.println("Compiling...");
         try {
             recurseDelete(classesDirectory());
             createDirectories(classesDirectory());
@@ -233,7 +239,7 @@ public class PyronautFileWatcher implements Runnable {
     }
 
     private URL[] buildUrls(Path... paths) throws MalformedURLException {
-        var result = new ArrayList<URL>(1+paths.length + compileClassPath.size());
+        var result = new ArrayList<URL>(1 + paths.length + compileClassPath.size());
         for (var path : paths) {
             result.add(path.toUri().toURL());
         }
@@ -264,11 +270,13 @@ public class PyronautFileWatcher implements Runnable {
 
         private ApplicationManagerInvoker(ClassLoader classLoader) {
             try {
-                var clazz = classLoader.loadClass("io.micronaut.python.cli.DefaultApplicationManager");
+                var clazz =
+                    classLoader.loadClass("io.micronaut.python.cli.DefaultApplicationManager");
                 var lookup = MethodHandles.privateLookupIn(clazz, MethodHandles.lookup());
                 var voidType = MethodType.methodType(void.class);
                 constructor = lookup.findConstructor(clazz, voidType);
-                startMethod = lookup.findVirtual(clazz, "startApplication", MethodType.methodType(void.class, String[].class));
+                startMethod = lookup.findVirtual(clazz, "startApplication",
+                    MethodType.methodType(void.class, String[].class));
                 stoptMethod = lookup.findVirtual(clazz, "stopApplication", voidType);
             } catch (Throwable e) {
                 throw new RuntimeException(e);

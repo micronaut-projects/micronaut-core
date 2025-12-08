@@ -56,18 +56,18 @@ public class PyronautInstallCommand extends BaseSourceCommand {
     private void installDependencies(Path tomlFile) {
         var outputDir = pyronautVenvCacheDir().resolve("dependencies").toAbsolutePath();
         try (var templateSource = PyronautInstallCommand.class.getResourceAsStream(
-            "build.gradle.template")) {
+            "template.build.gradle")) {
             var pyProject = Toml.parse(tomlFile);
             var repositories = buildRepositoriesBlock(pyProject);
             var scopes = this.scope != null ? List.of(scope) :
                 List.copyOf(pyProject.getTableOrEmpty("tool.pyronaut.dependencies").keySet());
             var template = new String(templateSource.readAllBytes(), StandardCharsets.UTF_8)
-                .replace("%REPOSITORIES%", repositories);
+                .replace("// %REPOSITORIES%", repositories);
             for (var scope : scopes) {
                 var destination = outputDir.resolve(scope);
                 System.out.println("Resolving " + scope + " dependencies into " + destination);
                 var buildScript = template.replace("%DESTINATION_DIR%", destination.toString())
-                    .replace("%DEPENDENCIES%",
+                    .replace("// %DEPENDENCIES%",
                         buildDependenciesList(pyProject, extraDependencies, scope));
                 var tmpDir = Files.createTempDirectory("pyronaut");
                 Files.write(tmpDir.resolve("settings.gradle"),

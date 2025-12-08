@@ -20,6 +20,8 @@ import io.micronaut.python.cli.commands.PyronautInstallCommand;
 import io.micronaut.python.cli.commands.PyronautRunCommand;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Model.CommandSpec;
+import picocli.CommandLine.Spec;
 
 import java.util.concurrent.Callable;
 
@@ -27,12 +29,15 @@ import java.util.concurrent.Callable;
     PyronautCleanCommand.class,
     PyronautRunCommand.class,
     PyronautInstallCommand.class
-})
-public class PyronautMainCommand implements Callable<Integer> {
+}, mixinStandardHelpOptions = true)
+public class PyronautMainCommand implements Callable<Void> {
+    @Spec
+    CommandSpec spec;
 
     @Override
-    public Integer call() throws Exception {
-        return 0;
+    public Void call() {
+        spec.commandLine().usage(System.out);
+        return null;
     }
 
     public static void main(String[] args) {
