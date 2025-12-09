@@ -107,7 +107,7 @@ class LoomCarrierSpec extends Specification {
         @Inject
         JsonMapper jsonMapper
 
-        @ExecuteOn(TaskExecutors.BLOCKING)
+        @ExecuteOn(TaskExecutors.VIRTUAL)
         @Get
         ThreadInfo threadInfo() {
             return new ThreadInfo(
@@ -116,7 +116,7 @@ class LoomCarrierSpec extends Specification {
             )
         }
 
-        @ExecuteOn(TaskExecutors.BLOCKING)
+        @ExecuteOn(TaskExecutors.VIRTUAL)
         @Get("/loop-jdk")
         String loopJdk() {
             def scheduler = EventLoopVirtualThreadScheduler.current()
@@ -138,13 +138,13 @@ class LoomCarrierSpec extends Specification {
             }
         }
 
-        @ExecuteOn(TaskExecutors.BLOCKING)
+        @ExecuteOn(TaskExecutors.VIRTUAL)
         @Get("/loop-mn")
         String loopMn() {
             return client.toBlocking().retrieve("/loom-carrier")
         }
 
-        @ExecuteOn(TaskExecutors.BLOCKING)
+        @ExecuteOn(TaskExecutors.VIRTUAL)
         @Get("/loop-read")
         LoopRead loopRead() {
             def before = threadInfo()

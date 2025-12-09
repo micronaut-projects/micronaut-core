@@ -189,7 +189,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             .getEventPublisher(HttpRequestReceivedEvent.class);
         final Supplier<ExecutorService> ioExecutor = SupplierUtil.memoized(() ->
             nettyEmbeddedServices.getExecutorSelector()
-                .select(TaskExecutors.BLOCKING).orElse(null)
+                .select(TaskExecutors.VIRTUAL).orElse(null)
         );
         this.routingHandler = new RoutingInBoundHandler(
             serverConfiguration,

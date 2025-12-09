@@ -63,7 +63,7 @@ class NonMutableResponseSpec extends Specification {
         ResponseClient responseClient
 
         @Get('/test/non-mutable')
-        @ExecuteOn(TaskExecutors.BLOCKING)
+        @ExecuteOn(TaskExecutors.VIRTUAL)
         HttpResponse<String> go() {
             responseClient.go()
         }

@@ -89,7 +89,7 @@ public class UploadController {
     }
 
     @Post(value = "/receive-file-upload-input-stream", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
-    @ExecuteOn(TaskExecutors.BLOCKING)
+    @ExecuteOn(TaskExecutors.VIRTUAL)
     public String receiveFileUploadInputStream(StreamingFileUpload data) throws IOException {
         try (InputStream stream = data.asInputStream()) {
             return new String(stream.readAllBytes(), StandardCharsets.UTF_8);

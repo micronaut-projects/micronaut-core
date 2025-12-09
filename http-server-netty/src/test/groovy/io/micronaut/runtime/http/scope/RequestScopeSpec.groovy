@@ -229,7 +229,7 @@ class RequestScopeSpec extends AbstractMicronautSpec {
         }
 
         @Get("/test-simple-request-scope")
-        @ExecuteOn(TaskExecutors.BLOCKING)
+        @ExecuteOn(TaskExecutors.VIRTUAL)
         String test() {
             return simpleRequestBean.sayHello()
         }

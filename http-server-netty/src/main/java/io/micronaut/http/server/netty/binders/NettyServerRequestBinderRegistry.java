@@ -53,7 +53,7 @@ public final class NettyServerRequestBinderRegistry implements RequestBinderRegi
     public NettyServerRequestBinderRegistry(ConversionService conversionService,
                                             List<RequestArgumentBinder> binders,
                                             BeanProvider<NettyHttpServerConfiguration> httpServerConfiguration,
-                                            @Named(TaskExecutors.BLOCKING)
+                                            @Named(TaskExecutors.VIRTUAL)
                                             BeanProvider<ExecutorService> executorService,
                                             MessageBodyHandlerRegistry bodyHandlerRegistry) {
 

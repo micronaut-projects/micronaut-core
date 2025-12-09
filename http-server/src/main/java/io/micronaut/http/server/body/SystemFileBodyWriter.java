@@ -68,7 +68,7 @@ public final class SystemFileBodyWriter extends AbstractFileBodyWriter implement
 
     private final ExecutorService ioExecutor;
 
-    public SystemFileBodyWriter(HttpServerConfiguration.FileTypeHandlerConfiguration configuration, @Named(TaskExecutors.BLOCKING) ExecutorService ioExecutor) {
+    public SystemFileBodyWriter(HttpServerConfiguration.FileTypeHandlerConfiguration configuration, @Named(TaskExecutors.VIRTUAL) ExecutorService ioExecutor) {
         super(configuration);
         this.ioExecutor = ioExecutor;
     }

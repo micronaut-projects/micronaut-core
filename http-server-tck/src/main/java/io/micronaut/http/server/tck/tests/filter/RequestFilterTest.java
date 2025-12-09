@@ -445,7 +445,7 @@ public class RequestFilterTest {
         }
 
         @RequestFilter("/request-filter/binding")
-        @ExecuteOn(TaskExecutors.BLOCKING)
+        @ExecuteOn(TaskExecutors.VIRTUAL)
         public void requestFilterBinding(
             @Header String contentType,
             @Body byte[] bytes,
@@ -501,7 +501,7 @@ public class RequestFilterTest {
         }
 
         @RequestFilter("/request-filter/continuation-blocking")
-        @ExecuteOn(TaskExecutors.BLOCKING)
+        @ExecuteOn(TaskExecutors.VIRTUAL)
         public void requestFilterContinuationBlocking(HttpRequest<?> request, FilterContinuation<HttpResponse<?>> continuation) {
             request.setAttribute("foo", "bar");
             HttpResponse<?> r = continuation.proceed();
@@ -515,7 +515,7 @@ public class RequestFilterTest {
         }
 
         @RequestFilter("/request-filter/continuation-update-request")
-        @ExecuteOn(TaskExecutors.BLOCKING)
+        @ExecuteOn(TaskExecutors.VIRTUAL)
         public void requestFilterContinuationUpdateRequest(FilterContinuation<HttpResponse<?>> continuation) {
             // won't affect the routing decision, but will appear in the controller
             continuation.request(HttpRequest.GET("/request-filter/continuation-update-request-2"));

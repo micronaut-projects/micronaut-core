@@ -43,7 +43,7 @@ public class GoogleAuthFilter {
     }
 
     @RequestFilter
-    @ExecuteOn(TaskExecutors.BLOCKING)
+    @ExecuteOn(TaskExecutors.VIRTUAL)
     public void filter(MutableHttpRequest<?> request) throws Exception {
         String uri = encodeURI(request);
         String t = authClientProvider.get().toBlocking().retrieve(HttpRequest.GET(uri) // <2>

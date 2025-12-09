@@ -56,7 +56,7 @@ public class RootRoutingTest {
 
     @Requires(property = "spec.name", value = SPEC_NAME)
     @Controller
-    @ExecuteOn(TaskExecutors.BLOCKING)
+    @ExecuteOn(TaskExecutors.VIRTUAL)
     static class MyController {
 
         @Post

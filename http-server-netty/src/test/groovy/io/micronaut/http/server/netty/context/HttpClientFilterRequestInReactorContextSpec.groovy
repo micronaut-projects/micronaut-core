@@ -115,7 +115,7 @@ class HttpClientFilterRequestInReactorContextSpec extends Specification {
         @Get("/foo")
         @Produces(MediaType.TEXT_PLAIN)
         @SingleResult
-        @ExecuteOn(TaskExecutors.BLOCKING)
+        @ExecuteOn(TaskExecutors.VIRTUAL)
         String foo() {
             fooClient.hello()
         }
@@ -123,7 +123,7 @@ class HttpClientFilterRequestInReactorContextSpec extends Specification {
         @Get("/bar")
         @Produces(MediaType.TEXT_PLAIN)
         @SingleResult
-        @ExecuteOn(TaskExecutors.BLOCKING)
+        @ExecuteOn(TaskExecutors.VIRTUAL)
         String bar() {
             fooClient.hello()
         }

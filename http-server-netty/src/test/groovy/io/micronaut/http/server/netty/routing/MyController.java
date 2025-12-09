@@ -12,7 +12,7 @@ import java.util.List;
 
 @Requires(property = "spec.name", value = "RootRoutingTest")
 @Controller
-@ExecuteOn(TaskExecutors.BLOCKING)
+@ExecuteOn(TaskExecutors.VIRTUAL)
 public class MyController {
 
     @Post

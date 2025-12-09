@@ -128,7 +128,7 @@ class FiltersPropagatedContextSpec8 extends Specification {
     static class Filter1 implements Ordered {
 
         @RequestFilter
-        @ExecuteOn(TaskExecutors.BLOCKING)
+        @ExecuteOn(TaskExecutors.VIRTUAL)
         MutableHttpResponse<?> myFilter(HttpRequest<?> request,
                                         FilterContinuation<MutableHttpResponse<?>> continuation,
                                         MutablePropagatedContext mutablePropagatedContext) {

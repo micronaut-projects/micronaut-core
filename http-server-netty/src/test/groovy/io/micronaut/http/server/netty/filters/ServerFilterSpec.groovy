@@ -139,7 +139,7 @@ class ServerFilterSpec extends Specification {
     @Singleton
     @Requires(property = "spec.name", value = "ServerFilterSpec")
     @ServerFilter("/blocking-filter/**")
-    @ExecuteOn(TaskExecutors.BLOCKING)
+    @ExecuteOn(TaskExecutors.VIRTUAL)
     static class BlockingFilter {
         def events = new ArrayList<String>()
 

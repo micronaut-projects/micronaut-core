@@ -48,7 +48,7 @@ class FilterFormSpec extends Specification {
     @ServerFilter("/form-error")
     static class Fltr {
         @RequestFilter
-        @ExecuteOn(TaskExecutors.BLOCKING)
+        @ExecuteOn(TaskExecutors.VIRTUAL)
         void filterRequest() {
         }
     }

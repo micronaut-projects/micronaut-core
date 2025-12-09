@@ -196,7 +196,7 @@ class ServerPreFilterSpec extends Specification {
     @Singleton
     @Requires(property = "spec.name", value = "ServerPreFilterSpec")
     @ServerFilter("/blocking-filter/**")
-    @ExecuteOn(TaskExecutors.BLOCKING)
+    @ExecuteOn(TaskExecutors.VIRTUAL)
     static class BlockingFilter {
         def events = new ArrayList<String>()
 
@@ -329,7 +329,7 @@ class ServerPreFilterSpec extends Specification {
     @Singleton
     @Requires(property = "spec.name", value = "ServerPreFilterSpec")
     @ServerFilter("/blocking-pre-matching-filter/**")
-    @ExecuteOn(TaskExecutors.BLOCKING)
+    @ExecuteOn(TaskExecutors.VIRTUAL)
     static class BlockingPreMatchingFilter {
         def events = new ArrayList<String>()
 

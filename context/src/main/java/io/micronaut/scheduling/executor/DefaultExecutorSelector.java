@@ -59,7 +59,7 @@ public class DefaultExecutorSelector implements ExecutorSelector {
     protected DefaultExecutorSelector(
         BeanLocator beanLocator,
         @jakarta.inject.Named(TaskExecutors.IO) BeanProvider<ExecutorService> ioExecutor,
-        @jakarta.inject.Named(TaskExecutors.BLOCKING) BeanProvider<ExecutorService> blockingExecutor) {
+        @jakarta.inject.Named(TaskExecutors.VIRTUAL) BeanProvider<ExecutorService> blockingExecutor) {
         this.beanLocator = beanLocator;
         this.ioExecutor = SupplierUtil.memoized(ioExecutor::get);
         this.blockingExecutor = SupplierUtil.memoized(blockingExecutor::get);

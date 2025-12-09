@@ -9,7 +9,7 @@ import org.slf4j.MDC;
 
 @Requires(property = "spec.name", value = "PropagatedContextExceptionHandlerTest")
 @Controller("/blocking")
-@ExecuteOn(TaskExecutors.BLOCKING)
+@ExecuteOn(TaskExecutors.VIRTUAL)
 public class BlockingController {
 
     @Get

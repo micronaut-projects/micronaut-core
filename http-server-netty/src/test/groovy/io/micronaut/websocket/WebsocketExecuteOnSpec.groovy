@@ -130,7 +130,7 @@ class WebsocketExecuteOnSpec extends Specification {
 
     @Requires(property = "spec.name", value = "WebsocketExecuteOnSpec")
     @ServerWebSocket("/echo/sync")
-    @ExecuteOn(TaskExecutors.BLOCKING)
+    @ExecuteOn(TaskExecutors.VIRTUAL)
     static class SynchronousEchoServerWebSocket {
 
         @Inject
@@ -167,7 +167,7 @@ class WebsocketExecuteOnSpec extends Specification {
 
     @Requires(property = "spec.name", value = "WebsocketExecuteOnSpec")
     @ServerWebSocket("/echo/reactive")
-    @ExecuteOn(TaskExecutors.BLOCKING)
+    @ExecuteOn(TaskExecutors.VIRTUAL)
     static class ReactiveEchoServerWebSocket {
 
         @Inject
@@ -211,7 +211,7 @@ class WebsocketExecuteOnSpec extends Specification {
 
     @Requires(property = "spec.name", value = "WebsocketExecuteOnSpec")
     @ServerWebSocket("/echo/async")
-    @ExecuteOn(TaskExecutors.BLOCKING)
+    @ExecuteOn(TaskExecutors.VIRTUAL)
     static class AsyncEchoServerWebSocket {
 
         @Inject
