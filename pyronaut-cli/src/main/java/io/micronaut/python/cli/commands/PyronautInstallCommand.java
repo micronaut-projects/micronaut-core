@@ -19,8 +19,6 @@ import org.gradle.tooling.GradleConnector;
 import org.gradle.tooling.events.OperationType;
 import org.gradle.tooling.events.ProgressEvent;
 import org.tomlj.Toml;
-import com.github.marschall.toml.TomlBuilder;
-import com.github.marschall.toml.TomlTableBuilder;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
