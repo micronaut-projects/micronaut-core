@@ -19,10 +19,11 @@ package io.micronaut.python.cli;
 //import io.micronaut.core.naming.Described;
 
 import io.micronaut.python.cli.util.FileUtils;
+import io.micronaut.python.cli.util.MavenArtifact;
+import io.micronaut.python.cli.util.PythonMavenRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
 import java.io.IOException;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
@@ -30,18 +31,10 @@ import java.lang.invoke.MethodType;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
-import java.nio.file.FileSystems;
-import java.nio.file.FileVisitResult;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.StandardWatchEventKinds;
-import java.nio.file.WatchKey;
-import java.nio.file.WatchService;
+import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -59,21 +52,21 @@ public class PyronautFileWatcher implements Runnable {
     public static final int ERROR = -1;
 
     private final Path sourceDirectory;
-    private final List<File> annotationProcessorPath;
-    private final List<File> compileClassPath;
+    private final PythonMavenRepository annotationProcessorRepo;
+    private final PythonMavenRepository compileClassPathRepo;
     private final Path outputDirectory;
     private final String[] parameters;
     private final AtomicBoolean running = new AtomicBoolean(true);
     private final AtomicBoolean starting = new AtomicBoolean(false);
 
     public PyronautFileWatcher(Path sourceDirectory,
-                               List<File> annotationProcessorPath,
-                               List<File> compileClassPath,
+                               PythonMavenRepository annotationProcessorRepo,
+                               PythonMavenRepository compileClassPathRepo,
                                String[] parameters) {
         this.sourceDirectory = sourceDirectory.toAbsolutePath();
         this.outputDirectory = FileUtils.resolveOutputDirectory(sourceDirectory);
-        this.annotationProcessorPath = annotationProcessorPath;
-        this.compileClassPath = compileClassPath;
+        this.annotationProcessorRepo = annotationProcessorRepo;
+        this.compileClassPathRepo = compileClassPathRepo;
         this.parameters = parameters;
     }
 
@@ -81,13 +74,13 @@ public class PyronautFileWatcher implements Runnable {
     public void run() {
         ApplicationManager appManager = null;
         try {
-            var truffleClassloader = createTruffleClassLoader(compileClassPath);
+            var truffleClassloader = createTruffleClassLoader(compileClassPathRepo);
             // Initial compilation and start
             if (compile(truffleClassloader) != SUCCESS) {
                 System.err.println("Initial compilation failed");
                 return;
             }
-            var classpath = buildUrls(classesDirectory(), sourceDirectory);
+            var classpath = buildUrls(classesDirectory(), sourceDirectory.resolve("config"));
             var classLoader = new URLClassLoader(classpath, truffleClassloader);
             appManager = new ApplicationManagerInvoker(classLoader);
             appManager.startApplication(parameters);
@@ -137,7 +130,7 @@ public class PyronautFileWatcher implements Runnable {
                         if (compile(truffleClassloader) == SUCCESS) {
                             appManager.startApplication(parameters);
                             long ed = System.nanoTime();
-                            var dur = Duration.ofNanos(ed-sd).toMillis();
+                            var dur = Duration.ofNanos(ed - sd).toMillis();
                             System.out.println("Restart done in " + dur + "ms");
                         } else {
                             System.err.println("Compilation failed, application not restarted");
@@ -157,45 +150,39 @@ public class PyronautFileWatcher implements Runnable {
         }
     }
 
-    private URLClassLoader createTruffleClassLoader(List<File> classpath) {
-        var urls = classpath.stream()
+    private URLClassLoader createTruffleClassLoader(PythonMavenRepository repo) {
+        var urls = repo.visitRepo(PyronautFileWatcher::isTruffleJar)
+            .stream()
             .map(f -> {
-                var name = f.getName();
-                if (isTruffleJar(name)) {
-                    try {
-                        return f.toURI().toURL();
-                    } catch (MalformedURLException e) {
-                        return null;
-                    }
+                try {
+                    return f.toURI().toURL();
+                } catch (MalformedURLException e) {
+                    return null;
                 }
-                return null;
             })
             .filter(Objects::nonNull)
             .toList()
             .toArray(new URL[0]);
-        return new URLClassLoader(urls, this.getClass().getClassLoader().getParent());
+        var parent = this.getClass().getClassLoader().getParent();
+        return new URLClassLoader(urls, parent);
     }
 
     /**
-     * A hackish way to put the Truffle and GraalVM Polyglot jars
-     * into a parent classloader which is used as the parent of both
-     * the compiler and the runtime. This is done because Truffle
-     * doesn't support loading in different classloaders without
-     * falling back to interpreted mode.
+     * Determines if a Maven artifact is supposed to belong to the
+     * Truffle/GraalVM engine, in which case it needs to be put in
+     * a parent classloader.
      *
      * @param name the name of a file
      * @return true if it belongs to the Truffle runtime
      */
-    private static boolean isTruffleJar(String name) {
-        return name.startsWith("truffle-") ||
-               name.startsWith("python-") ||
-               name.startsWith("polyglot-") ||
-               name.startsWith("icu4j-") ||
-               name.startsWith("regex-") ||
-               name.startsWith("nativeimage-") ||
-               name.startsWith("jniutils-") ||
-               name.startsWith("xz-") ||
-               name.startsWith("word-");
+    private static boolean isTruffleJar(MavenArtifact name) {
+        if (name.groupId().startsWith("org.graalvm")) {
+            return true;
+        }
+        if (name.groupId().equals("org.bouncycastle")) {
+            return true;
+        }
+        return false;
     }
 
     private void registerAll(Path start, WatchService watchService) throws IOException {
@@ -217,8 +204,8 @@ public class PyronautFileWatcher implements Runnable {
         compiler.classLoader = truffleClassloader;
         compiler.sourceDirectory = sourceDirectory.toFile();
         compiler.outputDirectory = outputDirectory.toFile();
-        compiler.annotationProcessorPath = annotationProcessorPath;
-        compiler.classpath = compileClassPath;
+        compiler.annotationProcessorPath = annotationProcessorRepo.asClasspath();
+        compiler.classpath = compileClassPathRepo.asClasspath();
         System.out.println("Compiling...");
         try {
             recurseDelete(classesDirectory());
@@ -239,15 +226,14 @@ public class PyronautFileWatcher implements Runnable {
     }
 
     private URL[] buildUrls(Path... paths) throws MalformedURLException {
+        var compileClassPath = compileClassPathRepo.visitRepo(a -> !isTruffleJar(a));
         var result = new ArrayList<URL>(1 + paths.length + compileClassPath.size());
         for (var path : paths) {
             result.add(path.toUri().toURL());
         }
         for (var file : compileClassPath) {
             var url = file.toURI().toURL();
-            if (!isTruffleJar(file.getName())) {
-                result.add(url);
-            }
+            result.add(url);
         }
         // This is a hack, so that the launcher is on classpath of the user app
         // and it won't work in a native image

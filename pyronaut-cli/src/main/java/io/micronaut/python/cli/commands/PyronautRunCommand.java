@@ -16,6 +16,7 @@
 package io.micronaut.python.cli.commands;
 
 import io.micronaut.python.cli.PyronautFileWatcher;
+import io.micronaut.python.cli.util.PythonMavenRepository;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
 
@@ -27,13 +28,16 @@ public class PyronautRunCommand extends BaseSourceCommand {
     @Override
     public Integer call() throws Exception {
         var sourceDirectory = resolveSourceDir();
-        var annotationProcessorPath = asClasspath(annotationProcessorDependenciesDir());
-        var compileClassPath = asClasspath(compileDependenciesDir());
-        if (compileClassPath.isEmpty()) {
+        var compileDependencies = PythonMavenRepository.inspect(compileDependenciesDir());
+        if (compileDependencies.isEmpty()) {
             System.err.println("Pyronaut dependencies not found. Did you run `pyronaut install`?");
             return -1;
         }
-        var watcher = new PyronautFileWatcher(sourceDirectory, annotationProcessorPath, compileClassPath, parameters);
+        var annotationProcDependencies = PythonMavenRepository.inspect(annotationProcessorDependenciesDir());
+        var watcher = new PyronautFileWatcher(sourceDirectory,
+            annotationProcDependencies,
+            compileDependencies,
+            parameters);
         var watcherThread = new Thread(watcher);
         watcherThread.start();
 

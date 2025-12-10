@@ -15,6 +15,10 @@
  */
 package io.micronaut.python.cli.commands;
 
+import io.micronaut.python.cli.util.FileUtils;
+
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.Callable;
 
@@ -33,5 +37,37 @@ abstract class BaseCommand implements Callable<Integer> {
 
     protected Path compileDependenciesDir() {
         return pyronautVenvCacheDir().resolve("dependencies/compile");
+    }
+
+    protected void withTemporaryDir(TempDirSink tempDirConsumer) {
+        withTemporaryDir((TempDirConsumer<Void>) tmpDir -> {
+            tempDirConsumer.accept(tmpDir);
+            return null;
+        });
+    }
+
+    protected <T> T withTemporaryDir(TempDirConsumer<T> tempDirConsumer) {
+        try {
+            var tmpDir = Files.createTempDirectory("pyronaut");
+            try {
+                return tempDirConsumer.consume(tmpDir);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            } finally {
+                FileUtils.recurseDelete(tmpDir);
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @FunctionalInterface
+    interface TempDirConsumer<T> {
+        T consume(Path tmpDir) throws Exception;
+    }
+
+    @FunctionalInterface
+    interface TempDirSink {
+        void accept(Path tmpDir) throws Exception;
     }
 }

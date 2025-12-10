@@ -17,6 +17,7 @@ package io.micronaut.python.cli;
 
 import io.micronaut.python.cli.commands.PyronautCleanCommand;
 import io.micronaut.python.cli.commands.PyronautInstallCommand;
+import io.micronaut.python.cli.commands.PyronautNativeCompileCommand;
 import io.micronaut.python.cli.commands.PyronautRunCommand;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
@@ -28,7 +29,8 @@ import java.util.concurrent.Callable;
 @Command(name = "pyronaut", description = "The Pyronaut CLI", subcommands = {
     PyronautCleanCommand.class,
     PyronautRunCommand.class,
-    PyronautInstallCommand.class
+    PyronautInstallCommand.class,
+    PyronautNativeCompileCommand.class
 }, mixinStandardHelpOptions = true)
 public class PyronautMainCommand implements Callable<Void> {
     @Spec

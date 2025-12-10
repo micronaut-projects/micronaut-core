@@ -62,7 +62,7 @@ public class GraalPyContextFactory {
 
         try {
             var classLoader = applicationContext.getClassLoader();
-            var beacon = classLoader.loadClass(PYRONAUT_MAIN_CLASS);
+            var beacon = findBeacon(classLoader);
             var builder = GraalPyResources.contextBuilder(VirtualFileSystem.newBuilder()
                     .resourceDirectory(APPLICATION_PATH)
                     .resourceLoadingClass(beacon).build())
@@ -94,6 +94,15 @@ public class GraalPyContextFactory {
         } catch (Exception e) {
             throw new ApplicationStartupException(
                 "Failed to initialize GraalPy context: " + e.getMessage(), e);
+        }
+    }
+
+    private static Class<?> findBeacon(ClassLoader classLoader) {
+        try {
+            return classLoader.loadClass(PYRONAUT_MAIN_CLASS);
+        } catch (ClassNotFoundException e) {
+            // will happen when compiled as a native image
+            return GraalPyContextFactory.class;
         }
     }
 

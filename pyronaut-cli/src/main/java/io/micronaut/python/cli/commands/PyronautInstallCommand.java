@@ -19,7 +19,6 @@ import org.gradle.tooling.GradleConnector;
 import org.gradle.tooling.events.OperationType;
 import org.gradle.tooling.events.ProgressEvent;
 import org.tomlj.Toml;
-import org.tomlj.TomlParseResult;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
@@ -30,11 +29,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 @Command(name = "install", description = "Installs Pyronaut dependencies", mixinStandardHelpOptions = true)
-public class PyronautInstallCommand extends BaseSourceCommand {
+public class PyronautInstallCommand extends AbstractPyronautDependencyResolutionAwareCommand {
     @Option(names = {"--scope"}, required = false)
     String scope;
 
@@ -92,52 +89,6 @@ public class PyronautInstallCommand extends BaseSourceCommand {
 
     private static void logEvent(ProgressEvent event) {
         System.out.println(event.getDisplayName());
-    }
-
-    private String buildRepositoriesBlock(TomlParseResult pyProject) {
-        var sb = new StringBuilder();
-        var repos = pyProject.getArray("tool.pyronaut.repositories");
-        if (repos == null || repos.isEmpty()) {
-            sb.append("    mavenCentral()\n");
-        } else {
-            for (var repo : repos.toList()) {
-                if (repo instanceof String repoName) {
-                    if ("mavenCentral".equals(repoName)) {
-                        sb.append("    mavenCentral()\n");
-                    } else if ("mavenLocal".equals(repoName)) {
-                        sb.append("    mavenLocal()\n");
-                    } else {
-                        sb.append("    maven { url =\"").append(repoName).append("\" }\n");
-                    }
-                }
-            }
-        }
-        return sb.toString();
-    }
-
-    private String buildDependenciesList(TomlParseResult pyProject, List<String> extraDependencies,
-                                         String scope) throws IOException {
-        var depsArray = pyProject.getArray("tool.pyronaut.dependencies." + scope);
-        if (depsArray == null && extraDependencies.isEmpty()) {
-            return "";
-        }
-        var bomVersion = pyProject.getString("tool.pyronaut.version");
-        String platform = null;
-        if (bomVersion != null) {
-            // TODO: Should be replaced with platform BOM, not core BOM, when we have a milestone
-            platform =
-                "    implementation(platform(\"io.micronaut:micronaut-core-bom:" + bomVersion + "\"))\n"+
-                "    implementation(platform(\"io.micronaut.platform:micronaut-platform:4.10.2\"))\n";
-        }
-        var allDependencies = depsArray == null ? extraDependencies.stream() :
-            Stream.concat(depsArray.toList().stream(), extraDependencies.stream());
-        var deps = allDependencies
-            .map(d -> "    implementation(\"" + d + "\")")
-            .collect(Collectors.joining("\n"));
-        if (platform != null) {
-            return platform + "\n" + deps;
-        }
-        return deps;
     }
 
 }

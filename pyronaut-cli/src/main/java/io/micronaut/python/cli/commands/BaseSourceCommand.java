@@ -15,11 +15,8 @@
  */
 package io.micronaut.python.cli.commands;
 
-import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
 
 abstract class BaseSourceCommand extends BaseCommand {
     protected Path resolveSourceDir() {
@@ -28,18 +25,5 @@ abstract class BaseSourceCommand extends BaseCommand {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-    }
-
-    protected static List<File> asClasspath(Path dependenciesDir) {
-        if (Files.isDirectory(dependenciesDir)) {
-            try (var walker = Files.walk(dependenciesDir)) {
-                return walker.map(Path::toFile)
-                    .filter(f -> f.getName().endsWith(".jar"))
-                    .toList();
-            } catch (IOException ex) {
-                return List.of();
-            }
-        }
-        return List.of();
     }
 }
