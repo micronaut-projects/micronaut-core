@@ -19,6 +19,8 @@ import org.gradle.tooling.GradleConnector;
 import org.gradle.tooling.events.OperationType;
 import org.gradle.tooling.events.ProgressEvent;
 import org.tomlj.Toml;
+import com.github.marschall.toml.TomlBuilder;
+import com.github.marschall.toml.TomlTableBuilder;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
@@ -43,6 +45,13 @@ public class PyronautInstallCommand extends AbstractPyronautDependencyResolution
         var sourceDirectory = resolveSourceDir();
         var tomlFile = sourceDirectory.resolve("pyproject.toml");
         if (Files.exists(tomlFile)) {
+            if (!extraDependencies.isEmpty()) {
+                try {
+                    mutateTomlWithDependencies(tomlFile, extraDependencies, scope);
+                } catch (IOException e) {
+                    throw new RuntimeException("Failed to update pyproject.toml", e);
+                }
+            }
             installDependencies(tomlFile);
         } else {
             System.out.println("No pyproject.toml file found.");
@@ -84,6 +93,65 @@ public class PyronautInstallCommand extends AbstractPyronautDependencyResolution
 
         } catch (IOException e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * Adds new dependencies under [tool.pyronaut.dependencies.<scope>] in the TOML.
+     */
+    private void mutateTomlWithDependencies(Path tomlFile, List<String> newDeps, String scope) throws IOException {
+        // Read original TOML lines
+        List<String> lines = Files.readAllLines(tomlFile);
+        String sectionHeader;
+        if (scope == null) {
+            // fallback to "default" if not specified
+            scope = "default";
+        }
+        sectionHeader = "[tool.pyronaut.dependencies." + scope + "]";
+        boolean foundSection = false, added = false;
+        int i = 0;
+
+        while (i < lines.size()) {
+            String line = lines.get(i).trim();
+            if (line.equals(sectionHeader)) {
+                foundSection = true;
+                // Insert after the section header, skip any existing deps with same name
+                i++;
+                for (String dep : newDeps) {
+                    String depKey = dep.split("[ =]", 2)[0].trim();
+                    boolean alreadyDeclared = false;
+                    int j = i;
+                    while (j < lines.size() && !lines.get(j).startsWith("[")) {
+                        if (lines.get(j).trim().startsWith(depKey + " ")) {
+                            alreadyDeclared = true;
+                            break;
+                        }
+                        j++;
+                    }
+                    if (!alreadyDeclared) {
+                        lines.add(i, dep + " = \"*\""); // naive, could parse versions
+                        i++;
+                        added = true;
+                    }
+                }
+                break;
+            }
+            i++;
+        }
+        if (!foundSection) {
+            // add section at end
+            lines.add("");
+            lines.add(sectionHeader);
+            for (String dep : newDeps) {
+                lines.add(dep + " = \"*\"");
+            }
+            added = true;
+        }
+        if (added) {
+            Files.write(tomlFile, lines, StandardCharsets.UTF_8);
+            System.out.println("Added dependencies to " + tomlFile + " under scope ["+scope+"]");
+        } else {
+            System.out.println("Dependencies already present in " + tomlFile + " under scope ["+scope+"]");
         }
     }
 
