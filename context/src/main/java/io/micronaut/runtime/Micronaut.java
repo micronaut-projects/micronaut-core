@@ -24,7 +24,7 @@ import io.micronaut.context.banner.MicronautBanner;
 import io.micronaut.context.banner.ResourceBanner;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
-import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.naming.Described;
 import io.micronaut.runtime.exceptions.ApplicationStartupException;
@@ -47,6 +47,7 @@ import static io.micronaut.core.reflect.ReflectionUtils.EMPTY_CLASS_ARRAY;
  * @author Graeme Rocher
  * @since 1.0
  */
+@NullMarked
 public class Micronaut extends DefaultApplicationContextBuilder implements ApplicationContextBuilder  {
     private static final String BANNER_NAME = "micronaut-banner.txt";
     private static final Logger LOG = LoggerFactory.getLogger(Micronaut.class);
@@ -65,7 +66,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
      */
     @Override
     @SuppressWarnings({"java:S1181", "java:S3776", "java:S1141"})
-    public @NonNull ApplicationContext start() {
+    public ApplicationContext start() {
         long start = System.nanoTime();
         printBanner();
         ApplicationContext applicationContext = super.build();
@@ -195,17 +196,17 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     }
 
     @Override
-    public @NonNull Micronaut include(@Nullable String... configurations) {
+    public Micronaut include(@Nullable String... configurations) {
         return (Micronaut) super.include(configurations);
     }
 
     @Override
-    public @NonNull Micronaut exclude(@Nullable String... configurations) {
+    public Micronaut exclude(@Nullable String... configurations) {
         return (Micronaut) super.exclude(configurations);
     }
 
     @Override
-    public @NonNull Micronaut banner(boolean isEnabled) {
+    public Micronaut banner(boolean isEnabled) {
         return (Micronaut) super.banner(isEnabled);
     }
 
@@ -215,7 +216,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
      * @param classes The application
      * @return The classes
      */
-    public @NonNull Micronaut classes(@Nullable Class<?>... classes) {
+    public Micronaut classes(@Nullable Class<?>... classes) {
         if (classes != null) {
             for (Class<?> aClass : classes) {
                 packages(aClass.getPackage().getName());
@@ -225,67 +226,67 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     }
 
     @Override
-    public @NonNull Micronaut properties(@Nullable Map<String, Object> properties) {
+    public Micronaut properties(@Nullable Map<String, Object> properties) {
         return (Micronaut) super.properties(properties);
     }
 
     @Override
-    public @NonNull Micronaut singletons(Object... beans) {
+    public Micronaut singletons(Object... beans) {
         return (Micronaut) super.singletons(beans);
     }
 
     @Override
-    public Micronaut beanDefinitions(@NonNull RuntimeBeanDefinition<?>... definitions) {
+    public Micronaut beanDefinitions(RuntimeBeanDefinition<?>... definitions) {
         return (Micronaut) super.beanDefinitions(definitions);
     }
 
     @Override
-    public @NonNull Micronaut propertySources(@Nullable PropertySource... propertySources) {
+    public Micronaut propertySources(@Nullable PropertySource... propertySources) {
         return (Micronaut) super.propertySources(propertySources);
     }
 
     @Override
-    public @NonNull Micronaut environmentPropertySource(boolean environmentPropertySource) {
+    public Micronaut environmentPropertySource(boolean environmentPropertySource) {
         return (Micronaut) super.environmentPropertySource(environmentPropertySource);
     }
 
     @Override
-    public @NonNull Micronaut environmentVariableIncludes(@Nullable String... environmentVariables) {
+    public Micronaut environmentVariableIncludes(@Nullable String... environmentVariables) {
         return (Micronaut) super.environmentVariableIncludes(environmentVariables);
     }
 
     @Override
-    public @NonNull Micronaut environmentVariableExcludes(@Nullable String... environmentVariables) {
+    public Micronaut environmentVariableExcludes(@Nullable String... environmentVariables) {
         return (Micronaut) super.environmentVariableExcludes(environmentVariables);
     }
 
     @Override
-    public @NonNull Micronaut mainClass(Class<?> mainClass) {
+    public Micronaut mainClass(@Nullable Class<?> mainClass) {
         return (Micronaut) super.mainClass(mainClass);
     }
 
     @Override
-    public @NonNull Micronaut classLoader(ClassLoader classLoader) {
+    public Micronaut classLoader(@Nullable ClassLoader classLoader) {
         return (Micronaut) super.classLoader(classLoader);
     }
 
     @Override
-    public @NonNull Micronaut args(@Nullable String... args) {
+    public Micronaut args(@Nullable String... args) {
         return (Micronaut) super.args(args);
     }
 
     @Override
-    public @NonNull Micronaut environments(@Nullable String... environments) {
+    public Micronaut environments(@Nullable String... environments) {
         return (Micronaut) super.environments(environments);
     }
 
     @Override
-    public @NonNull Micronaut defaultEnvironments(@Nullable String... environments) {
+    public Micronaut defaultEnvironments(@Nullable String... environments) {
         return (Micronaut) super.defaultEnvironments(environments);
     }
 
     @Override
-    public @NonNull Micronaut packages(@Nullable String... packages) {
+    public Micronaut packages(@Nullable String... packages) {
         return (Micronaut) super.packages(packages);
     }
 
@@ -356,7 +357,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
      */
     protected void handleStartupException(Environment environment, Throwable exception) {
         Function<Throwable, Integer> exitCodeMapper = exitHandlers.computeIfAbsent(exception.getClass(), exceptionType -> (throwable -> 1));
-        Integer code = exitCodeMapper.apply(exception);
+        int code = exitCodeMapper.apply(exception);
         if (code > 0 && !environment.getActiveNames().contains(Environment.TEST)) {
             if (LOG.isErrorEnabled()) {
                 LOG.error("Error starting Micronaut server: {}", exception.getMessage(), exception);
@@ -375,8 +376,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
         resolveBanner(out).print();
     }
 
-    @NonNull
-    private Banner resolveBanner(@NonNull PrintStream out) {
+    private Banner resolveBanner(PrintStream out) {
         return getResourceLoader().getResource(BANNER_NAME)
             .map(resource -> (Banner) new ResourceBanner(resource, out))
             .orElseGet(() -> new MicronautBanner(out));

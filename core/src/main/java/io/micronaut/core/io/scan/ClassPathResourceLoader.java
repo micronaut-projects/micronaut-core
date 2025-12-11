@@ -17,6 +17,7 @@ package io.micronaut.core.io.scan;
 
 import io.micronaut.core.io.ResourceLoader;
 
+import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -26,6 +27,7 @@ import org.jspecify.annotations.Nullable;
  * @author Graeme Rocher
  * @since 1.0
  */
+@NullMarked
 public interface ClassPathResourceLoader extends ResourceLoader {
 
     /**

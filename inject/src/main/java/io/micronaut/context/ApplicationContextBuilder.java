@@ -17,7 +17,8 @@ package io.micronaut.context;
 
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.env.PropertySource;
-import org.jspecify.annotations.NonNull;
+import io.micronaut.context.env.PropertySourcesLocator;
+import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.util.ArgumentUtils;
@@ -37,6 +38,7 @@ import java.util.Set;
  * @see ApplicationContextConfigurer
  * @see ApplicationContext#builder()
  */
+@NullMarked
 public interface ApplicationContextBuilder {
 
     /**
@@ -47,8 +49,8 @@ public interface ApplicationContextBuilder {
      * @see BeanResolutionTraceMode
      * @return This builder
      */
-    default @NonNull ApplicationContextBuilder beanResolutionTrace(
-        @NonNull BeanResolutionTraceMode traceMode,
+    default ApplicationContextBuilder beanResolutionTrace(
+        BeanResolutionTraceMode traceMode,
         String... classPatterns) {
         Objects.requireNonNull(traceMode, "Trace mode cannot be null");
         return beanResolutionTrace(
@@ -67,8 +69,8 @@ public interface ApplicationContextBuilder {
      * @see BeanResolutionTraceMode
      * @return This builder
      */
-    default @NonNull ApplicationContextBuilder beanResolutionTrace(
-        @NonNull BeanResolutionTraceConfiguration configuration) {
+    default ApplicationContextBuilder beanResolutionTrace(
+        BeanResolutionTraceConfiguration configuration) {
         return this;
     }
 
@@ -78,7 +80,7 @@ public interface ApplicationContextBuilder {
      * @return The context builder
      * @since 2.0
      */
-    default @NonNull ApplicationContextBuilder eagerInitConfiguration(boolean eagerInitConfiguration) {
+    default ApplicationContextBuilder eagerInitConfiguration(boolean eagerInitConfiguration) {
         if (eagerInitConfiguration) {
             return eagerInitAnnotated(ConfigurationReader.class);
         }
@@ -92,7 +94,7 @@ public interface ApplicationContextBuilder {
      * @since 2.0
      */
     @SuppressWarnings("unchecked")
-    default @NonNull ApplicationContextBuilder eagerInitSingletons(boolean eagerInitSingletons) {
+    default ApplicationContextBuilder eagerInitSingletons(boolean eagerInitSingletons) {
         if (eagerInitSingletons) {
             return eagerInitAnnotated(Singleton.class);
         }
@@ -105,7 +107,7 @@ public interface ApplicationContextBuilder {
      * @return This builder
      * @since 3.7.0
      */
-    default @NonNull ApplicationContextBuilder enableDefaultPropertySources(boolean areEnabled) {
+    default ApplicationContextBuilder enableDefaultPropertySources(boolean areEnabled) {
         return this;
     }
 
@@ -117,7 +119,7 @@ public interface ApplicationContextBuilder {
      * @since 2.0
      */
     @SuppressWarnings("unchecked")
-    @NonNull ApplicationContextBuilder eagerInitAnnotated(Class<? extends Annotation>... annotations);
+    ApplicationContextBuilder eagerInitAnnotated(Class<? extends Annotation>... annotations);
 
     /**
      * Override default config locations.
@@ -126,7 +128,7 @@ public interface ApplicationContextBuilder {
      * @return This environment
      * @since 2.0
      */
-    @NonNull ApplicationContextBuilder overrideConfigLocations(String... configLocations);
+    ApplicationContextBuilder overrideConfigLocations(String... configLocations);
 
     /**
      * Additional singletons to register prior to startup.
@@ -134,7 +136,7 @@ public interface ApplicationContextBuilder {
      * @param beans The beans
      * @return This builder
      */
-    @NonNull ApplicationContextBuilder singletons(@Nullable Object... beans);
+    ApplicationContextBuilder singletons(@Nullable Object... beans);
 
     /**
      * Register additional runtime bean definitions prior to startup.
@@ -142,7 +144,7 @@ public interface ApplicationContextBuilder {
      * @return The context builder
      * @since 4.5.0
      */
-    default @NonNull ApplicationContextBuilder beanDefinitions(@NonNull RuntimeBeanDefinition<?>... definitions) {
+    default ApplicationContextBuilder beanDefinitions(RuntimeBeanDefinition<?>... definitions) {
         return this;
     }
 
@@ -152,7 +154,7 @@ public interface ApplicationContextBuilder {
      * @return This builder
      * @since 4.8.0
      */
-    default @NonNull ApplicationContextBuilder beanConfigurations(@NonNull BeanConfiguration... configurations) {
+    default ApplicationContextBuilder beanConfigurations(BeanConfiguration... configurations) {
         return this;
     }
 
@@ -168,7 +170,7 @@ public interface ApplicationContextBuilder {
      * @param deduceEnvironment The boolean
      * @return This builder
      */
-    @NonNull ApplicationContextBuilder deduceEnvironment(@Nullable Boolean deduceEnvironment);
+    ApplicationContextBuilder deduceEnvironment(@Nullable Boolean deduceEnvironment);
 
     /**
      * If the package should be deduced from the stack trace. (default is {@code true})
@@ -177,7 +179,7 @@ public interface ApplicationContextBuilder {
      * @return This builder
      * @since 5.0
      */
-    @NonNull ApplicationContextBuilder deducePackage(@Nullable boolean deducePackage);
+    ApplicationContextBuilder deducePackage(boolean deducePackage);
 
     /**
      * If set to {@code true} (the default value is {@code false}) Micronaut will attempt to automatically deduce the Cloud environment it is running within.
@@ -189,7 +191,7 @@ public interface ApplicationContextBuilder {
      * @return This builder
      * @since 4.0.0
      */
-    @NonNull ApplicationContextBuilder deduceCloudEnvironment(boolean deduceEnvironment);
+    ApplicationContextBuilder deduceCloudEnvironment(boolean deduceEnvironment);
 
     /**
      * The environments to use.
@@ -197,7 +199,7 @@ public interface ApplicationContextBuilder {
      * @param environments The environments
      * @return This builder
      */
-    @NonNull ApplicationContextBuilder environments(@Nullable String... environments);
+    ApplicationContextBuilder environments(@Nullable String... environments);
 
     /**
      * The environments to use if no other environments are specified.
@@ -205,7 +207,7 @@ public interface ApplicationContextBuilder {
      * @param environments The environments
      * @return This builder
      */
-    @NonNull ApplicationContextBuilder defaultEnvironments(@Nullable String... environments);
+    ApplicationContextBuilder defaultEnvironments(@Nullable String... environments);
 
     /**
      * The packages to include for package scanning.
@@ -213,7 +215,7 @@ public interface ApplicationContextBuilder {
      * @param packages The packages
      * @return This builder
      */
-    @NonNull ApplicationContextBuilder packages(@Nullable String... packages);
+    ApplicationContextBuilder packages(@Nullable String... packages);
 
     /**
      * Properties to override from the environment.
@@ -221,7 +223,7 @@ public interface ApplicationContextBuilder {
      * @param properties The properties
      * @return This builder
      */
-    @NonNull ApplicationContextBuilder properties(@Nullable Map<String, Object> properties);
+    ApplicationContextBuilder properties(@Nullable Map<String, Object> properties);
 
     /**
      * Additional property sources.
@@ -229,7 +231,7 @@ public interface ApplicationContextBuilder {
      * @param propertySources The property sources to include
      * @return This builder
      */
-    @NonNull ApplicationContextBuilder propertySources(@Nullable PropertySource... propertySources);
+    ApplicationContextBuilder propertySources(@Nullable PropertySource... propertySources);
 
     /**
      * Set whether environment variables should contribute to configuration.
@@ -237,7 +239,7 @@ public interface ApplicationContextBuilder {
      * @param environmentPropertySource The boolean
      * @return This builder
      */
-    @NonNull ApplicationContextBuilder environmentPropertySource(boolean environmentPropertySource);
+    ApplicationContextBuilder environmentPropertySource(boolean environmentPropertySource);
 
     /**
      * Which environment variables should contribute to configuration.
@@ -245,7 +247,7 @@ public interface ApplicationContextBuilder {
      * @param environmentVariables The environment variables
      * @return This builder
      */
-    @NonNull ApplicationContextBuilder environmentVariableIncludes(@Nullable String... environmentVariables);
+    ApplicationContextBuilder environmentVariableIncludes(@Nullable String... environmentVariables);
 
     /**
      * Which environment variables should not contribute to configuration.
@@ -253,7 +255,7 @@ public interface ApplicationContextBuilder {
      * @param environmentVariables The environment variables
      * @return This builder
      */
-    @NonNull ApplicationContextBuilder environmentVariableExcludes(@Nullable String... environmentVariables);
+    ApplicationContextBuilder environmentVariableExcludes(@Nullable String... environmentVariables);
 
     /**
      * The main class used by this application.
@@ -261,7 +263,7 @@ public interface ApplicationContextBuilder {
      * @param mainClass The main class
      * @return This builder
      */
-    @NonNull ApplicationContextBuilder mainClass(@Nullable Class<?> mainClass);
+    ApplicationContextBuilder mainClass(@Nullable Class<?> mainClass);
 
     /**
      * The class loader to be used.
@@ -269,14 +271,14 @@ public interface ApplicationContextBuilder {
      * @param classLoader The classloader
      * @return This builder
      */
-    @NonNull ApplicationContextBuilder classLoader(@Nullable ClassLoader classLoader);
+    ApplicationContextBuilder classLoader(@Nullable ClassLoader classLoader);
 
     /**
      * Builds the {@link ApplicationContext}, but does not start it.
      *
      * @return The built, but not running {@link ApplicationContext}
      */
-    @NonNull ApplicationContext build();
+    ApplicationContext build();
 
     /**
      * Allow customizing the configurations that will be loaded.
@@ -284,7 +286,7 @@ public interface ApplicationContextBuilder {
      * @param configurations The configurations to include
      * @return This application
      */
-    @NonNull ApplicationContextBuilder include(@Nullable String... configurations);
+    ApplicationContextBuilder include(@Nullable String... configurations);
 
     /**
      * Allow customizing the configurations that will be loaded.
@@ -292,7 +294,7 @@ public interface ApplicationContextBuilder {
      * @param configurations The configurations to exclude
      * @return This application
      */
-    @NonNull ApplicationContextBuilder exclude(@Nullable String... configurations);
+    ApplicationContextBuilder exclude(@Nullable String... configurations);
 
     /**
      * Whether the banner is enabled or not.
@@ -300,7 +302,7 @@ public interface ApplicationContextBuilder {
      * @param isEnabled Whether the banner is enabled or not
      * @return This application
      */
-    @NonNull ApplicationContextBuilder banner(boolean isEnabled);
+    ApplicationContextBuilder banner(boolean isEnabled);
 
     /**
      * Whether to error on an empty bean provider. Defaults to {@code false}.
@@ -309,7 +311,7 @@ public interface ApplicationContextBuilder {
      * @return This application
      * @since 3.0.0
      */
-    @NonNull ApplicationContextBuilder allowEmptyProviders(boolean shouldAllow);
+    ApplicationContextBuilder allowEmptyProviders(boolean shouldAllow);
 
     /**
      * Set the command line arguments.
@@ -317,7 +319,7 @@ public interface ApplicationContextBuilder {
      * @param args The arguments
      * @return This application
      */
-    default @NonNull ApplicationContextBuilder args(@Nullable String... args) {
+    default ApplicationContextBuilder args(@Nullable String... args) {
         return this;
     }
 
@@ -328,7 +330,7 @@ public interface ApplicationContextBuilder {
      * @return This application
      * @since 3.1.0
      */
-    default @NonNull ApplicationContextBuilder bootstrapEnvironment(boolean bootstrapEnv) {
+    default ApplicationContextBuilder bootstrapEnvironment(boolean bootstrapEnv) {
         return this;
     }
 
@@ -339,7 +341,7 @@ public interface ApplicationContextBuilder {
      * @return This builder instance for method chaining.
      * @since 5.0
      */
-    default @NonNull ApplicationContextBuilder beanDefinitionsProvider(@NonNull BeanDefinitionsProvider provider) {
+    default ApplicationContextBuilder beanDefinitionsProvider(BeanDefinitionsProvider provider) {
         return this;
     }
 
@@ -350,7 +352,7 @@ public interface ApplicationContextBuilder {
      * @return This builder
      * @since 5.0
      */
-    @NonNull ApplicationContextBuilder eagerBeansEnabled(boolean enabled);
+    ApplicationContextBuilder eagerBeansEnabled(boolean enabled);
 
     /**
      * Enable or disable application events publishing.
@@ -359,7 +361,7 @@ public interface ApplicationContextBuilder {
      * @return This builder
      * @since 5.0
      */
-    @NonNull ApplicationContextBuilder eventsEnabled(boolean enabled);
+    ApplicationContextBuilder eventsEnabled(boolean enabled);
 
     /**
      * Set a predicate to filter beans considered by the context.
@@ -368,7 +370,7 @@ public interface ApplicationContextBuilder {
      * @return This builder
      * @since 5.0
      */
-    @NonNull ApplicationContextBuilder beansPredicate(java.util.function.@Nullable Predicate<io.micronaut.inject.QualifiedBeanType<?>> predicate);
+    ApplicationContextBuilder beansPredicate(java.util.function.@Nullable Predicate<io.micronaut.inject.QualifiedBeanType<?>> predicate);
 
     /**
      * Sets the class path resource resolver for the application context builder.
@@ -377,14 +379,23 @@ public interface ApplicationContextBuilder {
      * @return This builder
      * @since 5.0
      */
-    @NonNull ApplicationContextBuilder resourceResolver(@Nullable ClassPathResourceLoader resourceResolver);
+    ApplicationContextBuilder resourceResolver(@Nullable ClassPathResourceLoader resourceResolver);
+
+    /**
+     * Adds a property sources locator to the application context builder.
+     *
+     * @param propertySourcesLocator the property sources locator
+     * @return This builder
+     * @since 5.0
+     */
+    ApplicationContextBuilder propertySourcesLocator(PropertySourcesLocator propertySourcesLocator);
 
     /**
      * Starts the {@link ApplicationContext}.
      *
      * @return The running {@link ApplicationContext}
      */
-    default @NonNull ApplicationContext start() {
+    default ApplicationContext start() {
         return build().start();
     }
 
@@ -395,7 +406,7 @@ public interface ApplicationContextBuilder {
      * @param <T>          The type, a subclass of {@link AutoCloseable}. The close method of the implementation should shut down the context.
      * @return The running bean
      */
-    default @NonNull <T extends AutoCloseable> T run(@NonNull Class<T> type) {
+    default <T extends AutoCloseable> T run(Class<T> type) {
         ArgumentUtils.requireNonNull("type", type);
         ApplicationContext applicationContext = start();
         T bean = applicationContext.getBean(type);
