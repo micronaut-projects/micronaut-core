@@ -29,7 +29,7 @@ class BeanIntrospectorSpec {
 
         introspection.getProperty("stuff").get().set(testBean, "newvalue")
         introspection.getProperty("flag").get().set(testBean, true)
-        assertEquals(true, introspection.getProperty("flag", Boolean::class.java).get().get(testBean))
+        assertEquals(true, introspection.getProperty("flag").get().get(testBean))
 
         assertEquals("newvalue", testBean.stuff)
     }

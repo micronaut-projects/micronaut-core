@@ -23,6 +23,7 @@ import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.format.ReadableBytes;
@@ -45,6 +46,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Allows configuring Netty within {@link io.micronaut.http.server.netty.NettyHttpServer}.
@@ -222,6 +224,8 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private int formMaxFields = DEFAULT_FORM_MAX_FIELDS;
     private int formMaxBufferedBytes = DEFAULT_FORM_MAX_BUFFERED_BYTES;
     private boolean requestDecompressionEnabled = true;
+    @NextMajorVersion("Move to DecoderQuirk enum once it becomes mandatory")
+    private Set<String> formDecoderQuirks = Collections.emptySet();
 
     /**
      * Default empty constructor.
@@ -871,6 +875,30 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     public void setFormMaxBufferedBytes(int formMaxBufferedBytes) {
         this.formMaxBufferedBytes = formMaxBufferedBytes;
+    }
+
+    /**
+     * The decoder quirks for the
+     * <a href="https://github.com/netty-contrib/codec-multipart/">next-generation multipart
+     * parser</a>, if present. No quirks by default.
+     *
+     * @return The decoder quirks
+     */
+    @Experimental
+    public Set<String> getFormDecoderQuirks() {
+        return formDecoderQuirks;
+    }
+
+    /**
+     * The decoder quirks for the
+     * <a href="https://github.com/netty-contrib/codec-multipart/">next-generation multipart
+     * parser</a>, if present. No quirks by default.
+     *
+     * @param formDecoderQuirks The decoder quirks
+     */
+    @Experimental
+    public void setFormDecoderQuirks(Set<String> formDecoderQuirks) {
+        this.formDecoderQuirks = formDecoderQuirks;
     }
 
     /**

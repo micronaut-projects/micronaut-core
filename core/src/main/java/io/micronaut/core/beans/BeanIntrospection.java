@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.beans.exceptions.IntrospectionException;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.reflect.exception.InstantiationException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
@@ -304,7 +305,7 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
         ArgumentUtils.requireNonNull("type", type);
 
         final BeanProperty<T, ?> prop = getProperty(name).orElse(null);
-        if (prop != null && type.isAssignableFrom(prop.getType())) {
+        if (prop != null && ReflectionUtils.getWrapperType(type).isAssignableFrom(ReflectionUtils.getWrapperType(prop.getType()))) {
             //noinspection unchecked
             return Optional.of((BeanProperty<T, P>) prop);
         }
@@ -324,7 +325,7 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
         ArgumentUtils.requireNonNull("type", type);
 
         final BeanReadProperty<T, ?> prop = getReadProperty(name).orElse(null);
-        if (prop != null && type.isAssignableFrom(prop.getType())) {
+        if (prop != null && ReflectionUtils.getWrapperType(type).isAssignableFrom(ReflectionUtils.getWrapperType(prop.getType()))) {
             //noinspection unchecked
             return Optional.of((BeanReadProperty<T, P>) prop);
         }
@@ -345,7 +346,7 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
         ArgumentUtils.requireNonNull("type", type);
 
         final BeanWriteProperty<T, ?> prop = getWriteProperty(name).orElse(null);
-        if (prop != null && type.isAssignableFrom(prop.getType())) {
+        if (prop != null && ReflectionUtils.getWrapperType(type).isAssignableFrom(ReflectionUtils.getWrapperType(prop.getType()))) {
             //noinspection unchecked
             return Optional.of((BeanProperty<T, P>) prop);
         }
