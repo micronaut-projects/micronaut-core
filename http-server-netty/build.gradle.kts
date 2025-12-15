@@ -134,6 +134,7 @@ tasks.withType<Test>().configureEach {
     maxParallelForks = 4
     useJUnitPlatform()
     systemProperty("junit.jupiter.extensions.autodetection.enabled", "true")
+    systemProperty("io.netty.util.LeakPresenceDetector.trackCreationStack", "true") // TODO
 }
 
 //tasks.withType(Test).configureEach {
