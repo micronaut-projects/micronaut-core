@@ -593,7 +593,7 @@ class HttpPostSpec extends Specification {
 
         @Post(uri = "/permanentRedirect", consumes = MediaType.APPLICATION_FORM_URLENCODED)
         HttpResponse permanentRedirect() {
-            return HttpResponse.temporaryRedirect(URI.create("/post/permanentRedirectTarget"))
+            return HttpResponse.permanentRedirect(URI.create("/post/permanentRedirectTarget"))
         }
 
         @Post(uri = "/permanentRedirectTarget", consumes = MediaType.APPLICATION_FORM_URLENCODED)
