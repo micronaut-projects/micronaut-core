@@ -15,13 +15,15 @@
  */
 package io.micronaut.test.pytest.execution;
 
+import io.micronaut.test.pytest.PytestFileDescriptor;
+import io.micronaut.test.pytest.PytestTestDescriptor;
 import io.micronaut.test.pytest.listener.PytestTestListener;
 import org.junit.platform.engine.EngineExecutionListener;
 import org.junit.platform.engine.TestExecutionResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.nio.file.Path;
+
 
 /**
  * Adapter that implements PytestTestListener and forwards events to JUnit EngineExecutionListener.
@@ -30,33 +32,57 @@ public class JUnitPytestTestListener implements PytestTestListener {
 
     private static final Logger LOG = LoggerFactory.getLogger(JUnitPytestTestListener.class);
     private final EngineExecutionListener junitListener;
+    private final PytestFileDescriptor fileDescriptor;
 
-    public JUnitPytestTestListener(EngineExecutionListener junitListener) {
+    public JUnitPytestTestListener(
+        EngineExecutionListener junitListener,
+        PytestFileDescriptor fileDescriptor) {
         this.junitListener = junitListener;
+        this.fileDescriptor = fileDescriptor;
     }
 
     @Override
-    public void beforeFile(Path file) {
+    public void beforeFile(String file) {
         LOG.debug("Pytest starting file: {}", file);
+        junitListener.executionStarted(
+            fileDescriptor
+        );
     }
 
     @Override
-    public void afterFile(Path file, TestExecutionResult result) {
-        LOG.debug("Pytest finished file: {} with result: {}", file, result.getStatus());
+    public void afterFile(String file) {
+        LOG.debug("Pytest finished file: {}", file);
+        junitListener.executionFinished(
+            fileDescriptor,
+            // failures reported in children.
+            TestExecutionResult.successful()
+        );
     }
 
     @Override
     public void beforeTest(String testId) {
         LOG.debug("Pytest starting test: {}", testId);
+        fileDescriptor.getChildren()
+            .stream()
+            .filter(child -> child instanceof PytestTestDescriptor ptd &&
+                testId.endsWith("::" + ptd.getUniqueId().getSegments().getLast().getValue()))
+            .findAny().ifPresent(junitListener::executionStarted);
     }
 
     @Override
     public void afterTest(String testId, TestExecutionResult result) {
-        LOG.debug("Pytest finished test: {} with result: {}", testId, result.getStatus());
+        LOG.debug("Pytest finished test: {} with result: {}", testId, result);
+        fileDescriptor.getChildren()
+            .stream()
+            .filter(child -> child instanceof PytestTestDescriptor ptd &&
+                testId.endsWith("::" + ptd.getUniqueId().getSegments().getLast().getValue()))
+            .findAny().ifPresent(td -> {
+                junitListener.executionFinished(td, result);
+            });
     }
 
     @Override
     public void onResult(TestExecutionResult result) {
-        LOG.debug("Pytest session completed with result: {}", result.getStatus());
+        LOG.debug("Pytest session completed");
     }
 }

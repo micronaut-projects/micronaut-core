@@ -17,7 +17,7 @@ package io.micronaut.test.pytest.listener;
 
 import org.junit.platform.engine.TestExecutionResult;
 
-import java.nio.file.Path;
+
 
 /**
  * Listener interface for pytest test execution events.
@@ -30,15 +30,14 @@ public interface PytestTestListener {
      *
      * @param file the path to the Python test file
      */
-    void beforeFile(Path file);
+    void beforeFile(String file);
 
     /**
      * Called after pytest finishes processing a test file.
      *
      * @param file the path to the Python test file
-     * @param result the overall result for the file
      */
-    void afterFile(Path file, TestExecutionResult result);
+    void afterFile(String file);
 
     /**
      * Called before an individual test starts execution.
@@ -51,14 +50,12 @@ public interface PytestTestListener {
      * Called after an individual test finishes execution.
      *
      * @param testId the unique identifier of the test
-     * @param result the result of the test execution
+     * @param result The test execution result
      */
     void afterTest(String testId, TestExecutionResult result);
 
     /**
-     * Called when test execution is complete with overall results.
-     *
-     * @param result the overall test execution result
+     * Called when test execution is complete.
      */
     void onResult(TestExecutionResult result);
 }

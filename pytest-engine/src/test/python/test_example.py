@@ -28,3 +28,6 @@ def test_failing_test():
     """This test should fail to demonstrate error handling."""
     assert 1 + 1 == 3, "This assertion should fail"
 
+def test_failing_test2():
+    """This test should fail to demonstrate error handling."""
+    assert 1 + 1 == 3

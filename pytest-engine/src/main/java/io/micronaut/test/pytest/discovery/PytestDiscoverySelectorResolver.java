@@ -17,12 +17,8 @@ package io.micronaut.test.pytest.discovery;
 
 import org.junit.platform.engine.DiscoverySelector;
 import org.junit.platform.engine.TestDescriptor;
-import org.junit.platform.engine.discovery.ClasspathRootSelector;
 import org.junit.platform.engine.discovery.DirectorySelector;
 import org.junit.platform.engine.discovery.FileSelector;
-import org.junit.platform.engine.discovery.MethodSelector;
-import org.junit.platform.engine.discovery.PackageSelector;
-import org.junit.platform.engine.discovery.ClassSelector;
 import org.junit.platform.engine.support.descriptor.EngineDescriptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,88 +36,25 @@ public class PytestDiscoverySelectorResolver {
 
     private static final Logger LOG = LoggerFactory.getLogger(PytestDiscoverySelectorResolver.class);
 
-    private static final String SRC_TEST_PYTHON = "src/test/python";
-    private static final String SRC_MAIN_PYTHON = "src/main/python";
-
     /**
      * Resolves discovery selectors and adds corresponding test descriptors.
      */
     public void resolveSelectors(DiscoverySelector selector, EngineDescriptor engineDescriptor) {
-        if (selector instanceof ClasspathRootSelector classpathRootSelector) {
-            resolveClasspathRootSelector(classpathRootSelector, engineDescriptor);
-        } else if (selector instanceof PackageSelector packageSelector) {
-            resolvePackageSelector(packageSelector, engineDescriptor);
-        } else if (selector instanceof ClassSelector classSelector) {
-            resolveClassSelector(classSelector, engineDescriptor);
-        } else if (selector instanceof MethodSelector methodSelector) {
-            resolveMethodSelector(methodSelector, engineDescriptor);
-        } else if (selector instanceof DirectorySelector directorySelector) {
-            resolveDirectorySelector(directorySelector, engineDescriptor);
-        } else if (selector instanceof FileSelector fileSelector) {
-            resolveFileSelector(fileSelector, engineDescriptor);
-        } else {
-            LOG.debug("Unsupported selector type: {}", selector.getClass().getSimpleName());
+        switch (selector) {
+            case DirectorySelector directorySelector ->
+                resolveDirectorySelector(directorySelector, engineDescriptor);
+            case FileSelector fileSelector -> resolveFileSelector(fileSelector, engineDescriptor);
+            default ->
+                LOG.debug("Unsupported selector type: {}", selector.getClass().getSimpleName());
         }
     }
 
-    private void resolveClasspathRootSelector(ClasspathRootSelector selector, EngineDescriptor engineDescriptor) {
-        Path classpathRoot = Paths.get(selector.getClasspathRoot());
-        LOG.debug("Resolving classpath root: {}", classpathRoot);
-
-        // Look for Python test directories in the classpath root
-        Path testPythonDir = classpathRoot.resolve(SRC_TEST_PYTHON);
-        if (Files.exists(testPythonDir)) {
-            scanPythonDirectory(testPythonDir, engineDescriptor, true);
-        }
-
-        Path mainPythonDir = classpathRoot.resolve(SRC_MAIN_PYTHON);
-        if (Files.exists(mainPythonDir)) {
-            scanPythonDirectory(mainPythonDir, engineDescriptor, false);
-        }
-    }
-
-    private void resolvePackageSelector(PackageSelector selector, EngineDescriptor engineDescriptor) {
-        String packageName = selector.getPackageName();
-        LOG.debug("Resolving package: {}", packageName);
-
-        // Convert package name to directory path
-        String packagePath = packageName.replace('.', '/');
-
-        // Scan both test and main directories
-        scanPackageInDirectory(SRC_TEST_PYTHON, packagePath, engineDescriptor, true);
-        scanPackageInDirectory(SRC_MAIN_PYTHON, packagePath, engineDescriptor, false);
-    }
-
-    private void resolveClassSelector(ClassSelector selector, EngineDescriptor engineDescriptor) {
-        String className = selector.getClassName();
-        LOG.debug("Resolving class: {}", className);
-
-        // Convert class name to file path
-        String filePath = className.replace('.', '/') + ".py";
-
-        // Look for the file in test and main directories
-        findAndAddPythonFile(SRC_TEST_PYTHON, filePath, engineDescriptor, true);
-        findAndAddPythonFile(SRC_MAIN_PYTHON, filePath, engineDescriptor, false);
-    }
-
-    private void resolveMethodSelector(MethodSelector selector, EngineDescriptor engineDescriptor) {
-        String className = selector.getClassName();
-        String methodName = selector.getMethodName();
-        LOG.debug("Resolving method: {}.{}", className, methodName);
-
-        // Convert class name to file path
-        String filePath = className.replace('.', '/') + ".py";
-
-        // Look for the file and add specific method
-        findAndAddPythonMethod(SRC_TEST_PYTHON, filePath, methodName, engineDescriptor, true);
-        findAndAddPythonMethod(SRC_MAIN_PYTHON, filePath, methodName, engineDescriptor, false);
-    }
 
     private void resolveDirectorySelector(DirectorySelector selector, EngineDescriptor engineDescriptor) {
         Path directory = selector.getPath();
         LOG.debug("Resolving directory: {}", directory);
 
-        scanPythonDirectory(directory, engineDescriptor, isTestDirectory(directory));
+        scanPythonDirectory(directory, engineDescriptor, true);
     }
 
     private void resolveFileSelector(FileSelector selector, EngineDescriptor engineDescriptor) {
@@ -202,11 +135,7 @@ public class PytestDiscoverySelectorResolver {
         }
     }
 
-    private boolean isTestDirectory(Path directory) {
-        return directory.toString().contains(SRC_TEST_PYTHON);
-    }
-
     private boolean isTestFile(Path file) {
-        return file.toString().contains(SRC_TEST_PYTHON);
+        return file.getFileName().startsWith("test_");
     }
 }

@@ -7,6 +7,7 @@ and executes pytest with the specified test files.
 
 import sys
 import os
+import java
 from pathlib import Path
 from typing import List, Optional, Any
 
@@ -45,26 +46,48 @@ def run_pytest(test_files: List[str], listener: Any):
         # Create the plugin with the Java listener
         plugin = create_plugin(listener)
 
-        # Prepare pytest arguments
-        pytest_args = test_files.copy()
+        # Set sys.argv to avoid argument parsing issues in pytest
+        # pytest tries to access sys.argv[0] for the program name
+        original_argv = sys.argv[:]
+        sys.argv = ['pytest'] + test_files
 
-        # Add quiet mode to reduce output
-        pytest_args.extend(['-q', '--tb=short'])
+        try:
+            # Use pytest.main() with plugins - this should work now that sys.argv is set
+            exit_code = pytest.main(test_files, plugins=[plugin])
+            return exit_code
+        finally:
+            # Restore original sys.argv
+            sys.argv = original_argv
 
-        # Add our plugin
-        pytest_args.extend(['-p', 'no:warnings'])  # Disable warnings plugin
-
-        # Run pytest with our plugin
-        exit_code = pytest.main(pytest_args, plugins=[plugin])
-
-        return exit_code
-
-    except ImportError as e:
-        print(f"Failed to import pytest: {e}", file=sys.stderr)
-        raise
     except Exception as e:
-        print(f"Error running pytest: {e}", file=sys.stderr)
+        print(f"Error in simulated pytest execution: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc()
         raise
+
+
+def extract_test_functions(file_path: str) -> List[str]:
+    """
+    Extract test function names from a Python file.
+    This is a simple simulation - in real pytest it would use AST parsing.
+    """
+    try:
+        with open(file_path, 'r') as f:
+            content = f.read()
+
+        # Simple regex to find test functions (very basic)
+        import re
+        test_functions = []
+        for line in content.split('\n'):
+            match = re.match(r'def\s+(test_\w+)\s*\(', line.strip())
+            if match:
+                test_functions.append(match.group(1))
+
+        return test_functions
+
+    except Exception as e:
+        print(f"Error extracting test functions from {file_path}: {e}", file=sys.stderr)
+        return []
 
 
 def main():

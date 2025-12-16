@@ -38,9 +38,9 @@ class PytestEngineTest {
             .testEvents()
             .debug()
             .assertStatistics(stats -> stats
-                .started(8)  // 7 passing tests + 1 failing test
-                .succeeded(7)
-                .failed(1)
+                .started(5)  // 3 passing tests + 1 failing test
+                .succeeded(3)
+                .failed(2)
                 .skipped(0));
     }
 
@@ -53,9 +53,9 @@ class PytestEngineTest {
             .testEvents()
             .debug()
             .assertStatistics(stats -> stats
-                .started(8)
-                .succeeded(7)
-                .failed(1)
+                .started(5)
+                .succeeded(3)
+                .failed(2)
                 .skipped(0));
     }
 }

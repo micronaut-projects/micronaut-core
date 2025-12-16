@@ -19,7 +19,7 @@ import org.junit.platform.engine.TestExecutionResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.nio.file.Path;
+
 
 /**
  * Sample implementation of PytestTestListener that logs all test events.
@@ -29,16 +29,13 @@ public class LoggingPytestTestListener implements PytestTestListener {
     private static final Logger LOG = LoggerFactory.getLogger(LoggingPytestTestListener.class);
 
     @Override
-    public void beforeFile(Path file) {
+    public void beforeFile(String file) {
         LOG.info("Starting pytest execution for file: {}", file);
     }
 
     @Override
-    public void afterFile(Path file, TestExecutionResult result) {
-        LOG.info("Finished pytest execution for file: {} with result: {}", file, result.getStatus());
-        if (result.getThrowable().isPresent()) {
-            LOG.error("File execution failed: {}", file, result.getThrowable().get());
-        }
+    public void afterFile(String file) {
+        LOG.info("Finished pytest execution for file: {}", file);
     }
 
     @Override
@@ -48,17 +45,14 @@ public class LoggingPytestTestListener implements PytestTestListener {
 
     @Override
     public void afterTest(String testId, TestExecutionResult result) {
-        LOG.debug("Finished test execution: {} with result: {}", testId, result.getStatus());
-        if (result.getThrowable().isPresent()) {
-            LOG.error("Test execution failed: {}", testId, result.getThrowable().get());
+        LOG.debug("Finished test execution: {} with success: {}", testId, result);
+        if (result.getStatus() == TestExecutionResult.Status.FAILED) {
+            LOG.error("Test execution failed: {}", testId);
         }
     }
 
     @Override
     public void onResult(TestExecutionResult result) {
-        LOG.info("Pytest execution completed with overall result: {}", result.getStatus());
-        if (result.getThrowable().isPresent()) {
-            LOG.error("Overall execution failed", result.getThrowable().get());
-        }
+        LOG.info("Pytest execution completed");
     }
 }

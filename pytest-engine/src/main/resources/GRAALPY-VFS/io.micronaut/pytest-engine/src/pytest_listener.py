@@ -9,7 +9,7 @@ import pytest
 from typing import Optional, Any
 import sys
 import traceback
-
+import java
 
 class MicronautPytestPlugin:
     """
@@ -33,14 +33,15 @@ class MicronautPytestPlugin:
 
     def pytest_sessionfinish(self, session, exitstatus):
         """Called when pytest session finishes."""
-        from org.junit.platform.engine import TestExecutionResult
+        TestExecutionResult = java.type("org.junit.platform.engine.TestExecutionResult")
+        RuntimeException = java.type("java.lang.RuntimeException")
 
         # Convert pytest exit status to JUnit TestExecutionResult
         if exitstatus == pytest.ExitCode.OK:
             result = TestExecutionResult.successful()
         else:
             # Create a failed result with exit status information
-            exception = RuntimeError(f"Pytest session failed with exit code: {exitstatus}")
+            exception = RuntimeException(f"Pytest session failed with exit code: {exitstatus}")
             result = TestExecutionResult.failed(exception)
 
         self.listener.onResult(result)
@@ -49,11 +50,7 @@ class MicronautPytestPlugin:
         """Called when collection starts for a file."""
         if hasattr(collector, 'fspath') and collector.fspath:
             self.current_file = collector.fspath
-            self.listener.beforeFile(collector.fspath)
-
-    def pytest_collectfinish(self, collector):
-        """Called when collection finishes for a file."""
-        pass
+            self.listener.beforeFile(f"{collector.fspath}")
 
     def pytest_runtest_setup(self, item):
         """Called before test setup."""
@@ -78,13 +75,14 @@ class MicronautPytestPlugin:
 
     def pytest_runtest_teardown(self, item):
         """Called after test teardown."""
-        from org.junit.platform.engine import TestExecutionResult
+        TestExecutionResult = java.type("org.junit.platform.engine.TestExecutionResult")
+        RuntimeException = java.type("java.lang.RuntimeException")
 
         test_id = self._get_test_id(item)
         exception = self.test_results.get(test_id)
 
         if exception is not None:
-            result = TestExecutionResult.failed(exception)
+            result = TestExecutionResult.failed(RuntimeException(f"{exception}"))
         else:
             result = TestExecutionResult.successful()
 
@@ -96,8 +94,10 @@ class MicronautPytestPlugin:
     def pytest_collectreport(self, report):
         """Called when collection report is generated."""
         if report.failed:
-            from org.junit.platform.engine import TestExecutionResult
-            exception = RuntimeError(f"Collection failed: {report.longrepr}")
+            TestExecutionResult = java.type("org.junit.platform.engine.TestExecutionResult")
+            RuntimeException = java.type("java.lang.RuntimeException")
+
+            exception = RuntimeException(f"Collection failed: {report.longrepr}")
             result = TestExecutionResult.failed(exception)
             if self.current_file:
                 self.listener.afterFile(self.current_file, result)

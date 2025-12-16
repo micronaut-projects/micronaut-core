@@ -41,11 +41,9 @@ public class PytestTestExecutor {
     private static final Logger LOG = LoggerFactory.getLogger(PytestTestExecutor.class);
 
     private final EngineExecutionListener listener;
-    private final PytestTestListener testListener;
 
     public PytestTestExecutor(EngineExecutionListener listener) {
         this.listener = listener;
-        this.testListener = new JUnitPytestTestListener(listener);
     }
 
     /**
@@ -105,15 +103,14 @@ public class PytestTestExecutor {
                 .build())
             // TODO: constrain this in future
             .allowHostAccess(HostAccess.ALL)
-            .allowHostClassLookup(name -> name.startsWith("io.micronaut"));
+            .allowHostClassLookup(name -> true);
         if (pyEnv != null && venv != null && pyEnv.startsWith("graalpy")) {
             builder.option("python.Executable", Path.of(venv).resolve("bin/python").toString());
         }
         try (Context context = builder
 
             .build()) {
-
-
+            JUnitPytestTestListener testListener = new JUnitPytestTestListener(listener, fileDescriptor);
             // Call run_pytest with the file path and listener
             Value result = context.eval("python", """
 from pytest_runner import run_pytest
