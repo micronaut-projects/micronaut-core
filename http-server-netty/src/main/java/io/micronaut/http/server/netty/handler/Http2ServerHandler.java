@@ -257,8 +257,8 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
                 if (idle.state() == IdleState.ALL_IDLE) {
                     ctx.close();
                 }
+                super.userEventTriggered(ctx, evt);
             }
-            super.userEventTriggered(ctx, evt);
         }
 
         /**
@@ -276,6 +276,8 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
             stream.onHeadersRead(fhr, empty);
             if (!empty) {
                 stream.onDataRead(fhr.content(), true);
+            } else {
+                fhr.content().release();
             }
         }
     }

@@ -14,6 +14,7 @@ import org.junit.platform.suite.api.SuiteDisplayName;
 @SelectPackages("io.micronaut.http.client.tck.tests")
 @SuiteDisplayName("HTTP Client TCK for the HTTP Client Implementation based on Java HTTP Client")
 @ConfigurationParameter(key = ClientDisabledCondition.HTTP_CLIENT_CONFIGURATION, value = ClientDisabledCondition.JDK)
+@ConfigurationParameter(key = "junit.jupiter.extensions.autodetection.enabled", value = "true")
 @SuppressWarnings("java:S2187") // This runs a suite of tests, but has no tests of its own
 @ExcludeClassNamePatterns({
     "io.micronaut.http.client.tck.tests.ContinueTest", // Unsupported body type errors

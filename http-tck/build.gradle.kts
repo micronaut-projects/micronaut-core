@@ -21,4 +21,5 @@ dependencies {
     api(libs.junit.jupiter.api)
     api(libs.junit.jupiter.params)
     api(libs.managed.reactor)
+    implementation(libs.micronaut.test.netty.leak)
 }

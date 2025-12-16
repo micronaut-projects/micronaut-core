@@ -50,6 +50,7 @@ import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler
 import io.netty.handler.ssl.SslContextBuilder
 import io.netty.handler.ssl.SupportedCipherSuiteFilter
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory
+import io.netty.util.ReferenceCountUtil
 import jakarta.inject.Singleton
 import org.slf4j.LoggerFactory
 import reactor.core.publisher.Mono
@@ -77,8 +78,10 @@ class AccessLogSpec extends Specification {
         server.start()
 
         def responses = new CopyOnWriteArrayList<FullHttpResponse>()
+
+        def group = new NioEventLoopGroup(1)
         Bootstrap bootstrap = new Bootstrap()
-                .group(new NioEventLoopGroup(1))
+                .group(group)
                 .channel(NioSocketChannel)
                 .option(ChannelOption.AUTO_READ, true)
                 .handler(new ChannelInitializer<Channel>() {
@@ -128,7 +131,8 @@ class AccessLogSpec extends Specification {
         responses*.content().forEach(ByteBuf::release)
         server.close()
         channel.close()
-        bootstrap.config().group().shutdownGracefully()
+        ctx.close()
+        group.shutdownGracefully()
     }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6782')
@@ -144,8 +148,10 @@ class AccessLogSpec extends Specification {
         server.start()
 
         def responses = new CopyOnWriteArrayList<FullHttpResponse>()
+
+        def group = new NioEventLoopGroup(1)
         Bootstrap bootstrap = new Bootstrap()
-                .group(new NioEventLoopGroup(1))
+                .group(group)
                 .channel(NioSocketChannel)
                 .option(ChannelOption.AUTO_READ, true)
                 .handler(new ChannelInitializer<Channel>() {
@@ -194,7 +200,8 @@ class AccessLogSpec extends Specification {
         responses*.content().forEach(ByteBuf::release)
         server.close()
         channel.close()
-        bootstrap.config().group().shutdownGracefully()
+        ctx.close()
+        group.shutdownGracefully()
     }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6782')
@@ -209,8 +216,10 @@ class AccessLogSpec extends Specification {
         server.start()
 
         def responses = new CopyOnWriteArrayList<FullHttpResponse>()
+
+        def group = new NioEventLoopGroup(1)
         Bootstrap bootstrap = new Bootstrap()
-                .group(new NioEventLoopGroup(1))
+                .group(group)
                 .channel(NioSocketChannel)
                 .option(ChannelOption.AUTO_READ, true)
                 .handler(new ChannelInitializer<Channel>() {
@@ -272,7 +281,7 @@ class AccessLogSpec extends Specification {
         responses*.content().forEach(ByteBuf::release)
         server.close()
         channel.close()
-        bootstrap.config().group().shutdownGracefully()
+        group.shutdownGracefully()
     }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6782')
@@ -314,8 +323,10 @@ class AccessLogSpec extends Specification {
                         ApplicationProtocolConfig.SelectedListenerFailureBehavior.ACCEPT,
                         ApplicationProtocolNames.HTTP_2))
                 .build()
+
+        def group = new NioEventLoopGroup(1)
         Bootstrap bootstrap = new Bootstrap()
-                .group(new NioEventLoopGroup(1))
+                .group(group)
                 .channel(NioSocketChannel)
                 .option(ChannelOption.AUTO_READ, true)
                 .handler(new ChannelInitializer<Channel>() {
@@ -386,7 +397,9 @@ class AccessLogSpec extends Specification {
         responses*.content().forEach(ByteBuf::release)
         server.close()
         channel.close()
-        bootstrap.config().group().shutdownGracefully()
+        ctx.close()
+        ReferenceCountUtil.release(ctx)
+        group.shutdownGracefully()
     }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6782')
@@ -415,8 +428,9 @@ class AccessLogSpec extends Specification {
         request4.headers().add(HttpConversionUtil.ExtensionHeaderNames.SCHEME.text(), ':https')
 
         def responses = new CopyOnWriteArrayList<FullHttpResponse>()
+        def group = new NioEventLoopGroup(1)
         Bootstrap bootstrap = new Bootstrap()
-                .group(new NioEventLoopGroup(1))
+                .group(group)
                 .channel(NioSocketChannel)
                 .option(ChannelOption.AUTO_READ, true)
                 .handler(new ChannelInitializer<Channel>() {
@@ -484,7 +498,8 @@ class AccessLogSpec extends Specification {
         responses*.content().forEach(ByteBuf::release)
         server.close()
         channel.close()
-        bootstrap.config().group().shutdownGracefully()
+        ctx.close()
+        group.shutdownGracefully()
     }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6782')
@@ -514,8 +529,10 @@ class AccessLogSpec extends Specification {
         request4.headers().add(HttpConversionUtil.ExtensionHeaderNames.SCHEME.text(), ':https')
 
         def responses = new CopyOnWriteArrayList<FullHttpResponse>()
+
+        def group = new NioEventLoopGroup(1)
         Bootstrap bootstrap = new Bootstrap()
-                .group(new NioEventLoopGroup(1))
+                .group(group)
                 .channel(NioSocketChannel)
                 .option(ChannelOption.AUTO_READ, true)
                 .handler(new ChannelInitializer<Channel>() {
@@ -580,7 +597,8 @@ class AccessLogSpec extends Specification {
         responses*.content().forEach(ByteBuf::release)
         server.close()
         channel.close()
-        bootstrap.config().group().shutdownGracefully()
+        ctx.close()
+        group.shutdownGracefully()
     }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6782')

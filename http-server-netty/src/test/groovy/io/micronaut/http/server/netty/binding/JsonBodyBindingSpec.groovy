@@ -19,12 +19,16 @@ import io.micronaut.http.hateoas.JsonError
 import io.micronaut.http.hateoas.Link
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.micronaut.json.JsonSyntaxException
+import io.micronaut.scheduling.TaskExecutors
+import jakarta.inject.Inject
+import jakarta.inject.Named
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import reactor.core.scheduler.Schedulers
 import spock.lang.Issue
 
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.Executor
 
 class JsonBodyBindingSpec extends AbstractMicronautSpec {
 
@@ -388,6 +392,9 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
   @Controller(value = "/json", produces = io.micronaut.http.MediaType.APPLICATION_JSON)
     @Requires(property = "test.controller", value = "JsonController")
     static class JsonController {
+      @Inject
+      @Named(TaskExecutors.BLOCKING)
+      Executor blocking
 
         @Post("/params")
         String params(String name, int age) {
@@ -472,7 +479,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         @Post("/publisher-object")
         Publisher<String> publisherObject(@Body Publisher<Foo> publisher) {
             return Flux.from(publisher)
-                    .subscribeOn(Schedulers.boundedElastic())
+                    .subscribeOn(Schedulers.fromExecutor(blocking))
                     .map({ Foo foo ->
                         foo.toString()
             })
