@@ -232,7 +232,6 @@ public class DefaultHttpClient implements
      */
     private static final HttpHeaders REDIRECT_HEADER_BLOCKLIST_PRESERVE_BODY = new DefaultHttpHeaders()
         .add(HttpHeaderNames.HOST, "")
-        .add(HttpHeaderNames.TRANSFER_ENCODING, "")
         .add(HttpHeaderNames.CONNECTION, "");
 
     /**
