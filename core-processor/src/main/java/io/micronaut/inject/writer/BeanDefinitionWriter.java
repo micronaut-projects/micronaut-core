@@ -995,11 +995,6 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
     }
 
     @Override
-    public boolean isSingleton() {
-        return annotationMetadata.hasDeclaredStereotype(AnnotationUtil.SINGLETON);
-    }
-
-    @Override
     public void visitBeanDefinitionInterface(Class<? extends BeanDefinition> interfaceType) {
         this.classDefBuilder.addSuperinterface(TypeDef.of(interfaceType));
     }
@@ -2723,7 +2718,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
         }
 
         if (scope != null) {
-            return scope.equals(Singleton.class.getName());
+            return scope.equals(Singleton.class.getName()) || scope.equals(Context.class.getName());
         } else {
             final AnnotationMetadata annotationMetadata;
             if (beanProducingElement instanceof ClassElement) {
@@ -2733,7 +2728,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
             }
 
             return annotationMetadata.stringValue(DefaultScope.class)
-                .map(t -> t.equals(Singleton.class.getName()))
+                .map(t -> t.equals(Singleton.class.getName()) || t.equals(Context.class.getName()))
                 .orElse(false);
         }
     }
