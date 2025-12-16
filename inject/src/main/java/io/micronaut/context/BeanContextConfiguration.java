@@ -17,6 +17,7 @@ package io.micronaut.context;
 
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.inject.BeanConfiguration;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.QualifiedBeanType;
@@ -115,6 +116,15 @@ public interface BeanContextConfiguration {
      */
     @Nullable
     default Predicate<QualifiedBeanType<?>> beansPredicate() {
+        return null;
+    }
+
+    /**
+     * @return Bean configurations predicate.
+     * @since 5.0
+     */
+    @Nullable
+    default Predicate<BeanConfiguration> beanConfiguraionsPredicate() {
         return null;
     }
 

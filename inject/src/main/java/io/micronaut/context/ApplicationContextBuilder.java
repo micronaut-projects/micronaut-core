@@ -373,6 +373,15 @@ public interface ApplicationContextBuilder {
     ApplicationContextBuilder beansPredicate(java.util.function.@Nullable Predicate<io.micronaut.inject.QualifiedBeanType<?>> predicate);
 
     /**
+     * Set a predicate to filter bean configuration considered by the context.
+     *
+     * @param predicate The predicate to apply, or null to clear it
+     * @return This builder
+     * @since 5.0
+     */
+    ApplicationContextBuilder beanConfigurationsPredicate(java.util.function.@Nullable Predicate<BeanConfiguration> predicate);
+
+    /**
      * Sets the class path resource resolver for the application context builder.
      *
      * @param resourceResolver the class path resource resolver

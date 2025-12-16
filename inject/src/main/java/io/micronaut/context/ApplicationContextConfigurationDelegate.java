@@ -19,6 +19,7 @@ import io.micronaut.context.env.EnvironmentNamesDeducer;
 import io.micronaut.context.env.EnvironmentPackagesDeducer;
 import io.micronaut.context.env.PropertySourcesLocator;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.inject.BeanConfiguration;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.MutableConversionService;
@@ -181,7 +182,12 @@ class ApplicationContextConfigurationDelegate implements ApplicationContextConfi
     }
 
     @Override
-    public Predicate<QualifiedBeanType<?>> beansPredicate() {
+    public @Nullable Predicate<QualifiedBeanType<?>> beansPredicate() {
         return delegate.beansPredicate();
+    }
+
+    @Override
+    public @Nullable Predicate<BeanConfiguration> beanConfiguraionsPredicate() {
+        return delegate.beanConfiguraionsPredicate();
     }
 }

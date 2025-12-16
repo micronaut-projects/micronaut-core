@@ -84,7 +84,10 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private BeanDefinitionsProvider beanDefinitionsProvider = new DefaultBeanDefinitionsProvider();
     private boolean eagerBeansEnabled = true;
     private boolean eventsEnabled = true;
+    @Nullable
     private Predicate<QualifiedBeanType<?>> beansPredicate;
+    @Nullable
+    private Predicate<BeanConfiguration> beanConfigurationsPredicate;
 
     /**
      * Default constructor.
@@ -194,8 +197,15 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     }
 
     @Override
+    @Nullable
     public Predicate<QualifiedBeanType<?>> beansPredicate() {
         return beansPredicate;
+    }
+
+    @Override
+    @Nullable
+    public Predicate<BeanConfiguration> beanConfiguraionsPredicate() {
+        return beanConfigurationsPredicate;
     }
 
     @Override
@@ -423,6 +433,12 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     @Override
     public ApplicationContextBuilder beansPredicate(@Nullable Predicate<QualifiedBeanType<?>> predicate) {
         this.beansPredicate = predicate;
+        return this;
+    }
+
+    @Override
+    public ApplicationContextBuilder beanConfigurationsPredicate(@Nullable Predicate<BeanConfiguration> predicate) {
+        this.beanConfigurationsPredicate = predicate;
         return this;
     }
 
