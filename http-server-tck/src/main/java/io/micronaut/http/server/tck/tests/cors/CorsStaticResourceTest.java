@@ -22,11 +22,11 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.tck.AssertionUtils;
+import io.micronaut.http.tck.HttpResponseAssertion;
 import io.micronaut.http.uri.UriBuilder;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.Map;
 
 import static io.micronaut.http.tck.TestScenario.asserts;
@@ -38,23 +38,33 @@ import static io.micronaut.http.tck.TestScenario.asserts;
 })
 public class CorsStaticResourceTest {
     public static final String SPEC_NAME = "CorsStaticResourceTest";
+    public static final String ORIGIN = "http://some.domain.com";
 
     @Test
     public void staticResource() throws IOException {
-        asserts(SPEC_NAME,
-            Map.of(
-                "micronaut.server.cors.enabled", StringUtils.TRUE,
-                "micronaut.server.cors.configurations.default.allowed-origins", "http://some.domain.com",
-                "micronaut.server.cors.configurations.default.allowed-methods[0]", "GET",
-                "micronaut.router.static-resources.assets.mapping", "/assets/**",
-                "micronaut.router.static-resources.assets.paths", "classpath:assets"),
-            HttpRequest.GET(UriBuilder.of("/assets").path("hello.txt").build())
-                .accept(MediaType.TEXT_PLAIN)
-                .header(HttpHeaders.ORIGIN, "http://some.domain.com")
-                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, HttpMethod.GET.name()),
-            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
-                HttpStatus.OK,
-                "Hello World",
-                Collections.singletonMap(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN)));
+        Map<String, Object> config = Map.of(
+            "micronaut.server.cors.enabled", StringUtils.TRUE,
+            "micronaut.server.cors.configurations.default.allowed-origins", ORIGIN,
+            "micronaut.server.cors.configurations.default.allowed-methods[0]", "GET",
+            "micronaut.router.static-resources.assets.mapping", "/assets/**",
+            "micronaut.router.static-resources.assets.paths", "classpath:assets");
+        HttpRequest<?> request = HttpRequest.OPTIONS(UriBuilder.of("/assets").path("hello.txt").build())
+            .accept(MediaType.TEXT_PLAIN)
+            .header(HttpHeaders.ORIGIN, ORIGIN)
+            .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, HttpMethod.GET.name());
+        Map<String, String> expectedHeaders = Map.of(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS, HttpMethod.GET.name(),
+            HttpHeaders.ACCESS_CONTROL_MAX_AGE, "1800",
+            HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, ORIGIN,
+            HttpHeaders.VARY, "Origin");
+        asserts(SPEC_NAME, config, request,
+            (server, req) ->
+                AssertionUtils.assertDoesNotThrow(server, req, HttpStatus.OK, null, expectedHeaders));
+        request = HttpRequest.OPTIONS(UriBuilder.of("/assets").path("nonexisiting.txt").build())
+            .accept(MediaType.TEXT_PLAIN)
+            .header(HttpHeaders.ORIGIN, ORIGIN)
+            .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, HttpMethod.GET.name());
+        asserts(SPEC_NAME, config, request,
+            (server, req) ->
+                AssertionUtils.assertThrowsStatus(HttpStatus.FORBIDDEN));
     }
 }
