@@ -232,7 +232,7 @@ public final class BodyAssertion<T, E> {
         @Override
         public boolean test(String expected, String received) {
             return switch (type) {
-                case EQUAL -> received.equals(expected);
+                case EQUAL -> (received == null && expected == null) || received.equals(expected);
                 case CONTAIN -> (received == null && expected == null) || received.contains(expected);
                 case DOESNT_CONTAIN -> !received.contains(expected);
             };
