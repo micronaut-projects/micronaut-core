@@ -27,6 +27,10 @@ import java.nio.file.attribute.BasicFileAttributes;
 @Internal
 public final class FileUtils {
 
+    public static final String PYRONAUT_DIR = "__pyronaut__";
+    public static final String NATIVE_EXPORT_DIR = "native";
+    public static final String CLASSES_DIR = "classes";
+
     /**
      * Recursively deletes a directory and its content
      * @param directory the directory
@@ -59,6 +63,6 @@ public final class FileUtils {
      * @return the resolved directory
      */
     public static Path resolveOutputDirectory(Path sourceDirectory) {
-        return sourceDirectory.resolve(".pyronaut").toAbsolutePath();
+        return sourceDirectory.resolve(PYRONAUT_DIR).toAbsolutePath();
     }
 }

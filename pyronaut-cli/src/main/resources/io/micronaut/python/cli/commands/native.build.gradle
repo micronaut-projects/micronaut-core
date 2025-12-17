@@ -45,4 +45,7 @@ graalvmNative {
 tasks.register("exportBinary", Sync) {
     from(tasks.named("nativeCompile").flatMap(BuildNativeImageTask::getOutputDirectory))
     into(file("%DESTINATION_DIR%"))
+    doLast {
+        println("Native Pyronaut application exported to %DESTINATION_DIR%")
+    }
 }

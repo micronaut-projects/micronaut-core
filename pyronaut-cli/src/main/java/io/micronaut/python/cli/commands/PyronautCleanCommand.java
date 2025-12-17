@@ -18,14 +18,25 @@ package io.micronaut.python.cli.commands;
 import io.micronaut.python.cli.util.FileUtils;
 import picocli.CommandLine;
 
+import java.nio.file.Files;
+import java.util.List;
+
 @CommandLine.Command(name = "clean", description = "Deletes the temporary files", mixinStandardHelpOptions = true)
 public class PyronautCleanCommand extends BaseSourceCommand {
+    private static final List<String> EXTRA_DIRS_TO_DELETE = List.of("build", "dist");
+
     @Override
     public Integer call() throws Exception {
-        var sourceDirectory = resolveSourceDir();
+        var rootDir = resolveRootDir();
         FileUtils.recurseDelete(
-            FileUtils.resolveOutputDirectory(sourceDirectory)
+            FileUtils.resolveOutputDirectory(rootDir)
         );
+        for (var dirName : EXTRA_DIRS_TO_DELETE) {
+            var dir = rootDir.resolve(dirName);
+            if (Files.isDirectory(dir)) {
+                FileUtils.recurseDelete(dir);
+            }
+        }
         return 0;
     }
 }

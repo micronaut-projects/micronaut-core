@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.cli.commands;
 
+import io.micronaut.python.cli.util.FileUtils;
 import org.gradle.tooling.GradleConnector;
 import org.gradle.tooling.events.ProgressEvent;
 import org.tomlj.Toml;
@@ -29,9 +30,10 @@ import java.util.List;
 
 @Command(name = "native", description = "Builds a native image of the Pyronaut application", mixinStandardHelpOptions = true)
 public class PyronautNativeCompileCommand extends AbstractPyronautDependencyResolutionAwareCommand {
+
     @Override
     public Integer call() {
-        var sourceDirectory = resolveSourceDir();
+        var sourceDirectory = resolveRootDir();
         var tomlFile = sourceDirectory.resolve("pyproject.toml");
         if (Files.exists(tomlFile)) {
             buildNativeImage(tomlFile);
@@ -49,12 +51,15 @@ public class PyronautNativeCompileCommand extends AbstractPyronautDependencyReso
             var template = new String(templateSource.readAllBytes(), StandardCharsets.UTF_8)
                 .replace("// %REPOSITORIES%", repositories);
                 var imageName = findImageName(pyProject);
-                var buildScript = template.replace("// %DEPENDENCIES%", buildDependenciesList(pyProject, List.of(), "compile"))
+            var rootDirectory = tomlFile.getParent();
+            var pyronautDir = rootDirectory.resolve(FileUtils.PYRONAUT_DIR);
+            var classesDir = pyronautDir.resolve(FileUtils.CLASSES_DIR);
+            var buildScript = template.replace("// %DEPENDENCIES%", buildDependenciesList(pyProject, List.of(), "compile"))
                     .replace("%MAIN_CLASS%", "pyronaut_application.PyronautMain")
-                    .replace("%PYRONAUT_PATH%", tomlFile.getParent().resolve(".pyronaut").toAbsolutePath().toString())
-                    .replace("%PYRONAUT_CONFIG%", tomlFile.getParent().resolve("config").toAbsolutePath().toString())
+                    .replace("%PYRONAUT_PATH%", classesDir.toAbsolutePath().toString())
+                    .replace("%PYRONAUT_CONFIG%", rootDirectory.resolve("config").toAbsolutePath().toString())
                     .replace("%IMAGE_NAME%", imageName)
-                    .replace("%DESTINATION_DIR%", tomlFile.getParent().resolve("native").toAbsolutePath().toString());
+                    .replace("%DESTINATION_DIR%", pyronautDir.resolve(FileUtils.NATIVE_EXPORT_DIR).toAbsolutePath().toString());
                 withTemporaryDir(tmpDir -> {
                     Files.write(tmpDir.resolve("settings.gradle"),
                         List.of("rootProject.name = \"pyronaut-compile\""));

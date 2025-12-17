@@ -35,6 +35,7 @@ import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -58,6 +59,7 @@ public class PyronautFileWatcher implements Runnable {
     private final String[] parameters;
     private final AtomicBoolean running = new AtomicBoolean(true);
     private final AtomicBoolean starting = new AtomicBoolean(false);
+    private final static List<String> WATCHED_DIRECTORIES = List.of("src", "config");
 
     public PyronautFileWatcher(Path sourceDirectory,
                                PythonMavenRepository annotationProcessorRepo,
@@ -86,9 +88,14 @@ public class PyronautFileWatcher implements Runnable {
             appManager.startApplication(parameters);
             // Set up file watching
             var watchService = FileSystems.getDefault().newWatchService();
-            registerAll(sourceDirectory, watchService);
+            for (var watchedDirectory : WATCHED_DIRECTORIES) {
+                var dir = sourceDirectory.resolve(watchedDirectory);
+                if (Files.isDirectory(dir)) {
+                    registerAll(dir, watchService);
+                    System.out.println("Watching for changes in " + dir);
+                }
+            }
 
-            System.out.println("Watching for changes in " + sourceDirectory);
             var outputPath = outputDirectory.toAbsolutePath();
             while (running.get()) {
                 WatchKey key;
@@ -203,7 +210,7 @@ public class PyronautFileWatcher implements Runnable {
         var compiler = new PyronautCliCompiler();
         compiler.classLoader = truffleClassloader;
         compiler.sourceDirectory = sourceDirectory.toFile();
-        compiler.outputDirectory = outputDirectory.toFile();
+        compiler.outputDirectory = classesDirectory().toFile();
         compiler.annotationProcessorPath = annotationProcessorRepo.asClasspath();
         compiler.classpath = compileClassPathRepo.asClasspath();
         System.out.println("Compiling...");
@@ -218,7 +225,7 @@ public class PyronautFileWatcher implements Runnable {
     }
 
     private Path classesDirectory() {
-        return outputDirectory;
+        return outputDirectory.resolve(FileUtils.CLASSES_DIR);
     }
 
     public void stop() {

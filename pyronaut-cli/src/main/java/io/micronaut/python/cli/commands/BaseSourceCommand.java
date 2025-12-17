@@ -19,7 +19,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 
 abstract class BaseSourceCommand extends BaseCommand {
-    protected Path resolveSourceDir() {
+    protected Path resolveRootDir() {
         try {
             return Path.of(".").toFile().getCanonicalFile().toPath();
         } catch (IOException e) {

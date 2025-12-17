@@ -41,7 +41,7 @@ public class PyronautInstallCommand extends AbstractPyronautDependencyResolution
 
     @Override
     public Integer call() {
-        var sourceDirectory = resolveSourceDir();
+        var sourceDirectory = resolveRootDir();
         var tomlFile = sourceDirectory.resolve("pyproject.toml");
         if (Files.exists(tomlFile)) {
             if (!extraDependencies.isEmpty()) {

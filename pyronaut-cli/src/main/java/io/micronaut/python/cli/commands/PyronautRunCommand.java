@@ -27,7 +27,7 @@ public class PyronautRunCommand extends BaseSourceCommand {
 
     @Override
     public Integer call() throws Exception {
-        var sourceDirectory = resolveSourceDir();
+        var sourceDirectory = resolveRootDir();
         var compileDependencies = PythonMavenRepository.inspect(compileDependenciesDir());
         if (compileDependencies.isEmpty()) {
             System.err.println("Pyronaut dependencies not found. Did you run `pyronaut install`?");
