@@ -342,6 +342,11 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                                                                       @NotNull BasicFileAttributes attrs)
                                 throws IOException {
                                 if (file.toString().endsWith(".py")) {
+                                    var relative = directory.relativize(file).toString();
+                                    if (relative.equals("setup.py")) {
+                                        // temporary workaround
+                                        return FileVisitResult.CONTINUE;
+                                    }
                                     sources.add(Source.newBuilder("python", file.toFile()).build());
                                 }
                                 return FileVisitResult.CONTINUE;
