@@ -48,6 +48,7 @@ micronaut-rxjava2 = "2.7.0"
 micronaut-rxjava3 = "3.7.0"
 micronaut-reactor = "3.7.0"
 micronaut-kotlin = "4.6.0"
+micronaut-data = "5.0.0-SNAPSHOT"
 native-gradle-plugin = "0.11.3"
 neo4j-java-driver = "5.17.0"
 selenium = "4.27.0"
@@ -100,6 +101,7 @@ test-boms-micronaut-rxjava2 = { module = "io.micronaut.rxjava2:micronaut-rxjava2
 test-boms-micronaut-rxjava3 = { module = "io.micronaut.rxjava3:micronaut-rxjava3-bom", version.ref = "micronaut-rxjava3" }
 test-boms-micronaut-reactor = { module = "io.micronaut.reactor:micronaut-reactor-bom", version.ref = "micronaut-reactor" }
 test-boms-micronaut-kotlin = { module = "io.micronaut.kotlin:micronaut-kotlin-bom", version.ref = "micronaut-kotlin" }
+test-boms-micronaut-data = { module = "io.micronaut.data:micronaut-data-bom", version.ref = "micronaut-data" }
 
 boms-groovy = { module = "org.apache.groovy:groovy-bom", version.ref = "managed-groovy" }
 boms-kotlin = { module = "org.jetbrains.kotlin:kotlin-bom", version.ref = "managed-kotlin" }
