@@ -6,7 +6,7 @@ from typing import Annotated
 from .BookService import BookService
 
 @Property(name = "datasource.url", value = "test")
-@MicronautTest
+@MicronautTest(transactional = False)
 class BookServiceSpec:
     book_service : Annotated[BookService, Inject] = None
 
