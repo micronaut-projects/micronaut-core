@@ -1288,10 +1288,11 @@ public class DefaultHttpClient implements
     }
 
     /**
-     * @return The discriminator to use when selecting a server for the purposes of load balancing (defaults to null)
+     * @param request The request object
+     * @return The discriminator to use when selecting a server for the purposes of load balancing (defaults to {@link io.micronaut.http.HttpRequest})
      */
-    protected Object getLoadBalancerDiscriminator() {
-        return null;
+    protected Object getLoadBalancerDiscriminator(io.micronaut.http.HttpRequest<?> request) {
+        return request;
     }
 
     /**
@@ -1469,7 +1470,7 @@ public class DefaultHttpClient implements
         if (loadBalancer instanceof FixedLoadBalancer fixed) {
             selected = ExecutionFlow.just(fixed.getServiceInstance());
         } else {
-            selected = ReactiveExecutionFlow.fromPublisher(loadBalancer.select(getLoadBalancerDiscriminator()));
+            selected = ReactiveExecutionFlow.fromPublisher(loadBalancer.select(getLoadBalancerDiscriminator(request)));
         }
 
         return selected.map(server -> {

@@ -8,7 +8,7 @@ from jakarta.inject import Inject
 from typing import Annotated
 
 @Property(name = "datasource.url", value = "test")
-@MicronautTest
+@MicronautTest(transactional = False)
 class BookServiceSpec:
     book_service : Annotated[BookService, Inject] = None
 

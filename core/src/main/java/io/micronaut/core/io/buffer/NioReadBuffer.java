@@ -17,12 +17,12 @@ package io.micronaut.core.io.buffer;
 
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import java.io.ByteArrayInputStream;
-import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.util.function.Function;
 
 /**
  * {@link ReadBuffer} implementation based on NIO {@link ByteBuffer}.
@@ -108,13 +108,13 @@ final class NioReadBuffer extends ReadBuffer {
     }
 
     @Override
-    public void transferTo(@NonNull OutputStream stream) throws IOException {
+    public <R> @Nullable R useFastHeapBuffer(@NonNull Function<ByteBuffer, @NonNull R> function) {
         checkOpen();
         if (buffer.hasArray()) {
             closed = true;
-            stream.write(buffer.array(), buffer.arrayOffset() + buffer.position(), buffer.remaining());
+            return function.apply(buffer);
         } else {
-            super.transferTo(stream);
+            return super.useFastHeapBuffer(function);
         }
     }
 

@@ -30,4 +30,20 @@ dependencies {
     }
     testImplementation(libs.junit.jupiter.api)
     testImplementation(libs.junit.jupiter.params)
+
+    testImplementation(platform(libs.test.boms.micronaut.data))
+    testImplementation(platform(libs.test.boms.micronaut.sql))
+    testImplementation("io.micronaut.data:micronaut-data-processor") {
+        exclude(group = "io.micronaut")
+    }
+    testImplementation("io.micronaut.data:micronaut-data-jdbc") {
+        exclude(group = "io.micronaut")
+    }
+    testImplementation("io.micronaut.data:micronaut-data-model") {
+        exclude(group = "io.micronaut")
+    }
+    testImplementation("io.micronaut.sql:micronaut-jdbc-hikari")
+    testImplementation("com.h2database:h2")
+    testImplementation("jakarta.data:jakarta.data-api:1.1.0-M1")
+    testImplementation(libs.managed.snakeyaml)
 }

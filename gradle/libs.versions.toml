@@ -3,7 +3,7 @@ awaitility = "4.3.0"
 bcpkix = "1.70"
 blaze = "1.6.17"
 brotli4j = "1.18.0"
-bytebuddy = "1.18.1"
+bytebuddy = "1.18.2"
 caffeine = "2.9.3"
 classgraph = "4.8.184"
 compile-testing = "0.21.0"
@@ -11,7 +11,7 @@ compile-testing = "0.21.0"
 geb = "7.0"
 gradle-tapi = "9.2.1"
 # be sure to update graal version in gradle.properties as well
-graal-svm = "23.1.8"
+graal-svm = "23.1.9"
 h2 = "2.2.224"
 hibernate = "5.5.9.Final"
 htmlunit = "2.70.0"
@@ -35,9 +35,9 @@ jazzer = "0.24.0"
 jcache = "1.1.1"
 junit5 = "5.12.2"
 junit-platform="1.12.2"
-logback = "1.5.21"
-lombok = "1.18.40"
-logbook-netty = "3.12.2"
+logback = "1.5.22"
+lombok = "1.18.42"
+logbook-netty = "3.12.3"
 log4j = "2.24.3"
 micronaut-aws = "4.11.0"
 micronaut-groovy = "4.7.0"
@@ -49,6 +49,7 @@ micronaut-rxjava2 = "2.7.0"
 micronaut-rxjava3 = "3.7.0"
 micronaut-reactor = "3.7.0"
 micronaut-kotlin = "4.6.0"
+micronaut-data = "5.0.0-SNAPSHOT"
 native-gradle-plugin = "0.11.3"
 neo4j-java-driver = "5.17.0"
 selenium = "4.27.0"
@@ -56,10 +57,10 @@ okio = "3.9.1"
 picocli="4.7.7"
 slf4j = "2.0.17"
 smallrye = "6.9.2"
-spock = "2.4-M7-groovy-5.0"
+spock = "2.4-groovy-5.0"
 spotbugs = "4.9.8"
 systemlambda = "1.2.1"
-testcontainers = "1.21.3"
+testcontainers = "1.21.4"
 tomlj="1.1.1"
 vertx = "4.5.17"
 wiremock = "2.33.2"
@@ -73,7 +74,7 @@ junit4 = "4.13.2"
 # Versions which start with managed- are managed by Micronaut in the sense
 # that they will appear in the Micronaut BOM as <properties>
 #
-managed-groovy = "5.0.2"
+managed-groovy = "5.0.3"
 managed-jakarta-annotation-api = "2.1.1"
 managed-jackson = "3.0.1"
 managed-jackson-annotations = "2.20"
@@ -81,7 +82,7 @@ managed-kotlin = "2.2.21"
 managed-kotlin-coroutines = "1.10.2"
 managed-graalpy = "25.0.1"
 managed-methvin-directory-watcher = "0.19.1"
-managed-netty = "4.2.7.Final"
+managed-netty = "4.2.9.Final"
 managed-netty-tcnative = "2.0.74.Final"
 managed-reactive-streams = "1.0.4"
 # This should be kept aligned with https://github.com/micronaut-projects/micronaut-reactor/blob/master/gradle.properties from the BOM
@@ -102,6 +103,7 @@ test-boms-micronaut-rxjava2 = { module = "io.micronaut.rxjava2:micronaut-rxjava2
 test-boms-micronaut-rxjava3 = { module = "io.micronaut.rxjava3:micronaut-rxjava3-bom", version.ref = "micronaut-rxjava3" }
 test-boms-micronaut-reactor = { module = "io.micronaut.reactor:micronaut-reactor-bom", version.ref = "micronaut-reactor" }
 test-boms-micronaut-kotlin = { module = "io.micronaut.kotlin:micronaut-kotlin-bom", version.ref = "micronaut-kotlin" }
+test-boms-micronaut-data = { module = "io.micronaut.data:micronaut-data-bom", version.ref = "micronaut-data" }
 
 boms-groovy = { module = "org.apache.groovy:groovy-bom", version.ref = "managed-groovy" }
 boms-kotlin = { module = "org.jetbrains.kotlin:kotlin-bom", version.ref = "managed-kotlin" }
@@ -238,6 +240,7 @@ junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api", version.re
 junit-jupiter-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "junit5" }
 junit-jupiter-params = { module = "org.junit.jupiter:junit-jupiter-params", version.ref = "junit5" }
 junit-platform-engine = { module = "org.junit.platform:junit-platform-suite-engine", version.ref = "junit-platform" }
+junit-platform-testkit = { module = "org.junit.platform:junit-platform-testkit", version.ref = "junit-platform" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junit-platform" }
 junit-vintage = { module = "org.junit.vintage:junit-vintage-engine", version.ref = "junit5" }
 

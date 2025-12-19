@@ -1,12 +1,12 @@
 package io.micronaut.jackson
 
 import io.micronaut.context.annotation.Property
-import tools.jackson.databind.ObjectMapper
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
+import tools.jackson.databind.ObjectMapper
 
-@Property(name = "jackson.deserialization.failOnNullForPrimitives", value = "false")
+@Property(name = "jackson.deserialization-features.failOnNullForPrimitives", value = "false")
 @MicronautTest
 class JacksonNullableTest {
 

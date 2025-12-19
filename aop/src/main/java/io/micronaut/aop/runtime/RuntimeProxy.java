@@ -20,7 +20,7 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import static java.lang.annotation.RetentionPolicy.SOURCE;
 
 /**
  * The annotation used to declare a runtime proxy.
@@ -29,7 +29,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  * @since 5.0
  */
 @Documented
-@Retention(RUNTIME)
+@Retention(SOURCE)
 @Target({ElementType.ANNOTATION_TYPE, ElementType.TYPE, ElementType.METHOD})
 public @interface RuntimeProxy {
 
@@ -40,7 +40,7 @@ public @interface RuntimeProxy {
      */
     Class<? extends RuntimeProxyCreator> value();
 
-        /**
+    /**
      * <p>By default Micronaut will compile subclasses of the target class and call super.foo(..) to invoke the original method since
      * this is more efficient and allows proxied methods to work for calls from within the class.</p>
      *

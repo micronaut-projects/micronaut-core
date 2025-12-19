@@ -15,22 +15,8 @@
  */
 package io.micronaut.python.processing.annotation;
 
-import java.lang.annotation.Annotation;
-import java.lang.annotation.RetentionPolicy;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.stream.Collectors;
-
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
-import io.micronaut.python.processing.visitor.ReturnDef;
-import org.graalvm.polyglot.Value;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
-
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.ClassElement;
@@ -39,14 +25,17 @@ import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.python.processing.util.GraalPyUtil;
-import io.micronaut.python.processing.visitor.AnnotationMemberDef;
-import io.micronaut.python.processing.visitor.AttributeDef;
-import io.micronaut.python.processing.visitor.ClassDef;
-import io.micronaut.python.processing.visitor.DecoratorDef;
-import io.micronaut.python.processing.visitor.ElementDef;
-import io.micronaut.python.processing.visitor.FunctionDef;
-import io.micronaut.python.processing.visitor.PropertyDef;
-import io.micronaut.python.processing.visitor.PythonVisitorContext;
+import io.micronaut.python.processing.visitor.*;
+import org.graalvm.polyglot.Value;
+import org.jetbrains.annotations.Nullable;
+
+import java.lang.annotation.Annotation;
+import java.lang.annotation.RetentionPolicy;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * Builder for creating annotation metadata from Python decorators and elements.
@@ -59,7 +48,6 @@ import io.micronaut.python.processing.visitor.PythonVisitorContext;
 public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<ElementDef, DecoratorDef> {
     private final Map<String, DecoratorDef> decorators;
     private final PythonVisitorContext visitorContext;
-    private final Map<String, ElementDef> annotationTypes = new HashMap<>();
 
     public PythonAnnotationMetadataBuilder(Map<String, DecoratorDef> decorators, PythonVisitorContext visitorContext) {
         this.decorators = decorators;
@@ -77,10 +65,10 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
 
     @Override
     protected ElementDef getTypeForAnnotation(DecoratorDef annotationMirror) {
-        return new ClassDef(
+        return getAnnotationMirror(annotationMirror.annotationName()).orElseGet(() -> new ClassDef(
             annotationMirror.annotationName(),
             annotationMirror.stereotypes()
-        );
+        ));
     }
 
     @Override
@@ -301,14 +289,6 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
 
     @Override
     protected Optional<ElementDef> getAnnotationMirror(String annotationName) {
-        DecoratorDef value = decorators.get(annotationName);
-        if (value != null) {
-            return Optional.of(value)
-                .map(decoratorDef -> new ClassDef(
-                    decoratorDef.annotationName(),
-                    decoratorDef.stereotypes()
-                ));
-        }
         Optional<AnnotationValue<?>> annotationValue = visitorContext.getJavaVisitorContext().getAnnotationMetadataBuilder().buildAnnotation(annotationName);
         if (annotationValue.isPresent()) {
             AnnotationValue<?> av = annotationValue.get();
@@ -321,12 +301,12 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     }
 
     private DecoratorDef toDecoratorDef(AnnotationValue<?> av) {
-        return new DecoratorDef(av.getAnnotationName(), av.getAnnotationName(), null, Map.of(), av.getStereotypes().stream().map(this::toDecoratorDef).toList());
+        return new DecoratorDef(av.getAnnotationName(), av.getAnnotationName(), null, (Map) av.getValues(), av.getStereotypes() == null ? List.of() : av.getStereotypes().stream().map(this::toDecoratorDef).toList());
     }
 
     @Override
-    protected String getOriginatingClassName(ElementDef orginatingElement) {
-        return orginatingElement.name();
+    protected String getOriginatingClassName(ElementDef originating) {
+        return originating.name();
     }
 
     @Override

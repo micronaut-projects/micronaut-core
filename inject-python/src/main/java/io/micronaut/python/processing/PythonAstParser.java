@@ -20,6 +20,15 @@ import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.processing.visitor.ClassDef;
 import io.micronaut.python.processing.visitor.DecoratorDef;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.HostAccess;
 import org.graalvm.polyglot.Source;
@@ -28,13 +37,6 @@ import org.graalvm.python.embedding.GraalPyResources;
 import org.graalvm.python.embedding.VirtualFileSystem;
 import org.intellij.lang.annotations.Language;
 import org.jetbrains.annotations.NotNull;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.function.Function;
 
 public final class PythonAstParser {
 
@@ -188,7 +190,7 @@ public final class PythonAstParser {
         bindings.putMember("callback_get_class_elements", (Function<String, Object[]>) packageName -> {
             // Transform package names back from "micronaut." to "io.micronaut." for Java lookups
             String javaPackageName = packageName.startsWith("micronaut.") ? "io." + packageName : packageName;
-            return visitorContext.getClassElements(javaPackageName, StringUtils.EMPTY_STRING_ARRAY);
+            return visitorContext.getClassElements(javaPackageName, "*");
         });
         List<TransformResult> results = new ArrayList<>();
         for (Source source : pythonSource) {
@@ -201,7 +203,9 @@ public final class PythonAstParser {
                     getTransformSource()
                 ));
             } catch (Exception e) {
-                throw new ProcessingException(null, "Error processing Python source [" + source.getName() + "]: " + e.getMessage(), e);
+                StringWriter stack = new StringWriter();
+                e.printStackTrace(new PrintWriter(stack));
+                throw new ProcessingException(null, "Error processing Python source [" + source.getName() + "]: " + e.getMessage() + System.lineSeparator() + stack, e);
             }
             Map map = result.as(Map.class);
             String code = map.containsKey("code") ? map.get("code").toString() : null;

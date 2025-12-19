@@ -41,6 +41,7 @@ public class GraalPyContextFactory {
     public static final String PYRONAUT_MAIN_CLASS = "pyronaut_application.PyronautMain";
 
     private final ApplicationContext applicationContext;
+    private boolean providedContext = false;
 
     public GraalPyContextFactory(ApplicationContext applicationContext) {
         this.applicationContext = applicationContext;
@@ -56,6 +57,7 @@ public class GraalPyContextFactory {
     @Singleton
     public org.graalvm.polyglot.Context graalPyContext() {
         if (ContextHolder.isInitialized() && ContextHolder.isReuseContext()) {
+            providedContext = true;
             // Reuse context: this is an optimization for reloading
             return ContextHolder.getContext();
         }
@@ -117,7 +119,9 @@ public class GraalPyContextFactory {
             if (ctx != null) {
                 ctx.close(true);
             }
-            ContextHolder.resetContext();
+            if (!providedContext) {
+                ContextHolder.resetContext();
+            }
         }
     }
 

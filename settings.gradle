@@ -6,7 +6,7 @@ pluginManagement {
 }
 
 plugins {
-    id 'io.micronaut.build.shared.settings' version '8.0.0-M11'
+    id 'io.micronaut.build.shared.settings' version '8.0.0-M13'
 }
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
@@ -95,6 +95,7 @@ include "test-utils"
 include "test-suite-annotation-remapper"
 include "test-suite-annotation-remapper-visitor"
 include "test-suite-property-source"
+include "pytest-engine"
 
 // benchmarks
 include "benchmarks"

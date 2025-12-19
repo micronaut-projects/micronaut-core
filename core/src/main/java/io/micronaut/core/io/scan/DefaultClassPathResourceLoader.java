@@ -18,8 +18,11 @@ package io.micronaut.core.io.scan;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.helpers.NOPLogger;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -43,8 +46,6 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import org.slf4j.helpers.NOPLogger;
-
 /**
  * Loads resources from the classpath.
  *
@@ -52,12 +53,15 @@ import org.slf4j.helpers.NOPLogger;
  * @author graemerocher
  * @since 1.0
  */
+@NullMarked
 public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
 
     private final Logger log;
 
     private final ClassLoader classLoader;
+    @Nullable
     private final String basePath;
+    @Nullable
     private final URL baseURL;
     private final Map<String, Boolean> isDirectoryCache = new ConcurrentLinkedHashMap.Builder<String, Boolean>()
         .maximumWeightedCapacity(50).build();
@@ -79,7 +83,7 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
      * @param classLoader The class loader for loading resources
      * @param basePath    The path to look for resources under
      */
-    public DefaultClassPathResourceLoader(ClassLoader classLoader, String basePath) {
+    public DefaultClassPathResourceLoader(ClassLoader classLoader, @Nullable String basePath) {
         this(classLoader, basePath, false);
     }
 
@@ -90,7 +94,7 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
      * @param basePath    The path to look for resources under
      * @param checkBase   If set to {@code true} an extended check for the base path is performed otherwise paths with relative URLs like {@code ../} are prohibited.
      */
-    public DefaultClassPathResourceLoader(ClassLoader classLoader, String basePath, boolean checkBase) {
+    public DefaultClassPathResourceLoader(ClassLoader classLoader, @Nullable String basePath, boolean checkBase) {
         this(classLoader, basePath, checkBase, true);
     }
 
@@ -102,7 +106,7 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
      * @param checkBase   If set to {@code true} an extended check for the base path is performed otherwise paths with relative URLs like {@code ../} are prohibited.
      * @param logEnabled  flag to enable or disable logger
      */
-    public DefaultClassPathResourceLoader(ClassLoader classLoader, String basePath, boolean checkBase, boolean logEnabled) {
+    public DefaultClassPathResourceLoader(ClassLoader classLoader, @Nullable String basePath, boolean checkBase, boolean logEnabled) {
 
         log = logEnabled ? LoggerFactory.getLogger(getClass()) : NOPLogger.NOP_LOGGER;
 
@@ -299,7 +303,7 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
     }
 
     @SuppressWarnings("MagicNumber")
-    private String normalize(String path) {
+    private @Nullable String normalize(@Nullable String path) {
         if (path != null) {
             if (path.startsWith("classpath:")) {
                 path = path.substring(10);
