@@ -44,6 +44,16 @@ public final class PythonClassElement extends AbstractPythonClassElement {
     }
 
     @Override
+    public @org.jspecify.annotations.NonNull ClassElement getType() {
+        if (typeAnnotationsKey == null) {
+            return this;
+        }
+        PythonClassElement pythonClassElement = copyThis();
+        pythonClassElement.typeAnnotationsKey = null;
+        return pythonClassElement;
+    }
+
+    @Override
     protected PythonClassElement copyThis() {
         return new PythonClassElement(getNativeType(), environment, arrayDimensions);
     }

@@ -17,12 +17,13 @@ package io.micronaut.json;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.type.Argument;
 import io.micronaut.json.tree.JsonNode;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Processor;
 
 import java.io.IOException;
@@ -125,9 +126,25 @@ public interface JsonMapper {
      * @param <T> Type variable of the return type.
      * @return The deserialized object.
      * @throws IOException IOException
+     * @deprecated Prefer {@link #readValue(ReadBuffer, Argument)}
      */
+    @Deprecated(since = "5.0.0")
     default <T> T readValue(@NonNull ByteBuffer<?> byteBuffer, @NonNull Argument<T> type) throws IOException {
         return readValue(byteBuffer.toByteArray(), type);
+    }
+
+    /**
+     * Parse and map json from the given read buffer.
+     *
+     * @param readBuffer The input data.
+     * @param type       The type to deserialize to.
+     * @param <T>        Type variable of the return type.
+     * @return The deserialized object.
+     * @throws IOException IOException
+     * @since 5.0.0
+     */
+    default <T> T readValue(@NonNull ReadBuffer readBuffer, @NonNull Argument<T> type) throws IOException {
+        return readValue(readBuffer.toArray(), type);
     }
 
     /**

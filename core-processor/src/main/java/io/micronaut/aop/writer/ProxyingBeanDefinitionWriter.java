@@ -236,11 +236,6 @@ public abstract class ProxyingBeanDefinitionWriter implements ProxyingBeanDefini
     }
 
     @Override
-    public boolean isSingleton() {
-        return proxyBeanDefinitionWriter.isSingleton();
-    }
-
-    @Override
     public boolean isInterface() {
         return targetType.isInterface();
     }

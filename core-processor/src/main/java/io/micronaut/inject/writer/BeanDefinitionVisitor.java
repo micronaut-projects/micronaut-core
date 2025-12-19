@@ -126,11 +126,6 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
     boolean isInterface();
 
     /**
-     * @return Is the bean singleton
-     */
-    boolean isSingleton();
-
-    /**
      * Visit a marker interface on the generated bean definition.
      *
      * @param interfaceType The interface type

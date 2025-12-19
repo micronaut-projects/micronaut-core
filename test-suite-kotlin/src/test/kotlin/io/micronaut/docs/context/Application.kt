@@ -24,7 +24,7 @@ object Application {
 
     @JvmStatic
     fun main(args: Array<String>) {
-        Micronaut.build(null)
+        Micronaut.build()
                 .mainClass(Application::class.java)
                 .environmentPropertySource(false)
                 //or

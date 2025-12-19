@@ -21,6 +21,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
+import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -39,6 +42,7 @@ import io.micronaut.inject.ast.PropertyElementQuery;
 import io.micronaut.inject.ast.utils.EnclosedElementsQuery;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.python.processing.util.GraalPyUtil;
+import org.jspecify.annotations.NonNull;
 
 public abstract sealed class AbstractPythonClassElement extends AbstractPythonElement
     implements ArrayableClassElement, ElementProvider permits PythonClassElement, PythonEnumElement, PythonGenericPlaceholderElement {
@@ -48,6 +52,9 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
     protected final PythonProcessingEnvironment environment;
     /** Query implementation for enclosed elements. */
     private final PythonEnclosedElementsQuery enclosedElementsQuery = new PythonEnclosedElementsQuery();
+
+    protected ElementDef typeAnnotationsKey;
+    private ElementAnnotationMetadata typeAnnotationMetadata;
 
     protected AbstractPythonClassElement(ClassDef classDef, PythonProcessingEnvironment environment) {
         this(classDef, environment, 0);
@@ -61,6 +68,39 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
         );
         this.environment = environment;
         this.arrayDimensions = arrayDimensions;
+    }
+
+    @Override
+    protected MutableAnnotationMetadataDelegate<?> getAnnotationMetadataToWrite() {
+        if (typeAnnotationsKey == null) {
+            return super.getAnnotationMetadataToWrite();
+        }
+        return getTypeAnnotationMetadata();
+    }
+
+    @NonNull
+    @Override
+    public AnnotationMetadata getAnnotationMetadata() {
+        if (presetAnnotationMetadata != null) {
+            return presetAnnotationMetadata;
+        }
+        if (typeAnnotationsKey == null) {
+            return super.getAnnotationMetadata();
+        } else {
+            return new AnnotationMetadataHierarchy(true, super.getAnnotationMetadata(), getTypeAnnotationMetadata());
+        }
+    }
+
+    @Override
+    public @NonNull MutableAnnotationMetadataDelegate<AnnotationMetadata> getTypeAnnotationMetadata() {
+        if (typeAnnotationMetadata == null) {
+            typeAnnotationMetadata = elementAnnotationMetadataFactory.buildTypeAnnotations(this);
+        }
+        return typeAnnotationMetadata;
+    }
+
+    public final ElementDef getTypeAnnotationsKey() {
+        return typeAnnotationsKey;
     }
 
     @Override

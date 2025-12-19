@@ -9,7 +9,7 @@ class JacksonObjectSerializerSpec extends Specification {
 
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/2282")
     void "test empty optional is returned"() {
-        ObjectMapper objectMapper = new ObjectMapperFactory().objectMapper(null, null)
+        ObjectMapper objectMapper = new ObjectMapperFactory().jsonMapperBuilder(null, null).build()
 
         when:
         Optional<Object> optional = new JacksonObjectSerializer(objectMapper).deserialize("null".bytes)

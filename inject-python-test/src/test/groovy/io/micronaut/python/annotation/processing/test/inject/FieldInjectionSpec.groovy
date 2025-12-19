@@ -11,7 +11,7 @@ class FieldInjectionSpec extends AbstractPythonTypeElementSpec {
         given: "Python code with field injection"
         def pythonCode = '''
 from typing import Annotated
-from jakarta.inject import *
+from jakarta.inject import Singleton, Inject
 from micronaut.context.annotation import Executable
 from micronaut.http.client import HttpClient
 from micronaut.runtime.server import EmbeddedServer

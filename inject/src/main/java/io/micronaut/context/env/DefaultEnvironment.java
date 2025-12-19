@@ -20,8 +20,6 @@ import io.micronaut.context.PropertyResolverDelegate;
 import io.micronaut.context.env.yaml.YamlPropertySourceLoader;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.DefaultMutableConversionService;
 import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.io.ResourceLoader;
@@ -39,6 +37,8 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.value.PropertyCatalog;
 import io.micronaut.core.value.PropertyResolver;
 import io.micronaut.inject.BeanConfiguration;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -190,10 +190,10 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
 
     @Override
     public DefaultEnvironment addPropertySource(PropertySource propertySource) {
-        propertySources.put(propertySource.getName(), propertySource);
+        internalAddPropertySource(propertySource);
         if (isRunning() && !reading.get()) {
             propertyPlaceholderResolver.resetCaches();
-            process(propertySource);
+            internalProcessPropertySource(propertySource);
         }
         return this;
     }
@@ -344,20 +344,33 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
             propertySources = new ArrayList<>(this.propertySources.size());
         }
         propertySources.addAll(this.propertySources.values());
-        for (PropertySourcesLocator propertySourcesLocator : configuration.getPropertySourcesLocators()) {
-            propertySources.addAll(propertySourcesLocator.load(this));
+
+        for (PropertySource propertySource : propertySources) {
+            internalAddPropertySource(propertySource);
+        }
+
+        Collection<PropertySourcesLocator> propertySourcesLocators = configuration.getPropertySourcesLocators();
+        if (!propertySourcesLocators.isEmpty()) {
+            for (PropertySourcesLocator propertySourcesLocator : propertySourcesLocators) {
+                for (PropertySource propertySource : propertySourcesLocator.load(this)) {
+                    internalAddPropertySource(propertySource);
+                    propertySources.add(propertySource);
+                }
+            }
         }
 
         OrderUtil.sortOrdered(propertySources);
-
         for (PropertySource propertySource : propertySources) {
-            process(propertySource);
+            internalProcessPropertySource(propertySource);
         }
     }
 
-    private void process(PropertySource propertySource) {
-        LOG.debug("Processing property source: {} convention: {}", propertySource.getName(), propertySource.getConvention());
+    private void internalAddPropertySource(PropertySource propertySource) {
         propertySources.put(propertySource.getName(), propertySource);
+    }
+
+    private void internalProcessPropertySource(PropertySource propertySource) {
+        LOG.debug("Processing property source: {} convention: {}", propertySource.getName(), propertySource.getConvention());
         propertyPlaceholderResolver.processPropertySource(propertySource, propertySource.getConvention());
     }
 

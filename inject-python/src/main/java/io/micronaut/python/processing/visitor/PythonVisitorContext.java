@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
@@ -39,19 +40,19 @@ public class PythonVisitorContext implements VisitorContext {
     private final MutableConvertibleValues<Object> visitorAttributes = new MutableConvertibleValuesMap<>();
     private final Map<String, DecoratorDef> decorators;
     private final PythonProcessingEnvironment processingEnvironment;
-    private final VisitorContext javaVisitorContext;
+    private final JavaVisitorContext javaVisitorContext;
 
     public PythonVisitorContext(Map<String, DecoratorDef> decorators, PythonProcessingEnvironment processingEnvironment) {
         this(decorators, processingEnvironment, null);
     }
 
-    public PythonVisitorContext(Map<String, DecoratorDef> decorators, PythonProcessingEnvironment processingEnvironment, VisitorContext javaVisitorContext) {
+    public PythonVisitorContext(Map<String, DecoratorDef> decorators, PythonProcessingEnvironment processingEnvironment, JavaVisitorContext javaVisitorContext) {
         this.decorators = decorators;
         this.processingEnvironment = processingEnvironment;
         this.javaVisitorContext = javaVisitorContext;
     }
 
-    public VisitorContext getJavaVisitorContext() {
+    public JavaVisitorContext getJavaVisitorContext() {
         return javaVisitorContext;
     }
 

@@ -102,6 +102,8 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
     private final BeanDefinitionsProvider beanDefinitionReferencesProvider;
     @Nullable
     private final Predicate<QualifiedBeanType<?>> beansPredicate;
+    @Nullable
+    private final Predicate<BeanConfiguration> beanConfigurationsPredicate;
 
     private final ClassLoader classLoader;
     private Beans beans;
@@ -124,6 +126,7 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
         this.eagerInitStereotypesPresent = !configuredEagerSingletonAnnotations.isEmpty();
         this.eagerInitSingletons = eagerInitStereotypesPresent && (configuredEagerSingletonAnnotations.contains(AnnotationUtil.SINGLETON) || configuredEagerSingletonAnnotations.contains(Singleton.class.getName()));
         this.beansPredicate = contextConfiguration.beansPredicate();
+        this.beanConfigurationsPredicate = contextConfiguration.beanConfiguraionsPredicate();
         this.beanDefinitionReferencesProvider = contextConfiguration.getBeanDefinitionsProvider();
         this.classLoader = contextConfiguration.getClassLoader();
         if (beans == null) {
@@ -143,8 +146,10 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
     }
 
     @Override
-    public void registerConfiguration(BeanConfiguration configuration) {
-        additionalBeanConfigurations.add(configuration);
+    public void registerConfiguration(@NonNull BeanConfiguration configuration) {
+        if (beanConfigurationsPredicate == null || beanConfigurationsPredicate.test(configuration)) {
+            additionalBeanConfigurations.add(configuration);
+        }
     }
 
     @Override
