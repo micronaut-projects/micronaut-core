@@ -430,7 +430,11 @@ public final class FormDemuxer implements BufferConsumer {
         @Override
         void accept(PostBodyDecoder.Event event) {
             if (event == PostBodyDecoder.Event.CONTENT) {
-                add(decoder.decodedContent());
+                ByteBuf dc = decoder.decodedContent();
+                // TODO: https://github.com/netty-contrib/codec-multipart/commit/026ea6db77434466824ee9b858aa35f1a5254f27
+                ByteBuf copy = dc.copy();
+                dc.release();
+                add(copy);
             } else if (event == PostBodyDecoder.Event.FIELD_COMPLETE) {
                 baseSharedBuffer.complete();
                 if (fieldsPublisherCancelled) {

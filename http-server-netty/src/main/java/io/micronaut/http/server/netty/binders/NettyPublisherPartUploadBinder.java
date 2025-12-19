@@ -21,6 +21,7 @@ import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
 import io.micronaut.http.multipart.CompletedAttribute;
@@ -82,11 +83,15 @@ final class NettyPublisherPartUploadBinder implements TypedRequestArgumentBinder
             // Publisher<Publisher<…>>
             Argument<?> nestedType = contentArgument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
             publisher = Flux.from(formFactory.get().getOrCreateCompleter(request).subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.ASYNC, argument)))
-                .mapNotNull(f -> {
-                    try (f) {
-                        return conversionService.convert(f.byteBody(), nestedType).orElse(null);
+                .mapNotNull(f -> Flux.from(f.byteBody().toReadBufferPublisher()).map(rb -> {
+                    if (nestedType.isAssignableFrom(ReadBuffer.class)) {
+                        return rb;
+                    } else {
+                        try (rb) {
+                            return conversionService.convertRequired(rb, nestedType);
+                        }
                     }
-                });
+                }));
         } else if (contentTypeClass == PartData.class) {
             publisher = Flux.from(formFactory.get().getOrCreateCompleter(request).subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.ASYNC, argument)))
                 .concatMap(raw -> Flux.from(raw.byteBody().toReadBufferPublisher())

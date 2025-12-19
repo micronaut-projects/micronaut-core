@@ -64,7 +64,7 @@ public final class NettyReadBufferFactory extends ReadBufferFactory {
 
     @Override
     public ReadBuffer createEmpty() {
-        return new NettyReadBuffer(Unpooled.EMPTY_BUFFER);
+        return adapt(Unpooled.EMPTY_BUFFER);
     }
 
     @Override
