@@ -10,6 +10,7 @@ from typing import Optional, Any
 import sys
 import traceback
 import java
+import inspect
 
 class MicronautPytestPlugin:
     """
@@ -52,14 +53,10 @@ class MicronautPytestPlugin:
             self.current_file = collector.fspath
             self.listener.beforeFile(f"{collector.fspath}")
 
-    def pytest_runtest_setup(self, item):
-        """Called before test setup."""
-        test_id = self._get_test_id(item)
-        self.listener.beforeTest(test_id)
-
     def pytest_runtest_call(self, item):
         """Called when test is actually executed."""
-        pass
+        test_id = self._get_test_id(item)
+        self.listener.beforeTest(test_id, item)
 
     def pytest_runtest_makereport(self, item, call):
         """Called when test report is created."""
@@ -86,21 +83,24 @@ class MicronautPytestPlugin:
         else:
             result = TestExecutionResult.successful()
 
-        self.listener.afterTest(test_id, result)
+        self.listener.afterTest(test_id, item, result)
 
         # Clean up stored result
         self.test_results.pop(test_id, None)
 
     def pytest_collectreport(self, report):
         """Called when collection report is generated."""
+        TestExecutionResult = java.type("org.junit.platform.engine.TestExecutionResult")
         if report.failed:
-            TestExecutionResult = java.type("org.junit.platform.engine.TestExecutionResult")
             RuntimeException = java.type("java.lang.RuntimeException")
-
             exception = RuntimeException(f"Collection failed: {report.longrepr}")
             result = TestExecutionResult.failed(exception)
             if self.current_file:
-                self.listener.afterFile(self.current_file, result)
+                self.listener.afterFile(f"{self.current_file}", result)
+                raise Exception(f"Collection failed: {report.longrepr}")
+        else:
+            if self.current_file:
+                self.listener.afterFile(f"{self.current_file}", TestExecutionResult.successful())
 
     def _get_test_id(self, item) -> str:
         """

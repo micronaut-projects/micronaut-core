@@ -15,8 +15,16 @@
  */
 package io.micronaut.test.pytest;
 
+import io.micronaut.context.python.ContextHolder;
+import io.micronaut.context.python.GraalPyContextFactory;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.test.pytest.discovery.PytestDiscoverySelectorResolver;
 import io.micronaut.test.pytest.execution.PytestTestExecutor;
+import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.HostAccess;
+import org.graalvm.python.embedding.GraalPyResources;
+import org.graalvm.python.embedding.VirtualFileSystem;
+import org.junit.platform.engine.ConfigurationParameters;
 import org.junit.platform.engine.DiscoverySelector;
 import org.junit.platform.engine.EngineDiscoveryRequest;
 import org.junit.platform.engine.ExecutionRequest;
@@ -29,7 +37,9 @@ import org.junit.platform.engine.support.descriptor.EngineDescriptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.file.Path;
 import java.util.Optional;
+
 
 /**
  * JUnit 5 TestEngine implementation for running pytest tests using GraalPy.
@@ -40,6 +50,8 @@ public class PytestTestEngine implements TestEngine {
     private static final Logger LOG = LoggerFactory.getLogger(PytestTestEngine.class);
 
     private static final String ENGINE_ID = "pytest-engine";
+    private Context context;
+
 
     @Override
     public String getId() {
@@ -50,9 +62,33 @@ public class PytestTestEngine implements TestEngine {
     public TestDescriptor discover(EngineDiscoveryRequest discoveryRequest, UniqueId uniqueId) {
         LOG.debug("Starting test discovery with uniqueId: {}", uniqueId);
 
+        if (this.context == null) {
+            System.setProperty("org.graalvm.python.vfs.allow_multiple", StringUtils.TRUE);
+            var pyEnv = System.getenv("PYENV_VERSION");
+            var venv = System.getenv("VIRTUAL_ENV");
+            Context.Builder builder = GraalPyResources.contextBuilder(VirtualFileSystem.newBuilder()
+                    .resourceDirectory(GraalPyContextFactory.APPLICATION_PATH)
+                    .build())
+                .allowHostAccess(HostAccess.ALL)
+                .allowHostClassLookup(name -> true);
+            if (pyEnv != null && venv != null && pyEnv.startsWith("graalpy")) {
+                builder.option("python.Executable", Path.of(venv).resolve("bin/python").toString());
+            }
+            ConfigurationParameters configurationParameters = discoveryRequest.getConfigurationParameters();
+            configurationParameters.keySet().forEach(key -> {
+                if (key.startsWith("python.")) {
+                    configurationParameters.get(key).ifPresent(value ->
+                        builder.option(key, value)
+                    );
+                }
+            });
+            this.context = builder.build();
+            ContextHolder.setContext(context);
+        }
+
         EngineDescriptor engineDescriptor = new EngineDescriptor(uniqueId, "Micronaut Pytest Engine");
 
-        PytestDiscoverySelectorResolver selectorResolver = new PytestDiscoverySelectorResolver();
+        PytestDiscoverySelectorResolver selectorResolver = new PytestDiscoverySelectorResolver(context);
 
         // Process discovery selectors
         discoveryRequest.getSelectorsByType(DiscoverySelector.class).forEach(selector -> {
@@ -72,28 +108,38 @@ public class PytestTestEngine implements TestEngine {
         });
 
         LOG.debug("Discovery completed. Found {} test descriptors", engineDescriptor.getChildren().size());
+
         return engineDescriptor;
     }
 
     @Override
     public void execute(ExecutionRequest request) {
-        LOG.debug("Starting test execution");
+        if (context != null) {
+            LOG.debug("Starting test execution");
 
-        TestDescriptor rootDescriptor = request.getRootTestDescriptor();
-        PytestTestExecutor executor = new PytestTestExecutor(request.getEngineExecutionListener());
+            TestDescriptor rootDescriptor = request.getRootTestDescriptor();
+            PytestTestExecutor executor = new PytestTestExecutor(this.context, request.getEngineExecutionListener());
 
-        try {
-            executor.execute(rootDescriptor);
-            LOG.debug("Test execution completed successfully");
-        } catch (Exception e) {
-            LOG.error("Error during test execution", e);
-            throw e;
+            try {
+                executor.execute(rootDescriptor);
+                LOG.debug("Test execution completed successfully");
+            } catch (Exception e) {
+                LOG.error("Error during test execution", e);
+                throw e;
+            } finally {
+                try {
+                    context.close();
+                    context = null;
+                } catch (Exception e) {
+                    // ignore
+                }
+            }
         }
     }
 
     @Override
     public Optional<String> getGroupId() {
-        return Optional.of("io.micronaut.test");
+        return Optional.of("pyronaut.test");
     }
 
     @Override

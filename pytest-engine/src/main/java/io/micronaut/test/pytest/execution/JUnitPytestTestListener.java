@@ -17,12 +17,15 @@ package io.micronaut.test.pytest.execution;
 
 import io.micronaut.test.pytest.PytestFileDescriptor;
 import io.micronaut.test.pytest.PytestTestDescriptor;
+import io.micronaut.test.pytest.extension.PytestMicronautExtension;
 import io.micronaut.test.pytest.listener.PytestTestListener;
+import org.graalvm.polyglot.Value;
 import org.junit.platform.engine.EngineExecutionListener;
 import org.junit.platform.engine.TestExecutionResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
 
 
 /**
@@ -50,27 +53,36 @@ public class JUnitPytestTestListener implements PytestTestListener {
     }
 
     @Override
-    public void afterFile(String file) {
-        LOG.debug("Pytest finished file: {}", file);
-        junitListener.executionFinished(
-            fileDescriptor,
-            // failures reported in children.
-            TestExecutionResult.successful()
-        );
+    public void afterFile(String file, TestExecutionResult result) {
+        LOG.debug("Pytest finished file: {} ({})", file, result);
+        if (file.endsWith("/" + fileDescriptor.getDisplayName())) {
+            junitListener.executionFinished(
+                fileDescriptor,
+                result
+            );
+        }
     }
 
     @Override
-    public void beforeTest(String testId) {
+    public void beforeTest(String testId, Value item) {
         LOG.debug("Pytest starting test: {}", testId);
+
         fileDescriptor.getChildren()
             .stream()
             .filter(child -> child instanceof PytestTestDescriptor ptd &&
                 testId.endsWith("::" + ptd.getUniqueId().getSegments().getLast().getValue()))
-            .findAny().ifPresent(junitListener::executionStarted);
+            .findAny().ifPresent(testDescriptor -> {
+                    junitListener.executionStarted(testDescriptor);
+                    Value extValue = item.getMember(PytestMicronautExtension.ID);
+                    if (extValue != null) {
+                        PytestMicronautExtension extension = extValue.as(PytestMicronautExtension.class);
+                        extension.beforeEach(item, null, null, List.of());
+                    }
+                });
     }
 
     @Override
-    public void afterTest(String testId, TestExecutionResult result) {
+    public void afterTest(String testId, Value item, TestExecutionResult result) {
         LOG.debug("Pytest finished test: {} with result: {}", testId, result);
         fileDescriptor.getChildren()
             .stream()
@@ -78,6 +90,19 @@ public class JUnitPytestTestListener implements PytestTestListener {
                 testId.endsWith("::" + ptd.getUniqueId().getSegments().getLast().getValue()))
             .findAny().ifPresent(td -> {
                 junitListener.executionFinished(td, result);
+                Value extValue = item.getMember(PytestMicronautExtension.ID);
+                if (extValue != null) {
+                    PytestMicronautExtension extension = extValue.as(PytestMicronautExtension.class);
+                    try {
+                        extension.afterEach(item);
+                    } catch (Exception e) {
+                        if (e instanceof RuntimeException re) {
+                            throw re;
+                        } else {
+                            throw new RuntimeException(e);
+                        }
+                    }
+                }
             });
     }
 

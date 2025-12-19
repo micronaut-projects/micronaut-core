@@ -15,6 +15,7 @@
  */
 package io.micronaut.test.pytest.discovery;
 
+import org.graalvm.polyglot.Context;
 import org.junit.platform.engine.DiscoverySelector;
 import org.junit.platform.engine.TestDescriptor;
 import org.junit.platform.engine.discovery.DirectorySelector;
@@ -26,7 +27,6 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.stream.Stream;
 
 /**
@@ -35,6 +35,12 @@ import java.util.stream.Stream;
 public class PytestDiscoverySelectorResolver {
 
     private static final Logger LOG = LoggerFactory.getLogger(PytestDiscoverySelectorResolver.class);
+
+    public PytestDiscoverySelectorResolver(Context context) {
+        this.context = context;
+    }
+
+    private final Context context;
 
     /**
      * Resolves discovery selectors and adds corresponding test descriptors.
@@ -78,38 +84,11 @@ public class PytestDiscoverySelectorResolver {
         }
     }
 
-    private void scanPackageInDirectory(String baseDir, String packagePath, EngineDescriptor engineDescriptor, boolean isTestDirectory) {
-        Path basePath = Paths.get(baseDir);
-        Path packageDir = basePath.resolve(packagePath);
-
-        if (Files.exists(packageDir)) {
-            scanPythonDirectory(packageDir, engineDescriptor, isTestDirectory);
-        }
-    }
-
-    private void findAndAddPythonFile(String baseDir, String filePath, EngineDescriptor engineDescriptor, boolean isTestDirectory) {
-        Path basePath = Paths.get(baseDir);
-        Path fullPath = basePath.resolve(filePath);
-
-        if (Files.exists(fullPath)) {
-            addPythonFile(fullPath, engineDescriptor, isTestDirectory);
-        }
-    }
-
-    private void findAndAddPythonMethod(String baseDir, String filePath, String methodName, EngineDescriptor engineDescriptor, boolean isTestDirectory) {
-        Path basePath = Paths.get(baseDir);
-        Path fullPath = basePath.resolve(filePath);
-
-        if (Files.exists(fullPath)) {
-            addPythonMethod(fullPath, methodName, engineDescriptor, isTestDirectory);
-        }
-    }
-
     private void addPythonFile(Path filePath, EngineDescriptor engineDescriptor, boolean isTestDirectory) {
         LOG.debug("Adding Python file: {}", filePath);
 
         try {
-            PytestAstParser astParser = new PytestAstParser();
+            PytestAstParser astParser = new PytestAstParser(context);
             TestDescriptor fileDescriptor = astParser.parsePythonFile(filePath, isTestDirectory);
 
             if (fileDescriptor != null) {
@@ -124,7 +103,7 @@ public class PytestDiscoverySelectorResolver {
         LOG.debug("Adding Python method: {}::{}", filePath, methodName);
 
         try {
-            PytestAstParser astParser = new PytestAstParser();
+            PytestAstParser astParser = new PytestAstParser(context);
             TestDescriptor methodDescriptor = astParser.parsePythonMethod(filePath, methodName, isTestDirectory);
 
             if (methodDescriptor != null) {

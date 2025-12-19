@@ -17,10 +17,6 @@ package io.micronaut.test.pytest.execution;
 
 import io.micronaut.test.pytest.PytestFileDescriptor;
 import io.micronaut.test.pytest.PytestTestDescriptor;
-import io.micronaut.test.pytest.listener.PytestTestListener;
-import org.graalvm.polyglot.HostAccess;
-import org.graalvm.python.embedding.GraalPyResources;
-import org.graalvm.python.embedding.VirtualFileSystem;
 import org.junit.platform.engine.EngineExecutionListener;
 import org.junit.platform.engine.TestDescriptor;
 import org.junit.platform.engine.TestExecutionResult;
@@ -37,13 +33,14 @@ import java.nio.file.Paths;
  * Executes Python tests using pytest via GraalPy.
  */
 public class PytestTestExecutor {
-    private static final String PYTEST_RESOURCES = "GRAALPY-VFS/io.micronaut/pytest-engine";
     private static final Logger LOG = LoggerFactory.getLogger(PytestTestExecutor.class);
 
     private final EngineExecutionListener listener;
+    private final Context context;
 
-    public PytestTestExecutor(EngineExecutionListener listener) {
+    public PytestTestExecutor(Context context, EngineExecutionListener listener) {
         this.listener = listener;
+        this.context = context;
     }
 
     /**
@@ -96,24 +93,11 @@ public class PytestTestExecutor {
         LOG.debug("Running pytest for file: {}", fileDescriptor.getDisplayName());
 
         Path filePath = Paths.get(fileDescriptor.getUniqueId().getSegments().get(1).getValue());
-        var pyEnv = System.getenv("PYENV_VERSION");
-        var venv = System.getenv("VIRTUAL_ENV");
-        Context.Builder builder = GraalPyResources.contextBuilder(VirtualFileSystem.newBuilder()
-                .resourceDirectory(PYTEST_RESOURCES)
-                .build())
-            // TODO: constrain this in future
-            .allowHostAccess(HostAccess.ALL)
-            .allowHostClassLookup(name -> true);
-        if (pyEnv != null && venv != null && pyEnv.startsWith("graalpy")) {
-            builder.option("python.Executable", Path.of(venv).resolve("bin/python").toString());
-        }
-        try (Context context = builder
-
-            .build()) {
+        try {
             JUnitPytestTestListener testListener = new JUnitPytestTestListener(listener, fileDescriptor);
             // Call run_pytest with the file path and listener
             Value result = context.eval("python", """
-from pytest_runner import run_pytest
+from pyronaut.test import run_pytest
 
 run_pytest
             """).execute(

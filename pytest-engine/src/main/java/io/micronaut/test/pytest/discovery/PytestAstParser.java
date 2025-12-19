@@ -39,7 +39,7 @@ import java.util.*;
  * Parses Python files using AST to discover test functions and classes.
  * Uses GraalPy to execute Python AST parsing code.
  */
-public class PytestAstParser {
+final class PytestAstParser {
 
     private static final Logger LOG = LoggerFactory.getLogger(PytestAstParser.class);
 
@@ -81,13 +81,10 @@ def discover_tests(source_code: str) -> List[Tuple]:
         print(f"Error parsing Python AST: {e}", file=sys.stderr)
         return []
 """;
-
     private final Context context;
 
-    public PytestAstParser() {
-        this.context = Context.newBuilder("python")
-                .allowAllAccess(true)
-                .build();
+    public PytestAstParser(Context context) {
+        this.context = context;
         initializeParser();
     }
 

@@ -562,7 +562,7 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
     private void populateClassElements(@NonNull String[] stereotypes, boolean includeAll, Element enclosedElement, List<ClassElement> classElements) {
         if (enclosedElement instanceof TypeElement element) {
             JavaClassElement classElement = elementFactory.newClassElement(element, elementAnnotationMetadataFactory);
-            if ((includeAll || Arrays.stream(stereotypes).anyMatch(classElement::hasStereotype)) && !classElement.isAbstract()) {
+            if ((includeAll || Arrays.stream(stereotypes).anyMatch(classElement::hasStereotype))) {
                 classElements.add(classElement);
             }
             List<? extends Element> nestedElements = enclosedElement.getEnclosedElements();

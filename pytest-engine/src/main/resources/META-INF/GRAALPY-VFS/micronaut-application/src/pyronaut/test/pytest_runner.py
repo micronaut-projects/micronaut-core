@@ -41,7 +41,7 @@ def run_pytest(test_files: List[str], listener: Any):
     try:
         # Import pytest here to ensure virtual filesystem is set up
         import pytest
-        from pytest_listener import create_plugin
+        from pyronaut.test import create_plugin
 
         # Create the plugin with the Java listener
         plugin = create_plugin(listener)

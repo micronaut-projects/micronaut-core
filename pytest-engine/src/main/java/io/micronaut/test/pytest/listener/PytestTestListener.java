@@ -15,6 +15,7 @@
  */
 package io.micronaut.test.pytest.listener;
 
+import org.graalvm.polyglot.Value;
 import org.junit.platform.engine.TestExecutionResult;
 
 
@@ -36,23 +37,27 @@ public interface PytestTestListener {
      * Called after pytest finishes processing a test file.
      *
      * @param file the path to the Python test file
+     * @param result The result
      */
-    void afterFile(String file);
+    void afterFile(String file, TestExecutionResult result);
 
     /**
      * Called before an individual test starts execution.
      *
      * @param testId the unique identifier of the test
+     * @param item The pytest function to be executed
      */
-    void beforeTest(String testId);
+    void beforeTest(String testId, Value item);
 
     /**
      * Called after an individual test finishes execution.
      *
      * @param testId the unique identifier of the test
+     * @param item The pytest function that was executed
      * @param result The test execution result
+     *
      */
-    void afterTest(String testId, TestExecutionResult result);
+    void afterTest(String testId, Value item, TestExecutionResult result);
 
     /**
      * Called when test execution is complete.

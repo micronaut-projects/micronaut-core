@@ -256,7 +256,7 @@ def micronaut_annotation(name, repeated=None):
         Returns True if any imports were transformed.
         """
         # Get all ClassElements in the package
-        class_elements = self.callback_get_class_elements(original_module_name, None)
+        class_elements = self.callback_get_class_elements(original_module_name)
         if class_elements:
             transformed_any = False
             for class_element in class_elements:

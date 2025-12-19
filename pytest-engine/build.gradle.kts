@@ -1,10 +1,12 @@
 plugins {
     id("io.micronaut.build.internal.convention-test-library")
+    id("io.micronaut.build.internal.python")
 }
 
 dependencies {
     implementation(projects.micronautCore)
     implementation(projects.micronautContextPython)
+    implementation(libs.micronaut.test.core)
     implementation(libs.junit.platform.engine)
     implementation(libs.junit.platform.launcher)
     implementation(libs.managed.graalpy) {
