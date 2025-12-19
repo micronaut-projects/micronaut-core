@@ -32,12 +32,16 @@ import org.junit.platform.engine.TestDescriptor;
 import org.junit.platform.engine.TestEngine;
 import org.junit.platform.engine.UniqueId;
 import org.junit.platform.engine.discovery.ClassNameFilter;
+import org.junit.platform.engine.discovery.DirectorySelector;
+import org.junit.platform.engine.discovery.DiscoverySelectors;
 import org.junit.platform.engine.discovery.PackageNameFilter;
 import org.junit.platform.engine.support.descriptor.EngineDescriptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Optional;
 
 
@@ -50,6 +54,7 @@ public class PytestTestEngine implements TestEngine {
     private static final Logger LOG = LoggerFactory.getLogger(PytestTestEngine.class);
 
     private static final String ENGINE_ID = "pytest-engine";
+    public static final String TEST_SOURCE_DIR = "pytest.src.dir";
     private Context context;
 
 
@@ -61,6 +66,7 @@ public class PytestTestEngine implements TestEngine {
     @Override
     public TestDescriptor discover(EngineDiscoveryRequest discoveryRequest, UniqueId uniqueId) {
         LOG.debug("Starting test discovery with uniqueId: {}", uniqueId);
+        ConfigurationParameters configurationParameters = discoveryRequest.getConfigurationParameters();
 
         if (this.context == null) {
             System.setProperty("org.graalvm.python.vfs.allow_multiple", StringUtils.TRUE);
@@ -74,7 +80,6 @@ public class PytestTestEngine implements TestEngine {
             if (pyEnv != null && venv != null && pyEnv.startsWith("graalpy")) {
                 builder.option("python.Executable", Path.of(venv).resolve("bin/python").toString());
             }
-            ConfigurationParameters configurationParameters = discoveryRequest.getConfigurationParameters();
             configurationParameters.keySet().forEach(key -> {
                 if (key.startsWith("python.")) {
                     configurationParameters.get(key).ifPresent(value ->
@@ -89,6 +94,15 @@ public class PytestTestEngine implements TestEngine {
         EngineDescriptor engineDescriptor = new EngineDescriptor(uniqueId, "Micronaut Pytest Engine");
 
         PytestDiscoverySelectorResolver selectorResolver = new PytestDiscoverySelectorResolver(context);
+
+        String testSrc = configurationParameters.get(TEST_SOURCE_DIR).orElse(null);
+        if (testSrc != null) {
+            Path srcPath = Paths.get(testSrc);
+            if (Files.exists(srcPath)) {
+                DirectorySelector directorySelector = DiscoverySelectors.selectDirectory(testSrc);
+                selectorResolver.resolveSelectors(directorySelector, engineDescriptor);
+            }
+        }
 
         // Process discovery selectors
         discoveryRequest.getSelectorsByType(DiscoverySelector.class).forEach(selector -> {

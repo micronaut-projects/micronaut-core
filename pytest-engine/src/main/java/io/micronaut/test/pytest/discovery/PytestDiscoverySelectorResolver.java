@@ -60,7 +60,7 @@ public class PytestDiscoverySelectorResolver {
         Path directory = selector.getPath();
         LOG.debug("Resolving directory: {}", directory);
 
-        scanPythonDirectory(directory, engineDescriptor, true);
+        scanPythonDirectory(directory, engineDescriptor);
     }
 
     private void resolveFileSelector(FileSelector selector, EngineDescriptor engineDescriptor) {
@@ -72,13 +72,13 @@ public class PytestDiscoverySelectorResolver {
         }
     }
 
-    private void scanPythonDirectory(Path directory, EngineDescriptor engineDescriptor, boolean isTestDirectory) {
+    private void scanPythonDirectory(Path directory, EngineDescriptor engineDescriptor) {
         LOG.debug("Scanning Python directory: {}", directory);
 
         try (Stream<Path> paths = Files.walk(directory)) {
             paths.filter(Files::isRegularFile)
                  .filter(path -> path.toString().endsWith(".py"))
-                 .forEach(path -> addPythonFile(path, engineDescriptor, isTestDirectory));
+                 .forEach(path -> addPythonFile(path, engineDescriptor, true));
         } catch (IOException e) {
             LOG.error("Error scanning directory: {}", directory, e);
         }
@@ -96,21 +96,6 @@ public class PytestDiscoverySelectorResolver {
             }
         } catch (Exception e) {
             LOG.error("Error parsing Python file: {}", filePath, e);
-        }
-    }
-
-    private void addPythonMethod(Path filePath, String methodName, EngineDescriptor engineDescriptor, boolean isTestDirectory) {
-        LOG.debug("Adding Python method: {}::{}", filePath, methodName);
-
-        try {
-            PytestAstParser astParser = new PytestAstParser(context);
-            TestDescriptor methodDescriptor = astParser.parsePythonMethod(filePath, methodName, isTestDirectory);
-
-            if (methodDescriptor != null) {
-                engineDescriptor.addChild(methodDescriptor);
-            }
-        } catch (Exception e) {
-            LOG.error("Error parsing Python method: {}::{}", filePath, methodName, e);
         }
     }
 

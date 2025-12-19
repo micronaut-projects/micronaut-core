@@ -46,6 +46,22 @@ class PytestEngineTest {
     }
 
     @Test
+    void engineCanDiscoverPythonTestsSystemProperty() {
+        EngineTestKit
+            .engine("pytest-engine")
+            .configurationParameter(PytestTestEngine.TEST_SOURCE_DIR, "src/test/python")
+            .execute()
+            .testEvents()
+            .debug()
+            .assertStatistics(stats -> stats
+                .started(7)
+                .succeeded(5
+                )
+                .failed(2)
+                .skipped(0));
+    }
+
+    @Test
     void engineCanDiscoverSpecificTestFile() {
         EngineTestKit
             .engine("pytest-engine")
