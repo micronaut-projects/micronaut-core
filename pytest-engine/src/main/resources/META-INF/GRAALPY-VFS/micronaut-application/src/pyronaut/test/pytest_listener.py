@@ -11,6 +11,7 @@ import sys
 import traceback
 import java
 import inspect
+from typing import get_origin, get_args
 
 class MicronautPytestPlugin:
     """
@@ -101,6 +102,58 @@ class MicronautPytestPlugin:
         else:
             if self.current_file:
                 self.listener.afterFile(f"{self.current_file}", TestExecutionResult.successful())
+
+    def _resolve_bean_for_type(self, context, python_type):
+        """Resolve a bean based on Python type hint."""
+        if self._is_list_type(python_type):
+            # Handle List[SomeType]
+            element_type = get_args(python_type)[0]
+            java_class_name = self._python_type_to_java_class(element_type)
+            if java_class_name:
+                try:
+                    java_class = java.type(java_class_name)
+                    collection = context.getBeansOfType(java_class)
+                    return list(collection)  # Convert to Python list
+                except:
+                    pass
+        elif self._is_dict_type(python_type):
+            # Handle Dict[str, SomeType]
+            key_type, value_type = get_args(python_type)
+            if key_type == str:
+                java_class_name = self._python_type_to_java_class(value_type)
+                if java_class_name:
+                    try:
+                        java_class = java.type(java_class_name)
+                        java_map = context.mapOfType(java_class)
+                        return dict(java_map)  # Convert to Python dict
+                    except:
+                        pass
+        else:
+            # Handle single bean
+            java_class_name = self._python_type_to_java_class(python_type)
+            if java_class_name:
+                try:
+                    return context.getBean(java.type(java_class_name))
+                except:
+                    pass
+
+        return None
+
+    def _is_list_type(self, python_type):
+        """Check if type is List[T]."""
+        return get_origin(python_type) is list
+
+    def _is_dict_type(self, python_type):
+        """Check if type is Dict[K, V]."""
+        return get_origin(python_type) is dict
+
+    def _python_type_to_java_class(self, python_type):
+        """Convert Python type to fully qualified Java class name."""
+        if hasattr(python_type, '__module__') and hasattr(python_type, '__qualname__'):
+            module = python_type.__module__
+            qualname = python_type.__qualname__
+            return f"{module}.{qualname}"
+        return None
 
     def _get_test_id(self, item) -> str:
         """

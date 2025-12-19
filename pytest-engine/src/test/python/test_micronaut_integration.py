@@ -9,6 +9,8 @@ import pytest
 from pyronaut.test import *
 import java
 from micronaut.context.env import Environment
+from typing import List, Dict
+from test import Foo
 
 @pytest.fixture
 def my_context(request):
@@ -17,9 +19,15 @@ def my_context(request):
     yield fixture
     fixture.stop()
 
+@pytest.fixture
+def env(my_context):
+    return my_context["io.micronaut.context.env.Environment"]
 
-# def test_micronaut_context_creation(my_context, env : Environment):
-def test_micronaut_context_creation(my_context):
+@pytest.fixture
+def foo(my_context) -> Foo:
+    return my_context[Foo]
+
+def test_micronaut_context_creation(my_context, env: Environment, foo: Foo):
     """
     Test that the Micronaut ApplicationContext is created and accessible.
 
@@ -30,9 +38,12 @@ def test_micronaut_context_creation(my_context):
 
     # Verify the context is created
     assert ctx is not None
+    assert env is not None
+    assert foo is not None
     assert ctx.isRunning() is True
 
     # Verify environments are set
+    assert "test" in env.getActiveNames()
     assert "test" in ctx.getEnvironment().getActiveNames()
     assert "foo" in ctx.getEnvironment().getActiveNames()
 
