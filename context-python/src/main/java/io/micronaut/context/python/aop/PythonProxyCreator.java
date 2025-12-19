@@ -22,14 +22,20 @@ import io.micronaut.aop.runtime.RuntimeProxyDefinition;
 import io.micronaut.context.python.ContextHolder;
 import io.micronaut.context.python.ValueCoercible;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.type.Argument;
 import io.micronaut.inject.ExecutableMethod;
 import jakarta.inject.Singleton;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Value;
 import org.graalvm.polyglot.proxy.ProxyExecutable;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Internal
 @Singleton
@@ -48,6 +54,7 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
             targetBean = proxyDefinition.targetBean();
             value = ((ValueCoercible) targetBean).$unbox();
         }
+        AtomicReference<Object> targetBeanRef = new AtomicReference<>();
         boolean isIntroduction = proxyDefinition.introduction();
         for (RuntimeProxyDefinition.InterceptedMethod<T> interceptedMethod : proxyDefinition.interceptedMethods()) {
             ExecutableMethod<T, ?> executableMethod = interceptedMethod.executableMethod();
@@ -56,7 +63,7 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
             String methodName = executableMethod.getMethodName();
             Value originalFunction = value.getMember(methodName);
             ProxyExecutable proxiedFunction = args -> {
-                Object[] javaArgs = fromPolyglotArray(args);
+                Object[] javaArgs = fromPolyglotArray(args, executableMethod.getArguments());
                 Interceptor<T, ?>[] finalInterceptors;
                 if (isIntroduction) {
                     finalInterceptors = interceptors;
@@ -69,19 +76,52 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
                         toPolyglotArray(invocationContext.getParameterValues(), originalFunction.getContext())
                     );
                 }
-                return new MethodInterceptorChain(finalInterceptors, targetBean, executableMethod, javaArgs).proceed();
+                T tb = targetBean == null ? (T) targetBeanRef.get() : targetBean;
+                Object result = new MethodInterceptorChain(finalInterceptors, tb, executableMethod, javaArgs).proceed();
+                return unbox(result);
             };
             value.putMember(methodName, proxiedFunction);
         }
         if (isIntroduction) {
             fillAllAbstractMethods(value);
-            try {
-                return proxyDefinition.proxyBeanDefinition().getBeanType().getDeclaredConstructor(Value.class).newInstance(value.newInstance());
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
+            Class<T> type = proxyDefinition.proxyBeanDefinition().getBeanType();
+            T target = box(type, value.newInstance());
+            targetBeanRef.set(target);
+            return target;
         }
         return targetBean;
+    }
+
+    @Nullable
+    private Object unbox(@Nullable Object result) {
+        return switch (result) {
+            case null -> null;
+            case Value value -> value;
+            case ValueCoercible valueCoercible -> valueCoercible.asPolyglotValue();
+            case List<?> list -> {
+                List<Object> newList = new ArrayList<>(list.size());
+                for (Object o : list) {
+                    newList.add(unbox(o));
+                }
+                yield newList;
+            }
+            case Map<?, ?> map -> {
+                Map<Object, Object> newMap = new java.util.HashMap<>(map.size());
+                for (Map.Entry<?, ?> entry : map.entrySet()) {
+                    newMap.put(unbox(entry.getKey()), unbox(entry.getValue()));
+                }
+                yield newMap;
+            }
+            default -> result;
+        };
+    }
+
+    private <T> T box(Class<T> type, Value value) {
+        try {
+            return type.getDeclaredConstructor(Value.class).newInstance(value);
+        } catch (Exception e) {
+            return value.as(type);
+        }
     }
 
     private void fillAllAbstractMethods(Value pythonClass) {
@@ -115,11 +155,12 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
         return out;
     }
 
-    private Object[] fromPolyglotArray(Value[] in) {
+    private Object[] fromPolyglotArray(Value[] in, Argument<?>[] arguments) {
         Object[] out = new Object[in.length];
         for (int i = 0; i < in.length; i++) {
             Value arg = in[i];
-            out[i] = arg.as(Object.class);
+            Argument<?> argType = arguments[i];
+            out[i] = box(argType.getType(), arg);
         }
         return out;
     }
