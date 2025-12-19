@@ -45,6 +45,7 @@ public class GraalPyContextFactory {
     public static final String PYRONAUT_MAIN_CLASS = "pyronaut_application.PyronautMain";
 
     private final ApplicationContext applicationContext;
+    private boolean providedContext = false;
 
     public GraalPyContextFactory(ApplicationContext applicationContext) {
         this.applicationContext = applicationContext;
@@ -59,15 +60,17 @@ public class GraalPyContextFactory {
     @io.micronaut.context.annotation.Context
     @Singleton
     public org.graalvm.polyglot.Context graalPyContext() {
+        if (ContextHolder.isInitialized()) {
+            providedContext = true;
+            return ContextHolder.getContext();
+        }
+
         try {
             ClassLoader classLoader = applicationContext.getClassLoader();
 
             Context context = GraalPyResources.contextBuilder(VirtualFileSystem.newBuilder()
                     .resourceDirectory(APPLICATION_PATH)
                     .resourceLoadingClass(classLoader.loadClass(PYRONAUT_MAIN_CLASS)).build())
-                // restrict in future?
-//                .option("python.ExposeInternalSources", StringUtils.TRUE)
-//                .allowExperimentalOptions(true)
                 .allowHostAccess(HostAccess.ALL)
                 .allowHostClassLookup(name -> true)
                 .build();
@@ -103,7 +106,9 @@ public class GraalPyContextFactory {
      */
     @PreDestroy
     public void destroy() {
-        ContextHolder.resetContext();
+        if (!providedContext) {
+            ContextHolder.resetContext();
+        }
     }
 
 }

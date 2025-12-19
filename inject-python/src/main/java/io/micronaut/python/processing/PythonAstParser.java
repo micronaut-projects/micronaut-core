@@ -16,6 +16,8 @@
 package io.micronaut.python.processing;
 
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -187,7 +189,7 @@ public final class PythonAstParser {
         bindings.putMember("callback_get_class_elements", (Function<String, Object[]>) packageName -> {
             // Transform package names back from "micronaut." to "io.micronaut." for Java lookups
             String javaPackageName = packageName.startsWith("micronaut.") ? "io." + packageName : packageName;
-            return visitorContext.getClassElements(javaPackageName, StringUtils.EMPTY_STRING_ARRAY);
+            return visitorContext.getClassElements(javaPackageName, "*");
         });
         List<TransformResult> results = new ArrayList<>();
         for (Source source : pythonSource) {
@@ -200,7 +202,9 @@ public final class PythonAstParser {
                     getTransformSource()
                 ));
             } catch (Exception e) {
-                throw new ProcessingException(null, "Error processing Python source [" + source.getName() + "]: " + e.getMessage(), e);
+                StringWriter stack = new StringWriter();
+                e.printStackTrace(new PrintWriter(stack));
+                throw new ProcessingException(null, "Error processing Python source [" + source.getName() + "]: " + e.getMessage() + System.lineSeparator() + stack, e);
             }
             Map map = result.as(Map.class);
             String code = map.containsKey("code") ? map.get("code").toString() : null;
