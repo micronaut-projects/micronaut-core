@@ -63,7 +63,7 @@ public class UploadController {
 
         OutputStream outputStream = new ByteArrayOutputStream(); // <3>
 
-        Publisher<Boolean> uploadPublisher = file.transferTo(outputStream); // <4>
+        Publisher<?> uploadPublisher = file.transferTo(outputStream); // <4>
 
         return Mono.from(uploadPublisher)  // <5>
             .<HttpResponse<String>>thenReturn(HttpResponse.ok("Uploaded"))

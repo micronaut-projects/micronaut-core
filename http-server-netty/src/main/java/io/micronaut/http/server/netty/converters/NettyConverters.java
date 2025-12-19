@@ -21,19 +21,12 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.TypeConverterRegistrar;
-import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.naming.NameUtils;
-import io.micronaut.http.body.MessageBodyHandlerRegistry;
-import io.micronaut.http.codec.MediaTypeCodecRegistry;
-import io.micronaut.http.multipart.PartData;
 import io.micronaut.http.netty.channel.converters.ChannelOptionFactory;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelOption;
 import io.netty.util.ReferenceCounted;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.ByteBuffer;
 import java.util.Locale;
 import java.util.Optional;
 
@@ -48,26 +41,17 @@ import java.util.Optional;
 public final class NettyConverters implements TypeConverterRegistrar {
 
     private final ConversionService conversionService;
-    private final BeanProvider<MediaTypeCodecRegistry> decoderRegistryProvider;
-    private final BeanProvider<MessageBodyHandlerRegistry> messageBodyHandlerRegistries;
     private final BeanProvider<ChannelOptionFactory> channelOptionFactory;
 
     /**
      * Default constructor.
      *
      * @param conversionService            The conversion service
-     * @param decoderRegistryProvider      The decoder registry provider
-     * @param messageBodyHandlerRegistries The message body handlers
      * @param channelOptionFactory         The decoder channel option factory
      */
     public NettyConverters(ConversionService conversionService,
-                           //Prevent early initialization of the codecs
-                           BeanProvider<MediaTypeCodecRegistry> decoderRegistryProvider,
-                           BeanProvider<MessageBodyHandlerRegistry> messageBodyHandlerRegistries,
                            BeanProvider<ChannelOptionFactory> channelOptionFactory) {
         this.conversionService = conversionService;
-        this.decoderRegistryProvider = decoderRegistryProvider;
-        this.messageBodyHandlerRegistries = messageBodyHandlerRegistries;
         this.channelOptionFactory = channelOptionFactory;
     }
 
@@ -87,27 +71,6 @@ public final class NettyConverters implements TypeConverterRegistrar {
                 ByteBuf.class,
                 Object.class,
                 (object, targetType, context) -> conversionService.convert(object.toString(context.getCharset()), targetType, context)
-        );
-
-        conversionService.addConverter(
-                PartData.class,
-                Object.class,
-                (object, targetType, context) -> {
-                    try {
-                        if (targetType.isAssignableFrom(ByteBuffer.class)) {
-                            return Optional.of(object.getByteBuffer());
-                        } else if (targetType.isAssignableFrom(InputStream.class)) {
-                            return Optional.of(object.getInputStream());
-                        } else {
-                            try (ReadBuffer byteBuf = object.readBuffer()) {
-                                return this.conversionService.convert(byteBuf, targetType, context);
-                            }
-                        }
-                    } catch (IOException e) {
-                        context.reject(e);
-                        return Optional.empty();
-                    }
-                }
         );
 
         conversionService.addConverter(

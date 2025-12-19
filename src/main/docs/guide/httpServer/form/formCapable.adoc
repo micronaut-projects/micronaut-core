@@ -54,10 +54,12 @@ Once again, the `StreamingFileUpload` instances exert backpressure on the reques
 
 A `Publisher<Publisher<…>>>` behaves similar to `Publisher<StreamingFileUpload>` as described above, allowing you to stream individual fields.
 
-==== … of PartData or anything else
+==== … of PartData
 
-A api:io.micronaut.http.multipart.PartData[] object represents a _piece_ of a form field, containing the field metadata and a piece of the field value buffered in memory. This can also be converted to a `String` or similar type automatically.
-
-For large fields and file uploads, a single field may produce multiple `PartData` objects. If there are multiple fields of the same name, they will also produce multiple `PartData` instances.
+A api:io.micronaut.http.multipart.PartData[] object represents a _piece_ of a form field, containing the field metadata and a piece of the field value buffered in memory. For large fields and file uploads, a single field may produce multiple `PartData` objects. If there are multiple fields of the same name, they will also produce multiple `PartData` instances.
 
 This publisher exerts backpressure as described for `StreamingFileUpload`.
+
+=== … of anything else
+
+A publisher of any other type will be created by taking a publisher of completed parts as described above, and converting the parts to the target type. For file uploads where a media type is given, this may include conversion from e.g. JSON.

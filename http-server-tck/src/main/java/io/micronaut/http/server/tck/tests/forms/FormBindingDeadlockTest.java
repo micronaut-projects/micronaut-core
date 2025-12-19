@@ -16,6 +16,7 @@
 package io.micronaut.http.server.tck.tests.forms;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
@@ -23,7 +24,7 @@ import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Part;
 import io.micronaut.http.annotation.Post;
-import io.micronaut.http.multipart.CompletedPart;
+import io.micronaut.http.multipart.PartData;
 import io.micronaut.http.multipart.RawFormField;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
@@ -67,7 +68,7 @@ public class FormBindingDeadlockTest {
     @Test
     public void fullAsyncFail() throws IOException {
         test("/deadlock/full-async", "asyncPart=foo&syncPart=bar", """
-            Argument [Publisher<CompletedPart T> asyncPart] not satisfied: This argument won't consume posted data until you subscribe to it in the controller. This prevents the following arguments from being bound:
+            Argument [Publisher<PartData T> asyncPart] not satisfied: This argument won't consume posted data until you subscribe to it in the controller. This prevents the following arguments from being bound:
               [String syncPart] has not yet been received.""");
     }
 
@@ -88,7 +89,7 @@ public class FormBindingDeadlockTest {
                     .assertResponse(httpResponse -> {
                         Optional<String> bodyOptional = httpResponse.getBody(String.class);
                         assertTrue(bodyOptional.isPresent());
-                        assertEquals("{\"message\":\"Bad Request\",\"_links\":{\"self\":{\"href\":\"/deadlock/half-async\",\"templated\":false}},\"_embedded\":{\"errors\":[{\"message\":\"Argument [RawFormField asyncPart] not satisfied: This argument won't consume posted data until you subscribe to it in the controller. This prevents the following arguments from being bound:\\n  [String syncPart] has not yet been received.\",\"path\":\"/asyncPart\"}]}}", bodyOptional.get());
+                        assertEquals("{\"message\":\"Bad Request\",\"_embedded\":{\"errors\":[{\"message\":\"Argument [RawFormField asyncPart] not satisfied: This argument won't consume posted data until you subscribe to it in the controller. This prevents the following arguments from being bound:\\n  [String syncPart] has not yet been received.\",\"path\":\"/asyncPart\"}]},\"_links\":{\"self\":{\"href\":\"/deadlock/half-async\",\"templated\":false}}}", bodyOptional.get());
                     })
                     .build()))
             .run();
@@ -111,8 +112,9 @@ public class FormBindingDeadlockTest {
     static class MyController {
         @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
         @Post("/full-async")
-        Publisher<String> fullAsync(@Part("asyncPart") Publisher<CompletedPart> asyncPart, @Part("syncPart") String syncPart) {
+        Publisher<String> fullAsync(@Part("asyncPart") Publisher<PartData> asyncPart, @Part("syncPart") String syncPart) {
             return Mono.from(asyncPart)
+                .doOnNext(PartData::close)
                 .thenReturn(DID_NOT_FAIL)
                 .onErrorResume(t -> Mono.just(t.getMessage()));
         }
@@ -121,6 +123,7 @@ public class FormBindingDeadlockTest {
         @Post("/half-async")
         Publisher<String> halfAsync(RawFormField asyncPart, @Part("syncPart") String syncPart) {
             return Mono.from(asyncPart.byteBody().toReadBufferPublisher())
+                .doOnNext(ReadBuffer::close)
                 .thenReturn(DID_NOT_FAIL)
                 .onErrorResume(t -> Mono.just(t.getMessage()));
         }

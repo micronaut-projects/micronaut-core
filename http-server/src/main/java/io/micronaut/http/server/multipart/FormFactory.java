@@ -24,10 +24,17 @@ import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.io.buffer.ReadBufferFactory;
 import io.micronaut.core.io.file.TemporaryFileResource;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
+import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.form.FormCapableHttpRequest;
-import io.micronaut.http.multipart.*;
+import io.micronaut.http.multipart.CompletedAttribute;
+import io.micronaut.http.multipart.CompletedFileUpload;
+import io.micronaut.http.multipart.CompletedPart;
+import io.micronaut.http.multipart.FormFieldMetadata;
+import io.micronaut.http.multipart.RawFormField;
+import io.micronaut.http.multipart.StreamingFileUpload;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.scheduling.TaskExecutors;
 import jakarta.inject.Named;
@@ -153,6 +160,10 @@ public final class FormFactory {
      */
     @NonNull
     public ExecutionFlow<CompletedFileUpload> completeFileUpload(@NonNull FormCapableHttpRequest<?> request, @NonNull RawFormField formField) {
+        if (formField.metadata().fileName() == null) {
+            formField.close();
+            return ExecutionFlow.error(new HttpStatusException(HttpStatus.BAD_REQUEST, "Field [" + formField.metadata().name() + "] was expected to be a file upload, but is missing a file name"));
+        }
         ToDiskSubscriber tds = new ToDiskSubscriber(formField.metadata(), request.byteBodyFactory().readBufferFactory());
         Flux.from(formField.byteBody().toReadBufferPublisher()).subscribe(tds);
         request.addDisposalResource(tds::cleanup);

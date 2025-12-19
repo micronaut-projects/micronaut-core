@@ -28,6 +28,8 @@ import java.util.Optional;
 /**
  * Represents a chunk of data belonging to a part of a multipart request.
  *
+ * @param fieldMetadata The field metadata (name, file name, etc.)
+ * @param readBuffer The buffered part data
  * @author James Kleeh
  * @since 1.0
  */

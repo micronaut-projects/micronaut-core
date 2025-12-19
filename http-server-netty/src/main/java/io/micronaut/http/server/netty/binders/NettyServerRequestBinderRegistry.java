@@ -66,7 +66,7 @@ public final class NettyServerRequestBinderRegistry implements RequestBinderRegi
         ));
         internalRequestBinderRegistry.addArgumentBinder(new NettyInputStreamBodyBinder());
         internalRequestBinderRegistry.addArgumentBinder(new NettyStreamingFileUploadBinder(formFactory));
-        NettyCompletedFileUploadBinder completedFileUploadBinder = new NettyCompletedFileUploadBinder(conversionService, formFactory);
+        NettyCompletedFileUploadBinder completedFileUploadBinder = new NettyCompletedFileUploadBinder(formFactory);
         internalRequestBinderRegistry.addArgumentBinder(completedFileUploadBinder);
         NettyPublisherPartUploadBinder publisherPartUploadBinder = new NettyPublisherPartUploadBinder(conversionService, formFactory);
         internalRequestBinderRegistry.addArgumentBinder(publisherPartUploadBinder);

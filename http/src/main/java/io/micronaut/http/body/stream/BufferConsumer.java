@@ -16,9 +16,9 @@
 package io.micronaut.http.body.stream;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.body.ByteBody;
+import org.jspecify.annotations.NonNull;
 
 /**
  * This is a reactor-like API for streaming bytes. It's a bit better than reactor because it's more
@@ -65,6 +65,8 @@ public interface BufferConsumer {
          * Signal that we want to start consuming bytes. This is an optional hint to the upstream,
          * the upstream may ignore it and send bytes immediately. This is used for CONTINUE
          * support.
+         * <p>
+         * Must be called exactly once.
          */
         default void start() {
         }

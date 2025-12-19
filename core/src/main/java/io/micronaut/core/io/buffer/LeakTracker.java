@@ -17,9 +17,12 @@ package io.micronaut.core.io.buffer;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.netty.util.LeakPresenceDetector;
 import io.netty.util.ResourceLeakDetector;
 import io.netty.util.ResourceLeakDetectorFactory;
 import io.netty.util.ResourceLeakTracker;
+
+import java.util.function.Supplier;
 
 /**
  * Platform agnostic leak tracking API. Currently only implemented when netty is available.
@@ -50,6 +53,7 @@ public interface LeakTracker<T> {
          * Create a new leak tracker factory for the given tracked object type.
          *
          * @param trackedClass The type to track
+         * @param <T> The tracked type
          * @return The tracker factory
          */
         @NonNull
@@ -63,6 +67,23 @@ public interface LeakTracker<T> {
             }
             // fallback: no tracking
             return obj -> null;
+        }
+
+        /**
+         * Wrap static leak tracker creation to avoid triggering the LeakPresenceDetector. See
+         * netty javadoc.
+         *
+         * @param supplier Supplier to call
+         * @param <R> The supplier return value
+         * @return Value returned by the supplier
+         * @see io.netty.util.LeakPresenceDetector#staticInitializer(Supplier)
+         */
+        static <R> R staticInitializer(Supplier<R> supplier) {
+            if (LeakTrackerFactoryHolder.nettyAvailable) {
+                return LeakPresenceDetector.staticInitializer(supplier);
+            } else {
+                return supplier.get();
+            }
         }
     }
 }

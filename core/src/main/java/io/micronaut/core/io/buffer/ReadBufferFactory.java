@@ -16,9 +16,9 @@
 package io.micronaut.core.io.buffer;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.functional.ThrowingConsumer;
+import org.jspecify.annotations.NonNull;
 
 import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
@@ -247,8 +247,15 @@ public class ReadBufferFactory {
     public ReadBuffer compose(@NonNull Iterable<@NonNull ReadBuffer> buffers) {
         try {
             int capacity = 0;
+            int n = 0;
             for (ReadBuffer buffer : buffers) {
                 capacity = Math.addExact(capacity, buffer.readable());
+                n++;
+            }
+            if (n == 0) {
+                return createEmpty();
+            } else if (n == 1) {
+                return buffers.iterator().next();
             }
             try (BufferingOutputStream bos = outputStreamBuffer(capacity)) {
                 for (ReadBuffer buffer : buffers) {

@@ -40,14 +40,9 @@ class UploadController {
         val uploadPublisher = file.transferTo(tempFile) // <3>
 
         return Mono.from(uploadPublisher)  // <4>
-            .map { success ->
-                if (success) {
-                    HttpResponse.ok("Uploaded")
-                } else {
-                    HttpResponse.status<String>(CONFLICT)
-                        .body("Upload Failed")
-                }
-            }
+            .map<HttpResponse<String>> { HttpResponse.ok("Uploaded") }
+            .onErrorReturn(HttpResponse.status<String>(CONFLICT)
+                .body("Upload Failed"))
     }
     // end::file[]
 

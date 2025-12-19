@@ -79,7 +79,8 @@ public abstract sealed class CompletedPart implements Closeable permits Complete
     public abstract void closeAsync(@NonNull Executor ioExecutor);
 
     /**
-     * Get the definite size in bytes of the form field value.
+     * Get the definite size in bytes of the form field value. Remains accessible after this part
+     * is closed.
      *
      * @return The size in bytes
      */

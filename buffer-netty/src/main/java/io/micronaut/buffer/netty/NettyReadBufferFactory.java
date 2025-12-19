@@ -15,7 +15,6 @@
  */
 package io.micronaut.buffer.netty;
 
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.io.buffer.ReadBufferFactory;
@@ -26,6 +25,7 @@ import io.netty.buffer.ByteBufOutputStream;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
+import org.jspecify.annotations.NonNull;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -35,6 +35,7 @@ import java.nio.CharBuffer;
 import java.nio.channels.ScatteringByteChannel;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.Iterator;
 
 /**
  * Netty-based {@link ReadBufferFactory}. Also has additional utilities for dealing with netty
@@ -248,6 +249,17 @@ public final class NettyReadBufferFactory extends ReadBufferFactory {
 
     @Override
     public @NonNull ReadBuffer compose(@NonNull Iterable<@NonNull ReadBuffer> buffers) {
+        // shortcuts for buffers.size == 0 or 1
+        Iterator<ReadBuffer> itr = buffers.iterator();
+        if (!itr.hasNext()) {
+            return createEmpty();
+        } else {
+            ReadBuffer first = itr.next();
+            if (!itr.hasNext()) {
+                return first;
+            }
+        }
+
         CompositeByteBuf composite = allocator.compositeBuffer();
         try {
             for (ReadBuffer buffer : buffers) {

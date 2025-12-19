@@ -18,6 +18,12 @@ package io.micronaut.http;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 
+/**
+ * A server HTTP request that cleans up resources at the end of its lifecycle.
+ *
+ * @param <B> The request body
+ * @since 5.0.0
+ */
 @Experimental
 public interface LifecycleHttpRequest<B> extends HttpRequest<B> {
     /**

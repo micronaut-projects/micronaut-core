@@ -29,6 +29,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
+import io.micronaut.http.multipart.CompletedAttribute;
 import io.micronaut.http.multipart.CompletedFileUpload;
 import io.micronaut.http.simple.SimpleHttpHeaders;
 import jakarta.inject.Inject;
@@ -88,9 +89,15 @@ public class HttpConverterRegistrar implements TypeConverterRegistrar {
         );
         conversionService.addConverter(CompletedFileUpload.class, Object.class, (object, targetType, context) -> {
             Argument<Object> argument = context instanceof ArgumentConversionContext<?> ctx ? (Argument<Object>) ctx.getArgument() : Argument.of(targetType);
-            MediaType mediaType = object.getContentType().orElse(null);
-            Optional<MessageBodyReader<Object>> reader = messageBodyHandlerRegistry.get().findReader(argument, mediaType);
             try {
+                if (argument.isAssignableFrom(InputStream.class)) {
+                    return Optional.of(object.getInputStream());
+                } else if (argument.isAssignableFrom(ReadBuffer.class)) {
+                    return Optional.of(object.toReadBuffer()); // TODO: limit size
+                }
+
+                MediaType mediaType = object.getContentType().orElse(null);
+                Optional<MessageBodyReader<Object>> reader = messageBodyHandlerRegistry.get().findReader(argument, mediaType);
                 if (reader.isPresent()) {
                     try (InputStream is = object.getInputStream()) {
                         return Optional.ofNullable(reader.get().read(argument, mediaType, new SimpleHttpHeaders(), is));
@@ -102,6 +109,18 @@ public class HttpConverterRegistrar implements TypeConverterRegistrar {
                 }
             } catch (IOException e) {
                 throw new RuntimeException(e);
+            }
+        });
+        conversionService.addConverter(CompletedAttribute.class, Object.class, (object, targetType, context) -> {
+            Argument<Object> argument = context instanceof ArgumentConversionContext<?> ctx ? (Argument<Object>) ctx.getArgument() : Argument.of(targetType);
+            if (argument.isAssignableFrom(ReadBuffer.class)) {
+                return Optional.of(object.toReadBuffer());
+            } else if (argument.isAssignableFrom(InputStream.class)) {
+                return Optional.of(object.getInputStream());
+            } else {
+                try (ReadBuffer rb = object.toReadBuffer()) {
+                    return conversionService.convert(rb, targetType, context);
+                }
             }
         });
     }

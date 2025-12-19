@@ -19,7 +19,6 @@ import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ArgumentConversionContext;
-import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.type.Argument;
@@ -47,11 +46,9 @@ final class NettyCompletedFileUploadBinder implements TypedRequestArgumentBinder
 
     private static final Argument<CompletedFileUpload> STREAMING_FILE_UPLOAD_ARGUMENT = Argument.of(CompletedFileUpload.class);
 
-    private final ConversionService conversionService;
     private final BeanProvider<FormFactory> formFactory;
 
-    NettyCompletedFileUploadBinder(ConversionService conversionService, BeanProvider<FormFactory> formFactory) {
-        this.conversionService = conversionService;
+    NettyCompletedFileUploadBinder(BeanProvider<FormFactory> formFactory) {
         this.formFactory = formFactory;
     }
 

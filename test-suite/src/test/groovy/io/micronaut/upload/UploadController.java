@@ -28,9 +28,11 @@ import io.micronaut.http.multipart.CompletedFileUpload;
 import io.micronaut.http.multipart.CompletedPart;
 import io.micronaut.http.multipart.PartData;
 import io.micronaut.http.multipart.StreamingFileUpload;
+import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.multipart.MultipartBody;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
+import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
@@ -44,7 +46,6 @@ import reactor.core.scheduler.Schedulers;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
 import java.security.Principal;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -60,6 +61,8 @@ import java.util.function.Function;
 @Singleton
 @Controller("/upload")
 public class UploadController {
+    @Inject
+    HttpServerConfiguration.MultipartConfiguration multipartConfiguration;
 
     @Post(value = "/receive-json", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
     public String receiveJson(Data data, String title) {
@@ -84,7 +87,7 @@ public class UploadController {
     @Post(value = "/receive-file-upload", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
     public Publisher<? extends MutableHttpResponse<?>> receiveFileUpload(StreamingFileUpload data, String title) {
         long size = data.getDefinedSize().orElseThrow();
-        return Mono.from(data.transferTo(Path.of(title + ".json")))
+        return Mono.from(data.transferTo(multipartConfiguration.getLocation().orElseThrow().toPath().resolve(title + ".json")))
             .thenReturn(HttpResponse.ok("Uploaded " + size))
             .onErrorReturn(HttpResponse.status(HttpStatus.INTERNAL_SERVER_ERROR, "Something bad happened"));
     }

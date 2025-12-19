@@ -119,10 +119,12 @@ public abstract sealed class CompletedFileUpload extends CompletedPart {
     static final class Memory extends CompletedFileUpload {
         @NonNull
         private final ReadBuffer buffer;
+        private final int size;
 
         Memory(@NonNull FormFieldMetadata metadata, @NonNull ReadBuffer buffer) {
             super(metadata);
             this.buffer = buffer;
+            this.size = buffer.readable();
         }
 
         @Override
@@ -138,7 +140,7 @@ public abstract sealed class CompletedFileUpload extends CompletedPart {
 
         @Override
         public long getSize() {
-            return buffer.readable();
+            return size;
         }
 
         @Override
