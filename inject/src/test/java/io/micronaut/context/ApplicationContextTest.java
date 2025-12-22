@@ -47,15 +47,17 @@ public class ApplicationContextTest {
 
                 @Override
                 public Collection<PropertySource> load(Environment environment) {
-                    if (!environment.getActiveNames().contains("test")) {
+                    List<PropertySource> propertySources = new ArrayList<>(environment.getPropertySources());
+                    List<String> propSourceNames = propertySources.stream().map(PropertySource::getName).toList();
+                    // skip for bootstrap context
+                    if (!propSourceNames.contains("application")) {
                         return List.of();
                     }
-                    List<PropertySource> propertySources = new ArrayList<>(environment.getPropertySources());
-                    Assertions.assertEquals(4, propertySources.size());
-                    Assertions.assertEquals("application", propertySources.get(0).getName());
-                    Assertions.assertEquals("application-denis", propertySources.get(1).getName());
-                    Assertions.assertEquals("system", propertySources.get(2).getName());
-                    Assertions.assertEquals("env", propertySources.get(3).getName());
+                    Assertions.assertEquals(4, propSourceNames.size());
+                    Assertions.assertEquals("application", propSourceNames.get(0));
+                    Assertions.assertEquals("application-denis", propSourceNames.get(1));
+                    Assertions.assertEquals("system", propSourceNames.get(2));
+                    Assertions.assertEquals("env", propSourceNames.get(3));
                     Map<String, Object> values = new HashMap<>();
                     for (PropertySource propertySource : propertySources) {
                         for (String key : propertySource) {
