@@ -27,6 +27,9 @@ import org.graalvm.polyglot.Value;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 
 /**
@@ -57,10 +60,8 @@ public class PytestTestExecutor {
             } else if (descriptor instanceof PytestTestDescriptor testDescriptor) {
                 executeTest(testDescriptor);
             } else {
-                // Execute children
-                for (TestDescriptor child : descriptor.getChildren()) {
-                    execute(child);
-                }
+                // For the engine descriptor, run pytest on all discovered test files
+                runPytestForAllTests(descriptor);
             }
 
             listener.executionFinished(descriptor, TestExecutionResult.successful());
@@ -94,7 +95,7 @@ public class PytestTestExecutor {
 
         Path filePath = Paths.get(fileDescriptor.getUniqueId().getSegments().get(1).getValue());
         try {
-            JUnitPytestTestListener testListener = new JUnitPytestTestListener(listener, fileDescriptor);
+            JUnitPytestTestListener testListener = new JUnitPytestTestListener(listener, fileDescriptor.getChildren());
             // Call run_pytest with the file path and listener
             Value result = context.eval("python", """
 from pyronaut.test import run_pytest
@@ -109,6 +110,47 @@ run_pytest
 
         } catch (Exception e) {
             LOG.error("Error running pytest for file: {}", fileDescriptor.getDisplayName(), e);
+            throw e;
+        }
+    }
+
+    private void runPytestForAllTests(TestDescriptor engineDescriptor) throws Exception {
+        LOG.debug("Running pytest for all discovered tests");
+
+        // Collect all unique test files from the test descriptors
+        List<Path> testFiles = engineDescriptor.getChildren().stream()
+            .filter(child -> child instanceof PytestTestDescriptor)
+            .map(child -> ((PytestTestDescriptor) child).getFilePath())
+            .toList();
+
+        if (testFiles.isEmpty()) {
+            LOG.debug("No test files found to execute");
+            return;
+        }
+
+        LOG.debug("Running pytest on {} test files: {}", testFiles.size(), testFiles);
+
+        try {
+            JUnitPytestTestListener testListener = new JUnitPytestTestListener(listener, engineDescriptor.getChildren());
+            // Convert paths to strings for pytest
+            String[] fileArgs = testFiles.stream()
+                .map(Path::toString)
+                .toArray(String[]::new);
+
+            // Call run_pytest with the file paths and listener
+            context.eval("python", """
+from pyronaut.test import run_pytest
+
+run_pytest
+            """).execute(
+                fileArgs,
+                testListener
+            );
+
+            LOG.debug("Pytest execution completed for all tests");
+
+        } catch (Exception e) {
+            LOG.error("Error running pytest for all tests", e);
             throw e;
         }
     }

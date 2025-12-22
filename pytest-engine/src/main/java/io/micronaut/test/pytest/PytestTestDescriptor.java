@@ -21,12 +21,15 @@ import org.junit.platform.engine.UniqueId;
 import org.junit.platform.engine.support.descriptor.AbstractTestDescriptor;
 
 import java.nio.file.Path;
+import java.util.List;
 
 /**
  * Test descriptor for an individual Python test function or method.
  */
 public class PytestTestDescriptor extends AbstractTestDescriptor {
 
+    public static final String SEGMENT_SOURCE = "source";
+    public static final String SEGMENT_TEST = "test";
     private final Path filePath;
     private final int startLine;
     private final int endLine;
@@ -66,5 +69,14 @@ public class PytestTestDescriptor extends AbstractTestDescriptor {
 
     public int getEndColumn() {
         return endColumn;
+    }
+
+    public boolean matchesId(String testId) {
+        UniqueId uniqueId = getUniqueId();
+        List<UniqueId.Segment> segments = uniqueId.getSegments();
+        UniqueId.Segment source = segments.get(1);
+        UniqueId.Segment test = segments.get(2);
+        String nameToMatch =  "/" + source.getValue() + "::" + test.getValue();
+        return testId.endsWith(nameToMatch);
     }
 }

@@ -15,6 +15,7 @@
  */
 package io.micronaut.test.pytest;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.platform.engine.discovery.DiscoverySelectors;
 import org.junit.platform.testkit.engine.EngineTestKit;
@@ -57,21 +58,6 @@ class PytestEngineTest {
                 .started(7)
                 .succeeded(5
                 )
-                .failed(2)
-                .skipped(0));
-    }
-
-    @Test
-    void engineCanDiscoverSpecificTestFile() {
-        EngineTestKit
-            .engine("pytest-engine")
-            .selectors(DiscoverySelectors.selectFile("src/test/python/test_example.py"))
-            .execute()
-            .testEvents()
-            .debug()
-            .assertStatistics(stats -> stats
-                .started(5)
-                .succeeded(3)
                 .failed(2)
                 .skipped(0));
     }

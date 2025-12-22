@@ -11,5 +11,5 @@
     </root>
 
     <logger name="io.micronaut" level="INFO" />
-
+    <logger name="io.micronaut.test.pytest.execution" level="trace" />
 </configuration>
