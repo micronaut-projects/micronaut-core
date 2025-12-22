@@ -22,7 +22,7 @@ dependencies {
 
 application {
     mainClass = "io.micronaut.python.cli.PyronautMainCommand"
-    applicationDefaultJvmArgs = listOf("--sun-misc-unsafe-memory-access=allow")
+    applicationDefaultJvmArgs = listOf("--sun-misc-unsafe-memory-access=allow", "--enable-native-access=ALL-UNNAMED")
 }
 
 tasks {
