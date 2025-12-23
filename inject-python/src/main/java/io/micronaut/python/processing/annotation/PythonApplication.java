@@ -18,8 +18,9 @@ package io.micronaut.python.processing.annotation;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import java.lang.annotation.Target;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * Annotation to enable Python AST processing within a Java annotation processor.
@@ -42,9 +43,9 @@ public @interface PythonApplication {
     String code() default "";
 
     /**
-     * Directory path to scan for .py files to process.
+     * Directory paths to scan for .py files to process.
      *
      * @return The directory path
      */
-    String src() default "";
+    String[] src() default "";
 }

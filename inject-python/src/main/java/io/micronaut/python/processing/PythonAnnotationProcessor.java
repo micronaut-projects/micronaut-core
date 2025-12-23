@@ -124,7 +124,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                 element.getQualifiedName().toString(),
                 javaVisitorContext.getElementAnnotationMetadataFactory()
             );
-            PythonEnvironment environment;
+            PythonEnvironment environment = null;
             // Transform the code for processing (to detect Micronaut annotations)
             List<PythonAstParser.TransformResult> transformedList =
                 applyASTTransforms(annotation, originatingElement);
@@ -134,19 +134,24 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             }
 
             // Then parse the transformed code
-            String srcDir = annotation.src();
-            try {
-                List<Source> sourceList = transformedList
-                    .stream()
-                    .map(PythonAstParser.TransformResult::transformedSource)
-                    .toList();
-                environment = parser.parse(
-                    sourceList,
-                    srcDir,
-                    javaVisitorContext
-                );
-            } catch (Exception e) {
-                throw new ProcessingException(originatingElement, "Error parsing transformed python code: " + e.getMessage());
+            String[] srcDirs = annotation.src();
+            boolean hasSrcDirs = srcDirs != null && srcDirs.length != 0;
+            if (hasSrcDirs) {
+                for (var srcDir : srcDirs) {
+                    try {
+                        List<Source> sourceList = transformedList
+                            .stream()
+                            .map(PythonAstParser.TransformResult::transformedSource)
+                            .toList();
+                        environment = parser.parse(
+                            sourceList,
+                            srcDir,
+                            javaVisitorContext
+                        );
+                    } catch (Exception e) {
+                        throw new ProcessingException(originatingElement, "Error parsing transformed python code: " + e.getMessage());
+                    }
+                }
             }
 
             String mainPy;
@@ -168,45 +173,47 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                 // on concrete main
                 mainPy = null;
 
-                if (StringUtils.isNotEmpty(srcDir)) {
+                if (hasSrcDirs) {
                     // source mode, so we need to write out each source to META-INF
                     Map<PathEntry, List<String>> allModules = new LinkedHashMap<>();
                     Set<String> allExportedTypes = transformedList.stream()
                         .flatMap(tr -> tr.exportedTypes().stream())
                         .collect(Collectors.toSet());
-                    for (PythonAstParser.TransformResult transformResult : transformedList) {
-                        Source source = transformResult.originalSource();
-                        String path = source.getPath();
-                        int i = path.indexOf(srcDir);
-                        if (i > 0) {
-                            path = path.substring(i + srcDir.length() + 1);
-                        }
-
-                        if (!srcDir.isEmpty() && path.startsWith(srcDir)) {
-                            path = path.substring(srcDir.length() + 1);
-                        }
-                        String targetSource = APPLICATION_SRC_PATH + path;
-                        if (!transformResult.allClassNames().isEmpty()) {
-                            // has classes
-                            int parentIndex = path.lastIndexOf('/');
-                            if (parentIndex > -1) {
-                                String parentPath = path.substring(0, parentIndex + 1);
-                                allModules.computeIfAbsent(new PathEntry(parentPath, path.substring(parentIndex)), k -> new ArrayList<>())
-                                    .addAll(transformResult.allClassNames());
-                            } else {
-                                allModules.computeIfAbsent(new PathEntry("", path), k -> new ArrayList<>())
-                                    .addAll(transformResult.allClassNames());
+                    for (String srcDir : srcDirs) {
+                        for (PythonAstParser.TransformResult transformResult : transformedList) {
+                            Source source = transformResult.originalSource();
+                            String path = source.getPath();
+                            int i = path.indexOf(srcDir);
+                            if (i > 0) {
+                                path = path.substring(i + srcDir.length() + 1);
                             }
-                        }
-                        filesList.append("/META-INF/").append(targetSource).append("\n");
-                        javaVisitorContext.visitMetaInfFile(targetSource, originatingElement)
-                            .ifPresent(generatedFile -> {
-                                try (var writer = generatedFile.openWriter()) {
-                                    writer.write(source.getCharacters().toString());
-                                } catch (IOException e) {
-                                    throw new ProcessingException(originatingElement, "Failed to write Python code to [" + targetSource + "]: " + e.getMessage(), e);
+
+                            if (!srcDir.isEmpty() && path.startsWith(srcDir)) {
+                                path = path.substring(srcDir.length() + 1);
+                            }
+                            String targetSource = APPLICATION_SRC_PATH + path;
+                            if (!transformResult.allClassNames().isEmpty()) {
+                                // has classes
+                                int parentIndex = path.lastIndexOf('/');
+                                if (parentIndex > -1) {
+                                    String parentPath = path.substring(0, parentIndex + 1);
+                                    allModules.computeIfAbsent(new PathEntry(parentPath, path.substring(parentIndex)), k -> new ArrayList<>())
+                                        .addAll(transformResult.allClassNames());
+                                } else {
+                                    allModules.computeIfAbsent(new PathEntry("", path), k -> new ArrayList<>())
+                                        .addAll(transformResult.allClassNames());
                                 }
-                            });
+                            }
+                            filesList.append("/META-INF/").append(targetSource).append("\n");
+                            javaVisitorContext.visitMetaInfFile(targetSource, originatingElement)
+                                .ifPresent(generatedFile -> {
+                                    try (var writer = generatedFile.openWriter()) {
+                                        writer.write(source.getCharacters().toString());
+                                    } catch (IOException e) {
+                                        throw new ProcessingException(originatingElement, "Failed to write Python code to [" + targetSource + "]: " + e.getMessage(), e);
+                                    }
+                                });
+                        }
                     }
 
                     TreeSet<String> byParent = allModules.keySet().stream().map(pe -> pe.parent)
@@ -347,48 +354,49 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
 
         } else {
             // Process directory scanning if provided
-            String srcDir = annotation.src();
+            String[] srcDirs = annotation.src();
             List<Source> sources = new ArrayList<>();
-            if (!srcDir.isEmpty()) {
-                Path directory = Paths.get(srcDir);
-                if (Files.isDirectory(directory)) {
-                    try {
-                        Files.walkFileTree(directory, new SimpleFileVisitor<>() {
-                            @Override
-                            public @NotNull FileVisitResult preVisitDirectory(@NotNull Path dir,
-                                                                              @NotNull BasicFileAttributes attrs)
-                                throws IOException {
-                                if (Files.isHidden(dir) || dir.toFile().getName().startsWith(".")) {
-                                    return FileVisitResult.SKIP_SUBTREE;
-                                }
-                                return super.preVisitDirectory(dir, attrs);
-                            }
-
-                            @Override
-                            public @NotNull FileVisitResult visitFile(@NotNull Path file,
-                                                                      @NotNull BasicFileAttributes attrs)
-                                throws IOException {
-                                if (file.toString().endsWith(".py")) {
-                                    var relative = directory.relativize(file).toString();
-                                    if (relative.equals("setup.py")) {
-                                        // temporary workaround
-                                        return FileVisitResult.CONTINUE;
+            if (srcDirs != null) {
+                for (var srcDir : srcDirs) {
+                    Path directory = Paths.get(srcDir);
+                    if (Files.isDirectory(directory)) {
+                        try {
+                            Files.walkFileTree(directory, new SimpleFileVisitor<>() {
+                                @Override
+                                public @NotNull FileVisitResult preVisitDirectory(@NotNull Path dir,
+                                                                                  @NotNull BasicFileAttributes attrs)
+                                    throws IOException {
+                                    if (Files.isHidden(dir) || dir.toFile().getName().startsWith(".")) {
+                                        return FileVisitResult.SKIP_SUBTREE;
                                     }
-                                    sources.add(Source.newBuilder("python", file.toFile()).build());
+                                    return super.preVisitDirectory(dir, attrs);
                                 }
-                                return FileVisitResult.CONTINUE;
-                            }
-                        });
-                    } catch (IOException e) {
-                        throw new ProcessingException(originatingElement, "Error processing python code in directory [" + directory + "]: " + e.getMessage());
+
+                                @Override
+                                public @NotNull FileVisitResult visitFile(@NotNull Path file,
+                                                                          @NotNull BasicFileAttributes attrs)
+                                    throws IOException {
+                                    if (file.toString().endsWith(".py")) {
+                                        var relative = directory.relativize(file).toString();
+                                        if (relative.equals("setup.py")) {
+                                            // temporary workaround
+                                            return FileVisitResult.CONTINUE;
+                                        }
+                                        sources.add(Source.newBuilder("python", file.toFile()).build());
+                                    }
+                                    return FileVisitResult.CONTINUE;
+                                }
+                            });
+                        } catch (IOException e) {
+                            throw new ProcessingException(originatingElement, "Error processing python code in directory [" + directory + "]: " + e.getMessage());
+                        }
+                    } else {
+                        throw new ProcessingException(originatingElement, "Source directory does not exist: " + srcDir);
                     }
-                } else {
-                    throw new ProcessingException(originatingElement, "Source directory does not exist: " + srcDir);
                 }
             } else {
-                throw new ProcessingException(originatingElement, "Source directory does not exist: " + srcDir);
+                throw new ProcessingException(originatingElement, "Source directories are not set.");
             }
-
             return parser.transform(javaVisitorContext, sources.toArray(new Source[0]));
         }
     }
@@ -401,7 +409,6 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         // Collect all packages that need __init__.py files
         Map<String, List<String>> decoratorsByPackage = new LinkedHashMap<>();
         Map<String, Map<String, String>> javaClassesByPackage = new LinkedHashMap<>();
-
 
 
         // Process decorators
@@ -576,5 +583,6 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         return false;
     }
 
-    record PathEntry(String parent, String filename) {}
+    record PathEntry(String parent, String filename) {
+    }
 }
