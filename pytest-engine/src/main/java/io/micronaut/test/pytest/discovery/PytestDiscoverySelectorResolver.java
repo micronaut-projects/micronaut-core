@@ -27,6 +27,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.stream.Stream;
 
 /**
@@ -41,6 +42,14 @@ public class PytestDiscoverySelectorResolver {
     }
 
     private final Context context;
+    private Path baseDirectory;
+
+    /**
+     * Sets the base directory for computing relative test paths.
+     */
+    public void setBaseDirectory(Path baseDirectory) {
+        this.baseDirectory = baseDirectory;
+    }
 
     /**
      * Resolves discovery selectors and adds corresponding test descriptors.
@@ -59,8 +68,13 @@ public class PytestDiscoverySelectorResolver {
     private void resolveDirectorySelector(DirectorySelector selector, EngineDescriptor engineDescriptor) {
         Path directory = selector.getPath();
         LOG.debug("Resolving directory: {}", directory);
-
-        scanPythonDirectory(directory, engineDescriptor);
+        Path thisBase = this.baseDirectory;
+        try {
+            this.baseDirectory = directory;
+            scanPythonDirectory(directory, engineDescriptor);
+        } finally {
+            this.baseDirectory = thisBase;
+        }
     }
 
     private void resolveFileSelector(FileSelector selector, EngineDescriptor engineDescriptor) {
@@ -89,10 +103,10 @@ public class PytestDiscoverySelectorResolver {
 
         try {
             PytestAstParser astParser = new PytestAstParser(context);
-            TestDescriptor fileDescriptor = astParser.parsePythonFile(filePath, isTestDirectory);
+            List<TestDescriptor> testDescriptors = astParser.parsePythonFileAsTests(filePath, baseDirectory);
 
-            if (fileDescriptor != null) {
-                engineDescriptor.addChild(fileDescriptor);
+            for (TestDescriptor testDescriptor : testDescriptors) {
+                engineDescriptor.addChild(testDescriptor);
             }
         } catch (Exception e) {
             LOG.error("Error parsing Python file: {}", filePath, e);

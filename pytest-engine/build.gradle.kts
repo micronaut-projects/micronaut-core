@@ -29,6 +29,7 @@ tasks.withType<Test>().configureEach {
     val pyEnv = providers.environmentVariable("PYENV_VERSION")
     val vEnv = providers.environmentVariable("VIRTUAL_ENV")
     if (pyEnv.isPresent() && vEnv.isPresent()) {
+//        systemProperty("pytest.src.dir", "src/test/python")
         environment("PYENV_VERSION", pyEnv.get())
         environment("VIRTUAL_ENV", vEnv.get())
     } else {

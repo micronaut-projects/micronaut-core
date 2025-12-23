@@ -97,9 +97,12 @@ public class PytestTestEngine implements TestEngine {
         PytestDiscoverySelectorResolver selectorResolver = new PytestDiscoverySelectorResolver(context);
 
         String testSrc = configurationParameters.get(TEST_SOURCE_DIR).orElse(null);
+        Path baseDirectory = null;
         if (testSrc != null) {
             Path srcPath = Paths.get(testSrc);
             if (Files.exists(srcPath)) {
+                baseDirectory = srcPath;
+                selectorResolver.setBaseDirectory(baseDirectory);
                 DirectorySelector directorySelector = DiscoverySelectors.selectDirectory(testSrc);
                 selectorResolver.resolveSelectors(directorySelector, engineDescriptor);
             }

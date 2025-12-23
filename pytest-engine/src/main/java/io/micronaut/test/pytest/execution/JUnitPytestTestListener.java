@@ -21,11 +21,13 @@ import io.micronaut.test.pytest.extension.PytestMicronautExtension;
 import io.micronaut.test.pytest.listener.PytestTestListener;
 import org.graalvm.polyglot.Value;
 import org.junit.platform.engine.EngineExecutionListener;
+import org.junit.platform.engine.TestDescriptor;
 import org.junit.platform.engine.TestExecutionResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.Set;
 
 
 /**
@@ -35,42 +37,35 @@ public class JUnitPytestTestListener implements PytestTestListener {
 
     private static final Logger LOG = LoggerFactory.getLogger(JUnitPytestTestListener.class);
     private final EngineExecutionListener junitListener;
-    private final PytestFileDescriptor fileDescriptor;
+    private final Set<? extends TestDescriptor> children;
 
     public JUnitPytestTestListener(
         EngineExecutionListener junitListener,
-        PytestFileDescriptor fileDescriptor) {
+        Set<? extends TestDescriptor> testDescriptors) {
         this.junitListener = junitListener;
-        this.fileDescriptor = fileDescriptor;
+        this.children = testDescriptors;
     }
 
     @Override
     public void beforeFile(String file) {
         LOG.debug("Pytest starting file: {}", file);
-        junitListener.executionStarted(
-            fileDescriptor
-        );
+        // File-level events are not used in the new architecture
     }
 
     @Override
     public void afterFile(String file, TestExecutionResult result) {
         LOG.debug("Pytest finished file: {} ({})", file, result);
-        if (file.endsWith("/" + fileDescriptor.getDisplayName())) {
-            junitListener.executionFinished(
-                fileDescriptor,
-                result
-            );
-        }
+        // File-level events are not used in the new architecture
     }
 
     @Override
     public void beforeTest(String testId, Value item) {
         LOG.debug("Pytest starting test: {}", testId);
 
-        fileDescriptor.getChildren()
+        children
             .stream()
             .filter(child -> child instanceof PytestTestDescriptor ptd &&
-                testId.endsWith("::" + ptd.getUniqueId().getSegments().getLast().getValue()))
+                ptd.matchesId(testId))
             .findAny().ifPresent(testDescriptor -> {
                     junitListener.executionStarted(testDescriptor);
                     Value extValue = item.getMember(PytestMicronautExtension.ID);
@@ -84,10 +79,10 @@ public class JUnitPytestTestListener implements PytestTestListener {
     @Override
     public void afterTest(String testId, Value item, TestExecutionResult result) {
         LOG.debug("Pytest finished test: {} with result: {}", testId, result);
-        fileDescriptor.getChildren()
+        children
             .stream()
             .filter(child -> child instanceof PytestTestDescriptor ptd &&
-                testId.endsWith("::" + ptd.getUniqueId().getSegments().getLast().getValue()))
+                ptd.matchesId(testId))
             .findAny().ifPresent(td -> {
                 junitListener.executionFinished(td, result);
                 Value extValue = item.getMember(PytestMicronautExtension.ID);

@@ -37,7 +37,7 @@ import java.nio.file.Path;
 @Factory
 public class GraalPyContextFactory {
     public static final String APPLICATION_PATH = "META-INF/GRAALPY-VFS/micronaut-application";
-    public static final String APPLICATION_LAUNCHER_PATH = APPLICATION_PATH + "/main.py";
+    public static final String APPLICATION_LAUNCHER_PATH = APPLICATION_PATH + "/src/__main__.py";
     public static final String PYRONAUT_MAIN_CLASS = "pyronaut_application.PyronautMain";
 
     private final ApplicationContext applicationContext;
