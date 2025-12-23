@@ -74,6 +74,7 @@ public class PytestTestEngine implements TestEngine {
             var venv = System.getenv("VIRTUAL_ENV");
             Context.Builder builder = GraalPyResources.contextBuilder(VirtualFileSystem.newBuilder()
                     .resourceDirectory(GraalPyContextFactory.APPLICATION_PATH)
+                    .resourceLoadingClass(PytestTestEngine.class)
                     .build())
                 .allowHostAccess(HostAccess.ALL)
                 .allowHostClassLookup(name -> true);
