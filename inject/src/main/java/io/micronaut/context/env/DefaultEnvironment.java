@@ -356,7 +356,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
                 for (PropertySource propertySource : propertySourcesLocator.load(this)) {
                     internalAddPropertySource(propertySource);
                     propertySources.add(propertySource);
-                    if (isRefreshable) {
+                    if (isRefreshable && !PropertySource.CONTEXT.equals(propertySource.getName())) {
                         refreshablePropertySources.add(propertySource);
                     }
                 }
