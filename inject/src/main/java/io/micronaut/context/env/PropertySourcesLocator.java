@@ -37,4 +37,14 @@ public interface PropertySourcesLocator {
      * @return The located property sources
      */
     Collection<PropertySource> load(Environment environment);
+
+    /**
+     * Determines whether property sources loaded by this locator need to be refreshed
+     * when the {@link Environment#refresh()} is called.
+     *
+     * @return {@code true} if property sources need to be refreshed, {@code false} otherwise
+     */
+    default boolean isRefreshable() {
+        return true;
+    }
 }

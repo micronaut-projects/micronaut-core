@@ -143,6 +143,8 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
 
     void reset() {
         synchronized (catalog) {
+            Arrays.fill(nonGenerated, null);
+            Arrays.fill(rawCatalog, null);
             Arrays.fill(catalog, null);
             resetCaches();
         }
