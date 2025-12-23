@@ -179,11 +179,14 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                     Set<String> allExportedTypes = transformedList.stream()
                         .flatMap(tr -> tr.exportedTypes().stream())
                         .collect(Collectors.toSet());
-                    for (String srcDir : srcDirs) {
-                        for (PythonAstParser.TransformResult transformResult : transformedList) {
+                    for (PythonAstParser.TransformResult transformResult : transformedList) {
+                        for (String srcDir : srcDirs) {
                             Source source = transformResult.originalSource();
                             String path = source.getPath();
                             int i = path.indexOf(srcDir);
+                            if (i == -1) {
+                                continue;
+                            }
                             if (i > 0) {
                                 path = path.substring(i + srcDir.length() + 1);
                             }
