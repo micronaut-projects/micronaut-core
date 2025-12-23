@@ -111,6 +111,19 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
                 }
             }
 
+            // Try to load the generated pyronaut_application.py from META-INF
+            try (InputStream inputStream = classLoader
+                .getResourceAsStream(APPLICATION_LAUNCHER_PATH)) {
+
+                if (inputStream != null) {
+                    String scriptContent = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+                    Source source = Source.newBuilder(GraalPyRuntimeUtil.PYTHON, scriptContent, "__main__.py")
+                        .build();
+                    context.eval(source);
+                }
+            }
+
+
             // Make context available to bridge classes
             ContextHolder.setContext(context);
 
