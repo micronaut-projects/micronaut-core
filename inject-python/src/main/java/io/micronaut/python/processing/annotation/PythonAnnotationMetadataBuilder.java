@@ -15,22 +15,8 @@
  */
 package io.micronaut.python.processing.annotation;
 
-import java.lang.annotation.Annotation;
-import java.lang.annotation.RetentionPolicy;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.stream.Collectors;
-
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
-import io.micronaut.python.processing.visitor.ReturnDef;
-import org.graalvm.polyglot.Value;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
-
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.ClassElement;
@@ -39,14 +25,17 @@ import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.python.processing.util.GraalPyUtil;
-import io.micronaut.python.processing.visitor.AnnotationMemberDef;
-import io.micronaut.python.processing.visitor.AttributeDef;
-import io.micronaut.python.processing.visitor.ClassDef;
-import io.micronaut.python.processing.visitor.DecoratorDef;
-import io.micronaut.python.processing.visitor.ElementDef;
-import io.micronaut.python.processing.visitor.FunctionDef;
-import io.micronaut.python.processing.visitor.PropertyDef;
-import io.micronaut.python.processing.visitor.PythonVisitorContext;
+import io.micronaut.python.processing.visitor.*;
+import org.graalvm.polyglot.Value;
+import org.jetbrains.annotations.Nullable;
+
+import java.lang.annotation.Annotation;
+import java.lang.annotation.RetentionPolicy;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * Builder for creating annotation metadata from Python decorators and elements.

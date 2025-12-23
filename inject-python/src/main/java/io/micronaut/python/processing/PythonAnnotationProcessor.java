@@ -15,12 +15,32 @@
  */
 package io.micronaut.python.processing;
 
+import io.micronaut.annotation.processing.AbstractInjectAnnotationProcessor;
+import io.micronaut.annotation.processing.visitor.JavaNativeElement;
+import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.util.StringUtils;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.processing.ProcessingException;
+import io.micronaut.python.processing.annotation.PythonApplication;
+import io.micronaut.python.processing.beans.PythonBeanDefinitionProcessor;
+import io.micronaut.python.processing.visitor.PythonTypeElementVisitorProcessor;
+import org.graalvm.polyglot.Source;
+import org.jetbrains.annotations.NotNull;
+
+import javax.annotation.processing.ProcessingEnvironment;
+import javax.annotation.processing.RoundEnvironment;
+import javax.annotation.processing.SupportedAnnotationTypes;
+import javax.lang.model.element.Element;
+import javax.lang.model.element.TypeElement;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -30,26 +50,6 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
-import javax.annotation.processing.ProcessingEnvironment;
-import javax.annotation.processing.RoundEnvironment;
-import javax.annotation.processing.SupportedAnnotationTypes;
-import javax.lang.model.element.Element;
-import javax.lang.model.element.TypeElement;
-
-import io.micronaut.core.naming.NameUtils;
-import org.graalvm.polyglot.Source;
-
-import io.micronaut.annotation.processing.AbstractInjectAnnotationProcessor;
-import io.micronaut.annotation.processing.visitor.JavaNativeElement;
-import io.micronaut.core.util.StringUtils;
-import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.processing.ProcessingException;
-import io.micronaut.python.processing.annotation.PythonApplication;
-import io.micronaut.python.processing.beans.PythonBeanDefinitionProcessor;
-import io.micronaut.python.processing.visitor.PythonTypeElementVisitorProcessor;
-import org.jetbrains.annotations.NotNull;
 
 /**
  * Annotation processor for {@link PythonApplication} that enables Python AST processing
@@ -61,7 +61,6 @@ import org.jetbrains.annotations.NotNull;
 @SupportedAnnotationTypes("io.micronaut.python.processing.annotation.PythonApplication")
 public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor implements AutoCloseable {
     public static final String APPLICATION_PATH = "GRAALPY-VFS/micronaut-application/";
-    public static final String APPLICATION_LAUNCHER_PATH = APPLICATION_PATH + "main.py";
     public static final String APPLICATION_SRC_PATH = "GRAALPY-VFS/micronaut-application/src/";
 
     private PythonAstParser parser;
@@ -201,37 +200,65 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                     TreeSet<String> byParent = allModules.keySet().stream().map(pe -> pe.parent)
                         .collect(Collectors.toCollection(TreeSet::new));
                     for (String parent : byParent) {
-                        String initFilePath = APPLICATION_SRC_PATH + parent + "__init__.py";
-                        StringBuilder initContent = new StringBuilder();
-                        List<Map.Entry<PathEntry, List<String>>> entries = allModules.entrySet().stream()
-                            .filter(entry -> entry.getKey().parent.equals(parent))
-                            .toList();
-                        List<String> exportedTypes = new ArrayList<>();
-                        for (Map.Entry<PathEntry, List<String>> entry : entries) {
-                            List<String> types = entry.getValue();
-                            String filename = entry.getKey().filename;
-                            if (!types.isEmpty()) {
-                                for (String type : types) {
-                                    initContent.append("from .").append(NameUtils.filename(filename)).append(" import ").append(type).append('\n');
-                                    // Check if this type has decorators (is in allExportedTypes)
-                                    if (allExportedTypes.contains(type)) {
-                                        exportedTypes.add(type);
+                        if (StringUtils.isEmpty(parent)) {
+                            // root, generate __main__.py instead
+                            String mainFilePath = APPLICATION_SRC_PATH + parent + "__main__.py";
+                            StringBuilder mainContent = new StringBuilder();
+                            List<Map.Entry<PathEntry, List<String>>> entries = allModules.entrySet().stream()
+                                .filter(entry -> entry.getKey().parent.equals(parent))
+                                .toList();
+                            for (Map.Entry<PathEntry, List<String>> entry : entries) {
+                                List<String> types = entry.getValue();
+                                String filename = entry.getKey().filename;
+                                if (!types.isEmpty()) {
+                                    for (String type : types) {
+                                        mainContent.append("from ").append(NameUtils.filename(filename)).append(" import ").append(type).append('\n');
                                     }
                                 }
                             }
-                        }
-                        if (!exportedTypes.isEmpty()) {
-                            initContent.append("\n__all__ = ").append(toListOfString(exportedTypes)).append("\n");
-                        }
-                        filesList.append("/META-INF/").append(initFilePath).append("\n");
-                        javaVisitorContext.visitMetaInfFile(initFilePath, originatingElement)
-                            .ifPresent(generatedFile -> {
-                                try (var writer = generatedFile.openWriter()) {
-                                    writer.write(initContent.toString());
-                                } catch (IOException e) {
-                                    throw new ProcessingException(originatingElement, "Failed to write Python code to [" + initFilePath + "]: " + e.getMessage(), e);
+                            filesList.append("/META-INF/").append(mainFilePath).append("\n");
+                            javaVisitorContext.visitMetaInfFile(mainFilePath, originatingElement)
+                                .ifPresent(generatedFile -> {
+                                    try (var writer = generatedFile.openWriter()) {
+                                        writer.write(mainContent.toString());
+                                    } catch (IOException e) {
+                                        throw new ProcessingException(originatingElement, "Failed to write Python code to [" + mainFilePath + "]: " + e.getMessage(), e);
+                                    }
+                                });
+                        } else {
+
+                            String initFilePath = APPLICATION_SRC_PATH + parent + "__init__.py";
+                            StringBuilder initContent = new StringBuilder();
+                            List<Map.Entry<PathEntry, List<String>>> entries = allModules.entrySet().stream()
+                                .filter(entry -> entry.getKey().parent.equals(parent))
+                                .toList();
+                            List<String> exportedTypes = new ArrayList<>();
+                            for (Map.Entry<PathEntry, List<String>> entry : entries) {
+                                List<String> types = entry.getValue();
+                                String filename = entry.getKey().filename;
+                                if (!types.isEmpty()) {
+                                    for (String type : types) {
+                                        initContent.append("from .").append(NameUtils.filename(filename)).append(" import ").append(type).append('\n');
+                                        // Check if this type has decorators (is in allExportedTypes)
+                                        if (allExportedTypes.contains(type)) {
+                                            exportedTypes.add(type);
+                                        }
+                                    }
                                 }
-                            });
+                            }
+                            if (!exportedTypes.isEmpty()) {
+                                initContent.append("\n__all__ = ").append(toListOfString(exportedTypes)).append("\n");
+                            }
+                            filesList.append("/META-INF/").append(initFilePath).append("\n");
+                            javaVisitorContext.visitMetaInfFile(initFilePath, originatingElement)
+                                .ifPresent(generatedFile -> {
+                                    try (var writer = generatedFile.openWriter()) {
+                                        writer.write(initContent.toString());
+                                    } catch (IOException e) {
+                                        throw new ProcessingException(originatingElement, "Failed to write Python code to [" + initFilePath + "]: " + e.getMessage(), e);
+                                    }
+                                });
+                        }
                     }
                 }
             }
@@ -269,18 +296,6 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             // Invoke callback for each class element if callback is set
             if (classElementCallback != null) {
                 processingEnvironment.classes().values().forEach(classElementCallback);
-            }
-
-            // Write original Python code to META-INF
-            if (mainPy != null) {
-                javaVisitorContext.visitMetaInfFile(APPLICATION_LAUNCHER_PATH, originatingElement)
-                    .ifPresent(generatedFile -> {
-                        try (var writer = generatedFile.openWriter()) {
-                            writer.write(mainPy);
-                        } catch (IOException e) {
-                            throw new ProcessingException(originatingElement, "Failed to write Python code to [" + APPLICATION_LAUNCHER_PATH + "]: " + e.getMessage(), e);
-                        }
-                    });
             }
 
             // The visitor context is now ready for use by Micronaut's type visitors
@@ -325,14 +340,33 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             if (!srcDir.isEmpty()) {
                 Path directory = Paths.get(srcDir);
                 if (Files.isDirectory(directory)) {
-                    try (Stream<Path> stream = Files.walk(directory)) {
-                        Path[] files = stream
-                            .filter(Files::isRegularFile)
-                            .filter(path -> path.toString().endsWith(".py"))
-                            .toArray(Path[]::new);
-                        for (Path file : files) {
-                            sources.add(Source.newBuilder("python", file.toFile()).build());
-                        }
+                    try {
+                        Files.walkFileTree(directory, new SimpleFileVisitor<>() {
+                            @Override
+                            public @NotNull FileVisitResult preVisitDirectory(@NotNull Path dir,
+                                                                              @NotNull BasicFileAttributes attrs)
+                                throws IOException {
+                                if (Files.isHidden(dir) || dir.toFile().getName().startsWith(".")) {
+                                    return FileVisitResult.SKIP_SUBTREE;
+                                }
+                                return super.preVisitDirectory(dir, attrs);
+                            }
+
+                            @Override
+                            public @NotNull FileVisitResult visitFile(@NotNull Path file,
+                                                                      @NotNull BasicFileAttributes attrs)
+                                throws IOException {
+                                if (file.toString().endsWith(".py")) {
+                                    var relative = directory.relativize(file).toString();
+                                    if (relative.equals("setup.py")) {
+                                        // temporary workaround
+                                        return FileVisitResult.CONTINUE;
+                                    }
+                                    sources.add(Source.newBuilder("python", file.toFile()).build());
+                                }
+                                return FileVisitResult.CONTINUE;
+                            }
+                        });
                     } catch (IOException e) {
                         throw new ProcessingException(originatingElement, "Error processing python code in directory [" + directory + "]: " + e.getMessage());
                     }

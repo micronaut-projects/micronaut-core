@@ -15,6 +15,10 @@
  */
 package io.micronaut.python.compiler;
 
+import io.micronaut.inject.ast.ClassElement;
+
+import javax.tools.JavaFileObject;
+import javax.tools.SimpleJavaFileObject;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -25,11 +29,6 @@ import java.util.List;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
-
-import javax.tools.JavaFileObject;
-import javax.tools.SimpleJavaFileObject;
-
-import io.micronaut.inject.ast.ClassElement;
 
 /**
  * Compiler for Python applications using Micronaut annotation processing.
@@ -53,8 +52,11 @@ public final class PyronautCompiler {
     private final String javaSrc;
     private final String applicationClass;
     private final File targetDir;
+    private final List<File> annotationProcessorPath;
     private final List<File> classpath;
+    private final List<File> bootclasspath;
     private final Consumer<ClassElement> classElementCallback;
+    private final List<String> compilerOptions;
 
     private PyronautCompiler(Builder builder) {
         this.packageName = builder.packageName;
@@ -63,9 +65,11 @@ public final class PyronautCompiler {
         this.javaSrc = builder.javaSrc;
         this.applicationClass = builder.applicationClass;
         this.targetDir = builder.targetDir;
-        this.classpath = builder.classpath != null ? new ArrayList<>(builder.classpath) : null;
+        this.annotationProcessorPath = builder.annotationProcessorPath != null ? List.copyOf(builder.annotationProcessorPath) : null;
+        this.bootclasspath = builder.bootclasspath != null ? List.copyOf(builder.bootclasspath) : null;
+        this.classpath = builder.classpath != null ? List.copyOf(builder.classpath) : null;
         this.classElementCallback = builder.classElementCallback;
-
+        this.compilerOptions = builder.compilerOptions != null ? List.copyOf(builder.compilerOptions) : null;
         validateConfiguration();
     }
 
@@ -102,7 +106,7 @@ public final class PyronautCompiler {
             compiler.setClassElementCallback(classElementCallback);
         }
         JavaFileObject[] sources = createJavaSources();
-        Iterable<JavaFileObject> compiledClasses = compiler.compileInMemory(sources, classpath);
+        Iterable<JavaFileObject> compiledClasses = compiler.compileInMemory(sources, classpath, bootclasspath, annotationProcessorPath, compilerOptions);
         return new JavaFileObjectClassLoader(compiledClasses);
     }
 
@@ -119,8 +123,7 @@ public final class PyronautCompiler {
 
         PyronautJavaCompiler compiler = new PyronautJavaCompiler();
         JavaFileObject[] sources = createJavaSources();
-
-        compiler.compileToDisk(targetDir, sources, classpath);
+        compiler.compileToDisk(targetDir, sources, classpath, bootclasspath, annotationProcessorPath, compilerOptions);
     }
 
     private void validateConfiguration() {
@@ -250,7 +253,10 @@ public final class PyronautCompiler {
         private String javaSrc;
         private String applicationClass;
         private File targetDir;
+        private List<File> annotationProcessorPath;
+        private List<File> bootclasspath;
         private List<File> classpath;
+        private List<String> compilerOptions;
         private Consumer<ClassElement> classElementCallback;
 
         private Builder() {
@@ -325,13 +331,35 @@ public final class PyronautCompiler {
         }
 
         /**
+         * Set annotation processor path entries for compilation.
+         *
+         * @param annotationProcessorPath The classpath files
+         * @return This builder
+         */
+        public Builder annotationProcessorPath(List<File> annotationProcessorPath) {
+            this.annotationProcessorPath = annotationProcessorPath;
+            return this;
+        }
+
+        /**
          * Set additional classpath entries for compilation.
          *
          * @param classpath The classpath files
          * @return This builder
          */
         public Builder classpath(List<File> classpath) {
-            this.classpath = classpath != null ? new ArrayList<>(classpath) : null;
+            this.classpath = classpath;
+            return this;
+        }
+
+        /**
+         * Set boot classpath entries.
+         *
+         * @param bootclasspath The boot classpath files
+         * @return This builder
+         */
+        public Builder bootclasspath(List<File> bootclasspath) {
+            this.bootclasspath = bootclasspath;
             return this;
         }
 
@@ -344,6 +372,16 @@ public final class PyronautCompiler {
          */
         public Builder classElementCallback(Consumer<ClassElement> classElementCallback) {
             this.classElementCallback = classElementCallback;
+            return this;
+        }
+
+        /**
+         * Sets compiler options
+         * @param compilerOptions the compiler options
+         * @return this builder
+         */
+        public Builder options(List<String> compilerOptions) {
+            this.compilerOptions = compilerOptions;
             return this;
         }
 
