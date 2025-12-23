@@ -41,7 +41,7 @@ import jakarta.inject.Singleton;
 @Factory
 public class GraalPyContextFactory {
     public static final String APPLICATION_PATH = "META-INF/GRAALPY-VFS/micronaut-application";
-    public static final String APPLICATION_LAUNCHER_PATH = APPLICATION_PATH + "/main.py";
+    public static final String APPLICATION_LAUNCHER_PATH = APPLICATION_PATH + "/src/__main__.py";
     public static final String PYRONAUT_MAIN_CLASS = "pyronaut_application.PyronautMain";
 
     private final ApplicationContext applicationContext;
@@ -84,7 +84,7 @@ public class GraalPyContextFactory {
 
                 if (inputStream != null) {
                     String scriptContent = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
-                    Source source = Source.newBuilder(GraalPyRuntimeUtil.PYTHON, scriptContent, "main.py")
+                    Source source = Source.newBuilder(GraalPyRuntimeUtil.PYTHON, scriptContent, "__main__.py")
                         .build();
                     context.eval(source);
                 }
