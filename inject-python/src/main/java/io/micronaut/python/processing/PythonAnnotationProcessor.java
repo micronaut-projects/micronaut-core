@@ -62,6 +62,7 @@ import java.util.stream.Collectors;
 public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor implements AutoCloseable {
     public static final String APPLICATION_PATH = "GRAALPY-VFS/micronaut-application/";
     public static final String APPLICATION_SRC_PATH = "GRAALPY-VFS/micronaut-application/src/";
+    public static final String APPLICATION_LAUNCHER_PATH = APPLICATION_SRC_PATH + "__main__.py";
 
     private PythonAstParser parser;
     private Consumer<ClassElement> classElementCallback;
@@ -152,6 +153,17 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             StringBuilder filesList = new StringBuilder();
             if (StringUtils.isNotEmpty(annotation.code())) {
                 mainPy = annotation.code();
+                // Write original Python code to META-INF
+                if (mainPy != null) {
+                    javaVisitorContext.visitMetaInfFile(APPLICATION_LAUNCHER_PATH, originatingElement)
+                        .ifPresent(generatedFile -> {
+                            try (var writer = generatedFile.openWriter()) {
+                                writer.write(mainPy);
+                            } catch (IOException e) {
+                                throw new ProcessingException(originatingElement, "Failed to write Python code to [" + APPLICATION_LAUNCHER_PATH + "]: " + e.getMessage(), e);
+                            }
+                        });
+                }
             } else {
                 // on concrete main
                 mainPy = null;
