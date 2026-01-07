@@ -53,17 +53,22 @@ class TestFactory:
         def bar1BeanDefinition = context.getBeanDefinitions(context.classLoader.loadClass('python.Bar1'))
                 .find { it.getDeclaringType().get().simpleName.contains("TestFactory") }
 
-        def bar1 = getBean(context, 'python.Bar1').asPolyglotValue()
+
+        def wrapper = getBean(context, 'python.Bar1')
+        def bar1 = wrapper.asPolyglotValue()
 
         then:
         bar1 != null
         bar1.getMember('stopped').asBoolean() == false
 
         when:
-        context.close()
+        context.destroyBean(wrapper)
 
         then:
         bar1.getMember('stopped').asBoolean() == true
+
+        cleanup:
+        context.close()
     }
 
     void "test a factory bean with attribute"() {
