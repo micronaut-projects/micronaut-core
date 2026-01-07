@@ -20,6 +20,7 @@ import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.processing.visitor.ClassDef;
 import io.micronaut.python.processing.visitor.DecoratorDef;
+import io.micronaut.python.processing.visitor.ScriptDef;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -68,12 +69,16 @@ public final class PythonAstParser {
     public PythonEnvironment parse(@Language("python") String sources, String packageName, VisitorContext visitorContext) {
         Map<String, DecoratorDef> decorators = new LinkedHashMap<>();
         Map<String, ClassDef> classes = new LinkedHashMap<>();
+        Map<String, ScriptDef> scripts = new LinkedHashMap<>();
 
         Value bindings = context.getBindings(PYTHON);
         bindings.putMember("callback", (Function<Object, Object>) o -> {
             if (o instanceof ClassDef classDef) {
                 String qualifiedName = resolveQualifiedName(packageName, classDef);
                 classes.put(qualifiedName, classDef);
+            } else if (o instanceof ScriptDef scriptDef) {
+                String qualifiedName = resolveScriptQualifiedName(packageName, scriptDef);
+                scripts.put(qualifiedName, scriptDef);
             } else if (o instanceof DecoratorDef decoratorDef) {
                 decorators.put(decoratorDef.annotationName(), decoratorDef);
             }
@@ -88,6 +93,7 @@ public final class PythonAstParser {
         ));
         return new PythonEnvironment(
             classes,
+            scripts,
             decorators,
             context
         );
@@ -95,6 +101,14 @@ public final class PythonAstParser {
 
     private static @NotNull String resolveQualifiedName(String packageName, ClassDef classDef) {
         String qualifiedName = classDef.name();
+        if (!StringUtils.isEmpty(packageName)) {
+            qualifiedName = packageName + "." + qualifiedName;
+        }
+        return qualifiedName;
+    }
+
+    private static @NotNull String resolveScriptQualifiedName(String packageName, ScriptDef scriptDef) {
+        String qualifiedName = scriptDef.name();
         if (!StringUtils.isEmpty(packageName)) {
             qualifiedName = packageName + "." + qualifiedName;
         }
@@ -123,12 +137,16 @@ public final class PythonAstParser {
     public PythonEnvironment parse(List<Source> sources, String srcDir, VisitorContext visitorContext) {
         Map<String, DecoratorDef> decorators = new LinkedHashMap<>();
         Map<String, ClassDef> classes = new LinkedHashMap<>();
+        Map<String, ScriptDef> scripts = new LinkedHashMap<>();
 
         Value bindings = context.getBindings(PYTHON);
         bindings.putMember("callback", (Function<Object, Object>) o -> {
             if (o instanceof ClassDef classDef) {
                 String qualifiedName = resolveQualifiedName(classDef.packageName(), classDef);
                 classes.put(qualifiedName, classDef);
+            } else if (o instanceof ScriptDef scriptDef) {
+                String qualifiedName = resolveScriptQualifiedName(scriptDef.packageName(), scriptDef);
+                scripts.put(qualifiedName, scriptDef);
             } else if (o instanceof DecoratorDef decoratorDef) {
                 decorators.put(decoratorDef.annotationName(), decoratorDef);
             }
@@ -139,6 +157,7 @@ public final class PythonAstParser {
             String packageName = getPackageNameOfSource(srcDir, source);
             bindings.putMember("src", source.getCharacters());
             bindings.putMember("package_name", packageName);
+            bindings.putMember("file_name", source.getName());
             bindings.putMember("visitor_context", visitorContext);
             context.eval(Source.create(
                 PYTHON,
@@ -147,6 +166,7 @@ public final class PythonAstParser {
         }
         return new PythonEnvironment(
             classes,
+            scripts,
             decorators,
             context
         );
@@ -245,7 +265,7 @@ public final class PythonAstParser {
             from micronaut_processor import MicronautAstVisitor
 
             tree = ast.parse(src)
-            MicronautAstVisitor(callback, package_name, visitor_context).visit(tree)
+            MicronautAstVisitor(callback, package_name, file_name, visitor_context).visit(tree)
             """;
     }
 

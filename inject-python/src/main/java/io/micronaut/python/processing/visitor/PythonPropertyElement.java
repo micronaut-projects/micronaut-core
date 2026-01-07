@@ -47,8 +47,8 @@ import io.micronaut.python.processing.PythonProcessingEnvironment;
  */
 public final class PythonPropertyElement extends AbstractPythonElement implements PropertyElement {
     private final PythonProcessingEnvironment environment;
-    private final AbstractPythonClassElement declaringType;
-    private final AbstractPythonClassElement owningType;
+    private final ClassElement declaringType;
+    private final ClassElement owningType;
     private final PropertyDef propertyDef;
     private final ClassElement type;
     private final AccessKind readAccessKind;
@@ -60,8 +60,8 @@ public final class PythonPropertyElement extends AbstractPythonElement implement
 
     public PythonPropertyElement(PropertyDef propertyDef,
                                  PythonProcessingEnvironment environment,
-                                 AbstractPythonClassElement declaringType,
-                                 AbstractPythonClassElement owningType,
+                                 ClassElement declaringType,
+                                 ClassElement owningType,
                                  ElementAnnotationMetadataFactory metadataFactory) {
         super(
             propertyDef.name(),

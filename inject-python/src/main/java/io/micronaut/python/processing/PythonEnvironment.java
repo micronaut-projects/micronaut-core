@@ -17,15 +17,19 @@ package io.micronaut.python.processing;
 
 import io.micronaut.python.processing.visitor.ClassDef;
 import io.micronaut.python.processing.visitor.DecoratorDef;
+import io.micronaut.python.processing.visitor.ScriptDef;
 import org.graalvm.polyglot.Context;
 
+import java.util.Collections;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
- * Represents a Python environment containing parsed Python classes, decorators, and the GraalVM Polyglot context.
- * This record holds the state of a Python module after parsing, providing access to class definitions and decorators.
+ * Represents a Python environment containing parsed Python classes, decorators, scripts, and the GraalVM Polyglot context.
+ * This record holds the state of a Python module after parsing, providing access to class definitions, script definitions, and decorators.
  *
  * @param classes A map of Python class names to their definitions.
+ * @param scripts A map of Python script names to their definitions.
  * @param decorators A map of Python decorator names to their definitions.
  * @param context The GraalVM Polyglot context used for executing Python code.
  * @since 4.8.0
@@ -33,9 +37,21 @@ import java.util.Map;
  */
 public record PythonEnvironment(
     Map<String, ClassDef> classes,
+    Map<String, ScriptDef> scripts,
     Map<String, DecoratorDef> decorators,
     Context context
 ) implements AutoCloseable {
+
+    public PythonEnvironment {
+        classes = Collections.unmodifiableMap(classes);
+        scripts = Collections.unmodifiableMap(scripts.entrySet()
+        .stream()
+            .filter(entry ->
+                !entry.getValue().functions().isEmpty() || !entry.getValue().attributes().isEmpty()
+            )
+            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
+        decorators = Collections.unmodifiableMap(decorators);
+    }
 
     @Override
     public void close() {

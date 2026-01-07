@@ -53,8 +53,8 @@ import javax.lang.model.element.Element;
  */
 public non-sealed class PythonMethodElement extends AbstractPythonElement implements MethodElement, ElementProvider {
     private final PythonProcessingEnvironment environment;
-    private final AbstractPythonClassElement declaringType;
-    private final AbstractPythonClassElement owningType;
+    private final ClassElement declaringType;
+    private final ClassElement owningType;
     private final ClassElement returnType;
     private final ParameterElement[] parameters;
     private final MethodElementAnnotationsHelper helper;
@@ -73,8 +73,8 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
      */
     public PythonMethodElement(FunctionDef functionDef,
                                PythonProcessingEnvironment environment,
-                               AbstractPythonClassElement declaringType,
-                               AbstractPythonClassElement owningType,
+                               ClassElement declaringType,
+                               ClassElement owningType,
                                ElementAnnotationMetadataFactory metadataFactory) {
         super(Objects.requireNonNull(functionDef, "FunctionDef cannot be null").name(), functionDef, metadataFactory);
         this.environment = Objects.requireNonNull(environment, "PythonProcessingEnvironment cannot be null");

@@ -231,7 +231,7 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
         return filterProperties(allProperties, propertyElementQuery);
     }
 
-    private List<PropertyElement> filterProperties(List<PropertyElement> properties, PropertyElementQuery query) {
+    static List<PropertyElement> filterProperties(List<PropertyElement> properties, PropertyElementQuery query) {
         if (properties.isEmpty()) {
             return properties;
         }
@@ -282,7 +282,7 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
         return filteredProperties;
     }
 
-    private boolean isExcludedByAnnotations(PropertyElement property, Set<String> excludedAnnotations) {
+    private static boolean isExcludedByAnnotations(PropertyElement property, Set<String> excludedAnnotations) {
         if (excludedAnnotations.isEmpty()) {
             return false;
         }
@@ -301,11 +301,11 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
         return false;
     }
 
-    private boolean hasExcludedAnnotation(io.micronaut.inject.ast.Element element, Set<String> excludedAnnotations) {
+    private static boolean hasExcludedAnnotation(io.micronaut.inject.ast.Element element, Set<String> excludedAnnotations) {
         return excludedAnnotations.stream().anyMatch(element::hasAnnotation);
     }
 
-    private boolean isAccessibleViaAccessKinds(PropertyElement property, Set<io.micronaut.context.annotation.BeanProperties.AccessKind> accessKinds) {
+    private static boolean isAccessibleViaAccessKinds(PropertyElement property, Set<io.micronaut.context.annotation.BeanProperties.AccessKind> accessKinds) {
         // Check if any of the requested access kinds match the property's actual access kinds
         if (accessKinds.contains(io.micronaut.context.annotation.BeanProperties.AccessKind.METHOD)) {
             // Property has METHOD access if it has a getter or setter
@@ -322,7 +322,7 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
         return false;
     }
 
-    private boolean isAccessibleViaVisibility(PropertyElement property, io.micronaut.context.annotation.BeanProperties.Visibility visibility) {
+    private static boolean isAccessibleViaVisibility(PropertyElement property, io.micronaut.context.annotation.BeanProperties.Visibility visibility) {
         // For Python, we consider all properties accessible for now
         // In the future, we could check for private/protected modifiers if Python supports them
         return visibility == io.micronaut.context.annotation.BeanProperties.Visibility.ANY ||
@@ -330,7 +330,7 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
                visibility == io.micronaut.context.annotation.BeanProperties.Visibility.PUBLIC;
     }
 
-    private boolean isStaticProperty(PropertyElement property) {
+    private static boolean isStaticProperty(PropertyElement property) {
         // Check if the property is backed by a static field
         return property.getField()
             .map(field -> {
@@ -354,11 +354,6 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
                 }
             }
             return false;
-        }
-
-        @Override
-        protected ClassDef getNativeClassType(ClassElement classElement) {
-            return ((PythonClassElement) classElement).getNativeType();
         }
 
         @Override

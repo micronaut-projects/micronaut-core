@@ -22,7 +22,7 @@ import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.annotation.AbstractAnnotationElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 
-abstract sealed class AbstractPythonElement extends AbstractAnnotationElement implements Element permits AbstractPythonClassElement, PythonEnumConstantElement, PythonFieldElement, PythonMethodElement, PythonParameterElement, PythonPropertyElement, PythonPropertyGetterMethodElement, PythonPropertyParameterElement, PythonPropertySetterMethodElement {
+abstract sealed class AbstractPythonElement extends AbstractAnnotationElement implements Element permits AbstractPythonClassElement, PythonEnumConstantElement, PythonFieldElement, PythonMethodElement, PythonParameterElement, PythonPropertyElement, PythonPropertyGetterMethodElement, PythonPropertyParameterElement, PythonPropertySetterMethodElement, PythonScriptElement {
     private final String name;
     private final Object nativeType;
 

@@ -139,6 +139,24 @@ public record PythonProcessingEnvironment(
         return toMapOfClassElement(environment.classes(), this);
     }
 
+    /**
+     * Returns a map of Python script elements, converting the raw script definitions into
+     * processing-ready elements with annotation metadata support.
+     *
+     * @return A map of script names to Python script elements.
+     */
+    public Map<String, ClassElement> scripts() {
+        return toMapOfScriptElement(environment.scripts(), this);
+    }
+
+    private static Map<String, ClassElement> toMapOfScriptElement(java.util.Map<String, io.micronaut.python.processing.visitor.ScriptDef> scripts, PythonProcessingEnvironment environment) {
+        return scripts.entrySet().stream()
+            .collect(Collectors.toMap(
+                Map.Entry::getKey,
+                entry -> new io.micronaut.python.processing.visitor.PythonScriptElement(entry.getValue(), environment)
+            ));
+    }
+
     private static Map<String, ClassElement> toMapOfClassElement(Map<String, ClassDef> classes, PythonProcessingEnvironment environment) {
         return classes.entrySet().stream()
             .collect(Collectors.toMap(

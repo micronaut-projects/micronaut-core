@@ -61,6 +61,32 @@ public final class PythonElementFactory implements ElementFactory<ElementDef, Cl
         }
     }
 
+    /**
+     * Creates a new PythonScriptElement from a ScriptDef.
+     *
+     * @param scriptDef The script definition
+     * @param annotationMetadataFactory The annotation metadata factory
+     * @return The Python script element
+     */
+    @NonNull
+    public PythonScriptElement newScriptElement(@NonNull ScriptDef scriptDef,
+                                               @NonNull ElementAnnotationMetadataFactory annotationMetadataFactory) {
+        return new PythonScriptElement(scriptDef, environment);
+    }
+
+    /**
+     * Creates a new PythonScriptElement from a ScriptDef using the processing environment.
+     *
+     * @param scriptDef The script definition
+     * @param processingEnvironment The processing environment
+     * @return The Python script element
+     */
+    @NonNull
+    public static PythonScriptElement createScriptElement(@NonNull ScriptDef scriptDef,
+                                                         @NonNull PythonProcessingEnvironment processingEnvironment) {
+        return new PythonScriptElement(scriptDef, processingEnvironment);
+    }
+
     @NonNull
     @Override
     public ClassElement newSourceClassElement(@NonNull ClassDef classDef,
