@@ -23,7 +23,6 @@ import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.ElementQuery;
-import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PropertyElement;
@@ -39,6 +38,7 @@ import org.jspecify.annotations.NonNull;
 import javax.lang.model.element.Element;
 import java.util.List;
 import java.util.Optional;
+import java.util.ServiceLoader;
 
 /**
  * Represents a Python script as a Micronaut ClassElement.
@@ -68,11 +68,18 @@ public final class PythonScriptElement extends AbstractPythonElement implements 
                 enclosedElement.hasStereotype(Executable.class)) {
                 // make bean.
                 annotate(Singleton.class);
-                // TODO: make extensible
-                if (enclosedElement.hasStereotype("io.micronaut.http.annotation.HttpMethodMapping")) {
-                    annotate("io.micronaut.http.annotation.Controller");
-                }
+                applyTypeLevelDefaultAnnotations(enclosedElement);
             }
+        }
+    }
+
+    private void applyTypeLevelDefaultAnnotations(MemberElement enclosedElement) {
+        ServiceLoader<PythonScriptElementProcessor> serviceLoader = ServiceLoader.load(
+            PythonScriptElementProcessor.class,
+            PythonScriptElement.class.getClassLoader()
+        );
+        for (PythonScriptElementProcessor processor : serviceLoader) {
+            processor.process(this, enclosedElement);
         }
     }
 
