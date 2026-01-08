@@ -116,6 +116,7 @@ public class PythonTypeElementVisitorProcessor {
         }
 
         Map<String, ClassElement> classes = environment.classes();
+        Map<String, ClassElement> scripts = environment.scripts();
         for (LoadedVisitor loadedVisitor : loadedVisitors) {
             TypeElementVisitor<?, ?> visitor = loadedVisitor.getVisitor();
             for (ClassElement element : classes.values()) {
@@ -127,6 +128,18 @@ public class PythonTypeElementVisitorProcessor {
                         );
                     }
                     visitor.visitClass(element, pythonVisitorContext);
+                }
+            }
+            // Also process script elements
+            for (ClassElement scriptElement : scripts.values()) {
+                if (loadedVisitor.matchesClass(scriptElement)) {
+                    if (isAopProxy(scriptElement)) {
+                        scriptElement.annotate(RuntimeProxy.class, builder ->
+                            builder.value("io.micronaut.context.python.aop.PythonProxyCreator")
+                                .member("proxyTarget", true)
+                        );
+                    }
+                    visitor.visitClass(scriptElement, pythonVisitorContext);
                 }
             }
         }

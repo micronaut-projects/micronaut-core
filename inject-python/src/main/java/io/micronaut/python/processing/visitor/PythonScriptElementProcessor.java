@@ -15,20 +15,20 @@
  */
 package io.micronaut.python.processing.visitor;
 
-import java.util.List;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.MemberElement;
 
 /**
- * Base interface for all Python AST element definitions.
- * This sealed interface defines the common contract for all Python elements
- * that can be processed by Micronaut's annotation processing system.
- *
- * @author Micronaut Team
- * @since 5.0.0
+ * Processor for Python script elements that can apply type-level default annotations
+ * based on member element stereotypes.
  */
-public sealed interface ElementDef permits AnnotationMemberDef, ArgumentDef, AttributeDef, ClassDef, FunctionDef, PropertyDef, ReturnDef, ScriptDef {
-    default List<DecoratorDef> decorators() {
-        return List.of();
-    }
+public interface PythonScriptElementProcessor {
 
-    String name();
+    /**
+     * Process a Python script element and its member element to apply default annotations.
+     *
+     * @param classElement the Python script class element
+     * @param memberElement the member element being processed
+     */
+    void process(ClassElement classElement, MemberElement memberElement);
 }

@@ -30,12 +30,12 @@ import javax.lang.model.element.Modifier;
 import io.micronaut.aop.Around;
 import io.micronaut.aop.InterceptorBinding;
 import io.micronaut.aop.Introduction;
-import io.micronaut.aop.runtime.RuntimeProxy;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Vetoed;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.processing.ProcessingException;
@@ -58,6 +58,7 @@ import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.processing.visitor.AbstractPythonClassElement;
 import io.micronaut.python.processing.visitor.PythonClassElement;
+import io.micronaut.python.processing.visitor.PythonScriptElement;
 import io.micronaut.sourcegen.generator.SourceGenerator;
 import io.micronaut.sourcegen.generator.SourceGenerators;
 import io.micronaut.sourcegen.model.ClassDef;
@@ -116,7 +117,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     public void visitClass(ClassElement element, VisitorContext context) {
         if (context instanceof PythonVisitorContext pythonVisitorContext) {
 
-            if (element instanceof AbstractPythonClassElement classElement) {
+            if (element instanceof PythonScriptElement scriptElement) {
+                // Handle script elements
+                visitScript(scriptElement, context);
+            } else if (element instanceof AbstractPythonClassElement classElement) {
 
                 try {
                     if (classBuilders.containsKey(classElement.getName())) {
@@ -172,7 +176,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             if (method.hasDeclaredStereotype(InterceptorBinding.class)) {
                                 isAopProxy = true;
                             }
-                            addBridgeMethod(method, builder, pythonValue, context, false, addedMethodNames);
+                            addBridgeMethod(method, builder, pythonValue, context, false, false, addedMethodNames);
                             methodSet.add(method);
                         }
                     }
@@ -304,7 +308,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         if (methodElement.hasDeclaredStereotype(InterceptorBinding.class)) {
                             isAopProxy = true;
                         }
-                        addBridgeMethod(methodElement, builder, pythonValue, context, methodElement.hasDeclaredAnnotation(JUNIT_TEST), addedMethodNames);
+                        addBridgeMethod(methodElement, builder, pythonValue, context, methodElement.hasDeclaredAnnotation(JUNIT_TEST), false, addedMethodNames);
                     }
 
                     // Find injection methods (annotated with @Inject)
@@ -403,6 +407,130 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         }
     }
 
+    private void visitScript(PythonScriptElement scriptElement, VisitorContext context) {
+        try {
+            if (classBuilders.containsKey(scriptElement.getName())) {
+                return;
+            }
+
+            String typeName = scriptElement.getName();
+
+            var builder = ClassDef.builder(scriptElement.getPackageName() + "." + scriptElement.getSimpleName())
+                .addModifiers(Modifier.PUBLIC);
+            builder.addAnnotation(Vetoed.class);
+            builder.addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.ValueCoercible"));
+
+            // Scripts are singletons - add a static instance field
+            ClassTypeDef thisType = ClassTypeDef.of(typeName);
+            FieldDef instanceField = FieldDef.builder("INSTANCE")
+                .ofType(thisType)
+                .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+                .build();
+
+            // Add the GraalPy value field
+            FieldDef pythonValue = FieldDef.builder("graalpyInternalValue")
+                .ofType(POLYGLOT_VALUE)
+                .addModifiers(Modifier.PRIVATE, Modifier.STATIC)
+                .build();
+
+            // Default constructor for classes without __init__ or with no parameters
+            MethodDef.MethodDefBuilder constructor = MethodDef.constructor();
+            builder.addMethod(
+                constructor.build(((aThis, methodParameters) -> {
+                    String name = scriptElement.getNativeType().name();
+                    if (name.endsWith(".py")) {
+                        name = name.substring(0, name.length() - 3);
+                    }
+                    ExpressionDef pythonInstance = CONTEXT_HOLDER
+                        .invokeStatic("findScript", POLYGLOT_VALUE,
+                            List.of(
+                                ExpressionDef.constant(scriptElement.getPackageName()),
+                                ExpressionDef.constant(name)
+                            )
+                        );
+
+                    return aThis.field(pythonValue).assign(pythonInstance);
+                }))
+            );
+
+            builder.addField(instanceField);
+            builder.addField(pythonValue);
+
+            StubEntry stubEntry = new StubEntry(builder, pythonValue, scriptElement);
+            classBuilders.put(scriptElement.getName(), stubEntry);
+
+            // Track method names that have been added to avoid duplicates
+            Set<String> addedMethodNames = stubEntry.bridgedMethods();
+
+            // implement asPolyglotValue
+            builder.addMethod(MethodDef.builder(AS_POLYGLOT_VALUE)
+                .addModifiers(Modifier.PUBLIC)
+                .returns(POLYGLOT_VALUE)
+                .build(((aThis, methodParameters) ->
+                    thisType.getStaticField("graalpyInternalValue", POLYGLOT_VALUE).returning())
+                ));
+
+            // implement static factory
+            builder.addMethod(MethodDef.builder(FROM_POLYGLOT_VALUE)
+                .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+                .addParameter(POLYGLOT_VALUE)
+                .returns(thisType)
+                .build(((aThis, methodParameters) ->
+                    thisType.getStaticField("INSTANCE", thisType).returning()))
+            );
+
+            // Get the singleton instance
+            builder.addMethod(MethodDef.builder("getInstance")
+                .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+                .returns(thisType)
+                .build(((aThis, methodParameters) ->
+                    thisType.getStaticField("INSTANCE", thisType).returning()))
+            );
+
+            List<MethodElement> methodsToBridge = scriptElement.getEnclosedElements(
+                ElementQuery.ALL_METHODS
+                    .onlyAccessible()
+                    .onlyInstance()
+                    .onlyDeclared()
+                    .annotated(ann ->
+                        ann.hasStereotype(Executable.class) ||
+                            ann.hasAnnotation(AnnotationUtil.PRE_DESTROY) ||
+                            ann.hasAnnotation(AnnotationUtil.POST_CONSTRUCT) ||
+                            ann.hasStereotype(Around.class) ||
+                            ann.hasDeclaredStereotype(AnnotationUtil.SCOPE) ||
+                            ann.hasDeclaredStereotype(Bean.class)));
+
+            for (MethodElement methodElement : methodsToBridge) {
+                addBridgeMethod(
+                    methodElement,
+                    builder,
+                    pythonValue,
+                    context,
+                    false,
+                    true,
+                    addedMethodNames
+                );
+            }
+
+            // Find injection fields (script attributes)
+            List<PropertyElement> beanProperties = scriptElement.getBeanProperties();
+            for (PropertyElement beanProperty : beanProperties) {
+                if (beanProperty.hasStereotype(AnnotationUtil.INJECT)) {
+                    addSetter(beanProperty, builder, pythonValue);
+                }
+
+                if (beanProperty.hasStereotype(Bean.class)) {
+                    addGetter(beanProperty, builder, pythonValue);
+                }
+            }
+
+        } catch (ProcessingException e) {
+            throw e;
+        } catch (Exception e) {
+            context.fail("Failed to generate stub for Python script [" + scriptElement.getSimpleName() + "]: " + e.getMessage(), null);
+        }
+    }
+
     private static TypeDef erasedType(ClassElement t) {
         var parameterType = !t.getTypeArguments().isEmpty() ? ClassTypeDef.of(t.getName()) : TypeDef.of(t);
         return parameterType;
@@ -453,6 +581,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         FieldDef pythonValue,
         VisitorContext visitorContext,
         boolean isJunit5Test,
+        boolean isScript,
         Set<String> addedMethodNames) {
         String pythonFunctionName = methodElement.getName();
         String key = methodElement.getDescription(true);
@@ -486,7 +615,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             stubEntry.pythonValue,
                             visitorContext,
                             false,
-                            stubEntry.bridgedMethods
+                            false, stubEntry.bridgedMethods
                         );
                     }
                 }
@@ -511,7 +640,6 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 // For child classes, pythonValue will be null, so we need to create a field reference to the inherited field
                 VariableDef.Field pythonValueField = toFieldRef(pythonValue, aThis);
                 List<ExpressionDef> parameterExpressions = new ArrayList<>();
-                parameterExpressions.add(ExpressionDef.constant(pythonFunctionName));
                 for (int i = 0; i < parameters.length; i++) {
                     @NonNull ParameterElement parameter = parameters[i];
                     VariableDef.MethodParameter methodParameter = methodParameters.get(i);
@@ -520,11 +648,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
                 // Get the return type to determine appropriate conversion method
                 var returnType = methodElement.getReturnType();
-                var invokedValue = pythonValueField.invoke(
-                    "invokeMember",
-                    POLYGLOT_VALUE,
-                    parameterExpressions
-                );
+                var invokedValue = pythonValueField
+                    .invoke("getMember", POLYGLOT_VALUE, ExpressionDef.constant(pythonFunctionName))
+                    .invoke("execute", POLYGLOT_VALUE, parameterExpressions);
 
                 if (isJunit5Test) {
                     return invokedValue;

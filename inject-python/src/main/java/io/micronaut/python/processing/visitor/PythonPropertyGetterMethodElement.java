@@ -45,8 +45,8 @@ import org.jspecify.annotations.NonNull;
 public final class PythonPropertyGetterMethodElement extends AbstractPythonElement implements MethodElement, ElementProvider {
 
     private final PythonProcessingEnvironment environment;
-    private final AbstractPythonClassElement declaringType;
-    private final AbstractPythonClassElement owningType;
+    private final ClassElement declaringType;
+    private final ClassElement owningType;
     private final ClassElement returnType;
     private final String methodName;
     private final PythonPropertyElement propertyElement;
@@ -54,8 +54,8 @@ public final class PythonPropertyGetterMethodElement extends AbstractPythonEleme
     public PythonPropertyGetterMethodElement(
             PythonPropertyElement propertyElement,
             PythonProcessingEnvironment environment,
-            AbstractPythonClassElement declaringType,
-            AbstractPythonClassElement owningType,
+            ClassElement declaringType,
+            ClassElement owningType,
             ElementAnnotationMetadataFactory metadataFactory) {
         super(propertyElement.getName(), null, metadataFactory);
         this.methodName = propertyElement.getName();

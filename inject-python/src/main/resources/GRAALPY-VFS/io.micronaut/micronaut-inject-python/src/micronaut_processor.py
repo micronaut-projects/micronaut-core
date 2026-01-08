@@ -11,6 +11,7 @@ ArgumentsDef = java.type("io.micronaut.python.processing.visitor.ArgumentsDef")
 ArgumentDef = java.type("io.micronaut.python.processing.visitor.ArgumentDef")
 ReturnDef = java.type("io.micronaut.python.processing.visitor.ReturnDef")
 TypeRef = java.type("io.micronaut.python.processing.visitor.TypeRef")
+ScriptDef = java.type("io.micronaut.python.processing.visitor.ScriptDef")
 
 def extract_decorator_name(node):
     """
@@ -59,7 +60,7 @@ def is_static_method(func_node):
 
 class MicronautAstVisitor(ast.NodeVisitor):
 
-    def __init__(self, callback, package_name="", visitor_context=None):
+    def __init__(self, callback, package_name="", file_name = "Script.py", visitor_context=None):
         self.callback = callback
         self.package_name = package_name
         self.visitor_context = visitor_context
@@ -74,6 +75,11 @@ class MicronautAstVisitor(ast.NodeVisitor):
         self.java_type_assignments = {}  # Track java.type() assignments: variable_name -> full_qualified_name
         self.imported_types = {}  # Track imported types: simple_name -> full_qualified_name
         self.local_classes = set()  # Track class names defined in this file
+        # Script handling
+        self.current_script = None
+        self.current_script_attributes = []
+        self.current_script_functions = []
+        self.script_name = file_name
 
     def visit(self, node: ast.AST) -> ast.AST:
         match node:
@@ -181,7 +187,6 @@ class MicronautAstVisitor(ast.NodeVisitor):
                 # Track function nesting to avoid processing nested functions as micronaut decorators
                 was_in_function = self.in_function
                 self.in_function = True
-
                 try:
                     # Handle property decorators
                     if self.current_class is not None:
@@ -242,6 +247,8 @@ class MicronautAstVisitor(ast.NodeVisitor):
                                 self.current_class = self.current_class.withConstructor(func_def)
                             else:
                                 self.current_class = self.current_class.withFunction(func_def)
+                        elif self.current_class is None and self._is_script_function(node):
+                            self._handle_script_function(func_def)
                         return super().visit(node)
                 finally:
                     self.in_function = was_in_function
@@ -251,11 +258,17 @@ class MicronautAstVisitor(ast.NodeVisitor):
                 # Handle class attribute assignments
                 if self.current_class is not None:
                     self._handle_assign(node)
+                # Handle script attribute assignments
+                elif self.current_class is None and self._is_script_assignment(node):
+                    self._handle_script_assign(node)
                 return node
             case ast.AnnAssign():
                 # Handle annotated assignments (type hints)
                 if self.current_class is not None:
                     self._handle_ann_assign(node)
+                # Handle script attribute assignments
+                elif self.current_class is None and self._is_script_assignment(node):
+                    self._handle_script_ann_assign(node)
                 return node
             case ast.ImportFrom():
                 # Track imported types for name resolution
@@ -307,9 +320,21 @@ class MicronautAstVisitor(ast.NodeVisitor):
                     self._handle_field_docstring(node)
                 return node
             case ast.Module():
+                # Process the module and create script element if we have script-level constructs
                 self.current_class = None
-                self.callback.apply(node)
-                return super().visit(node)
+                result = super().visit(node)
+
+                # Create script element if we have collected script attributes or functions
+                if self.current_script_attributes or self.current_script_functions:
+                    script_def = ScriptDef(self.script_name, self.package_name, self.current_script_functions, self.current_script_attributes, None)
+                    self.callback.apply(script_def)
+
+                    # Reset script state
+                    self.current_script = None
+                    self.current_script_attributes = []
+                    self.current_script_functions = []
+
+                return result
             case _:
                 return node
 
@@ -424,6 +449,129 @@ class MicronautAstVisitor(ast.NodeVisitor):
                     self.current_class_attributes[-1] = updated_attr
                 # Update last_attribute reference
                 self.last_attribute = updated_attr
+
+    def _is_script_assignment(self, node):
+        if isinstance(getattr(node, "parent", None), ast.ClassDef):
+            return False
+        """
+        Check if an assignment node represents a script-level attribute assignment.
+        Script assignments are module-level variable assignments that can be dependency injection targets.
+        """
+        if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+            attr_name = node.targets[0].id
+            # Skip special dunder attributes and private attributes
+            if not attr_name.startswith('__') and not attr_name.startswith('_'):
+                return True
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            attr_name = node.target.id
+            # Skip special dunder attributes and private attributes
+            if not attr_name.startswith('__') and not attr_name.startswith('_'):
+                return True
+        return False
+
+    def _handle_script_assign(self, node):
+        """
+        Handle ast.Assign nodes for script attributes.
+        """
+        # Only handle simple assignments to names (not complex expressions)
+        if len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+            attr_name = node.targets[0].id
+            # Skip special dunder attributes and private attributes
+            if not attr_name.startswith('__') and not attr_name.startswith('_'):
+                try:
+                    # Evaluate the AST expression to get a Python Value
+                    code = compile(ast.Expression(body=node.value), filename='<ast>', mode='eval')
+                    value = eval(code)
+                except Exception:
+                    value = None  # Non-evaluable expressions
+
+                # Determine if it's a static attribute (script attributes are typically static)
+                is_static = False  # Script attributes should be injectable
+                type_name = None  # No type annotation for simple assignments
+
+                attr_def = JavaAttributeDef(attr_name, None, type_name, value, [], None, is_static, None)
+                self.current_script_attributes.append(attr_def)
+
+    def _handle_script_ann_assign(self, node):
+        """
+        Handle ast.AnnAssign nodes for script attributes.
+        """
+        if isinstance(node.target, ast.Name):
+            attr_name = node.target.id
+            # Skip special dunder attributes and private attributes
+            if not attr_name.startswith('__') and not attr_name.startswith('_'):
+                # Extract type annotation
+                try:
+                    annotation = ast.unparse(node.annotation)
+                except AttributeError:
+                    # Fallback for older Python versions
+                    annotation = ast.dump(node.annotation)
+
+                try:
+                    # Evaluate the AST expression to get a Python Value
+                    if node.value:
+                        code = compile(ast.Expression(body=node.value), filename='<ast>', mode='eval')
+                        value = eval(code)
+                    else:
+                        value = None
+                except Exception:
+                    value = None
+
+                # Check for typing.Annotated and extract decorators from metadata
+                decorators = []
+                type_name = annotation  # Default to full annotation
+
+                if isinstance(node.annotation, ast.Subscript) and isinstance(node.annotation.value, ast.Name) and node.annotation.value.id == 'Annotated':
+                    parsed_annotation, parsed_decorators = self._parse_annotated_type(node.annotation)
+                    if parsed_annotation:
+                        type_name = parsed_annotation   # Use extracted type for typeName
+                        decorators = parsed_decorators  # Add any decorators found
+
+                        # Check if the parsed type annotation is nullable and add @Nullable decorator
+                        if self._is_nullable_type_annotation(parsed_annotation):
+                            nullable_decorator = DecoratorDef("Nullable", "jakarta.annotation.Nullable", None, {}, [])
+                            decorators.append(nullable_decorator)
+                else:
+                    # Parse type into TypeRef structure
+                    type_name = self._parse_type(node.annotation)
+
+                    # For non-Annotated types, check if the type itself is nullable
+                    if self._is_nullable_union_type(node.annotation):
+                        nullable_decorator = DecoratorDef("Nullable", "jakarta.annotation.Nullable", None, {}, [])
+                        decorators.append(nullable_decorator)
+
+                # Script attributes are typically static
+                is_static = False
+
+                attr_def = JavaAttributeDef(attr_name, annotation, type_name, value, decorators, None, is_static, None)
+                self.current_script_attributes.append(attr_def)
+
+    def _is_script_function(self, node):
+        parent = getattr(node, "parent", None)
+        if isinstance(parent, ast.ClassDef) or node.name == 'micronaut_annotation':
+            return False
+
+        decorators = [
+            decorator_to_function(self, d)
+            for d in node.decorator_list
+            if decorator_to_function(self, d) is not None
+        ]
+        if not decorators:
+            return False
+        """
+        Check if a function node represents a script-level function.
+        Script functions are module-level functions that can be executed.
+        """
+        # For now, we'll consider all module-level functions as script functions
+        # In the future, we might want to check for specific decorators like @Executable
+        return True
+
+    def _handle_script_function(self, func_def):
+        """
+        Handle ast.FunctionDef nodes for script functions.
+        """
+        # Add the function to the script
+        self.current_script_functions.append(func_def)
 
     def _is_enum_class(self, node):
         """
@@ -1435,28 +1583,16 @@ def is_micronaut_decorator(funcdef, visitor=None):
             if is_target:
                 return True
 
-    # Also check for the _micronaut_annotations pattern (for backward compatibility)
-    if funcdef.body and len(funcdef.body) > 0:
-        # Look for the pattern where hasattr(func, '_micronaut_annotations') is checked
-        for stmt in funcdef.body:
-            if isinstance(stmt, ast.If) and isinstance(stmt.test, ast.UnaryOp):
-                # Look for: if not hasattr(func, '_micronaut_annotations'):
-                if (isinstance(stmt.test.op, ast.Not)
-                    and isinstance(stmt.test.operand, ast.Call)
-                    and isinstance(stmt.test.operand.func, ast.Name)
-                    and stmt.test.operand.func.id == "hasattr"):
-                    args = stmt.test.operand.args
-                    if len(args) >= 2 and isinstance(args[1], ast.Constant) and args[1].value == "_micronaut_annotations":
-                        return True
-
     # Check if this function has decorators imported from micronaut.* or jakarta.inject.* packages
     if visitor is not None:
         for dec in funcdef.decorator_list:
             decorator_name = extract_decorator_name(dec)
             if decorator_name:
                 existing_decorator = visitor.known_decorators.get(decorator_name)
-                if existing_decorator and (existing_decorator.annotationName().startswith('io.micronaut.') or existing_decorator.annotationName().startswith('jakarta.inject.')):
-                    return True
+                if existing_decorator:
+                    annotation_name = existing_decorator.annotationName()
+                    if annotation_name.startswith('io.micronaut.aop') or annotation_name.startswith('jakarta.inject.'):
+                        return True
 
     return False
 

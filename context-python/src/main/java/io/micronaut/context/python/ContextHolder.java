@@ -158,6 +158,41 @@ public final class ContextHolder {
     }
 
     /**
+     * Find a Python script.
+     * @param packageName The package name
+     * @param scriptName The script name
+     * @return The value
+     * @throws InstantiationException if the script cannot be found
+     */
+    public static @NotNull Value findScript(String packageName, String scriptName) {
+        Context ctx = getContext();
+        Value v = ctx.getBindings(PYTHON);
+        if (v != null) {
+            if (PYTHON.equals(packageName)) {
+                if ("Unnamed".equals(scriptName)) {
+                    return v;
+                } else {
+                    Value member = ctx.eval(PYTHON, "import " + scriptName )
+                        .getMember(scriptName);
+                    if (member == null) {
+                        throw new InstantiationException("Cannot find Python module: " + packageName);
+                    }
+                    return member;
+                }
+            } else {
+                Value member = ctx.eval(PYTHON, "from " + packageName + " import " + scriptName )
+                    .getMember(scriptName);
+                if (member == null) {
+                    throw new InstantiationException("Cannot find Python module: " + packageName);
+                }
+                return member;
+            }
+        } else {
+            throw new InstantiationException("Cannot find Python module: " + packageName);
+        }
+    }
+
+    /**
      * Invoke a static method on the given Python class.
      *
      * @param packageName The package name

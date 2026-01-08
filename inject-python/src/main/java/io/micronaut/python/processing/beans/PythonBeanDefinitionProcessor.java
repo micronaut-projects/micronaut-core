@@ -43,23 +43,30 @@ public final class PythonBeanDefinitionProcessor {
     ) {
         PythonVisitorContext visitorContext = processingEnvironment.visitorContext();
         for (ClassElement classElement : processingEnvironment.classes().values()) {
-            try {
-                // Skip generated classes and vetoed classes
-                if (isGenerated(classElement) || isVetoed(classElement)) {
-                    continue;
-                }
+            processClassElement(classElement, visitorContext);
+        }
+        for (ClassElement classElement : processingEnvironment.scripts().values()) {
+            processClassElement(classElement, visitorContext);
+        }
+    }
 
-                // Use BeanDefinitionCreatorFactory to create bean definitions
-                var produce = BeanDefinitionCreatorFactory.produce(classElement, visitorContext);
-                for (BeanDefinitionVisitor writer : produce.build()) {
-                    if (processed.add(writer.getBeanDefinitionName())) {
-                        writer.visitBeanDefinitionEnd();
-                        processBeanDefinition(writer, visitorContext);
-                    }
-                }
-            } catch (ProcessingException e) {
-                handleProcessingException(visitorContext, e);
+    private void processClassElement(ClassElement classElement, PythonVisitorContext visitorContext) {
+        try {
+            // Skip generated classes and vetoed classes
+            if (isGenerated(classElement) || isVetoed(classElement)) {
+                return;
             }
+
+            // Use BeanDefinitionCreatorFactory to create bean definitions
+            var produce = BeanDefinitionCreatorFactory.produce(classElement, visitorContext);
+            for (BeanDefinitionVisitor writer : produce.build()) {
+                if (processed.add(writer.getBeanDefinitionName())) {
+                    writer.visitBeanDefinitionEnd();
+                    processBeanDefinition(writer, visitorContext);
+                }
+            }
+        } catch (ProcessingException e) {
+            handleProcessingException(visitorContext, e);
         }
     }
 

@@ -15,20 +15,19 @@
  */
 package io.micronaut.python.processing.visitor;
 
-import java.util.List;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.MemberElement;
 
 /**
- * Base interface for all Python AST element definitions.
- * This sealed interface defines the common contract for all Python elements
- * that can be processed by Micronaut's annotation processing system.
- *
- * @author Micronaut Team
- * @since 5.0.0
+ * Default processor that applies the Controller annotation when a method
+ * with the HttpMethodMapping stereotype is found.
  */
-public sealed interface ElementDef permits AnnotationMemberDef, ArgumentDef, AttributeDef, ClassDef, FunctionDef, PropertyDef, ReturnDef, ScriptDef {
-    default List<DecoratorDef> decorators() {
-        return List.of();
-    }
+public class ControllerScriptElementProcessor implements PythonScriptElementProcessor {
 
-    String name();
+    @Override
+    public void process(ClassElement classElement, MemberElement memberElement) {
+        if (memberElement.hasStereotype("io.micronaut.http.annotation.HttpMethodMapping")) {
+            classElement.annotate("io.micronaut.http.annotation.Controller");
+        }
+    }
 }
