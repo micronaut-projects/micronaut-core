@@ -226,7 +226,7 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
 
             @Override
             public EnvironmentNamesDeducer getEnvironmentNamesDeducer() {
-                return () -> new LinkedHashSet<>(configuration.getEnvironments());
+                return () -> new LinkedHashSet<>(environment.getActiveNames());
             }
 
             @Override
