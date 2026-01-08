@@ -10,6 +10,40 @@ import jakarta.inject.Singleton
 
 class PythonControllerSpec extends AbstractPythonTypeElementSpec {
 
+    void "test python controller with import alias"() {
+        given:
+        def context = buildContext('''
+import jakarta.inject as inject
+import micronaut.http.annotation as http
+
+@inject.Singleton
+class MessageService:
+    def say_hello(self, name : str) -> str:
+        return f"Hello {name}"
+
+@http.Controller("/hello")
+class HelloController:
+    def __init__(self, messageService: MessageService):
+        self.messageService = messageService
+
+    @http.Get("/{name}")
+    def say_hello(self, name : str) -> str:
+        return self.messageService.say_hello(name)
+
+''', true)
+
+        def embeddedServer = context.getBean(EmbeddedServer)
+        embeddedServer.start()
+        def client = context.createBean(HttpClient, embeddedServer.URL)
+
+        expect:
+        client.toBlocking().retrieve("/hello/John") == "Hello John"
+
+        cleanup:
+        client.close()
+        context?.close()
+    }
+
     void "test python controller"() {
         given:
         def context = buildContext('''

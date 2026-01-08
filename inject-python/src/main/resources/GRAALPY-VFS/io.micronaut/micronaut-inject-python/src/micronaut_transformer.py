@@ -107,6 +107,36 @@ class MicronautTransformer(ast.NodeTransformer):
 
         return node
 
+    def visit_Import(self, node: ast.Import):
+        """
+        Transform plain import statements like:
+        import jakarta.inject as i
+        import micronaut.context.annotation as a
+
+        For such package-level imports, generate decorators for all annotation types
+        found in the imported package so that alias-qualified usage like @i.Singleton
+        or @a.Executable can be recognized at runtime without requiring the module to exist.
+        If any decorators are generated, remove the import from the AST.
+        """
+        transformed_any = False
+
+        for alias in node.names:
+            original_module_name = alias.name
+            # Scan the entire package for annotation types
+            try:
+                class_elements = self.callback_get_class_elements(original_module_name)
+            except Exception:
+                class_elements = None
+            if class_elements:
+                for class_element in class_elements:
+                    if self._is_annotation_class(class_element):
+                        import_name = class_element.getSimpleName()
+                        decorator_code = self._generate_decorator_from_class_element(class_element, import_name)
+                        if decorator_code:
+                            self.transformed_code.append(decorator_code)
+
+        return node
+
     def visit_Module(self, node: ast.Module) -> ast.Module:
         """
         Process the entire module and add generated decorators and java.type assignments at the beginning.
@@ -192,6 +222,10 @@ def micronaut_annotation(name, repeated=None):
             if isinstance(decorator.func, ast.Name):
                 return decorator.func.id
         elif isinstance(decorator, ast.Attribute):
+            # If attribute corresponds to a generated decorator (e.g. @a.Executable),
+            # return the attribute name to match generated decorator function name.
+            if hasattr(decorator, 'attr') and decorator.attr in self.generated_decorators:
+                return decorator.attr
             # Handle decorated decorators like @micronaut_annotation("...")
             if isinstance(decorator.value, ast.Name) and decorator.value.id in self.generated_decorators:
                 return decorator.value.id
@@ -324,6 +358,10 @@ def micronaut_annotation(name, repeated=None):
         decorator_name = import_name
         annotation_name = class_element.getName()
 
+        # skip inners for now
+        if "$" in annotation_name:
+            return None
+
         # Skip if already generated
         if decorator_name in self.generated_decorators:
             return None
@@ -376,7 +414,7 @@ def micronaut_annotation(name, repeated=None):
                     import_package = meta_package[3:]  # Remove 'io.' prefix
 
                 # Use absolute import path of the function
-                import_lines.append(f"from {import_package}.{meta_simple_name} import {meta_simple_name}")
+                import_lines.append(f"from {import_package} import {meta_simple_name}")
 
         # Remove duplicates
         import_lines = list(set(import_lines))

@@ -291,15 +291,26 @@ class MicronautAstVisitor(ast.NodeVisitor):
                             self.imported_types[alias.asname] = full_name
                         else:
                             self.imported_types[alias.name] = full_name
+
                 return super().visit(node)
             case ast.Import():
+
                 # Track imported modules/types for name resolution
                 for alias in node.names:
+                    mod_name = alias.name
+                    # Normalize Micronaut packages to io.micronaut.*
+                    if not mod_name.startswith('io.') and mod_name.startswith('micronaut.'):
+                        mod_name = f"io.{mod_name}"
                     if alias.asname:
-                        self.imported_types[alias.asname] = alias.name
+                        self.imported_types[alias.asname] = mod_name
                     else:
                         # For 'import module', the module name becomes available
-                        self.imported_types[alias.name] = alias.name
+                        self.imported_types[alias.name] = mod_name
+                    # Also expose the last segment of a dotted module for attribute-style usage:
+                    # e.g., `import micronaut.context.annotation` allows `annotation.Executable`
+                    if '.' in alias.name:
+                        last_seg = alias.name.split('.')[-1]
+                        self.imported_types[last_seg] = mod_name
                 return super().visit(node)
             case ast.Expr():
                 # Handle potential field docstrings - string literals that follow attribute assignments
@@ -559,6 +570,21 @@ class MicronautAstVisitor(ast.NodeVisitor):
 
         return args
 
+    def _resolve_dotted_name(self, parts):
+        """
+        Resolve a dotted name given as a list of parts, applying import alias mapping and
+        micronaut -> io.micronaut normalization.
+        """
+        if not parts:
+            return ""
+        root = parts[0]
+        tail = parts[1:]
+        base = self.imported_types.get(root, root)
+        full = ".".join([base] + tail) if tail else base
+        if full.startswith("micronaut."):
+            full = f"io.{full}"
+        return full
+
     def _extract_type_name(self, type_node):
         """
         Extract a type name from an AST type node.
@@ -608,7 +634,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
                 current = current.value
             if isinstance(current, ast.Name):
                 names.insert(0, current.id)
-            return '.'.join(names)
+            return self._resolve_dotted_name(names)
         elif isinstance(type_node, ast.Subscript):
             # Handle generic types like List[SomeClass] or Dict[str, SomeClass]
             base_name = self._extract_type_name(type_node.value)  # e.g., "List"
@@ -1146,12 +1172,54 @@ def decorator_to_function(visitor, node):
                 else:
                     # If not a known micronaut decorator, treat as direct annotation
                     return None
+        case ast.Attribute():
+            # Handle qualified decorator names like alias.Decorator used without parentheses
+            names = []
+            current = node
+            while isinstance(current, ast.Attribute):
+                names.insert(0, current.attr)
+                current = current.value
+            if isinstance(current, ast.Name):
+                names.insert(0, current.id)
+            simple_name = names[-1] if names else None
+            # Resolve through visitor alias mapping if available
+            resolved_name = '.'.join(names)
+            if visitor is not None and hasattr(visitor, '_resolve_dotted_name'):
+                resolved_name = visitor._resolve_dotted_name(names)
+            return DecoratorDef(simple_name or resolved_name, resolved_name, None, {}, [])
         # when a decorator takes argument values it is represented by ast.Call
         # here we parse out the constants to the call and set them as the named
         # values to the decorator
         case ast.Call():
-            decorator_name = node.func.id
-            decorator_declaration = visitor.known_decorators.get(decorator_name)
+            # Support both simple names and qualified attributes as decorator functions
+            # Determine decorator simple name and resolved annotation name
+            if isinstance(node.func, ast.Name):
+                decorator_name = node.func.id
+                decorator_declaration = visitor.known_decorators.get(decorator_name)
+                resolved_decorator_fqn = None
+                if visitor is not None:
+                    # Try imported types first, then java.type assignments
+                    resolved_decorator_fqn = visitor.imported_types.get(decorator_name) or visitor.java_type_assignments.get(decorator_name, decorator_name)
+            elif isinstance(node.func, ast.Attribute):
+                # Build qualified name parts for alias resolution
+                names = []
+                current = node.func
+                while isinstance(current, ast.Attribute):
+                    names.insert(0, current.attr)
+                    current = current.value
+                if isinstance(current, ast.Name):
+                    names.insert(0, current.id)
+                decorator_name = names[-1] if names else ''
+                decorator_declaration = visitor.known_decorators.get(decorator_name)
+                resolved_decorator_fqn = '.'.join(names)
+                if visitor is not None and hasattr(visitor, '_resolve_dotted_name'):
+                    resolved_decorator_fqn = visitor._resolve_dotted_name(names)
+            else:
+                # Unknown node.func form; fallback
+                decorator_name = getattr(getattr(node.func, 'id', None), '__str__', lambda: '')() or 'unknown'
+                decorator_declaration = visitor.known_decorators.get(decorator_name)
+                resolved_decorator_fqn = decorator_name
+
             if decorator_declaration is not None:
                 members = extract_call_arguments_with_defaults(decorator_declaration, node, visitor)
                 return DecoratorDef(
@@ -1162,34 +1230,31 @@ def decorator_to_function(visitor, node):
                     decorator_declaration.stereotypes()
                 )
             else:
-                # If not a known micronaut decorator, treat as direct annotation with arguments
+                # Direct annotation or Java annotation used as a decorator
                 members = extract_call_arguments_with_defaults(None, node, visitor)
-                # Resolve names in the members dict
+                # Resolve names in member values
                 resolved_members = {}
                 for key, value in members.items():
                     if isinstance(value, str):
-                        # Check imported types first
-                        imported_name = visitor.imported_types.get(value)
-                        if imported_name:
-                            resolved_members[key] = imported_name
-                        else:
-                            # Check if this is a Java type that was imported
+                        if visitor is not None:
+                            imported_name = visitor.imported_types.get(value)
+                            if imported_name:
+                                resolved_members[key] = imported_name
+                                continue
                             resolved_value = visitor.java_type_assignments.get(value, value)
                             resolved_members[key] = resolved_value
+                        else:
+                            resolved_members[key] = value
                     else:
                         resolved_members[key] = value
 
-                # Resolve the decorator name
-                resolved_decorator_name = decorator_name
-                if visitor is not None:
-                    imported_name = visitor.imported_types.get(decorator_name)
-                    if imported_name:
-                        resolved_decorator_name = imported_name
-                    else:
-                        resolved_name = visitor.java_type_assignments.get(decorator_name, decorator_name)
-                        resolved_decorator_name = resolved_name
+                # resolved_decorator_fqn may be None for simple names
+                if resolved_decorator_fqn is None:
+                    resolved_decorator_fqn = decorator_name
+                    if visitor is not None:
+                        resolved_decorator_fqn = visitor.imported_types.get(decorator_name) or visitor.java_type_assignments.get(decorator_name, decorator_name)
 
-                return DecoratorDef(decorator_name, resolved_decorator_name, None, resolved_members, [])
+                return DecoratorDef(decorator_name, resolved_decorator_fqn, None, resolved_members, [])
         case _:
             return None
 
@@ -1249,7 +1314,9 @@ def convert_ast_value(node, visitor=None):
             if base_name:
                 return f"{visitor.package_name}.{base_name}"
 
-        # Return as qualified name string
+        # Return as qualified name string, applying alias resolution when possible
+        if visitor is not None and hasattr(visitor, '_resolve_dotted_name'):
+            return visitor._resolve_dotted_name(names)
         return '.'.join(names)
 
     # Try to evaluate the value if it's a constant or simple expression
