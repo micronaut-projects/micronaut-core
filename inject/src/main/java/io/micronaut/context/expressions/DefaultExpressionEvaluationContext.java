@@ -50,7 +50,7 @@ public final class DefaultExpressionEvaluationContext implements ConfigurableExp
         this(null, null, null, null);
     }
 
-    public DefaultExpressionEvaluationContext(@Nullable Object thisObject, @Nullable Object[] args,
+    public DefaultExpressionEvaluationContext(@Nullable Object thisObject, Object @Nullable [] args,
                                               @Nullable BeanContext beanContext,
                                               @Nullable BeanDefinition<?> owningBean) {
         this.thisObject = thisObject;

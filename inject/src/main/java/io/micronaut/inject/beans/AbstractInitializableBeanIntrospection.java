@@ -184,7 +184,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
     @NonNull
     @Internal
     @UsedByGeneratedCode
-    protected B instantiateInternal(@Nullable Object[] arguments) {
+    protected B instantiateInternal(Object @Nullable [] arguments) {
         if (hasBuilder() && arguments != null) {
             Builder<B> b = builder();
             @NonNull Argument<?>[] args = b.getBuilderArguments();
@@ -197,7 +197,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
             if (buildMethodArguments.length == 0) {
                 return b.build();
             } else {
-                @Nullable Object[] buildParams = Arrays.copyOfRange(arguments, args.length, arguments.length);
+                Object @Nullable [] buildParams = Arrays.copyOfRange(arguments, args.length, arguments.length);
                 return b.build(buildParams);
             }
 
@@ -263,7 +263,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
      */
     @Nullable
     @UsedByGeneratedCode
-    protected <V> V dispatch(int index, @NonNull B target, @Nullable Object[] args) {
+    protected <V> V dispatch(int index, @NonNull B target, Object @Nullable [] args) {
         throw unknownDispatchAtIndexException(index);
     }
 

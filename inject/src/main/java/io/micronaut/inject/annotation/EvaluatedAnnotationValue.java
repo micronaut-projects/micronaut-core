@@ -90,7 +90,7 @@ public final class EvaluatedAnnotationValue<A extends Annotation> extends Annota
      * @param args arguments passed to method
      * @return copy of annotation metadata
      */
-    public EvaluatedAnnotationValue<A> withArguments(@Nullable Object thisObject, Object[] args) {
+    public EvaluatedAnnotationValue<A> withArguments(@Nullable Object thisObject, Object @Nullable [] args) {
         return new EvaluatedAnnotationValue<>(
             annotationValue,
             evaluationContext.withArguments(thisObject, args));

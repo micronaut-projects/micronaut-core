@@ -96,7 +96,7 @@ public interface ObjectSerializer {
      * @return An {@link Optional} of the object
      * @throws SerializationException if there is a serialization problem
      */
-    default <T> Optional<T> deserialize(@Nullable byte[] bytes, Class<T> requiredType) throws SerializationException {
+    default <T> Optional<T> deserialize(byte @Nullable [] bytes, Class<T> requiredType) throws SerializationException {
         if (bytes == null) {
             return Optional.empty();
         }
@@ -119,7 +119,7 @@ public interface ObjectSerializer {
      * @throws SerializationException if there is a serialization problem
      * @since 2.0
      */
-    default <T> Optional<T> deserialize(@Nullable byte[] bytes, Argument<T> requiredType) throws SerializationException {
+    default <T> Optional<T> deserialize(byte @Nullable [] bytes, Argument<T> requiredType) throws SerializationException {
         return deserialize(bytes, requiredType.getType());
     }
 
@@ -130,7 +130,7 @@ public interface ObjectSerializer {
      * @return An {@link Optional} of the object
      * @throws SerializationException if there is a serialization problem
      */
-    default Optional<Object> deserialize(@Nullable byte[] bytes) throws SerializationException {
+    default Optional<Object> deserialize(byte @Nullable [] bytes) throws SerializationException {
         if (bytes == null) {
             return Optional.empty();
         }

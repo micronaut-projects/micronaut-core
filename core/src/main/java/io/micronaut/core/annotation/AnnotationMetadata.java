@@ -1537,7 +1537,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param annotations The annotations
      * @return True if any of the given stereotypes are present
      */
-    default boolean hasStereotype(@Nullable String[] annotations) {
+    default boolean hasStereotype(String @Nullable [] annotations) {
         if (ArrayUtils.isEmpty(annotations)) {
             return false;
         }

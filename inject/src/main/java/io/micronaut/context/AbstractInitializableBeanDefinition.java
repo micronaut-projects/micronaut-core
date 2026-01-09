@@ -153,11 +153,11 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
             Class<T> beanType,
             @Nullable MethodOrFieldReference constructor,
             @Nullable AnnotationMetadata annotationMetadata,
-            @Nullable MethodReference[] methodInjection,
-            @Nullable FieldReference[] fieldInjection,
-            @Nullable AnnotationReference[] annotationInjection,
+            MethodReference @Nullable [] methodInjection,
+            FieldReference @Nullable [] fieldInjection,
+            AnnotationReference @Nullable [] annotationInjection,
             @Nullable ExecutableMethodsDefinition<T> executableMethodsDefinition,
-            @Nullable Map<String, Argument<?>[]> typeArgumentsMap,
+            Map<String, Argument<?> @Nullable []> typeArgumentsMap,
             @NonNull PrecalculatedInfo precalculatedInfo) {
         this.type = beanType;
         if (annotationMetadata == null || annotationMetadata == AnnotationMetadata.EMPTY_METADATA) {

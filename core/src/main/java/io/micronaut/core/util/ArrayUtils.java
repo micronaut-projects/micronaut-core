@@ -164,7 +164,7 @@ public final class ArrayUtils {
      * @param array The array
      * @return The string representation
      */
-    public static String toString(@Nullable Object[] array) {
+    public static String toString(Object @Nullable [] array) {
         String delimiter = ",";
         return toString(delimiter, array);
     }
@@ -176,7 +176,7 @@ public final class ArrayUtils {
      * @param array     The array
      * @return The string representation
      */
-    public static String toString(String delimiter, @Nullable Object[] array) {
+    public static String toString(String delimiter, Object @Nullable [] array) {
         if (isEmpty(array)) {
             return "";
         }

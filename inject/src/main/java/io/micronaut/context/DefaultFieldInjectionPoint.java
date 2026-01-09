@@ -66,7 +66,7 @@ class DefaultFieldInjectionPoint<B, T> implements FieldInjectionPoint<B, T>, Env
         Class<T> fieldType,
         String field,
         @Nullable AnnotationMetadata annotationMetadata,
-        @Nullable Argument[] typeArguments) {
+        Argument @Nullable [] typeArguments) {
 
         this.declaringBean = declaringBean;
         this.declaringType = declaringType;

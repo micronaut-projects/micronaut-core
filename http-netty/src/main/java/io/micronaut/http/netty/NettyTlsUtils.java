@@ -106,7 +106,7 @@ public final class NettyTlsUtils {
      * @return {@link KeyStore} containing only the selected alias
      */
     @NonNull
-    private static KeyStore extractKeystoreAlias(@NonNull KeyStore rootKeystore, @NonNull String alias, @Nullable char[] password) throws Exception {
+    private static KeyStore extractKeystoreAlias(@NonNull KeyStore rootKeystore, @NonNull String alias, char @Nullable [] password) throws Exception {
         if (!rootKeystore.containsAlias(alias)) {
             throw new IllegalArgumentException("Alias " + alias + " not found in keystore");
         }

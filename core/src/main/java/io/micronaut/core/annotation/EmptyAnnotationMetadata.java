@@ -535,7 +535,7 @@ final class EmptyAnnotationMetadata implements AnnotationMetadata {
     }
 
     @Override
-    public boolean hasStereotype(@Nullable String[] annotations) {
+    public boolean hasStereotype(String @Nullable [] annotations) {
         return false;
     }
 

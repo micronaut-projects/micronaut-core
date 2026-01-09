@@ -555,7 +555,7 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
      */
     @UsedByGeneratedCode
     @NonNull
-    static <T> Argument<T> of(@NonNull Class<T> type, @Nullable AnnotationMetadata annotationMetadata, @Nullable Class<?>[] typeParameters) {
+    static <T> Argument<T> of(@NonNull Class<T> type, @Nullable AnnotationMetadata annotationMetadata, Class<?> @Nullable [] typeParameters) {
         if (ArrayUtils.isEmpty(typeParameters)) {
             return of(type, annotationMetadata);
         }
