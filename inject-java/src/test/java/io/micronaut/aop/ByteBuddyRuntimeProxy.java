@@ -117,8 +117,7 @@ public class ByteBuddyRuntimeProxy implements RuntimeProxyCreator {
         }
 
         @RuntimeType
-        @Nullable
-        public Object intercept(@AllArguments Object[] args
+        public Object intercept(@AllArguments Object @Nullable [] args
         ) throws Exception {
             return new MethodInterceptorChain<>(interceptors, proxyTarget, executableMethod, args).proceed();
         }

@@ -123,7 +123,7 @@ public class ByteBodyFactory {
      * @param array The array
      * @return A {@link ByteBody} with the same content as the array
      */
-    public CloseableAvailableByteBody adapt(byte @NonNull @NonNull [] array) {
+    public CloseableAvailableByteBody adapt(byte @NonNull [] array) {
         return adapt(readBufferFactory().adapt(array));
     }
 

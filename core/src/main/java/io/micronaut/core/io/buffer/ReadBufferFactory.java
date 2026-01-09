@@ -138,7 +138,7 @@ public class ReadBufferFactory {
      * @param array A byte array
      * @return The adapted buffer
      */
-    public ReadBuffer adapt(byte @NonNull @NonNull [] array) {
+    public ReadBuffer adapt(byte @NonNull [] array) {
         return adapt(ByteBuffer.wrap(array));
     }
 

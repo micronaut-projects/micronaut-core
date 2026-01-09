@@ -114,16 +114,12 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     private final PrecalculatedInfo precalculatedInfo;
     @Nullable
     private final MethodOrFieldReference constructor;
-    @Nullable
-    private final MethodReference[] methodInjection;
-    @Nullable
-    private final FieldReference[] fieldInjection;
+    private final MethodReference @Nullable [] methodInjection;
+    private final FieldReference @Nullable [] fieldInjection;
     @Nullable
     private final ExecutableMethodsDefinition<T> executableMethodsDefinition;
-    @Nullable
-    private final Map<String, Argument<?>[]> typeArgumentsMap;
-    @Nullable
-    private AnnotationReference[] annotationInjection;
+    private final Map<String, Argument<?> @Nullable []> typeArgumentsMap;
+    private AnnotationReference @Nullable [] annotationInjection;
     @Nullable
     private Environment environment;
     @Nullable
@@ -140,8 +136,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     private List<MethodInjectionPoint<T, ?>> preDestroyMethods;
     @Nullable
     private Collection<Class<?>> requiredComponents;
-    @Nullable
-    private Argument<?>[] requiredParametrizedArguments;
+    private Argument<?> @Nullable [] requiredParametrizedArguments;
     @Nullable
     private Optional<Class<? extends Annotation>> scope;
 
@@ -318,8 +313,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         };
     }
 
-    @Nullable
-    protected int[] getIndexesOfExecutableMethodsForProcessing() {
+    protected int @Nullable [] getIndexesOfExecutableMethodsForProcessing() {
         return null; // Fallback to
     }
 

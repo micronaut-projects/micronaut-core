@@ -1518,8 +1518,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @return The string[] or null
      */
     @Internal
-    @Nullable
-    public static String[] resolveStringValues(@Nullable Object value, @Nullable Function<Object, Object> valueMapper) {
+    public static String @Nullable [] resolveStringValues(@Nullable Object value, @Nullable Function<Object, Object> valueMapper) {
         if (value == null) {
             return null;
         }
@@ -1612,8 +1611,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @return The class values or null
      */
     @Internal
-    @Nullable
-    public static Class<?>[] resolveClassValues(@Nullable Object value) {
+    public static Class<?> @Nullable [] resolveClassValues(@Nullable Object value) {
         // conditional branches ordered from most likely to least likely
         // generally at runtime values are always AnnotationClassValue
         // A class can be present at compilation time

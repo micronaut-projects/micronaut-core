@@ -573,14 +573,12 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         Argument<?>[] arguments,
         Argument<?>[] constructorArguments,
         int constructorLength,
-        @Nullable
-        UnsafeBeanProperty<Object, Object>[] writeableProperties,
+        UnsafeBeanProperty<Object, Object> @Nullable [] writeableProperties,
         @Nullable
         BeanIntrospection<Object> builder,
         @Nullable
         BeanMethod<Object, Object> creator,
-        @Nullable
-        BeanMethod<Object, Object>[] buildMethods,
+        BeanMethod<Object, Object> @Nullable [] buildMethods,
         StringIntMap argumentIndex,
         Object[] defaultValues,
         boolean[] required) {
@@ -629,14 +627,12 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         public IntrospectionBuilderData(
             Argument<?>[] arguments,
             int constructorLength,
-            @Nullable
-            UnsafeBeanProperty<Object, Object>[] writeableProperties,
+            UnsafeBeanProperty<Object, Object> @Nullable [] writeableProperties,
             @Nullable
             BeanIntrospection<Object> builder,
             @Nullable
             BeanMethod<Object, Object> creator,
-            @Nullable
-            BeanMethod<Object, Object>[] buildMethods,
+            BeanMethod<Object, Object> @Nullable [] buildMethods,
             StringIntMap argumentIndex,
             Object[] defaultValues,
             boolean[] required) {
@@ -1333,15 +1329,14 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         final String name;
         @Nullable
         final AnnotationMetadata annotationMetadata;
-        @Nullable
-        final Argument<?>[] arguments;
+        final Argument<?> @Nullable [] arguments;
 
         final int methodIndex;
 
         public BeanMethodRef(@NonNull Argument<P> returnType,
                              @NonNull String name,
                              @Nullable AnnotationMetadata annotationMetadata,
-                             @Nullable Argument<?>[] arguments,
+                             Argument<?> @Nullable [] arguments,
                              int methodIndex) {
             this.returnType = returnType;
             this.name = name;
