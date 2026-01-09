@@ -17,6 +17,7 @@ package io.micronaut.core.io.buffer;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.functional.ThrowingConsumer;
+import org.jspecify.annotations.Nullable;
 
 import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
@@ -176,6 +177,7 @@ public class ReadBufferFactory {
 
     private BufferingOutputStream outputStreamBuffer(int capacity) {
         return new BufferingOutputStream() {
+            @Nullable
             NoCopyByteArrayOutputStream out = new NoCopyByteArrayOutputStream(capacity);
 
             @Override

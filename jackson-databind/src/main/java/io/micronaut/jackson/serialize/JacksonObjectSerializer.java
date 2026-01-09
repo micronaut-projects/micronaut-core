@@ -21,6 +21,7 @@ import io.micronaut.core.serialize.exceptions.SerializationException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.jackson.JacksonConfiguration;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JavaType;
 import tools.jackson.databind.ObjectMapper;
@@ -49,7 +50,10 @@ public class JacksonObjectSerializer implements ObjectSerializer {
     }
 
     @Override
-    public Optional<byte[]> serialize(Object object) throws SerializationException {
+    public Optional<byte[]> serialize(@Nullable Object object) throws SerializationException {
+        if (object == null) {
+            return Optional.empty();
+        }
         try {
             return Optional.of(objectMapper.writeValueAsBytes(object));
         } catch (JacksonException e) {
@@ -58,7 +62,10 @@ public class JacksonObjectSerializer implements ObjectSerializer {
     }
 
     @Override
-    public void serialize(Object object, OutputStream outputStream) throws SerializationException {
+    public void serialize(@Nullable Object object, OutputStream outputStream) throws SerializationException {
+        if (object == null) {
+            return;
+        }
         try {
             objectMapper.writeValue(outputStream, object);
         } catch (JacksonException e) {
@@ -67,38 +74,50 @@ public class JacksonObjectSerializer implements ObjectSerializer {
     }
 
     @Override
-    public <T> Optional<T> deserialize(byte[] bytes, Class<T> requiredType) throws SerializationException {
+    public <T> Optional<T> deserialize(byte @Nullable[] bytes, Class<T> requiredType) throws SerializationException {
+        if (bytes == null) {
+            return Optional.empty();
+        }
         try {
-            return Optional.ofNullable(objectMapper.readValue(bytes, requiredType));
+            return Optional.of(objectMapper.readValue(bytes, requiredType));
         } catch (JacksonException e) {
             throw new SerializationException("Error deserializing object from JSON: " + e.getMessage(), e);
         }
     }
 
     @Override
-    public <T> Optional<T> deserialize(InputStream inputStream, Class<T> requiredType) throws SerializationException {
+    public <T> Optional<T> deserialize(@Nullable InputStream inputStream, Class<T> requiredType) throws SerializationException {
+        if (inputStream == null) {
+            return Optional.empty();
+        }
         try {
-            return Optional.ofNullable(objectMapper.readValue(inputStream, requiredType));
+            return Optional.of(objectMapper.readValue(inputStream, requiredType));
         } catch (JacksonException e) {
             throw new SerializationException("Error deserializing object from JSON: " + e.getMessage(), e);
         }
     }
 
     @Override
-    public <T> Optional<T> deserialize(byte[] bytes, Argument<T> requiredType) throws SerializationException {
+    public <T> Optional<T> deserialize(byte @Nullable[] bytes, Argument<T> requiredType) throws SerializationException {
+        if (bytes == null) {
+            return Optional.empty();
+        }
         try {
             JavaType javaType = JacksonConfiguration.constructType(requiredType, objectMapper.getTypeFactory());
-            return Optional.ofNullable(objectMapper.readValue(bytes, javaType));
+            return Optional.of(objectMapper.readValue(bytes, javaType));
         } catch (JacksonException e) {
             throw new SerializationException("Error deserializing object from JSON: " + e.getMessage(), e);
         }
     }
 
     @Override
-    public <T> Optional<T> deserialize(InputStream inputStream, Argument<T> requiredType) throws SerializationException {
+    public <T> Optional<T> deserialize(@Nullable InputStream inputStream, Argument<T> requiredType) throws SerializationException {
+        if (inputStream == null) {
+            return Optional.empty();
+        }
         try {
             JavaType javaType = JacksonConfiguration.constructType(requiredType, objectMapper.getTypeFactory());
-            return Optional.ofNullable(objectMapper.readValue(inputStream, javaType));
+            return Optional.of(objectMapper.readValue(inputStream, javaType));
         } catch (JacksonException e) {
             throw new SerializationException("Error deserializing object from JSON: " + e.getMessage(), e);
         }

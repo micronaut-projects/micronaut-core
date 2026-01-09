@@ -25,5 +25,5 @@ public interface Named {
     /**
      * @return The name of the component
      */
- String getName();
+    String getName();
 }

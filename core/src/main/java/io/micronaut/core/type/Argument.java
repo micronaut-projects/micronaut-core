@@ -124,7 +124,7 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
     Argument<Void> VOID_OBJECT = Argument.of(Void.class);
 
     /**
-     * @return The name of the argument
+     * @return The name of argument
      */
     @Override
     String getName();
@@ -196,7 +196,7 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
         Argument[] candidateArgumentTypeParameters = candidateArgument.getTypeParameters();
         if (typeParameters.length == 0) {
             // Wildcard or no type parameters
-            return candidateArgumentTypeParameters.length >= 0;
+            return true;
         }
         if (candidateArgumentTypeParameters.length == 0) {
             for (Argument typeParameter : typeParameters) {
@@ -288,10 +288,9 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
      * @return The argument instance
      */
     @UsedByGeneratedCode
-    static <T> Argument<T> of(
- Class<T> type,
-            @Nullable String name,
-            @Nullable Argument<?>... typeParameters) {
+    static <T> Argument<T> of(Class<T> type,
+                              @Nullable String name,
+                              @Nullable Argument<?>... typeParameters) {
         return new DefaultArgument<>(type, name, AnnotationMetadata.EMPTY_METADATA, typeParameters);
     }
 
@@ -329,11 +328,11 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
      */
     @UsedByGeneratedCode
     static <T> Argument<T> ofTypeVariable(
- Class<T> type,
-            @Nullable String argumentName,
- String variableName,
-            @Nullable AnnotationMetadata annotationMetadata,
-            @Nullable Argument<?>... typeParameters) {
+        Class<T> type,
+        @Nullable String argumentName,
+        String variableName,
+        @Nullable AnnotationMetadata annotationMetadata,
+        @Nullable Argument<?>... typeParameters) {
         Objects.requireNonNull(variableName, "Variable name cannot be null");
         return new DefaultGenericPlaceholder<>(
                 type,

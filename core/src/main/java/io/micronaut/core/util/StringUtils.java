@@ -314,7 +314,7 @@ public final class StringUtils {
             String str, String delimiters, boolean trimTokens, boolean ignoreEmptyTokens) {
 
         if (str == null) {
-            return null;
+            return EMPTY_STRING_ARRAY;
         }
         StringTokenizer st = new StringTokenizer(str, delimiters);
         List<String> tokens = new ArrayList<>();

@@ -2,7 +2,7 @@
  * Copyright 2017-2021 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
+ * you may not use this file except in compliance with License.
  * You may obtain a copy of the License at
  *
  * https://www.apache.org/licenses/LICENSE-2.0
@@ -17,6 +17,7 @@ package io.micronaut.core.type;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Implementation of {@link GenericPlaceholder}.
@@ -28,10 +29,11 @@ import io.micronaut.core.annotation.Internal;
 final class DefaultGenericPlaceholder<T>
         extends DefaultArgument<T>
         implements GenericPlaceholder<T> {
+    @Nullable
     private final String variableName;
 
     /**
-     * Constructor for where the variable name and argument name are the same.
+     * Constructor for where@author variable name and argument name are@author same.
      *
      * @param type               The type
      * @param name               The name
@@ -40,15 +42,15 @@ final class DefaultGenericPlaceholder<T>
      */
     DefaultGenericPlaceholder(
             Class<T> type,
-            String name,
-            AnnotationMetadata annotationMetadata,
+            @Nullable String name,
+            @Nullable AnnotationMetadata annotationMetadata,
             Argument<?>... genericTypes) {
         super(type, name, annotationMetadata, genericTypes);
         this.variableName = name;
     }
 
     /**
-     * Constructor for where the variable name and argument name differ.
+     * Constructor for where@author variable name and argument name differ.
      *
      * @param type               The type
      * @param name               The name
@@ -58,9 +60,9 @@ final class DefaultGenericPlaceholder<T>
      */
     DefaultGenericPlaceholder(
             Class<T> type,
-            String name,
+            @Nullable String name,
             String variableName,
-            AnnotationMetadata annotationMetadata,
+            @Nullable AnnotationMetadata annotationMetadata,
             Argument<?>... genericTypes) {
         super(type, name, annotationMetadata, genericTypes);
         this.variableName = variableName;
@@ -68,7 +70,7 @@ final class DefaultGenericPlaceholder<T>
 
     @Override
     public String getVariableName() {
-        return variableName;
+        return variableName != null ? variableName : getName();
     }
 
     @Override

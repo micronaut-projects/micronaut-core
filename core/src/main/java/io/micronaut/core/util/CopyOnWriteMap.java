@@ -56,7 +56,7 @@ public final class CopyOnWriteMap<K, V> extends AbstractMap<K, V> implements Con
     private final int maxSizeWithEvictionMargin;
 
     @SuppressWarnings("unused")
-    private Map<? extends K, ? extends V> actualField;
+    private Map<? extends K, ? extends V> actualField = EMPTY;
 
     static {
         try {
@@ -108,7 +108,7 @@ public final class CopyOnWriteMap<K, V> extends AbstractMap<K, V> implements Con
     }
 
     @Override
-    public V get(Object key) {
+    public @org.jspecify.annotations.Nullable V get(Object key) {
         return actual().get(key);
     }
 
@@ -300,7 +300,7 @@ public final class CopyOnWriteMap<K, V> extends AbstractMap<K, V> implements Con
 
     private final class EntrySetIterator implements Iterator<Entry<K, V>> {
         final Iterator<? extends Entry<? extends K, ? extends V>> itr = actual().entrySet().iterator();
-        K lastKey;
+        @org.jspecify.annotations.Nullable K lastKey;
 
         @Override
         public boolean hasNext() {
@@ -316,7 +316,9 @@ public final class CopyOnWriteMap<K, V> extends AbstractMap<K, V> implements Con
 
         @Override
         public void remove() {
-            CopyOnWriteMap.this.remove(lastKey);
+            if (lastKey != null) {
+                CopyOnWriteMap.this.remove(lastKey);
+            }
         }
     }
 

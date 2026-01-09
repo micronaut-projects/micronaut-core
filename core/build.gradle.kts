@@ -3,6 +3,7 @@ import me.champeau.gradle.japicmp.JapicmpTask
 
 plugins {
     id("io.micronaut.build.internal.convention-core-library")
+    id("io.micronaut.build.internal.convention-nullaway")
 }
 
 micronautBuild {

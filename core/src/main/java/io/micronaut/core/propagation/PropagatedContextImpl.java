@@ -16,6 +16,8 @@
 package io.micronaut.core.propagation;
 
 import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -157,6 +159,7 @@ final class PropagatedContextImpl implements PropagatedContext {
         return element;
     }
 
+    @Nullable
     private <T extends PropagatedContextElement> T findElement(Class<T> elementType) {
         for (int i = elements.length - 1; i >= 0; i--) {
             PropagatedContextElement element = elements[i];
@@ -196,7 +199,7 @@ final class PropagatedContextImpl implements PropagatedContext {
         PropagatedContextImpl ctx = this;
         ThreadContext.set(ctx);
         if (containsThreadElements) {
-            ThreadState[] threadState = ctx.updateThreadState();
+            @Nullable ThreadState[] threadState = ctx.updateThreadState();
             return new Scope() { // Keep the anonymous class to avoid lambda in hot path
                 @Override
                 public void close() {
@@ -212,7 +215,7 @@ final class PropagatedContextImpl implements PropagatedContext {
         return restore;
     }
 
-    private ThreadState[] updateThreadState() {
+    private @Nullable ThreadState[] updateThreadState() {
         ThreadState[] threadState = new ThreadState[elements.length];
         int index = 0;
         for (PropagatedContextElement element : elements) {
@@ -225,7 +228,7 @@ final class PropagatedContextImpl implements PropagatedContext {
         return threadState;
     }
 
-    private void restoreState(ThreadState[] threadState) {
+    private void restoreState(@Nullable ThreadState[] threadState) {
         for (int i = threadState.length - 1; i >= 0; i--) {
             ThreadState s = threadState[i];
             if (s != null) {
@@ -234,7 +237,7 @@ final class PropagatedContextImpl implements PropagatedContext {
         }
     }
 
-    private record ThreadState(ThreadPropagatedContextElement<Object> element, Object state) {
+    private record ThreadState(ThreadPropagatedContextElement<Object> element, @Nullable Object state) {
 
         void restore() {
             element.restoreThreadContext(state);

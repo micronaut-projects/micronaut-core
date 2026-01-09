@@ -42,7 +42,7 @@ final class ImperativeExecutionFlowImpl implements ImperativeExecutionFlow<Objec
     @Nullable
     private Map<String, Object> context;
 
-    <T> ImperativeExecutionFlowImpl(T value, Throwable error) {
+    <T> ImperativeExecutionFlowImpl(@Nullable T value, @Nullable Throwable error) {
         this.value = value;
         this.error = error;
     }

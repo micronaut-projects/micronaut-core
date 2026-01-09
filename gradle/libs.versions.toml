@@ -68,6 +68,10 @@ icu4j = "76.1"
 jfrunit = "1.0.0.Alpha2"
 junit4 = "4.13.2"
 zacsweers-kotlin-compile-testing = "0.12.1"
+errorprone-gradle-plugin = "4.3.0"
+nullaway = "0.12.15"
+error_prone_core = "2.45.0"
+
 #
 # Versions which start with managed- are managed by Micronaut in the sense
 # that they will appear in the Micronaut BOM as <properties>
@@ -319,6 +323,12 @@ ksp-aaEmbeddable = { module = "com.google.devtools.ksp:symbol-processing-aa-embe
 jfrunit-core = { module = "org.moditect.jfrunit:jfrunit-core", version.ref = "jfrunit" }
 
 zacsweers-kct-ksp = { module = "dev.zacsweers.kctfork:ksp", version.ref = "zacsweers-kotlin-compile-testing" }
+
+nullaway = { module = "com.uber.nullaway:nullaway", version.ref = "nullaway" }
+error-prone-core = { module = "com.google.errorprone:error_prone_core", version.ref = "error_prone_core" }
+
+gradle-errorprone = { module = "net.ltgt.errorprone:net.ltgt.errorprone.gradle.plugin", version.ref = "errorprone-gradle-plugin"}
+gradle-nullaway = { module = "net.ltgt.errorprone:net.ltgt.errorprone.gradle.plugin", version.ref = "errorprone-gradle-plugin"}
 
 [plugins]
 managed-kotlin-allopen = { id = "org.jetbrains.kotlin.plugin.allopen", version.ref = "managed-kotlin" }

@@ -14,5 +14,6 @@ dependencies {
     implementation libs.tomlj
     implementation libs.japicmp.gradle.plugin
     implementation libs.native.gradle.plugin
-    implementation(libs.sonatype.scan)
+    implementation libs.sonatype.scan
+    implementation libs.gradle.errorprone
 }

@@ -14,6 +14,9 @@
  * limitations under the License.
  */
 package io.micronaut.core.type;
+
+import java.util.Objects;
+
 /**
  * Extends {@link Argument} to allow differentiating the
  * variable name from the argument name in cases where this is
@@ -28,7 +31,7 @@ public interface GenericPlaceholder<T> extends Argument<T> {
      * @return The variable name, never {@code null}.
      */
     default String getVariableName() {
-        return getName();
+        return Objects.requireNonNull(getName(), "Argument name cannot be null");
     }
 
     @Override

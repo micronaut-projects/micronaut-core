@@ -16,6 +16,8 @@
 package io.micronaut.core.util;
 
 import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.Nullable;
+
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -33,11 +35,12 @@ import java.util.function.Function;
 @Internal
 public final class EnvironmentProperties {
     private static final char[] DOT_DASH = new char[] {'.', '-'};
+    @Nullable
     private final EnvironmentProperties delegate;
 
     private final Map<String, List<String>> cache = new HashMap<>();
 
-    private EnvironmentProperties(EnvironmentProperties delegate) {
+    private EnvironmentProperties(@Nullable EnvironmentProperties delegate) {
         this.delegate = delegate;
     }
 

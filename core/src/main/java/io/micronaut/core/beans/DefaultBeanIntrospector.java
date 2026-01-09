@@ -15,6 +15,13 @@
  */
 package io.micronaut.core.beans;
 
+import io.micronaut.core.beans.exceptions.IntrospectionException;
+import io.micronaut.core.io.service.SoftServiceLoader;
+import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.core.util.ArgumentUtils;
+import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -24,11 +31,6 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
-import io.micronaut.core.beans.exceptions.IntrospectionException;
-import io.micronaut.core.io.service.SoftServiceLoader;
-import io.micronaut.core.reflect.ClassUtils;
-import io.micronaut.core.util.ArgumentUtils;
-import org.slf4j.Logger;
 
 /**
  * Default implementation of the {@link BeanIntrospector} interface that uses service loader to discovery introspections.
@@ -42,6 +44,7 @@ class DefaultBeanIntrospector implements BeanIntrospector {
 
     private static final Logger LOG = ClassUtils.getLogger(DefaultBeanIntrospector.class);
 
+    @Nullable
     private Map<String, BeanIntrospectionReference<Object>> introspectionMap;
     private final ClassLoader classLoader;
 

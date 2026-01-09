@@ -15,6 +15,8 @@
  */
 package io.micronaut.core.cli;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -54,12 +56,13 @@ public interface CommandLine {
      * @param name The option
      * @return The value
      */
+    @Nullable
     Object optionValue(String name);
 
     /**
      * @return The last specified option
      */
-    Map.Entry<String, Object> lastOption();
+    Map. @Nullable Entry<String, Object> lastOption();
 
     /**
      * @return The remaining args as one big string

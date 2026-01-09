@@ -141,7 +141,12 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      */
     @UsedByGeneratedCode
     @Internal
-    public AnnotationValue(String annotationName, Map<CharSequence, Object> values, Map<CharSequence, Object> defaultValues, RetentionPolicy retentionPolicy) {
+    public AnnotationValue(String annotationName,
+                           Map<CharSequence, Object> values,
+                           @Nullable
+                           Map<CharSequence, Object> defaultValues,
+                           @Nullable
+                           RetentionPolicy retentionPolicy) {
         this(annotationName, values, defaultValues, retentionPolicy, null);
     }
 
@@ -155,8 +160,11 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     @Internal
     public AnnotationValue(String annotationName,
                            Map<CharSequence, Object> values,
+                           @Nullable
                            Map<CharSequence, Object> defaultValues,
+                           @Nullable
                            RetentionPolicy retentionPolicy,
+                           @Nullable
                            List<AnnotationValue<?>> stereotypes) {
         this(annotationName, values, defaultValues, retentionPolicy, stereotypes, null);
     }
@@ -172,9 +180,13 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     @Internal
     public AnnotationValue(String annotationName,
                            Map<CharSequence, Object> values,
+                           @Nullable
                            Map<CharSequence, Object> defaultValues,
+                           @Nullable
                            RetentionPolicy retentionPolicy,
+                           @Nullable
                            List<AnnotationValue<?>> stereotypes,
+                           @Nullable
                            AnnotationDefaultValuesProvider defaultValuesProvider) {
         this.annotationName = annotationName;
         this.convertibleValues = newConvertibleValues(values);
@@ -352,7 +364,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @param <E>         The enum type
      * @return An {@link Optional} of the enum value
      */
-    public <E extends Enum> Optional<E> enumValue(String member, Class<E> enumType, Function<Object, Object> valueMapper) {
+    public <E extends Enum> Optional<E> enumValue(String member, Class<E> enumType, @Nullable Function<Object, Object> valueMapper) {
         ArgumentUtils.requireNonNull("enumType", enumType);
         if (StringUtils.isEmpty(member)) {
             return Optional.empty();
@@ -666,7 +678,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @param valueMapper The mapper
      * @return The string values
      */
-    public String[] stringValues(String member, Function<Object, Object> valueMapper) {
+    public String[] stringValues(String member, @Nullable Function<Object, Object> valueMapper) {
         if (StringUtils.isEmpty(member)) {
             return StringUtils.EMPTY_STRING_ARRAY;
         }
@@ -1427,7 +1439,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
             Object value = member.getValue();
             Object otherValue = otherValues.get(member.getKey());
 
-            if (!AnnotationUtil.areEqual(value, otherValue)) {
+            if (otherValue != null && !AnnotationUtil.areEqual(value, otherValue)) {
                 return false;
             }
         }
@@ -1520,22 +1532,18 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         if (value instanceof CharSequence) {
             return new String[]{value.toString()};
         }
-        if (value != null) {
-            if (value.getClass().isArray()) {
-                int len = Array.getLength(value);
-                String[] newArray = new String[len];
-                for (int i = 0; i < newArray.length; i++) {
-                    Object entry = Array.get(value, i);
-                    if (entry != null) {
-                        newArray[i] = entry.toString();
-                    }
+        if (value.getClass().isArray()) {
+            int len = Array.getLength(value);
+            String[] newArray = new String[len];
+            for (int i = 0; i < newArray.length; i++) {
+                Object entry = Array.get(value, i);
+                if (entry != null) {
+                    newArray[i] = entry.toString();
                 }
-                return newArray;
-            } else {
-                return new String[]{value.toString()};
             }
+            return newArray;
         }
-        return null;
+        return new String[]{value.toString()};
     }
 
     /**
@@ -1668,7 +1676,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     }
 
     @Nullable
-    private Object getRawSingleValue(String member, Function<Object, Object> valueMapper) {
+    private Object getRawSingleValue(String member, @Nullable Function<Object, Object> valueMapper) {
         Object rawValue = values.get(member);
         if (rawValue != null) {
             if (rawValue.getClass().isArray()) {

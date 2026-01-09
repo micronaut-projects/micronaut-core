@@ -109,8 +109,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param stereotype The annotation names
      * @return A set of annotation names
      */
-    default
-    List<String> getAnnotationNamesByStereotype(@Nullable String stereotype) {
+    default List<String> getAnnotationNamesByStereotype(@Nullable String stereotype) {
         return Collections.emptyList();
     }
 

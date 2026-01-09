@@ -504,7 +504,7 @@ final class EmptyAnnotationMetadata implements AnnotationMetadata {
     }
 
     @Override
-    public boolean hasStereotype(@Nullable Class<? extends Annotation>... annotations) {
+    public boolean hasStereotype(Class<? extends Annotation> @Nullable ... annotations) {
         return false;
     }
 
@@ -524,7 +524,7 @@ final class EmptyAnnotationMetadata implements AnnotationMetadata {
     }
 
     @Override
-    public boolean hasDeclaredStereotype(@Nullable Class<? extends Annotation>... annotations) {
+    public boolean hasDeclaredStereotype(Class<? extends Annotation> @Nullable ... annotations) {
         return false;
     }
 

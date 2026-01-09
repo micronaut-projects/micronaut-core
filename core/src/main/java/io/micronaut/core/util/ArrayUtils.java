@@ -15,9 +15,10 @@
  */
 package io.micronaut.core.util;
 
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.reflect.ReflectionUtils;
+import org.jetbrains.annotations.Contract;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.reflect.Array;
 import java.util.Arrays;
@@ -145,6 +146,7 @@ public final class ArrayUtils {
      * @param array The array
      * @return True if it is
      */
+    @Contract("null -> true")
     public static boolean isEmpty(@Nullable Object @Nullable[] array) {
         return array == null || array.length == 0;
     }
@@ -155,6 +157,7 @@ public final class ArrayUtils {
      * @param array The array
      * @return True if it is
      */
+    @Contract("null -> false")
     public static boolean isNotEmpty(@Nullable Object @Nullable[] array) {
         return !isEmpty(array);
     }

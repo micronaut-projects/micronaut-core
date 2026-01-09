@@ -39,6 +39,7 @@ public interface UnsafeBeanProperty<B, T> extends UnsafeBeanWriteProperty<B, T>,
      * @return The value
      */
     @Override
+    @Nullable
     T getUnsafe(B bean);
 
     /**

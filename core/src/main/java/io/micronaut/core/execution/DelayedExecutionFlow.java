@@ -90,10 +90,13 @@ public sealed interface DelayedExecutionFlow<T> extends ExecutionFlow<T> permits
      * @param throwable The exception
      * @since 4.7.0
      */
-    default void complete(T value, Throwable throwable) {
+    default void complete(@Nullable T value, @Nullable Throwable throwable) {
         if (throwable != null) {
             if (throwable instanceof CompletionException completionException) {
-                throwable = completionException.getCause();
+                Throwable cause = completionException.getCause();
+                if (cause != null) {
+                    throwable = cause;
+                }
             }
             completeExceptionally(throwable);
         } else {

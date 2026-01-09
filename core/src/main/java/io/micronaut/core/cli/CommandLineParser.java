@@ -18,6 +18,7 @@ package io.micronaut.core.cli;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.cli.exceptions.ParseException;
 import io.micronaut.core.util.StringUtils;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -41,9 +42,9 @@ class CommandLineParser implements CommandLine.Builder<CommandLineParser> {
 
     private static final String DEFAULT_PADDING = "        ";
 
-    private Map<String, Option> declaredOptions = new HashMap<>();
+    private final Map<String, Option> declaredOptions = new HashMap<>();
     private int longestOptionNameLength = 0;
-    private String usageMessage;
+    private @Nullable String usageMessage;
 
     /**
      * Adds a declared option.
@@ -90,7 +91,7 @@ class CommandLineParser implements CommandLine.Builder<CommandLineParser> {
      * @return message
      */
     public String getOptionsHelpMessage() {
-        String ls = System.getProperty("line.separator");
+        String ls = System.lineSeparator();
         usageMessage = "Available options:";
         StringBuilder sb = new StringBuilder(usageMessage);
         sb.append(ls);
@@ -152,6 +153,7 @@ class CommandLineParser implements CommandLine.Builder<CommandLineParser> {
      * @param arg arg
      * @return argument processed
      */
+    @Nullable
     protected String processOption(DefaultCommandLine cl, String arg) {
         if (arg.length() < 2) {
             return null;
@@ -162,7 +164,7 @@ class CommandLineParser implements CommandLine.Builder<CommandLineParser> {
             return null;
         }
 
-        arg = (arg.charAt(1) == '-' ? arg.substring(2, arg.length()) : arg.substring(1, arg.length())).trim();
+        arg = (arg.charAt(1) == '-' ? arg.substring(2) : arg.substring(1)).trim();
 
         if (arg.contains("=")) {
             String[] split = arg.split("=", 2);
@@ -194,7 +196,7 @@ class CommandLineParser implements CommandLine.Builder<CommandLineParser> {
     protected void processSystemArg(DefaultCommandLine cl, String arg) {
         int i = arg.indexOf('=');
         String name = arg.substring(2, i);
-        String value = arg.substring(i + 1, arg.length());
+        String value = arg.substring(i + 1);
         cl.addSystemProperty(name, value);
     }
 

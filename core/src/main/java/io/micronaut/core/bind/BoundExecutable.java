@@ -18,6 +18,7 @@ package io.micronaut.core.bind;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Executable;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.List;
@@ -45,6 +46,7 @@ public interface BoundExecutable<T, R> extends Executable<T, R> {
      * @param instance The target instance
      * @return The result
      */
+    @Nullable
     R invoke(T instance);
 
     /**
@@ -52,7 +54,7 @@ public interface BoundExecutable<T, R> extends Executable<T, R> {
      *
      * @return The arguments
      */
-    Object[] getBoundArguments();
+    @Nullable Object[] getBoundArguments();
 
     @Override
     default Class<T> getDeclaringType() {
@@ -69,12 +71,13 @@ public interface BoundExecutable<T, R> extends Executable<T, R> {
     }
 
     @Override
-    default R invoke(T instance, Object... arguments) {
+    @Nullable
+    default R invoke(T instance, @Nullable Object... arguments) {
         return getTarget().invoke(instance, arguments);
     }
 
     @Override
-    default Argument[] getArguments() {
+    default Argument<?>[] getArguments() {
         return getTarget().getArguments();
     }
 
