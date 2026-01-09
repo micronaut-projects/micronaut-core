@@ -183,7 +183,7 @@ public final class FileCertificateProvider implements CertificateProvider {
         return load(config, mainBytes, certBytes);
     }
 
-    static KeyStore load(AbstractCertificateFileConfig config, byte @NonNull [] mainBytes, byte[] certBytes) throws GeneralSecurityException, PemParser.NotPemException, IOException {
+    static @NonNull KeyStore load(AbstractCertificateFileConfig config, byte[] mainBytes, byte[] certBytes) throws GeneralSecurityException, PemParser.NotPemException, IOException {
         KeyStore ks;
         if (config.format == null) {
             try {

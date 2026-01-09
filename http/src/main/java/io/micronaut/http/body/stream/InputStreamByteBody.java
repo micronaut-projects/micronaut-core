@@ -137,7 +137,7 @@ public final class InputStreamByteBody extends InternalByteBody implements Close
     }
 
     @Override
-    public Flux<byte @NonNull []> toByteArrayPublisher() {
+    public @NonNull Flux<byte[]> toByteArrayPublisher() {
         ExtendedInputStream s = toInputStream();
         Sinks.Many<byte[]> sink = Sinks.many().unicast().onBackpressureBuffer();
         return sink.asFlux()

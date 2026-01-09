@@ -263,7 +263,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
      */
     @Nullable
     @UsedByGeneratedCode
-    protected <V> V dispatch(int index, B target, Object @Nullable @NonNull [] args) {
+    protected <V> V dispatch(int index, @NonNull B target, Object @NonNull [] args) {
         throw unknownDispatchAtIndexException(index);
     }
 

@@ -276,7 +276,7 @@ public final class ApplicationEventPublisherFactory<T>
         };
     }
 
-    private void notifyEventListeners(Object event, ApplicationEventListener @NonNull [] eventListeners) {
+    private void notifyEventListeners(@NonNull Object event, ApplicationEventListener @NonNull [] eventListeners) {
         if (eventListeners.length == 0) {
             return;
         }

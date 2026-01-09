@@ -73,7 +73,7 @@ public abstract class InternalByteBody implements ByteBody {
     }
 
     @Override
-    public Publisher<byte @NonNull []> toByteArrayPublisher() {
+    public @NonNull Publisher<byte[]> toByteArrayPublisher() {
         return Flux.from(toReadBufferPublisher())
             .doOnDiscard(ReadBuffer.class, ReadBuffer::close)
             .map(ReadBuffer::toArray);

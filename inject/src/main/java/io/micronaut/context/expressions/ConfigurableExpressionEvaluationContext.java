@@ -37,7 +37,8 @@ public sealed interface ConfigurableExpressionEvaluationContext extends Expressi
      * @param args method arguments
      * @return evaluation context which arguments can be used in evaluation.
      */
-    default ConfigurableExpressionEvaluationContext withArguments(Object @Nullable @NonNull [] args) {
+    @NonNull
+    default ConfigurableExpressionEvaluationContext withArguments(Object @Nullable [] args) {
         return withArguments(null, args);
     }
 
@@ -48,7 +49,8 @@ public sealed interface ConfigurableExpressionEvaluationContext extends Expressi
      * @param args method arguments
      * @return evaluation context which arguments can be used in evaluation.
      */
-    ConfigurableExpressionEvaluationContext withArguments(@Nullable Object thisObject, Object @Nullable @NonNull [] args);
+    @NonNull
+    ConfigurableExpressionEvaluationContext withArguments(@Nullable Object thisObject, Object @Nullable [] args);
 
     /**
      * Set bean owning evaluated expression.

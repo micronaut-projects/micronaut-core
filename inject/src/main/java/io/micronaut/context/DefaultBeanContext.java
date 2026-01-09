@@ -1054,7 +1054,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
     }
 
-    private <T> Map<String, Object> resolveArgumentValues(BeanResolutionContext resolutionContext, BeanDefinition<T> definition, Object @NonNull [] args) {
+    @NonNull
+    private <T> Map<String, Object> resolveArgumentValues(BeanResolutionContext resolutionContext, BeanDefinition<T> definition, Object[] args) {
         Argument[] requiredArguments;
         if (definition instanceof ParametrizedInstantiatableBeanDefinition<T> parametrizedInstantiatableBeanDefinition) {
             requiredArguments = parametrizedInstantiatableBeanDefinition.getRequiredArguments();
@@ -1506,7 +1507,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
     @NonNull
     @Override
-    public <T, R> Optional<ExecutableMethod<T, R>> findProxyTargetMethod(Class<T> beanType, @NonNull String method, @NonNull Class<?> @NonNull [] arguments) {
+    public <T, R> Optional<ExecutableMethod<T, R>> findProxyTargetMethod(@NonNull Class<T> beanType, @NonNull String method, @NonNull Class<?>[] arguments) {
         ArgumentUtils.requireNonNull("beanType", beanType);
         ArgumentUtils.requireNonNull("method", method);
         BeanDefinition<T> definition = getProxyTargetBeanDefinition(beanType, null);
@@ -2217,7 +2218,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
     @NonNull
     private <T> Map<String, Object> getRequiredArgumentValues(@NonNull BeanResolutionContext resolutionContext,
-                                                              Argument<?> @NonNull [] requiredArguments,
+                                                              @NonNull Argument<?>[] requiredArguments,
                                                               @Nullable Map<String, Object> argumentValues,
                                                               @NonNull BeanDefinition<T> beanDefinition) {
         Map<String, Object> convertedValues;

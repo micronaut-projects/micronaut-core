@@ -198,7 +198,7 @@ public interface JsonMapper {
      */
     @NonNull
     @Deprecated
-    default Processor<byte[], JsonNode> createReactiveParser(Consumer<Processor<byte @NonNull [], JsonNode>> onSubscribe, boolean streamArray) {
+    default Processor<byte[], JsonNode> createReactiveParser(@NonNull Consumer<Processor<byte[], JsonNode>> onSubscribe, boolean streamArray) {
         throw new UnsupportedOperationException("Reactive parser not supported");
     }
 

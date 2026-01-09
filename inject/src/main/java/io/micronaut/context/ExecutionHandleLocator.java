@@ -262,7 +262,8 @@ public interface ExecutionHandleLocator {
         throw new UnsupportedOperationException("No such method [" + method + "(" + Arrays.stream(method.getArgumentTypes()).map(Class::getName).collect(Collectors.joining(",")) + ") ] for bean [" + beanDefinition.getBeanType() + "]");
     }
 
-    private static NoSuchMethodException newNoSuchMethodException(@NonNull String bean, @NonNull String method, @NonNull Class<?> @NonNull [] arguments) {
+    @NonNull
+    private static NoSuchMethodException newNoSuchMethodException(@NonNull String bean, @NonNull String method, @NonNull Class<?>[] arguments) {
         return new NoSuchMethodException("No such method [" + method + "(" + Arrays.stream(arguments).map(Class::getName).collect(Collectors.joining(",")) + ")] for bean [" + bean + "]");
     }
 }

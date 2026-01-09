@@ -35,7 +35,7 @@ public interface BeanConstructorElement extends ConstructorElement {
      * @param parameterConsumer The parameter consumer
      * @return This bean method
      */
-    default BeanConstructorElement withParameters(@NonNull Consumer<BeanParameterElement @NonNull []> parameterConsumer) {
+    default @NonNull BeanConstructorElement withParameters(@NonNull Consumer<BeanParameterElement[]> parameterConsumer) {
         Objects.requireNonNull(parameterConsumer, "The parameter consumer cannot be null");
         parameterConsumer.accept(getParameters());
         return this;

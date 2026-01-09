@@ -313,7 +313,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         };
     }
 
-    protected int @Nullable [] getIndexesOfExecutableMethodsForProcessing() {
+    protected int [] getIndexesOfExecutableMethodsForProcessing() {
         return null; // Fallback to
     }
 

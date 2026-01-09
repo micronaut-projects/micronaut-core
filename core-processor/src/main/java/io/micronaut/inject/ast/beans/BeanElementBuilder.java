@@ -190,7 +190,8 @@ public interface BeanElementBuilder extends ConfigurableElement {
      * @param parameters The parameters
      * @return This builder
      */
-    BeanElementBuilder withParameters(Consumer<BeanParameterElement @NonNull []> parameters);
+    @NonNull
+    BeanElementBuilder withParameters(Consumer<BeanParameterElement[]> parameters);
 
     @NonNull
     @Override
