@@ -105,8 +105,8 @@ public class ArgumentUtils {
      */
     public static void validateArguments(
             @NonNull Described described,
-            @NonNull Argument<?>[] arguments,
-            @NonNull Object[] values) {
+            Argument<?> @NonNull [] arguments,
+            Object @NonNull [] values) {
         int requiredCount = arguments.length;
         @SuppressWarnings("ConstantConditions") int actualCount = ArrayUtils.isEmpty(values) ? 0 : values.length;
         if (requiredCount != actualCount) {

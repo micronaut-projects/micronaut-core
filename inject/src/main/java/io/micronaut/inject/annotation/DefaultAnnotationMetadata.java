@@ -675,8 +675,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      * @return The int value
      */
     @Override
-    @NonNull
-    public String[] stringValues(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Function<Object, Object> valueMapper) {
+    public String @NonNull [] stringValues(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Function<Object, Object> valueMapper) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         String repeatableTypeName = findRepeatableAnnotationContainerInternal(annotation.getName());
         if (repeatableTypeName != null) {
@@ -701,8 +700,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      * @return The int value
      */
     @Override
-    @NonNull
-    public String[] stringValues(@NonNull String annotation, @NonNull String member, Function<Object, Object> valueMapper) {
+    public String @NonNull [] stringValues(@NonNull String annotation, @NonNull String member, Function<Object, Object> valueMapper) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         Object v = getRawValue(annotation, member);
         String[] strings = AnnotationValue.resolveStringValues(v, valueMapper);

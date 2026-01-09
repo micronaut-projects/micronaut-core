@@ -75,7 +75,7 @@ public final class HttpVersionSelection {
     private final boolean http2CipherSuites;
     private final boolean http3;
 
-    private HttpVersionSelection(@NonNull PlaintextMode plaintextMode, boolean alpn, @NonNull String[] alpnSupportedProtocols, boolean http2CipherSuites) {
+    private HttpVersionSelection(PlaintextMode plaintextMode, boolean alpn, @NonNull String @NonNull [] alpnSupportedProtocols, boolean http2CipherSuites) {
         this.plaintextMode = plaintextMode;
         this.alpn = alpn;
         this.alpnSupportedProtocols = alpnSupportedProtocols;

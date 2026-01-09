@@ -91,8 +91,7 @@ class DefaultConstructorInjectionPoint<T> implements ConstructorInjectionPoint<T
     }
 
     @Override
-    @NonNull
-    public Argument<?>[] getArguments() {
+    public Argument<?> @NonNull [] getArguments() {
         return arguments;
     }
 

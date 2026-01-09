@@ -130,8 +130,7 @@ public interface BeanMethodElement extends MethodElement {
      * @param parameterConsumer The parameter consumer
      * @return This bean method
      */
-    default @NonNull
-    BeanMethodElement withParameters(@NonNull Consumer<BeanParameterElement[]> parameterConsumer) {
+    default BeanMethodElement withParameters(@NonNull Consumer<BeanParameterElement @NonNull []> parameterConsumer) {
         Objects.requireNonNull(parameterConsumer, "The parameter consumer cannot be null");
         parameterConsumer.accept(getParameters());
         return this;

@@ -43,7 +43,7 @@ public class ResourceResolver {
     /**
      * @param resourceLoaders The resource loaders
      */
-    public ResourceResolver(@NonNull ResourceLoader[] resourceLoaders) {
+    public ResourceResolver(ResourceLoader @NonNull [] resourceLoaders) {
         this(Arrays.asList(resourceLoaders));
     }
 

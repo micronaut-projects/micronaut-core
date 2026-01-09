@@ -359,7 +359,7 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
 
     @SuppressWarnings("unchecked")
     @Override
-    public @NonNull <T extends Annotation> T[] synthesizeAnnotationsByType(@NonNull Class<T> annotationClass) {
+    public <T extends Annotation> T @NonNull [] synthesizeAnnotationsByType(@NonNull Class<T> annotationClass) {
         ArgumentUtils.requireNonNull("annotationClass", annotationClass);
         Environment environment = getEnvironment();
         if (environment != null) {
@@ -376,7 +376,7 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
 
     @SuppressWarnings("unchecked")
     @Override
-    public @NonNull <T extends Annotation> T[] synthesizeDeclaredAnnotationsByType(@NonNull Class<T> annotationClass) {
+    public <T extends Annotation> T @NonNull [] synthesizeDeclaredAnnotationsByType(@NonNull Class<T> annotationClass) {
         ArgumentUtils.requireNonNull("annotationClass", annotationClass);
         Environment environment = getEnvironment();
         if (environment != null) {

@@ -65,7 +65,7 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
      */
     private ConstructorInterceptorChain(
         @NonNull BeanConstructor<T> beanConstructor,
-        @NonNull Interceptor<T, T>[] interceptors,
+        Interceptor<T, T> @NonNull [] interceptors,
         Object... originalParameters) {
         super(interceptors, originalParameters);
         this.beanConstructor = Objects.requireNonNull(beanConstructor, "Bean constructor cannot be null");
@@ -84,7 +84,7 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
     private ConstructorInterceptorChain(
         @NonNull BeanDefinition<T> beanDefinition,
         @NonNull BeanConstructor<T> beanConstructor,
-        @NonNull Interceptor<T, T>[] interceptors,
+        Interceptor<T, T> @NonNull [] interceptors,
         int additionalInterceptorParametersCount,
         Object... originalParameters) {
         this(beanConstructor, interceptors, resolveConcreteSubset(beanDefinition, originalParameters, additionalInterceptorParametersCount));
@@ -126,8 +126,7 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
     }
 
     @Override
-    public @NonNull
-    Argument<?>[] getArguments() {
+    public Argument<?> @NonNull [] getArguments() {
         return beanConstructor.getArguments();
     }
 

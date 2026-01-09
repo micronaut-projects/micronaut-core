@@ -238,7 +238,7 @@ public final class SystemFileBodyWriter extends AbstractFileBodyWriter implement
         }
 
         @Override
-        public int read(@NonNull byte[] b, int off, int len) throws IOException {
+        public int read(byte @NonNull [] b, int off, int len) throws IOException {
             if (!doSkip()) {
                 return -1;
             }

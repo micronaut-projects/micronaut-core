@@ -69,7 +69,7 @@ abstract class AbstractInterceptorChain<B, R> implements InvocationContext<B, R>
     }
 
     @Override
-    public @NonNull Object[] getParameterValues() {
+    public Object @NonNull [] getParameterValues() {
         return originalParameters;
     }
 

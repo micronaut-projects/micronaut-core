@@ -277,7 +277,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * @param stereotypes The stereotypes
      * @return The class elements
      */
-    default @NonNull ClassElement[] getClassElements(@NonNull String aPackage, @NonNull String... stereotypes) {
+    default ClassElement @NonNull [] getClassElements(@NonNull String aPackage, @NonNull String... stereotypes) {
         return ClassElement.ZERO_CLASS_ELEMENTS;
     }
 

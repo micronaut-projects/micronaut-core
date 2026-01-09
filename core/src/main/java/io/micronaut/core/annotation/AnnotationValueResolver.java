@@ -102,8 +102,7 @@ public interface AnnotationValueResolver extends ValueResolver<CharSequence> {
      *
      * @return An array of classes
      */
-    @NonNull
-    default Class<?>[] classValues() {
+    default Class<?> @NonNull [] classValues() {
         return classValues(AnnotationMetadata.VALUE_MEMBER);
     }
 
@@ -113,7 +112,7 @@ public interface AnnotationValueResolver extends ValueResolver<CharSequence> {
      * @param member The annotation member
      * @return An array of classes
      */
-    @NonNull Class<?>[] classValues(@NonNull String member);
+    Class<?> @NonNull [] classValues(@NonNull String member);
 
 
     /**
@@ -123,7 +122,7 @@ public interface AnnotationValueResolver extends ValueResolver<CharSequence> {
      * @param member The annotation member
      * @return An array of class values
      */
-    @NonNull AnnotationClassValue<?>[] annotationClassValues(@NonNull String member);
+    AnnotationClassValue<?> @NonNull [] annotationClassValues(@NonNull String member);
 
     /**
      * The {@link AnnotationClassValue} instance for the given member.
@@ -298,14 +297,14 @@ public interface AnnotationValueResolver extends ValueResolver<CharSequence> {
      * @param member The annotation member
      * @return An array of {@link String}
      */
-    @NonNull String[] stringValues(@NonNull String member);
+    String @NonNull [] stringValues(@NonNull String member);
 
     /**
      * The string values for the given member.
      *
      * @return An array of {@link String}
      */
-    default @NonNull String[] stringValues() {
+    default String @NonNull [] stringValues() {
         return stringValues(AnnotationMetadata.VALUE_MEMBER);
     }
 
@@ -316,7 +315,7 @@ public interface AnnotationValueResolver extends ValueResolver<CharSequence> {
      * @return An array of {@code boolean}
      * @since 3.0.0
      */
-    @NonNull boolean[] booleanValues(@NonNull String member);
+    boolean @NonNull [] booleanValues(@NonNull String member);
 
     /**
      * The boolean[] value for the given member.
@@ -324,7 +323,7 @@ public interface AnnotationValueResolver extends ValueResolver<CharSequence> {
      * @return An array of {@code boolean}
      * @since 3.0.0
      */
-    default @NonNull boolean[] booleanValues() {
+    default boolean @NonNull [] booleanValues() {
         return booleanValues(AnnotationMetadata.VALUE_MEMBER);
     }
 
@@ -335,7 +334,7 @@ public interface AnnotationValueResolver extends ValueResolver<CharSequence> {
      * @return An array of {@code byte}
      * @since 3.0.0
      */
-    @NonNull byte[] byteValues(@NonNull String member);
+    byte @NonNull [] byteValues(@NonNull String member);
 
     /**
      * The byte[] value for the given member.
@@ -343,7 +342,7 @@ public interface AnnotationValueResolver extends ValueResolver<CharSequence> {
      * @return An array of {@code byte}
      * @since 3.0.0
      */
-    default @NonNull byte[] byteValues() {
+    default byte @NonNull [] byteValues() {
         return byteValues(AnnotationMetadata.VALUE_MEMBER);
     }
 
@@ -354,7 +353,7 @@ public interface AnnotationValueResolver extends ValueResolver<CharSequence> {
      * @return An array of {@code char}
      * @since 3.0.0
      */
-    @NonNull char[] charValues(@NonNull String member);
+    char @NonNull [] charValues(@NonNull String member);
 
     /**
      * The char[] value for the given member.
@@ -362,7 +361,7 @@ public interface AnnotationValueResolver extends ValueResolver<CharSequence> {
      * @return An array of {@code char}
      * @since 3.0.0
      */
-    default @NonNull char[] charValues() {
+    default char @NonNull [] charValues() {
         return charValues(AnnotationMetadata.VALUE_MEMBER);
     }
 
@@ -373,7 +372,7 @@ public interface AnnotationValueResolver extends ValueResolver<CharSequence> {
      * @return An array of {@code int}
      * @since 3.0.0
      */
-    @NonNull int[] intValues(@NonNull String member);
+    int @NonNull [] intValues(@NonNull String member);
 
     /**
      * The int[] value for the given member.
@@ -381,7 +380,7 @@ public interface AnnotationValueResolver extends ValueResolver<CharSequence> {
      * @return An array of {@code int}
      * @since 3.0.0
      */
-    default @NonNull int[] intValues() {
+    default int @NonNull [] intValues() {
         return intValues(AnnotationMetadata.VALUE_MEMBER);
     }
 
@@ -392,7 +391,7 @@ public interface AnnotationValueResolver extends ValueResolver<CharSequence> {
      * @return An array of {@code double}
      * @since 3.0.0
      */
-    @NonNull double[] doubleValues(@NonNull String member);
+    double @NonNull [] doubleValues(@NonNull String member);
 
     /**
      * The double[] value for the given member.
@@ -400,7 +399,7 @@ public interface AnnotationValueResolver extends ValueResolver<CharSequence> {
      * @return An array of {@code double}
      * @since 3.0.0
      */
-    default @NonNull double[] doubleValues() {
+    default double @NonNull [] doubleValues() {
         return doubleValues(AnnotationMetadata.VALUE_MEMBER);
     }
 
@@ -411,7 +410,7 @@ public interface AnnotationValueResolver extends ValueResolver<CharSequence> {
      * @return An array of {@code long}
      * @since 3.0.0
      */
-    @NonNull long[] longValues(@NonNull String member);
+    long @NonNull [] longValues(@NonNull String member);
 
     /**
      * The long[] value for the given member.
@@ -419,7 +418,7 @@ public interface AnnotationValueResolver extends ValueResolver<CharSequence> {
      * @return An array of {@code long}
      * @since 3.0.0
      */
-    default @NonNull long[] longValues() {
+    default long @NonNull [] longValues() {
         return longValues(AnnotationMetadata.VALUE_MEMBER);
     }
 
@@ -430,7 +429,7 @@ public interface AnnotationValueResolver extends ValueResolver<CharSequence> {
      * @return An array of {@code float}
      * @since 3.0.0
      */
-    @NonNull float[] floatValues(@NonNull String member);
+    float @NonNull [] floatValues(@NonNull String member);
 
     /**
      * The float[] value for the given member.
@@ -438,7 +437,7 @@ public interface AnnotationValueResolver extends ValueResolver<CharSequence> {
      * @return An array of {@code float}
      * @since 3.0.0
      */
-    default @NonNull float[] floatValues() {
+    default float @NonNull [] floatValues() {
         return floatValues(AnnotationMetadata.VALUE_MEMBER);
     }
 
@@ -449,7 +448,7 @@ public interface AnnotationValueResolver extends ValueResolver<CharSequence> {
      * @return An array of {@code short}
      * @since 3.0.0
      */
-    @NonNull short[] shortValues(@NonNull String member);
+    short @NonNull [] shortValues(@NonNull String member);
 
     /**
      * The short[] value for the given member.
@@ -457,7 +456,7 @@ public interface AnnotationValueResolver extends ValueResolver<CharSequence> {
      * @return An array of {@code short}
      * @since 3.0.0
      */
-    default @NonNull short[] shortValues() {
+    default short @NonNull [] shortValues() {
         return shortValues(AnnotationMetadata.VALUE_MEMBER);
     }
 

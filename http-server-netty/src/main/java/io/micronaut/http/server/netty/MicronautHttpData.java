@@ -750,7 +750,7 @@ public abstract sealed class MicronautHttpData<D extends HttpData> extends Abstr
         }
 
         @Override
-        public int read(@NonNull byte[] b, int off, int len) throws IOException {
+        public int read(byte @NonNull [] b, int off, int len) throws IOException {
             if (!buf.isReadable()) {
                 buf.release();
 

@@ -1562,8 +1562,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @return An array of enum values
      */
     @Internal
-    @NonNull
-    public static <E extends Enum> E[] resolveEnumValues(@NonNull Class<E> enumType, @Nullable Object rawValue) {
+    public static <E extends Enum> E @NonNull [] resolveEnumValues(@NonNull Class<E> enumType, @Nullable Object rawValue) {
         if (rawValue == null) {
             return (E[]) Array.newInstance(enumType, 0);
         }

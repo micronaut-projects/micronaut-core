@@ -53,7 +53,7 @@ public interface BeanWrapper<T> extends AnnotationMetadataProvider {
      *
      * @return The property names
      */
-    default @NonNull String[] getPropertyNames() {
+    default String @NonNull [] getPropertyNames() {
         return getIntrospection().getPropertyNames();
     }
 

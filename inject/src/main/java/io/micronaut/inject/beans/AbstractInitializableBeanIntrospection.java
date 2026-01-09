@@ -187,13 +187,13 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
     protected B instantiateInternal(Object @Nullable [] arguments) {
         if (hasBuilder() && arguments != null) {
             Builder<B> b = builder();
-            @NonNull Argument<?>[] args = b.getBuilderArguments();
+            Argument<?> @NonNull [] args = b.getBuilderArguments();
             for (int i = 0; i < args.length; i++) {
                 Argument<Object> arg = (Argument<Object>) args[i];
                 Object val = arguments[i];
                 b.with(i, arg, val);
             }
-            @NonNull Argument<?>[] buildMethodArguments = b.getBuildMethodArguments();
+            Argument<?> @NonNull [] buildMethodArguments = b.getBuildMethodArguments();
             if (buildMethodArguments.length == 0) {
                 return b.build();
             } else {
@@ -263,7 +263,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
      */
     @Nullable
     @UsedByGeneratedCode
-    protected <V> V dispatch(int index, @NonNull B target, Object @Nullable [] args) {
+    protected <V> V dispatch(int index, B target, Object @Nullable @NonNull [] args) {
         throw unknownDispatchAtIndexException(index);
     }
 
@@ -511,7 +511,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
                         Set<BeanMethod<?, ?>> excludedMethods = new HashSet<>();
                         for (BeanMethod<Object, Object> builderMethod : builderMethods) {
                             Argument<?> argument;
-                            @NonNull Argument<?>[] methodArgs = builderMethod.getArguments();
+                            Argument<?> @NonNull [] methodArgs = builderMethod.getArguments();
                             if (ArrayUtils.isNotEmpty(methodArgs)) {
                                 argument = toWrapperIfNecessary(methodArgs[0]);
                             } else {
@@ -538,7 +538,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
                 }
             } else {
                 int constructorLength = constructorArguments.length;
-                @NonNull UnsafeBeanProperty<B, Object>[] writeableProperties = resolveWriteableProperties(beanPropertiesList);
+                UnsafeBeanProperty<B, Object> @NonNull [] writeableProperties = resolveWriteableProperties(beanPropertiesList);
 
                 this.builderData = new IntrospectionBuilderData(
                     constructorArguments,
@@ -561,8 +561,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
     }
 
     @SuppressWarnings("unchecked")
-    @NonNull
-    private <P> UnsafeBeanProperty<P, Object>[] resolveWriteableProperties(Collection<BeanProperty<P, Object>> beanProperties) {
+    private <P> UnsafeBeanProperty<P, Object> @NonNull [] resolveWriteableProperties(Collection<BeanProperty<P, Object>> beanProperties) {
         return beanProperties.stream()
             .filter(bp -> !bp.isReadOnly() && Arrays.stream(constructorArguments).noneMatch(a -> bp.getName().equals(a.getName())))
             .map(bp -> ((UnsafeBeanProperty<P, Object>) bp))
@@ -603,8 +602,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
             init(arguments);
         }
 
-        @NonNull
-        private static boolean[] toRequires(int constructorLength, Argument<?>[] constructorArguments, UnsafeBeanProperty<Object, Object>[] writeableProperties) {
+        private static boolean @NonNull [] toRequires(int constructorLength, Argument<?>[] constructorArguments, UnsafeBeanProperty<Object, Object>[] writeableProperties) {
             boolean[] requires = new boolean[constructorLength + writeableProperties.length];
             for (int i = 0; i < constructorLength; i++) {
                 Argument<?> argument = constructorArguments[i];
@@ -662,8 +660,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
             return arguments;
         }
 
-        @NonNull
-        private static Argument<?>[] toArguments(BeanProperty<?, ?>[] writeableProperties) {
+        private static Argument<?> @NonNull [] toArguments(BeanProperty<?, ?>[] writeableProperties) {
             return Arrays.stream(writeableProperties)
                 .map(bp -> {
                     Argument<?> argument = bp.asArgument();
@@ -695,12 +692,12 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         }
 
         @Override
-        public @NonNull Argument<?>[] getBuilderArguments() {
+        public Argument<?> @NonNull [] getBuilderArguments() {
             return builderData.arguments;
         }
 
         @Override
-        public @NonNull Argument<?>[] getBuildMethodArguments() {
+        public Argument<?> @NonNull [] getBuildMethodArguments() {
             return builderData.creator.getArguments();
         }
 

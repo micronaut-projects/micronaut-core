@@ -277,12 +277,12 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
     }
 
     @Override
-    default @NonNull <T extends Annotation> T[] synthesizeAnnotationsByType(@NonNull Class<T> annotationClass) {
+    default <T extends Annotation> T @NonNull [] synthesizeAnnotationsByType(@NonNull Class<T> annotationClass) {
         return getAnnotationMetadata().synthesizeAnnotationsByType(annotationClass);
     }
 
     @Override
-    default @NonNull <T extends Annotation> T[] synthesizeDeclaredAnnotationsByType(@NonNull Class<T> annotationClass) {
+    default <T extends Annotation> T @NonNull [] synthesizeDeclaredAnnotationsByType(@NonNull Class<T> annotationClass) {
         return getAnnotationMetadata().synthesizeDeclaredAnnotationsByType(annotationClass);
     }
 
@@ -627,12 +627,12 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
     }
 
     @Override
-    default @NonNull Annotation[] synthesizeAll() {
+    default Annotation @NonNull [] synthesizeAll() {
         return getAnnotationMetadata().synthesizeAll();
     }
 
     @Override
-    default @NonNull Annotation[] synthesizeDeclared() {
+    default Annotation @NonNull [] synthesizeDeclared() {
         return getAnnotationMetadata().synthesizeDeclared();
     }
 

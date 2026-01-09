@@ -627,7 +627,7 @@ public abstract class ProxyingBeanDefinitionWriter implements ProxyingBeanDefini
     }
 
     @Override
-    public @NonNull Element[] getOriginatingElements() {
+    public Element @NonNull [] getOriginatingElements() {
         return originatingElements.getOriginatingElements();
     }
 

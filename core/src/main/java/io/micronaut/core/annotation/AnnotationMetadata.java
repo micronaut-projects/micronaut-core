@@ -965,7 +965,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @return An {@link Optional} class
      * @param <T> The type of the class
      */
-    default @NonNull <T> Class<T>[] classValues(@NonNull String annotation) {
+    default <T> Class<T> @NonNull [] classValues(@NonNull String annotation) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         return classValues(annotation, VALUE_MEMBER);
     }
@@ -978,7 +978,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @return An {@link Optional} class
      * @param <T> The type of the class
      */
-    default @NonNull <T> Class<T>[] classValues(@NonNull String annotation, @NonNull String member) {
+    default <T> Class<T> @NonNull [] classValues(@NonNull String annotation, @NonNull String member) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
 
@@ -992,7 +992,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @return An {@link Optional} class
      * @param <T> The type of the class
      */
-    default @NonNull <T> Class<T>[] classValues(@NonNull Class<? extends Annotation> annotation) {
+    default <T> Class<T> @NonNull [] classValues(@NonNull Class<? extends Annotation> annotation) {
         ArgumentUtils.requireNonNull("annotation", annotation);
 
         return classValues(annotation, VALUE_MEMBER);
@@ -1006,7 +1006,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @return An {@link Optional} class
      * @param <T> The type of the class
      */
-    default @NonNull <T> Class<T>[] classValues(@NonNull Class<? extends Annotation> annotation, @NonNull String member) {
+    default <T> Class<T> @NonNull [] classValues(@NonNull Class<? extends Annotation> annotation, @NonNull String member) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
 
@@ -1203,7 +1203,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param member     The member
      * @return The string values if it is present
      */
-    default @NonNull String[] stringValues(@NonNull Class<? extends Annotation> annotation, @NonNull String member) {
+    default String @NonNull [] stringValues(@NonNull Class<? extends Annotation> annotation, @NonNull String member) {
         return StringUtils.EMPTY_STRING_ARRAY;
     }
 
@@ -1213,7 +1213,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param annotation The annotation
      * @return The string values if it is present
      */
-    default @NonNull String[] stringValues(@NonNull Class<? extends Annotation> annotation) {
+    default String @NonNull [] stringValues(@NonNull Class<? extends Annotation> annotation) {
         return stringValues(annotation, VALUE_MEMBER);
     }
 
@@ -1224,7 +1224,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param member     The member
      * @return The string values if it is present
      */
-    default @NonNull String[] stringValues(@NonNull String annotation, @NonNull String member) {
+    default String @NonNull [] stringValues(@NonNull String annotation, @NonNull String member) {
         return StringUtils.EMPTY_STRING_ARRAY;
     }
 
@@ -1234,7 +1234,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param annotation The annotation
      * @return The string values if it is present
      */
-    default @NonNull String[] stringValues(@NonNull String annotation) {
+    default String @NonNull [] stringValues(@NonNull String annotation) {
         return stringValues(annotation, VALUE_MEMBER);
     }
 

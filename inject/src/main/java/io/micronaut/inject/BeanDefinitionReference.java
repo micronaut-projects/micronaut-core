@@ -137,8 +137,7 @@ public interface BeanDefinitionReference<T> extends QualifiedBeanType<T> {
      * @return An array of indexes.
      * @since 5.0
      */
-    @NonNull
-    default Class<?>[] getIndexes() {
+    default Class<?> @NonNull [] getIndexes() {
         return getAnnotationMetadata().classValues(Indexes.class);
     }
 

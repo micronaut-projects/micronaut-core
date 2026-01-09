@@ -128,8 +128,7 @@ public @interface Client {
      * @return The supported ALPN protocols.
      * @since 4.0.0
      */
-    @NonNull
-    String[] alpnModes() default {
+    String @NonNull [] alpnModes() default {
         HttpVersionSelection.ALPN_HTTP_2,
         HttpVersionSelection.ALPN_HTTP_1
     };

@@ -217,7 +217,7 @@ final class MapperIntroduction implements MethodInterceptor<Object, Object> {
     ) {
         Map<String, Function<Object, BiConsumer<Object, MappingBuilder<Object>>>> customMappers = new HashMap<>();
         BeanIntrospection.Builder<Object> builderMeta = toIntrospection.builder();
-        @NonNull Argument<?>[] builderArguments = builderMeta.getBuilderArguments();
+        Argument<?> @NonNull [] builderArguments = builderMeta.getBuilderArguments();
         for (AnnotationValue<Mapper.Mapping> mapping : annotations) {
             String to = mapping.stringValue(Mapper.Mapping.MEMBER_TO).orElse(null);
             String format = mapping.stringValue(Mapper.Mapping.MEMBER_FORMAT).orElse(null);
@@ -478,7 +478,7 @@ final class MapperIntroduction implements MethodInterceptor<Object, Object> {
         private <I, O> void mapBean(I input, MapStrategy mapStrategy, BeanIntrospection<I> inputIntrospection, MappingBuilder<O> builder) {
             boolean isDefault = mapStrategy == MapStrategy.DEFAULT;
             Mapper.ConflictStrategy conflictStrategy = mapStrategy.conflictStrategy();
-            @SuppressWarnings("unchecked") @NonNull Argument<Object>[] arguments = (Argument<Object>[]) builder.getBuilderArguments();
+            @SuppressWarnings("unchecked") Argument<Object> @NonNull [] arguments = (Argument<Object>[]) builder.getBuilderArguments();
 
             if (!isDefault) {
                 processCustomMappers(input, mapStrategy, builder);
@@ -507,7 +507,7 @@ final class MapperIntroduction implements MethodInterceptor<Object, Object> {
         }
 
         private <O> void mapMap(Map<String, Object> input, MapStrategy mapStrategy, MappingBuilder<O> builder) {
-            @NonNull Argument<Object>[] arguments = (Argument<Object>[]) builder.getBuilderArguments();
+            Argument<Object> @NonNull [] arguments = (Argument<Object>[]) builder.getBuilderArguments();
             Mapper.ConflictStrategy conflictStrategy = mapStrategy.conflictStrategy();
             boolean isDefault = mapStrategy == MapStrategy.DEFAULT;
             if (!isDefault) {
@@ -560,7 +560,7 @@ final class MapperIntroduction implements MethodInterceptor<Object, Object> {
         /**
          * @return the arguments to build from.
          */
-        @NonNull Argument<?>[] getBuilderArguments();
+        Argument<?> @NonNull [] getBuilderArguments();
 
         /**
          * Get the argument index based on its name.
@@ -616,7 +616,7 @@ final class MapperIntroduction implements MethodInterceptor<Object, Object> {
         }
 
         @Override
-        public @NonNull Argument<?>[] getBuilderArguments() {
+        public Argument<?> @NonNull [] getBuilderArguments() {
             return builder.getBuilderArguments();
         }
 
@@ -671,7 +671,7 @@ final class MapperIntroduction implements MethodInterceptor<Object, Object> {
         }
 
         @Override
-        public @NonNull Argument<?>[] getBuilderArguments() {
+        public Argument<?> @NonNull [] getBuilderArguments() {
             return arguments;
         }
 

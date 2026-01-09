@@ -115,7 +115,7 @@ public interface AnnotationSource {
      *
      * @return All the annotations
      */
-    default @NonNull Annotation[] synthesizeAll() {
+    default Annotation @NonNull [] synthesizeAll() {
         return AnnotationUtil.ZERO_ANNOTATIONS;
     }
 
@@ -126,7 +126,7 @@ public interface AnnotationSource {
      *
      * @return All declared annotations
      */
-    default @NonNull Annotation[] synthesizeDeclared() {
+    default Annotation @NonNull [] synthesizeDeclared() {
         return AnnotationUtil.ZERO_ANNOTATIONS;
     }
 
@@ -140,7 +140,7 @@ public interface AnnotationSource {
      * @return All annotations by the given type
      */
     @SuppressWarnings("unchecked")
-    default @NonNull <T extends Annotation> T[] synthesizeAnnotationsByType(@NonNull Class<T> annotationClass) {
+    default <T extends Annotation> T @NonNull [] synthesizeAnnotationsByType(@NonNull Class<T> annotationClass) {
         ArgumentUtils.requireNonNull("annotationClass", annotationClass);
         return (T[]) Array.newInstance(annotationClass, 0);
     }
@@ -155,7 +155,7 @@ public interface AnnotationSource {
      * @return Declared annotations by the given type
      */
     @SuppressWarnings("unchecked")
-    default @NonNull <T extends Annotation> T[] synthesizeDeclaredAnnotationsByType(@NonNull Class<T> annotationClass) {
+    default <T extends Annotation> T @NonNull [] synthesizeDeclaredAnnotationsByType(@NonNull Class<T> annotationClass) {
         ArgumentUtils.requireNonNull("annotationClass", annotationClass);
         return (T[]) Array.newInstance(annotationClass, 0);
     }

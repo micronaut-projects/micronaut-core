@@ -53,8 +53,7 @@ public final class AvailableByteArrayBody extends InternalByteBody implements Cl
      * @deprecated Construct through {@link io.micronaut.http.body.ByteBodyFactory} instead
      */
     @Deprecated
-    @NonNull
-    public static AvailableByteArrayBody create(@NonNull ByteBufferFactory<?, ?> bufferFactory, byte @NonNull [] array) {
+    public static AvailableByteArrayBody create(@NonNull ByteBufferFactory<?, ?> bufferFactory, byte @NonNull @NonNull [] array) {
         ArgumentUtils.requireNonNull("bufferFactory", bufferFactory);
         ArgumentUtils.requireNonNull("array", array);
         return new AvailableByteArrayBody(ReadBufferFactory.getJdkFactory().adapt(array));

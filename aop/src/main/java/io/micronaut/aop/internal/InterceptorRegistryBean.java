@@ -49,7 +49,7 @@ public final class InterceptorRegistryBean implements InstantiatableBeanDefiniti
     }
 
     @Override
-    public @NonNull Class<?>[] getIndexes() {
+    public Class<?> @NonNull [] getIndexes() {
         return new Class[]{InterceptorRegistry.class};
     }
 

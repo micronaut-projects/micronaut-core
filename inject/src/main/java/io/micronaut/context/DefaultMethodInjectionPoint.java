@@ -117,8 +117,7 @@ class DefaultMethodInjectionPoint<B, T> implements MethodInjectionPoint<B, T>, E
     }
 
     @Override
-    @NonNull
-    public Argument<?>[] getArguments() {
+    public Argument<?> @NonNull [] getArguments() {
         return arguments;
     }
 
