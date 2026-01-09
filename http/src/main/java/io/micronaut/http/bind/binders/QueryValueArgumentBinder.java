@@ -185,8 +185,11 @@ public class QueryValueArgumentBinder<T> extends AbstractArgumentBinder<T> imple
                     return propagateConversionError(context.getLastError());
                 }
             } else if (conversionContext.hasErrors()) {
-                Optional<ConversionError> error = conversionContext.getLastError();
-                if (error.isPresent()) {
+                ConversionError conversionError = conversionContext.getLastError().orElse(null);
+                if (conversionError != null) {
+                    Exception cause = conversionError.getCause();
+                    context.reject(builderArg, cause);
+                    Optional<ConversionError> error = context.getLastError();
                     return propagateConversionError(error);
                 }
             }

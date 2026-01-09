@@ -149,7 +149,7 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
 
         expect:
         response.status() == HttpStatus.BAD_REQUEST
-        response.body().contains("Failed to convert argument [book] for value [abc]")
+        response.body().contains("Failed to convert argument [book] for value [Integer age]")
     }
 
     void "test simple binding without argument specified"() {
