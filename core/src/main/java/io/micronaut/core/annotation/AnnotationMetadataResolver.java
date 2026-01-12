@@ -15,6 +15,9 @@
  */
 package io.micronaut.core.annotation;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
+
 /**
  * An interface for types capable of resolving {@link AnnotationMetadata}.
  *

@@ -17,6 +17,8 @@ package io.micronaut.core.annotation;
 
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.util.ArgumentUtils;
+import org.jspecify.annotations.NonNull;
+
 import java.util.Objects;
 import java.util.Optional;
 

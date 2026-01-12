@@ -16,7 +16,15 @@
 package io.micronaut.core.annotation;
 
 import io.micronaut.core.value.ValueResolver;
-import java.util.*;
+import org.jspecify.annotations.NonNull;
+
+import java.util.Arrays;
+import java.util.EnumSet;
+import java.util.Map;
+import java.util.Optional;
+import java.util.OptionalDouble;
+import java.util.OptionalInt;
+import java.util.OptionalLong;
 
 /**
  * Interface for types that resolve annotation values.
@@ -113,7 +121,6 @@ public interface AnnotationValueResolver extends ValueResolver<CharSequence> {
      * @return An array of classes
      */
     Class<?> @NonNull [] classValues(@NonNull String member);
-
 
     /**
      * The {@link AnnotationClassValue} instances for the given member. Unlike {@link #classValues(String)} this may

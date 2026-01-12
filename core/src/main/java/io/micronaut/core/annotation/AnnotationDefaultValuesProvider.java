@@ -15,6 +15,8 @@
  */
 package io.micronaut.core.annotation;
 
+import org.jspecify.annotations.NonNull;
+
 import java.util.Map;
 
 /**

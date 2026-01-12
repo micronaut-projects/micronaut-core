@@ -15,6 +15,9 @@
  */
 package io.micronaut.core.annotation;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
+
 import java.util.AbstractCollection;
 import java.util.AbstractMap;
 import java.util.Arrays;

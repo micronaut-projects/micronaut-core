@@ -17,9 +17,17 @@ package io.micronaut.core.annotation;
 
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.value.OptionalValues;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.OptionalDouble;
+import java.util.OptionalInt;
+import java.util.OptionalLong;
+import java.util.Set;
 
 /**
  * An interface that can be implemented by other classes that delegate the resolution of the {@link AnnotationMetadata}
