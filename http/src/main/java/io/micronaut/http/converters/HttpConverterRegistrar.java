@@ -119,7 +119,15 @@ public class HttpConverterRegistrar implements TypeConverterRegistrar {
                 return Optional.of(object.getInputStream());
             } else {
                 try (ReadBuffer rb = object.toReadBuffer()) {
-                    return conversionService.convert(rb, targetType, context);
+                    Optional<Object> direct = conversionService.convert(rb, targetType, context);
+                    if (direct.isPresent()) {
+                        return direct;
+                    }
+                    String s = rb.toString(context.getCharset());
+                    if (targetType.isAssignableFrom(String.class)) {
+                        return Optional.of(s);
+                    }
+                    return conversionService.convert(s, targetType, context);
                 }
             }
         });
