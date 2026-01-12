@@ -106,9 +106,13 @@ public final class FormDemuxer implements BufferConsumer {
     }
 
     public Flux<RawFormField> fields() {
-        return sink.asFlux()
+        Flux<RawFormField> flux = sink.asFlux()
             .doOnCancel(this::cancel)
             .doOnDiscard(RawFormField.class, RawFormField::close);
+        if (upstream != null) {
+            flux = flux.doOnSubscribe(s -> upstream.start());
+        }
+        return flux;
     }
 
     private void cancel() {
