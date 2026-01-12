@@ -29,6 +29,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
+import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.multipart.CompletedAttribute;
 import io.micronaut.http.multipart.CompletedFileUpload;
 import io.micronaut.http.simple.SimpleHttpHeaders;
@@ -101,6 +102,9 @@ public class HttpConverterRegistrar implements TypeConverterRegistrar {
                 if (reader.isPresent()) {
                     try (InputStream is = object.getInputStream()) {
                         return Optional.ofNullable(reader.get().read(argument, mediaType, new SimpleHttpHeaders(), is));
+                    } catch (CodecException e) {
+                        context.reject(e);
+                        return Optional.empty();
                     }
                 } else {
                     try (ReadBuffer rb = object.toReadBuffer()) { // TODO: limit size
