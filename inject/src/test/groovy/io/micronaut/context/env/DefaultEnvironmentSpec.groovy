@@ -93,6 +93,9 @@ class DefaultEnvironmentSpec extends Specification {
 
         then:
         diff.isEmpty()
+
+        cleanup:
+        System.clearProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY)
     }
 
     void "test environment system property refresh"() {
@@ -134,6 +137,25 @@ class DefaultEnvironmentSpec extends Specification {
         !env.activeNames.contains("foo")
         !env.activeNames.contains("x")
         !env.containsProperty("foo")
+    }
+
+    void "test getting environment name from a system property in bootstrap context"() {
+        given:
+        System.setProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY, StringUtils.TRUE)
+        System.setProperty(Environment.ENVIRONMENTS_PROPERTY, "k8s")
+
+        when:
+        ApplicationContext applicationContext = ApplicationContext.builder()
+                .build()
+                .start()
+
+        then:
+        applicationContext.getRequiredProperty("test1", String.class) == "test2"
+
+        cleanup:
+        applicationContext.stop()
+        System.clearProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY)
+        System.clearProperty(Environment.ENVIRONMENTS_PROPERTY)
     }
 
     void "test system property source loader"() {
@@ -545,6 +567,7 @@ class DefaultEnvironmentSpec extends Specification {
 
         cleanup:
         applicationContext.stop()
+        System.clearProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY)
     }
 
     void "test custom config locations respect environment order"() {

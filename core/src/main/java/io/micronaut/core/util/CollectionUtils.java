@@ -15,6 +15,7 @@
  */
 package io.micronaut.core.util;
 
+import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
@@ -180,6 +181,7 @@ public class CollectionUtils {
      * @param map The map
      * @return True if it is empty or null
      */
+    @Contract("null -> true")
     public static boolean isEmpty(@Nullable Map map) {
         return map == null || map.isEmpty();
     }
@@ -190,6 +192,7 @@ public class CollectionUtils {
      * @param map The map
      * @return True if it is not null and not empty
      */
+    @Contract("null -> false")
     public static boolean isNotEmpty(@Nullable Map map) {
         return map != null && !map.isEmpty();
     }
@@ -200,6 +203,7 @@ public class CollectionUtils {
      * @param collection The collection
      * @return True if it is empty or null
      */
+    @Contract("null -> true")
     public static boolean isEmpty(@Nullable Collection collection) {
         return collection == null || collection.isEmpty();
     }
@@ -210,6 +214,7 @@ public class CollectionUtils {
      * @param collection The collection
      * @return True if it is not null and not empty
      */
+    @Contract("null -> false")
     public static boolean isNotEmpty(@Nullable Collection collection) {
         return collection != null && !collection.isEmpty();
     }

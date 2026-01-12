@@ -15,6 +15,7 @@
  */
 package io.micronaut.core.util;
 
+import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -70,6 +71,7 @@ public final class StringUtils {
      * @param str The string
      * @return True if str is empty or null
      */
+    @Contract("null -> true")
     public static boolean isEmpty(@Nullable CharSequence str) {
         return str == null || str.isEmpty();
     }
@@ -80,6 +82,7 @@ public final class StringUtils {
      * @param str The string
      * @return True if str is not null and not empty
      */
+    @Contract("null -> false")
     public static boolean isNotEmpty(@Nullable CharSequence str) {
         return !isEmpty(str);
     }
@@ -90,6 +93,7 @@ public final class StringUtils {
      * @param str The string
      * @return True if str contains any non whitespace characters
      */
+    @Contract("null -> false")
     public static boolean hasText(@Nullable CharSequence str) {
         if (isEmpty(str)) {
             return false;

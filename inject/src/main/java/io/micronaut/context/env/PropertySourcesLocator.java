@@ -16,6 +16,7 @@
 package io.micronaut.context.env;
 
 import io.micronaut.core.annotation.Experimental;
+import org.jspecify.annotations.NullMarked;
 
 import java.util.Collection;
 
@@ -25,6 +26,7 @@ import java.util.Collection;
  * @author Denis Stepanov
  * @since 5.0
  */
+@NullMarked
 @Experimental
 public interface PropertySourcesLocator {
 
