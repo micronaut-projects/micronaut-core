@@ -22,10 +22,13 @@ import io.micronaut.context.exceptions.ConfigurationException
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.core.order.OrderUtil
 import io.micronaut.core.util.StringUtils
+import io.micronaut.core.value.PropertyCatalog
+import io.micronaut.core.value.PropertyNotFoundException
 import spock.lang.Issue
 import spock.lang.Specification
 import spock.util.environment.RestoreSystemProperties
 
+import java.util.concurrent.Executors
 import java.util.function.Function
 
 /**
@@ -96,6 +99,66 @@ class DefaultEnvironmentSpec extends Specification {
 
         cleanup:
         System.clearProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY)
+    }
+
+    void "test cache related issue when refresh method is executed"() {
+        given:
+        def propertyMap = ['testPropKey': 'testPropValueOld']
+        def propertySource = new MapPropertySource('CustomPS', propertyMap)
+        def env = new DefaultEnvironment({['test']})
+        env.addPropertySource(propertySource)
+        env.start()
+
+        expect:
+        env.getRequiredProperty("testPropKey", String.class) == 'testPropValueOld'
+
+        and:
+        def testFinished = false
+        def executor = Executors.newSingleThreadExecutor()
+        executor.submit(new Runnable() {
+            @Override
+            void run() {
+                while (!testFinished) {
+                    env.getRequiredProperty("testPropKey", String.class)
+                }
+            }
+        })
+
+        when:
+        propertyMap.put('testPropKey', 'testPropValueNew')
+        def diff = env.refreshAndDiff()
+        testFinished = true
+
+        then:
+        env.getRequiredProperty("testPropKey", String.class) == 'testPropValueNew'
+        diff.get('test-prop-key') == 'testPropValueOld'
+    }
+
+    void "test all catalogs are cleared when properties are dropped"() {
+        given:
+        def propertyMap = ['testPropKey': 'testPropValueOld']
+        def propertySource = new MapPropertySource('CustomPS', propertyMap)
+        def env = new DefaultEnvironment({['test']})
+        env.addPropertySource(propertySource)
+        env.start()
+
+        expect:
+        env.getProperty("testPropKey", String.class).get() == 'testPropValueOld'
+        env.getProperty("test-prop-key", String.class).get() == 'testPropValueOld'
+
+        when:
+        env.stop()  // Using this to invoke dropProperties() -> reset() method since they are private
+
+        then:
+        env.getProperty("testPropKey", String.class).isEmpty()  // Retrieves from rawCatalog
+        env.getProperty("test-prop-key", String.class).isEmpty()  // Retrieves from catalog
+
+        when:
+        env.start()
+
+        then:
+        env.getProperty("testPropKey", String.class).get() == 'testPropValueOld'
+        env.getProperty("test-prop-key", String.class).get() == 'testPropValueOld'
     }
 
     void "test environment system property refresh"() {
