@@ -1,10 +1,13 @@
 package io.micronaut.http.server.netty.multipart;
 
+import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.ByteBodyFactory;
+import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.stream.BaseSharedBuffer;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
+import io.micronaut.http.exceptions.BufferLengthExceededException;
 import io.micronaut.http.multipart.RawFormField;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.netty.channel.embedded.EmbeddedChannel;
@@ -38,7 +41,7 @@ public class FormDemuxerTest {
     }
 
     private FormDemuxer createUrlEncoded(ByteBody body) {
-        return new FormDemuxer(PostBodyDecoder.builder().forUrlEncodedData(), channel, BodySizeLimits.UNLIMITED, body);
+        return new FormDemuxer(PostBodyDecoder.builder().forUrlEncodedData(), channel, BodySizeLimits.UNLIMITED, BodySizeLimits.UNLIMITED, body);
     }
 
     private static <T> Queue<T> toQueue(Flux<T> flux) {
@@ -243,7 +246,7 @@ public class FormDemuxerTest {
         QueueSubscriber<RawFormField> fields = new QueueSubscriber<>();
         new FormDemuxer(PostBodyDecoder.builder()
             .enableQuirks(DecoderQuirk.REFUSE_NON_HEX_PERCENT_DECODE)
-            .forUrlEncodedData(), channel, BodySizeLimits.UNLIMITED, streamingBody.rootBody()).fields().subscribe(fields.noBackpressure());
+            .forUrlEncodedData(), channel, BodySizeLimits.UNLIMITED, BodySizeLimits.UNLIMITED, streamingBody.rootBody()).fields().subscribe(fields.noBackpressure());
 
         write(streamingBody.sharedBuffer(), "foo=ba");
 
@@ -256,6 +259,71 @@ public class FormDemuxerTest {
 
         assertInstanceOf(FormDecoderException.class, data.error);
         assertInstanceOf(FormDecoderException.class, fields.error);
+    }
+
+    @Test
+    public void fieldBufferLimit() {
+        MockUpstream upstream = new MockUpstream();
+        ByteBodyFactory.StreamingBody streamingBody = byteBodyFactory.createStreamingBody(BodySizeLimits.UNLIMITED, upstream);
+        QueueSubscriber<RawFormField> fields = new QueueSubscriber<>();
+        new FormDemuxer(PostBodyDecoder.builder()
+            .enableQuirks(DecoderQuirk.REFUSE_NON_HEX_PERCENT_DECODE)
+            .forUrlEncodedData(), channel, new BodySizeLimits(Long.MAX_VALUE, 6), BodySizeLimits.UNLIMITED, streamingBody.rootBody())
+            .fields().subscribe(fields.noBackpressure());
+
+        // note: 'ba' actually takes up 4 bytes in the buffer counter, since it's buffered twice: once in BaseSharedBuffer, once in AsFlux
+
+        write(streamingBody.sharedBuffer(), "foo=ba");
+
+        RawFormField field1 = fields.queue.remove();
+        assertEquals("foo", field1.metadata().name());
+        QueueSubscriber<String> data1 = content(field1.byteBody()).noBackpressure();
+        assertEquals("ba", data1.queue.poll());
+
+        for (int i = 0; i < 10; i++) {
+            write(streamingBody.sharedBuffer(), "ba");
+            assertEquals("ba", data1.queue.poll());
+        }
+
+        write(streamingBody.sharedBuffer(), "r&fizz=");
+        assertEquals("r", data1.queue.poll());
+        assertTrue(data1.complete);
+
+        // next field gets 8 bytes and should fail immediately
+
+        RawFormField field2 = fields.queue.remove();
+        QueueSubscriber<String> data2 = content(field2.byteBody());
+        write(streamingBody.sharedBuffer(), "buzzbuzz");
+        data2.request(1);
+
+        assertInstanceOf(BufferLengthExceededException.class, data2.error);
+    }
+
+    @Test
+    public void formBufferLimit() {
+        MockUpstream upstream = new MockUpstream();
+        ByteBodyFactory.StreamingBody streamingBody = byteBodyFactory.createStreamingBody(BodySizeLimits.UNLIMITED, upstream);
+        QueueSubscriber<RawFormField> fields = new QueueSubscriber<>();
+        new FormDemuxer(PostBodyDecoder.builder()
+            .enableQuirks(DecoderQuirk.REFUSE_NON_HEX_PERCENT_DECODE)
+            .forUrlEncodedData(), channel, BodySizeLimits.UNLIMITED, new BodySizeLimits(Long.MAX_VALUE, 6), streamingBody.rootBody())
+            .fields().subscribe(fields.noBackpressure());
+
+        // note: 'ba' actually takes up 4 bytes in the buffer counter, since it's buffered twice: once in BaseSharedBuffer, once in AsFlux
+
+        write(streamingBody.sharedBuffer(), "foo=ba");
+        RawFormField field1 = fields.queue.remove();
+        CloseableByteBody bb1 = field1.byteBody();
+        Flux.from(bb1.split(ByteBody.SplitBackpressureMode.FASTEST).toReadBufferPublisher()).subscribe(ReadBuffer::close);
+
+        write(streamingBody.sharedBuffer(), "r&fizz=");
+        RawFormField field2 = fields.queue.remove();
+        QueueSubscriber<String> data2 = content(field2.byteBody());
+
+        write(streamingBody.sharedBuffer(), "buzz");
+        assertInstanceOf(BufferLengthExceededException.class, data2.error);
+
+        bb1.close();
     }
 
     private static final class MockUpstream implements BufferConsumer.Upstream {

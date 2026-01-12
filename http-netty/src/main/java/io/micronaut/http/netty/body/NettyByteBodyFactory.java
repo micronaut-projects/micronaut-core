@@ -18,8 +18,6 @@ package io.micronaut.http.netty.body;
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.body.AbstractBodyAdapter;
@@ -37,6 +35,8 @@ import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.Channel;
 import io.netty.channel.EventLoop;
 import io.netty.handler.codec.http.HttpHeaders;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
@@ -66,7 +66,7 @@ public final class NettyByteBodyFactory extends ByteBodyFactory {
 
     @Override
     public StreamingBody createStreamingBody(BodySizeLimits limits, BufferConsumer.Upstream upstream) {
-        StreamingNettyByteBody.SharedBuffer sb = createStreamingBuffer(BodySizeLimits.UNLIMITED, upstream);
+        StreamingNettyByteBody.SharedBuffer sb = createStreamingBuffer(limits, upstream);
         return new StreamingBody(sb, new StreamingNettyByteBody(sb));
     }
 

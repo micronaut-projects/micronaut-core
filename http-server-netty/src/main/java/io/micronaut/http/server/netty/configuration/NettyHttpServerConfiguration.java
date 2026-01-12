@@ -222,7 +222,10 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private int jsonBufferMaxComponents = DEFAULT_JSON_BUFFER_MAX_COMPONENTS;
     private boolean legacyMultiplexHandlers = false;
     private int formMaxFields = DEFAULT_FORM_MAX_FIELDS;
-    private int formMaxBufferedBytes = DEFAULT_FORM_MAX_BUFFERED_BYTES;
+    private long fieldMaxBufferedBytes = Long.MAX_VALUE;
+    private long fieldMaxBytes = Long.MAX_VALUE;
+    private long formMaxBufferedBytes = DEFAULT_FORM_MAX_BUFFERED_BYTES;
+    private long formMaxBytes = Long.MAX_VALUE;
     private boolean requestDecompressionEnabled = true;
     private Set<DecoderQuirk> formDecoderQuirks = Collections.emptySet();
 
@@ -855,25 +858,91 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     }
 
     /**
-     * The maximum number of bytes the form / multipart decoders are allowed to buffer internally.
-     * This sets a limit on form field size.
+     * The maximum number of bytes that are allowed to be buffered per form value. If there are
+     * multiple fields, this limit is counted separately for each.
+     *
+     * @return The maximum number of bytes
+     * @since 5.0.0
+     */
+    public long getFieldMaxBufferedBytes() {
+        return fieldMaxBufferedBytes;
+    }
+
+    /**
+     * The maximum number of bytes that are allowed to be buffered per form value. If there are
+     * multiple fields, this limit is counted separately for each.
+     *
+     * @param fieldMaxBufferedBytes The maximum number of bytes
+     * @since 5.0.0
+     */
+    public void setFieldMaxBufferedBytes(long fieldMaxBufferedBytes) {
+        this.fieldMaxBufferedBytes = fieldMaxBufferedBytes;
+    }
+
+    /**
+     * The maximum number of bytes per form <i>value</i>. If there are multiple fields, this limit
+     * is counted separately for each.
+     *
+     * @return The maximum number of bytes
+     * @since 5.0.0
+     */
+    public long getFieldMaxBytes() {
+        return fieldMaxBytes;
+    }
+
+    /**
+     * The maximum number of bytes per form <i>value</i>. If there are multiple fields, this limit
+     * is counted separately for each.
+     *
+     * @param fieldMaxBytes The maximum number of bytes
+     * @since 5.0.0
+     */
+    public void setFieldMaxBytes(long fieldMaxBytes) {
+        this.fieldMaxBytes = fieldMaxBytes;
+    }
+
+    /**
+     * The maximum number of bytes the entire form is allowed to buffer internally. If multiple
+     * fields are buffered, this limit is shared.
      *
      * @return The maximum number of buffered bytes
      * @since 4.6.0
      */
-    public int getFormMaxBufferedBytes() {
+    public long getFormMaxBufferedBytes() {
         return formMaxBufferedBytes;
     }
 
     /**
-     * The maximum number of bytes the form / multipart decoders are allowed to buffer internally.
-     * This sets a limit on form field size.
+     * The maximum number of bytes the entire form is allowed to buffer internally. If multiple
+     * fields are buffered, this limit is shared.
      *
      * @param formMaxBufferedBytes The maximum number of buffered bytes
      * @since 4.6.0
      */
-    public void setFormMaxBufferedBytes(int formMaxBufferedBytes) {
+    public void setFormMaxBufferedBytes(long formMaxBufferedBytes) {
         this.formMaxBufferedBytes = formMaxBufferedBytes;
+    }
+
+    /**
+     * The maximum number of bytes of all form <i>values</i>. If there are multiple fields, this
+     * limit is shared.
+     *
+     * @return The maximum number of bytes
+     * @since 5.0.0
+     */
+    public long getFormMaxBytes() {
+        return formMaxBytes;
+    }
+
+    /**
+     * The maximum number of bytes of all form <i>values</i>. If there are multiple fields, this
+     * limit is shared.
+     *
+     * @param formMaxBytes The maximum number of bytes
+     * @since 5.0.0
+     */
+    public void setFormMaxBytes(long formMaxBytes) {
+        this.formMaxBytes = formMaxBytes;
     }
 
     /**

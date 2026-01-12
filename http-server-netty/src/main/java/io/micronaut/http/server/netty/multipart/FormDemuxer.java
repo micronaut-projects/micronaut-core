@@ -29,6 +29,7 @@ import io.micronaut.http.body.stream.BaseSharedBuffer;
 import io.micronaut.http.body.stream.BaseStreamingByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
+import io.micronaut.http.body.stream.SizeLimitTracker;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.multipart.FormFieldMetadata;
 import io.micronaut.http.multipart.RawFormField;
@@ -66,7 +67,8 @@ public final class FormDemuxer implements BufferConsumer {
     private final PostBodyDecoder decoder;
     private final NettyByteBodyFactory byteBodyFactory;
     private final EventLoop eventLoop;
-    private final BodySizeLimits fieldLimits; // todo: share one limit between fields
+    private final SizeLimitTracker.TrackerPair totalTracker;
+    private final BodySizeLimits fieldLimits;
     @Nullable
     private final Upstream upstream;
 
@@ -78,11 +80,12 @@ public final class FormDemuxer implements BufferConsumer {
     private long unacknowledged = 0;
     private boolean decodeFailure = false;
 
-    public FormDemuxer(PostBodyDecoder decoder, Channel channel, BodySizeLimits fieldLimits, ByteBody byteBody) {
+    public FormDemuxer(PostBodyDecoder decoder, Channel channel, BodySizeLimits fieldLimits, BodySizeLimits totalLimits, ByteBody byteBody) {
         this.decoder = decoder;
         this.byteBodyFactory = new NettyByteBodyFactory(channel);
         this.eventLoop = channel.eventLoop();
         this.fieldLimits = fieldLimits;
+        this.totalTracker = SizeLimitTracker.notThreadSafe(totalLimits).makeBothAtomic();
         if (byteBody instanceof AvailableByteBody abb) {
             upstream = null;
             if (eventLoop.inEventLoop()) {
@@ -423,6 +426,7 @@ public final class FormDemuxer implements BufferConsumer {
 
             ByteBodyFactory.StreamingBody streamingBody = byteBodyFactory.createStreamingBody(fieldLimits, this);
             this.baseSharedBuffer = streamingBody.sharedBuffer();
+            this.baseSharedBuffer.addSizeLimitTrackers(totalTracker);
             this.rootBody = streamingBody.rootBody();
         }
 
