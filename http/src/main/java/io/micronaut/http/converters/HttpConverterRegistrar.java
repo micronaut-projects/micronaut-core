@@ -120,7 +120,8 @@ public class HttpConverterRegistrar implements TypeConverterRegistrar {
             } else {
                 try (ReadBuffer rb = object.toReadBuffer()) {
                     Optional<Object> direct = conversionService.convert(rb, targetType, context);
-                    if (direct.isPresent()) {
+                    // This detects Optional.empty and Optional[Optional.empty]
+                    if (direct.isPresent() && (!targetType.equals(Optional.class) || ((Optional<?>) direct.get()).isPresent())) {
                         return direct;
                     }
                     String s = rb.toString(context.getCharset());
