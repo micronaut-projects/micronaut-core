@@ -17,7 +17,6 @@ package io.micronaut.http.netty.channel;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NextMajorVersion;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.naming.Named;
 
 import java.time.Duration;
@@ -104,7 +103,6 @@ public interface EventLoopGroupConfiguration extends Named {
      *
      * @return The available transports, in order of preference
      */
-    @NonNull
     @NextMajorVersion("Change default to all transports")
     default List<String> getTransport() {
         return isPreferNativeTransport() ? DefaultEventLoopGroupFactory.FACTORY_PRIORITY : List.of(NioEventLoopGroupFactory.NAME);

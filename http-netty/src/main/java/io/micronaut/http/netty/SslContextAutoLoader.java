@@ -17,7 +17,6 @@ package io.micronaut.http.netty;
 
 import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.ssl.CertificateProvider;
 import io.micronaut.http.ssl.SslConfiguration;
@@ -126,14 +125,14 @@ public abstract class SslContextAutoLoader {
      *
      * @return a provider of {@link CertificateProvider} beans
      */
-    protected abstract @NonNull BeanProvider<CertificateProvider> certificateProviders();
+    protected abstract BeanProvider<CertificateProvider> certificateProviders();
 
     /**
      * The SSL configuration used to derive defaults like protocols, ciphers and client auth.
      *
      * @return the SSL configuration
      */
-    protected abstract @NonNull SslConfiguration sslConfiguration();
+    protected abstract SslConfiguration sslConfiguration();
 
     /**
      * Whether the target transport is QUIC/HTTP3 (true) or TCP (false).
@@ -148,7 +147,7 @@ public abstract class SslContextAutoLoader {
      *
      * @return a holder for legacy contexts
      */
-    protected abstract @NonNull SslContextHolder createLegacy();
+    protected abstract SslContextHolder createLegacy();
 
     /**
      * Start auto-loading using names from {@link SslConfiguration}
@@ -216,7 +215,7 @@ public abstract class SslContextAutoLoader {
      *
      * @return the builder to construct Netty SSL contexts
      */
-    protected abstract @NonNull NettySslContextBuilder builder();
+    protected abstract NettySslContextBuilder builder();
 
     /**
      * Build fresh SSL contexts from the supplied key/trust stores and swap the active holder.

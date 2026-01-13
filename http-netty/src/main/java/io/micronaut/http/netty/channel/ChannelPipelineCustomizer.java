@@ -16,8 +16,6 @@
 package io.micronaut.http.netty.channel;
 
 import io.micronaut.core.annotation.NextMajorVersion;
-import org.jspecify.annotations.NonNull;
-
 /**
  * Interface that allows customizations to the {@link io.netty.channel.ChannelPipeline}.
  *
@@ -90,5 +88,5 @@ public interface ChannelPipelineCustomizer {
      * @deprecated Use NettyClientCustomizer or NettyServerCustomizer instead.
      */
     @Deprecated
-    void doOnConnect(@NonNull ChannelPipelineListener listener);
+    void doOnConnect(ChannelPipelineListener listener);
 }

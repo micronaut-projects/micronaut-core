@@ -16,7 +16,6 @@
 package io.micronaut.http.netty;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.async.publisher.Publishers;
@@ -176,7 +175,7 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
      * @param response The mn response
      * @return The netty response
      */
-    public static @NonNull HttpResponse toNoBodyResponse(io.micronaut.http.@NonNull HttpResponse<?> response) {
+    public static HttpResponse toNoBodyResponse(io.micronaut.http.HttpResponse<?> response) {
         Objects.requireNonNull(response, "The response cannot be null");
         while (response instanceof HttpResponseWrapper<?> wrapper) {
             response = wrapper.getDelegate();
@@ -357,7 +356,6 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
         return this;
     }
 
-    @NonNull
     @Override
     public FullHttpResponse toFullHttpResponse() {
         ByteBuf content;
@@ -379,7 +377,6 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
         return defaultFullHttpResponse;
     }
 
-    @NonNull
     @Override
     public StreamedHttpResponse toStreamHttpResponse() {
         ByteBuf content;
@@ -400,7 +397,6 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
         return streamedHttpResponse;
     }
 
-    @NonNull
     @Override
     public HttpResponse toHttpResponse() {
         return toFullHttpResponse();

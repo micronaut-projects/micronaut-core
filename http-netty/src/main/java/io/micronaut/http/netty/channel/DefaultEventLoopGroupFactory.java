@@ -17,7 +17,6 @@ package io.micronaut.http.netty.channel;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Primary;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.http.netty.configuration.NettyGlobalConfiguration;
@@ -87,7 +86,7 @@ public class DefaultEventLoopGroupFactory implements EventLoopGroupFactory {
      */
     @Inject
     public DefaultEventLoopGroupFactory(
-        @NonNull Map<String, EventLoopGroupFactory> eventLoopGroupFactories,
+        Map<String, EventLoopGroupFactory> eventLoopGroupFactories,
         @Nullable NettyGlobalConfiguration nettyGlobalConfiguration) {
 
         this.factories = eventLoopGroupFactories;
@@ -120,7 +119,7 @@ public class DefaultEventLoopGroupFactory implements EventLoopGroupFactory {
     }
 
     @Override
-    public IoHandlerFactory createIoHandlerFactory(@NonNull EventLoopGroupConfiguration configuration) {
+    public IoHandlerFactory createIoHandlerFactory(EventLoopGroupConfiguration configuration) {
         return getFactory(configuration).createIoHandlerFactory(configuration);
     }
 

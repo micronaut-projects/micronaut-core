@@ -17,7 +17,6 @@ package io.micronaut.http.netty.channel;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.netty.channel.Channel;
 import io.netty.channel.IoHandlerFactory;
@@ -77,7 +76,7 @@ public class NioEventLoopGroupFactory implements EventLoopGroupFactory {
     }
 
     @Override
-    public @NonNull Channel channelInstance(NettyChannelType type, @Nullable EventLoopGroupConfiguration configuration, Channel parent, int fd) {
+    public Channel channelInstance(NettyChannelType type, @Nullable EventLoopGroupConfiguration configuration, Channel parent, int fd) {
         if (fd != 0) {
             throw new IllegalArgumentException("With nio, only channel fd 0 is supported. Either switch to fd 0, or use the epoll transport that supports any fd.");
         }

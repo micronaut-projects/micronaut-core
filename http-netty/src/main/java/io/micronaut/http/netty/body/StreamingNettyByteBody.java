@@ -33,7 +33,6 @@ import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.util.ResourceLeakDetector;
 import io.netty.util.ResourceLeakDetectorFactory;
 import io.netty.util.ResourceLeakTracker;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 import java.util.function.Supplier;
@@ -91,7 +90,7 @@ public final class StreamingNettyByteBody extends BaseStreamingByteBody<Streamin
     }
 
     @Override
-    public @NonNull CloseableByteBody split(@NonNull SplitBackpressureMode backpressureMode) {
+    public CloseableByteBody split(SplitBackpressureMode backpressureMode) {
         touch();
         BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {
@@ -104,7 +103,7 @@ public final class StreamingNettyByteBody extends BaseStreamingByteBody<Streamin
     }
 
     @Override
-    public @NonNull ExecutionFlow<? extends CloseableAvailableByteBody> bufferFlow() {
+    public ExecutionFlow<? extends CloseableAvailableByteBody> bufferFlow() {
         BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {
             failClaim();

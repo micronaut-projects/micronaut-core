@@ -16,7 +16,6 @@
 package io.micronaut.http.netty.cookies;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.ServerCookieDecoder;
 
@@ -30,8 +29,7 @@ import static io.netty.handler.codec.http.cookie.ServerCookieDecoder.LAX;
 @Internal
 public final class NettyLaxServerCookieDecoder implements ServerCookieDecoder {
     @Override
-    @NonNull
-    public List<Cookie> decode(@NonNull String headerValue) {
+    public List<Cookie> decode(String headerValue) {
         return LAX.decode(headerValue)
                 .stream()
                 .map(nettyCookie -> (Cookie) new NettyCookie(nettyCookie))

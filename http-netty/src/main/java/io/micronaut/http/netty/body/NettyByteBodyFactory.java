@@ -18,7 +18,6 @@ package io.micronaut.http.netty.body;
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.buffer.ReadBuffer;
@@ -50,7 +49,7 @@ import reactor.core.publisher.Flux;
 public final class NettyByteBodyFactory extends ByteBodyFactory {
     private final EventLoop loop;
 
-    public NettyByteBodyFactory(@NonNull Channel channel) {
+    public NettyByteBodyFactory(Channel channel) {
         this(channel.alloc(), channel.eventLoop());
     }
 
@@ -60,7 +59,7 @@ public final class NettyByteBodyFactory extends ByteBodyFactory {
     }
 
     @Override
-    public @NonNull NettyReadBufferFactory readBufferFactory() {
+    public NettyReadBufferFactory readBufferFactory() {
         return (NettyReadBufferFactory) super.readBufferFactory();
     }
 
@@ -79,7 +78,7 @@ public final class NettyByteBodyFactory extends ByteBodyFactory {
         return adapt(readBufferFactory().adapt(byteBuf));
     }
 
-    public CloseableByteBody createChecked(@NonNull BodySizeLimits bodySizeLimits, @NonNull ByteBuf buf) {
+    public CloseableByteBody createChecked(BodySizeLimits bodySizeLimits, ByteBuf buf) {
         // AvailableNettyByteBody does not support exceptions, so if we hit one of the configured
         // limits, we return a StreamingNettyByteBody instead.
         int readable = buf.readableBytes();

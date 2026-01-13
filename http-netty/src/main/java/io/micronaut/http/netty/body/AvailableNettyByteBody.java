@@ -18,7 +18,6 @@ package io.micronaut.http.netty.body;
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
@@ -56,7 +55,7 @@ public final class AvailableNettyByteBody extends InternalByteBody implements Cl
     @Nullable
     private ByteBuf buffer;
 
-    public AvailableNettyByteBody(@NonNull ByteBuf buffer) {
+    public AvailableNettyByteBody(ByteBuf buffer) {
         this.buffer = Objects.requireNonNull(buffer, "buffer");
         this.length = buffer.readableBytes();
     }
@@ -66,8 +65,7 @@ public final class AvailableNettyByteBody extends InternalByteBody implements Cl
             NettyReadBufferFactory.of(ByteBufAllocator.DEFAULT).createEmpty());
     }
 
-    @NonNull
-    public static ByteBuf toByteBuf(@NonNull AvailableByteBody body) {
+    public static ByteBuf toByteBuf(AvailableByteBody body) {
         return NettyByteBodyFactory.toByteBuf(body);
     }
 
@@ -81,8 +79,7 @@ public final class AvailableNettyByteBody extends InternalByteBody implements Cl
      * @return The body with the given input buffer, or a {@link StreamingNettyByteBody} with the
      * appropriate content length error
      */
-    @NonNull
-    public static CloseableByteBody createChecked(@NonNull EventLoop loop, @NonNull BodySizeLimits bodySizeLimits, @NonNull ByteBuf buf) {
+    public static CloseableByteBody createChecked(EventLoop loop, BodySizeLimits bodySizeLimits, ByteBuf buf) {
         return new NettyByteBodyFactory(buf.alloc(), loop).createChecked(bodySizeLimits, buf);
     }
 
@@ -95,7 +92,7 @@ public final class AvailableNettyByteBody extends InternalByteBody implements Cl
     }
 
     @Override
-    public @NonNull InputStream toInputStream() {
+    public InputStream toInputStream() {
         return new ByteBufInputStream(claim(), true);
     }
 
@@ -104,7 +101,6 @@ public final class AvailableNettyByteBody extends InternalByteBody implements Cl
         return length;
     }
 
-    @NonNull
     private ByteBuf claim() {
         ByteBuf b = buffer;
         if (b == null) {
@@ -117,7 +113,7 @@ public final class AvailableNettyByteBody extends InternalByteBody implements Cl
     }
 
     @Override
-    public @NonNull ExecutionFlow<? extends CloseableAvailableByteBody> bufferFlow() {
+    public ExecutionFlow<? extends CloseableAvailableByteBody> bufferFlow() {
         return ExecutionFlow.just(new AvailableNettyByteBody(claim()));
     }
 
@@ -133,12 +129,12 @@ public final class AvailableNettyByteBody extends InternalByteBody implements Cl
 
     @SuppressWarnings("deprecation")
     @Override
-    public @NonNull Publisher<ReadBuffer> toReadBufferPublisher() {
+    public Publisher<ReadBuffer> toReadBufferPublisher() {
         return Flux.just(NettyReadBufferFactory.of(ByteBufAllocator.DEFAULT).adapt(claim()));
     }
 
     @Override
-    public byte @NonNull [] toByteArray() {
+    public byte[] toByteArray() {
         ByteBuf b = claim();
         try {
             return ByteBufUtil.getBytes(b);
@@ -148,17 +144,17 @@ public final class AvailableNettyByteBody extends InternalByteBody implements Cl
     }
 
     @Override
-    public @NonNull ByteBuffer<?> toByteBuffer() {
+    public ByteBuffer<?> toByteBuffer() {
         return NettyByteBufferFactory.DEFAULT.wrap(claim());
     }
 
     @Override
-    public @NonNull CloseableByteBody move() {
+    public CloseableByteBody move() {
         return new AvailableNettyByteBody(claim());
     }
 
     @Override
-    public @NonNull String toString(Charset charset) {
+    public String toString(Charset charset) {
         ByteBuf b = claim();
         try {
             return b.toString(charset);
@@ -168,7 +164,7 @@ public final class AvailableNettyByteBody extends InternalByteBody implements Cl
     }
 
     @Override
-    public @NonNull CloseableAvailableByteBody split() {
+    public CloseableAvailableByteBody split() {
         ByteBuf b = buffer;
         if (b == null) {
             failClaim();

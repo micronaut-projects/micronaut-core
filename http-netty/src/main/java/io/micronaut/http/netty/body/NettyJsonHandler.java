@@ -19,7 +19,6 @@ import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.annotation.Order;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
@@ -128,12 +127,12 @@ public final class NettyJsonHandler<T> implements MessageBodyHandler<T>, Chunked
     }
 
     @Override
-    public ByteBodyHttpResponse<?> write(@NonNull ByteBodyFactory bodyFactory, @NonNull HttpRequest<?> request, @NonNull MutableHttpResponse<T> outgoingResponse, @NonNull Argument<T> type, @NonNull MediaType mediaType, @NonNull T object) throws CodecException {
+    public ByteBodyHttpResponse<?> write(ByteBodyFactory bodyFactory, HttpRequest<?> request, MutableHttpResponse<T> outgoingResponse, Argument<T> type, MediaType mediaType, T object) throws CodecException {
         return jsonMessageHandler.write(bodyFactory, request, outgoingResponse, type, mediaType, object);
     }
 
     @Override
-    public CloseableByteBody writePiece(@NonNull ByteBodyFactory bodyFactory, @NonNull HttpRequest<?> request, @NonNull HttpResponse<?> response, @NonNull Argument<T> type, @NonNull MediaType mediaType, T object) {
+    public CloseableByteBody writePiece(ByteBodyFactory bodyFactory, HttpRequest<?> request, HttpResponse<?> response, Argument<T> type, MediaType mediaType, T object) {
         return jsonMessageHandler.writePiece(bodyFactory, request, response, type, mediaType, object);
     }
 

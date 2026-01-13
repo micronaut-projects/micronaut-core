@@ -19,5 +19,8 @@
  * @author Sergio del Amo
  * @since 1.0
  */
+@NullMarked
 package io.micronaut.http.netty.channel;
 
+
+import org.jspecify.annotations.NullMarked;
