@@ -1,7 +1,7 @@
 package io.micronaut.http.server.netty.binding
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.http.HttpStatus
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
 import io.micronaut.http.MutableHttpResponse
 import io.micronaut.http.annotation.Consumes
@@ -11,8 +11,8 @@ import io.micronaut.http.multipart.StreamingFileUpload
 import io.micronaut.runtime.server.EmbeddedServer
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import spock.lang.Issue
-import spock.lang.Requires
 import spock.lang.Specification
 import spock.lang.Timeout
 
@@ -105,7 +105,7 @@ Content-Type: ${contentType}\r
             }
             return Flux.from(dataFile)
                     .flatMap { it.transferTo(os) }
-                    .map { success -> success ? io.micronaut.http.HttpResponse.<String> ok('uploaded') : io.micronaut.http.HttpResponse.<String> status(HttpStatus.INTERNAL_SERVER_ERROR, 'error 1') }
+                    .then(Mono.just(HttpResponse.<String> ok('uploaded')))
         }
     }
 }

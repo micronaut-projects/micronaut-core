@@ -163,7 +163,7 @@ public final class StreamingFileUpload implements Closeable {
      * <p>A convenience method to write this uploaded item the provided output stream.</p>
      *
      * @param outputStream the destination to which the stream will be written.
-     * @return A {@link Publisher} that outputs whether the transfer was successful
+     * @return A {@link Publisher} that completes when the transfer is done
      * @since 3.1.0
      */
     public Publisher<?> transferTo(OutputStream outputStream) {
