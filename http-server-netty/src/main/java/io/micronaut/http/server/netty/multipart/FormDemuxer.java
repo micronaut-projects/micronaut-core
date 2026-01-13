@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.multipart;
 
+import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
@@ -34,7 +35,6 @@ import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.multipart.FormFieldMetadata;
 import io.micronaut.http.multipart.RawFormField;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
-import io.micronaut.http.netty.body.StreamingNettyByteBody;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
@@ -65,7 +65,8 @@ import java.util.Optional;
 public final class FormDemuxer implements BufferConsumer {
     private static final Logger LOG = LoggerFactory.getLogger(FormDemuxer.class);
     private final PostBodyDecoder decoder;
-    private final NettyByteBodyFactory byteBodyFactory;
+    private final ByteBodyFactory byteBodyFactory;
+    @Nullable
     private final EventLoop eventLoop;
     private final SizeLimitTracker.TrackerPair totalTracker;
     private final BodySizeLimits fieldLimits;
@@ -82,23 +83,25 @@ public final class FormDemuxer implements BufferConsumer {
 
     public FormDemuxer(PostBodyDecoder decoder, Channel channel, BodySizeLimits fieldLimits, BodySizeLimits totalLimits, ByteBody byteBody) {
         this.decoder = decoder;
-        this.byteBodyFactory = new NettyByteBodyFactory(channel);
-        this.eventLoop = channel.eventLoop();
         this.fieldLimits = fieldLimits;
-        this.totalTracker = SizeLimitTracker.notThreadSafe(totalLimits).makeBothAtomic();
         if (byteBody instanceof AvailableByteBody abb) {
+            // NettyBodyAnnotationBinder triggers this branch from outside the EventLoop sometimes,
+            // and requires immediate results, without waiting for the EventLoop. That means we
+            // need to take some special measures.
+
+            this.eventLoop = null;
+            // we need to use a reactive byteBodyFactory here so we don't need to wait for the event loop
+            this.byteBodyFactory = new ByteBodyFactory(NettyByteBufferFactory.DEFAULT, NettyReadBufferFactory.of(channel.alloc())) {
+            };
+            this.totalTracker = SizeLimitTracker.notThreadSafe(totalLimits);
             upstream = null;
-            if (eventLoop.inEventLoop()) {
-                add(abb.toReadBuffer());
-                complete();
-            } else {
-                eventLoop.execute(() -> {
-                    add(abb.toReadBuffer());
-                    complete();
-                });
-            }
+            add(abb.toReadBuffer());
+            complete();
         } else {
-            try (StreamingNettyByteBody s = byteBodyFactory.toStreaming(byteBody)) {
+            this.eventLoop = channel.eventLoop();
+            this.byteBodyFactory = new NettyByteBodyFactory(channel);
+            this.totalTracker = SizeLimitTracker.notThreadSafe(totalLimits).makeBothAtomic();
+            try (var s = byteBodyFactory.toStreaming(byteBody)) {
                 this.upstream = s.primary(this);
             }
             // we delay streaming until the upstream is set, so let's do that now.
@@ -119,7 +122,7 @@ public final class FormDemuxer implements BufferConsumer {
     }
 
     private void cancel() {
-        if (!eventLoop.inEventLoop()) {
+        if (eventLoop != null && !eventLoop.inEventLoop()) {
             eventLoop.execute(this::cancel);
             return;
         }
@@ -129,7 +132,7 @@ public final class FormDemuxer implements BufferConsumer {
     }
 
     private void handleDecoderException(Exception e) {
-        assert eventLoop.inEventLoop();
+        assert eventLoop == null || eventLoop.inEventLoop();
         decodeFailure = true;
 
         if (e instanceof TooManyFormFieldsException) {
@@ -149,7 +152,7 @@ public final class FormDemuxer implements BufferConsumer {
     }
 
     private void forwardOutput() {
-        assert eventLoop.inEventLoop();
+        assert eventLoop == null || eventLoop.inEventLoop();
         while (state != null) {
             PostBodyDecoder.Event event = decoder.next();
             if (event == null) {
@@ -201,7 +204,7 @@ public final class FormDemuxer implements BufferConsumer {
     }
 
     private void emit(FormFieldMetadata metadata, ByteBody content) {
-        assert eventLoop.inEventLoop();
+        assert eventLoop == null || eventLoop.inEventLoop();
         CloseableByteBody moved = content.move();
         Sinks.EmitResult result = sink.tryEmitNext(new RawFormField(metadata, moved));
         if (result.isFailure()) {
@@ -211,7 +214,7 @@ public final class FormDemuxer implements BufferConsumer {
 
     @Override
     public void add(@NonNull ReadBuffer rb) {
-        assert eventLoop.inEventLoop();
+        assert eventLoop == null || eventLoop.inEventLoop();
 
         if (state == null) {
             rb.close();
@@ -231,7 +234,7 @@ public final class FormDemuxer implements BufferConsumer {
 
     @Override
     public void complete() {
-        assert eventLoop.inEventLoop();
+        assert eventLoop == null || eventLoop.inEventLoop();
         try {
             decoder.endInput();
         } catch (Exception e) {
@@ -244,7 +247,7 @@ public final class FormDemuxer implements BufferConsumer {
 
     @Override
     public void discard() {
-        assert eventLoop.inEventLoop();
+        assert eventLoop == null || eventLoop.inEventLoop();
         if (state instanceof StreamingContent sc) {
             sc.baseSharedBuffer.discard();
         }
@@ -253,7 +256,7 @@ public final class FormDemuxer implements BufferConsumer {
 
     @Override
     public void error(Throwable e) {
-        assert eventLoop.inEventLoop();
+        assert eventLoop == null || eventLoop.inEventLoop();
         if (state instanceof StreamingContent sc) {
             sc.baseSharedBuffer.error(e);
         }
@@ -375,7 +378,7 @@ public final class FormDemuxer implements BufferConsumer {
                 }
                 FormFieldMetadata metadata = headers.computeMetadata();
                 buffers.clear(); // avoid double release
-                try (CloseableByteBody body = byteBodyFactory.createChecked(fieldLimits, combined)) {
+                try (CloseableByteBody body = byteBodyFactory.createChecked(fieldLimits, ((NettyReadBufferFactory) byteBodyFactory.readBufferFactory()).adapt(combined))) {
                     emit(metadata, body);
                 }
 
@@ -432,7 +435,7 @@ public final class FormDemuxer implements BufferConsumer {
 
         void add(ByteBuf content) {
             unacknowledged += content.readableBytes();
-            baseSharedBuffer.add(byteBodyFactory.readBufferFactory().adapt(content));
+            baseSharedBuffer.add(((NettyReadBufferFactory) byteBodyFactory.readBufferFactory()).adapt(content));
         }
 
         @Override
@@ -457,7 +460,7 @@ public final class FormDemuxer implements BufferConsumer {
 
         @Override
         public void onBytesConsumed(long bytesConsumed) {
-            if (!eventLoop.inEventLoop()) {
+            if (eventLoop != null && !eventLoop.inEventLoop()) {
                 eventLoop.execute(() -> onBytesConsumed(bytesConsumed));
                 return;
             }
@@ -477,7 +480,7 @@ public final class FormDemuxer implements BufferConsumer {
                 // shortcut
                 return;
             }
-            if (!eventLoop.inEventLoop()) {
+            if (eventLoop != null && !eventLoop.inEventLoop()) {
                 eventLoop.execute(this::allowDiscard);
                 return;
             }

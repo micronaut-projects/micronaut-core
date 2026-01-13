@@ -80,18 +80,7 @@ public final class NettyByteBodyFactory extends ByteBodyFactory {
     }
 
     public CloseableByteBody createChecked(@NonNull BodySizeLimits bodySizeLimits, @NonNull ByteBuf buf) {
-        // AvailableNettyByteBody does not support exceptions, so if we hit one of the configured
-        // limits, we return a StreamingNettyByteBody instead.
-        int readable = buf.readableBytes();
-        if (readable > bodySizeLimits.maxBodySize() || readable > bodySizeLimits.maxBufferSize()) {
-            BufferConsumer.Upstream upstream = bytesConsumed -> {
-            };
-            StreamingNettyByteBody.SharedBuffer mockBuffer = createStreamingBuffer(bodySizeLimits, upstream);
-            mockBuffer.add(readBufferFactory().adapt(buf)); // this will trigger the exception for exceeded body or buffer size
-            return new StreamingNettyByteBody(mockBuffer);
-        } else {
-            return adapt(buf);
-        }
+        return createChecked(bodySizeLimits, readBufferFactory().adapt(buf));
     }
 
     public CloseableByteBody adaptNetty(Publisher<ByteBuf> publisher) {
