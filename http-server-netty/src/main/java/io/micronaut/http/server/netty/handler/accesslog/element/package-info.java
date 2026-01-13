@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2026 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,12 +14,9 @@
  * limitations under the License.
  */
 /**
- * Netty Server WebSocket support classes.
- *
- * @author graemerocher
- * @since 1.0
+ * The package info.
  */
 @NullMarked
-package io.micronaut.http.server.netty.websocket;
+package io.micronaut.http.server.netty.handler.accesslog.element;
 
 import org.jspecify.annotations.NullMarked;

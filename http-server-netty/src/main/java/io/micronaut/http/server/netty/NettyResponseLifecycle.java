@@ -17,7 +17,6 @@ package io.micronaut.http.server.netty;
 
 import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.async.subscriber.LazySendingSubscriber;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ReadBuffer;
@@ -87,12 +86,12 @@ final class NettyResponseLifecycle extends ResponseLifecycle {
     }
 
     @Override
-    protected @NonNull CloseableByteBody concatenate(Publisher<ByteBody> items) {
+    protected CloseableByteBody concatenate(Publisher<ByteBody> items) {
         return NettyConcatenatingSubscriber.concatenate(byteBodyFactory(), ConcatenatingSubscriber.Separators.NONE, items);
     }
 
     @Override
-    protected @NonNull CloseableByteBody concatenateJson(Publisher<ByteBody> items) {
+    protected CloseableByteBody concatenateJson(Publisher<ByteBody> items) {
         return NettyConcatenatingSubscriber.concatenate(byteBodyFactory(), NettyConcatenatingSubscriber.JSON_NETTY, items);
     }
 
@@ -113,7 +112,7 @@ final class NettyResponseLifecycle extends ResponseLifecycle {
         }
 
         @Override
-        public void add(@NonNull ReadBuffer buffer) {
+        public void add(ReadBuffer buffer) {
             if (flow.executeNow(() -> super.add(buffer))) {
                 super.add(buffer);
             }

@@ -17,7 +17,6 @@ package io.micronaut.http.server.netty.handler;
 
 import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.util.NativeImageUtils;
@@ -236,7 +235,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     }
 
     @Override
-    public void channelRead(@NonNull ChannelHandlerContext ctx, @NonNull Object msg) throws Exception {
+    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
         reading = true;
         inboundHandler.read(msg);
     }
@@ -373,7 +372,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
     }
 
-    private @NonNull NettyByteBodyFactory byteBodyFactory() {
+    private NettyByteBodyFactory byteBodyFactory() {
         return new NettyByteBodyFactory(ctx.channel());
     }
 
@@ -933,7 +932,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         @Override
-        public void writeHeadResponse(@NonNull HttpResponse response) {
+        public void writeHeadResponse(HttpResponse response) {
             writeFull(new DefaultFullHttpResponse(
                 response.protocolVersion(),
                 response.status(),
@@ -961,7 +960,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         @Override
-        public void write(@NonNull HttpResponse response, @NonNull ByteBody body) {
+        public void write(HttpResponse response, ByteBody body) {
             if (body instanceof AvailableByteBody available) {
                 writeFull(new DefaultFullHttpResponse(response.protocolVersion(), response.status(), NettyByteBodyFactory.toByteBuf(available), response.headers(), EmptyHttpHeaders.INSTANCE), false);
             } else {

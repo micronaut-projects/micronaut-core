@@ -16,7 +16,6 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.http.netty.stream.StreamedHttpMessage;
 import io.netty.handler.codec.http.HttpContent;
 import org.reactivestreams.Publisher;
@@ -50,7 +49,6 @@ public final class HttpContentProcessorAsReactiveProcessor {
      * @return The publisher producing output data
      * @param <T> The output element type
      */
-    @NonNull
     public static <T> Flux<T> asPublisher(FormDataHttpContentProcessor processor, Publisher<HttpContent> streamed) {
         return Flux.concat(Flux.from(streamed)
             .doOnError(e -> {

@@ -16,7 +16,6 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.server.HttpServerConfiguration;
@@ -475,7 +474,7 @@ public abstract sealed class MicronautHttpData<D extends HttpData> extends Abstr
     }
 
     @Override
-    public int compareTo(@NonNull InterfaceHttpData o) {
+    public int compareTo(InterfaceHttpData o) {
         throw new UnsupportedOperationException();
     }
 
@@ -750,7 +749,7 @@ public abstract sealed class MicronautHttpData<D extends HttpData> extends Abstr
         }
 
         @Override
-        public int read(byte @NonNull [] b, int off, int len) throws IOException {
+        public int read(byte[] b, int off, int len) throws IOException {
             if (!buf.isReadable()) {
                 buf.release();
 

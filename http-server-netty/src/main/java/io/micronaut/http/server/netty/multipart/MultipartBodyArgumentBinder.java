@@ -17,7 +17,6 @@ package io.micronaut.http.server.netty.multipart;
 
 import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
@@ -68,7 +67,7 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
     public BindingResult<MultipartBody> bind(ArgumentConversionContext<MultipartBody> context, HttpRequest<?> source) {
         if (source instanceof NettyHttpRequest<?> nhr) {
             FormDataHttpContentProcessor processor = new FormDataHttpContentProcessor(nhr, httpServerConfiguration.get());
-            @NonNull Flux<HttpData> multiObjectBody;
+            Flux<HttpData> multiObjectBody;
             try {
                 multiObjectBody = HttpContentProcessorAsReactiveProcessor.asPublisher(processor, NettyByteBodyFactory.toByteBufs(nhr.byteBody()).map(DefaultHttpContent::new));
             } catch (Throwable e) {

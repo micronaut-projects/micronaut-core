@@ -22,7 +22,6 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.io.socket.SocketUtils;
@@ -281,7 +280,6 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     }
 
     @Override
-    @NonNull
     public synchronized NettyEmbeddedServer start() {
         if (!isRunning()) {
             if (isDefault && !applicationContext.isRunning()) {
@@ -353,18 +351,15 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     }
 
     @Override
-    @NonNull
     public synchronized NettyEmbeddedServer stop() {
         return stop(false);
     }
 
     @Override
-    @NonNull
     public NettyEmbeddedServer stopServerOnly() {
         return stop(true);
     }
 
-    @NonNull
     private NettyEmbeddedServer stop(boolean stopServerOnly) {
         if (isRunning() && workerGroup != null) {
             if (running.compareAndSet(true, false)) {
@@ -375,7 +370,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     }
 
     @Override
-    public void register(@NonNull NettyServerCustomizer customizer) {
+    public void register(NettyServerCustomizer customizer) {
         Objects.requireNonNull(customizer, "customizer");
         rootCustomizer.add(customizer);
     }
@@ -576,7 +571,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                         // setServerChannel has been called by the time bind runs.
                         .handler(new ChannelInitializer<Channel>() {
                             @Override
-                            protected void initChannel(@NonNull Channel ch) {
+                            protected void initChannel(Channel ch) {
                                 listener.setServerChannel(ch);
                             }
                         })
@@ -854,7 +849,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     }
 
     @Override
-    public void doOnConnect(@NonNull ChannelPipelineListener listener) {
+    public void doOnConnect(ChannelPipelineListener listener) {
         this.pipelineListeners.add(Objects.requireNonNull(listener, "The listener cannot be null"));
     }
 
@@ -921,7 +916,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             ChannelPromise closePromise;
 
             @Override
-            public void channelRead(@NonNull ChannelHandlerContext ctx, @NonNull Object msg) throws Exception {
+            public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
                 reading = true;
                 ctx.fireChannelRead(msg);
                 reading = false;
@@ -1037,7 +1032,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         }
 
         @Override
-        protected void initChannel(@NonNull Channel ch) throws Exception {
+        protected void initChannel(Channel ch) throws Exception {
             HttpPipelineBuilder.ConnectionPipeline cp = httpPipelineBuilder.new ConnectionPipeline(ch, contextWrapper.takeRetained());
             activeConnections.add(cp);
             ch.closeFuture().addListener((ChannelFutureListener) future -> activeConnections.remove(cp));
@@ -1094,7 +1089,6 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     }
 
     private static final class DomainSocketHolder {
-        @NonNull
         private static SocketAddress makeDomainSocketAddress(String path) {
             try {
                 return new DomainSocketAddress(path);

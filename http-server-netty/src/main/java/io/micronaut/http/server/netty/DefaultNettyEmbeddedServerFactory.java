@@ -22,7 +22,6 @@ import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.core.order.OrderUtil;
@@ -142,14 +141,12 @@ public class DefaultNettyEmbeddedServerFactory
     }
 
     @Override
-    @NonNull
-    public NettyEmbeddedServer build(@NonNull NettyHttpServerConfiguration configuration) {
+    public NettyEmbeddedServer build(NettyHttpServerConfiguration configuration) {
         return buildInternal(configuration, false, null);
     }
 
     @Override
-    @NonNull
-    public NettyEmbeddedServer build(@NonNull NettyHttpServerConfiguration configuration, @Nullable ServerSslConfiguration sslConfiguration) {
+    public NettyEmbeddedServer build(NettyHttpServerConfiguration configuration, @Nullable ServerSslConfiguration sslConfiguration) {
         return buildInternal(configuration, false, sslConfiguration);
     }
 
@@ -160,8 +157,7 @@ public class DefaultNettyEmbeddedServerFactory
      */
     @Singleton
     @Primary
-    @NonNull
-    protected NettyEmbeddedServer buildDefaultServer(@NonNull NettyHttpServerConfiguration configuration) {
+    protected NettyEmbeddedServer buildDefaultServer(NettyHttpServerConfiguration configuration) {
         return buildInternal(configuration, true, null);
     }
 
@@ -170,8 +166,7 @@ public class DefaultNettyEmbeddedServerFactory
         return messageBodyHandlerRegistry;
     }
 
-    @NonNull
-    private NettyEmbeddedServer buildInternal(@NonNull NettyHttpServerConfiguration configuration,
+    private NettyEmbeddedServer buildInternal(NettyHttpServerConfiguration configuration,
                                               boolean isDefaultServer,
                                               @Nullable ServerSslConfiguration sslConfiguration) {
         Objects.requireNonNull(configuration, "Netty HTTP server configuration cannot be null");
@@ -192,7 +187,7 @@ public class DefaultNettyEmbeddedServerFactory
         }
     }
 
-    private NettyEmbeddedServices resolveNettyEmbeddedServices(@NonNull NettyHttpServerConfiguration configuration,
+    private NettyEmbeddedServices resolveNettyEmbeddedServices(NettyHttpServerConfiguration configuration,
                                                                @Nullable ServerSslConfiguration sslConfiguration) {
         if (sslConfiguration != null && sslConfiguration.isEnabled()) {
             ServerSslBuilder resolvedSslBuilder;
@@ -322,13 +317,12 @@ public class DefaultNettyEmbeddedServerFactory
     }
 
     @Override
-    public @NonNull BeanProvider<CertificateProvider> getCertificateProviders() {
+    public BeanProvider<CertificateProvider> getCertificateProviders() {
         return certificateProviders;
     }
 
     @Override
-    @NonNull
-    public EventLoopGroup createEventLoopGroup(int numThreads, @NonNull ExecutorService executorService, Integer ioRatio) {
+    public EventLoopGroup createEventLoopGroup(int numThreads, ExecutorService executorService, Integer ioRatio) {
         return eventLoopGroupFactory.createEventLoopGroup(
                 numThreads,
                 executorService,

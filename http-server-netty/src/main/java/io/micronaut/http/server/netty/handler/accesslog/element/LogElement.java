@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.http.server.netty.handler.accesslog.element;
-
-import org.jspecify.annotations.NonNull;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.http.HttpHeaders;
@@ -82,7 +80,7 @@ public interface LogElement {
      * @param protocol The request protocol.
      * @return The processed value.
      */
-    default String onRequestHeaders(@NonNull ConnectionMetadata metadata, @NonNull String method, @NonNull HttpHeaders headers, @NonNull String uri, @NonNull String protocol) {
+    default String onRequestHeaders(ConnectionMetadata metadata, String method, HttpHeaders headers, String uri, String protocol) {
         SocketChannel ch = metadata instanceof ConnectionMetadataImpl.SocketChannelMetadata m ? m.ch() : null;
         return onRequestHeaders(ch, method, headers, uri, protocol);
     }

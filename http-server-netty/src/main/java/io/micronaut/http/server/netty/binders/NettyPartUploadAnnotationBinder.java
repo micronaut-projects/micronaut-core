@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.http.server.netty.binders;
-
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionError;
@@ -73,7 +71,6 @@ final class NettyPartUploadAnnotationBinder<T> implements AnnotatedRequestArgume
         return bindPart(conversionService, context, nettyRequest, inputName, false);
     }
 
-    @NonNull
     static <T> BindingResult<T> bindPart(ConversionService conversionService, ArgumentConversionContext<T> context, NettyHttpRequest<?> nettyRequest, String inputName, boolean skipClaimed) {
         if (skipClaimed && nettyRequest.formRouteCompleter().isClaimed(inputName)) {
             return BindingResult.unsatisfied();

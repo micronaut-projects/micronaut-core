@@ -17,7 +17,6 @@ package io.micronaut.http.server.netty.handler;
 
 import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.util.NativeImageUtils;
@@ -77,7 +76,7 @@ abstract class MultiplexedServerHandler {
      */
     abstract void flush();
 
-    private @NonNull NettyByteBodyFactory byteBodyFactory() {
+    private NettyByteBodyFactory byteBodyFactory() {
         return new NettyByteBodyFactory(ctx.channel());
     }
 
@@ -251,7 +250,7 @@ abstract class MultiplexedServerHandler {
         }
 
         @Override
-        public void write(@NonNull HttpResponse response, @NonNull ByteBody body) {
+        public void write(HttpResponse response, ByteBody body) {
             body.touch();
             if (responseDone) {
                 body.touch();
@@ -360,12 +359,12 @@ abstract class MultiplexedServerHandler {
         }
 
         @Override
-        public void writeHeadResponse(@NonNull HttpResponse response) {
+        public void writeHeadResponse(HttpResponse response) {
             response.headers().remove(HttpHeaderNames.TRANSFER_ENCODING);
             writeFull(response, Unpooled.EMPTY_BUFFER);
         }
 
-        private void writeFull(@NonNull HttpResponse response, @NonNull ByteBuf content) {
+        private void writeFull(HttpResponse response, ByteBuf content) {
             if (responseDone) {
                 // stream closed
                 content.release();
@@ -404,7 +403,7 @@ abstract class MultiplexedServerHandler {
             flush();
         }
 
-        private ChannelPromise endPromise(@NonNull HttpResponse response) {
+        private ChannelPromise endPromise(HttpResponse response) {
             if (jfrEvent == null) {
                 return ctx.voidPromise();
             }

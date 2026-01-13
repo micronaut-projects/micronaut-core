@@ -23,7 +23,6 @@ import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.core.util.StringUtils;
@@ -253,7 +252,6 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * @return Sets the server type.
      * @see HttpServerType
      */
-    @NonNull
     public HttpServerType getServerType() {
         return serverType;
     }
@@ -518,7 +516,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * @return The file type handler configuration.
      * @since 3.1.0
      */
-    public @NonNull FileTypeHandlerConfiguration getFileTypeHandlerConfiguration() {
+    public FileTypeHandlerConfiguration getFileTypeHandlerConfiguration() {
         return fileTypeHandlerConfiguration;
     }
 
@@ -528,7 +526,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * @since 3.1.0
      */
     @Inject
-    public void setFileTypeHandlerConfiguration(@NonNull FileTypeHandlerConfiguration fileTypeHandlerConfiguration) {
+    public void setFileTypeHandlerConfiguration(FileTypeHandlerConfiguration fileTypeHandlerConfiguration) {
         if (fileTypeHandlerConfiguration != null) {
             this.fileTypeHandlerConfiguration = fileTypeHandlerConfiguration;
         }
@@ -1310,7 +1308,6 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
             /**
              * @return True if the cache control should be public
              */
-            @NonNull
             public boolean getPublic() {
                 return publicCache;
             }
@@ -1339,7 +1336,6 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
             this.name = name;
         }
 
-        @NonNull
         @Override
         public String getName() {
             return name;
@@ -1464,7 +1460,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         }
 
         @Override
-        public @NonNull List<String> getTransport() {
+        public List<String> getTransport() {
             return transport == null ? EventLoopGroupConfiguration.super.getTransport() : transport;
         }
 
@@ -1479,7 +1475,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          *
          * @param transport The available transports, in order of preference
          */
-        public void setTransport(@NonNull List<String> transport) {
+        public void setTransport(List<String> transport) {
             this.transport = transport;
         }
 
@@ -1595,7 +1591,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          * The address family of this listener.
          * @param family The address family of this listener.
          */
-        public void setFamily(@NonNull Family family) {
+        public void setFamily(Family family) {
             Objects.requireNonNull(family, "family");
             this.family = family;
         }
