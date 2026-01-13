@@ -86,7 +86,6 @@ class FormLimitSpec extends Specification {
                 .contentType(multipart ? MediaType.MULTIPART_FORM_DATA + ";boundary=abcdef" : MediaType.APPLICATION_FORM_URLENCODED), Argument.STRING, Argument.STRING)
         then:
         if (toSend > limitToConfigure) {
-            // TODO: form-max-buffered-bytes works a bit differently now, does not throw when there's only a single input buffer
             assert response.status() == HttpStatus.REQUEST_ENTITY_TOO_LARGE
         } else {
             assert response.body() == "attributes: 1" // even spaces only are a valid attribute!
@@ -95,6 +94,7 @@ class FormLimitSpec extends Specification {
         where:
         multipart | toSend | limitToConfigure
         false     | 100    | 128
+        // TODO: form-max-buffered-bytes works a bit differently now, does not throw when there's only a single input buffer
         false     | 100    | 64
         /* client does not support raw multipart requests atm
         true      | 100    | 128
