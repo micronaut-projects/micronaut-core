@@ -57,7 +57,7 @@ public interface MutableConvertibleValues<V> extends ConvertibleValues<V> {
      * @param values The values
      * @return This values instance
      */
-    default MutableConvertibleValues<V> putAll(Map<CharSequence, V> values) {
+    default MutableConvertibleValues<V> putAll(@Nullable Map<CharSequence, V> values) {
         if (values != null) {
             for (Map.Entry<CharSequence, V> entry : values.entrySet()) {
                 put(entry.getKey(), entry.getValue());
@@ -72,7 +72,7 @@ public interface MutableConvertibleValues<V> extends ConvertibleValues<V> {
      * @param values The values
      * @return This values instance
      */
-    default MutableConvertibleValues<V> putAll(ConvertibleValues<V> values) {
+    default MutableConvertibleValues<V> putAll(@Nullable ConvertibleValues<V> values) {
         if (values != null) {
             for (Map.Entry<String, V> entry : values) {
                 put(entry.getKey(), entry.getValue());
@@ -88,7 +88,7 @@ public interface MutableConvertibleValues<V> extends ConvertibleValues<V> {
      * @param <T>    The target generic type
      * @return The values
      */
-    static <T> MutableConvertibleValues<T> of(Map<? extends CharSequence, T> values) {
+    static <T> MutableConvertibleValues<T> of(@Nullable Map<? extends CharSequence, T> values) {
         if (values == null) {
             return new MutableConvertibleValuesMap<>();
         } else {

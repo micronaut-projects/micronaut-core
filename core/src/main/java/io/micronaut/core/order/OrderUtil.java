@@ -16,7 +16,6 @@
 package io.micronaut.core.order;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.annotation.Order;
 
 import java.util.ArrayList;
@@ -285,7 +284,7 @@ public class OrderUtil {
      * @return The order or zero if there is no {@link Order} annotation.
      * @since 3.0.0
      */
-    public static int getOrder(@NonNull AnnotationMetadata annotationMetadata) {
+    public static int getOrder(AnnotationMetadata annotationMetadata) {
         return annotationMetadata.intValue(Order.class).orElse(0);
     }
 

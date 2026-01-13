@@ -16,8 +16,6 @@
 package io.micronaut.core.propagation;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -88,7 +86,6 @@ final class PropagatedContextImpl implements PropagatedContext {
         return Optional.ofNullable(ThreadContext.get());
     }
 
-    @NonNull
     public static PropagatedContextImpl getOrEmpty() {
         PropagatedContextImpl propagatedContext = ThreadContext.get();
         if (propagatedContext == null) {

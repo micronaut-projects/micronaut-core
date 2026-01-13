@@ -24,8 +24,6 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
-
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.beans.exceptions.IntrospectionException;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.reflect.ClassUtils;
@@ -55,9 +53,8 @@ class DefaultBeanIntrospector implements BeanIntrospector {
         this.classLoader = classLoader;
     }
 
-    @NonNull
     @Override
-    public Collection<BeanIntrospection<Object>> findIntrospections(@NonNull Predicate<? super BeanIntrospectionReference<?>> filter) {
+    public Collection<BeanIntrospection<Object>> findIntrospections(Predicate<? super BeanIntrospectionReference<?>> filter) {
         ArgumentUtils.requireNonNull("filter", filter);
         return getIntrospections()
                 .values()
@@ -67,9 +64,8 @@ class DefaultBeanIntrospector implements BeanIntrospector {
                 .collect(Collectors.toList());
     }
 
-    @NonNull
     @Override
-    public Collection<Class<?>> findIntrospectedTypes(@NonNull Predicate<? super BeanIntrospectionReference<?>> filter) {
+    public Collection<Class<?>> findIntrospectedTypes(Predicate<? super BeanIntrospectionReference<?>> filter) {
         ArgumentUtils.requireNonNull("filter", filter);
         return getIntrospections()
                 .values()
@@ -79,10 +75,9 @@ class DefaultBeanIntrospector implements BeanIntrospector {
                 .collect(Collectors.toSet());
     }
 
-    @NonNull
     @Override
     @SuppressWarnings("java:S1181")
-    public <T> Optional<BeanIntrospection<T>> findIntrospection(@NonNull Class<T> beanType) {
+    public <T> Optional<BeanIntrospection<T>> findIntrospection(Class<T> beanType) {
         ArgumentUtils.requireNonNull("beanType", beanType);
         @SuppressWarnings("unchecked") final BeanIntrospectionReference<T> reference =
                 (BeanIntrospectionReference<T>) getIntrospections().get(beanType.getName());

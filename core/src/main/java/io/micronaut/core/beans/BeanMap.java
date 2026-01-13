@@ -16,8 +16,6 @@
 package io.micronaut.core.beans;
 
 import io.micronaut.core.util.ArgumentUtils;
-
-import org.jspecify.annotations.NonNull;
 import java.util.Map;
 
 /**
@@ -32,7 +30,7 @@ public interface BeanMap<T> extends Map<String, Object> {
     /**
      * @return The bean type
      */
-    @NonNull Class<T> getBeanType();
+ Class<T> getBeanType();
 
     /**
      * Creates a {@link BeanMap} for the given bean.
@@ -42,7 +40,7 @@ public interface BeanMap<T> extends Map<String, Object> {
      * @return The bean map
      */
     @SuppressWarnings({"unchecked", "deprecation"})
-    static @NonNull <B> BeanMap<B> of(@NonNull B bean) {
+    static <B> BeanMap<B> of(B bean) {
         ArgumentUtils.requireNonNull("bean", bean);
         BeanIntrospection<B> introspection = (BeanIntrospection<B>) BeanIntrospector.SHARED.getIntrospection(bean.getClass());
         return new BeanIntrospectionMap<>(introspection, bean);

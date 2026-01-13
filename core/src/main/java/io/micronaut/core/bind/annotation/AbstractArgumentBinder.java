@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.core.bind.annotation;
-
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.bind.ArgumentBinder.BindingResult;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -138,8 +136,7 @@ public abstract class AbstractArgumentBinder<T> {
      * @return The name
      * @since 4.8
      */
-    @NonNull
-    protected String getParameterName(@NonNull Argument<T> argument) {
+    protected String getParameterName(Argument<T> argument) {
         throw new IllegalStateException("Parameter resolved method must be implemented!");
     }
 

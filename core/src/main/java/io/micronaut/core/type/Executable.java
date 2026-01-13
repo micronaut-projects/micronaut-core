@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.core.type;
-
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 
@@ -34,14 +32,14 @@ public interface Executable<T, R> extends AnnotationMetadataProvider {
      * @return The declaring type
      * @since 3.0.0
      */
-    @NonNull Class<T> getDeclaringType();
+ Class<T> getDeclaringType();
 
     /**
      * The required argument types.
      *
      * @return The arguments
      */
-    Argument<?> @NonNull [] getArguments();
+    Argument<?>[] getArguments();
 
     /**
      * Invokes the method.

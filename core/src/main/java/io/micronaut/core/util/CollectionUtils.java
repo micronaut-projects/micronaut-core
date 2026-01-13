@@ -16,7 +16,6 @@
 package io.micronaut.core.util;
 
 import org.jetbrains.annotations.Contract;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.convert.ConversionService;
@@ -309,7 +308,7 @@ public class CollectionUtils {
      * @param <T>         The type
      * @return The set
      */
-    public static @NonNull <T> Iterable<T> enumerationToIterable(@Nullable Enumeration<T> enumeration) {
+    public static <T> Iterable<T> enumerationToIterable(@Nullable Enumeration<T> enumeration) {
         if (enumeration == null) {
             return Collections.emptyList();
         }
@@ -437,7 +436,7 @@ public class CollectionUtils {
      * @param <T> The generic type
      * @return A non-null unmodifiable list
      */
-    public static @NonNull <T> List<T> unmodifiableList(@Nullable List<T> list) {
+    public static <T> List<T> unmodifiableList(@Nullable List<T> list) {
         if (isEmpty(list)) {
             return Collections.emptyList();
         }
@@ -451,7 +450,7 @@ public class CollectionUtils {
      * @param <T> The generic type
      * @return The last element of a collection or null
      */
-    public static @Nullable <T> T last(@NonNull Collection<T> collection) {
+    public static @Nullable <T> T last(Collection<T> collection) {
         if (collection instanceof List) {
             List<T> list = (List<T>) collection;
             final int s = list.size();
@@ -491,8 +490,7 @@ public class CollectionUtils {
      * @return The enum set
      * @since 4.6
      */
-    @NonNull
-    public static <E extends Enum<E>> EnumSet<E> enumSet(@NonNull E... enums) {
+    public static <E extends Enum<E>> EnumSet<E> enumSet(E... enums) {
         if (enums.length == 0) {
             throw new IllegalStateException("At least one item is required!");
         }

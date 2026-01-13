@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.core.execution;
-
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,7 +59,7 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
     }
 
     @Override
-    public void completeFrom(@NonNull ExecutionFlow<T> flow) {
+    public void completeFrom(ExecutionFlow<T> flow) {
         flow.onComplete(this::complete);
     }
 
@@ -71,7 +69,7 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
      *
      * @param executionFlow The execution flow
      */
-    private void completeLazy(@NonNull ExecutionFlow<Object> executionFlow) {
+    private void completeLazy(ExecutionFlow<Object> executionFlow) {
         if (head == null) {
             throw new IllegalStateException("Delayed flow has been completed");
         }
@@ -82,7 +80,7 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
         head = null;
     }
 
-    private boolean completeAtomic(@NonNull ExecutionFlow<Object> executionFlow) {
+    private boolean completeAtomic(ExecutionFlow<Object> executionFlow) {
         Head head = HEAD_UPDATER.getAndSet(this, null);
         if (head == null) {
             return false;

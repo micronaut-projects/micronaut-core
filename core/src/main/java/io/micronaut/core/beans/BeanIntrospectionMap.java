@@ -18,8 +18,6 @@ package io.micronaut.core.beans;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.CollectionUtils;
-
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.ObjectUtils;
 
 import java.util.*;
@@ -66,7 +64,7 @@ final class BeanIntrospectionMap<T> implements BeanMap<T> {
     }
 
     @Override
-    public @NonNull Class<T> getBeanType() {
+    public Class<T> getBeanType() {
         return beanIntrospection.getBeanType();
     }
 

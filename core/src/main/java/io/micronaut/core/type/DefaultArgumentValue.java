@@ -17,7 +17,6 @@ package io.micronaut.core.type;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
@@ -82,13 +81,13 @@ class DefaultArgumentValue<V> implements ArgumentValue<V> {
 
     @Nullable
     @Override
-    public <T extends Annotation> T synthesize(@NonNull Class<T> annotationClass, @NonNull String sourceAnnotation) {
+    public <T extends Annotation> T synthesize(Class<T> annotationClass, String sourceAnnotation) {
         return argument.synthesize(annotationClass, sourceAnnotation);
     }
 
     @Nullable
     @Override
-    public <T extends Annotation> T synthesizeDeclared(@NonNull Class<T> annotationClass, @NonNull String sourceAnnotation) {
+    public <T extends Annotation> T synthesizeDeclared(Class<T> annotationClass, String sourceAnnotation) {
         return argument.synthesizeDeclared(annotationClass, sourceAnnotation);
     }
 

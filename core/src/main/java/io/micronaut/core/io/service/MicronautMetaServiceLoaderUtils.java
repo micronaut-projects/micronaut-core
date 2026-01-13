@@ -16,7 +16,6 @@
 package io.micronaut.core.io.service;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.io.IOUtils;
 
@@ -68,9 +67,8 @@ public final class MicronautMetaServiceLoaderUtils {
      * @param <S>          The service type
      * @return the result
      */
-    @NonNull
-    public static <S> List<S> findMetaMicronautServiceEntries(@NonNull ClassLoader classLoader,
-                                                              @NonNull Class<S> serviceClass,
+    public static <S> List<S> findMetaMicronautServiceEntries(ClassLoader classLoader,
+ Class<S> serviceClass,
                                                               @Nullable Predicate<S> predicate) {
         SoftServiceLoader.StaticServiceLoader<S> staticServiceLoader = (SoftServiceLoader.StaticServiceLoader<S>) SoftServiceLoader.STATIC_SERVICES.get(serviceClass.getName());
         if (staticServiceLoader != null) {
@@ -88,9 +86,8 @@ public final class MicronautMetaServiceLoaderUtils {
      * @return The entries
      * @throws IOException
      */
-    @NonNull
-    public static Set<String> findMicronautMetaServiceEntries(@NonNull ClassLoader classLoader,
-                                                              @NonNull String serviceName) throws IOException {
+    public static Set<String> findMicronautMetaServiceEntries(ClassLoader classLoader,
+ String serviceName) throws IOException {
         CacheEntry ce = cacheEntry;
         if (ce == null || ce.classLoader != classLoader) {
             ce = new CacheEntry(classLoader, findAllMicronautMetaServices(classLoader));
@@ -106,8 +103,7 @@ public final class MicronautMetaServiceLoaderUtils {
      * @return the all entries
      * @throws IOException
      */
-    @NonNull
-    public static Map<String, Set<String>> findAllMicronautMetaServices(@NonNull ClassLoader classLoader) throws IOException {
+    public static Map<String, Set<String>> findAllMicronautMetaServices(ClassLoader classLoader) throws IOException {
         final ServiceScanner.StaticServiceDefinitions ssd = ServiceScanner.findStaticServiceDefinitions();
         if (ssd != null) {
             return ssd.serviceTypeMap();

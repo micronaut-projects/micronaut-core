@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.core.exceptions;
-
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import java.util.function.BiConsumer;
 
@@ -34,7 +32,7 @@ public interface BeanExceptionHandler<T, E extends Throwable> extends BiConsumer
      * @param bean The bean
      * @param throwable The error
      */
-    void handle(@Nullable T bean, @NonNull E throwable);
+    void handle(@Nullable T bean, E throwable);
 
     /**
      * Handles the exception.
@@ -43,7 +41,7 @@ public interface BeanExceptionHandler<T, E extends Throwable> extends BiConsumer
      * @param throwable The error
      */
     @Override
-    default void accept(@Nullable T bean, @NonNull E throwable) {
+    default void accept(@Nullable T bean, E throwable) {
         handle(bean, throwable);
     }
 }

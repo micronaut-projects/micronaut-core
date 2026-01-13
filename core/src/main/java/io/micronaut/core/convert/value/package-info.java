@@ -19,5 +19,7 @@
  * @author graemerocher
  * @since 1.0
  */
+@NullMarked
 package io.micronaut.core.convert.value;
 
+import org.jspecify.annotations.NullMarked;

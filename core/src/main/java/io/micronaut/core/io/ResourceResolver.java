@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.core.io;
-
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.io.file.FileSystemResourceLoader;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.io.value.Base64ResourceLoader;
@@ -43,14 +41,14 @@ public class ResourceResolver {
     /**
      * @param resourceLoaders The resource loaders
      */
-    public ResourceResolver(ResourceLoader @NonNull [] resourceLoaders) {
+    public ResourceResolver(ResourceLoader[] resourceLoaders) {
         this(Arrays.asList(resourceLoaders));
     }
 
     /**
      * @param resourceLoaders The resource loaders
      */
-    public ResourceResolver(@NonNull List<ResourceLoader> resourceLoaders) {
+    public ResourceResolver(List<ResourceLoader> resourceLoaders) {
         ArgumentUtils.requireNonNull("resourceLoaders", resourceLoaders);
         this.resourceLoaders = resourceLoaders;
     }
@@ -73,7 +71,7 @@ public class ResourceResolver {
      * @param <T>          The type
      * @return An optional resource loader
      */
-    public @NonNull <T extends ResourceLoader> Optional<T> getLoader(@NonNull Class<T> resolverType) {
+    public <T extends ResourceLoader> Optional<T> getLoader(Class<T> resolverType) {
         ArgumentUtils.requireNonNull("resolverType", resolverType);
         return resourceLoaders.stream()
             .filter(rl -> resolverType.isAssignableFrom(rl.getClass()))
@@ -87,7 +85,7 @@ public class ResourceResolver {
      * @param prefix The prefix the loader should support. (classpath:, file:, etc.)
      * @return An optional resource loader
      */
-    public @NonNull  Optional<ResourceLoader> getSupportingLoader(@NonNull String prefix) {
+    public  Optional<ResourceLoader> getSupportingLoader(String prefix) {
         ArgumentUtils.requireNonNull("prefix", prefix);
         return resourceLoaders.stream()
             .filter(rl -> rl.supportsPrefix(prefix))
@@ -101,7 +99,7 @@ public class ResourceResolver {
      * @param basePath The path to load resources from
      * @return An optional resource loader
      */
-    public @NonNull Optional<ResourceLoader> getLoaderForBasePath(@NonNull String basePath) {
+    public Optional<ResourceLoader> getLoaderForBasePath(String basePath) {
         ArgumentUtils.requireNonNull("basePath", basePath);
         Optional<ResourceLoader> resourceLoader = getSupportingLoader(basePath);
         return resourceLoader.map(rl -> rl.forBase(basePath));
@@ -113,7 +111,7 @@ public class ResourceResolver {
      * @param path The path to the resource
      * @return An optional input stream
      */
-    public @NonNull Optional<InputStream> getResourceAsStream(@NonNull String path) {
+    public Optional<InputStream> getResourceAsStream(String path) {
         ArgumentUtils.requireNonNull("path", path);
         Optional<ResourceLoader> resourceLoader = getSupportingLoader(path);
         if (resourceLoader.isPresent()) {
@@ -128,7 +126,7 @@ public class ResourceResolver {
      * @param path The path to the resource
      * @return An optional URL
      */
-    public @NonNull Optional<URL> getResource(@NonNull String path) {
+    public Optional<URL> getResource(String path) {
         ArgumentUtils.requireNonNull("path", path);
         Optional<ResourceLoader> resourceLoader = getSupportingLoader(path);
         if (resourceLoader.isPresent()) {
@@ -143,7 +141,7 @@ public class ResourceResolver {
      * @param path The path to the resource
      * @return A stream of URLs
      */
-    public @NonNull Stream<URL> getResources(@NonNull String path) {
+    public Stream<URL> getResources(String path) {
         ArgumentUtils.requireNonNull("path", path);
         Optional<ResourceLoader> resourceLoader = getSupportingLoader(path);
         if (resourceLoader.isPresent()) {

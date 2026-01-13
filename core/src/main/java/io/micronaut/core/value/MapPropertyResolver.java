@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.core.value;
-
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.StringUtils;
@@ -71,9 +69,8 @@ public class MapPropertyResolver implements PropertyResolver {
         return conversionService.convert(value, conversionContext);
     }
 
-    @NonNull
     @Override
-    public Collection<String> getPropertyEntries(@NonNull String name) {
+    public Collection<String> getPropertyEntries(String name) {
         if (StringUtils.isNotEmpty(name)) {
             String prefix = name + ".";
             Set<String> strings = map.keySet();

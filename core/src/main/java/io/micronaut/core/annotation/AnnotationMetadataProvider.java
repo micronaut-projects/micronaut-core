@@ -14,9 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.core.annotation;
-
-import org.jspecify.annotations.NonNull;
-
 import java.lang.annotation.Annotation;
 import java.util.Optional;
 
@@ -33,7 +30,6 @@ public interface AnnotationMetadataProvider extends AnnotationSource {
      *
      * @return The {@link AnnotationMetadata}
      */
-    @NonNull
     default AnnotationMetadata getAnnotationMetadata() {
         return AnnotationMetadata.EMPTY_METADATA;
     }

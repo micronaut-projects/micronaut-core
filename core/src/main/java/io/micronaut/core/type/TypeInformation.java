@@ -18,7 +18,6 @@ package io.micronaut.core.type;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationUtil;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.AnsiColour;
@@ -44,7 +43,6 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
     /**
      * @return The type
      */
-    @NonNull
     Class<T> getType();
 
     /**
@@ -69,7 +67,6 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
     }
 
     @Override
-    @NonNull
     default String getTypeName() {
         Argument<?>[] typeParameters = getTypeParameters();
         if (ArrayUtils.isNotEmpty(typeParameters)) {
@@ -164,7 +161,7 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
      * @return The type string including the scope and qualifier
      * @see #getTypeString(TypeFormat)
      */
-    default String getBeanTypeString(@NonNull TypeFormat format) {
+    default String getBeanTypeString(TypeFormat format) {
         return TypeFormat.getBeanTypeString(
             format,
             getType(),
@@ -180,7 +177,7 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
      * @return The type string representation
      * @since 4.8.0
      */
-    default @NonNull String getTypeString(@NonNull TypeFormat format) {
+    default String getTypeString(TypeFormat format) {
         Class<T> type = getType();
         return TypeFormat.getTypeString(format, type, getTypeVariables());
     }
@@ -231,7 +228,7 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
      * @return The {@link Type}
      * @since 3.5.2
      */
-    default @NonNull Type asType() {
+    default Type asType() {
         if (getTypeParameters().length == 0) {
             return getType();
         }
@@ -244,7 +241,7 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
      * @return The {@link ParameterizedType}
      * @since 2.0.0
      */
-    default @NonNull ParameterizedType asParameterizedType() {
+    default ParameterizedType asParameterizedType() {
         return new ParameterizedType() {
             @Override
             public Type[] getActualTypeArguments() {
@@ -305,7 +302,7 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
      * @return The simple name
      * @since 3.0.0
      */
-    default @NonNull String getSimpleName() {
+    default String getSimpleName() {
         return getType().getSimpleName();
     }
 
@@ -359,8 +356,8 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
          * @param argument   The argument
          * @return The string
          */
-        public static @NonNull String getBeanTypeString(
-            TypeInformation.@NonNull TypeFormat typeFormat, @NonNull Argument<?> argument) {
+        public static String getBeanTypeString(
+            TypeInformation. TypeFormat typeFormat, Argument<?> argument) {
             return getBeanTypeString(
                 typeFormat,
                 argument.getType(),
@@ -408,10 +405,10 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
          * @param generics The generics
          * @return the type string
          */
-        public static @NonNull String getTypeString(
-            @NonNull TypeFormat format,
-            @NonNull Class<?> type,
-            @NonNull Map<String, Argument<?>> generics) {
+        public static String getTypeString(
+ TypeFormat format,
+ Class<?> type,
+ Map<String, Argument<?>> generics) {
             String typeName = switch (format) {
                 case SIMPLE -> type.getSimpleName();
                 case QUALIFIED -> type.getCanonicalName();
@@ -443,11 +440,11 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
          * @param annotationMetadata The annotation metadata
          * @return the type string
          */
-        public static @NonNull String getBeanTypeString(
-            @NonNull TypeFormat format,
-            @NonNull Class<?> type,
-            @NonNull Map<String, Argument<?>> generics,
-            @NonNull AnnotationMetadata annotationMetadata) {
+        public static String getBeanTypeString(
+ TypeFormat format,
+ Class<?> type,
+ Map<String, Argument<?>> generics,
+ AnnotationMetadata annotationMetadata) {
             String typeFormat = TypeFormat.getTypeString(
                 format,
                 type,
