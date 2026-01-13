@@ -23,11 +23,15 @@ import java.util.concurrent.ThreadLocalRandom
 
 class RequestDecompressionConfigSpec extends Specification {
 
-    def 'server request decompression can be disabled'(CharSequence contentEncoding, Object compressor) {
+    def 'server request decompression can be disabled'(CharSequence contentEncoding, Object compressor, boolean http2) {
         given: 'an embedded server with request decompression disabled'
         Map<String, Object> cfg = [
-            'spec.name'                                           : 'RequestDecompressionConfigSpec',
-            'micronaut.server.netty.request-decompression-enabled': false
+                'spec.name'                                                : 'RequestDecompressionConfigSpec',
+                'micronaut.server.netty.request-decompression-enabled'     : false,
+                'micronaut.server.ssl.port'                                : 0,
+                'micronaut.http.client.http-version'                       : http2 ? '2.0' : '1.1',
+                'micronaut.server.http-version'                            : http2 ? '2.0' : '1.1',
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
         ]
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, cfg)
         def client = server.applicationContext.createBean(HttpClient, server.URI).toBlocking()
@@ -67,15 +71,23 @@ class RequestDecompressionConfigSpec extends Specification {
         server.stop()
 
         where:
-        contentEncoding            | compressor
-        HttpHeaderValues.GZIP      | ZlibWrapper.GZIP
-        HttpHeaderValues.X_GZIP    | ZlibWrapper.GZIP
+        contentEncoding            | compressor               | http2
+        HttpHeaderValues.GZIP      | ZlibWrapper.GZIP         | false
+        HttpHeaderValues.X_GZIP    | ZlibWrapper.GZIP         | false
         // deflate can mean raw (NONE) or zlib wrapper; ensure both do not get decompressed by server
-        HttpHeaderValues.DEFLATE   | ZlibWrapper.NONE
-        HttpHeaderValues.X_DEFLATE | ZlibWrapper.NONE
-        HttpHeaderValues.DEFLATE   | ZlibWrapper.ZLIB
-        HttpHeaderValues.X_DEFLATE | ZlibWrapper.ZLIB
-        HttpHeaderValues.SNAPPY    | new SnappyFrameEncoder()
+        HttpHeaderValues.DEFLATE   | ZlibWrapper.NONE         | false
+        HttpHeaderValues.X_DEFLATE | ZlibWrapper.NONE         | false
+        HttpHeaderValues.DEFLATE   | ZlibWrapper.ZLIB         | false
+        HttpHeaderValues.X_DEFLATE | ZlibWrapper.ZLIB         | false
+        HttpHeaderValues.SNAPPY    | new SnappyFrameEncoder() | false
+        HttpHeaderValues.GZIP      | ZlibWrapper.GZIP         | true
+        HttpHeaderValues.X_GZIP    | ZlibWrapper.GZIP         | true
+        // deflate can mean raw (NONE) or zlib wrapper; ensure both do not get decompressed by server
+        HttpHeaderValues.DEFLATE   | ZlibWrapper.NONE         | true
+        HttpHeaderValues.X_DEFLATE | ZlibWrapper.NONE         | true
+        HttpHeaderValues.DEFLATE   | ZlibWrapper.ZLIB         | true
+        HttpHeaderValues.X_DEFLATE | ZlibWrapper.ZLIB         | true
+        HttpHeaderValues.SNAPPY    | new SnappyFrameEncoder() | true
     }
 
     @Requires(property = "spec.name", value = "RequestDecompressionConfigSpec")
