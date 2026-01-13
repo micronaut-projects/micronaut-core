@@ -1,6 +1,5 @@
 package io.micronaut.http.server.netty.handler
 
-
 import io.micronaut.core.annotation.NonNull
 import io.micronaut.http.body.CloseableByteBody
 import io.micronaut.http.body.InternalByteBody
@@ -37,7 +36,6 @@ import io.netty.handler.codec.http2.Http2Frame
 import io.netty.handler.codec.http2.Http2FrameCodec
 import io.netty.handler.codec.http2.Http2FrameCodecBuilder
 import io.netty.handler.codec.http2.Http2HeadersFrame
-import io.netty.handler.codec.http2.Http2PingFrame
 import io.netty.handler.codec.http2.Http2ResetFrame
 import io.netty.handler.codec.http2.Http2SettingsAckFrame
 import io.netty.handler.codec.http2.Http2SettingsFrame
@@ -413,9 +411,12 @@ class Http2ServerHandlerSpec extends Specification {
         Throwable err = null
         CompositeByteBuf received = ByteBufAllocator.DEFAULT.compositeBuffer()
         boolean complete = false
+        boolean responseWritten = false
+        OutboundAccess outboundAccessR = null
         def (server, client, duplexHandler) = configure(new RequestHandler() {
             @Override
             void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                outboundAccessR = outboundAccess
                 NettyByteBodyFactory.toByteBufs(body).subscribe(new Subscriber<ByteBuf>() {
                     @Override
                     void onSubscribe(Subscription s) {
@@ -437,6 +438,11 @@ class Http2ServerHandlerSpec extends Specification {
                         complete = true
                     }
                 })
+            }
+
+            @Override
+            void responseWritten(Object attachment) {
+                responseWritten = true
             }
 
             @Override
@@ -471,6 +477,12 @@ class Http2ServerHandlerSpec extends Specification {
         EmbeddedTestUtil.advance(server, client)
         then:
         err instanceof ClosedChannelException
+        !responseWritten
+
+        when:
+        outboundAccessR.write(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), NettyByteBodyFactory.empty())
+        then:
+        responseWritten
 
         cleanup:
         received.release()
