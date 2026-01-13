@@ -9,17 +9,19 @@ import jakarta.inject.Singleton
 class ArgMutatingInterceptor : Interceptor<Any?, Any?> {
 
     override fun intercept(context: InvocationContext<Any?, Any?>): Any? {
-        val m = context.synthesize(
+        val m = context.stringValue(
             Mutating::class.java
         )
-        if (!context.parameters.isEmpty()) {
-            val arg = context.parameters[m.value] as MutableArgumentValue<Any>?
-            if (arg != null) {
-                val value = arg.value
-                if (value is Number) {
-                    arg.setValue(value.toInt() * 2)
-                } else {
-                    arg.setValue("changed")
+        if (m.isPresent) {
+            if (!context.parameters.isEmpty()) {
+                val arg = context.parameters[m.get()] as MutableArgumentValue<Any>?
+                if (arg != null) {
+                    val value = arg.value
+                    if (value is Number) {
+                        arg.setValue(value.toInt() * 2)
+                    } else {
+                        arg.setValue("changed")
+                    }
                 }
             }
         }
