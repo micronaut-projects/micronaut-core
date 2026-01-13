@@ -17,7 +17,6 @@ package io.micronaut.http.client.netty;
 
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
@@ -119,7 +118,6 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, NettyHtt
         return this.nettyHttpResponse.status().code();
     }
 
-    @NonNull
     @Override
     public HttpHeaders getHeaders() {
         return headers;
@@ -135,21 +133,18 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, NettyHtt
         return nettyCookies.findCookie(name);
     }
 
-    @NonNull
     @Override
     public MutableConvertibleValues<Object> getAttributes() {
         return attributes;
     }
 
-    @NonNull
     @Override
     public Optional<B> getBody() {
         return Optional.ofNullable(body);
     }
 
-    @NonNull
     @Override
-    public <T> Optional<T> getBody(@NonNull Class<T> type) {
+    public <T> Optional<T> getBody(Class<T> type) {
         if (type == null) {
             return Optional.empty();
         }
@@ -157,9 +152,8 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, NettyHtt
     }
 
     @SuppressWarnings("unchecked")
-    @NonNull
     @Override
-    public <T> Optional<T> getBody(@NonNull Argument<T> type) {
+    public <T> Optional<T> getBody(Argument<T> type) {
         if (type == null) {
             return Optional.empty();
         }
@@ -233,7 +227,6 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, NettyHtt
         return conversionService.convert(unpooledContent.slice(), ByteBuf.class, type);
     }
 
-    @NonNull
     @Override
     public FullHttpResponse toFullHttpResponse() {
         var copy = new DefaultFullHttpResponse(
@@ -248,7 +241,7 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, NettyHtt
     }
 
     @Override
-    public io.netty.handler.codec.http.@NonNull HttpResponse toHttpResponse() {
+    public io.netty.handler.codec.http.HttpResponse toHttpResponse() {
         return nettyHttpResponse;
     }
 

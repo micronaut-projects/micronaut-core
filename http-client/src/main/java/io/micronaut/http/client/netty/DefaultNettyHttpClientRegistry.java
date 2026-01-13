@@ -24,7 +24,6 @@ import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
@@ -191,9 +190,8 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
         this.blockingExecutor = blockingExecutor;
     }
 
-    @NonNull
     @Override
-    public DefaultHttpClient getClient(@NonNull HttpVersionSelection httpVersion, @NonNull String clientId, @Nullable String path) {
+    public DefaultHttpClient getClient(HttpVersionSelection httpVersion, String clientId, @Nullable String path) {
         final ClientKey key = new ClientKey(
                 httpVersion,
                 clientId,
@@ -206,38 +204,33 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     }
 
     @Override
-    public @NonNull RawHttpClient getRawClient(@NonNull HttpVersionSelection httpVersion, @NonNull String clientId, @Nullable String path) {
+    public RawHttpClient getRawClient(HttpVersionSelection httpVersion, String clientId, @Nullable String path) {
         return getClient(httpVersion, clientId, path);
     }
 
     @Override
-    @NonNull
-    public DefaultHttpClient getClient(@NonNull AnnotationMetadata metadata) {
+    public DefaultHttpClient getClient(AnnotationMetadata metadata) {
         final ClientKey key = getClientKey(metadata);
         return getClient(key, beanContext, metadata);
     }
 
     @Override
-    @NonNull
-    public DefaultHttpClient getSseClient(@NonNull AnnotationMetadata metadata) {
+    public DefaultHttpClient getSseClient(AnnotationMetadata metadata) {
         return getClient(metadata);
     }
 
     @Override
-    @NonNull
-    public DefaultHttpClient getStreamingHttpClient(@NonNull AnnotationMetadata metadata) {
+    public DefaultHttpClient getStreamingHttpClient(AnnotationMetadata metadata) {
         return getClient(metadata);
     }
 
     @Override
-    @NonNull
-    public DefaultHttpClient getProxyHttpClient(@NonNull AnnotationMetadata metadata) {
+    public DefaultHttpClient getProxyHttpClient(AnnotationMetadata metadata) {
         return getClient(metadata);
     }
 
     @Override
-    @NonNull
-    public DefaultHttpClient getWebSocketClient(@NonNull AnnotationMetadata metadata) {
+    public DefaultHttpClient getWebSocketClient(AnnotationMetadata metadata) {
         return getClient(metadata);
     }
 
@@ -287,47 +280,42 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     }
 
     @Override
-    @NonNull
-    public HttpClient resolveClient(@Nullable InjectionPoint<?>  injectionPoint,
+    public HttpClient resolveClient(@Nullable InjectionPoint<?> injectionPoint,
                                     @Nullable LoadBalancer loadBalancer,
                                     @Nullable HttpClientConfiguration configuration,
-                                    @NonNull BeanContext beanContext) {
+                                    BeanContext beanContext) {
         return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext);
     }
 
     @Override
-    @NonNull
-    public ProxyHttpClient resolveProxyHttpClient(@Nullable InjectionPoint<?>  injectionPoint,
+    public ProxyHttpClient resolveProxyHttpClient(@Nullable InjectionPoint<?> injectionPoint,
                                                   @Nullable LoadBalancer loadBalancer,
                                                   @Nullable HttpClientConfiguration configuration,
-                                                  @NonNull BeanContext beanContext) {
+                                                  BeanContext beanContext) {
         return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext);
     }
 
     @Override
-    @NonNull
-    public SseClient resolveSseClient(@Nullable InjectionPoint<?>  injectionPoint,
+    public SseClient resolveSseClient(@Nullable InjectionPoint<?> injectionPoint,
                                       @Nullable LoadBalancer loadBalancer,
                                       @Nullable HttpClientConfiguration configuration,
-                                      @NonNull BeanContext beanContext) {
+                                      BeanContext beanContext) {
         return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext);
     }
 
     @Override
-    @NonNull
-    public StreamingHttpClient resolveStreamingHttpClient(@Nullable InjectionPoint<?>  injectionPoint,
+    public StreamingHttpClient resolveStreamingHttpClient(@Nullable InjectionPoint<?> injectionPoint,
                                                           @Nullable LoadBalancer loadBalancer,
                                                           @Nullable HttpClientConfiguration configuration,
-                                                          @NonNull BeanContext beanContext) {
+                                                          BeanContext beanContext) {
         return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext);
     }
 
     @Override
-    @NonNull
     public WebSocketClient resolveWebSocketClient(@Nullable InjectionPoint<?> injectionPoint,
                                                   @Nullable LoadBalancer loadBalancer,
                                                   @Nullable HttpClientConfiguration configuration,
-                                                  @NonNull BeanContext beanContext) {
+                                                  BeanContext beanContext) {
         return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext);
     }
 
@@ -337,13 +325,13 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     }
 
     @Override
-    public void doOnConnect(@NonNull ChannelPipelineListener listener) {
+    public void doOnConnect(ChannelPipelineListener listener) {
         Objects.requireNonNull(listener, "listener");
         pipelineListeners.add(listener);
     }
 
     @Override
-    public void register(@NonNull NettyClientCustomizer customizer) {
+    public void register(NettyClientCustomizer customizer) {
         Objects.requireNonNull(customizer, "customizer");
         clientCustomizer.add(customizer);
     }
@@ -499,7 +487,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             @Nullable InjectionPoint injectionPoint,
             @Nullable LoadBalancer loadBalancer,
             @Nullable HttpClientConfiguration configuration,
-            @NonNull BeanContext beanContext) {
+            BeanContext beanContext) {
         if (loadBalancer != null) {
             if (configuration == null) {
                 configuration = defaultHttpClientConfiguration;

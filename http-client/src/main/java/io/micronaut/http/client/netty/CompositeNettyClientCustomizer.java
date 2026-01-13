@@ -16,7 +16,6 @@
 package io.micronaut.http.client.netty;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.http.netty.AbstractCompositeCustomizer;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
@@ -45,7 +44,7 @@ final class CompositeNettyClientCustomizer
     }
 
     @Override
-    public @NonNull NettyClientCustomizer specializeForBootstrap(@NonNull Bootstrap bootstrap) {
+    public NettyClientCustomizer specializeForBootstrap(Bootstrap bootstrap) {
         return specialize(ch -> ch.specializeForBootstrap(bootstrap));
     }
 

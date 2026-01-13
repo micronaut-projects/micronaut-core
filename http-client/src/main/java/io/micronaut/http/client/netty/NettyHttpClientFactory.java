@@ -16,7 +16,6 @@
 package io.micronaut.http.client.netty;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientConfiguration;
@@ -51,73 +50,63 @@ public class NettyHttpClientFactory implements
         WebSocketClientFactory,
         RawHttpClientFactory {
 
-    @NonNull
     @Override
     public HttpClient createClient(URL url) {
         return createNettyClient(url);
     }
 
-    @NonNull
     @Override
-    public HttpClient createClient(URL url, @NonNull HttpClientConfiguration configuration) {
+    public HttpClient createClient(URL url, HttpClientConfiguration configuration) {
         return createNettyClient(url, configuration);
     }
 
-    @NonNull
     @Override
     public ProxyHttpClient createProxyClient(URL url) {
         return createNettyClient(url);
     }
 
-    @NonNull
     @Override
-    public ProxyHttpClient createProxyClient(URL url, @NonNull HttpClientConfiguration configuration) {
+    public ProxyHttpClient createProxyClient(URL url, HttpClientConfiguration configuration) {
         return createNettyClient(url, configuration);
     }
 
-    @NonNull
     @Override
     public SseClient createSseClient(@Nullable URL url) {
         return createNettyClient(url);
     }
 
-    @NonNull
     @Override
-    public SseClient createSseClient(@Nullable URL url, @NonNull HttpClientConfiguration configuration) {
+    public SseClient createSseClient(@Nullable URL url, HttpClientConfiguration configuration) {
         return createNettyClient(url, configuration);
     }
 
-    @NonNull
     @Override
     public StreamingHttpClient createStreamingClient(URL url) {
         return createNettyClient(url);
     }
 
-    @NonNull
     @Override
-    public StreamingHttpClient createStreamingClient(URL url, @NonNull HttpClientConfiguration configuration) {
+    public StreamingHttpClient createStreamingClient(URL url, HttpClientConfiguration configuration) {
         return createNettyClient(url, configuration);
     }
 
-    @NonNull
     @Override
     public WebSocketClient createWebSocketClient(URI uri) {
         return createNettyClient(uri);
     }
 
-    @NonNull
     @Override
-    public WebSocketClient createWebSocketClient(URI uri, @NonNull HttpClientConfiguration configuration) {
+    public WebSocketClient createWebSocketClient(URI uri, HttpClientConfiguration configuration) {
         return createNettyClient(uri, configuration);
     }
 
     @Override
-    public @NonNull RawHttpClient createRawClient(@Nullable URI url) {
+    public RawHttpClient createRawClient(@Nullable URI url) {
         return createNettyClient(url);
     }
 
     @Override
-    public @NonNull RawHttpClient createRawClient(@Nullable URI url, @NonNull HttpClientConfiguration configuration) {
+    public RawHttpClient createRawClient(@Nullable URI url, HttpClientConfiguration configuration) {
         return createNettyClient(url, configuration);
     }
 

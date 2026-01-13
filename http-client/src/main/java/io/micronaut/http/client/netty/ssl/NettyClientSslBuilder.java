@@ -17,7 +17,6 @@ package io.micronaut.http.client.netty.ssl;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Secondary;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.client.HttpVersionSelection;
@@ -85,7 +84,6 @@ public class NettyClientSslBuilder extends SslBuilder<SslContext> implements Cli
         return Optional.of(build(ssl, HttpVersionSelection.forLegacyVersion(httpVersion)));
     }
 
-    @NonNull
     @Override
     public final SslContext build(SslConfiguration ssl, HttpVersionSelection versionSelection) {
         try {

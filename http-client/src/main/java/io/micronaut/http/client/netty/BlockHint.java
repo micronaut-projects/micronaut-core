@@ -16,7 +16,6 @@
 package io.micronaut.http.client.netty;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.netty.util.concurrent.EventExecutor;
@@ -54,7 +53,6 @@ public record BlockHint(Thread blockedThread, @Nullable BlockHint next) {
         }
     }
 
-    @NonNull
     static HttpClientException createException() {
         return new HttpClientException(
             "Failed to perform blocking request on the event loop because request execution " +
