@@ -15,11 +15,11 @@
  */
 package io.micronaut.http.multipart;
 
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.io.buffer.LeakTracker;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.util.functional.ThrowingSupplier;
 import io.micronaut.http.body.CloseableByteBody;
+import org.jspecify.annotations.NonNull;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -34,6 +34,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.OptionalLong;
 import java.util.concurrent.Executor;
+import java.util.concurrent.locks.StampedLock;
 
 /**
  * A form file upload that is being streamed to the server. Unlike {@link CompletedFileUpload},
@@ -172,12 +173,19 @@ public final class StreamingFileUpload implements Closeable {
     private Publisher<?> transferTo(ThrowingSupplier<OutputStream, IOException> supplier) {
         Sinks.One<Object> sink = Sinks.one();
         field.byteBody().toReadBufferPublisher().subscribe(new Subscriber<>() {
+            // lock for subscription and outputStream. Used to make sure onSubscribe completes
+            // before onError/onComplete processing.
+            final StampedLock outputLock = new StampedLock();
             Subscription subscription;
             OutputStream outputStream;
 
             @Override
             public void onSubscribe(Subscription s) {
                 this.subscription = s;
+                long stamp = outputLock.tryWriteLock();
+                if (stamp == 0) {
+                    throw new IllegalStateException("Already locked?");
+                }
                 ioExecutor.execute(() -> {
                     try {
                         outputStream = supplier.get();
@@ -185,6 +193,8 @@ public final class StreamingFileUpload implements Closeable {
                     } catch (Exception e) {
                         subscription.cancel();
                         sink.tryEmitError(e);
+                    } finally {
+                        outputLock.unlock(stamp);
                     }
                 });
             }
@@ -210,10 +220,13 @@ public final class StreamingFileUpload implements Closeable {
             @Override
             public void onError(Throwable t) {
                 ioExecutor.execute(() -> {
+                    long stamp = outputLock.writeLock();
                     try {
                         outputStream.close();
                     } catch (IOException ex) {
                         t.addSuppressed(ex);
+                    } finally {
+                        outputLock.unlockWrite(stamp);
                     }
                     sink.tryEmitError(t);
                 });
@@ -222,11 +235,14 @@ public final class StreamingFileUpload implements Closeable {
             @Override
             public void onComplete() {
                 ioExecutor.execute(() -> {
+                    long stamp = outputLock.writeLock();
                     try {
                         outputStream.close();
                         sink.tryEmitEmpty();
                     } catch (IOException ex) {
                         sink.tryEmitError(ex);
+                    } finally {
+                        outputLock.unlockWrite(stamp);
                     }
                 });
             }
