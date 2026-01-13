@@ -31,15 +31,16 @@ import java.util.Optional;
  * @since 1.0
  */
 @Internal
-class DefaultArgumentValue<V> implements ArgumentValue<V> {
+sealed class DefaultArgumentValue<V> implements ArgumentValue<V> permits DefaultMutableArgumentValue {
     private final Argument<V> argument;
+    @Nullable
     private final V value;
 
     /**
      * @param argument The argument
      * @param value    The value
      */
-    DefaultArgumentValue(Argument<V> argument, V value) {
+    DefaultArgumentValue(Argument<V> argument, @Nullable V value) {
         this.argument = argument;
         this.value = value;
     }
@@ -60,7 +61,7 @@ class DefaultArgumentValue<V> implements ArgumentValue<V> {
     }
 
     @Override
-    public Argument[] getTypeParameters() {
+    public Argument<?>[] getTypeParameters() {
         return argument.getTypeParameters();
     }
 
@@ -69,6 +70,7 @@ class DefaultArgumentValue<V> implements ArgumentValue<V> {
         return argument.getTypeVariables();
     }
 
+    @Nullable
     @Override
     public V getValue() {
         return value;

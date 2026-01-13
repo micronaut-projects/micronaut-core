@@ -38,7 +38,7 @@ public interface TypeVariableResolver {
     /**
      * @return The type parameters as an array
      */
-    default Argument[] getTypeParameters() {
+    default Argument<?>[] getTypeParameters() {
         Collection<Argument<?>> values = getTypeVariables().values();
         return values.toArray(Argument.ZERO_ARGUMENTS);
     }
