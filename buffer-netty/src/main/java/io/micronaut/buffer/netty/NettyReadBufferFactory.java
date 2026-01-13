@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.buffer.netty;
-
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.io.buffer.ReadBufferFactory;
 import io.micronaut.core.util.functional.ThrowingConsumer;
@@ -54,8 +52,7 @@ public final class NettyReadBufferFactory extends ReadBufferFactory {
      * @param allocator The allocator to use
      * @return The buffer factory
      */
-    @NonNull
-    public static NettyReadBufferFactory of(@NonNull ByteBufAllocator allocator) {
+    public static NettyReadBufferFactory of(ByteBufAllocator allocator) {
         return new NettyReadBufferFactory(allocator);
     }
 
@@ -65,7 +62,7 @@ public final class NettyReadBufferFactory extends ReadBufferFactory {
     }
 
     @Override
-    public @NonNull ReadBuffer copyOf(@NonNull CharSequence cs, @NonNull Charset charset) {
+    public ReadBuffer copyOf(CharSequence cs, Charset charset) {
         ByteBuf byteBuf = charset == StandardCharsets.UTF_8 ?
             ByteBufUtil.writeUtf8(allocator, cs) :
             ByteBufUtil.encodeString(allocator, CharBuffer.wrap(cs), charset);
@@ -73,7 +70,7 @@ public final class NettyReadBufferFactory extends ReadBufferFactory {
     }
 
     @Override
-    public @NonNull ReadBuffer copyOf(@NonNull InputStream stream) throws IOException {
+    public ReadBuffer copyOf(InputStream stream) throws IOException {
         ByteBuf buffer = allocator.buffer();
         boolean free = true;
         try {
@@ -92,7 +89,7 @@ public final class NettyReadBufferFactory extends ReadBufferFactory {
     }
 
     @Override
-    public @NonNull ReadBuffer copyOf(@NonNull ByteBuffer nioBuffer) {
+    public ReadBuffer copyOf(ByteBuffer nioBuffer) {
         ByteBuf bb = allocator.buffer(nioBuffer.remaining());
         boolean done = false;
         try {
@@ -107,13 +104,12 @@ public final class NettyReadBufferFactory extends ReadBufferFactory {
     }
 
     @Override
-    public @NonNull ReadBuffer adapt(@NonNull ByteBuffer nioBuffer) {
+    public ReadBuffer adapt(ByteBuffer nioBuffer) {
         return adapt(Unpooled.wrappedBuffer(nioBuffer));
     }
 
     @Override
-    @NonNull
-    public ReadBuffer adapt(io.micronaut.core.io.buffer.@NonNull ByteBuffer<?> buffer) {
+    public ReadBuffer adapt(io.micronaut.core.io.buffer.ByteBuffer<?> buffer) {
         if (buffer.asNativeBuffer() instanceof ByteBuf bb) {
             return adapt(bb);
         }
@@ -121,7 +117,7 @@ public final class NettyReadBufferFactory extends ReadBufferFactory {
     }
 
     @Override
-    public ReadBuffer adapt(byte @NonNull [] array) {
+    public ReadBuffer adapt(byte[] array) {
         return adapt(Unpooled.wrappedBuffer(array));
     }
 
@@ -134,8 +130,7 @@ public final class NettyReadBufferFactory extends ReadBufferFactory {
      * @param buffer A buffer
      * @return The adapted buffer
      */
-    @NonNull
-    public ReadBuffer adapt(@NonNull ByteBuf buffer) {
+    public ReadBuffer adapt(ByteBuf buffer) {
         return new NettyReadBuffer(buffer);
     }
 
@@ -146,8 +141,7 @@ public final class NettyReadBufferFactory extends ReadBufferFactory {
      * @param readBuffer The buffer to read from
      * @return The read data
      */
-    @NonNull
-    public static ByteBuf toByteBuf(@NonNull ReadBuffer readBuffer) {
+    public static ByteBuf toByteBuf(ReadBuffer readBuffer) {
         if (readBuffer instanceof NettyReadBuffer nrb) {
             return nrb.toByteBuf();
         } else {
@@ -156,7 +150,7 @@ public final class NettyReadBufferFactory extends ReadBufferFactory {
     }
 
     @Override
-    public @NonNull <T extends Throwable> ReadBuffer buffer(@NonNull ThrowingConsumer<? super OutputStream, T> writer) throws T {
+    public <T extends Throwable> ReadBuffer buffer(ThrowingConsumer<? super OutputStream, T> writer) throws T {
         ByteBuf buf = allocator.buffer();
         boolean release = true;
         try {
@@ -177,7 +171,7 @@ public final class NettyReadBufferFactory extends ReadBufferFactory {
     }
 
     @Override
-    public ReadBufferFactory.@NonNull BufferingOutputStream outputStreamBuffer() {
+    public ReadBufferFactory. BufferingOutputStream outputStreamBuffer() {
         return new ReadBufferFactory.BufferingOutputStream() {
             ByteBufOutputStream out = new ByteBufOutputStream(allocator.buffer());
 
@@ -224,7 +218,7 @@ public final class NettyReadBufferFactory extends ReadBufferFactory {
     }
 
     @Override
-    public @NonNull ReadBuffer compose(@NonNull Iterable<@NonNull ReadBuffer> buffers) {
+    public ReadBuffer compose(Iterable<ReadBuffer> buffers) {
         CompositeByteBuf composite = allocator.compositeBuffer();
         try {
             for (ReadBuffer buffer : buffers) {

@@ -21,3 +21,7 @@ tasks.named("ossIndexAudit") {
     // the task fails if there are no dependencies (:facepalm:)
     enabled = false
 }
+
+dependencies {
+    compileOnly(libs.managed.jspecify)
+}

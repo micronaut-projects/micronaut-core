@@ -20,7 +20,6 @@ import io.micronaut.context.ApplicationContextBuilder;
 import io.micronaut.context.ApplicationContextProvider;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.function.LocalFunctionRegistry;
@@ -103,7 +102,7 @@ public class AbstractExecutor<C> implements ApplicationContextProvider, Closeabl
      *
      * @return The {@link ApplicationContextBuilder}
      */
-    protected @NonNull ApplicationContextBuilder newApplicationContextBuilder() {
+    protected ApplicationContextBuilder newApplicationContextBuilder() {
         return ApplicationContext.builder(Environment.FUNCTION);
     }
 
@@ -128,7 +127,7 @@ public class AbstractExecutor<C> implements ApplicationContextProvider, Closeabl
     }
 
     @Override
-    public @NonNull ApplicationContext getApplicationContext() {
+    public ApplicationContext getApplicationContext() {
         return this.applicationContext;
     }
 

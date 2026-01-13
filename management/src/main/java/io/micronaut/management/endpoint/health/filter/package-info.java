@@ -19,4 +19,7 @@
  * @author graemerocher
  * @since 1.0
  */
+@NullMarked
 package io.micronaut.management.endpoint.health.filter;
+
+import org.jspecify.annotations.NullMarked;
