@@ -30,7 +30,6 @@ import io.micronaut.context.EnvironmentConfigurable;
 import io.micronaut.context.annotation.Type;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.order.OrderUtil;
@@ -72,7 +71,7 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
     public InterceptorChain(Interceptor<B, R>[] interceptors,
                             B target,
                             ExecutableMethod<B, R> method,
-                            Object... originalParameters) {
+                            @Nullable Object... originalParameters) {
         super(interceptors, originalParameters);
         if (LOG.isTraceEnabled()) {
             LOG.trace("Intercepted method [{}] invocation on target: {}", method, target);
@@ -87,29 +86,28 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
         }
     }
 
-    @NonNull
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
         return annotationMetadata;
     }
 
     @Override
-    public Argument[] getArguments() {
+    public Argument<?>[] getArguments() {
         return executionHandle.getArguments();
     }
 
     @Override
-    public R invoke(B instance, Object... arguments) {
+    public R invoke(B instance, @Nullable Object... arguments) {
         return proceed();
     }
 
-    @NonNull
     @Override
     public B getTarget() {
         return target;
     }
 
     @Override
+    @Nullable
     public R proceed() throws RuntimeException {
         Interceptor<B, R> interceptor;
         if (interceptorCount == 0 || index == interceptorCount) {
@@ -256,14 +254,14 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
         return ArrayUtils.concat(aroundInterceptors, introductionInterceptors);
     }
 
-    private static <T> Interceptor<T, ?> @NonNull [] resolveInterceptors(BeanContext beanContext,
+    private static <T> Interceptor<T, ?>[] resolveInterceptors(BeanContext beanContext,
                                                                ExecutableMethod<T, ?> method,
                                                                List<BeanRegistration<Interceptor<T, ?>>> interceptors,
                                                                InterceptorKind interceptorKind) {
         return resolveInterceptors(beanContext.getBean(InterceptorRegistry.class), method, interceptors, interceptorKind);
     }
 
-    private static <T> Interceptor<T, ?> @NonNull [] resolveInterceptors(InterceptorRegistry interceptorRegistry,
+    private static <T> Interceptor<T, ?>[] resolveInterceptors(InterceptorRegistry interceptorRegistry,
                                                                ExecutableMethod<T, ?> method,
                                                                List<BeanRegistration<Interceptor<T, ?>>> interceptors,
                                                                InterceptorKind interceptorKind) {
@@ -285,7 +283,7 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
     private static <T> Interceptor<T, ?>[] resolveInterceptorsInternal(ExecutableMethod<?, ?> method,
                                                                        Class<? extends Annotation> annotationType,
                                                                        Interceptor<T, ?>[] interceptors,
-                                                                       @NonNull ClassLoader classLoader) {
+ ClassLoader classLoader) {
         List<Class<? extends Annotation>> annotations = method.getAnnotationTypesByStereotype(annotationType, classLoader);
 
         Set<Class<?>> applicableClasses = new HashSet<>();

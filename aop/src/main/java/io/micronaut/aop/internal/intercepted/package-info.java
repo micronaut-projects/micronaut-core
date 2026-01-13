@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2026 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,15 +14,9 @@
  * limitations under the License.
  */
 /**
- * The interception chain for AOP.
- *
- * @author graemerocher
- * @since 1.0
+ * The package info.
  */
-@Internal
 @NullMarked
-package io.micronaut.aop.chain;
-
+package io.micronaut.aop.internal.intercepted;
 
 import org.jspecify.annotations.NullMarked;
-import io.micronaut.core.annotation.Internal;

@@ -22,7 +22,6 @@ import io.micronaut.aop.InvocationContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.type.Argument;
@@ -58,11 +57,13 @@ abstract class AbstractInterceptorChain<B, R> implements InvocationContext<B, R>
     protected final Interceptor<B, R>[] interceptors;
     protected final @Nullable Object[] originalParameters;
     protected final int interceptorCount;
+    @Nullable
     protected volatile MutableConvertibleValues<Object> attributes;
     protected int index = 0;
+    @Nullable
     protected volatile Map<String, MutableArgumentValue<?>> parameters;
 
-    AbstractInterceptorChain(Interceptor<B, R>[] interceptors, Object... originalParameters) {
+    AbstractInterceptorChain(Interceptor<B, R>[] interceptors, @Nullable Object... originalParameters) {
         this.interceptors = interceptors;
         this.interceptorCount = interceptors.length;
         this.originalParameters = originalParameters;
@@ -70,12 +71,12 @@ abstract class AbstractInterceptorChain<B, R> implements InvocationContext<B, R>
 
     @Override
     @Nullable
-    public Object @NonNull [] getParameterValues() {
+    public Object[] getParameterValues() {
         return originalParameters;
     }
 
     @Override
-    public @NonNull MutableConvertibleValues<Object> getAttributes() {
+    public MutableConvertibleValues<Object> getAttributes() {
         MutableConvertibleValues<Object> localAttributes = this.attributes;
         if (localAttributes == null) {
             synchronized (this) { // double check
@@ -90,7 +91,7 @@ abstract class AbstractInterceptorChain<B, R> implements InvocationContext<B, R>
     }
 
     @Override
-    public @NonNull Map<String, MutableArgumentValue<?>> getParameters() {
+    public Map<String, MutableArgumentValue<?>> getParameters() {
         Map<String, MutableArgumentValue<?>> localParameters = this.parameters;
         if (localParameters == null) {
             synchronized (this) { // double check
@@ -112,7 +113,6 @@ abstract class AbstractInterceptorChain<B, R> implements InvocationContext<B, R>
 
     private <T> MutableArgumentValue<T> create(Argument<T> argument, int finalIndex) {
         return new MutableArgumentValue<>() {
-            @NonNull
             @Override
             public AnnotationMetadata getAnnotationMetadata() {
                 return argument.getAnnotationMetadata();
@@ -133,13 +133,11 @@ abstract class AbstractInterceptorChain<B, R> implements InvocationContext<B, R>
                 return argument.getTypeVariables();
             }
 
-            @NonNull
             @Override
             public String getName() {
                 return argument.getName();
             }
 
-            @NonNull
             @Override
             public Class<T> getType() {
                 return argument.getType();
@@ -169,7 +167,8 @@ abstract class AbstractInterceptorChain<B, R> implements InvocationContext<B, R>
     }
 
     @Override
-    public R proceed(@NonNull Interceptor from) throws RuntimeException {
+    @Nullable
+    public R proceed(Interceptor from) throws RuntimeException {
         for (int i = 0; i < interceptors.length; i++) {
             Interceptor<B, R> interceptor = interceptors[i];
             if (interceptor == from) {
@@ -189,8 +188,7 @@ abstract class AbstractInterceptorChain<B, R> implements InvocationContext<B, R>
      * @return The binding
      * @since 3.3.0
      */
-    protected static @NonNull Collection<AnnotationValue<?>> resolveInterceptorValues(@NonNull AnnotationMetadata annotationMetadata,
-                                                                                      @NonNull InterceptorKind kind) {
+    protected static Collection<AnnotationValue<?>> resolveInterceptorValues(AnnotationMetadata annotationMetadata, InterceptorKind kind) {
         annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
         if (annotationMetadata instanceof AnnotationMetadataHierarchy annotationMetadataHierarchy) {
             final List<AnnotationValue<InterceptorBinding>> declaredValues =

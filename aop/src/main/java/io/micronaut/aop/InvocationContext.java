@@ -16,7 +16,6 @@
 package io.micronaut.aop;
 
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.attr.MutableAttributeHolder;
 import io.micronaut.core.type.Argument;
@@ -50,13 +49,11 @@ public interface InvocationContext<T, R> extends Executable<T, R>, AnnotationMet
      *
      * @return The bound {@link ArgumentValue} instances
      */
-    @NonNull
     Map<String, MutableArgumentValue<?>> getParameters();
 
     /**
      * @return The target object
      */
-    @NonNull
     T getTarget();
 
     /**
@@ -83,21 +80,19 @@ public interface InvocationContext<T, R> extends Executable<T, R>, AnnotationMet
      * @return An enum representing the kind of interception that is occurring.
      * @since 3.0.0
      */
-    default @NonNull InterceptorKind getKind() {
+    default InterceptorKind getKind() {
         return InterceptorKind.AROUND;
     }
 
     @SuppressWarnings("unchecked")
-    @NonNull
     @Override
     default Class<T> getDeclaringType() {
         return (Class<T>) getTarget().getClass();
     }
 
     @SuppressWarnings("unchecked")
-    @NonNull
     @Override
-    default InvocationContext<T, R> setAttribute(@NonNull CharSequence name, Object value) {
+    default InvocationContext<T, R> setAttribute(CharSequence name, @Nullable Object value) {
         return (InvocationContext<T, R>) MutableAttributeHolder.super.setAttribute(name, value);
     }
 
@@ -107,8 +102,7 @@ public interface InvocationContext<T, R> extends Executable<T, R>, AnnotationMet
      *
      * @return The bound {@link ArgumentValue} instances
      */
-    @Nullable
-    default Object @NonNull [] getParameterValues() {
+    default @Nullable Object [] getParameterValues() {
         return getParameters()
             .values()
             .stream()
@@ -121,10 +115,10 @@ public interface InvocationContext<T, R> extends Executable<T, R>, AnnotationMet
      *
      * @return A map of parameter names to values
      */
-    default @NonNull Map<String, Object> getParameterValueMap() {
+    default Map<String, @Nullable Object> getParameterValueMap() {
         Argument<?>[] arguments = getArguments();
-        Object[] parameterValues = getParameterValues();
-        Map<String, Object> valueMap = CollectionUtils.newLinkedHashMap(arguments.length);
+        @Nullable Object[] parameterValues = getParameterValues();
+        Map<String, @Nullable Object> valueMap = CollectionUtils.newLinkedHashMap(arguments.length);
         for (int i = 0; i < parameterValues.length; i++) {
             Object parameterValue = parameterValues[i];
             Argument<?> arg = arguments[i];

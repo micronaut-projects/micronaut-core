@@ -63,7 +63,7 @@ public final class EvaluatedAnnotationMetadata extends MappingAnnotationMetadata
      * @param args arguments passed to method
      * @return copy of annotation metadata
      */
-    public EvaluatedAnnotationMetadata withArguments(@Nullable Object thisObject, Object @Nullable [] args) {
+    public EvaluatedAnnotationMetadata withArguments(@Nullable Object thisObject, @Nullable Object @Nullable [] args) {
         return new EvaluatedAnnotationMetadata(
             delegateAnnotationMetadata,
             evaluationContext.withArguments(thisObject, args)

@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.aop;
-
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.type.Executable;
 import io.micronaut.inject.ExecutableMethod;
 
@@ -34,7 +32,6 @@ public interface MethodInvocationContext<T, R> extends InvocationContext<T, R>, 
      *
      * @return The underlying method reference.
      */
-    @NonNull
     ExecutableMethod<T, R> getExecutableMethod();
 
     @Override
@@ -47,7 +44,6 @@ public interface MethodInvocationContext<T, R> extends InvocationContext<T, R>, 
         return getExecutableMethod().isAbstract();
     }
 
-    @NonNull
     @Override
     default Class<T> getDeclaringType() {
         return getExecutableMethod().getDeclaringType();

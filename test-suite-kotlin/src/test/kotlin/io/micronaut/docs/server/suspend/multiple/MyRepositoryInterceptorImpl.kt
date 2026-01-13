@@ -19,21 +19,21 @@ import io.micronaut.aop.InterceptedMethod
 import io.micronaut.aop.InterceptorBean
 import io.micronaut.aop.MethodInterceptor
 import io.micronaut.aop.MethodInvocationContext
+import io.micronaut.core.convert.ConversionService
 import jakarta.inject.Singleton
-import java.io.IOException
 import java.util.concurrent.CompletableFuture
 
 @InterceptorBean(MyRepository::class)
 @Singleton
-class MyRepositoryInterceptorImpl : MethodInterceptor<Any, Any> {
-    override fun intercept(context: MethodInvocationContext<Any, Any>?): Any? {
-        val interceptedMethod = InterceptedMethod.of(context)
+class MyRepositoryInterceptorImpl(val conversionService: ConversionService) : MethodInterceptor<Any, Any> {
+    override fun intercept(context: MethodInvocationContext<Any, Any>): Any {
+        val interceptedMethod = InterceptedMethod.of(context, conversionService)
         return try {
             if (interceptedMethod.resultType() == InterceptedMethod.ResultType.COMPLETION_STAGE) {
-                MyService.events.add("repository-" + context!!.methodName)
+                MyService.events.add("repository-" + context.methodName)
                 val cf: CompletableFuture<String> = CompletableFuture.supplyAsync{
                     Thread.sleep(1000)
-                    context!!.methodName
+                    context.methodName
                 }
                 interceptedMethod.handleResult(cf)
             } else {

@@ -26,14 +26,14 @@ import jakarta.inject.Singleton
 @InterceptorBean(Tx::class)
 class TxInterceptor internal constructor(
     private val txManager: TxManager, private val conversionService: ConversionService
-) : MethodInterceptor<Any?, Any?> {
+) : MethodInterceptor<Any, Any> {
 
-    override fun intercept(context: MethodInvocationContext<Any?, Any?>): Any? {
+    override fun intercept(context: MethodInvocationContext<Any, Any>): Any {
         val interceptedMethod = InterceptedMethod.of(context, conversionService)
         return try {
             if (interceptedMethod.resultType() == InterceptedMethod.ResultType.COMPLETION_STAGE) {
                 return interceptedMethod.handleResult(
-                    txManager.inTransaction() { tx: String? -> interceptedMethod.interceptResultAsCompletionStage() }
+                    txManager.inTransaction { _: String? -> interceptedMethod.interceptResultAsCompletionStage() }
                 )
             }
             throw IllegalStateException("This interceptor supports only COMPLETION_STAGE!")
