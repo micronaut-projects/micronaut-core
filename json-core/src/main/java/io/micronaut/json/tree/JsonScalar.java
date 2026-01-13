@@ -14,9 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.json.tree;
-
-import org.jspecify.annotations.NonNull;
-
 import java.util.Map;
 
 /**
@@ -32,13 +29,11 @@ abstract class JsonScalar extends JsonNode {
     }
 
     @Override
-    @NonNull
     public Iterable<JsonNode> values() {
         throw new IllegalStateException("Not a container");
     }
 
     @Override
-    @NonNull
     public Iterable<Map.Entry<String, JsonNode>> entries() {
         throw new IllegalStateException("Not an object");
     }
@@ -49,7 +44,7 @@ abstract class JsonScalar extends JsonNode {
     }
 
     @Override
-    public JsonNode get(@NonNull String fieldName) {
+    public JsonNode get(String fieldName) {
         return null;
     }
 

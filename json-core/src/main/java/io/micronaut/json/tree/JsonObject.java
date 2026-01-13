@@ -16,7 +16,6 @@
 package io.micronaut.json.tree;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.CollectionUtils;
 
 import java.util.Map;
@@ -56,7 +55,7 @@ public class JsonObject extends JsonContainer {
     }
 
     @Override
-    public JsonNode get(@NonNull String fieldName) {
+    public JsonNode get(String fieldName) {
         return values.get(fieldName);
     }
 
@@ -66,13 +65,11 @@ public class JsonObject extends JsonContainer {
     }
 
     @Override
-    @NonNull
     public Iterable<JsonNode> values() {
         return values.values();
     }
 
     @Override
-    @NonNull
     public Iterable<Map.Entry<String, JsonNode>> entries() {
         return values.entrySet();
     }

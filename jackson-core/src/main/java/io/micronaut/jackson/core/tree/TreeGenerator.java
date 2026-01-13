@@ -30,7 +30,6 @@ import tools.jackson.core.TreeNode;
 import tools.jackson.core.Version;
 import tools.jackson.core.util.JacksonFeatureSet;
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.json.JsonStreamConfig;
 import io.micronaut.json.tree.JsonNode;
 
@@ -162,7 +161,6 @@ public final class TreeGenerator extends JsonGenerator {
      * @return The completed node.
      * @throws IllegalStateException If there is still data missing. Check with {@link #isComplete()}.
      */
-    @NonNull
     public JsonNode getCompletedValue() {
         if (!isComplete()) {
             throw new IllegalStateException("Not completed");

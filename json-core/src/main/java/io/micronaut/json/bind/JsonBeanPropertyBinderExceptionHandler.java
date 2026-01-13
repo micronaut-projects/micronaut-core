@@ -16,7 +16,6 @@
 package io.micronaut.json.bind;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 
@@ -37,5 +36,5 @@ public interface JsonBeanPropertyBinderExceptionHandler {
      * @param e The exception that occurred during mapping.
      * @return The conversion error, or an empty value if default handling should be used.
      */
-    Optional<ConversionErrorException> toConversionError(@Nullable Object object, @NonNull Exception e);
+    Optional<ConversionErrorException> toConversionError(@Nullable Object object, Exception e);
 }

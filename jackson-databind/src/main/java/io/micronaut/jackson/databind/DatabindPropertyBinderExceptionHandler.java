@@ -17,7 +17,6 @@ package io.micronaut.jackson.databind;
 
 import tools.jackson.databind.DatabindException;
 import tools.jackson.databind.exc.InvalidFormatException;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
@@ -39,7 +38,7 @@ import java.util.Optional;
 @Singleton
 final class DatabindPropertyBinderExceptionHandler implements JsonBeanPropertyBinderExceptionHandler {
     @Override
-    public Optional<ConversionErrorException> toConversionError(@Nullable Object object, @NonNull Exception e) {
+    public Optional<ConversionErrorException> toConversionError(@Nullable Object object, Exception e) {
         if (e instanceof InvalidFormatException ife) {
             Object originalValue = ife.getValue();
             var conversionError = new ConversionError() {
