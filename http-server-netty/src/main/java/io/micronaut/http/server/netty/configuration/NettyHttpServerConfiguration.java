@@ -184,7 +184,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      *
      * @since 4.6.0
      */
-    public static final int DEFAULT_FORM_MAX_BUFFERED_BYTES = 1024;
+    public static final int DEFAULT_FORM_MAX_BUFFERED_BYTES = 4 * 1024 * 1024;
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServerConfiguration.class);
 

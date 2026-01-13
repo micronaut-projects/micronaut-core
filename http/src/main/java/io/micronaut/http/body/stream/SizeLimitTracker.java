@@ -122,6 +122,11 @@ final class Unlimited implements SizeLimitTracker {
     public @NonNull SizeLimitTracker makeAtomic() {
         return this;
     }
+
+    @Override
+    public String toString() {
+        return "SizeLimitTracker[Unlimited]";
+    }
 }
 
 final class NotThreadSafe implements SizeLimitTracker {
@@ -185,6 +190,11 @@ final class NotThreadSafe implements SizeLimitTracker {
         atomic.set(value);
         return atomic;
     }
+
+    @Override
+    public String toString() {
+        return "SizeLimitTracker[NotThreadSafe: " + value + "/" + limit + "]";
+    }
 }
 
 final class Atomic extends AtomicLong implements SizeLimitTracker {
@@ -216,6 +226,11 @@ final class Atomic extends AtomicLong implements SizeLimitTracker {
     @Override
     public @NonNull SizeLimitTracker makeAtomic() {
         return this;
+    }
+
+    @Override
+    public String toString() {
+        return "SizeLimitTracker[Atomic: " + get() + "/" + limit + "]";
     }
 }
 
@@ -266,5 +281,10 @@ final class Composite implements SizeLimitTracker {
         } else {
             return compose(a, b);
         }
+    }
+
+    @Override
+    public String toString() {
+        return "SizeLimitTracker[" + a + ", " + b + "]";
     }
 }
