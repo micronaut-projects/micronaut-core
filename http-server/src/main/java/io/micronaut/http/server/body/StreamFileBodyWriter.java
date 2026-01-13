@@ -54,7 +54,7 @@ import java.util.concurrent.ExecutorService;
 public final class StreamFileBodyWriter extends AbstractFileBodyWriter implements ResponseBodyWriter<StreamedFile> {
     private final ExecutorService ioExecutor;
 
-    StreamFileBodyWriter(HttpServerConfiguration.FileTypeHandlerConfiguration configuration, @Named(TaskExecutors.BLOCKING) ExecutorService ioExecutor) {
+    StreamFileBodyWriter(HttpServerConfiguration.FileTypeHandlerConfiguration configuration, @Named(TaskExecutors.VIRTUAL) ExecutorService ioExecutor) {
         super(configuration);
         this.ioExecutor = ioExecutor;
     }

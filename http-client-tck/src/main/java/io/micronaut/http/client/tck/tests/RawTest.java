@@ -124,7 +124,7 @@ class RawTest {
                      InputStreamByteBody.create(
                          new ByteArrayInputStream(LONG_PAYLOAD),
                          OptionalLong.of(LONG_PAYLOAD.length),
-                         server.getApplicationContext().getBean(Executor.class, Qualifiers.byName(TaskExecutors.BLOCKING)),
+                         server.getApplicationContext().getBean(Executor.class, Qualifiers.byName(TaskExecutors.VIRTUAL)),
                          ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE)
                      ),
                      null
@@ -240,7 +240,7 @@ class RawTest {
         }
 
         @ResponseFilter("/filter-replace-response")
-        @ExecuteOn(TaskExecutors.BLOCKING)
+        @ExecuteOn(TaskExecutors.VIRTUAL)
         public HttpResponse<?> filterReplaceResponse(HttpResponse<?> response) throws Exception {
             try (ByteBodyHttpResponse<?> r = (ByteBodyHttpResponse<?>) response) {
                 return HttpResponse.ok("Replaced response. Response body: " + r.byteBody().buffer().get().toString(StandardCharsets.UTF_8));

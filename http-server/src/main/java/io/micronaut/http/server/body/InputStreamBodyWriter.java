@@ -50,7 +50,7 @@ import java.util.concurrent.ExecutorService;
 public final class InputStreamBodyWriter extends AbstractFileBodyWriter implements ResponseBodyWriter<InputStream> {
     private final ExecutorService executorService;
 
-    InputStreamBodyWriter(HttpServerConfiguration.FileTypeHandlerConfiguration configuration, @Named(TaskExecutors.BLOCKING) ExecutorService executorService) {
+    InputStreamBodyWriter(HttpServerConfiguration.FileTypeHandlerConfiguration configuration, @Named(TaskExecutors.VIRTUAL) ExecutorService executorService) {
         super(configuration);
         this.executorService = executorService;
     }

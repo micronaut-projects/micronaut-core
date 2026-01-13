@@ -105,7 +105,7 @@ class FormLimitSpec extends Specification {
     @Requires(property = "spec.name", value = "FormLimitSpec")
     static class MyCtrl {
         @Post
-        @ExecuteOn(TaskExecutors.BLOCKING)
+        @ExecuteOn(TaskExecutors.VIRTUAL)
         @Consumes([MediaType.APPLICATION_FORM_URLENCODED, MediaType.MULTIPART_FORM_DATA])
         String post(@Body MultipartBody body) {
             return "attributes: " + Flux.from(body).doOnNext { it.getBytes() }.count().block()

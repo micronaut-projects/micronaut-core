@@ -24,7 +24,7 @@ class GoogleAuthFilter {
     }
 
     @RequestFilter
-    @ExecuteOn(TaskExecutors.BLOCKING)
+    @ExecuteOn(TaskExecutors.VIRTUAL)
     void filter(MutableHttpRequest<?> request) {
         String authURI = encodeURI(request)
         String token = authClientProvider.get().toBlocking().retrieve(HttpRequest.GET(authURI).header( // <2>

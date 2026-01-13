@@ -174,7 +174,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
         EventLoopGroupFactory eventLoopGroupFactory,
         BeanContext beanContext,
         JsonMapper jsonMapper,
-        @Nullable @Named(TaskExecutors.BLOCKING) ExecutorService blockingExecutor) {
+        @Nullable @Named(TaskExecutors.VIRTUAL) ExecutorService blockingExecutor) {
         this.clientFilterResolver = httpClientFilterResolver;
         this.defaultHttpClientConfiguration = defaultHttpClientConfiguration;
         this.loadBalancerResolver = loadBalancerResolver;

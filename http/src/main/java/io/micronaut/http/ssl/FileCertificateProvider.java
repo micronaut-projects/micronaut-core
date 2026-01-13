@@ -78,7 +78,7 @@ public final class FileCertificateProvider implements CertificateProvider {
     FileCertificateProvider(
         @NonNull Config config,
         @NonNull @jakarta.inject.Named(TaskExecutors.SCHEDULED) ExecutorService scheduler,
-        @NonNull @jakarta.inject.Named(TaskExecutors.BLOCKING) Executor blockingExecutor
+        @NonNull @jakarta.inject.Named(TaskExecutors.VIRTUAL) Executor blockingExecutor
     ) throws Exception {
         if (config.refreshMode == RefreshMode.NONE) {
             flux = Flux.just(load(config));

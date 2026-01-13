@@ -68,8 +68,8 @@ public final class IOExecutorServiceConfig {
      * @return The blocking executor
      */
     @Singleton
-    @Named(TaskExecutors.BLOCKING)
-    @Requires(missingProperty = ExecutorConfiguration.PREFIX + "." + TaskExecutors.BLOCKING)
+    @Named(TaskExecutors.VIRTUAL)
+    @Requires(missingProperty = ExecutorConfiguration.PREFIX + "." + TaskExecutors.VIRTUAL)
     ExecutorService blocking(
         @Named(TaskExecutors.IO) BeanProvider<ExecutorService> io,
         @Named(TaskExecutors.VIRTUAL) BeanProvider<ExecutorService> virtual

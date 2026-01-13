@@ -43,7 +43,7 @@ class TraceFilter {
     }
 
     @RequestFilter
-    @ExecuteOn(TaskExecutors.BLOCKING) // <3>
+    @ExecuteOn(TaskExecutors.VIRTUAL) // <3>
     void filterRequest(HttpRequest<?> request) {
         traceService.trace(request) // <4>
     }

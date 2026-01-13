@@ -39,7 +39,7 @@ public class TraceFilter {
 
     // tag::doFilter[]
     @RequestFilter
-    @ExecuteOn(TaskExecutors.BLOCKING) // <4>
+    @ExecuteOn(TaskExecutors.VIRTUAL) // <4>
     public void filterRequest(HttpRequest<?> request, FilterContinuation<MutableHttpResponse<?>> continuation) { // <1>
         traceService.trace(request);
         MutableHttpResponse<?> res = continuation.proceed(); // <2>

@@ -113,7 +113,7 @@ class ContinueTest {
     @Requires(property = "spec.name", value = SPEC_NAME)
     public static class SimpleController {
         @Post("/plain")
-        @ExecuteOn(TaskExecutors.BLOCKING)
+        @ExecuteOn(TaskExecutors.VIRTUAL)
         public String plain(@Body Publisher<String> data) {
             return String.join("", Flux.from(data).collectList().block());
         }

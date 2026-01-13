@@ -41,7 +41,7 @@ public abstract class AbstractHealthIndicator<T> implements HealthIndicator {
      * @param executorService The executor service
      */
     @Inject
-    public void setExecutorService(@Named(TaskExecutors.BLOCKING) ExecutorService executorService) {
+    public void setExecutorService(@Named(TaskExecutors.VIRTUAL) ExecutorService executorService) {
         this.executorService = executorService;
     }
 

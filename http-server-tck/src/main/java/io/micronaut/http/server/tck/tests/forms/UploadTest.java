@@ -75,7 +75,7 @@ public class UploadTest {
     public static class UploadController {
         @Consumes(MediaType.MULTIPART_FORM_DATA)
         @Post("/input-stream")
-        @ExecuteOn(TaskExecutors.BLOCKING)
+        @ExecuteOn(TaskExecutors.VIRTUAL)
         byte[] inputStream(StreamingFileUpload file) throws Exception {
             try (InputStream stream = file.asInputStream()) {
                 return stream.readAllBytes();

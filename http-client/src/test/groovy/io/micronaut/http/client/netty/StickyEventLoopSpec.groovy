@@ -127,7 +127,7 @@ class StickyEventLoopSpec extends Specification {
         }
 
         @Get("/concurrent")
-        @ExecuteOn(TaskExecutors.BLOCKING)
+        @ExecuteOn(TaskExecutors.VIRTUAL)
         def concurrent() {
             latch.countDown()
             latch.await()

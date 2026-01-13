@@ -347,7 +347,7 @@ class ReadTimeoutSpec extends Specification {
         }
 
         @Get(value = "/client", produces = MediaType.TEXT_PLAIN)
-        @ExecuteOn(TaskExecutors.BLOCKING)
+        @ExecuteOn(TaskExecutors.VIRTUAL)
         String test() {
             return testClient.get()
         }

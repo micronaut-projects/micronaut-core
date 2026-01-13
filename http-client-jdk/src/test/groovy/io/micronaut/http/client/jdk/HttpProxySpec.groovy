@@ -68,7 +68,7 @@ class HttpProxySpec extends Specification {
         }
 
         @Get
-        @ExecuteOn(TaskExecutors.BLOCKING)
+        @ExecuteOn(TaskExecutors.VIRTUAL)
         String get(HttpRequest<?> request) {
             "Proxied " + ctx.createBean(HttpClient, "http://localhost:${ctx.getBean(TargetPort).port}".toURI())
                     .toBlocking()

@@ -116,7 +116,7 @@ public class FormUrlEncodedBodyInRequestFilterTest {
             this.bodyParser = bodyParser;
         }
 
-        @ExecuteOn(TaskExecutors.BLOCKING)
+        @ExecuteOn(TaskExecutors.VIRTUAL)
         @RequestFilter
         @Nullable
         public HttpResponse<?> csrfFilter(@NonNull HttpRequest<?> request) {

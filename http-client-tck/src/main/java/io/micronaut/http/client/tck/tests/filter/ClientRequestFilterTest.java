@@ -418,7 +418,7 @@ public class ClientRequestFilterTest {
         }
 
         @RequestFilter("/request-filter/continuation-blocking")
-        @ExecuteOn(TaskExecutors.BLOCKING)
+        @ExecuteOn(TaskExecutors.VIRTUAL)
         public void requestFilterContinuationBlocking(MutableHttpRequest<?> request, FilterContinuation<HttpResponse<?>> continuation) {
             request.header("foo", "bar");
             HttpResponse<?> r = continuation.proceed();
@@ -432,7 +432,7 @@ public class ClientRequestFilterTest {
         }
 
         @RequestFilter("/request-filter/continuation-update-request")
-        @ExecuteOn(TaskExecutors.BLOCKING)
+        @ExecuteOn(TaskExecutors.VIRTUAL)
         public void requestFilterContinuationUpdateRequest(FilterContinuation<HttpResponse<?>> continuation) {
             // won't affect the routing decision, but will appear in the controller
             continuation.request(HttpRequest.GET("/request-filter/continuation-update-request-2"));

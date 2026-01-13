@@ -12,7 +12,7 @@ import io.micronaut.scheduling.annotation.ExecuteOn;
 @Controller("/hello")
 class HelloWorldController {
 
-    @ExecuteOn(TaskExecutors.BLOCKING)
+    @ExecuteOn(TaskExecutors.VIRTUAL)
     @Produces(MediaType.TEXT_PLAIN)
     @Get("/world")
     String index() {

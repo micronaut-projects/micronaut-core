@@ -158,7 +158,7 @@ public final class PublisherAsBlocking implements Subscriber<ReadBuffer>, Closea
                 }
                 if (demanded) {
                     if (Thread.currentThread() instanceof NonBlocking) {
-                        throw new IllegalStateException("Attempted to do blocking operation on a thread marked as NonBlocking. (Maybe the netty event loop?) Please only run blocking operations on IO or virtual threads, for example by marking your controller with @ExecuteOn(TaskExecutors.BLOCKING).");
+                        throw new IllegalStateException("Attempted to do blocking operation on a thread marked as NonBlocking. (Maybe the netty event loop?) Please only run blocking operations on IO or virtual threads, for example by marking your controller with @ExecuteOn(TaskExecutors.VIRTUAL).");
                     }
                     newDataCondition.await();
                 }

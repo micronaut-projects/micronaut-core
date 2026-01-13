@@ -30,13 +30,16 @@ public interface TaskExecutors {
     String IO = "io";
 
     /**
+     * @deprecated Since 5.0.0. Use {@link #VIRTUAL} instead on JDK 21+, or migrate to dedicated executors suited for your workload.
      * The name of the {@link java.util.concurrent.ExecutorService} used to schedule blocking tasks.
      * If available, this will use {@link #VIRTUAL virtual threads}. Otherwise, it will fall back to
      * {@link #IO}.
      */
+    @Deprecated(since = "5.0.0")
     String BLOCKING = "blocking";
 
     /**
+     * Recommended replacement for (@link #BLOCKING}) on JDK 21+.
      * Executor that runs tasks on virtual threads. This requires JDK 19+, and
      * {@code --enable-preview}.
      */
