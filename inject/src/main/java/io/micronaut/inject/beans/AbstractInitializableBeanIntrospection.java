@@ -184,7 +184,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
     @NonNull
     @Internal
     @UsedByGeneratedCode
-    protected B instantiateInternal(Object @Nullable [] arguments) {
+    protected B instantiateInternal(@Nullable Object @Nullable [] arguments) {
         if (hasBuilder() && arguments != null) {
             Builder<B> b = builder();
             Argument<?> @NonNull [] args = b.getBuilderArguments();
@@ -337,7 +337,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
 
     @NonNull
     @Override
-    public B instantiate(boolean strictNullable, Object... arguments) throws InstantiationException {
+    public B instantiate(boolean strictNullable, @Nullable Object @Nullable ... arguments) throws InstantiationException {
         ArgumentUtils.requireNonNull("arguments", arguments);
 
         if (arguments.length == 0) {
@@ -368,7 +368,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
     }
 
     @Override
-    public B instantiateUnsafe(@NonNull Object... arguments) {
+    public B instantiateUnsafe(@Nullable Object @Nullable ... arguments) {
         return instantiateInternal(arguments);
     }
 

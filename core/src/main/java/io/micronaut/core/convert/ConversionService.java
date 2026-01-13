@@ -43,7 +43,7 @@ public interface ConversionService {
      * @param <T>        The target type
      * @return The optional
      */
-    default <T> Optional<T> convert(Object object, Class<T> targetType, ConversionContext context) {
+    default <T> Optional<T> convert(@Nullable Object object, Class<T> targetType, ConversionContext context) {
         if (object == null) {
             return Optional.empty();
         }
@@ -62,7 +62,7 @@ public interface ConversionService {
      * @return The optional
      * @since 4.2.0
      */
-    default <S, T> Optional<T> convert(S object, Class<? super S> sourceType, Class<T> targetType, ConversionContext context) {
+    default <S, T> Optional<T> convert(@Nullable S object, Class<? super S> sourceType, Class<T> targetType, ConversionContext context) {
         return convert(object, targetType, context);
     }
 
@@ -85,7 +85,7 @@ public interface ConversionService {
      * @param <T>        The generic type
      * @return The optional
      */
-    default <T> Optional<T> convert(Object object, Class<T> targetType) {
+    default <T> Optional<T> convert(@Nullable Object object, Class<T> targetType) {
         return convert(object, targetType, ConversionContext.DEFAULT);
     }
 
@@ -97,7 +97,7 @@ public interface ConversionService {
      * @param <T>        The generic type
      * @return The optional
      */
-    default <T> Optional<T> convert(Object object, Argument<T> targetType) {
+    default <T> Optional<T> convert(@Nullable Object object, Argument<T> targetType) {
         return convert(object, targetType.getType(), ConversionContext.of(targetType));
     }
 
@@ -112,7 +112,7 @@ public interface ConversionService {
      * @return The optional
      * @since 4.2.0
      */
-    default <S, T> Optional<T> convert(S object, Class<? super S> sourceType, Argument<T> targetType) {
+    default <S, T> Optional<T> convert(@Nullable S object, Class<? super S> sourceType, Argument<T> targetType) {
         return convert(object, sourceType, targetType.getType(), ConversionContext.of(targetType));
     }
 
@@ -124,7 +124,7 @@ public interface ConversionService {
      * @param <T>     The generic type
      * @return The optional
      */
-    default <T> Optional<T> convert(Object object, ArgumentConversionContext<T> context) {
+    default <T> Optional<T> convert(@Nullable Object object, ArgumentConversionContext<T> context) {
         return convert(object, context.getArgument().getType(), context);
     }
 
@@ -168,7 +168,7 @@ public interface ConversionService {
      * @throws ConversionErrorException if the value cannot be converted
      * @since 4.1.0
      */
-    default  <T> T convertRequired(Object value, ArgumentConversionContext<T> context) {
+    default <T> T convertRequired(@Nullable Object value, ArgumentConversionContext<T> context) {
         Argument<T> argument = context.getArgument();
         return convert(
             value,
@@ -177,8 +177,8 @@ public interface ConversionService {
         ).orElseThrow(() -> newConversionError(context, argument, value));
     }
 
-    private static <T> ConversionErrorException newConversionError(ArgumentConversionContext<T> context, Argument<T> argument, Object value) {
+    private static <T> ConversionErrorException newConversionError(ArgumentConversionContext<T> context, Argument<T> argument, @Nullable Object value) {
         Optional<ConversionError> lastError = context.getLastError();
-        return lastError.map(conversionError -> new ConversionErrorException(context.getArgument(), conversionError)).orElseGet(() -> new ConversionErrorException(context.getArgument(), new IllegalArgumentException("Cannot convert type [" + value.getClass() + "] to target type: " + argument.getType() + ". Considering defining a TypeConverter bean to handle this case.")));
+        return lastError.map(conversionError -> new ConversionErrorException(context.getArgument(), conversionError)).orElseGet(() -> new ConversionErrorException(context.getArgument(), new IllegalArgumentException("Cannot convert type [" + (value == null ? "null" : value.getClass()) + "] to target type: " + argument.getType() + ". Considering defining a TypeConverter bean to handle this case.")));
     }
 }

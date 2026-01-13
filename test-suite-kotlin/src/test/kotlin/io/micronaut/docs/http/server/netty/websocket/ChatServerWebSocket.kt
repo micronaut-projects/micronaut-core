@@ -49,7 +49,7 @@ class ChatServerWebSocket(private val broadcaster: WebSocketBroadcaster) {
 
     private fun isValid(topic: String, session: WebSocketSession): Predicate<WebSocketSession> {
         return Predicate<WebSocketSession> {
-            (it !== session && topic.equals(it.uriVariables.get("topic", String::class.java, null), ignoreCase = true))
+            (it !== session && topic.equals(it.uriVariables.get("topic", String::class.java).orElse(null), ignoreCase = true))
         }
     }
 }

@@ -109,7 +109,7 @@ public abstract class AbstractBeanMethod<B, T> implements BeanMethod<B, T> {
 
     @SuppressWarnings("java:S2638")
     @Override
-    public T invoke(B instance, Object... arguments) {
+    public T invoke(B instance, @Nullable Object... arguments) {
         return invokeInternal(instance, arguments);
     }
 

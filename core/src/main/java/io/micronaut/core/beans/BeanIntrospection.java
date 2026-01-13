@@ -16,13 +16,14 @@
 package io.micronaut.core.beans;
 
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.beans.exceptions.IntrospectionException;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.reflect.exception.InstantiationException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
+import org.jspecify.annotations.Nullable;
+
 import java.lang.annotation.Annotation;
 import java.util.Collection;
 import java.util.Collections;
@@ -50,7 +51,7 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
     /**
      * @return An immutable collection of properties.
      */
- Collection<BeanProperty<T, Object>> getBeanProperties();
+    Collection<BeanProperty<T, Object>> getBeanProperties();
 
     /**
      * @return An immutable collection of read properties.
@@ -76,16 +77,17 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
      * @return An immutable collection of properties.
      * @see io.micronaut.core.annotation.Introspected#indexed()
      */
- Collection<BeanProperty<T, Object>> getIndexedProperties(Class<? extends Annotation> annotationType);
+    Collection<BeanProperty<T, Object>> getIndexedProperties(Class<? extends Annotation> annotationType);
 
     /**
      * @return Obtain a builder for this introspection.
      * @since 4.1.0
      */
- Builder<T> builder();
+    Builder<T> builder();
 
     /**
      * Can the introspection be constructed with {@link #builder()}.
+     *
      * @return True if it can
      * @since 4.1.0
      */
@@ -111,7 +113,7 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
      * @return An instance
      * @throws InstantiationException If the bean cannot be instantiated or the arguments are not satisfied.
      */
- T instantiate() throws InstantiationException;
+    T instantiate() throws InstantiationException;
 
     /**
      * Instantiates an instance of the bean, throwing an exception is instantiation is not possible.
@@ -120,7 +122,7 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
      * @return An instance
      * @throws InstantiationException If the bean cannot be instantiated.
      */
-    default T instantiate(Object... arguments) throws InstantiationException {
+    default T instantiate(@Nullable Object @Nullable... arguments) throws InstantiationException {
         return instantiate(true, arguments);
     }
 
@@ -132,7 +134,7 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
      * @return An instance
      * @throws InstantiationException If the bean cannot be instantiated.
      */
- T instantiate(boolean strictNullable, Object... arguments) throws InstantiationException;
+    T instantiate(boolean strictNullable, @Nullable Object @Nullable... arguments) throws InstantiationException;
 
     /**
      * The bean type.
@@ -140,7 +142,7 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
      * @return The bean type
      */
     @Override
- Class<T> getBeanType();
+    Class<T> getBeanType();
 
     /**
      * Get all the bean properties annotated for the given type.
@@ -150,9 +152,9 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
      * @return An immutable collection of properties.
      * @see io.micronaut.core.annotation.Introspected#indexed()
      */
- Optional<BeanProperty<T, Object>> getIndexedProperty(
- Class<? extends Annotation> annotationType,
- String annotationValue);
+    Optional<BeanProperty<T, Object>> getIndexedProperty(
+        Class<? extends Annotation> annotationType,
+        String annotationValue);
 
     /**
      * Returns the {@link BeanMethod} instances for this introspection.
@@ -161,7 +163,6 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
      * of the actual methods of the class and do not include any methods that are exposed as {@link BeanProperty} instances.</p>
      *
      * @return An immutable collection of methods.
-     *
      * @since 2.3.0
      */
     default Collection<BeanMethod<T, Object>> getBeanMethods() {
@@ -176,7 +177,7 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
      * @see io.micronaut.core.annotation.Introspected#indexed()
      */
     default Optional<BeanProperty<T, Object>> getIndexedProperty(
- Class<? extends Annotation> annotationType) {
+        Class<? extends Annotation> annotationType) {
         return getIndexedProperties(annotationType).stream().findFirst();
     }
 
@@ -425,11 +426,11 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
         /**
          * Create the instance with the given value for the given property.
          *
-         * @param name     The name of the argument
-         * @param value    The value
+         * @param name  The name of the argument
+         * @param value The value
          * @return This builder
          */
- Builder<T> with(String name, @Nullable Object value);
+        Builder<T> with(String name, @Nullable Object value);
 
         /**
          * Create the instance copying properties from the given instance to start.
@@ -437,7 +438,7 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
          * @param existing The existing bean
          * @return This builder
          */
- Builder<T> with(T existing);
+        Builder<T> with(T existing);
 
         /**
          * Create the instance with the given value for the given property.
@@ -468,7 +469,7 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
          * @return The built instance.
          * @throws IllegalArgumentException If one of the supplied inputs is invalid
          */
- T build();
+        T build();
 
         /**
          * Build the instance from the current state and given parameters to the build method.
@@ -477,6 +478,6 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
          * @return The built instance.
          * @throws IllegalArgumentException If one of the supplied inputs is invalid
          */
- T build(Object... params);
+        T build(Object... params);
     }
 }
