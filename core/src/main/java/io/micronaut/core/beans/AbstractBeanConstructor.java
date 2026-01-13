@@ -64,8 +64,7 @@ public abstract class AbstractBeanConstructor<T> implements BeanConstructor<T> {
     }
 
     @Override
-    @NonNull
-    public Argument<?>[] getArguments() {
+    public Argument<?> @NonNull [] getArguments() {
         return arguments;
     }
 }

@@ -65,7 +65,7 @@ public abstract class AbstractBeanProperty<B, P> implements UnsafeBeanProperty<B
             @NonNull Class<P> type,
             @NonNull String name,
             @Nullable AnnotationMetadata annotationMetadata,
-            @Nullable Argument[] typeArguments) {
+            Argument @Nullable [] typeArguments) {
         this.introspection = introspection;
         this.type = type;
         this.beanType = introspection.getBeanType();

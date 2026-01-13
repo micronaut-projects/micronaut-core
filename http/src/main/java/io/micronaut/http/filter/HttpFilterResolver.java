@@ -75,7 +75,7 @@ public interface HttpFilterResolver<T extends AnnotationMetadataProvider> {
         /**
          * @return The filter patterns
          */
-        @NonNull String[] getPatterns();
+        String @NonNull [] getPatterns();
 
         /**
          * @return The filter patterns

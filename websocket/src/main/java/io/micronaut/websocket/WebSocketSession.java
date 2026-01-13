@@ -175,8 +175,7 @@ public interface WebSocketSession extends MutableConvertibleValues<Object>, Auto
      * {@link WebSocketPongMessage}.
      * @return A future that completes when the ping has been sent. (Not when the pong has been received!)
      */
-    @NonNull
-    default CompletableFuture<?> sendPingAsync(@NonNull byte[] content) {
+    default CompletableFuture<?> sendPingAsync(@NonNull byte @NonNull [] content) {
         throw new UnsupportedOperationException("Ping not supported by this implementation");
     }
 

@@ -26,6 +26,8 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
@@ -1518,8 +1520,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @return The string[] or null
      */
     @Internal
-    @Nullable
-    public static String[] resolveStringValues(@Nullable Object value, @Nullable Function<Object, Object> valueMapper) {
+    public static String @Nullable [] resolveStringValues(@Nullable Object value, @Nullable Function<Object, Object> valueMapper) {
         if (value == null) {
             return null;
         }
@@ -1562,8 +1563,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @return An array of enum values
      */
     @Internal
-    @NonNull
-    public static <E extends Enum> E[] resolveEnumValues(@NonNull Class<E> enumType, @Nullable Object rawValue) {
+    public static <E extends Enum> E @NonNull [] resolveEnumValues(@NonNull Class<E> enumType, @Nullable Object rawValue) {
         if (rawValue == null) {
             return (E[]) Array.newInstance(enumType, 0);
         }
@@ -1613,8 +1613,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @return The class values or null
      */
     @Internal
-    @Nullable
-    public static Class<?>[] resolveClassValues(@Nullable Object value) {
+    public static Class<?> @Nullable [] resolveClassValues(@Nullable Object value) {
         // conditional branches ordered from most likely to least likely
         // generally at runtime values are always AnnotationClassValue
         // A class can be present at compilation time

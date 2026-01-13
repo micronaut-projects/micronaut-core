@@ -79,8 +79,7 @@ public abstract class AbstractProviderDefinition<T> implements InstantiatableBea
     }
 
     @Override
-    @NonNull
-    public Class<?>[] getIndexes() {
+    public Class<?> @NonNull [] getIndexes() {
         try {
             return new Class<?>[]{getBeanType()};
         } catch (NoClassDefFoundError e) {

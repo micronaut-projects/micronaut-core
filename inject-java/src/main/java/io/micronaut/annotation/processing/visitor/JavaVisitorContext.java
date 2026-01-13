@@ -280,7 +280,7 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
     }
 
     @Override
-    public @NonNull ClassElement[] getClassElements(@NonNull String aPackage, @NonNull String... stereotypes) {
+    public ClassElement @NonNull [] getClassElements(@NonNull String aPackage, @NonNull String... stereotypes) {
         ArgumentUtils.requireNonNull("aPackage", aPackage);
         ArgumentUtils.requireNonNull("stereotypes", stereotypes);
         final PackageElement packageElement = elements.getPackageElement(aPackage);
@@ -551,7 +551,7 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
         return visitorAttributes.get(name, conversionContext);
     }
 
-    private void populateClassElements(@NonNull String[] stereotypes, PackageElement packageElement, List<ClassElement> classElements) {
+    private void populateClassElements(String @NonNull [] stereotypes, PackageElement packageElement, List<ClassElement> classElements) {
         final List<? extends Element> enclosedElements = packageElement.getEnclosedElements();
         boolean includeAll = Arrays.equals(stereotypes, new String[] {"*"});
         for (Element enclosedElement : enclosedElements) {
@@ -559,7 +559,7 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
         }
     }
 
-    private void populateClassElements(@NonNull String[] stereotypes, boolean includeAll, Element enclosedElement, List<ClassElement> classElements) {
+    private void populateClassElements(String @NonNull [] stereotypes, boolean includeAll, Element enclosedElement, List<ClassElement> classElements) {
         if (enclosedElement instanceof TypeElement element) {
             JavaClassElement classElement = elementFactory.newClassElement(element, elementAnnotationMetadataFactory);
             if ((includeAll || Arrays.stream(stereotypes).anyMatch(classElement::hasStereotype)) && !classElement.isAbstract()) {

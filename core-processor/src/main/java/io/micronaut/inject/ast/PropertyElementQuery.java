@@ -205,8 +205,7 @@ public final class PropertyElementQuery {
     /**
      * @return The read method prefixes.
      */
-    @NonNull
-    public String[] getReadPrefixes() {
+    public String @NonNull [] getReadPrefixes() {
         return readPrefixes;
     }
 
@@ -227,7 +226,7 @@ public final class PropertyElementQuery {
     /**
      * @return The write method prefixes.
      */
-    public @NonNull String[] getWritePrefixes() {
+    public String @NonNull [] getWritePrefixes() {
         return writePrefixes;
     }
 
@@ -236,7 +235,7 @@ public final class PropertyElementQuery {
      * @param writePrefixes The write prefixes
      * @return This PropertyElementQuery
      */
-    public @NonNull PropertyElementQuery writePrefixes(String[] writePrefixes) {
+    public PropertyElementQuery writePrefixes(String @NonNull [] writePrefixes) {
         if (ArrayUtils.isNotEmpty(writePrefixes)) {
             this.writePrefixes = writePrefixes;
         } else {

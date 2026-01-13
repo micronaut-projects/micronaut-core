@@ -224,7 +224,7 @@ public class NettyWebSocketSession implements WebSocketSession {
 
     @NonNull
     @Override
-    public CompletableFuture<?> sendPingAsync(@NonNull byte[] content) {
+    public CompletableFuture<?> sendPingAsync(byte @NonNull [] content) {
         if (isOpen()) {
             ByteBuf messageBuffer = channel.alloc().buffer(content.length);
             messageBuffer.writeBytes(content);

@@ -28,8 +28,7 @@ public interface OriginatingElements {
      * @return The elements where the bean definition originated from as an array.
      * @since 2.1.1
      */
-    @NonNull
-    Element[] getOriginatingElements();
+    Element @NonNull [] getOriginatingElements();
 
     /**
      * Add another element that should be included in the originating elements.

@@ -153,8 +153,7 @@ public class JavaMethodElement extends AbstractJavaMemberElement implements Meth
     }
 
     @Override
-    @NonNull
-    public ClassElement[] getThrownTypes() {
+    public ClassElement @NonNull [] getThrownTypes() {
         final List<? extends TypeMirror> thrownTypes = executableElement.getThrownTypes();
         if (!thrownTypes.isEmpty()) {
             return thrownTypes.stream()

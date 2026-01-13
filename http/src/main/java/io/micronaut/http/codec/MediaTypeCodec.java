@@ -111,8 +111,7 @@ public interface MediaTypeCodec {
      * @throws CodecException When the result cannot be encoded
      * @since 3.2.0
      */
-    @NonNull
-    default <T> byte[] encode(@NonNull Argument<T> type, T object) throws CodecException {
+    default <T> byte @NonNull [] encode(@NonNull Argument<T> type, T object) throws CodecException {
         return encode(object);
     }
 

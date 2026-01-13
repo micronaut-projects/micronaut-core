@@ -15,6 +15,9 @@
  */
 package io.micronaut.core.annotation;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
+
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -965,7 +968,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @return An {@link Optional} class
      * @param <T> The type of the class
      */
-    default @NonNull <T> Class<T>[] classValues(@NonNull String annotation) {
+    default <T> Class<T> @NonNull [] classValues(@NonNull String annotation) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         return classValues(annotation, VALUE_MEMBER);
     }
@@ -978,7 +981,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @return An {@link Optional} class
      * @param <T> The type of the class
      */
-    default @NonNull <T> Class<T>[] classValues(@NonNull String annotation, @NonNull String member) {
+    default <T> Class<T> @NonNull [] classValues(@NonNull String annotation, @NonNull String member) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
 
@@ -992,7 +995,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @return An {@link Optional} class
      * @param <T> The type of the class
      */
-    default @NonNull <T> Class<T>[] classValues(@NonNull Class<? extends Annotation> annotation) {
+    default <T> Class<T> @NonNull [] classValues(@NonNull Class<? extends Annotation> annotation) {
         ArgumentUtils.requireNonNull("annotation", annotation);
 
         return classValues(annotation, VALUE_MEMBER);
@@ -1006,7 +1009,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @return An {@link Optional} class
      * @param <T> The type of the class
      */
-    default @NonNull <T> Class<T>[] classValues(@NonNull Class<? extends Annotation> annotation, @NonNull String member) {
+    default <T> Class<T> @NonNull [] classValues(@NonNull Class<? extends Annotation> annotation, @NonNull String member) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
 
@@ -1203,7 +1206,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param member     The member
      * @return The string values if it is present
      */
-    default @NonNull String[] stringValues(@NonNull Class<? extends Annotation> annotation, @NonNull String member) {
+    default String @NonNull [] stringValues(@NonNull Class<? extends Annotation> annotation, @NonNull String member) {
         return StringUtils.EMPTY_STRING_ARRAY;
     }
 
@@ -1213,7 +1216,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param annotation The annotation
      * @return The string values if it is present
      */
-    default @NonNull String[] stringValues(@NonNull Class<? extends Annotation> annotation) {
+    default String @NonNull [] stringValues(@NonNull Class<? extends Annotation> annotation) {
         return stringValues(annotation, VALUE_MEMBER);
     }
 
@@ -1224,7 +1227,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param member     The member
      * @return The string values if it is present
      */
-    default @NonNull String[] stringValues(@NonNull String annotation, @NonNull String member) {
+    default String @NonNull [] stringValues(@NonNull String annotation, @NonNull String member) {
         return StringUtils.EMPTY_STRING_ARRAY;
     }
 
@@ -1234,7 +1237,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param annotation The annotation
      * @return The string values if it is present
      */
-    default @NonNull String[] stringValues(@NonNull String annotation) {
+    default String @NonNull [] stringValues(@NonNull String annotation) {
         return stringValues(annotation, VALUE_MEMBER);
     }
 
@@ -1537,7 +1540,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param annotations The annotations
      * @return True if any of the given stereotypes are present
      */
-    default boolean hasStereotype(@Nullable String[] annotations) {
+    default boolean hasStereotype(String @Nullable [] annotations) {
         if (ArrayUtils.isEmpty(annotations)) {
             return false;
         }

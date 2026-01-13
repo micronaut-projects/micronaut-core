@@ -256,16 +256,14 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
         return ArrayUtils.concat(aroundInterceptors, introductionInterceptors);
     }
 
-    @NonNull
-    private static <T> Interceptor<T, ?>[] resolveInterceptors(BeanContext beanContext,
+    private static <T> Interceptor<T, ?> @NonNull [] resolveInterceptors(BeanContext beanContext,
                                                                ExecutableMethod<T, ?> method,
                                                                List<BeanRegistration<Interceptor<T, ?>>> interceptors,
                                                                InterceptorKind interceptorKind) {
         return resolveInterceptors(beanContext.getBean(InterceptorRegistry.class), method, interceptors, interceptorKind);
     }
 
-    @NonNull
-    private static <T> Interceptor<T, ?>[] resolveInterceptors(InterceptorRegistry interceptorRegistry,
+    private static <T> Interceptor<T, ?> @NonNull [] resolveInterceptors(InterceptorRegistry interceptorRegistry,
                                                                ExecutableMethod<T, ?> method,
                                                                List<BeanRegistration<Interceptor<T, ?>>> interceptors,
                                                                InterceptorKind interceptorKind) {

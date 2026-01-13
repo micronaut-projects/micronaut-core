@@ -37,8 +37,7 @@ public interface ParametrizedInstantiatableBeanDefinition<T> extends Instantiata
     /**
      * @return The arguments required to construct this bean
      */
-    @NonNull
-    Argument<Object>[] getRequiredArguments();
+    Argument<Object> @NonNull [] getRequiredArguments();
 
     /**
      * Variation of the {@link #instantiate(BeanContext)} method that allows passing the values necessary for

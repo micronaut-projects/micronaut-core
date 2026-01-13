@@ -183,8 +183,7 @@ interface EnvironmentAnnotationMetadata extends AnnotationMetadata {
      * @param valueMapper The value mapper
      * @return The int value
      */
-    @NonNull
-    String[] stringValues(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Function<Object, Object> valueMapper);
+    String @NonNull [] stringValues(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Function<Object, Object> valueMapper);
 
     /**
      * Retrieve the string value and optionally map its value.
@@ -193,8 +192,7 @@ interface EnvironmentAnnotationMetadata extends AnnotationMetadata {
      * @param valueMapper The value mapper
      * @return The int value
      */
-    @NonNull
-    String[] stringValues(@NonNull String annotation, @NonNull String member, Function<Object, Object> valueMapper);
+    String @NonNull [] stringValues(@NonNull String annotation, @NonNull String member, Function<Object, Object> valueMapper);
 
     /**
      * Retrieve the string value and optionally map its value.

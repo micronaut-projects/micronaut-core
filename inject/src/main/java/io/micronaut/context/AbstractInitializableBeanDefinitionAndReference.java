@@ -46,11 +46,11 @@ public abstract class AbstractInitializableBeanDefinitionAndReference<T> extends
     protected AbstractInitializableBeanDefinitionAndReference(Class<T> beanType,
                                                               @Nullable MethodOrFieldReference constructor,
                                                               @Nullable AnnotationMetadata annotationMetadata,
-                                                              @Nullable MethodReference[] methodInjection,
-                                                              @Nullable FieldReference[] fieldInjection,
-                                                              @Nullable AnnotationReference[] annotationInjection,
+                                                              MethodReference @Nullable [] methodInjection,
+                                                              FieldReference @Nullable [] fieldInjection,
+                                                              AnnotationReference @Nullable [] annotationInjection,
                                                               @Nullable ExecutableMethodsDefinition<T> executableMethodsDefinition,
-                                                              @Nullable Map<String, Argument<?>[]> typeArgumentsMap,
+                                                              Map<String, Argument<?> @Nullable []> typeArgumentsMap,
                                                               @NonNull PrecalculatedInfo precalculatedInfo) {
         this(beanType, constructor, annotationMetadata, methodInjection, fieldInjection, annotationInjection, executableMethodsDefinition, typeArgumentsMap, precalculatedInfo, null, null, null);
     }
@@ -58,14 +58,14 @@ public abstract class AbstractInitializableBeanDefinitionAndReference<T> extends
     protected AbstractInitializableBeanDefinitionAndReference(Class<T> beanType,
                                                               @Nullable MethodOrFieldReference constructor,
                                                               @Nullable AnnotationMetadata annotationMetadata,
-                                                              @Nullable MethodReference[] methodInjection,
-                                                              @Nullable FieldReference[] fieldInjection,
-                                                              @Nullable AnnotationReference[] annotationInjection,
+                                                              MethodReference @Nullable [] methodInjection,
+                                                              FieldReference @Nullable [] fieldInjection,
+                                                              AnnotationReference @Nullable [] annotationInjection,
                                                               @Nullable ExecutableMethodsDefinition<T> executableMethodsDefinition,
-                                                              @Nullable Map<String, Argument<?>[]> typeArgumentsMap,
+                                                              Map<String, Argument<?> @Nullable []> typeArgumentsMap,
                                                               @NonNull PrecalculatedInfo precalculatedInfo,
-                                                              @Nullable Condition[] preLoadConditions,
-                                                              @Nullable Condition[] postLoadConditions,
+                                                              Condition @Nullable [] preLoadConditions,
+                                                              Condition @Nullable [] postLoadConditions,
                                                               @Nullable Throwable failedInitialization) {
         super(beanType, constructor, annotationMetadata, methodInjection, fieldInjection, annotationInjection, executableMethodsDefinition, typeArgumentsMap, precalculatedInfo);
         this.failedInitialization = failedInitialization;

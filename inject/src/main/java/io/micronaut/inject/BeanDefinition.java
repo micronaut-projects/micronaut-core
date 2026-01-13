@@ -415,7 +415,7 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
      * @param type The type
      * @return The type parameters
      */
-    default @NonNull Class<?>[] getTypeParameters(@Nullable Class<?> type) {
+    default Class<?> @NonNull [] getTypeParameters(@Nullable Class<?> type) {
         if (type == null) {
             return ReflectionUtils.EMPTY_CLASS_ARRAY;
         } else {
@@ -438,7 +438,7 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
      *
      * @return The type parameters for the bean type as a class array.
      */
-    default @NonNull Class<?>[] getTypeParameters() {
+    default Class<?> @NonNull [] getTypeParameters() {
         return getTypeParameters(getBeanType());
     }
 
@@ -550,7 +550,7 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
                     beanDescription.append(beanTypeString)
                         .append(".")
                         .append(beanMethod);
-                    @NonNull Argument<?>[] methodArguments = method.getArguments();
+                    Argument<?> @NonNull [] methodArguments = method.getArguments();
                     List<Argument<?>> typeArguments = getTypeArguments(adaptedType);
                     if (typeArguments.size() == methodArguments.length) {
                         arguments = new Argument[methodArguments.length];

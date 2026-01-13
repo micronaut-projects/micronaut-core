@@ -17,9 +17,17 @@ package io.micronaut.core.annotation;
 
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.value.OptionalValues;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.OptionalDouble;
+import java.util.OptionalInt;
+import java.util.OptionalLong;
+import java.util.Set;
 
 /**
  * An interface that can be implemented by other classes that delegate the resolution of the {@link AnnotationMetadata}
@@ -277,12 +285,12 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
     }
 
     @Override
-    default @NonNull <T extends Annotation> T[] synthesizeAnnotationsByType(@NonNull Class<T> annotationClass) {
+    default <T extends Annotation> T @NonNull [] synthesizeAnnotationsByType(@NonNull Class<T> annotationClass) {
         return getAnnotationMetadata().synthesizeAnnotationsByType(annotationClass);
     }
 
     @Override
-    default @NonNull <T extends Annotation> T[] synthesizeDeclaredAnnotationsByType(@NonNull Class<T> annotationClass) {
+    default <T extends Annotation> T @NonNull [] synthesizeDeclaredAnnotationsByType(@NonNull Class<T> annotationClass) {
         return getAnnotationMetadata().synthesizeDeclaredAnnotationsByType(annotationClass);
     }
 
@@ -627,12 +635,12 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
     }
 
     @Override
-    default @NonNull Annotation[] synthesizeAll() {
+    default Annotation @NonNull [] synthesizeAll() {
         return getAnnotationMetadata().synthesizeAll();
     }
 
     @Override
-    default @NonNull Annotation[] synthesizeDeclared() {
+    default Annotation @NonNull [] synthesizeDeclared() {
         return getAnnotationMetadata().synthesizeDeclared();
     }
 

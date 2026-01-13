@@ -16,8 +16,6 @@
 package io.micronaut.http.filter;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.async.propagation.ReactivePropagation;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.bind.ArgumentBinder;
@@ -42,6 +40,7 @@ import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.inject.ExecutableMethod;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import reactor.core.scheduler.NonBlocking;
 
@@ -83,8 +82,8 @@ record MethodFilter<T>(FilterOrder order,
                        @Nullable
                        UnsafeExecutable<T, ?> unsafeExecutable,
                        boolean isResponseFilter,
-                       @Nullable FilterArgBinder @NonNull [] argBinders,
-                       @Nullable AsyncFilterArgBinder @Nullable [] asyncArgBinders,
+                       FilterArgBinder @Nullable [] argBinders,
+                       AsyncFilterArgBinder @Nullable [] asyncArgBinders,
                        @Nullable
                        Predicate<FilterMethodContext> filterCondition,
                        @Nullable

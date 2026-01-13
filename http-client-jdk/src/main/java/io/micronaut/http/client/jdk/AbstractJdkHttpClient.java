@@ -395,8 +395,7 @@ abstract class AbstractJdkHttpClient {
      * @param <O>         The body type
      * @return A Micronaut response
      */
-    @NonNull
-    protected <O> HttpResponse<O> response(java.net.http.@NonNull HttpResponse<byte[]> netResponse, @NonNull Argument<O> bodyType) {
+    protected <O> HttpResponse<O> response(java.net.http.@NonNull HttpResponse<byte @NonNull []> netResponse, @NonNull Argument<O> bodyType) {
         return new HttpResponseAdapter<>(netResponse, bodyType, conversionService, mediaTypeCodecRegistry, messageBodyHandlerRegistry);
     }
 

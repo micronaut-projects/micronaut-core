@@ -62,7 +62,7 @@ class DefaultMethodInjectionPoint<B, T> implements MethodInjectionPoint<B, T>, E
         BeanDefinition<B> declaringBean,
         Class<?> declaringType,
         String methodName,
-        @Nullable Argument<?>[] arguments,
+        Argument<?> @Nullable [] arguments,
         @Nullable AnnotationMetadata annotationMetadata) {
         Objects.requireNonNull(declaringBean, "Declaring bean cannot be null");
         this.declaringType = declaringType;
@@ -117,8 +117,7 @@ class DefaultMethodInjectionPoint<B, T> implements MethodInjectionPoint<B, T>, E
     }
 
     @Override
-    @NonNull
-    public Argument<?>[] getArguments() {
+    public Argument<?> @NonNull [] getArguments() {
         return arguments;
     }
 

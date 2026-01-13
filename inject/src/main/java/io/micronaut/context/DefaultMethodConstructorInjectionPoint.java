@@ -44,7 +44,7 @@ class DefaultMethodConstructorInjectionPoint<T> extends DefaultMethodInjectionPo
         BeanDefinition<T> declaringBean,
         Class<?> declaringType,
         String methodName,
-        @Nullable Argument<?>[] arguments,
+        Argument<?> @Nullable [] arguments,
         @Nullable AnnotationMetadata annotationMetadata) {
         super(declaringBean, declaringType, methodName, arguments, annotationMetadata);
     }

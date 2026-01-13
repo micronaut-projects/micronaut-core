@@ -214,8 +214,7 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
     }
 
     @Override
-    @NonNull
-    public Class<?>[] getTypeParameters() {
+    public Class<?> @NonNull [] getTypeParameters() {
         return getTypeArguments()
             .stream()
             .map(Argument::getType)

@@ -41,7 +41,7 @@ public interface BeanConstructor<T> extends AnnotationMetadataProvider, Describe
     /**
      * @return The constructor argument types.
      */
-    @NonNull Argument<?>[] getArguments();
+    Argument<?> @NonNull [] getArguments();
 
     /**
      * Instantiate an instance.

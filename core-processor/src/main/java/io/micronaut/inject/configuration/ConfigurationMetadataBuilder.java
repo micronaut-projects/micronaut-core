@@ -63,7 +63,7 @@ public class ConfigurationMetadataBuilder {
     /**
      * @return The originating elements for the builder.
      */
-    public @NonNull Element[] getOriginatingElements() {
+    public Element @NonNull [] getOriginatingElements() {
         return originatingElements.getOriginatingElements();
     }
 

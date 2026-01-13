@@ -131,16 +131,14 @@ public interface MethodElement extends MemberElement {
      * @return The {@code throws} types, if any. Never {@code null}.
      * @since 3.1.0
      */
-    @NonNull
-    default ClassElement[] getThrownTypes() {
+    default ClassElement @NonNull [] getThrownTypes() {
         return ClassElement.ZERO_CLASS_ELEMENTS;
     }
 
     /**
      * @return The method parameters
      */
-    @NonNull
-    ParameterElement[] getParameters();
+    ParameterElement @NonNull [] getParameters();
 
     /**
      * Takes this method element and transforms into a new method element with the given parameters appended to the existing parameters.
@@ -196,7 +194,7 @@ public interface MethodElement extends MemberElement {
      * @return The suspend parameters
      * @since 2.3.0
      */
-    default @NonNull ParameterElement[] getSuspendParameters() {
+    default ParameterElement @NonNull [] getSuspendParameters() {
         return getParameters();
     }
 

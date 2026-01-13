@@ -192,7 +192,7 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
      *
      * @return An argument array
      */
-    default @NonNull Argument<?>[] getConstructorArguments() {
+    default Argument<?> @NonNull [] getConstructorArguments() {
         return Argument.ZERO_ARGUMENTS;
     }
 
@@ -358,7 +358,7 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
      *
      * @return The property names
      */
-    default @NonNull String[] getPropertyNames() {
+    default String @NonNull [] getPropertyNames() {
         return getBeanProperties().stream().map(BeanProperty::getName).toArray(String[]::new);
     }
 
@@ -368,7 +368,7 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
      * @return The property names
      * @since 4.4.0
      */
-    default @NonNull String[] getReadPropertyNames() {
+    default String @NonNull [] getReadPropertyNames() {
         return getBeanReadProperties().stream().map(BeanReadProperty::getName).toArray(String[]::new);
     }
 
@@ -384,7 +384,7 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
             }
 
             @Override
-            public @NonNull Argument<?>[] getArguments() {
+            public Argument<?> @NonNull [] getArguments() {
                 return getConstructorArguments();
             }
 
@@ -419,14 +419,14 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
          *
          * @return The arguments
          */
-        @NonNull Argument<?>[] getBuilderArguments();
+        Argument<?> @NonNull [] getBuilderArguments();
 
         /**
          * Any arguments required by the build method. If the build method has arguments these should be provided by {@link #build()}.
          *
          * @return The arguments
          */
-        @NonNull Argument<?>[] getBuildMethodArguments();
+        Argument<?> @NonNull [] getBuildMethodArguments();
 
         /**
          * @param name The argument name

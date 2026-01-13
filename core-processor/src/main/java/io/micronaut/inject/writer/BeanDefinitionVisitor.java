@@ -440,7 +440,7 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
      * @return The generic type arguments for the bean type.
      * @since 3.0.0
      */
-    default @NonNull ClassElement[] getTypeArguments() {
+    default ClassElement @NonNull [] getTypeArguments() {
         return ClassElement.ZERO_CLASS_ELEMENTS;
     }
 

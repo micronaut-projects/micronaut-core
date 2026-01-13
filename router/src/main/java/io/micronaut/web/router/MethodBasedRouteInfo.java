@@ -35,8 +35,7 @@ public interface MethodBasedRouteInfo<T, R> extends RouteInfo<R> {
      */
     MethodExecutionHandle<T, R> getTargetMethod();
 
-    @NonNull
-    String[] getArgumentNames();
+    String @NonNull [] getArgumentNames();
 
     RequestArgumentBinder<Object>[] resolveArgumentBinders(RequestBinderRegistry requestBinderRegistry);
 

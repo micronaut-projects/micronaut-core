@@ -118,8 +118,7 @@ public sealed interface ByteBody permits AvailableByteBody, CloseableByteBody, I
      *
      * @return The streamed bytes
      */
-    @NonNull
-    Publisher<byte[]> toByteArrayPublisher();
+    Publisher<byte @NonNull []> toByteArrayPublisher();
 
     /**
      * Get this body as a reactive stream of {@link ReadBuffer}s. Note that the caller must take

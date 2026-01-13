@@ -41,7 +41,7 @@ public interface Executable<T, R> extends AnnotationMetadataProvider {
      *
      * @return The arguments
      */
-    @NonNull Argument<?>[] getArguments();
+    Argument<?> @NonNull [] getArguments();
 
     /**
      * Invokes the method.

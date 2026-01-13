@@ -93,7 +93,7 @@ public final class ApplicationEventPublisherFactory<T>
     }
 
     @Override
-    public @NonNull Class<?>[] getIndexes() {
+    public Class<?> @NonNull [] getIndexes() {
         return new Class<?>[]{getBeanType()};
     }
 
@@ -276,7 +276,7 @@ public final class ApplicationEventPublisherFactory<T>
         };
     }
 
-    private void notifyEventListeners(@NonNull Object event, ApplicationEventListener[] eventListeners) {
+    private void notifyEventListeners(@NonNull Object event, ApplicationEventListener @NonNull [] eventListeners) {
         if (eventListeners.length == 0) {
             return;
         }

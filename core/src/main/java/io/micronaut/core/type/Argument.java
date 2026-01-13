@@ -247,8 +247,7 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
      * @param arguments The arguments
      * @return The class array
      */
-    static @NonNull
-    Class<?>[] toClassArray(@Nullable Argument<?>... arguments) {
+    static Class<?> @NonNull [] toClassArray(@Nullable Argument<?>... arguments) {
         if (ArrayUtils.isEmpty(arguments)) {
             return ReflectionUtils.EMPTY_CLASS_ARRAY;
         }
@@ -554,8 +553,7 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
      * @since 3.0.0
      */
     @UsedByGeneratedCode
-    @NonNull
-    static <T> Argument<T> of(@NonNull Class<T> type, @Nullable AnnotationMetadata annotationMetadata, @Nullable Class<?>[] typeParameters) {
+    static <T> Argument<T> of(@NonNull Class<T> type, @Nullable AnnotationMetadata annotationMetadata, Class<?> @Nullable @NonNull [] typeParameters) {
         if (ArrayUtils.isEmpty(typeParameters)) {
             return of(type, annotationMetadata);
         }

@@ -114,16 +114,12 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     private final PrecalculatedInfo precalculatedInfo;
     @Nullable
     private final MethodOrFieldReference constructor;
-    @Nullable
-    private final MethodReference[] methodInjection;
-    @Nullable
-    private final FieldReference[] fieldInjection;
+    private final MethodReference @Nullable [] methodInjection;
+    private final FieldReference @Nullable [] fieldInjection;
     @Nullable
     private final ExecutableMethodsDefinition<T> executableMethodsDefinition;
-    @Nullable
-    private final Map<String, Argument<?>[]> typeArgumentsMap;
-    @Nullable
-    private AnnotationReference[] annotationInjection;
+    private final Map<String, Argument<?> @Nullable []> typeArgumentsMap;
+    private AnnotationReference @Nullable [] annotationInjection;
     @Nullable
     private Environment environment;
     @Nullable
@@ -140,8 +136,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     private List<MethodInjectionPoint<T, ?>> preDestroyMethods;
     @Nullable
     private Collection<Class<?>> requiredComponents;
-    @Nullable
-    private Argument<?>[] requiredParametrizedArguments;
+    private Argument<?> @Nullable [] requiredParametrizedArguments;
     @Nullable
     private Optional<Class<? extends Annotation>> scope;
 
@@ -153,11 +148,11 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
             Class<T> beanType,
             @Nullable MethodOrFieldReference constructor,
             @Nullable AnnotationMetadata annotationMetadata,
-            @Nullable MethodReference[] methodInjection,
-            @Nullable FieldReference[] fieldInjection,
-            @Nullable AnnotationReference[] annotationInjection,
+            MethodReference @Nullable [] methodInjection,
+            FieldReference @Nullable [] fieldInjection,
+            AnnotationReference @Nullable [] annotationInjection,
             @Nullable ExecutableMethodsDefinition<T> executableMethodsDefinition,
-            @Nullable Map<String, Argument<?>[]> typeArgumentsMap,
+            Map<String, Argument<?> @Nullable []> typeArgumentsMap,
             @NonNull PrecalculatedInfo precalculatedInfo) {
         this.type = beanType;
         if (annotationMetadata == null || annotationMetadata == AnnotationMetadata.EMPTY_METADATA) {
@@ -318,8 +313,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         };
     }
 
-    @Nullable
-    protected int[] getIndexesOfExecutableMethodsForProcessing() {
+    protected int [] getIndexesOfExecutableMethodsForProcessing() {
         return null; // Fallback to
     }
 
