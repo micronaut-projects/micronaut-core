@@ -182,29 +182,42 @@ public final class StreamingFileUpload implements Closeable {
             @Override
             public void onSubscribe(Subscription s) {
                 this.subscription = s;
+                // if there is an onComplete immediately after onSubscribe, this lock delays it
+                // until the onSubscribe execute is done.
                 long stamp = outputLock.tryWriteLock();
                 if (stamp == 0) {
                     throw new IllegalStateException("Already locked?");
                 }
                 ioExecutor.execute(() -> {
+                    boolean success = false;
                     try {
                         outputStream = supplier.get();
-                        subscription.request(1);
+                        success = true;
                     } catch (Exception e) {
                         subscription.cancel();
                         sink.tryEmitError(e);
                     } finally {
-                        outputLock.unlock(stamp);
+                        outputLock.unlockWrite(stamp);
+                    }
+                    if (success) {
+                        subscription.request(1);
                     }
                 });
             }
 
             @Override
             public void onNext(ReadBuffer readBuffer) {
+                // if there is an onComplete immediately after onNext, this lock delays it until
+                // the onNext execute is done.
+                long stamp = outputLock.tryWriteLock();
+                if (stamp == 0) {
+                    throw new IllegalStateException("Already locked?");
+                }
                 ioExecutor.execute(() -> {
+                    boolean success = false;
                     try (readBuffer) {
                         readBuffer.transferTo(outputStream);
-                        subscription.request(1);
+                        success = true;
                     } catch (Exception e) {
                         try {
                             outputStream.close();
@@ -213,6 +226,11 @@ public final class StreamingFileUpload implements Closeable {
                         }
                         subscription.cancel();
                         sink.tryEmitError(e);
+                    } finally {
+                        outputLock.unlock(stamp);
+                    }
+                    if (success) {
+                        subscription.request(1);
                     }
                 });
             }
