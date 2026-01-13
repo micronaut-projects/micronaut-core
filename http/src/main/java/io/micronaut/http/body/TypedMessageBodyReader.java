@@ -16,7 +16,6 @@
 package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
 
@@ -33,7 +32,6 @@ public interface TypedMessageBodyReader<T> extends MessageBodyReader<T> {
     /**
      * @return The body type.
      */
-    @NonNull
     Argument<T> getType();
 
     @Override

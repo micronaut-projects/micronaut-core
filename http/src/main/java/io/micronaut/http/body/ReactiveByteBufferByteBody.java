@@ -16,7 +16,6 @@
 package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
@@ -70,7 +69,7 @@ public final class ReactiveByteBufferByteBody extends BaseStreamingByteBody<Reac
     }
 
     @Override
-    public @NonNull CloseableByteBody split(@NonNull SplitBackpressureMode backpressureMode) {
+    public CloseableByteBody split(SplitBackpressureMode backpressureMode) {
         BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {
             failClaim();
@@ -82,7 +81,7 @@ public final class ReactiveByteBufferByteBody extends BaseStreamingByteBody<Reac
     }
 
     @Override
-    public @NonNull ExecutionFlow<? extends CloseableAvailableByteBody> bufferFlow() {
+    public ExecutionFlow<? extends CloseableAvailableByteBody> bufferFlow() {
         BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {
             failClaim();

@@ -16,7 +16,6 @@
 package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.io.buffer.ReadBufferFactory;
@@ -251,7 +250,7 @@ public class ConcatenatingSubscriber implements BufferConsumer.Upstream, CoreSub
     }
 
     @Override
-    public void add(@NonNull ReadBuffer buffer) {
+    public void add(ReadBuffer buffer) {
         int n = buffer.readable();
         onForward(n);
         sharedBuffer.add(buffer);
@@ -328,8 +327,7 @@ public class ConcatenatingSubscriber implements BufferConsumer.Upstream, CoreSub
          * @param factory The factory to use
          * @return The separators
          */
-        @NonNull
-        public static Separators jsonSeparators(@NonNull ReadBufferFactory factory) {
+        public static Separators jsonSeparators(ReadBufferFactory factory) {
             return new Separators(
                 factory.copyOf("[", StandardCharsets.UTF_8),
                 factory.copyOf("]", StandardCharsets.UTF_8),

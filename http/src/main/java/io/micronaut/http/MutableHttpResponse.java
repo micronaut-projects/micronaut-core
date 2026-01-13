@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.http;
-
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.cachecontrol.CacheControl;
 import io.micronaut.http.cookie.Cookie;
@@ -103,8 +101,7 @@ public interface MutableHttpResponse<B> extends HttpResponse<B>, MutableHttpMess
      * @return This response object
      * @since 4.9.0
      */
-    @NonNull
-    default MutableHttpResponse<B> cacheControl(@NonNull CacheControl cacheControl) {
+    default MutableHttpResponse<B> cacheControl(CacheControl cacheControl) {
         return header(HttpHeaders.CACHE_CONTROL, Objects.requireNonNull(cacheControl, "Cache Control parameter cannot be null").toString());
     }
 

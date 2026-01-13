@@ -19,4 +19,7 @@
  * @author Vladimir Orany
  * @since 1.0
  */
+@NullMarked
 package io.micronaut.http.simple;
+
+import org.jspecify.annotations.NullMarked;

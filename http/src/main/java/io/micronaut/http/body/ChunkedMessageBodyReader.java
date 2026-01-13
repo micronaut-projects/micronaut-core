@@ -16,12 +16,11 @@
 package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
 import io.micronaut.http.MediaType;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 
 /**
@@ -32,11 +31,10 @@ import org.reactivestreams.Publisher;
  */
 @Experimental
 public interface ChunkedMessageBodyReader<T> extends MessageBodyReader<T> {
-    @NonNull
     Publisher<? extends T> readChunked(
-        @NonNull Argument<T> type,
+        Argument<T> type,
         @Nullable MediaType mediaType,
-        @NonNull Headers httpHeaders,
-        @NonNull Publisher<ByteBuffer<?>> input
+        Headers httpHeaders,
+        Publisher<ByteBuffer<?>> input
     );
 }

@@ -16,7 +16,6 @@
 package io.micronaut.http.ssl;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
@@ -207,7 +206,6 @@ public class SslConfiguration implements Toggleable {
     /**
      * @return The timeout for the SSL handshake
      */
-    @NonNull
     public Duration getHandshakeTimeout() {
         return handshakeTimeout;
     }
@@ -309,7 +307,7 @@ public class SslConfiguration implements Toggleable {
     /**
      * @param handshakeTimeout The timeout for the SSL handshake
      */
-    public void setHandshakeTimeout(@NonNull Duration handshakeTimeout) {
+    public void setHandshakeTimeout(Duration handshakeTimeout) {
         this.handshakeTimeout = Objects.requireNonNull(handshakeTimeout, "handshakeTimeout");
     }
 

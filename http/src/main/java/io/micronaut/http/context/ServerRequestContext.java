@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.http.context;
-
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.async.propagation.ReactorPropagation;
 import io.micronaut.core.propagation.PropagatedContext;
@@ -51,7 +49,7 @@ public final class ServerRequestContext {
      * @param request  The request
      * @param runnable The runnable
      */
-    public static void with(@Nullable HttpRequest<?> request, @NonNull Runnable runnable) {
+    public static void with(@Nullable HttpRequest<?> request, Runnable runnable) {
         try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(request)).propagate()) {
             runnable.run();
         }
@@ -64,7 +62,7 @@ public final class ServerRequestContext {
      * @param runnable The runnable
      * @return The newly instrumented runnable
      */
-    public static Runnable instrument(@Nullable HttpRequest<?> request, @NonNull Runnable runnable) {
+    public static Runnable instrument(@Nullable HttpRequest<?> request, Runnable runnable) {
         return () -> with(request, runnable);
     }
 
@@ -76,7 +74,7 @@ public final class ServerRequestContext {
      * @param <T>      The return type of the callable
      * @return The return value of the callable
      */
-    public static <T> T with(@Nullable HttpRequest<?> request, @NonNull Supplier<T> supplier) {
+    public static <T> T with(@Nullable HttpRequest<?> request, Supplier<T> supplier) {
         try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(request)).propagate()) {
             return supplier.get();
         }
@@ -91,7 +89,7 @@ public final class ServerRequestContext {
      * @return The return value of the callable
      * @throws Exception If the callable throws an exception
      */
-    public static <T> T with(@Nullable HttpRequest<?> request, @NonNull Callable<T> callable) throws Exception {
+    public static <T> T with(@Nullable HttpRequest<?> request, Callable<T> callable) throws Exception {
         try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(request)).propagate()) {
             return callable.call();
         }
@@ -116,8 +114,7 @@ public final class ServerRequestContext {
      * @since 4.8.0
      */
     @SuppressWarnings("unchecked")
-    @NonNull
-    public static <T> Optional<HttpRequest<T>> currentRequest(@NonNull ContextView context) {
+    public static <T> Optional<HttpRequest<T>> currentRequest(ContextView context) {
         return ReactorPropagation.findPropagatedContext(context)
             .flatMap(ctx -> ctx.find(ServerHttpRequestContext.class))
             .map(e -> (HttpRequest<T>) e.httpRequest())

@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.http.multipart;
-
-import org.jspecify.annotations.NonNull;
 import org.reactivestreams.Publisher;
 
 import java.io.File;
@@ -88,7 +86,6 @@ public interface StreamingFileUpload extends FileUpload, Publisher<PartData> {
      * @return An {@link InputStream} that reads this file's contents
      * @since 4.2.0
      */
-    @NonNull
     default InputStream asInputStream() {
         throw new UnsupportedOperationException("StreamingFileUpload doesn't support asInputStream");
     }

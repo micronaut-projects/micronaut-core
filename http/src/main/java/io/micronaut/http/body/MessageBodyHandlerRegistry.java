@@ -16,11 +16,10 @@
 package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.CodecException;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.Optional;
@@ -50,94 +49,100 @@ public interface MessageBodyHandlerRegistry {
 
     /**
      * Find a reader for the type and annotation metadata at declaration point.
-     * @param type The type
+     *
+     * @param type      The type
      * @param mediaType The media type
+     * @param <T>       The generic type
      * @return A message body reader if it is existing.
-     * @param <T> The generic type
      */
-    @NonNull
-    default <T> MessageBodyReader<T> getReader(@NonNull Argument<T> type, @Nullable List<MediaType> mediaType) {
+    default <T> MessageBodyReader<T> getReader(Argument<T> type, @Nullable List<MediaType> mediaType) {
         return findReader(type, mediaType).orElseThrow(() -> new CodecException("Cannot read value of argument [" + type + "]. No possible readers found for media type: " + mediaType));
     }
 
     /**
      * Find a reader for the type and annotation metadata at declaration point.
-     * @param type The type
+     *
+     * @param type      The type
      * @param mediaType The media type
+     * @param <T>       The generic type
      * @return A message body reader if it is existing.
-     * @param <T> The generic type
      */
-    <T> Optional<MessageBodyReader<T>> findReader(@NonNull Argument<T> type,
+    <T> Optional<MessageBodyReader<T>> findReader(Argument<T> type,
                                                   @Nullable List<MediaType> mediaType);
 
     /**
      * Find a reader for the type and annotation metadata at declaration point.
-     * @param type The type
+     *
+     * @param type      The type
      * @param mediaType The media type
+     * @param <T>       The generic type
      * @return A message body reader if it is existing.
-     * @param <T> The generic type
      * @since 4.6
      */
-    default <T> Optional<MessageBodyReader<T>> findReader(@NonNull Argument<T> type,
+    default <T> Optional<MessageBodyReader<T>> findReader(Argument<T> type,
                                                           @Nullable MediaType mediaType) {
         return findReader(type, mediaType == null ? List.of() : List.of(mediaType));
     }
 
     /**
      * Find a reader for the type and annotation metadata at declaration point.
+     *
      * @param type The type
+     * @param <T>  The generic type
      * @return A message body reader if it is existing.
-     * @param <T> The generic type
      * @since 4.6
      */
-    default <T> Optional<MessageBodyReader<T>> findReader(@NonNull Argument<T> type) {
+    default <T> Optional<MessageBodyReader<T>> findReader(Argument<T> type) {
         return findReader(type, List.of());
     }
 
     /**
      * Find a writer for the type and annotation metadata at declaration point.
-     * @param type The type
+     *
+     * @param type      The type
      * @param mediaType The media type
+     * @param <T>       The generic type
      * @return A message body writer if it is existing.
-     * @param <T> The generic type
      */
-    <T> Optional<MessageBodyWriter<T>> findWriter(@NonNull Argument<T> type,
-                                                  @NonNull List<MediaType> mediaType);
+    <T> Optional<MessageBodyWriter<T>> findWriter(Argument<T> type,
+                                                  List<MediaType> mediaType);
 
     /**
      * Find a writer for the type and annotation metadata at declaration point.
-     * @param type The type
+     *
+     * @param type      The type
      * @param mediaType The media type
+     * @param <T>       The generic type
      * @return A message body writer if it is existing.
-     * @param <T> The generic type
      * @since 4.6
      */
-    default <T> Optional<MessageBodyWriter<T>> findWriter(@NonNull Argument<T> type,
+    default <T> Optional<MessageBodyWriter<T>> findWriter(Argument<T> type,
                                                           @Nullable MediaType mediaType) {
         return findWriter(type, mediaType == null ? List.of() : List.of(mediaType));
     }
 
     /**
      * Find a writer for the type and annotation metadata at declaration point.
+     *
      * @param type The type
+     * @param <T>  The generic type
      * @return A message body writer if it is existing.
-     * @param <T> The generic type
      * @since 4.6
      */
-    default <T> Optional<MessageBodyWriter<T>> findWriter(@NonNull Argument<T> type) {
+    default <T> Optional<MessageBodyWriter<T>> findWriter(Argument<T> type) {
         return findWriter(type, List.of());
     }
 
     /**
      * Gets a writer for the type and annotation metadata at declaration point or fails with {@link CodecException}.
-     * @param type The type
+     *
+     * @param type      The type
      * @param mediaType The media type
+     * @param <T>       The generic type
      * @return A message body writer if it is existing.
-     * @param <T> The generic type
      */
-    @NonNull
-    default <T> MessageBodyWriter<T> getWriter(@NonNull Argument<T> type,
-                                               @NonNull List<MediaType> mediaType) {
+    default <T> MessageBodyWriter<T> getWriter(Argument<T> type,
+                                               List<MediaType> mediaType) {
         return findWriter(type, mediaType)
             .orElseThrow(() -> new CodecException("Cannot encode value of argument [" + type + "]. No possible encoders found for media type: " + mediaType));
     }

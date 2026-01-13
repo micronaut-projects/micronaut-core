@@ -16,7 +16,6 @@
 package io.micronaut.http.body.stream;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
@@ -66,8 +65,7 @@ public final class InputStreamByteBody extends InternalByteBody implements Close
      * @deprecated Please pass a {@link ByteBodyFactory} instead
      * ({@link #create(InputStream, OptionalLong, Executor, ByteBodyFactory)})
      */
-    @NonNull
-    public static CloseableByteBody create(@NonNull InputStream stream, @NonNull OptionalLong length, @NonNull Executor ioExecutor, @NonNull ByteBufferFactory<?, ?> bufferFactory) {
+    public static CloseableByteBody create(InputStream stream, OptionalLong length, Executor ioExecutor, ByteBufferFactory<?, ?> bufferFactory) {
         ArgumentUtils.requireNonNull("bufferFactory", bufferFactory);
         return create(stream, length, ioExecutor, ByteBodyFactory.createDefault(bufferFactory));
     }
@@ -82,8 +80,7 @@ public final class InputStreamByteBody extends InternalByteBody implements Close
      * @param bodyFactory A {@link ByteBodyFactory} for buffer-based methods
      * @return The body
      */
-    @NonNull
-    public static CloseableByteBody create(@NonNull InputStream stream, @NonNull OptionalLong length, @NonNull Executor ioExecutor, @NonNull ByteBodyFactory bodyFactory) {
+    public static CloseableByteBody create(InputStream stream, OptionalLong length, Executor ioExecutor, ByteBodyFactory bodyFactory) {
         ArgumentUtils.requireNonNull("stream", stream);
         ArgumentUtils.requireNonNull("length", length);
         ArgumentUtils.requireNonNull("ioExecutor", ioExecutor);
@@ -92,7 +89,7 @@ public final class InputStreamByteBody extends InternalByteBody implements Close
     }
 
     @Override
-    public @NonNull CloseableByteBody allowDiscard() {
+    public CloseableByteBody allowDiscard() {
         if (stream == null) {
             failClaim();
         }
@@ -110,7 +107,7 @@ public final class InputStreamByteBody extends InternalByteBody implements Close
     }
 
     @Override
-    public @NonNull CloseableByteBody split(SplitBackpressureMode backpressureMode) {
+    public CloseableByteBody split(SplitBackpressureMode backpressureMode) {
         if (stream == null) {
             failClaim();
         }
@@ -120,12 +117,12 @@ public final class InputStreamByteBody extends InternalByteBody implements Close
     }
 
     @Override
-    public @NonNull OptionalLong expectedLength() {
+    public OptionalLong expectedLength() {
         return context.expectedLength();
     }
 
     @Override
-    public @NonNull ExtendedInputStream toInputStream() {
+    public ExtendedInputStream toInputStream() {
         ExtendedInputStream s = stream;
         if (s == null) {
             failClaim();
@@ -137,7 +134,7 @@ public final class InputStreamByteBody extends InternalByteBody implements Close
     }
 
     @Override
-    public @NonNull Flux<byte[]> toByteArrayPublisher() {
+    public Flux<byte[]> toByteArrayPublisher() {
         ExtendedInputStream s = toInputStream();
         Sinks.Many<byte[]> sink = Sinks.many().unicast().onBackpressureBuffer();
         return sink.asFlux()
@@ -166,12 +163,12 @@ public final class InputStreamByteBody extends InternalByteBody implements Close
     }
 
     @Override
-    public @NonNull Publisher<ReadBuffer> toReadBufferPublisher() {
+    public Publisher<ReadBuffer> toReadBufferPublisher() {
         return Flux.from(toByteArrayPublisher()).map(context.bodyFactory.readBufferFactory()::adapt);
     }
 
     @Override
-    public @NonNull ExecutionFlow<? extends CloseableAvailableByteBody> bufferFlow() {
+    public ExecutionFlow<? extends CloseableAvailableByteBody> bufferFlow() {
         ExtendedInputStream s = toInputStream();
         return ExecutionFlow.async(context.ioExecutor, () -> {
             try (ExtendedInputStream t = s) {
@@ -183,7 +180,7 @@ public final class InputStreamByteBody extends InternalByteBody implements Close
     }
 
     @Override
-    public @NonNull CloseableByteBody move() {
+    public CloseableByteBody move() {
         return new InputStreamByteBody(context, toInputStream());
     }
 

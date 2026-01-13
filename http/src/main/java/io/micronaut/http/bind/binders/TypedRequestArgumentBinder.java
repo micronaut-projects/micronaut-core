@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.http.bind.binders;
-
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.bind.TypeArgumentBinder;
 import io.micronaut.http.HttpRequest;
 
@@ -36,7 +34,7 @@ public interface TypedRequestArgumentBinder<T> extends RequestArgumentBinder<T>,
      *
      * @return Additional supers types
      */
-    default @NonNull List<Class<?>> superTypes() {
+    default List<Class<?>> superTypes() {
         return Collections.emptyList();
     }
 

@@ -16,8 +16,6 @@
 package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
-
 /**
  * Combination of {@link CloseableByteBody} and {@link AvailableByteBody}. See their
  * documentation for details.
@@ -34,7 +32,6 @@ public interface CloseableAvailableByteBody extends AvailableByteBody, Closeable
      */
     @SuppressWarnings("deprecation")
     @Override
-    @NonNull
     @Deprecated
     default CloseableAvailableByteBody allowDiscard() {
         return this;

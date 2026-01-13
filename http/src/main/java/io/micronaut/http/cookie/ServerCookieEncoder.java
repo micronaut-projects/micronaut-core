@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.http.cookie;
-
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
 
@@ -44,6 +42,5 @@ public interface ServerCookieEncoder {
      * @param cookies Cookies to encode
      * @return Returns a string representation for each supplied cookie. The string representation is typically used as the value of the {@link io.micronaut.http.HttpHeaders#SET_COOKIE} header.
      */
-    @NonNull
-    List<String> encode(@NonNull Cookie... cookies);
+    List<String> encode(Cookie... cookies);
 }

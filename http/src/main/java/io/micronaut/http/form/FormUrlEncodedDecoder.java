@@ -17,7 +17,6 @@ package io.micronaut.http.form;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.util.StringUtils;
-import reactor.util.annotation.NonNull;
 
 import java.nio.charset.Charset;
 import java.util.LinkedHashMap;
@@ -37,8 +36,7 @@ public interface FormUrlEncodedDecoder {
      * @param charset Charset
      * @return a Map representation of the Form URL encoded String
      */
-    @NonNull
-    Map<String, Object> decode(@NonNull String formUrlEncodedString, @NonNull Charset charset);
+    Map<String, Object> decode(String formUrlEncodedString, Charset charset);
 
     /**
      * Converts a map with value list of string to value Object. If the list of string has a single element, then the value is the element itself.

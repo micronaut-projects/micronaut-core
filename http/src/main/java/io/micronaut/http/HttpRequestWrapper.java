@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.http;
-
-import org.jspecify.annotations.NonNull;
 import io.micronaut.http.cookie.Cookies;
 
 import javax.net.ssl.SSLSession;
@@ -58,13 +56,11 @@ public class HttpRequestWrapper<B> extends HttpMessageWrapper<B> implements Http
         return getDelegate().accept();
     }
 
-    @NonNull
     @Override
     public Optional<Principal> getUserPrincipal() {
         return getDelegate().getUserPrincipal();
     }
 
-    @NonNull
     @Override
     public <T extends Principal> Optional<T> getUserPrincipal(Class<T> principalType) {
         return getDelegate().getUserPrincipal(principalType);

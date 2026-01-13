@@ -16,8 +16,8 @@
 package io.micronaut.http.uri;
 
 import io.micronaut.core.util.ArgumentUtils;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+
 import java.net.URI;
 import java.util.Map;
 
@@ -35,7 +35,7 @@ public interface UriBuilder {
      * @param fragment The fragment
      * @return This builder
      */
-    @NonNull UriBuilder fragment(@Nullable String fragment);
+    UriBuilder fragment(@Nullable String fragment);
 
     /**
      * Sets the URI scheme.
@@ -43,7 +43,7 @@ public interface UriBuilder {
      * @param scheme The scheme
      * @return This builder
      */
-    @NonNull UriBuilder scheme(@Nullable String scheme);
+    UriBuilder scheme(@Nullable String scheme);
 
     /**
      * Sets the URI user info.
@@ -51,7 +51,7 @@ public interface UriBuilder {
      * @param userInfo The use info
      * @return This builder
      */
-    @NonNull UriBuilder userInfo(@Nullable String userInfo);
+    UriBuilder userInfo(@Nullable String userInfo);
 
     /**
      * Sets the URI host.
@@ -59,7 +59,7 @@ public interface UriBuilder {
      * @param host The host to use
      * @return This builder
      */
-    @NonNull UriBuilder host(@Nullable String host);
+    UriBuilder host(@Nullable String host);
 
     /**
      * Sets the URI port.
@@ -67,7 +67,7 @@ public interface UriBuilder {
      * @param port The port to use
      * @return This builder
      */
-    @NonNull UriBuilder port(int port);
+    UriBuilder port(int port);
 
     /**
      * Appends the given path to the existing path correctly handling '/'. If path is null it is simply ignored.
@@ -75,7 +75,7 @@ public interface UriBuilder {
      * @param path The path
      * @return This builder
      */
-    @NonNull UriBuilder path(@Nullable String path);
+    UriBuilder path(@Nullable String path);
 
     /**
      * Replaces the existing path if any. If path is null it is simply ignored.
@@ -83,27 +83,27 @@ public interface UriBuilder {
      * @param path The path
      * @return This builder
      */
-    @NonNull UriBuilder replacePath(@Nullable String path);
+    UriBuilder replacePath(@Nullable String path);
 
     /**
      * Adds a query parameter for the give name and values. The values will be URI encoded.
      * If either name or values are null the value will be ignored.
      *
-     * @param name The name
+     * @param name   The name
      * @param values The values
      * @return This builder
      */
-    @NonNull UriBuilder queryParam(String name, Object... values);
+    UriBuilder queryParam(String name, Object... values);
 
     /**
      * Adds a query parameter for the give name and values. The values will be URI encoded.
      * If either name or values are null the value will be ignored.
      *
-     * @param name The name
+     * @param name   The name
      * @param values The values
      * @return This builder
      */
-    @NonNull UriBuilder replaceQueryParam(String name, Object... values);
+    UriBuilder replaceQueryParam(String name, Object... values);
 
     /**
      * The constructed URI.
@@ -111,7 +111,7 @@ public interface UriBuilder {
      * @return Build the URI
      * @throws io.micronaut.http.exceptions.UriSyntaxException if the URI to be constructed is invalid
      */
-    @NonNull URI build();
+    URI build();
 
     /**
      * Expands the URI if it is a template, using the given values.
@@ -119,7 +119,7 @@ public interface UriBuilder {
      * @param values Expands the URI with the given values.
      * @return Build the URI
      */
-    @NonNull URI expand(Map<String, ? super Object> values);
+    URI expand(Map<String, ? super Object> values);
 
     /**
      * Create a {@link UriBuilder} with the given base URI as a starting point.
@@ -127,7 +127,7 @@ public interface UriBuilder {
      * @param uri The URI
      * @return The builder
      */
-    static @NonNull UriBuilder of(@NonNull URI uri) {
+    static UriBuilder of(URI uri) {
         ArgumentUtils.requireNonNull("uri", uri);
         return new DefaultUriBuilder(uri);
     }
@@ -138,7 +138,7 @@ public interface UriBuilder {
      * @param uri The URI
      * @return The builder
      */
-    static @NonNull UriBuilder of(@NonNull CharSequence uri) {
+    static UriBuilder of(CharSequence uri) {
         ArgumentUtils.requireNonNull("uri", uri);
         return new DefaultUriBuilder(uri);
     }

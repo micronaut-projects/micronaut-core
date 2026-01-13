@@ -16,7 +16,6 @@
 package io.micronaut.http.cookie;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.StringUtils;
 
 import java.net.HttpCookie;
@@ -40,13 +39,11 @@ public final class DefaultServerCookieEncoder implements ServerCookieEncoder {
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss 'GMT'");
 
     @Override
-    @NonNull
-    public List<String> encode(@NonNull Cookie... cookies) {
+    public List<String> encode(Cookie... cookies) {
         return Arrays.stream(cookies).map(this::encodeCookie).toList();
     }
 
-    @NonNull
-    private String encodeCookie(@NonNull Cookie cookie) {
+    private String encodeCookie(Cookie cookie) {
         StringBuilder sb = new StringBuilder();
         sb.append(cookie.getName()).append(EQUAL).append(cookie.getValue());
         if (isMaxAgeSet(cookie)) {

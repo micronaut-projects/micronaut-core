@@ -17,8 +17,6 @@ package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Indexed;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.io.buffer.ReferenceCounted;
@@ -28,6 +26,7 @@ import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.CodecException;
+import org.jspecify.annotations.Nullable;
 
 import java.io.OutputStream;
 import java.nio.charset.Charset;
@@ -54,7 +53,7 @@ public interface MessageBodyWriter<T> {
      * @param mediaType The media type, can  be {@code null}
      * @return True if is writable
      */
-    default boolean isWriteable(@NonNull Argument<T> type, @Nullable MediaType mediaType) {
+    default boolean isWriteable(Argument<T> type, @Nullable MediaType mediaType) {
         return true;
     }
 
@@ -65,7 +64,7 @@ public interface MessageBodyWriter<T> {
      * @param type The type
      * @return The closure
      */
-    default MessageBodyWriter<T> createSpecific(@NonNull Argument<T> type) {
+    default MessageBodyWriter<T> createSpecific(Argument<T> type) {
         return this;
     }
 
@@ -89,7 +88,7 @@ public interface MessageBodyWriter<T> {
      * @param headers The headers
      * @return The charset
      */
-    static @NonNull Charset getCharset(@NonNull Headers headers) {
+    static Charset getCharset(Headers headers) {
         return findCharset(headers).orElse(StandardCharsets.UTF_8);
     }
 
@@ -100,7 +99,7 @@ public interface MessageBodyWriter<T> {
      * @param headers   The headers
      * @return The charset
      */
-    static @NonNull Charset getCharset(@Nullable MediaType mediaType, @NonNull Headers headers) {
+    static Charset getCharset(@Nullable MediaType mediaType, Headers headers) {
         Charset charset = mediaType == null ? null : mediaType.getCharset().orElse(null);
         if (charset == null) {
             return getCharset(headers);
@@ -115,7 +114,7 @@ public interface MessageBodyWriter<T> {
      * @param headers   The headers
      * @return The charset
      */
-    static Optional<Charset> findCharset(@Nullable MediaType mediaType, @NonNull Headers headers) {
+    static Optional<Charset> findCharset(@Nullable MediaType mediaType, Headers headers) {
         if (mediaType == null) {
             return findCharset(headers);
         }
@@ -128,7 +127,7 @@ public interface MessageBodyWriter<T> {
      * @param headers The headers
      * @return The charset
      */
-    static Optional<Charset> findCharset(@NonNull Headers headers) {
+    static Optional<Charset> findCharset(Headers headers) {
         return Optional.ofNullable(findCharset0(headers));
     }
 
@@ -151,11 +150,11 @@ public interface MessageBodyWriter<T> {
      * @throws CodecException If an error occurs decoding
      */
     void writeTo(
-        @NonNull Argument<T> type,
-        @NonNull MediaType mediaType,
+        Argument<T> type,
+        MediaType mediaType,
         T object,
-        @NonNull MutableHeaders outgoingHeaders,
-        @NonNull OutputStream outputStream) throws CodecException;
+        MutableHeaders outgoingHeaders,
+        OutputStream outputStream) throws CodecException;
 
     /**
      * Writes an object to the given stream.
@@ -165,16 +164,15 @@ public interface MessageBodyWriter<T> {
      * @param object          The object to write
      * @param outgoingHeaders The HTTP headers
      * @param bufferFactory   A byte buffer factory
-     * @throws CodecException If an error occurs decoding
      * @return The encoded byte buffer
+     * @throws CodecException If an error occurs decoding
      */
-    @NonNull
     default ByteBuffer<?> writeTo(
-        @NonNull Argument<T> type,
-        @NonNull MediaType mediaType,
+        Argument<T> type,
+        MediaType mediaType,
         T object,
-        @NonNull MutableHeaders outgoingHeaders,
-        @NonNull ByteBufferFactory<?, ?> bufferFactory) throws CodecException {
+        MutableHeaders outgoingHeaders,
+        ByteBufferFactory<?, ?> bufferFactory) throws CodecException {
         ByteBuffer<?> buffer = bufferFactory.buffer();
         try {
             writeTo(type, mediaType, object, outgoingHeaders, buffer.toOutputStream());

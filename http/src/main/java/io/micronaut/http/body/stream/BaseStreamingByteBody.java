@@ -16,7 +16,6 @@
 package io.micronaut.http.body.stream;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.body.CloseableByteBody;
@@ -45,7 +44,7 @@ public abstract class BaseStreamingByteBody<SB extends BaseSharedBuffer> extends
     }
 
     @Override
-    public final @NonNull OptionalLong expectedLength() {
+    public final OptionalLong expectedLength() {
         return sharedBuffer.getExpectedLength();
     }
 
@@ -55,7 +54,7 @@ public abstract class BaseStreamingByteBody<SB extends BaseSharedBuffer> extends
      * @param primary The consumer or {@code null} to discard the data
      * @return The upstream to signal backpressure
      */
-    public abstract BufferConsumer.@NonNull Upstream primary(@Nullable BufferConsumer primary);
+    public abstract BufferConsumer.Upstream primary(@Nullable BufferConsumer primary);
 
     /**
      * Create a new body instance on the same shared buffer with the given upstream. This is used
@@ -64,25 +63,24 @@ public abstract class BaseStreamingByteBody<SB extends BaseSharedBuffer> extends
      * @param upstream The upstream
      * @return The body
      */
-    @NonNull
-    protected abstract BaseStreamingByteBody<SB> derive(BufferConsumer.@NonNull Upstream upstream);
+    protected abstract BaseStreamingByteBody<SB> derive(BufferConsumer. Upstream upstream);
 
     @Override
-    public final @NonNull Publisher<ReadBuffer> toReadBufferPublisher() {
+    public final Publisher<ReadBuffer> toReadBufferPublisher() {
         BaseSharedBuffer.AsFlux asFlux = new BaseSharedBuffer.AsFlux(sharedBuffer);
         BufferConsumer.Upstream upstream = primary(asFlux);
         return asFlux.asFlux(upstream);
     }
 
     @Override
-    public final @NonNull InputStream toInputStream() {
+    public final InputStream toInputStream() {
         PublisherAsBlocking publisherAsBlocking = new PublisherAsBlocking();
         toReadBufferPublisher().subscribe(publisherAsBlocking);
         return new PublisherAsStream(publisherAsBlocking);
     }
 
     @Override
-    public final @NonNull CloseableByteBody move() {
+    public final CloseableByteBody move() {
         BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {
             failClaim();
@@ -93,7 +91,7 @@ public abstract class BaseStreamingByteBody<SB extends BaseSharedBuffer> extends
     }
 
     @Override
-    public final @NonNull CloseableByteBody allowDiscard() {
+    public final CloseableByteBody allowDiscard() {
         BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {
             failClaim();

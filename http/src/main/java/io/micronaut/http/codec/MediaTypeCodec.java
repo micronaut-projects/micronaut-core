@@ -16,7 +16,6 @@
 package io.micronaut.http.codec;
 
 import io.micronaut.core.annotation.Indexed;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.type.Argument;
@@ -97,7 +96,7 @@ public interface MediaTypeCodec {
      * @throws CodecException When the result cannot be encoded
      * @since 3.2.0
      */
-    default <T> void encode(@NonNull Argument<T> type, @NonNull T object, @NonNull OutputStream outputStream) throws CodecException {
+    default <T> void encode(Argument<T> type, T object, OutputStream outputStream) throws CodecException {
         encode(object, outputStream);
     }
 
@@ -111,7 +110,7 @@ public interface MediaTypeCodec {
      * @throws CodecException When the result cannot be encoded
      * @since 3.2.0
      */
-    default <T> byte @NonNull [] encode(@NonNull Argument<T> type, T object) throws CodecException {
+    default <T> byte[] encode(Argument<T> type, T object) throws CodecException {
         return encode(object);
     }
 
@@ -127,7 +126,7 @@ public interface MediaTypeCodec {
      * @throws CodecException When the result cannot be encoded
      * @since 3.2.0
      */
-    default @NonNull <T, B> ByteBuffer<B> encode(@NonNull Argument<T> type, T object, @NonNull ByteBufferFactory<?, B> allocator) throws CodecException {
+    default <T, B> ByteBuffer<B> encode(Argument<T> type, T object, ByteBufferFactory<?, B> allocator) throws CodecException {
         return encode(object, allocator);
     }
 

@@ -20,7 +20,6 @@ import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.exceptions.ConfigurationException;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.io.ResourceResolver;
 import org.reactivestreams.Publisher;
@@ -38,11 +37,11 @@ import java.security.KeyStore;
 @BootstrapContextCompatible
 public final class ResourceCertificateProvider implements CertificateProvider {
     private final String name;
-    private final @NonNull KeyStore ks;
+    private final KeyStore ks;
 
     ResourceCertificateProvider(
-        @NonNull Config config,
-        @NonNull ResourceResolver resourceLoader
+ Config config,
+ ResourceResolver resourceLoader
     ) throws Exception {
         name = config.name;
         byte[] bytes;
@@ -53,12 +52,12 @@ public final class ResourceCertificateProvider implements CertificateProvider {
     }
 
     @Override
-    public @NonNull Publisher<@NonNull KeyStore> getKeyStore() {
+    public Publisher<KeyStore> getKeyStore() {
         return Publishers.just(ks);
     }
 
     @Override
-    public @NonNull String getName() {
+    public String getName() {
         return name;
     }
 
@@ -70,7 +69,7 @@ public final class ResourceCertificateProvider implements CertificateProvider {
     public static final class Config extends AbstractCertificateFileConfig {
         private String resource;
 
-        public Config(@Parameter @NonNull String name) {
+        public Config(@Parameter String name) {
             super(name);
         }
 
@@ -80,7 +79,7 @@ public final class ResourceCertificateProvider implements CertificateProvider {
          * properties in {@link AbstractCertificateFileConfig} (e.g. {@code format}, {@code password}).
          * @return the resource location of the certificate material
          */
-        public @NonNull String getResource() {
+        public String getResource() {
             return resource;
         }
 
@@ -90,7 +89,7 @@ public final class ResourceCertificateProvider implements CertificateProvider {
          * properties in {@link AbstractCertificateFileConfig} (e.g. {@code format}, {@code password}).
          * @param resource the resource location of the certificate material
          */
-        public void setResource(@NonNull String resource) {
+        public void setResource(String resource) {
             this.resource = resource;
         }
     }

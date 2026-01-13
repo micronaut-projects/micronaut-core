@@ -16,7 +16,6 @@
 package io.micronaut.http.uri;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
@@ -254,7 +253,7 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
      * @return a match or null
      */
     @Nullable
-    public UriMatchInfo tryMatch(@NonNull String uri) {
+    public UriMatchInfo tryMatch(String uri) {
         int length = uri.length();
         if (length > 1 && uri.charAt(length - 1) == '/') {
             uri = uri.substring(0, length - 1);

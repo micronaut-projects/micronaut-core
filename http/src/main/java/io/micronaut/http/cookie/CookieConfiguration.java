@@ -14,9 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.http.cookie;
-
-import org.jspecify.annotations.NonNull;
-
 import java.time.temporal.TemporalAmount;
 import java.util.Optional;
 
@@ -31,7 +28,6 @@ public interface CookieConfiguration {
     /**
      * @return The name of the cookie
      */
-    @NonNull
     String getCookieName();
 
     /**

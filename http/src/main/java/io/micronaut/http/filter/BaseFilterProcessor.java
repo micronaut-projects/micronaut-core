@@ -19,7 +19,6 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.context.processor.BeanDefinitionProcessor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.Order;
 import io.micronaut.core.bind.ArgumentBinder;
@@ -192,8 +191,7 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements BeanD
      * @param patterns Input patterns
      * @return Output patterns with server context path prepended
      */
-    @NonNull
-    protected List<String> prependContextPath(@NonNull List<String> patterns) {
+    protected List<String> prependContextPath(List<String> patterns) {
         return patterns;
     }
 

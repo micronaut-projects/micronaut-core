@@ -16,7 +16,6 @@
 package io.micronaut.http.body.stream;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.body.ByteBody;
 
@@ -35,7 +34,7 @@ public interface BufferConsumer {
      *
      * @param rb The buffer
      */
-    void add(@NonNull ReadBuffer rb);
+    void add(ReadBuffer rb);
 
     /**
      * Signal normal completion of the stream.
