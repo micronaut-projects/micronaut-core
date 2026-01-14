@@ -18,7 +18,6 @@ package io.micronaut.http.body.stream;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.body.ByteBody;
-import org.jspecify.annotations.NonNull;
 
 /**
  * This is a reactor-like API for streaming bytes. It's a bit better than reactor because it's more

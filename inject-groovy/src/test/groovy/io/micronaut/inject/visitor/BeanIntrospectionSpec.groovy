@@ -15,10 +15,9 @@ import io.micronaut.core.reflect.exception.InstantiationException
 import io.micronaut.core.type.GenericPlaceholder
 import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
 import io.micronaut.inject.visitor.introspections.Person
+import jakarta.validation.constraints.Size
 import spock.lang.Issue
 import spock.util.environment.RestoreSystemProperties
-
-import jakarta.validation.constraints.Size
 
 @RestoreSystemProperties
 class BeanIntrospectionSpec extends AbstractBeanDefinitionSpec {
@@ -320,7 +319,7 @@ class Test {
         def one = introspection.getRequiredProperty("one", String)
         one.isReadWrite()
 
-        def two = introspection.getRequiredProperty("two", Integer)
+        def two = introspection.getRequiredProperty("two", int.class)
         two.isReadOnly()
 
         def three = introspection.getRequiredProperty("three", String)
@@ -406,7 +405,7 @@ class CopyMe {
         copyMe.url == expectUrl
 
         when:
-        def enabled = introspection.getRequiredProperty("enabled", Boolean)
+        def enabled = introspection.getRequiredProperty("enabled", boolean.class)
         def urlProperty = introspection.getRequiredProperty("url", URL)
         def property = introspection.getRequiredProperty("name", String)
         def another = introspection.getRequiredProperty("another", String)
@@ -501,7 +500,7 @@ class CopyMe {
         copyMe.url == expectUrl
 
         when:
-        def enabled = introspection.getRequiredProperty("enabled", Boolean)
+        def enabled = introspection.getRequiredProperty("enabled", boolean.class)
         def urlProperty = introspection.getRequiredProperty("url", URL)
         def property = introspection.getRequiredProperty("name", String)
         def another = introspection.getRequiredProperty("another", String)
@@ -1219,8 +1218,8 @@ class ParentBean {
 
         when:
         BeanProperty nameProp = introspection.getProperty("name", String).get()
-        BeanProperty boolProp = introspection.getProperty("flag", Boolean).get()
-        BeanProperty ageProp = introspection.getProperty("age", Integer).get()
+        BeanProperty boolProp = introspection.getProperty("flag", boolean.class).get()
+        BeanProperty ageProp = introspection.getProperty("age", int.class).get()
         BeanProperty listProp = introspection.getProperty("list").get()
         BeanProperty primitiveArrayProp = introspection.getProperty("primitiveArray").get()
         BeanProperty stringArrayProp = introspection.getProperty("stringArray").get()
@@ -1385,8 +1384,8 @@ class ParentBean {
 
         when:
         BeanProperty nameProp = introspection.getProperty("name", String).get()
-        BeanProperty boolProp = introspection.getProperty("flag", Boolean).get()
-        BeanProperty ageProp = introspection.getProperty("age", Integer).get()
+        BeanProperty boolProp = introspection.getProperty("flag", boolean.class).get()
+        BeanProperty ageProp = introspection.getProperty("age", int.class).get()
         BeanProperty listProp = introspection.getProperty("list").get()
         BeanProperty primitiveArrayProp = introspection.getProperty("primitiveArray").get()
         BeanProperty stringArrayProp = introspection.getProperty("stringArray").get()
@@ -1699,7 +1698,7 @@ enum Test {
 
         then:
         instance.name() == "A"
-        introspection.getRequiredProperty("number", Integer).get(instance) == 0
+        introspection.getRequiredProperty("number", int).get(instance) == 0
 
         when:
         introspection.instantiate()
@@ -1748,7 +1747,7 @@ enum Test {
 
         then:
         instance.name() == "A"
-        introspection.getRequiredProperty("number", Integer).get(instance) == 0
+        introspection.getRequiredProperty("number", int).get(instance) == 0
 
         when:
         introspection.instantiate()

@@ -1,7 +1,10 @@
 package io.micronaut.inject.visitor.beans
 
 import io.micronaut.core.beans.BeanIntrospector
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions.fail
 import org.junit.jupiter.api.Test
 
 class BeanIntrospectorSpec {
@@ -29,7 +32,7 @@ class BeanIntrospectorSpec {
 
         introspection.getProperty("stuff").get().set(testBean, "newvalue")
         introspection.getProperty("flag").get().set(testBean, true)
-        assertEquals(true, introspection.getProperty("flag").get().get(testBean))
+        assertEquals(true, introspection.getProperty("flag", Boolean::class.java).get().get(testBean))
 
         assertEquals("newvalue", testBean.stuff)
     }
