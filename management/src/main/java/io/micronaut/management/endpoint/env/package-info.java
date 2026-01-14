@@ -19,4 +19,7 @@
  * @author Álvaro Sánchez-Mariscal
  * @since 1.2.0
  */
+@NullMarked
 package io.micronaut.management.endpoint.env;
+
+import org.jspecify.annotations.NullMarked;

@@ -18,8 +18,11 @@
  */
 @Configuration
 @Requires(classes = ObjectMapper.class)
+@NullMarked
 package io.micronaut.jackson;
 
+
+import org.jspecify.annotations.NullMarked;
 import tools.jackson.databind.ObjectMapper;
 import io.micronaut.context.annotation.Configuration;
 import io.micronaut.context.annotation.Requires;

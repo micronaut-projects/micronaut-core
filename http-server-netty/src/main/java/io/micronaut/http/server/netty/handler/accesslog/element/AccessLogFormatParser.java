@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.http.server.netty.handler.accesslog.element;
-
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.order.OrderUtil;
 import io.netty.channel.ChannelHandlerContext;
@@ -293,7 +291,7 @@ public class AccessLogFormatParser {
         }
 
         @Override
-        public String onRequestHeaders(@NonNull ConnectionMetadata metadata, @NonNull String method, @NonNull HttpHeaders headers, @NonNull String uri, @NonNull String protocol) {
+        public String onRequestHeaders(ConnectionMetadata metadata, String method, HttpHeaders headers, String uri, String protocol) {
             return delegate.onRequestHeaders(metadata, method, headers, uri, protocol);
         }
 

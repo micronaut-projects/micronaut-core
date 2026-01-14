@@ -14,9 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.json.tree;
-
-import org.jspecify.annotations.NonNull;
-
 /**
  * JsonNode implementation for string values.
  *
@@ -25,10 +22,9 @@ import org.jspecify.annotations.NonNull;
  */
 final class JsonString extends JsonScalar {
 
-    @NonNull
     private final String value;
 
-    JsonString(@NonNull String value) {
+    JsonString(String value) {
         this.value = value;
     }
 
@@ -52,13 +48,11 @@ final class JsonString extends JsonScalar {
         return true;
     }
 
-    @NonNull
     @Override
     public String getStringValue() {
         return value;
     }
 
-    @NonNull
     @Override
     public String coerceStringValue() {
         return value;

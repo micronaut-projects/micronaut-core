@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.http.netty.channel;
-
-import org.jspecify.annotations.NonNull;
 import io.netty.channel.ChannelPipeline;
 
 /**
@@ -34,5 +32,5 @@ public interface ChannelPipelineListener {
      * @param pipeline The pipeline
      * @return The pipeline
      */
-    @NonNull ChannelPipeline onConnect(@NonNull ChannelPipeline pipeline);
+ ChannelPipeline onConnect(ChannelPipeline pipeline);
 }

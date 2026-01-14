@@ -16,7 +16,6 @@
 package io.micronaut.module.info.runtime;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.module.info.MavenCoordinates;
 import io.micronaut.module.info.MicronautModuleInfo;
 
@@ -31,7 +30,6 @@ import java.util.Set;
  * MicronautModuleInfo which uses IDs for hierarchical relationships.
  */
 @Experimental
-@NonNull
 public final class MicronautRuntimeModule {
     private final MicronautModuleInfo info;
     private final MicronautRuntimeModule parent;

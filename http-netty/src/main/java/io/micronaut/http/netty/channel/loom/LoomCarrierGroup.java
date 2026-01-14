@@ -18,7 +18,6 @@ package io.micronaut.http.netty.channel.loom;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.scheduling.LoomSupport;
 import io.netty.channel.EventLoopGroup;
@@ -201,7 +200,7 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
         }
 
         @Override
-        public @NonNull AttributeMap attributeMap() {
+        public AttributeMap attributeMap() {
             return attributeMap;
         }
 
@@ -525,12 +524,12 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
 
     record IoScheduler(Runner runner) implements Executor, EventLoopVirtualThreadScheduler, LoomBranchSupport.VirtualThreadSchedulerProxy {
         @Override
-        public @NonNull AttributeMap attributeMap() {
+        public AttributeMap attributeMap() {
             return runner.attributeMap();
         }
 
         @Override
-        public @NonNull EventExecutor eventLoop() {
+        public EventExecutor eventLoop() {
             return runner.eventLoop();
         }
 
@@ -582,12 +581,12 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
         }
 
         @Override
-        public @NonNull AttributeMap attributeMap() {
+        public AttributeMap attributeMap() {
             return io.attributeMap();
         }
 
         @Override
-        public @NonNull EventExecutor eventLoop() {
+        public EventExecutor eventLoop() {
             return io.eventLoop();
         }
     }

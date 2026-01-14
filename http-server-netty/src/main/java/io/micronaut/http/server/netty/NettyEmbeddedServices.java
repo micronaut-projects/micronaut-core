@@ -19,7 +19,6 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
@@ -62,20 +61,17 @@ public interface NettyEmbeddedServices {
     /**
      * @return The channel outbound handlers
      */
-    @NonNull
     List<ChannelOutboundHandler> getOutboundHandlers();
 
     /**
      * @return The application context
      */
-    @NonNull
     ApplicationContext getApplicationContext();
 
     /**
      * @return The request argument satisfier
      * @see io.micronaut.http.server.binding.RequestArgumentSatisfier
      */
-    @NonNull
     default RequestArgumentSatisfier getRequestArgumentSatisfier() {
         return getRouteExecutor().getRequestArgumentSatisfier();
     }
@@ -84,27 +80,23 @@ public interface NettyEmbeddedServices {
      * @return The route executor
      * @see io.micronaut.http.server.RouteExecutor
      */
-    @NonNull
     RouteExecutor getRouteExecutor();
 
     /**
      * @return The media type code registry
      * @see io.micronaut.http.codec.MediaTypeCodecRegistry
      */
-    @NonNull
     MediaTypeCodecRegistry getMediaTypeCodecRegistry();
 
     /**
      * @return The static resource resolver
      * @see io.micronaut.web.router.resource.StaticResourceResolver
      */
-    @NonNull
     StaticResourceResolver getStaticResourceResolver();
 
     /**
      * @return The executor resolver
      */
-    @NonNull
     default ExecutorSelector getExecutorSelector() {
         return getRouteExecutor().getExecutorSelector();
     }
@@ -119,13 +111,11 @@ public interface NettyEmbeddedServices {
     /**
      * @return The channel option factory
      */
-    @NonNull
     ChannelOptionFactory getChannelOptionFactory();
 
     /**
      * @return The http compression strategy
      */
-    @NonNull
     HttpCompressionStrategy getHttpCompressionStrategy();
 
     /**
@@ -138,13 +128,12 @@ public interface NettyEmbeddedServices {
     /**
      * @return The event loop group registry.
      */
-    @NonNull
     EventLoopGroupRegistry getEventLoopGroupRegistry();
 
     /**
      * @return Obtains the router
      */
-    default @NonNull Router getRouter() {
+    default Router getRouter() {
         return getRouteExecutor().getRouter();
     }
 
@@ -153,7 +142,7 @@ public interface NettyEmbeddedServices {
      * @param config The config
      * @return The event loop group config
      */
-    @NonNull EventLoopGroup createEventLoopGroup(@NonNull EventLoopGroupConfiguration config);
+    EventLoopGroup createEventLoopGroup(EventLoopGroupConfiguration config);
 
     /**
      * Creates the event loop group configuration.
@@ -162,7 +151,7 @@ public interface NettyEmbeddedServices {
      * @param ioRatio The I/O ratio
      * @return The event loop group
      */
-    @NonNull EventLoopGroup createEventLoopGroup(int numThreads, @NonNull ExecutorService executorService, @Nullable  Integer ioRatio);
+    EventLoopGroup createEventLoopGroup(int numThreads, ExecutorService executorService, @Nullable  Integer ioRatio);
 
     /**
      * Gets the server socket channel instance.
@@ -172,8 +161,7 @@ public interface NettyEmbeddedServices {
      * @deprecated Use {@link #getChannelInstance(NettyChannelType, EventLoopGroupConfiguration)} instead
      */
     @Deprecated(since = "4.5.0", forRemoval = true)
-    @NonNull
-    default ServerSocketChannel getServerSocketChannelInstance(@NonNull EventLoopGroupConfiguration workerConfig) {
+    default ServerSocketChannel getServerSocketChannelInstance(EventLoopGroupConfiguration workerConfig) {
         return (ServerSocketChannel) getChannelInstance(NettyChannelType.SERVER_SOCKET, workerConfig);
     }
 
@@ -185,7 +173,7 @@ public interface NettyEmbeddedServices {
      * @deprecated Use {@link #getChannelInstance(NettyChannelType, EventLoopGroupConfiguration)} instead
      */
     @Deprecated(since = "4.5.0", forRemoval = true)
-    @NonNull default ServerChannel getDomainServerChannelInstance(@NonNull EventLoopGroupConfiguration workerConfig) {
+    default ServerChannel getDomainServerChannelInstance(EventLoopGroupConfiguration workerConfig) {
         return (ServerChannel) getChannelInstance(NettyChannelType.DOMAIN_SERVER_SOCKET, workerConfig);
     }
 
@@ -196,7 +184,7 @@ public interface NettyEmbeddedServices {
      * @return The channel
      * @throws UnsupportedOperationException if domain sockets are not supported.
      */
-    @NonNull default Channel getChannelInstance(NettyChannelType type, @NonNull EventLoopGroupConfiguration workerConfig) {
+    default Channel getChannelInstance(NettyChannelType type, EventLoopGroupConfiguration workerConfig) {
         return switch (type) {
             case SERVER_SOCKET -> getServerSocketChannelInstance(workerConfig);
             case DOMAIN_SERVER_SOCKET -> getDomainServerChannelInstance(workerConfig);
@@ -213,7 +201,7 @@ public interface NettyEmbeddedServices {
      * @return The channel
      * @throws UnsupportedOperationException if domain sockets are not supported.
      */
-    @NonNull default Channel getChannelInstance(NettyChannelType type, @NonNull EventLoopGroupConfiguration workerConfig, Channel parent, int fd) {
+    default Channel getChannelInstance(NettyChannelType type, EventLoopGroupConfiguration workerConfig, Channel parent, int fd) {
         throw new UnsupportedOperationException("File descriptor channels not supported");
     }
 
@@ -223,10 +211,9 @@ public interface NettyEmbeddedServices {
      * @param <E> The event generic type
      * @return The event publisher
      */
-    @NonNull <E> ApplicationEventPublisher<E> getEventPublisher(@NonNull Class<E> eventClass);
+    <E> ApplicationEventPublisher<E> getEventPublisher(Class<E> eventClass);
 
     NettyServerSslFactory getSslFactory();
 
-    @NonNull
     BeanProvider<CertificateProvider> getCertificateProviders();
 }

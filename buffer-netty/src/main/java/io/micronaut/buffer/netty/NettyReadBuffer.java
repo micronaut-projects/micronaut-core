@@ -21,7 +21,6 @@ import io.micronaut.core.io.buffer.ReadBuffer;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.util.IllegalReferenceCountException;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
@@ -80,12 +79,12 @@ final class NettyReadBuffer extends ReadBuffer {
     }
 
     @Override
-    public @NonNull ReadBuffer duplicate() {
+    public ReadBuffer duplicate() {
         return new NettyReadBuffer(getBuf().retainedDuplicate());
     }
 
     @Override
-    public @NonNull ReadBuffer split(int splitPosition) {
+    public ReadBuffer split(int splitPosition) {
         return new NettyReadBuffer(getBuf().readRetainedSlice(splitPosition));
     }
 
@@ -97,7 +96,7 @@ final class NettyReadBuffer extends ReadBuffer {
     }
 
     @Override
-    public void toArray(byte @NonNull [] destination, int offset) throws IndexOutOfBoundsException {
+    public void toArray(byte[] destination, int offset) throws IndexOutOfBoundsException {
         ByteBuf b = getBuf();
         try {
             buf = null;
@@ -111,7 +110,7 @@ final class NettyReadBuffer extends ReadBuffer {
     }
 
     @Override
-    public @NonNull String toString(Charset charset) {
+    public String toString(Charset charset) {
         ByteBuf b = getBuf();
         try {
             buf = null;
@@ -122,7 +121,7 @@ final class NettyReadBuffer extends ReadBuffer {
     }
 
     @Override
-    public @NonNull ByteBuffer<?> toByteBuffer() {
+    public ByteBuffer<?> toByteBuffer() {
         ByteBuf b = getBuf();
         buf = null;
         return new NettyByteBuffer(b);
@@ -136,7 +135,7 @@ final class NettyReadBuffer extends ReadBuffer {
     }
 
     @Override
-    public <R> @Nullable R useFastHeapBuffer(@NonNull Function<java.nio.ByteBuffer, @NonNull R> function) {
+    public <R> @Nullable R useFastHeapBuffer(Function<java.nio.ByteBuffer, R> function) {
         ByteBuf b = getBuf();
         if (b.hasArray()) {
             buf = null;
@@ -147,7 +146,7 @@ final class NettyReadBuffer extends ReadBuffer {
     }
 
     @Override
-    public void transferTo(@NonNull OutputStream stream) throws IOException {
+    public void transferTo(OutputStream stream) throws IOException {
         ByteBuf b = getBuf();
         buf = null;
         try {

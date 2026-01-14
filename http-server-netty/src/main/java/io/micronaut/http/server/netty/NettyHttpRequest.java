@@ -216,7 +216,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     }
 
     @Override
-    public @NonNull ByteBodyFactory byteBodyFactory() {
+    public ByteBodyFactory byteBodyFactory() {
         return new NettyByteBodyFactory(channelHandlerContext.channel());
     }
 
@@ -229,7 +229,6 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         return new NettyMutableHttpRequest();
     }
 
-    @NonNull
     @Override
     public Optional<Object> getAttribute(CharSequence name) {
         return Optional.ofNullable(getAttributes().getValue(Objects.requireNonNull(name, "Name cannot be null").toString()));
@@ -430,7 +429,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     }
 
     @Override
-    public PushCapableHttpRequest<T> serverPush(@NonNull HttpRequest<?> request) {
+    public PushCapableHttpRequest<T> serverPush(HttpRequest<?> request) {
         ChannelHandlerContext connectionHandlerContext = findConnectionHandler();
         if (connectionHandlerContext != null) {
             Http2ConnectionHandler connectionHandler = (Http2ConnectionHandler) connectionHandlerContext.handler();
@@ -501,7 +500,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
                 new Http2StreamChannelBootstrap(channelHandlerContext.channel().parent())
                     .handler(new ChannelInitializer<Http2StreamChannel>() {
                         @Override
-                        protected void initChannel(@NonNull Http2StreamChannel ch) throws Exception {
+                        protected void initChannel(Http2StreamChannel ch) throws Exception {
                             int newStream = ch.stream().id();
 
                             channelHandlerContext.write(new DefaultHttp2PushPromiseFrame(outboundHeaders)
@@ -802,13 +801,11 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
             return headers;
         }
 
-        @NonNull
         @Override
         public MutableConvertibleValues<Object> getAttributes() {
             return NettyHttpRequest.this.getAttributes();
         }
 
-        @NonNull
         @Override
         public Optional<T> getBody() {
             if (body != null) {
@@ -817,7 +814,6 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
             return NettyHttpRequest.this.getBody();
         }
 
-        @NonNull
         @Override
         public Cookies getCookies() {
             return NettyHttpRequest.this.getCookies();
@@ -839,13 +835,11 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
             return httpParameters;
         }
 
-        @NonNull
         @Override
         public HttpMethod getMethod() {
             return NettyHttpRequest.this.getMethod();
         }
 
-        @NonNull
         @Override
         public URI getUri() {
             if (uri != null) {
@@ -872,7 +866,6 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
             }
         }
 
-        @NonNull
         @Override
         @Deprecated
         public StreamedHttpRequest toStreamHttpRequest() {
@@ -894,7 +887,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
 
         @Override
         @Deprecated
-        public io.netty.handler.codec.http.@NonNull HttpRequest toHttpRequest() {
+        public io.netty.handler.codec.http. HttpRequest toHttpRequest() {
             if (isStream()) {
                 return toStreamHttpRequest();
             }

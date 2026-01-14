@@ -19,7 +19,6 @@ import io.micronaut.context.condition.Condition;
 import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.netty.util.internal.PlatformDependent;
 
 import java.lang.invoke.MethodHandle;
@@ -97,7 +96,6 @@ public final class PrivateLoomSupport {
         CARRIER_THREAD = carrierThread;
     }
 
-    @NonNull
     static ForkJoinPool getDefaultScheduler() {
         try {
             return (ForkJoinPool) DEFAULT_SCHEDULER.invokeExact();

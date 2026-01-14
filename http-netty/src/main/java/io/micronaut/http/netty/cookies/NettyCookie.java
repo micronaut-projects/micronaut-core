@@ -16,7 +16,6 @@
 package io.micronaut.http.netty.cookies;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.SameSite;
@@ -76,12 +75,12 @@ public class NettyCookie implements Cookie {
     }
 
     @Override
-    public @NonNull String getName() {
+    public String getName() {
         return nettyCookie.name();
     }
 
     @Override
-    public @NonNull String getValue() {
+    public String getValue() {
         return nettyCookie.value();
     }
 
@@ -111,7 +110,7 @@ public class NettyCookie implements Cookie {
     }
 
     @Override
-    public @NonNull Cookie maxAge(long maxAge) {
+    public Cookie maxAge(long maxAge) {
         nettyCookie.setMaxAge(maxAge);
         return this;
     }
@@ -128,7 +127,7 @@ public class NettyCookie implements Cookie {
     }
 
     @Override
-    public @NonNull Cookie sameSite(@Nullable SameSite sameSite) {
+    public Cookie sameSite(@Nullable SameSite sameSite) {
         if (nettyCookie instanceof io.netty.handler.codec.http.cookie.DefaultCookie cookie) {
             cookie.setSameSite(sameSite == null ? null : io.netty.handler.codec.http.cookie.CookieHeaderNames.SameSite.valueOf(sameSite.name()));
         }
@@ -136,31 +135,31 @@ public class NettyCookie implements Cookie {
     }
 
     @Override
-    public @NonNull Cookie value(@NonNull String value) {
+    public Cookie value(String value) {
         nettyCookie.setValue(value);
         return this;
     }
 
     @Override
-    public @NonNull Cookie domain(String domain) {
+    public Cookie domain(String domain) {
         nettyCookie.setDomain(domain);
         return this;
     }
 
     @Override
-    public @NonNull Cookie path(String path) {
+    public Cookie path(String path) {
         nettyCookie.setPath(path);
         return this;
     }
 
     @Override
-    public @NonNull Cookie secure(boolean secure) {
+    public Cookie secure(boolean secure) {
         nettyCookie.setSecure(secure);
         return this;
     }
 
     @Override
-    public @NonNull Cookie httpOnly(boolean httpOnly) {
+    public Cookie httpOnly(boolean httpOnly) {
         nettyCookie.setHttpOnly(httpOnly);
         return this;
     }

@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.http.server.netty.handler.accesslog.element;
-
-import org.jspecify.annotations.NonNull;
 import io.netty.channel.Channel;
 import io.netty.channel.socket.DatagramChannel;
 import io.netty.channel.socket.SocketChannel;
@@ -38,7 +36,6 @@ public interface ConnectionMetadata {
      *
      * @return The local address
      */
-    @NonNull
     Optional<SocketAddress> localAddress();
 
     /**
@@ -46,7 +43,6 @@ public interface ConnectionMetadata {
      *
      * @return The remote address
      */
-    @NonNull
     Optional<SocketAddress> remoteAddress();
 
     /**
@@ -57,7 +53,7 @@ public interface ConnectionMetadata {
      * @return The string representation, or {@link Optional#empty()} if this type of address is
      * not supported
      */
-    static Optional<String> getHostAddress(@NonNull SocketAddress a) {
+    static Optional<String> getHostAddress(SocketAddress a) {
         if (a instanceof InetSocketAddress addr) {
             return Optional.of(addr.getAddress().getHostAddress());
         } else {
@@ -73,7 +69,7 @@ public interface ConnectionMetadata {
      * @return The string representation, or {@link Optional#empty()} if this type of address is
      * not supported
      */
-    static Optional<String> getHostName(@NonNull SocketAddress a) {
+    static Optional<String> getHostName(SocketAddress a) {
         if (a instanceof InetSocketAddress addr) {
             return Optional.of(addr.getAddress().getHostName());
         } else if (a instanceof UnixDomainSocketAddress addr) {
@@ -101,8 +97,7 @@ public interface ConnectionMetadata {
      * @param channel The channel
      * @return The metadata, potentially {@link #empty()}
      */
-    @NonNull
-    static ConnectionMetadata ofNettyChannel(@NonNull Channel channel) {
+    static ConnectionMetadata ofNettyChannel(Channel channel) {
         if (channel instanceof SocketChannel sc) {
             return new ConnectionMetadataImpl.SocketChannelMetadata(sc);
         } else if (ConnectionMetadataImpl.QUIC_CHANNEL != null && ConnectionMetadataImpl.QUIC_CHANNEL.isInstance(channel)) {
@@ -122,7 +117,6 @@ public interface ConnectionMetadata {
      *
      * @return An empty metadata instance
      */
-    @NonNull
     static ConnectionMetadata empty() {
         return ConnectionMetadataImpl.Empty.INSTANCE;
     }

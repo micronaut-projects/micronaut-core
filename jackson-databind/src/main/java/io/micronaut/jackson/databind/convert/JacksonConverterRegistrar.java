@@ -18,7 +18,6 @@ package io.micronaut.jackson.databind.convert;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
@@ -204,7 +203,6 @@ public class JacksonConverterRegistrar implements TypeConverterRegistrar {
         };
     }
 
-    @NonNull
     private Optional<PropertyNamingStrategy> resolvePropertyNamingStrategy(@Nullable CharSequence charSequence) {
         if (charSequence != null) {
             String stringValue = NameUtils.environmentName(charSequence.toString());

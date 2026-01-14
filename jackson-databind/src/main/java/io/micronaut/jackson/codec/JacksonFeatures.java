@@ -20,7 +20,6 @@ import tools.jackson.databind.JacksonModule;
 import tools.jackson.databind.SerializationFeature;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.json.JsonFeatures;
@@ -129,8 +128,7 @@ public final class JacksonFeatures implements JsonFeatures {
      * @return This object.
      * @since 3.2
      */
-    @NonNull
-    public JacksonFeatures addModule(@NonNull Class<? extends JacksonModule> moduleClass) {
+    public JacksonFeatures addModule(Class<? extends JacksonModule> moduleClass) {
         Objects.requireNonNull(moduleClass, "moduleClass");
         additionalModules.add(moduleClass);
         return this;
@@ -160,7 +158,6 @@ public final class JacksonFeatures implements JsonFeatures {
      * @return List of additional modules to load.
      * @since 3.2
      */
-    @NonNull
     public List<Class<? extends JacksonModule>> getAdditionalModules() {
         return additionalModules;
     }

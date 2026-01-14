@@ -16,7 +16,6 @@
 package io.micronaut.json.convert;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
@@ -84,7 +83,7 @@ public class JsonNodeConvertibleValues<V> implements ConvertibleValues<V> {
     }
 
     @Override
-    public @NonNull ConversionService getConversionService() {
+    public ConversionService getConversionService() {
         return conversionService;
     }
 }

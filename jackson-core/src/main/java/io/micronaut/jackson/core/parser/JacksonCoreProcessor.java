@@ -16,7 +16,6 @@
 package io.micronaut.jackson.core.parser;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.async.processor.SingleThreadedBufferingProcessor;
 import io.micronaut.jackson.core.tree.JsonNodeTreeCodec;
 import io.micronaut.jackson.core.tree.JsonStreamTransfer;
@@ -69,7 +68,7 @@ public class JacksonCoreProcessor extends SingleThreadedBufferingProcessor<byte[
      * @param jsonFactory Factory to use for creating the parser
      * @param deserializationConfig The deserialization configuration (in particular bignum handling)
      */
-    public JacksonCoreProcessor(boolean streamArray, TokenStreamFactory jsonFactory, @NonNull JsonStreamConfig deserializationConfig) {
+    public JacksonCoreProcessor(boolean streamArray, TokenStreamFactory jsonFactory, JsonStreamConfig deserializationConfig) {
         this.jsonFactory = jsonFactory;
         this.streamArray = streamArray;
         this.treeCodec = JsonNodeTreeCodec.getInstance().withConfig(deserializationConfig);

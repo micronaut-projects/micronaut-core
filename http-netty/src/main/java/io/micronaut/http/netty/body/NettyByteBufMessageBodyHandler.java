@@ -20,7 +20,6 @@ import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.type.Argument;
@@ -100,7 +99,7 @@ public final class NettyByteBufMessageBodyHandler implements TypedMessageBodyHan
     }
 
     @Override
-    public @NonNull CloseableByteBody writePiece(@NonNull ByteBodyFactory bodyFactory, @NonNull HttpRequest<?> request, @NonNull HttpResponse<?> response, @NonNull Argument<ByteBuf> type, @NonNull MediaType mediaType, ByteBuf object) throws CodecException {
+    public CloseableByteBody writePiece(ByteBodyFactory bodyFactory, HttpRequest<?> request, HttpResponse<?> response, Argument<ByteBuf> type, MediaType mediaType, ByteBuf object) throws CodecException {
         NettyReadBufferFactory readBufferFactory;
         if (bodyFactory.readBufferFactory() instanceof NettyReadBufferFactory nrbf) {
             readBufferFactory = nrbf;

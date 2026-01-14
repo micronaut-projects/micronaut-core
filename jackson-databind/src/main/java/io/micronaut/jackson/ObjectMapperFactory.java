@@ -30,7 +30,6 @@ import io.micronaut.jackson.serialize.MicronautDeserializers;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.core.JsonParser;
 import tools.jackson.core.json.JsonFactory;
@@ -140,7 +139,7 @@ public class ObjectMapperFactory {
     @Primary
     @Named("json")
     @BootstrapContextCompatible
-    public JsonMapper jsonMapper(JsonMapper.@NonNull Builder jsonMapperBuilder) {
+    public JsonMapper jsonMapper(JsonMapper.Builder jsonMapperBuilder) {
         return jsonMapperBuilder.build();
     }
 

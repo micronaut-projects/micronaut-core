@@ -23,7 +23,6 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.json.JsonConfiguration;
-import org.jspecify.annotations.NonNull;
 import tools.jackson.core.StreamReadFeature;
 import tools.jackson.core.StreamWriteFeature;
 import tools.jackson.core.json.JsonFactory;
@@ -483,7 +482,7 @@ public class JacksonConfiguration implements JsonConfiguration {
      * @param <T> The generic type
      * @return The JavaType
      */
-    public static <T> JavaType constructType(@NonNull Argument<T> type, @NonNull TypeFactory typeFactory) {
+    public static <T> JavaType constructType(Argument<T> type, TypeFactory typeFactory) {
         ArgumentUtils.requireNonNull("type", type);
         ArgumentUtils.requireNonNull("typeFactory", typeFactory);
         Map<String, Argument<?>> typeVariables = type.getTypeVariables();

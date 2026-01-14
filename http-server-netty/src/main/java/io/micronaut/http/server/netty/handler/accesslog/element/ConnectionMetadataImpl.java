@@ -16,7 +16,6 @@
 package io.micronaut.http.server.netty.handler.accesslog.element;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.netty.channel.Channel;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.unix.DomainSocketAddress;
@@ -75,12 +74,12 @@ final class ConnectionMetadataImpl {
     @Internal
     record SocketChannelMetadata(SocketChannel ch) implements ConnectionMetadata {
         @Override
-        public @NonNull Optional<SocketAddress> localAddress() {
+        public Optional<SocketAddress> localAddress() {
             return Optional.of(ch.localAddress());
         }
 
         @Override
-        public @NonNull Optional<SocketAddress> remoteAddress() {
+        public Optional<SocketAddress> remoteAddress() {
             return Optional.of(ch.remoteAddress());
         }
     }
@@ -88,12 +87,12 @@ final class ConnectionMetadataImpl {
     @Internal
     record GenericChannelMetadata(Channel ch) implements ConnectionMetadata {
         @Override
-        public @NonNull Optional<SocketAddress> localAddress() {
+        public Optional<SocketAddress> localAddress() {
             return Optional.of(ch.localAddress());
         }
 
         @Override
-        public @NonNull Optional<SocketAddress> remoteAddress() {
+        public Optional<SocketAddress> remoteAddress() {
             return Optional.of(ch.remoteAddress());
         }
     }
@@ -101,12 +100,12 @@ final class ConnectionMetadataImpl {
     @Internal
     record QuicChannelMetadata(Channel ch) implements ConnectionMetadata {
         @Override
-        public @NonNull Optional<SocketAddress> localAddress() {
+        public Optional<SocketAddress> localAddress() {
             return Optional.ofNullable(((QuicChannel) ch).localSocketAddress());
         }
 
         @Override
-        public @NonNull Optional<SocketAddress> remoteAddress() {
+        public Optional<SocketAddress> remoteAddress() {
             return Optional.ofNullable(((QuicChannel) ch).remoteSocketAddress());
         }
     }
@@ -116,12 +115,12 @@ final class ConnectionMetadataImpl {
         static final ConnectionMetadata INSTANCE = new Empty();
 
         @Override
-        public @NonNull Optional<SocketAddress> localAddress() {
+        public Optional<SocketAddress> localAddress() {
             return Optional.empty();
         }
 
         @Override
-        public @NonNull Optional<SocketAddress> remoteAddress() {
+        public Optional<SocketAddress> remoteAddress() {
             return Optional.empty();
         }
     }

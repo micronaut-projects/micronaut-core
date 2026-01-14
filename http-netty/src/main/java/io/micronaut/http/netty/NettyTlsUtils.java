@@ -16,7 +16,6 @@
 package io.micronaut.http.netty;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.ssl.ClientAuthentication;
@@ -71,8 +70,7 @@ public final class NettyTlsUtils {
      * {@link io.micronaut.http.ssl.SslBuilder#getKeyStore(SslConfiguration)}
      * @return The {@link KeyManagerFactory} containing the key store
      */
-    @NonNull
-    public static KeyManagerFactory storeToFactory(@NonNull SslConfiguration ssl, @Nullable KeyStore keyStore) throws Exception {
+    public static KeyManagerFactory storeToFactory(SslConfiguration ssl, @Nullable KeyStore keyStore) throws Exception {
         KeyManagerFactory keyManagerFactory;
         if (useOpenssl(ssl)) {
             // I don't understand why, but netty uses this logic, so we will too.
@@ -105,7 +103,7 @@ public final class NettyTlsUtils {
      * @param password Password of Alias
      * @return {@link KeyStore} containing only the selected alias
      */
-    private static KeyStore extractKeystoreAlias(@NonNull KeyStore rootKeystore, @NonNull String alias, char @Nullable @NonNull [] password) throws Exception {
+    private static KeyStore extractKeystoreAlias(KeyStore rootKeystore, String alias, char @Nullable [] password) throws Exception {
         if (!rootKeystore.containsAlias(alias)) {
             throw new IllegalArgumentException("Alias " + alias + " not found in keystore");
         }

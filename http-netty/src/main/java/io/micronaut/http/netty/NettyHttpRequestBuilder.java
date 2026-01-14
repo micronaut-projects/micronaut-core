@@ -16,7 +16,6 @@
 package io.micronaut.http.netty;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.body.ByteBody;
@@ -43,7 +42,6 @@ public interface NettyHttpRequestBuilder {
      * @return a full http request
      */
     @Deprecated
-    @NonNull
     default FullHttpRequest toFullHttpRequest() {
         throw new UnsupportedOperationException();
     }
@@ -55,7 +53,6 @@ public interface NettyHttpRequestBuilder {
      * @deprecated Go through {@link #toHttpRequestDirect()} and {@link #toHttpRequestWithoutBody()} instead
      */
     @Deprecated(since = "4.0.0", forRemoval = true)
-    @NonNull
     default StreamedHttpRequest toStreamHttpRequest() {
         throw new UnsupportedOperationException();
     }
@@ -65,7 +62,6 @@ public interface NettyHttpRequestBuilder {
      * @return The http request
      * @deprecated Go through {@link #toHttpRequestDirect()} and {@link #toHttpRequestWithoutBody()} instead
      */
-    @NonNull
     @Deprecated(since = "4.0.0", forRemoval = true)
     default HttpRequest toHttpRequest() {
         throw new UnsupportedOperationException();
@@ -79,7 +75,6 @@ public interface NettyHttpRequestBuilder {
      * @deprecated Go through {@link #toHttpRequestWithoutBody()} and {@link #byteBodyDirect()} instead
      */
     @Deprecated
-    @NonNull
     default Optional<HttpRequest> toHttpRequestDirect() {
         return Optional.empty();
     }
@@ -101,7 +96,6 @@ public interface NettyHttpRequestBuilder {
      *
      * @return The request excluding the body
      */
-    @NonNull
     HttpRequest toHttpRequestWithoutBody();
 
     /**
@@ -120,7 +114,7 @@ public interface NettyHttpRequestBuilder {
      * @deprecated Go through {@link #toHttpRequestDirect()} and {@link #toHttpRequestWithoutBody()} instead
      */
     @Deprecated(since = "4.0.0", forRemoval = true)
-    static @NonNull HttpRequest toHttpRequest(io.micronaut.http.@NonNull HttpRequest<?> request) {
+    static HttpRequest toHttpRequest(io.micronaut.http.HttpRequest<?> request) {
         return asBuilder(request).toHttpRequestWithoutBody();
     }
 
@@ -131,7 +125,7 @@ public interface NettyHttpRequestBuilder {
      * @param request The micronaut http request
      * @return The builder for further operations
      */
-    static NettyHttpRequestBuilder asBuilder(io.micronaut.http.@NonNull HttpRequest<?> request) {
+    static NettyHttpRequestBuilder asBuilder(io.micronaut.http.HttpRequest<?> request) {
         boolean supportDirect = true;
 
         while (true) {

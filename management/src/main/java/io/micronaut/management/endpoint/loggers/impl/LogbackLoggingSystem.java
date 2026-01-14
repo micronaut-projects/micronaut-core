@@ -21,7 +21,6 @@ import ch.qos.logback.classic.LoggerContext;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.logging.LogLevel;
 import io.micronaut.logging.impl.LogbackUtils;
@@ -54,7 +53,6 @@ public class LogbackLoggingSystem implements ManagedLoggingSystem, io.micronaut.
     }
 
     @Override
-    @NonNull
     public Collection<LoggerConfiguration> getLoggers() {
         return getLoggerContext()
             .getLoggerList()
@@ -64,7 +62,6 @@ public class LogbackLoggingSystem implements ManagedLoggingSystem, io.micronaut.
     }
 
     @Override
-    @NonNull
     public LoggerConfiguration getLogger(String name) {
         return toLoggerConfiguration(getLoggerContext().getLogger(name));
     }

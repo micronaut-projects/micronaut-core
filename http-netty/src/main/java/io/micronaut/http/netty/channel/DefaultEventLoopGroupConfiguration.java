@@ -18,7 +18,6 @@ package io.micronaut.http.netty.channel;
 import io.micronaut.context.annotation.ConfigurationInject;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.util.StringUtils;
@@ -181,11 +180,10 @@ public class DefaultEventLoopGroupConfiguration implements EventLoopGroupConfigu
     }
 
     @Override
-    public @NonNull List<String> getTransport() {
+    public List<String> getTransport() {
         return transport == null ? EventLoopGroupConfiguration.super.getTransport() : transport;
     }
 
-    @NonNull
     @Override
     public String getName() {
         return name;

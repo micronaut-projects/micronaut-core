@@ -21,7 +21,6 @@ import io.micronaut.context.LifeCycle;
 import io.micronaut.context.processor.BeanDefinitionProcessor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
@@ -89,7 +88,6 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
      */
     protected abstract void registerRoute(ExecutableMethod<?, ?> method, String id, @Nullable Integer port);
 
-    @NonNull
     @Override
     public AbstractEndpointRouteBuilder start() {
         return this;
@@ -98,7 +96,6 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
     /**
      * Clears endpoint ids information.
      */
-    @NonNull
     @Override
     public AbstractEndpointRouteBuilder stop() {
         endpointIds.clear();

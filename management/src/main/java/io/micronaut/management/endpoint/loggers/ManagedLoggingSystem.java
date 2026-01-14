@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.management.endpoint.loggers;
-
-import org.jspecify.annotations.NonNull;
 import jakarta.validation.constraints.NotBlank;
 
 import java.util.Collection;
@@ -33,7 +31,6 @@ public interface ManagedLoggingSystem extends io.micronaut.logging.LoggingSystem
      *
      * @return A {@link Collection} of {@link LoggerConfiguration} instances for all existing loggers
      */
-    @NonNull
     Collection<LoggerConfiguration> getLoggers();
 
     /**
@@ -42,7 +39,6 @@ public interface ManagedLoggingSystem extends io.micronaut.logging.LoggingSystem
      * @param name the logger name
      * @return the logger configuration
      */
-    @NonNull
     LoggerConfiguration getLogger(@NotBlank String name);
 
 }

@@ -16,7 +16,6 @@
 package io.micronaut.http.server.netty.ssl;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.http.netty.NettySslContextBuilder;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import jakarta.inject.Singleton;
@@ -39,8 +38,7 @@ public class NettyServerSslFactory {
      * @return a server-mode {@link NettySslContextBuilder}
      */
     @Experimental
-    @NonNull
-    public NettySslContextBuilder serverBuilder(NettyHttpServerConfiguration.@NonNull NettyListenerConfiguration listenerConfiguration) {
+    public NettySslContextBuilder serverBuilder(NettyHttpServerConfiguration. NettyListenerConfiguration listenerConfiguration) {
         return serverBuilder();
     }
 
@@ -49,7 +47,6 @@ public class NettyServerSslFactory {
      *
      * @return a server-mode {@link NettySslContextBuilder}
      */
-    @NonNull
     public NettySslContextBuilder serverBuilder() {
         return new NettySslContextBuilder(true);
     }

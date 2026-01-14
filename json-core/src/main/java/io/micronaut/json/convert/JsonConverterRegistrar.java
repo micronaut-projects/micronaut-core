@@ -18,7 +18,6 @@ package io.micronaut.json.convert;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.bind.BeanPropertyBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -232,7 +231,6 @@ public final class JsonConverterRegistrar implements TypeConverterRegistrar {
         };
     }
 
-    @NonNull
     private static <K> Argument<K> argument(Class<K> targetType, ConversionContext context) {
         if (context instanceof ArgumentConversionContext<?> argumentConversionContext) {
             Argument<?> argument = argumentConversionContext.getArgument();

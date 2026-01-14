@@ -17,7 +17,6 @@ package io.micronaut.management.endpoint.loggers.impl;
 
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.logging.LogLevel;
 import io.micronaut.management.endpoint.loggers.LoggerConfiguration;
 import io.micronaut.management.endpoint.loggers.LoggersEndpoint;
@@ -46,7 +45,6 @@ import static java.util.stream.Collectors.toList;
 public class Log4jLoggingSystem implements ManagedLoggingSystem, io.micronaut.logging.LoggingSystem {
 
     @Override
-    @NonNull
     public Collection<LoggerConfiguration> getLoggers() {
         return getLog4jLoggerContext()
             .getLoggers()
@@ -56,7 +54,6 @@ public class Log4jLoggingSystem implements ManagedLoggingSystem, io.micronaut.lo
     }
 
     @Override
-    @NonNull
     public LoggerConfiguration getLogger(String name) {
         return toLoggerConfiguration(LogManager.getLogger(name));
     }

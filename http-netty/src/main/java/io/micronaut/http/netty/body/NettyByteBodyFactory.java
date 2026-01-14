@@ -50,7 +50,7 @@ import reactor.core.publisher.Flux;
 public final class NettyByteBodyFactory extends ByteBodyFactory {
     private final EventLoop loop;
 
-    public NettyByteBodyFactory(@NonNull Channel channel) {
+    public NettyByteBodyFactory(Channel channel) {
         this(channel.alloc(), channel.eventLoop());
     }
 
@@ -60,7 +60,7 @@ public final class NettyByteBodyFactory extends ByteBodyFactory {
     }
 
     @Override
-    public @NonNull NettyReadBufferFactory readBufferFactory() {
+    public NettyReadBufferFactory readBufferFactory() {
         return (NettyReadBufferFactory) super.readBufferFactory();
     }
 
@@ -79,7 +79,7 @@ public final class NettyByteBodyFactory extends ByteBodyFactory {
         return adapt(readBufferFactory().adapt(byteBuf));
     }
 
-    public CloseableByteBody createChecked(@NonNull BodySizeLimits bodySizeLimits, @NonNull ByteBuf buf) {
+    public CloseableByteBody createChecked(BodySizeLimits bodySizeLimits, ByteBuf buf) {
         return createChecked(bodySizeLimits, readBufferFactory().adapt(buf));
     }
 

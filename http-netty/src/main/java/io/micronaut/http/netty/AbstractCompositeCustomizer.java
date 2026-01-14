@@ -16,7 +16,6 @@
 package io.micronaut.http.netty;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.order.OrderUtil;
 import io.netty.channel.Channel;
 import org.slf4j.Logger;
@@ -74,8 +73,7 @@ public abstract class AbstractCompositeCustomizer<C, R> {
 
     protected abstract C makeNewComposite(List<C> members);
 
-    @NonNull
-    public final C specializeForChannel(@NonNull Channel channel, @NonNull R role) {
+    public final C specializeForChannel(Channel channel, R role) {
         return specialize(c -> specializeForChannel(c, channel, role));
     }
 

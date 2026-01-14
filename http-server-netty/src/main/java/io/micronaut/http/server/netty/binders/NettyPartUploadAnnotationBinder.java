@@ -81,7 +81,6 @@ final class NettyPartUploadAnnotationBinder<T> implements AnnotatedRequestArgume
         return bindPart(conversionService, context, formFactory.get(), nettyRequest, inputName, false);
     }
 
-    @NonNull
     static <T> BindingResult<T> bindPart(ConversionService conversionService, ArgumentConversionContext<T> context, FormFactory formFactory, FormCapableHttpRequest<?> nettyRequest, String inputName, boolean skipClaimed) {
         FormRouteCompleter completer = formFactory.getOrCreateCompleter(nettyRequest);
         if (skipClaimed && completer.isClaimed(inputName)) {

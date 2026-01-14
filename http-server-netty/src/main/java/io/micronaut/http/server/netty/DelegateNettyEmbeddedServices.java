@@ -19,7 +19,6 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
@@ -51,7 +50,6 @@ interface DelegateNettyEmbeddedServices extends NettyEmbeddedServices {
     /**
      * @return The instance to delegate to.
      */
-    @NonNull
     NettyEmbeddedServices getDelegate();
 
     @Override
@@ -125,13 +123,12 @@ interface DelegateNettyEmbeddedServices extends NettyEmbeddedServices {
     }
 
     @Override
-    default @NonNull Channel getChannelInstance(NettyChannelType type, @NonNull EventLoopGroupConfiguration workerConfig, Channel parent, int fd) {
+    default Channel getChannelInstance(NettyChannelType type, EventLoopGroupConfiguration workerConfig, Channel parent, int fd) {
         return getDelegate().getChannelInstance(type, workerConfig, parent, fd);
     }
 
     @Override
-    @NonNull
-    default Channel getChannelInstance(NettyChannelType type, @NonNull EventLoopGroupConfiguration workerConfig) {
+    default Channel getChannelInstance(NettyChannelType type, EventLoopGroupConfiguration workerConfig) {
         return getDelegate().getChannelInstance(type, workerConfig);
     }
 
@@ -141,7 +138,7 @@ interface DelegateNettyEmbeddedServices extends NettyEmbeddedServices {
     }
 
     @Override
-    default @NonNull BeanProvider<CertificateProvider> getCertificateProviders() {
+    default BeanProvider<CertificateProvider> getCertificateProviders() {
         return getDelegate().getCertificateProviders();
     }
 }
