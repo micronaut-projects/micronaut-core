@@ -311,7 +311,6 @@ public interface ElementQuery<T extends Element> {
          */
         List<Predicate<String>> getNamePredicates();
 
-
         /**
          * @return The name predicates
          * @since 3.0.0
