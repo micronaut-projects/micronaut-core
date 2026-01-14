@@ -16,7 +16,6 @@
 package io.micronaut.context.env;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.value.PropertyResolver;
 
@@ -42,10 +41,9 @@ public interface PropertyExpressionResolver {
      * @param <T>               The type
      * @return The optional resolved value
      */
-    @NonNull
-    <T> Optional<T> resolve(@NonNull PropertyResolver propertyResolver,
-                            @NonNull ConversionService conversionService,
-                            @NonNull String expression,
-                            @NonNull Class<T> requiredType);
+    <T> Optional<T> resolve(PropertyResolver propertyResolver,
+                            ConversionService conversionService,
+                            String expression,
+                            Class<T> requiredType);
 
 }

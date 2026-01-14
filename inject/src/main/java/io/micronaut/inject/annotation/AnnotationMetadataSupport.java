@@ -311,7 +311,6 @@ public final class AnnotationMetadataSupport {
      * @return The default values for the annotation
      */
     @UsedByGeneratedCode
-    @NonNull
     public static Map<CharSequence, Object> getDefaultValues(String annotation) {
         return ANNOTATION_DEFAULTS.getOrDefault(annotation, Collections.emptyMap());
     }
@@ -461,7 +460,7 @@ public final class AnnotationMetadataSupport {
      * @since 4.0.0
      */
     @Internal
-    static void registerRepeatableAnnotation(@NonNull String repeatable, @NonNull String repeatableContainer) {
+    static void registerRepeatableAnnotation(String repeatable, String repeatableContainer) {
         REPEATABLE_ANNOTATIONS_CONTAINERS.put(repeatable, repeatableContainer);
     }
 
@@ -576,7 +575,6 @@ public final class AnnotationMetadataSupport {
             return method.getDefaultValue();
         }
 
-        @NonNull
         @Override
         public AnnotationValue<A> annotationValue() {
             if (annotationValue != null) {

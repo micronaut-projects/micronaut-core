@@ -23,7 +23,6 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Indexes;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import jakarta.inject.Singleton;
 
 /**
@@ -137,7 +136,7 @@ public interface BeanDefinitionReference<T> extends QualifiedBeanType<T> {
      * @return An array of indexes.
      * @since 5.0
      */
-    default Class<?> @NonNull [] getIndexes() {
+    default Class<?>[] getIndexes() {
         return getAnnotationMetadata().classValues(Indexes.class);
     }
 

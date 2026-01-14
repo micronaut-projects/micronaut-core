@@ -26,7 +26,6 @@ import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Indexes;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.type.Argument;
@@ -79,7 +78,7 @@ public abstract class AbstractProviderDefinition<T> implements InstantiatableBea
     }
 
     @Override
-    public Class<?> @NonNull [] getIndexes() {
+    public Class<?>[] getIndexes() {
         try {
             return new Class<?>[]{getBeanType()};
         } catch (NoClassDefFoundError e) {
@@ -114,7 +113,7 @@ public abstract class AbstractProviderDefinition<T> implements InstantiatableBea
     }
 
     @Override
-    public boolean isEnabled(@NonNull BeanContext context, @Nullable BeanResolutionContext resolutionContext) {
+    public boolean isEnabled(BeanContext context, @Nullable BeanResolutionContext resolutionContext) {
         return isPresent();
     }
 
@@ -143,12 +142,12 @@ public abstract class AbstractProviderDefinition<T> implements InstantiatableBea
      * @param singleton Whether the bean is a singleton
      * @return The provider
      */
-    protected abstract @NonNull T buildProvider(
-            @NonNull BeanResolutionContext resolutionContext,
-            @NonNull BeanContext context,
-            @NonNull Argument<Object> argument,
-            @Nullable Qualifier<Object> qualifier,
-            boolean singleton);
+    protected abstract T buildProvider(
+        BeanResolutionContext resolutionContext,
+        BeanContext context,
+        Argument<Object> argument,
+        @Nullable Qualifier<Object> qualifier,
+        boolean singleton);
 
     @Override
     public T instantiate(BeanResolutionContext resolutionContext, BeanContext context) throws BeanInstantiationException {
@@ -229,7 +228,6 @@ public abstract class AbstractProviderDefinition<T> implements InstantiatableBea
     }
 
     @Override
-    @NonNull
     public final List<Argument<?>> getTypeArguments(Class<?> type) {
         if (type == getBeanType()) {
             return getTypeArguments();
@@ -238,7 +236,6 @@ public abstract class AbstractProviderDefinition<T> implements InstantiatableBea
     }
 
     @Override
-    @NonNull
     public final List<Argument<?>> getTypeArguments() {
         return Collections.singletonList(TYPE_VARIABLE);
     }

@@ -17,7 +17,6 @@ package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Indexed;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.ByteBodyHttpResponseWrapper;
@@ -32,8 +31,8 @@ import io.micronaut.http.codec.CodecException;
  * allows more fine-grained control over the response than the {@link MessageBodyWriter} API.
  *
  * @param <T> The body type
- * @since 4.7.0
  * @author Jonas Konrad
+ * @since 4.7.0
  */
 @Experimental
 @Indexed(MessageBodyWriter.class)
@@ -50,13 +49,12 @@ public interface ResponseBodyWriter<T> extends MessageBodyWriter<T> {
      * @return A {@link ByteBodyHttpResponse} with the response bytes
      * @throws CodecException If an error occurs encoding
      */
-    @NonNull
     default ByteBodyHttpResponse<?> write(
-        @NonNull ByteBodyFactory bodyFactory,
-        @NonNull HttpRequest<?> request,
-        @NonNull MutableHttpResponse<T> httpResponse,
-        @NonNull Argument<T> type,
-        @NonNull MediaType mediaType,
+        ByteBodyFactory bodyFactory,
+        HttpRequest<?> request,
+        MutableHttpResponse<T> httpResponse,
+        Argument<T> type,
+        MediaType mediaType,
         T object) throws CodecException {
         httpResponse.getHeaders().contentTypeIfMissing(mediaType);
         return ByteBodyHttpResponseWrapper.wrap(httpResponse, writePiece(bodyFactory, request, httpResponse, type, mediaType, object));
@@ -75,24 +73,22 @@ public interface ResponseBodyWriter<T> extends MessageBodyWriter<T> {
      * @return The response bytes
      * @throws CodecException If an error occurs encoding
      */
-    @NonNull
     CloseableByteBody writePiece(
-        @NonNull ByteBodyFactory bodyFactory,
-        @NonNull HttpRequest<?> request,
-        @NonNull HttpResponse<?> response,
-        @NonNull Argument<T> type,
-        @NonNull MediaType mediaType,
+        ByteBodyFactory bodyFactory,
+        HttpRequest<?> request,
+        HttpResponse<?> response,
+        Argument<T> type,
+        MediaType mediaType,
         T object) throws CodecException;
 
     /**
      * Wrap the given writer, if necessary, to get a {@link ResponseBodyWriter}.
      *
      * @param writer The generic message writer
+     * @param <T>    The body type
      * @return The response writer
-     * @param <T> The body type
      */
-    @NonNull
-    static <T> ResponseBodyWriter<T> wrap(@NonNull MessageBodyWriter<T> writer) {
+    static <T> ResponseBodyWriter<T> wrap(MessageBodyWriter<T> writer) {
         if (writer instanceof ResponseBodyWriter<T> rbw) {
             return rbw;
         } else {

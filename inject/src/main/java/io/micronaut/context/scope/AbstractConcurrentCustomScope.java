@@ -18,7 +18,6 @@ package io.micronaut.context.scope;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.LifeCycle;
 import io.micronaut.context.exceptions.BeanDestructionException;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.BeanDefinition;
@@ -63,7 +62,6 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
      * @return Obtains the scope map, never null
      * @throws java.lang.IllegalStateException if the scope map cannot be obtained in the current context
      */
-    @NonNull
     protected abstract Map<BeanIdentifier, CreatedBean<?>> getScopeMap(boolean forCreation);
 
     @Override
@@ -77,7 +75,6 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
     @Override
     public abstract void close();
 
-    @NonNull
     @Override
     public final AbstractConcurrentCustomScope<A> stop() {
         w.lock();
@@ -162,8 +159,7 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
      * @param <T> The generic type
      * @return Created bean
      */
-    @NonNull
-    protected <T> CreatedBean<T> doCreate(@NonNull BeanCreationContext<T> creationContext) {
+    protected <T> CreatedBean<T> doCreate(BeanCreationContext<T> creationContext) {
         return creationContext.create();
     }
 

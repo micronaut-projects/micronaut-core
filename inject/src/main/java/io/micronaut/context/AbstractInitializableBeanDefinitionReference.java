@@ -18,7 +18,6 @@ package io.micronaut.context;
 import io.micronaut.context.exceptions.BeanContextException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
 
@@ -162,7 +161,6 @@ public abstract class AbstractInitializableBeanDefinitionReference<T> extends Ab
     }
 
     @Override
-    @NonNull
     public final Set<Class<?>> getExposedTypes() {
         if (!hasExposedTypes) {
             return Collections.EMPTY_SET;

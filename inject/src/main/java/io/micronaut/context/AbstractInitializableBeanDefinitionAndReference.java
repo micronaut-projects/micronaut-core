@@ -20,7 +20,6 @@ import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.context.conditions.MatchesDynamicCondition;
 import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
@@ -51,7 +50,7 @@ public abstract class AbstractInitializableBeanDefinitionAndReference<T> extends
                                                               AnnotationReference @Nullable [] annotationInjection,
                                                               @Nullable ExecutableMethodsDefinition<T> executableMethodsDefinition,
                                                               Map<String, Argument<?> @Nullable []> typeArgumentsMap,
-                                                              @NonNull PrecalculatedInfo precalculatedInfo) {
+ PrecalculatedInfo precalculatedInfo) {
         this(beanType, constructor, annotationMetadata, methodInjection, fieldInjection, annotationInjection, executableMethodsDefinition, typeArgumentsMap, precalculatedInfo, null, null, null);
     }
 
@@ -63,7 +62,7 @@ public abstract class AbstractInitializableBeanDefinitionAndReference<T> extends
                                                               AnnotationReference @Nullable [] annotationInjection,
                                                               @Nullable ExecutableMethodsDefinition<T> executableMethodsDefinition,
                                                               Map<String, Argument<?> @Nullable []> typeArgumentsMap,
-                                                              @NonNull PrecalculatedInfo precalculatedInfo,
+ PrecalculatedInfo precalculatedInfo,
                                                               Condition @Nullable [] preLoadConditions,
                                                               Condition @Nullable [] postLoadConditions,
                                                               @Nullable Throwable failedInitialization) {

@@ -20,8 +20,6 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.type.Argument;
-
-import org.jspecify.annotations.NonNull;
 import java.lang.annotation.Annotation;
 import java.util.Collection;
 import java.util.List;
@@ -119,7 +117,6 @@ public interface DelegatingBeanDefinition<T> extends BeanDefinition<T> {
     }
 
     @Override
-    @NonNull
     default String getName() {
         return getTarget().getName();
     }
@@ -150,7 +147,7 @@ public interface DelegatingBeanDefinition<T> extends BeanDefinition<T> {
     }
 
     @Override
-    default boolean isEnabled(@NonNull BeanContext context, @Nullable BeanResolutionContext resolutionContext) {
+    default boolean isEnabled(BeanContext context, @Nullable BeanResolutionContext resolutionContext) {
         return getTarget().isEnabled(context, resolutionContext);
     }
 
@@ -160,7 +157,7 @@ public interface DelegatingBeanDefinition<T> extends BeanDefinition<T> {
     }
 
     @Override
-    default @NonNull List<Argument<?>> getTypeArguments(String type) {
+    default List<Argument<?>> getTypeArguments(String type) {
         return getTarget().getTypeArguments(type);
     }
 }

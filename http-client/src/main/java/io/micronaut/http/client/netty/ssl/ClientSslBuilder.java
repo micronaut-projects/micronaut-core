@@ -16,7 +16,6 @@
 package io.micronaut.http.client.netty.ssl;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.netty.handler.codec.quic.QuicSslContext;
@@ -36,7 +35,6 @@ public interface ClientSslBuilder {
      * @param versionSelection The HTTP versions to support
      * @return The ssl context
      */
-    @NonNull
     SslContext build(SslConfiguration ssl, HttpVersionSelection versionSelection);
 
     /**
@@ -46,7 +44,6 @@ public interface ClientSslBuilder {
      * @return The ssl context
      */
     @Experimental
-    @NonNull
     default QuicSslContext buildHttp3(SslConfiguration ssl) {
         throw new UnsupportedOperationException("QUIC not supported");
     }

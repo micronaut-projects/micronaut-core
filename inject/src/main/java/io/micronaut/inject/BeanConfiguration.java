@@ -17,8 +17,6 @@ package io.micronaut.inject;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
-import org.jspecify.annotations.NonNull;
-
 import java.util.function.Predicate;
 
 /**
@@ -86,7 +84,7 @@ public interface BeanConfiguration extends AnnotationMetadataProvider, BeanConte
      * @return The bean configuration
      * @since 4.8.0
      */
-    static @NonNull BeanConfiguration of(@NonNull Package thePackage, @NonNull Predicate<BeanContext> condition) {
+    static BeanConfiguration of(Package thePackage, Predicate<BeanContext> condition) {
         return of(thePackage.getName(), condition);
     }
 
@@ -97,7 +95,7 @@ public interface BeanConfiguration extends AnnotationMetadataProvider, BeanConte
      * @return The bean configuration
      * @since 4.8.0
      */
-    static @NonNull BeanConfiguration of(@NonNull String thePackage, @NonNull Predicate<BeanContext> condition) {
+    static BeanConfiguration of(String thePackage, Predicate<BeanContext> condition) {
         return new ConditionalBeanConfiguration(thePackage, condition);
     }
 
@@ -108,7 +106,7 @@ public interface BeanConfiguration extends AnnotationMetadataProvider, BeanConte
      * @return The bean configuration
      * @since 4.8.0
      */
-    static @NonNull BeanConfiguration disabled(@NonNull String thePackage) {
+    static BeanConfiguration disabled(String thePackage) {
         return new ConditionalBeanConfiguration(thePackage, (beanContext -> false));
     }
 }

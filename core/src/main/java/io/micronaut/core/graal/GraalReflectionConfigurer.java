@@ -19,7 +19,6 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.ReflectionConfig;
 import io.micronaut.core.annotation.TypeHint;
@@ -174,7 +173,7 @@ public interface GraalReflectionConfigurer extends AnnotationMetadataProvider {
          * @return The class or null
          */
         @Nullable
-        Class<?> findClassByName(@NonNull String name);
+        Class<?> findClassByName(String name);
 
         /**
          * Register the given types for reflection.

@@ -16,7 +16,6 @@
 package io.micronaut.context.env;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.order.Ordered;
 
 import java.util.Map;
@@ -53,7 +52,7 @@ public interface PropertySource extends Iterable<String>, Ordered {
      * @return The origin of the property source.
      * @since 4.8.0
      */
-    default @NonNull Origin getOrigin() {
+    default Origin getOrigin() {
         return Origin.of(getName());
     }
 
@@ -224,7 +223,7 @@ public interface PropertySource extends Iterable<String>, Ordered {
          * @param location The location
          * @return The origin
          */
-        static @NonNull Origin of(@NonNull String location) {
+        static Origin of(String location) {
             Objects.requireNonNull(location, "Location cannot be null");
             return new DefaultOrigin(location);
         }

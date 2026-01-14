@@ -29,7 +29,6 @@ import io.micronaut.context.event.BeanInitializedEventListener;
 import io.micronaut.context.event.BeanPreDestroyEventListener;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
@@ -116,7 +115,7 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
      *
      * @param contextConfiguration The context configuration
      */
-    public DefaultBeanDefinitionService(@NonNull BeanContextConfiguration contextConfiguration) {
+    public DefaultBeanDefinitionService(BeanContextConfiguration contextConfiguration) {
         Set<Class<? extends Annotation>> eagerInitAnnotated = contextConfiguration.getEagerInitAnnotated();
         List<String> configuredEagerSingletonAnnotations = new ArrayList<>(eagerInitAnnotated.size());
         for (Class<? extends Annotation> ann : eagerInitAnnotated) {
@@ -146,14 +145,14 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
     }
 
     @Override
-    public void registerConfiguration(@NonNull BeanConfiguration configuration) {
+    public void registerConfiguration(BeanConfiguration configuration) {
         if (beanConfigurationsPredicate == null || beanConfigurationsPredicate.test(configuration)) {
             additionalBeanConfigurations.add(configuration);
         }
     }
 
     @Override
-    public void addBeanDefinition(@NonNull RuntimeBeanDefinition<?> definition) {
+    public void addBeanDefinition(RuntimeBeanDefinition<?> definition) {
         Objects.requireNonNull(definition, "Bean definition cannot be null");
         BeanDefinitionProducer producer = new BeanDefinitionProducer(definition);
         if (beans == null) {
@@ -387,7 +386,6 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
             .collect(Collectors.toList());
     }
 
-    @NonNull
     private Collection<BeanDefinitionProducer> resolveTypeIndex(Class<?> indexedType) {
         return beans.beanIndex.computeIfAbsent(indexedType, COMPUTE_INDEXES_FN);
     }
@@ -546,7 +544,6 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
         }
     }
 
-    @NonNull
     private List<BeanDefinitionReference<?>> resolveBeanDefinitionReferences() {
         List<BeanDefinitionReference<?>> refs = beanDefinitionReferencesProvider.provide(classLoader);
         if (beansPredicate != null) {
@@ -601,7 +598,7 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
         @SuppressWarnings("java:S3077")
         private volatile Object definition;
 
-        BeanDefinitionProducer(@NonNull BeanDefinitionReference<?> reference) {
+        BeanDefinitionProducer(BeanDefinitionReference<?> reference) {
             this.reference = reference;
         }
 
@@ -615,7 +612,7 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
             return ref.isEnabled(context);
         }
 
-        static boolean isDefinitionEnabled(@NonNull BeanContext context,
+        static boolean isDefinitionEnabled(BeanContext context,
                                            @Nullable BeanResolutionContext resolutionContext,
                                            @Nullable BeanDefinition<?> def) {
             if (def == null) {

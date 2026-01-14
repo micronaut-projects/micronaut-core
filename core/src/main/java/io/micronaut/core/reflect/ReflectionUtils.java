@@ -16,7 +16,6 @@
 package io.micronaut.core.reflect;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.naming.NameUtils;
@@ -357,7 +356,7 @@ public class ReflectionUtils {
      * @since 4.0.0
      */
     @Internal
-    public static Optional<Object> getFieldValue(@NonNull Class<?> fieldOwnerClass, @NonNull String fieldName, @NonNull Object instance) {
+    public static Optional<Object> getFieldValue(Class<?> fieldOwnerClass, String fieldName, Object instance) {
         try {
             final Field f = getRequiredField(fieldOwnerClass, fieldName);
             f.setAccessible(true);
@@ -489,8 +488,8 @@ public class ReflectionUtils {
      * @param value The value
      */
     public static void setField(
-            @NonNull Field field,
-            @NonNull Object instance,
+ Field field,
+ Object instance,
             @Nullable Object value) {
         try {
             ClassUtils.REFLECTION_LOGGER.debug("Reflectively setting field {} to value {} on object {}", field, value, value);
@@ -513,7 +512,7 @@ public class ReflectionUtils {
      * @since 3.7.0
      */
     @UsedByGeneratedCode
-    public static Object getField(@NonNull Class<?> clazz, @NonNull String fieldName, @NonNull Object instance) {
+    public static Object getField(Class<?> clazz, String fieldName, Object instance) {
         try {
             ClassUtils.REFLECTION_LOGGER.debug("Reflectively getting field {} of class {} and instance {}", fieldName, clazz, instance);
             Field field = getRequiredField(clazz, fieldName);
@@ -532,9 +531,9 @@ public class ReflectionUtils {
      * @param value The value
      * @since 4.0.0
      */
-    public static void setField(@NonNull Class<?> clazz,
-                                @NonNull String fieldName,
-                                @NonNull Object instance,
+    public static void setField(Class<?> clazz,
+ String fieldName,
+ Object instance,
                                 @Nullable Object value) {
         try {
             Field field = findField(clazz, fieldName)

@@ -19,7 +19,6 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
@@ -48,70 +47,63 @@ final class EmptyAnnotationMetadata implements AnnotationMetadata {
     }
 
     @Override
-    public <E extends Enum<E>> E[] enumValues(@NonNull String annotation, Class<E> enumType) {
+    public <E extends Enum<E>> E[] enumValues(String annotation, Class<E> enumType) {
         return (E[]) Array.newInstance(enumType, 0);
     }
 
     @Override
-    public <E extends Enum<E>> E[] enumValues(@NonNull String annotation, @NonNull String member, Class<E> enumType) {
+    public <E extends Enum<E>> E[] enumValues(String annotation, String member, Class<E> enumType) {
         return (E[]) Array.newInstance(enumType, 0);
     }
 
     @Override
-    public <E extends Enum<E>> E[] enumValues(@NonNull Class<? extends Annotation> annotation, Class<E> enumType) {
+    public <E extends Enum<E>> E[] enumValues(Class<? extends Annotation> annotation, Class<E> enumType) {
         return (E[]) Array.newInstance(enumType, 0);
     }
 
     @Override
-    public <E extends Enum<E>> E[] enumValues(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Class<E> enumType) {
+    public <E extends Enum<E>> E[] enumValues(Class<? extends Annotation> annotation, String member, Class<E> enumType) {
         return (E[]) Array.newInstance(enumType, 0);
     }
 
-    @NonNull
     @Override
     public List<String> getAnnotationNamesByStereotype(@Nullable String stereotype) {
         return Collections.emptyList();
     }
 
-    @NonNull
     @Override
     public Set<String> getAnnotationNames() {
         return Collections.emptySet();
     }
 
-    @NonNull
     @Override
     public Set<String> getDeclaredAnnotationNames() {
         return Collections.emptySet();
     }
 
-    @NonNull
     @Override
     public List<String> getDeclaredAnnotationNamesByStereotype(@Nullable String stereotype) {
         return Collections.emptyList();
     }
 
-    @NonNull
     @Override
-    public <T> OptionalValues<T> getValues(@NonNull String annotation, @NonNull Class<T> valueType) {
+    public <T> OptionalValues<T> getValues(String annotation, Class<T> valueType) {
         //noinspection unchecked
         return OptionalValues.EMPTY_VALUES;
     }
 
     @Override
-    public <T> Optional<T> getDefaultValue(@NonNull String annotation, @NonNull String member, @NonNull Argument<T> requiredType) {
+    public <T> Optional<T> getDefaultValue(String annotation, String member, Argument<T> requiredType) {
         return Optional.empty();
     }
 
-    @NonNull
     @Override
-    public <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByType(@NonNull Class<T> annotationType) {
+    public <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByType(Class<T> annotationType) {
         return Collections.emptyList();
     }
 
-    @NonNull
     @Override
-    public <T extends Annotation> List<AnnotationValue<T>> getDeclaredAnnotationValuesByType(@NonNull Class<T> annotationType) {
+    public <T extends Annotation> List<AnnotationValue<T>> getDeclaredAnnotationValuesByType(Class<T> annotationType) {
         return Collections.emptyList();
     }
 
@@ -145,44 +137,43 @@ final class EmptyAnnotationMetadata implements AnnotationMetadata {
         return false;
     }
 
-    @NonNull
     @Override
-    public Map<CharSequence, Object> getDefaultValues(@NonNull String annotation) {
+    public Map<CharSequence, Object> getDefaultValues(String annotation) {
         return Collections.emptyMap();
     }
 
     @Override
-    public <T> Optional<T> getDefaultValue(@NonNull String annotation, @NonNull String member, @NonNull Class<T> requiredType) {
+    public <T> Optional<T> getDefaultValue(String annotation, String member, Class<T> requiredType) {
         return Optional.empty();
     }
 
     @Override
-    public <T> Optional<T> getDefaultValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member, @NonNull Argument<T> requiredType) {
+    public <T> Optional<T> getDefaultValue(Class<? extends Annotation> annotation, String member, Argument<T> requiredType) {
         return Optional.empty();
     }
 
     @Override
-    public boolean isAnnotationPresent(@NonNull Class<? extends Annotation> annotationClass) {
+    public boolean isAnnotationPresent(Class<? extends Annotation> annotationClass) {
         return false;
     }
 
     @Override
-    public boolean isDeclaredAnnotationPresent(@NonNull Class<? extends Annotation> annotationClass) {
+    public boolean isDeclaredAnnotationPresent(Class<? extends Annotation> annotationClass) {
         return false;
     }
 
     @Override
-    public <T> Optional<T> getDefaultValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member, @NonNull Class<T> requiredType) {
+    public <T> Optional<T> getDefaultValue(Class<? extends Annotation> annotation, String member, Class<T> requiredType) {
         return Optional.empty();
     }
 
     @Override
-    public <T> Optional<T> getValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member, @NonNull Class<T> requiredType) {
+    public <T> Optional<T> getValue(Class<? extends Annotation> annotation, String member, Class<T> requiredType) {
         return Optional.empty();
     }
 
     @Override
-    public <T> Optional<T> getValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member, @NonNull Argument<T> requiredType) {
+    public <T> Optional<T> getValue(Class<? extends Annotation> annotation, String member, Argument<T> requiredType) {
         return Optional.empty();
     }
 
@@ -197,12 +188,12 @@ final class EmptyAnnotationMetadata implements AnnotationMetadata {
     }
 
     @Override
-    public Optional<Class<? extends Annotation>> getAnnotationTypeByStereotype(@NonNull Class<? extends Annotation> stereotype) {
+    public Optional<Class<? extends Annotation>> getAnnotationTypeByStereotype(Class<? extends Annotation> stereotype) {
         return Optional.empty();
     }
 
     @Override
-    public Optional<Class<? extends Annotation>> getDeclaredAnnotationTypeByStereotype(@NonNull Class<? extends Annotation> stereotype) {
+    public Optional<Class<? extends Annotation>> getDeclaredAnnotationTypeByStereotype(Class<? extends Annotation> stereotype) {
         return Optional.empty();
     }
 
@@ -212,12 +203,12 @@ final class EmptyAnnotationMetadata implements AnnotationMetadata {
     }
 
     @Override
-    public Optional<Class<? extends Annotation>> getAnnotationType(@NonNull String name) {
+    public Optional<Class<? extends Annotation>> getAnnotationType(String name) {
         return Optional.empty();
     }
 
     @Override
-    public Optional<Class<? extends Annotation>> getAnnotationType(@NonNull String name, @NonNull ClassLoader classLoader) {
+    public Optional<Class<? extends Annotation>> getAnnotationType(String name, ClassLoader classLoader) {
         return Optional.empty();
     }
 
@@ -227,305 +218,278 @@ final class EmptyAnnotationMetadata implements AnnotationMetadata {
     }
 
     @Override
-    public Optional<String> getAnnotationNameByStereotype(@NonNull Class<? extends Annotation> stereotype) {
+    public Optional<String> getAnnotationNameByStereotype(Class<? extends Annotation> stereotype) {
         return Optional.empty();
     }
 
-    @NonNull
     @Override
-    public <T> OptionalValues<T> getValues(@NonNull Class<? extends Annotation> annotation, @NonNull Class<T> valueType) {
+    public <T> OptionalValues<T> getValues(Class<? extends Annotation> annotation, Class<T> valueType) {
         //noinspection unchecked
         return OptionalValues.EMPTY_VALUES;
     }
 
-    @NonNull
     @Override
-    public List<String> getAnnotationNamesByStereotype(@NonNull Class<? extends Annotation> stereotype) {
-        return Collections.emptyList();
-    }
-
-    @NonNull
-    @Override
-    public List<Class<? extends Annotation>> getAnnotationTypesByStereotype(@NonNull Class<? extends Annotation> stereotype) {
-        return Collections.emptyList();
-    }
-
-    @NonNull
-    @Override
-    public List<Class<? extends Annotation>> getAnnotationTypesByStereotype(@NonNull String stereotype) {
+    public List<String> getAnnotationNamesByStereotype(Class<? extends Annotation> stereotype) {
         return Collections.emptyList();
     }
 
     @Override
-    public <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(@NonNull Class<T> annotationClass) {
+    public List<Class<? extends Annotation>> getAnnotationTypesByStereotype(Class<? extends Annotation> stereotype) {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public List<Class<? extends Annotation>> getAnnotationTypesByStereotype(String stereotype) {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(Class<T> annotationClass) {
         return Optional.empty();
     }
 
     @Override
-    public <T extends Annotation> Optional<AnnotationValue<T>> findDeclaredAnnotation(@NonNull Class<T> annotationClass) {
+    public <T extends Annotation> Optional<AnnotationValue<T>> findDeclaredAnnotation(Class<T> annotationClass) {
         return Optional.empty();
     }
 
     @Override
-    public <T> Optional<T> getValue(@NonNull String annotation, @NonNull String member, @NonNull Class<T> requiredType) {
+    public <T> Optional<T> getValue(String annotation, String member, Class<T> requiredType) {
         return Optional.empty();
     }
 
     @Override
-    public <T> Optional<T> getValue(@NonNull String annotation, @NonNull String member, @NonNull Argument<T> requiredType) {
+    public <T> Optional<T> getValue(String annotation, String member, Argument<T> requiredType) {
         return Optional.empty();
     }
 
     @Override
-    public OptionalLong longValue(@NonNull String annotation, @NonNull String member) {
+    public OptionalLong longValue(String annotation, String member) {
         return OptionalLong.empty();
     }
 
     @Override
-    public OptionalLong longValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member) {
+    public OptionalLong longValue(Class<? extends Annotation> annotation, String member) {
         return OptionalLong.empty();
     }
 
     @Override
-    public <E extends Enum<E>> Optional<E> enumValue(@NonNull String annotation, Class<E> enumType) {
+    public <E extends Enum<E>> Optional<E> enumValue(String annotation, Class<E> enumType) {
         return Optional.empty();
     }
 
     @Override
-    public <E extends Enum<E>> Optional<E> enumValue(@NonNull String annotation, @NonNull String member, Class<E> enumType) {
+    public <E extends Enum<E>> Optional<E> enumValue(String annotation, String member, Class<E> enumType) {
         return Optional.empty();
     }
 
     @Override
-    public <E extends Enum<E>> Optional<E> enumValue(@NonNull Class<? extends Annotation> annotation, Class<E> enumType) {
+    public <E extends Enum<E>> Optional<E> enumValue(Class<? extends Annotation> annotation, Class<E> enumType) {
         return Optional.empty();
     }
 
     @Override
-    public <E extends Enum<E>> Optional<E> enumValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Class<E> enumType) {
+    public <E extends Enum<E>> Optional<E> enumValue(Class<? extends Annotation> annotation, String member, Class<E> enumType) {
         return Optional.empty();
     }
 
-    @NonNull
     @Override
-    public <T> Class<T>[] classValues(@NonNull String annotation) {
-        return (Class<T>[]) ReflectionUtils.EMPTY_CLASS_ARRAY;
-    }
-
-    @NonNull
-    @Override
-    public <T> Class<T>[] classValues(@NonNull String annotation, @NonNull String member) {
-        return (Class<T>[]) ReflectionUtils.EMPTY_CLASS_ARRAY;
-    }
-
-    @NonNull
-    @Override
-    public <T> Class<T>[] classValues(@NonNull Class<? extends Annotation> annotation) {
-        return (Class<T>[]) ReflectionUtils.EMPTY_CLASS_ARRAY;
-    }
-
-    @NonNull
-    @Override
-    public <T> Class<T>[] classValues(@NonNull Class<? extends Annotation> annotation, @NonNull String member) {
+    public <T> Class<T>[] classValues(String annotation) {
         return (Class<T>[]) ReflectionUtils.EMPTY_CLASS_ARRAY;
     }
 
     @Override
-    public Optional<Class> classValue(@NonNull String annotation) {
+    public <T> Class<T>[] classValues(String annotation, String member) {
+        return (Class<T>[]) ReflectionUtils.EMPTY_CLASS_ARRAY;
+    }
+
+    @Override
+    public <T> Class<T>[] classValues(Class<? extends Annotation> annotation) {
+        return (Class<T>[]) ReflectionUtils.EMPTY_CLASS_ARRAY;
+    }
+
+    @Override
+    public <T> Class<T>[] classValues(Class<? extends Annotation> annotation, String member) {
+        return (Class<T>[]) ReflectionUtils.EMPTY_CLASS_ARRAY;
+    }
+
+    @Override
+    public Optional<Class> classValue(String annotation) {
         return Optional.empty();
     }
 
     @Override
-    public Optional<Class> classValue(@NonNull String annotation, @NonNull String member) {
+    public Optional<Class> classValue(String annotation, String member) {
         return Optional.empty();
     }
 
     @Override
-    public Optional<Class> classValue(@NonNull Class<? extends Annotation> annotation) {
+    public Optional<Class> classValue(Class<? extends Annotation> annotation) {
         return Optional.empty();
     }
 
     @Override
-    public Optional<Class> classValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member) {
+    public Optional<Class> classValue(Class<? extends Annotation> annotation, String member) {
         return Optional.empty();
     }
 
     @Override
-    public OptionalInt intValue(@NonNull String annotation, @NonNull String member) {
+    public OptionalInt intValue(String annotation, String member) {
         return OptionalInt.empty();
     }
 
     @Override
-    public OptionalInt intValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member) {
+    public OptionalInt intValue(Class<? extends Annotation> annotation, String member) {
         return OptionalInt.empty();
     }
 
     @Override
-    public OptionalInt intValue(@NonNull Class<? extends Annotation> annotation) {
+    public OptionalInt intValue(Class<? extends Annotation> annotation) {
         return OptionalInt.empty();
     }
 
     @Override
-    public Optional<String> stringValue(@NonNull String annotation, @NonNull String member) {
+    public Optional<String> stringValue(String annotation, String member) {
         return Optional.empty();
     }
 
     @Override
-    public Optional<String> stringValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member) {
-        return Optional.empty();
-    }
-
-    @NonNull
-    @Override
-    public Optional<String> stringValue(@NonNull Class<? extends Annotation> annotation) {
-        return Optional.empty();
-    }
-
-    @NonNull
-    @Override
-    public Optional<String> stringValue(@NonNull String annotation) {
+    public Optional<String> stringValue(Class<? extends Annotation> annotation, String member) {
         return Optional.empty();
     }
 
     @Override
-    public Optional<Boolean> booleanValue(@NonNull String annotation, @NonNull String member) {
+    public Optional<String> stringValue(Class<? extends Annotation> annotation) {
         return Optional.empty();
     }
 
     @Override
-    public Optional<Boolean> booleanValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member) {
+    public Optional<String> stringValue(String annotation) {
         return Optional.empty();
     }
 
-    @NonNull
     @Override
-    public Optional<Boolean> booleanValue(@NonNull Class<? extends Annotation> annotation) {
+    public Optional<Boolean> booleanValue(String annotation, String member) {
         return Optional.empty();
     }
 
-    @NonNull
     @Override
-    public Optional<Boolean> booleanValue(@NonNull String annotation) {
+    public Optional<Boolean> booleanValue(Class<? extends Annotation> annotation, String member) {
         return Optional.empty();
     }
 
-    @NonNull
     @Override
-    public String[] stringValues(@NonNull Class<? extends Annotation> annotation, @NonNull String member) {
+    public Optional<Boolean> booleanValue(Class<? extends Annotation> annotation) {
+        return Optional.empty();
+    }
+
+    @Override
+    public Optional<Boolean> booleanValue(String annotation) {
+        return Optional.empty();
+    }
+
+    @Override
+    public String[] stringValues(Class<? extends Annotation> annotation, String member) {
         return StringUtils.EMPTY_STRING_ARRAY;
     }
 
-    @NonNull
     @Override
-    public String[] stringValues(@NonNull Class<? extends Annotation> annotation) {
+    public String[] stringValues(Class<? extends Annotation> annotation) {
         return StringUtils.EMPTY_STRING_ARRAY;
     }
 
-    @NonNull
     @Override
-    public String[] stringValues(@NonNull String annotation, @NonNull String member) {
+    public String[] stringValues(String annotation, String member) {
         return StringUtils.EMPTY_STRING_ARRAY;
     }
 
-    @NonNull
     @Override
-    public String[] stringValues(@NonNull String annotation) {
+    public String[] stringValues(String annotation) {
         return StringUtils.EMPTY_STRING_ARRAY;
     }
 
-    @NonNull
     @Override
-    public OptionalDouble doubleValue(@NonNull String annotation, @NonNull String member) {
+    public OptionalDouble doubleValue(String annotation, String member) {
         return OptionalDouble.empty();
     }
 
-    @NonNull
     @Override
-    public OptionalDouble doubleValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member) {
+    public OptionalDouble doubleValue(Class<? extends Annotation> annotation, String member) {
         return OptionalDouble.empty();
     }
 
-    @NonNull
     @Override
-    public OptionalDouble doubleValue(@NonNull Class<? extends Annotation> annotation) {
+    public OptionalDouble doubleValue(Class<? extends Annotation> annotation) {
         return OptionalDouble.empty();
     }
 
-    @NonNull
     @Override
-    public <T> Optional<T> getValue(@NonNull String annotation, @NonNull Class<T> requiredType) {
-        return Optional.empty();
-    }
-
-    @NonNull
-    @Override
-    public Optional<Object> getValue(@NonNull String annotation, @NonNull String member) {
-        return Optional.empty();
-    }
-
-    @NonNull
-    @Override
-    public Optional<Object> getValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member) {
+    public <T> Optional<T> getValue(String annotation, Class<T> requiredType) {
         return Optional.empty();
     }
 
     @Override
-    public boolean isTrue(@NonNull String annotation, @NonNull String member) {
+    public Optional<Object> getValue(String annotation, String member) {
+        return Optional.empty();
+    }
+
+    @Override
+    public Optional<Object> getValue(Class<? extends Annotation> annotation, String member) {
+        return Optional.empty();
+    }
+
+    @Override
+    public boolean isTrue(String annotation, String member) {
         return false;
     }
 
     @Override
-    public boolean isTrue(@NonNull Class<? extends Annotation> annotation, @NonNull String member) {
+    public boolean isTrue(Class<? extends Annotation> annotation, String member) {
         return false;
     }
 
     @Override
-    public boolean isPresent(@NonNull String annotation, @NonNull String member) {
+    public boolean isPresent(String annotation, String member) {
         return false;
     }
 
     @Override
-    public boolean isPresent(@NonNull Class<? extends Annotation> annotation, @NonNull String member) {
+    public boolean isPresent(Class<? extends Annotation> annotation, String member) {
         return false;
     }
 
     @Override
-    public boolean isFalse(@NonNull Class<? extends Annotation> annotation, @NonNull String member) {
+    public boolean isFalse(Class<? extends Annotation> annotation, String member) {
         return true;
     }
 
     @Override
-    public boolean isFalse(@NonNull String annotation, @NonNull String member) {
+    public boolean isFalse(String annotation, String member) {
         return true;
     }
 
-    @NonNull
     @Override
-    public Optional<Object> getValue(@NonNull String annotation) {
+    public Optional<Object> getValue(String annotation) {
         return Optional.empty();
     }
 
-    @NonNull
     @Override
-    public Optional<Object> getValue(@NonNull Class<? extends Annotation> annotation) {
+    public Optional<Object> getValue(Class<? extends Annotation> annotation) {
         return Optional.empty();
     }
 
-    @NonNull
     @Override
-    public <T> Optional<T> getValue(@NonNull Class<? extends Annotation> annotation, @NonNull Class<T> requiredType) {
+    public <T> Optional<T> getValue(Class<? extends Annotation> annotation, Class<T> requiredType) {
         return Optional.empty();
     }
 
-    @NonNull
     @Override
-    public <T> Optional<T> getValue(@NonNull Class<? extends Annotation> annotation, @NonNull Argument<T> requiredType) {
+    public <T> Optional<T> getValue(Class<? extends Annotation> annotation, Argument<T> requiredType) {
         return Optional.empty();
     }
 
-    @NonNull
     @Override
-    public <T> Optional<T> getValue(@NonNull String annotation, @NonNull Argument<T> requiredType) {
+    public <T> Optional<T> getValue(String annotation, Argument<T> requiredType) {
         return Optional.empty();
     }
 
@@ -545,7 +509,7 @@ final class EmptyAnnotationMetadata implements AnnotationMetadata {
     }
 
     @Override
-    public boolean hasStereotype(String @Nullable [] annotations) {
+    public boolean hasStereotype(String @Nullable[] annotations) {
         return false;
     }
 

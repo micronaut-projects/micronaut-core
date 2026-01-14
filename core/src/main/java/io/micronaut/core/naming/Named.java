@@ -14,9 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.core.naming;
-
-import org.jspecify.annotations.NonNull;
-
 /**
  * An interface for components that are named.
  *
@@ -28,5 +25,5 @@ public interface Named {
     /**
      * @return The name of the component
      */
-    @NonNull String getName();
+ String getName();
 }

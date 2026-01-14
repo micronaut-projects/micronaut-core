@@ -16,8 +16,6 @@
 package io.micronaut.inject.annotation;
 
 import io.micronaut.core.annotation.AnnotatedElement;
-
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import java.util.Set;
 
@@ -37,8 +35,5 @@ public interface AnnotatedElementValidator {
      *
      * @return The error messages
      */
-    @NonNull
-    Set<String> validatedAnnotatedElement(
-            @NonNull AnnotatedElement element,
-            @Nullable Object value);
+    Set<String> validatedAnnotatedElement(AnnotatedElement element, @Nullable Object value);
 }

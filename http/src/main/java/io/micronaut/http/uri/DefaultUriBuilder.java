@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.http.uri;
-
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.value.MutableConvertibleMultiValues;
 import io.micronaut.core.convert.value.MutableConvertibleMultiValuesMap;
@@ -163,7 +161,6 @@ class DefaultUriBuilder implements UriBuilder {
         }
     }
 
-    @NonNull
     @Override
     public UriBuilder fragment(@Nullable String fragment) {
         if (fragment != null) {
@@ -172,7 +169,6 @@ class DefaultUriBuilder implements UriBuilder {
         return this;
     }
 
-    @NonNull
     @Override
     public UriBuilder scheme(@Nullable String scheme) {
         if (scheme != null) {
@@ -181,7 +177,6 @@ class DefaultUriBuilder implements UriBuilder {
         return this;
     }
 
-    @NonNull
     @Override
     public UriBuilder userInfo(@Nullable String userInfo) {
         if (userInfo != null) {
@@ -190,7 +185,6 @@ class DefaultUriBuilder implements UriBuilder {
         return this;
     }
 
-    @NonNull
     @Override
     public UriBuilder host(@Nullable String host) {
         if (host != null) {
@@ -199,7 +193,6 @@ class DefaultUriBuilder implements UriBuilder {
         return this;
     }
 
-    @NonNull
     @Override
     public UriBuilder port(int port) {
         if (port < -1) {
@@ -209,7 +202,6 @@ class DefaultUriBuilder implements UriBuilder {
         return this;
     }
 
-    @NonNull
     @Override
     public UriBuilder path(@Nullable String path) {
         if (StringUtils.isNotEmpty(path)) {
@@ -232,7 +224,6 @@ class DefaultUriBuilder implements UriBuilder {
         return this;
     }
 
-    @NonNull
     @Override
     public UriBuilder replacePath(@Nullable String path) {
         if (path != null) {
@@ -242,7 +233,6 @@ class DefaultUriBuilder implements UriBuilder {
         return this;
     }
 
-    @NonNull
     @Override
     public UriBuilder queryParam(String name, Object... values) {
         if (StringUtils.isNotEmpty(name) && ArrayUtils.isNotEmpty(values)) {
@@ -260,7 +250,6 @@ class DefaultUriBuilder implements UriBuilder {
         return this;
     }
 
-    @NonNull
     @Override
     public UriBuilder replaceQueryParam(String name, Object... values) {
         if (StringUtils.isNotEmpty(name) && ArrayUtils.isNotEmpty(values)) {
@@ -277,7 +266,6 @@ class DefaultUriBuilder implements UriBuilder {
         return this;
     }
 
-    @NonNull
     @Override
     public URI build() {
         try {
@@ -287,7 +275,6 @@ class DefaultUriBuilder implements UriBuilder {
         }
     }
 
-    @NonNull
     @Override
     public URI expand(Map<String, ? super Object> values) {
         String uri = reconstructAsString(values);

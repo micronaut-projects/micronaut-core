@@ -16,11 +16,10 @@
 package io.micronaut.http.util;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.MediaType;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 
 import java.nio.charset.Charset;
@@ -35,6 +34,7 @@ import java.util.regex.Pattern;
 
 /**
  * Utility class to work with {@link io.micronaut.http.HttpHeaders} or HTTP Headers.
+ *
  * @author Sergio del Amo
  * @since 3.8.0
  */
@@ -50,11 +50,12 @@ public final class HttpHeadersUtil {
 
     /**
      * Trace HTTP Headers.
-     * @param log Logger
+     *
+     * @param log         Logger
      * @param httpHeaders HTTP Headers
      */
-    public static void trace(@NonNull Logger log,
-                             @NonNull HttpHeaders httpHeaders) {
+    public static void trace(Logger log,
+                             HttpHeaders httpHeaders) {
         if (log.isTraceEnabled()) {
             trace(log, httpHeaders.names(), httpHeaders::getAll);
         }
@@ -62,13 +63,14 @@ public final class HttpHeadersUtil {
 
     /**
      * Trace HTTP Headers.
-     * @param log Logger
-     * @param names HTTP Header names
+     *
+     * @param log           Logger
+     * @param names         HTTP Header names
      * @param getAllHeaders Function to get all the header values for a particular header name
      */
-    public static void trace(@NonNull Logger log,
-                             @NonNull Set<String> names,
-                             @NonNull Function<String, List<String>> getAllHeaders) {
+    public static void trace(Logger log,
+                             Set<String> names,
+                             Function<String, List<String>> getAllHeaders) {
         if (log.isTraceEnabled()) {
             names.forEach(name -> trace(log, name, getAllHeaders));
         }
@@ -76,13 +78,14 @@ public final class HttpHeadersUtil {
 
     /**
      * Trace HTTP Headers.
-     * @param log Logger
+     *
+     * @param log           Logger
      * @param namesSupplier HTTP Header names Provider
      * @param getAllHeaders Function to get all the header values for a particular header name
      */
-    public static void trace(@NonNull Logger log,
-                             @NonNull Supplier<Set<String>> namesSupplier,
-                             @NonNull Function<String, List<String>> getAllHeaders) {
+    public static void trace(Logger log,
+                             Supplier<Set<String>> namesSupplier,
+                             Function<String, List<String>> getAllHeaders) {
         if (log.isTraceEnabled()) {
             trace(log, namesSupplier.get(), getAllHeaders);
         }
@@ -90,13 +93,14 @@ public final class HttpHeadersUtil {
 
     /**
      * Trace HTTP Headers.
-     * @param log Logger
-     * @param name HTTP Header name
+     *
+     * @param log           Logger
+     * @param name          HTTP Header name
      * @param getAllHeaders Function to get all the header values for a particular header name
      */
-    public static void trace(@NonNull Logger log,
-                             @NonNull String name,
-                             @NonNull Function<String, List<String>> getAllHeaders) {
+    public static void trace(Logger log,
+                             String name,
+                             Function<String, List<String>> getAllHeaders) {
         boolean isMasked = HEADER_MASK_PATTERNS.get().matcher(name).matches();
         List<String> all = getAllHeaders.apply(name);
         if (all.size() > 1) {
@@ -128,7 +132,7 @@ public final class HttpHeadersUtil {
      */
     @Internal
     @Nullable
-    public static String splitAcceptHeader(@NonNull String text) {
+    public static String splitAcceptHeader(String text) {
         int len = text.length();
         if (len == 0 || (len == 1 && text.charAt(0) == '*')) {
             return null;
@@ -145,12 +149,11 @@ public final class HttpHeadersUtil {
     /**
      * Resolve the {@link Charset} to use for request identified by the Content-Type HTTP Header value and the Accept-Charset HTTP Header value.
      *
-     * @param contentTypeHeaderValue Content-Type HTTP Header Value
+     * @param contentTypeHeaderValue   Content-Type HTTP Header Value
      * @param acceptCharsetHeaderValue Accept-Charset HTTP Header Value
      * @return A {@link Charset}
      * @since 4.8.8
      */
-    @NonNull
     public static Charset parseCharacterEncoding(@Nullable String contentTypeHeaderValue, @Nullable String acceptCharsetHeaderValue) {
         MediaType contentType = contentTypeHeaderValue == null ? null : MediaType.of(contentTypeHeaderValue);
         Charset charset = acceptCharsetHeaderValue != null ? parseAcceptCharset(acceptCharsetHeaderValue) : StandardCharsets.UTF_8;
@@ -160,14 +163,13 @@ public final class HttpHeadersUtil {
     /**
      * Resolve the {@link Charset} to use for the request.
      *
-     * @param contentType ContenType
+     * @param contentType   ContenType
      * @param acceptCharset Accept Charset
      * @return An {@link Optional} of {@link Charset}
      * @since 4.8.8
      */
-    @NonNull
     public static Charset parseCharacterEncoding(@Nullable MediaType contentType,
-                                                 @NonNull Charset acceptCharset) {
+                                                 Charset acceptCharset) {
         try {
 
             if (contentType != null) {
@@ -192,8 +194,7 @@ public final class HttpHeadersUtil {
      * @return Accept Charset
      * @since 4.8.8
      */
-    @NonNull
-    public static Charset parseAcceptCharset(@NonNull String acceptCharsetHeaderValue) {
+    public static Charset parseAcceptCharset(String acceptCharsetHeaderValue) {
         String text = HttpHeadersUtil.splitAcceptHeader(acceptCharsetHeaderValue);
         if (text != null) {
             try {

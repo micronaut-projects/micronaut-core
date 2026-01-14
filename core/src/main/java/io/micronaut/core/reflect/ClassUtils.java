@@ -19,7 +19,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.optim.StaticOptimizations;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -175,7 +174,7 @@ public class ClassUtils {
      * @param type The type
      * @return The logger
      */
-    public static @NonNull Logger getLogger(@NonNull Class<?> type) {
+    public static Logger getLogger(Class<?> type) {
         if (ENABLE_CLASS_LOADER_LOGGING) {
             return LoggerFactory.getLogger(type);
         } else {
@@ -189,7 +188,7 @@ public class ClassUtils {
      * @param primitiveType The primitive type name
      * @return The array type
      */
-    public static @NonNull Optional<Class<?>> arrayTypeForPrimitive(String primitiveType) {
+    public static Optional<Class<?>> arrayTypeForPrimitive(String primitiveType) {
         if (primitiveType != null) {
             return Optional.ofNullable(PRIMITIVE_ARRAY_MAP.get(primitiveType));
         }

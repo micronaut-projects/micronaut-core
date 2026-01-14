@@ -18,7 +18,6 @@ package io.micronaut.inject.provider;
 import io.micronaut.context.*;
 import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
@@ -55,9 +54,9 @@ public final class BeanProviderDefinition extends AbstractProviderDefinition<Bea
 
     @Override
     protected BeanProvider<Object> buildProvider(
-            @NonNull BeanResolutionContext resolutionContext,
-            @NonNull BeanContext context,
-            @NonNull Argument<Object> argument,
+            BeanResolutionContext resolutionContext,
+            BeanContext context,
+            Argument<Object> argument,
             @Nullable Qualifier<Object> qualifier,
             boolean singleton) {
         return new BeanProvider<>() {
@@ -110,7 +109,6 @@ public final class BeanProviderDefinition extends AbstractProviderDefinition<Bea
                 return context.containsBean(argument, finalQualifier);
             }
 
-            @NonNull
             @Override
             public Iterator<Object> iterator() {
                 return resolutionContext.copy().getBeansOfType(argument, finalQualifier).iterator();

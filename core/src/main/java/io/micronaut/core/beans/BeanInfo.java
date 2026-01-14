@@ -16,7 +16,6 @@
 package io.micronaut.core.beans;
 
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.type.Argument;
@@ -32,13 +31,11 @@ public interface BeanInfo<T> extends AnnotationMetadataProvider, ArgumentCoercib
     /**
      * @return The bean type
      */
-    @NonNull
     Class<T> getBeanType();
 
     /**
      * @return The generic bean type
      */
-    @NonNull
     default Argument<T> getGenericBeanType() {
         return Argument.of(getBeanType());
     }

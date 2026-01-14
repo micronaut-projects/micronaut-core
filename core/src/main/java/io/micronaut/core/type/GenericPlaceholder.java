@@ -14,9 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.core.type;
-
-import org.jspecify.annotations.NonNull;
-
 /**
  * Extends {@link Argument} to allow differentiating the
  * variable name from the argument name in cases where this is
@@ -30,7 +27,6 @@ public interface GenericPlaceholder<T> extends Argument<T> {
     /**
      * @return The variable name, never {@code null}.
      */
-    @NonNull
     default String getVariableName() {
         return getName();
     }

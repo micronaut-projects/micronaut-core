@@ -33,7 +33,7 @@ class ThirdPartyClientFilterSpec: StringSpec() {
                 "bintray.username" to username,
                 "bintray.token" to token,
                 "bintray.organization" to "grails",
-                "spec.name" to ThirdPartyClientFilterSpec::class.simpleName))
+                "spec.name" to ThirdPartyClientFilterSpec::class.simpleName as Any))
     )
 
     val client = autoClose(

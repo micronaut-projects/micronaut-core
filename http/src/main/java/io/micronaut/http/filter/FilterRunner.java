@@ -16,7 +16,6 @@
 package io.micronaut.http.filter;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.order.OrderUtil;
@@ -108,7 +107,7 @@ public class FilterRunner {
      *
      * @param filters The list of filters to sort in place
      */
-    public static void sort(@NonNull List<GenericHttpFilter> filters) {
+    public static void sort(List<GenericHttpFilter> filters) {
         if (filters.isEmpty()) {
             return;
         }
@@ -122,7 +121,7 @@ public class FilterRunner {
      *
      * @param filters The list of filters to sort in place
      */
-    public static void sortReverse(@NonNull List<GenericHttpFilter> filters) {
+    public static void sortReverse(List<GenericHttpFilter> filters) {
         if (filters.isEmpty()) {
             return;
         }
@@ -136,7 +135,7 @@ public class FilterRunner {
      * @param request The request
      * @since 4.6
      */
-    protected void doRouteMatch(@NonNull HttpRequest<?> request) {
+    protected void doRouteMatch(HttpRequest<?> request) {
         throw new IllegalStateException("Route match not supported");
     }
 
@@ -176,8 +175,7 @@ public class FilterRunner {
      * @param propagatedContext The propagatedContext
      * @return The flow
      */
-    @NonNull
-    protected ExecutionFlow<HttpResponse<?>> provideResponse(@NonNull HttpRequest<?> request, @NonNull PropagatedContext propagatedContext) {
+    protected ExecutionFlow<HttpResponse<?>> provideResponse(HttpRequest<?> request, PropagatedContext propagatedContext) {
         return responseProvider.apply(request, propagatedContext);
     }
 
@@ -187,13 +185,11 @@ public class FilterRunner {
      * @return The filters
      * @since 4.6
      */
-    @NonNull
-    protected List<GenericHttpFilter> findFiltersAfterRouteMatch(@NonNull HttpRequest<?> request) {
+    protected List<GenericHttpFilter> findFiltersAfterRouteMatch(HttpRequest<?> request) {
         throw new IllegalStateException("Find filters not supported");
     }
 
-    @NonNull
-    private List<InternalHttpFilter> findInternalFiltersAfterRouteMatch(@NonNull HttpRequest<?> request) {
+    private List<InternalHttpFilter> findInternalFiltersAfterRouteMatch(HttpRequest<?> request) {
         return filters == null ? (List) findFiltersAfterRouteMatch(request) : filters;
     }
 
@@ -204,8 +200,7 @@ public class FilterRunner {
      * @return The flow that completes after all filters and the terminal operation, with the final
      * response
      */
-    @NonNull
-    public final ExecutionFlow<HttpResponse<?>> run(@NonNull HttpRequest<?> request) {
+    public final ExecutionFlow<HttpResponse<?>> run(HttpRequest<?> request) {
         return run(request, PropagatedContext.getOrEmpty());
     }
 

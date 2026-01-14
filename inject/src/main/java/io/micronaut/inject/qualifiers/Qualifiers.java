@@ -23,7 +23,6 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.type.Argument;
@@ -83,7 +82,7 @@ public class Qualifiers {
      */
     @SuppressWarnings("unchecked")
     public static @Nullable
-    <T> Qualifier<T> forArgument(@NonNull Argument<?> argument) {
+    <T> Qualifier<T> forArgument(Argument<?> argument) {
         AnnotationMetadata annotationMetadata = Objects.requireNonNull(argument, "Argument cannot be null").getAnnotationMetadata();
         boolean hasMetadata = annotationMetadata != AnnotationMetadata.EMPTY_METADATA;
 
@@ -146,7 +145,7 @@ public class Qualifiers {
      * @since 4.0.0
      */
     @Nullable
-    public static String findName(@NonNull Qualifier<?> qualifier) {
+    public static String findName(Qualifier<?> qualifier) {
         if (qualifier instanceof NameQualifier<?> nameQualifier) {
             return nameQualifier.getName();
         }
@@ -335,7 +334,7 @@ public class Qualifiers {
      * @return The qualifier
      * @since 3.0.0
      */
-    public static @NonNull <T> Qualifier<T> byExactTypeArgumentName(@NonNull String typeName) {
+    public static <T> Qualifier<T> byExactTypeArgumentName(String typeName) {
         return new ExactTypeArgumentNameQualifier<>(typeName);
     }
 
@@ -369,8 +368,7 @@ public class Qualifiers {
      * @param <T>                The bean type
      * @return The qualifier
      */
-    public static @NonNull
-    <T> Qualifier<T> byInterceptorBinding(@NonNull AnnotationMetadata annotationMetadata) {
+    public static <T> Qualifier<T> byInterceptorBinding(AnnotationMetadata annotationMetadata) {
         return new InterceptorBindingQualifier<>(annotationMetadata);
     }
 
@@ -382,13 +380,12 @@ public class Qualifiers {
      * @return The qualifier
      * @since 3.3.0
      */
-    public static @NonNull
-    <T> Qualifier<T> byInterceptorBindingValues(@NonNull Collection<AnnotationValue<?>> binding) {
+    public static <T> Qualifier<T> byInterceptorBindingValues(Collection<AnnotationValue<?>> binding) {
         return new InterceptorBindingQualifier(binding);
     }
 
     @Nullable
-    private static <T> Qualifier<T> findCustomByType(@NonNull AnnotationMetadata metadata, @NonNull Class<? extends Annotation> type) {
+    private static <T> Qualifier<T> findCustomByType(AnnotationMetadata metadata, Class<? extends Annotation> type) {
         if (Any.class == type) {
             //noinspection unchecked
             return AnyQualifier.INSTANCE;
@@ -410,7 +407,7 @@ public class Qualifiers {
     }
 
     @Nullable
-    private static <T> Qualifier<T> findCustomByName(@NonNull AnnotationMetadata metadata, @NonNull String type) {
+    private static <T> Qualifier<T> findCustomByName(AnnotationMetadata metadata, String type) {
         if (Type.NAME.equals(type)) {
             Optional<Class> aClass = metadata.classValue(type);
             if (aClass.isPresent()) {

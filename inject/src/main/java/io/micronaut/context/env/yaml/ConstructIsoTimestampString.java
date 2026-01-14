@@ -16,7 +16,6 @@
 package io.micronaut.context.env.yaml;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.yaml.snakeyaml.constructor.AbstractConstruct;
 import org.yaml.snakeyaml.error.YAMLException;
 import org.yaml.snakeyaml.nodes.Node;
@@ -47,7 +46,6 @@ final class ConstructIsoTimestampString extends AbstractConstruct {
         return parse(nodeValue);
     }
 
-    @NonNull
     static Temporal parse(String nodeValue) {
         Matcher match = YMD_REGEXP.matcher(nodeValue);
         if (match.matches()) {

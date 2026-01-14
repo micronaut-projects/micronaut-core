@@ -18,7 +18,6 @@ package io.micronaut.context;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ObjectUtils;
@@ -91,12 +90,11 @@ class DefaultConstructorInjectionPoint<T> implements ConstructorInjectionPoint<T
     }
 
     @Override
-    public Argument<?> @NonNull [] getArguments() {
+    public Argument<?>[] getArguments() {
         return arguments;
     }
 
     @Override
-    @NonNull
     public BeanDefinition<T> getDeclaringBean() {
         return declaringBean;
     }

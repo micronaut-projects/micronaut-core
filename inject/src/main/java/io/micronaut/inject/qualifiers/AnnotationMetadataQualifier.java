@@ -19,13 +19,12 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.BeanType;
 import io.micronaut.inject.QualifiedBeanType;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
@@ -46,23 +45,21 @@ import java.util.stream.Collectors;
 @Internal
 final class AnnotationMetadataQualifier<T> extends FilteringQualifier<T> {
 
-    @NonNull
     final String annotationName;
-    @NonNull
     final String annotationSimpleName;
     @Nullable
     final AnnotationValue<Annotation> qualifierAnn;
 
-    private AnnotationMetadataQualifier(@NonNull String annotationName,
-                                        @NonNull String annotationSimpleName,
+    private AnnotationMetadataQualifier(String annotationName,
+                                        String annotationSimpleName,
                                         @Nullable AnnotationValue<Annotation> value) {
         this.annotationName = annotationName;
         this.annotationSimpleName = annotationSimpleName;
         this.qualifierAnn = value;
     }
 
-    static <T> AnnotationMetadataQualifier<T> fromType(@NonNull AnnotationMetadata annotationMetadata,
-                                                       @NonNull Class<? extends Annotation> annotationType) {
+    static <T> AnnotationMetadataQualifier<T> fromType(AnnotationMetadata annotationMetadata,
+                                                       Class<? extends Annotation> annotationType) {
         return new AnnotationMetadataQualifier<>(
             annotationType.getName(),
             annotationType.getSimpleName(),
@@ -70,8 +67,8 @@ final class AnnotationMetadataQualifier<T> extends FilteringQualifier<T> {
         );
     }
 
-    static <T> AnnotationMetadataQualifier<T> fromTypeName(@NonNull AnnotationMetadata annotationMetadata,
-                                                           @NonNull String annotationTypeName) {
+    static <T> AnnotationMetadataQualifier<T> fromTypeName(AnnotationMetadata annotationMetadata,
+                                                           String annotationTypeName) {
         return new AnnotationMetadataQualifier<>(
             annotationTypeName,
             NameUtils.getSimpleName(annotationTypeName),
@@ -79,8 +76,8 @@ final class AnnotationMetadataQualifier<T> extends FilteringQualifier<T> {
         );
     }
 
-    static <T extends Annotation> AnnotationMetadataQualifier<T> fromValue(@NonNull AnnotationMetadata annotationMetadata,
-                                                                           @NonNull AnnotationValue<T> annotationValue) {
+    static <T extends Annotation> AnnotationMetadataQualifier<T> fromValue(AnnotationMetadata annotationMetadata,
+                                                                           AnnotationValue<T> annotationValue) {
         return new AnnotationMetadataQualifier<>(
             annotationValue.getAnnotationName(),
             NameUtils.getSimpleName(annotationValue.getAnnotationName()),
@@ -155,7 +152,6 @@ final class AnnotationMetadataQualifier<T> extends FilteringQualifier<T> {
         return map;
     }
 
-    @NonNull
     private static Set<String> resolveNonBindingMembers(AnnotationMetadata annotationMetadata) {
         String[] nonBindingArray = AnnotationUtil.resolveNonBindingMembers(annotationMetadata);
         return ArrayUtils.isNotEmpty(nonBindingArray) ? new LinkedHashSet<>(Arrays.asList(nonBindingArray)) : Collections.emptySet();

@@ -19,7 +19,6 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.type.Argument;
 
 import java.util.Map;
@@ -37,7 +36,7 @@ public interface ParametrizedInstantiatableBeanDefinition<T> extends Instantiata
     /**
      * @return The arguments required to construct this bean
      */
-    Argument<Object> @NonNull [] getRequiredArguments();
+    Argument<Object>[] getRequiredArguments();
 
     /**
      * Variation of the {@link #instantiate(BeanContext)} method that allows passing the values necessary for
@@ -50,14 +49,12 @@ public interface ParametrizedInstantiatableBeanDefinition<T> extends Instantiata
      * @return The instantiated bean
      * @throws BeanInstantiationException If the bean cannot be instantiated for the arguments supplied
      */
-    @NonNull
-    T instantiate(@NonNull BeanResolutionContext resolutionContext,
-                  @NonNull BeanContext context,
-                  @NonNull Map<String, Object> requiredArgumentValues) throws BeanInstantiationException;
+    T instantiate(BeanResolutionContext resolutionContext,
+                  BeanContext context,
+                  Map<String, Object> requiredArgumentValues) throws BeanInstantiationException;
 
     @Override
-    @NonNull
-    default T instantiate(@NonNull BeanResolutionContext resolutionContext, @NonNull BeanContext context) throws BeanInstantiationException {
+    default T instantiate(BeanResolutionContext resolutionContext, BeanContext context) throws BeanInstantiationException {
         throw new BeanInstantiationException(this, "Cannot instantiate parametrized bean with no arguments");
     }
 }

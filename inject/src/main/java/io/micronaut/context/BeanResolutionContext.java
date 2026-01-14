@@ -17,7 +17,6 @@ package io.micronaut.context;
 
 import io.micronaut.context.env.ConfigurationPath;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.convert.ConversionServiceProvider;
@@ -67,8 +66,7 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * @return A collection of {@link BeanRegistration}
      * @since 3.5.0
      */
-    @NonNull
-    <T> Collection<BeanRegistration<T>> getBeanRegistrations(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier);
+    <T> Collection<BeanRegistration<T>> getBeanRegistrations(Argument<T> beanType, @Nullable Qualifier<T> qualifier);
 
     /**
      * Call back to destroy any {@link io.micronaut.context.annotation.InjectScope} beans.
@@ -106,7 +104,6 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * @return The configuration path.
      * @since 4.0.0
      */
-    @NonNull
     ConfigurationPath getConfigurationPath();
 
     /**
@@ -198,7 +195,7 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     /**
      * @return The dependent beans that must be destroyed by an upstream bean
      */
-    default @NonNull List<BeanRegistration<?>> getAndResetDependentBeans() {
+    default List<BeanRegistration<?>> getAndResetDependentBeans() {
         return Collections.emptyList();
     }
 
@@ -276,9 +273,8 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * @since 5.0
      */
     @UsedByGeneratedCode
-    @NonNull
-    <T> T getProxyTargetBean(@NonNull BeanDefinition<T> definition,
-                             @NonNull Argument<T> beanType,
+    <T> T getProxyTargetBean(BeanDefinition<T> definition,
+                             Argument<T> beanType,
                              @Nullable Qualifier<T> qualifier);
 
     /**

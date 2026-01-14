@@ -16,4 +16,7 @@
 /**
  * Internal package to support injection providers of various types.
  */
+@NullMarked
 package io.micronaut.inject.provider;
+
+import org.jspecify.annotations.NullMarked;

@@ -16,7 +16,6 @@
 package io.micronaut.http;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
@@ -54,7 +53,6 @@ public class MutableHttpRequestWrapper<B> extends HttpRequestWrapper<B> implemen
         }
     }
 
-    @NonNull
     @Override
     public Optional<B> getBody() {
         if (body == null) {
@@ -64,9 +62,8 @@ public class MutableHttpRequestWrapper<B> extends HttpRequestWrapper<B> implemen
         }
     }
 
-    @NonNull
     @Override
-    public <T> Optional<T> getBody(@NonNull Class<T> type) {
+    public <T> Optional<T> getBody(Class<T> type) {
         if (body == null) {
             return getDelegate().getBody(type);
         } else {
@@ -95,7 +92,6 @@ public class MutableHttpRequestWrapper<B> extends HttpRequestWrapper<B> implemen
     }
 
     @Override
-    @NonNull
     public URI getUri() {
         if (uri == null) {
             return getDelegate().getUri();
@@ -104,13 +100,11 @@ public class MutableHttpRequestWrapper<B> extends HttpRequestWrapper<B> implemen
         }
     }
 
-    @NonNull
     @Override
     public MutableHttpParameters getParameters() {
         return (MutableHttpParameters) super.getParameters();
     }
 
-    @NonNull
     @Override
     public MutableHttpHeaders getHeaders() {
         return (MutableHttpHeaders) super.getHeaders();

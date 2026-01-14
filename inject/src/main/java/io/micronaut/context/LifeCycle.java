@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.context;
-
-import org.jspecify.annotations.NonNull;
 import java.io.Closeable;
 
 /**
@@ -40,7 +38,7 @@ public interface LifeCycle<T extends LifeCycle<T>> extends Closeable, AutoClosea
      *
      * @return This lifecycle component
      */
-    default @NonNull T start() {
+    default T start() {
         return (T) this;
     }
 
@@ -49,7 +47,7 @@ public interface LifeCycle<T extends LifeCycle<T>> extends Closeable, AutoClosea
      *
      * @return This lifecycle component
      */
-    default @NonNull T stop() {
+    default T stop() {
         return (T) this;
     }
 
@@ -66,7 +64,7 @@ public interface LifeCycle<T extends LifeCycle<T>> extends Closeable, AutoClosea
      *
      * @return This lifecycle component
      */
-    default @NonNull T refresh() {
+    default T refresh() {
         stop();
         start();
         return (T) this;

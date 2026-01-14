@@ -17,7 +17,6 @@ package io.micronaut.http.client.netty;
 
 import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
@@ -449,7 +448,6 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
          *
          * @return The size limits
          */
-        @NonNull
         default BodySizeLimits sizeLimits() {
             return BodySizeLimits.UNLIMITED;
         }
@@ -470,7 +468,7 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
          *
          * @param ctx The handler context
          */
-        default void continueReceived(@NonNull ChannelHandlerContext ctx) {
+        default void continueReceived(ChannelHandlerContext ctx) {
         }
 
         /**
@@ -481,7 +479,7 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
          * @param ctx The handler context
          * @param t The failure
          */
-        void fail(@NonNull ChannelHandlerContext ctx, @NonNull Throwable t);
+        void fail(ChannelHandlerContext ctx, Throwable t);
 
         /**
          * Called when the headers (and potentially some or all of the body) are fully received.
@@ -489,7 +487,7 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
          * @param response The response status, headers...
          * @param body The response body, potentially streaming
          */
-        void complete(@NonNull HttpResponse response, @NonNull CloseableByteBody body);
+        void complete(HttpResponse response, CloseableByteBody body);
 
         /**
          * Called when the last piece of the body is received. This handler can be removed and the
@@ -497,7 +495,7 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
          *
          * @param ctx The handler context
          */
-        void finish(@NonNull ChannelHandlerContext ctx);
+        void finish(ChannelHandlerContext ctx);
 
         /**
          * Called when the body passed to {@link #complete(HttpResponse, CloseableByteBody)} has

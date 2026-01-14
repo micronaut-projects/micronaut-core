@@ -19,8 +19,6 @@ import io.micronaut.core.annotation.AnnotatedElement;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
-
-import org.jspecify.annotations.NonNull;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 
@@ -79,7 +77,6 @@ public interface MethodReference<T, R> extends AnnotationMetadataDelegate, Annot
             .toArray(String[]::new);
     }
 
-    @NonNull
     @Override
     default String getName() {
         return getMethodName();

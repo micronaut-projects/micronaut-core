@@ -19,7 +19,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.body.stream.BaseSharedBuffer;
 import io.micronaut.http.body.stream.BufferConsumer;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
@@ -48,7 +47,7 @@ public class AbstractBodyAdapter implements BufferConsumer.Upstream, Subscriber<
     private boolean started;
     private volatile boolean cancelled;
 
-    public AbstractBodyAdapter(@NonNull Publisher<ReadBuffer> source, @Nullable Runnable onDiscard) {
+    public AbstractBodyAdapter(Publisher<ReadBuffer> source, @Nullable Runnable onDiscard) {
         this.source = source;
         this.onDiscard = onDiscard;
     }

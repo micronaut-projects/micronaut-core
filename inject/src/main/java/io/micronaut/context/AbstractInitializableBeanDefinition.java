@@ -33,7 +33,6 @@ import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.bind.annotation.Bindable;
@@ -153,7 +152,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
             AnnotationReference @Nullable [] annotationInjection,
             @Nullable ExecutableMethodsDefinition<T> executableMethodsDefinition,
             Map<String, Argument<?> @Nullable []> typeArgumentsMap,
-            @NonNull PrecalculatedInfo precalculatedInfo) {
+ PrecalculatedInfo precalculatedInfo) {
         this.type = beanType;
         if (annotationMetadata == null || annotationMetadata == AnnotationMetadata.EMPTY_METADATA) {
             this.annotationMetadata = AnnotationMetadata.EMPTY_METADATA;
@@ -219,8 +218,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     }
 
     @Override
-    public final @NonNull
-    List<Argument<?>> getTypeArguments(String type) {
+    public final List<Argument<?>> getTypeArguments(String type) {
         if (type == null || typeArgumentsMap == null) {
             return Collections.emptyList();
         }
@@ -232,7 +230,6 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     }
 
     @Override
-    @NonNull
     public AnnotationMetadata getAnnotationMetadata() {
         return annotationMetadata;
     }
@@ -289,7 +286,6 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
             private final int length = indexes.length;
 
             @Override
-            @NonNull
             public Iterator<ExecutableMethod<T, ?>> iterator() {
                 return new Iterator<>() {
 
@@ -379,7 +375,6 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     }
 
     @Override
-    @NonNull
     public Set<Class<?>> getExposedTypes() {
         return Collections.EMPTY_SET;
     }
@@ -592,7 +587,6 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     }
 
     @Override
-    @NonNull
     public final String getName() {
         return getBeanType().getName();
     }
@@ -1062,7 +1056,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         Argument<?> argument = methodRef.arguments[argIndex];
         try (BeanResolutionContext.Path path = resolutionContext.getPath()
                 .pushMethodArgumentResolve(this, methodRef.methodName, argument, methodRef.arguments)) {
-            Object val = resolutionContext.resolvePropertyValue( argument, propertyValue, cliProperty, false);
+            Object val = resolutionContext.resolvePropertyValue(argument, propertyValue, cliProperty, false);
             if (this instanceof ValidatedBeanDefinition validatedBeanDefinition) {
                 validatedBeanDefinition.validateBeanArgument(
                     resolutionContext,
@@ -2277,7 +2271,6 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         return coerceCollectionToCorrectType(returnType.getType(), beansOfType, resolutionContext, returnType);
     }
 
-    @NonNull
     private static <K, R> DependencyInjectionException noGenericsError(BeanResolutionContext resolutionContext, Argument<R> returnType) {
         return new DependencyInjectionException(resolutionContext, "Type " + returnType.getType() + " has no generic argument");
     }
@@ -2363,7 +2356,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     }
 
     private <B> BeanRegistration<B> resolveBeanRegistration(BeanResolutionContext resolutionContext, BeanContext context,
-                                                            @NonNull Argument<B> returnType, Argument<B> beanType, Qualifier<B> qualifier) {
+                                                            Argument<B> returnType, Argument<B> beanType, Qualifier<B> qualifier) {
         try {
             if (beanType == null) {
                 throw new DependencyInjectionException(resolutionContext, "Cannot resolve bean registration. Argument [" + returnType + "] missing generic type information.");

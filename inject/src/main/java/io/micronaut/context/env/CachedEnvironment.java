@@ -16,7 +16,6 @@
 package io.micronaut.context.env;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.optim.StaticOptimizations;
 
@@ -85,7 +84,6 @@ public class CachedEnvironment {
      * If caching is not enabled, this just delegates to {@link System#getenv}.
      * @return the environment variables
      */
-    @NonNull
     public static Map<String, String> getenv() {
         return LOCKED ? CACHED_ENVIRONMENT : System.getenv();
     }

@@ -19,7 +19,6 @@ import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.scope.AbstractConcurrentCustomScope;
 import io.micronaut.context.scope.BeanCreationContext;
 import io.micronaut.context.scope.CreatedBean;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.http.HttpRequest;
@@ -67,7 +66,6 @@ class RequestCustomScope extends AbstractConcurrentCustomScope<RequestScope> imp
         destroyBeans(event.getSource());
     }
 
-    @NonNull
     @Override
     protected Map<BeanIdentifier, CreatedBean<?>> getScopeMap(boolean forCreation) {
         final HttpRequest<Object> request = ServerRequestContext.currentRequest().orElse(null);
@@ -79,9 +77,8 @@ class RequestCustomScope extends AbstractConcurrentCustomScope<RequestScope> imp
         }
     }
 
-    @NonNull
     @Override
-    protected <T> CreatedBean<T> doCreate(@NonNull BeanCreationContext<T> creationContext) {
+    protected <T> CreatedBean<T> doCreate(BeanCreationContext<T> creationContext) {
         final HttpRequest<Object> request = ServerRequestContext.currentRequest().orElse(null);
         final CreatedBean<T> createdBean = super.doCreate(creationContext);
         final T bean = createdBean.bean();

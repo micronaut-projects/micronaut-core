@@ -16,8 +16,6 @@
 package io.micronaut.context.event;
 
 import io.micronaut.core.annotation.Indexed;
-import org.jspecify.annotations.NonNull;
-
 import java.util.EventListener;
 
 /**
@@ -39,5 +37,5 @@ public interface BeanPreDestroyEventListener<T> extends EventListener {
      * @param event The bean created event
      * @return The bean or a replacement bean of the same type
      */
-    @NonNull T onPreDestroy(@NonNull BeanPreDestroyEvent<T> event);
+    T onPreDestroy(BeanPreDestroyEvent<T> event);
 }

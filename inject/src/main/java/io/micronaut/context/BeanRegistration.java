@@ -16,7 +16,6 @@
 package io.micronaut.context;
 
 import io.micronaut.context.scope.CreatedBean;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.order.Ordered;
@@ -78,11 +77,10 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
      * @return new bean registration
      * @since 3.5.0
      */
-    @NonNull
-    public static <K> BeanRegistration<K> of(@NonNull BeanContext beanContext,
-                                             @NonNull BeanIdentifier identifier,
-                                             @NonNull BeanDefinition<K> beanDefinition,
-                                             @NonNull K bean) {
+    public static <K> BeanRegistration<K> of(BeanContext beanContext,
+                                             BeanIdentifier identifier,
+                                             BeanDefinition<K> beanDefinition,
+                                             K bean) {
         return of(beanContext, identifier, beanDefinition, bean, null);
     }
 
@@ -98,11 +96,10 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
      * @return new bean registration
      * @since 3.5.0
      */
-    @NonNull
-    public static <K> BeanRegistration<K> of(@NonNull BeanContext beanContext,
-                                             @NonNull BeanIdentifier identifier,
-                                             @NonNull BeanDefinition<K> beanDefinition,
-                                             @NonNull K bean,
+    public static <K> BeanRegistration<K> of(BeanContext beanContext,
+                                             BeanIdentifier identifier,
+                                             BeanDefinition<K> beanDefinition,
+                                             K bean,
                                              @Nullable
                                              List<BeanRegistration<?>> dependents) {
         boolean hasDependents = CollectionUtils.isNotEmpty(dependents);
@@ -168,7 +165,6 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
         return beanDefinition;
     }
 
-    @NonNull
     @Override
     public T bean() {
         return bean;

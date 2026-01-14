@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.core.beans;
-
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.type.Executable;
 import io.micronaut.core.type.ReturnType;
@@ -33,13 +31,12 @@ public interface BeanMethod<B, T> extends Executable<B, T>, Named {
     /**
      * @return The declaring bean introspection.
      */
-    @NonNull
     BeanIntrospection<B> getDeclaringBean();
 
     /**
      * @return The return type.
      */
-    @NonNull ReturnType<T> getReturnType();
+ ReturnType<T> getReturnType();
 
     @Override
     default Class<B> getDeclaringType() {

@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.context;
-
-import org.jspecify.annotations.NonNull;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
@@ -223,7 +221,6 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
             return AbstractExecutableMethod.this.isSuspend();
         }
 
-        @NonNull
         @Override
         public AnnotationMetadata getAnnotationMetadata() {
             return AbstractExecutableMethod.this.getAnnotationMetadata();
@@ -246,7 +243,6 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
         }
 
         @Override
-        @NonNull
         public Argument asArgument() {
             Map<String, Argument<?>> typeVariables = getTypeVariables();
             Collection<Argument<?>> values = typeVariables.values();

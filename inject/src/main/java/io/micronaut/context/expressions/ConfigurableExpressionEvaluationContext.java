@@ -17,7 +17,6 @@ package io.micronaut.context.expressions;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.expressions.ExpressionEvaluationContext;
 import io.micronaut.inject.BeanDefinition;
@@ -37,7 +36,6 @@ public sealed interface ConfigurableExpressionEvaluationContext extends Expressi
      * @param args method arguments
      * @return evaluation context which arguments can be used in evaluation.
      */
-    @NonNull
     default ConfigurableExpressionEvaluationContext withArguments(Object @Nullable [] args) {
         return withArguments(null, args);
     }
@@ -49,7 +47,6 @@ public sealed interface ConfigurableExpressionEvaluationContext extends Expressi
      * @param args method arguments
      * @return evaluation context which arguments can be used in evaluation.
      */
-    @NonNull
     ConfigurableExpressionEvaluationContext withArguments(@Nullable Object thisObject, Object @Nullable [] args);
 
     /**
@@ -58,7 +55,6 @@ public sealed interface ConfigurableExpressionEvaluationContext extends Expressi
      * @param beanDefinition owning bean definition
      * @return evaluation context aware of owning bean.
      */
-    @NonNull
     ConfigurableExpressionEvaluationContext withOwningBean(@Nullable BeanDefinition<?> beanDefinition);
 
     /**
@@ -67,6 +63,5 @@ public sealed interface ConfigurableExpressionEvaluationContext extends Expressi
      * @param beanContext bean context
      * @return evaluation context aware of bean context.
      */
-    @NonNull
     ConfigurableExpressionEvaluationContext withBeanContext(@Nullable BeanContext beanContext);
 }

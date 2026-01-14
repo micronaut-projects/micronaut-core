@@ -17,7 +17,6 @@ package io.micronaut.core.type;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
@@ -229,7 +228,6 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
     }
 
     @Override
-    @NonNull
     public Class<T> getType() {
         return type;
     }
@@ -245,7 +243,6 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
     }
 
     @Override
-    @NonNull
     public String getName() {
         if (name != null) {
             return name;
@@ -326,7 +323,7 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
     }
 
     @Override
-    public @NonNull Argument<T> asArgument() {
+    public Argument<T> asArgument() {
         return this;
     }
 }

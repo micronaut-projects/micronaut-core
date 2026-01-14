@@ -16,7 +16,6 @@
 package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ReadBuffer;
@@ -44,7 +43,6 @@ public sealed interface AvailableByteBody extends ByteBody permits CloseableAvai
      * @see ByteBody#split()
      * @return A body with the same content as this one
      */
-    @NonNull
     CloseableAvailableByteBody split();
 
     /**
@@ -57,7 +55,7 @@ public sealed interface AvailableByteBody extends ByteBody permits CloseableAvai
      */
     @Override
     @Deprecated
-    default @NonNull CloseableAvailableByteBody split(@NonNull SplitBackpressureMode backpressureMode) {
+    default CloseableAvailableByteBody split(SplitBackpressureMode backpressureMode) {
         return split();
     }
 
@@ -67,7 +65,6 @@ public sealed interface AvailableByteBody extends ByteBody permits CloseableAvai
      * @deprecated This method is unnecessary for {@link AvailableByteBody}, it does nothing.
      */
     @Override
-    @NonNull
     @Deprecated
     default AvailableByteBody allowDiscard() {
         return this;
@@ -90,7 +87,6 @@ public sealed interface AvailableByteBody extends ByteBody permits CloseableAvai
      * {@link #length()} directly.
      */
     @Override
-    @NonNull
     @Deprecated
     default OptionalLong expectedLength() {
         return OptionalLong.of(length());
@@ -103,7 +99,7 @@ public sealed interface AvailableByteBody extends ByteBody permits CloseableAvai
      *
      * @return The bytes
      */
-    byte @NonNull [] toByteArray();
+    byte [] toByteArray();
 
     /**
      * Get this body as a {@link ReadBuffer}.
@@ -112,7 +108,6 @@ public sealed interface AvailableByteBody extends ByteBody permits CloseableAvai
      *
      * @return The bytes
      */
-    @NonNull
     default ReadBuffer toReadBuffer() {
         return ReadBufferFactory.getJdkFactory().adapt(toByteArray());
     }
@@ -126,7 +121,6 @@ public sealed interface AvailableByteBody extends ByteBody permits CloseableAvai
      *
      * @return The bytes
      */
-    @NonNull
     default ByteBuffer<?> toByteBuffer() {
         try (ReadBuffer rb = toReadBuffer()) {
             return rb.toByteBuffer();
@@ -134,7 +128,6 @@ public sealed interface AvailableByteBody extends ByteBody permits CloseableAvai
     }
 
     @Override
-    @NonNull
     default InputStream toInputStream() {
         try (ReadBuffer rb = toReadBuffer()) {
             return rb.toInputStream();
@@ -149,8 +142,7 @@ public sealed interface AvailableByteBody extends ByteBody permits CloseableAvai
      * @param charset The charset to convert the body
      * @return The body as a string
      */
-    @NonNull
-    default String toString(@NonNull Charset charset) {
+    default String toString(Charset charset) {
         try (ReadBuffer rb = toReadBuffer()) {
             return rb.toString(charset);
         }
@@ -163,7 +155,6 @@ public sealed interface AvailableByteBody extends ByteBody permits CloseableAvai
      * {@link #toByteBuffer()} directly.
      */
     @Override
-    @NonNull
     @Deprecated
     default Publisher<ByteBuffer<?>> toByteBufferPublisher() {
         return Publishers.just(toByteBuffer());
@@ -176,7 +167,6 @@ public sealed interface AvailableByteBody extends ByteBody permits CloseableAvai
      * {@link #toByteArray()} directly.
      */
     @Override
-    @NonNull
     @Deprecated
     default Publisher<byte[]> toByteArrayPublisher() {
         return Publishers.just(toByteArray());
@@ -189,7 +179,6 @@ public sealed interface AvailableByteBody extends ByteBody permits CloseableAvai
      * {@link #toReadBuffer()} directly.
      */
     @Override
-    @NonNull
     @Deprecated
     default Publisher<ReadBuffer> toReadBufferPublisher() {
         return Publishers.just(toReadBuffer());

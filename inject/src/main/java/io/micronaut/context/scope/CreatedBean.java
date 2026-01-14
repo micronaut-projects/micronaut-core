@@ -16,7 +16,6 @@
 package io.micronaut.context.scope;
 
 import io.micronaut.context.exceptions.BeanDestructionException;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
 
@@ -40,7 +39,6 @@ public interface CreatedBean<T> extends Closeable, AutoCloseable {
     /**
      * @return The bean
      */
-    @NonNull
     T bean();
 
     /**

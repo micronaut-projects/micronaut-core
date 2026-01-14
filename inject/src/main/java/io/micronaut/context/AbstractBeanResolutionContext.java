@@ -24,7 +24,6 @@ import io.micronaut.context.exceptions.DependencyInjectionException;
 import io.micronaut.context.scope.CustomScope;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -132,7 +131,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         }
     }
 
-    private boolean isTraceEnabled(@NonNull String typeName, @NonNull Set<String> tracePatterns) {
+    private boolean isTraceEnabled(String typeName, Set<String> tracePatterns) {
         return (tracePatterns.isEmpty() || tracePatterns.stream().anyMatch(typeName::matches));
     }
 
@@ -222,9 +221,8 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         return valString;
     }
 
-    @NonNull
     @Override
-    public <T> T getBean(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+    public <T> T getBean(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         T bean = context.getBean(this, beanType, qualifier);
         if (tracer != null) {
             tracer.traceBeanResolved(
@@ -260,9 +258,8 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         return context.getBean(definition);
     }
 
-    @NonNull
     @Override
-    public <T> Collection<T> getBeansOfType(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+    public <T> Collection<T> getBeansOfType(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         Collection<T> beans = context.getBeansOfType(this, beanType, qualifier);
         if (tracer != null) {
             traceBeanCollection(beanType, qualifier, beans);
@@ -299,9 +296,8 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         }
     }
 
-    @NonNull
     @Override
-    public <T> Stream<T> streamOfType(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+    public <T> Stream<T> streamOfType(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         return context.streamOfType(this, beanType, qualifier);
     }
 
@@ -319,9 +315,8 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         return beanMap;
     }
 
-    @NonNull
     @Override
-    public <T> Optional<T> findBean(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+    public <T> Optional<T> findBean(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         Optional<T> resolved = context.findBean(this, beanType, qualifier);
         if (tracer != null) {
             tracer.traceBeanResolved(
@@ -362,9 +357,8 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         return context.getProxyTargetBean(this, Argument.of(beanType), qualifier);
     }
 
-    @NonNull
     @Override
-    public <T> Collection<BeanRegistration<T>> getBeanRegistrations(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+    public <T> Collection<BeanRegistration<T>> getBeanRegistrations(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         Collection<BeanRegistration<T>> registrations = context.getBeanRegistrations(this, beanType, qualifier);
         if (tracer != null) {
             traceBeanCollection(
@@ -381,7 +375,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
      *
      * @param context The previous context
      */
-    public void copyStateFrom(@NonNull AbstractBeanResolutionContext context) {
+    public void copyStateFrom(AbstractBeanResolutionContext context) {
         path.addAll(context.path);
         qualifier = context.qualifier;
         if (context.attributes != null) {
@@ -411,7 +405,6 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         }
     }
 
-    @NonNull
     @Override
     public List<BeanRegistration<?>> getAndResetDependentBeans() {
         if (dependentBeans == null) {
@@ -542,7 +535,6 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         return Optional.empty();
     }
 
-    @NonNull
     private Map<CharSequence, Object> getAttributesOrCreate() {
         if (attributes == null) {
             attributes = new LinkedHashMap<>(2);
@@ -550,7 +542,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         return attributes;
     }
 
-    public final <T> Collection<BeanDefinition<T>> findBeanDefinitions(@NonNull Argument<T> argument, BeanDefinition<?> bd) {
+    public final <T> Collection<BeanDefinition<T>> findBeanDefinitions(Argument<T> argument, BeanDefinition<?> bd) {
         return context.findBeanCandidates(this, argument, bd);
     }
 
@@ -926,7 +918,6 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             return toConsoleString(false);
         }
 
-        @NonNull
         public String toConsoleString(boolean ansiSupported) {
             StringBuilder baseString;
             BeanDefinition<Object> declaringType = getDeclaringType();
@@ -965,7 +956,6 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             return this;
         }
 
-        @NonNull
         @Override
         public CallableInjectionPoint<Object> getOuterInjectionPoint() {
             return getDeclaringType().getConstructor();

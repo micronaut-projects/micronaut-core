@@ -18,7 +18,6 @@ package io.micronaut.context.env;
 import io.micronaut.context.ApplicationContextConfiguration;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
@@ -93,7 +92,7 @@ final class DefaultEnvironmentAndPackageDeducer implements EnvironmentNamesDeduc
     private LinkedHashSet<String> environments;
     private String packageName;
 
-    public DefaultEnvironmentAndPackageDeducer(@NonNull Logger log, @NonNull ApplicationContextConfiguration configuration) {
+    public DefaultEnvironmentAndPackageDeducer(Logger log, ApplicationContextConfiguration configuration) {
         this.log = log;
         this.configuration = configuration;
         this.deduceEnvironments = configuration.getDeduceEnvironments().orElse(null);

@@ -16,11 +16,10 @@
 package io.micronaut.http.filter;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.http.HttpRequest;
+import org.jspecify.annotations.Nullable;
 
 import java.util.function.Function;
 
@@ -36,6 +35,7 @@ sealed interface InternalHttpFilter extends GenericHttpFilter, Ordered permits A
 
     /**
      * Checks the filter is implementing {@link ConditionalFilter} and is enabled.
+     *
      * @param request The request
      * @return true if enabled
      */
@@ -80,8 +80,7 @@ sealed interface InternalHttpFilter extends GenericHttpFilter, Ordered permits A
      * @return The filter execution flow
      * @since 4.3.0
      */
-    @NonNull
-    default ExecutionFlow<FilterContext> processRequestFilter(@NonNull FilterContext context) {
+    default ExecutionFlow<FilterContext> processRequestFilter(FilterContext context) {
         if (!isFiltersRequest()) {
             throw new IllegalStateException("Filtering request is not supported!");
         }
@@ -95,9 +94,8 @@ sealed interface InternalHttpFilter extends GenericHttpFilter, Ordered permits A
      * @param downstream The downstream
      * @return The filter execution flow
      */
-    @NonNull
-    default ExecutionFlow<FilterContext> processRequestFilter(@NonNull FilterContext context,
-                                                              @NonNull Function<FilterContext, ExecutionFlow<FilterContext>> downstream) {
+    default ExecutionFlow<FilterContext> processRequestFilter(FilterContext context,
+                                                              Function<FilterContext, ExecutionFlow<FilterContext>> downstream) {
         if (!isFiltersRequest()) {
             throw new IllegalStateException("Filtering request is not supported!");
         }
@@ -111,8 +109,7 @@ sealed interface InternalHttpFilter extends GenericHttpFilter, Ordered permits A
      * @param exceptionToFilter The exception to filter
      * @return The filter execution flow
      */
-    @NonNull
-    default ExecutionFlow<FilterContext> processResponseFilter(@NonNull FilterContext context,
+    default ExecutionFlow<FilterContext> processResponseFilter(FilterContext context,
                                                                @Nullable Throwable exceptionToFilter) {
         if (!isFiltersResponse()) {
             throw new IllegalStateException("Filtering response is not supported!");

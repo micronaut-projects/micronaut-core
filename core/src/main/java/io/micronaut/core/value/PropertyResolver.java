@@ -19,8 +19,6 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.naming.conventions.StringConvention;
 import io.micronaut.core.type.Argument;
-
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Collection;
@@ -48,7 +46,7 @@ public interface PropertyResolver extends ValueResolver<String> {
      * @param name The name of the property
      * @return True if it is
      */
-    boolean containsProperty(@NonNull String name);
+    boolean containsProperty(String name);
 
     /**
      * Whether the given property or any nested properties exist for the key given key within this resolver.
@@ -56,7 +54,7 @@ public interface PropertyResolver extends ValueResolver<String> {
      * @param name The name of the property
      * @return True if it is
      */
-    boolean containsProperties(@NonNull String name);
+    boolean containsProperties(String name);
 
     /**
      * <p>Resolve the given property for the given name, type and generic type arguments.</p>
@@ -68,7 +66,7 @@ public interface PropertyResolver extends ValueResolver<String> {
      * @param <T>               The concrete type
      * @return An optional containing the property value if it exists
      */
-    @NonNull <T> Optional<T> getProperty(@NonNull String name, @NonNull ArgumentConversionContext<T> conversionContext);
+ <T> Optional<T> getProperty(String name, ArgumentConversionContext<T> conversionContext);
 
     /**
      * Returns a collection of properties entries under the given key. For example given the following keys:
@@ -85,7 +83,7 @@ public interface PropertyResolver extends ValueResolver<String> {
      * @param name The name to resolve
      * @return The property entries.
      */
-    default @NonNull Collection<String> getPropertyEntries(@NonNull String name) {
+    default Collection<String> getPropertyEntries(String name) {
         return Collections.emptySet();
     }
 
@@ -107,8 +105,7 @@ public interface PropertyResolver extends ValueResolver<String> {
      *
      * @since 4.7.0
      */
-    @NonNull
-    default Collection<String> getPropertyEntries(@NonNull String name, @NonNull PropertyCatalog propertyCatalog) {
+    default Collection<String> getPropertyEntries(String name, PropertyCatalog propertyCatalog) {
         return Collections.emptySet();
     }
 
@@ -122,7 +119,7 @@ public interface PropertyResolver extends ValueResolver<String> {
      * @param <T>      The concrete type
      * @return An optional containing the property value if it exists
      */
-    default @NonNull <T> Optional<T> getProperty(@NonNull String name, @NonNull Argument<T> argument) {
+    default <T> Optional<T> getProperty(String name, Argument<T> argument) {
         return getProperty(name, ConversionContext.of(argument));
     }
 
@@ -132,7 +129,7 @@ public interface PropertyResolver extends ValueResolver<String> {
      * @param name The name
      * @return The properties
      */
-    default @NonNull Map<String, Object> getProperties(@NonNull String name) {
+    default Map<String, Object> getProperties(String name) {
         return getProperties(name, null);
     }
 
@@ -144,7 +141,7 @@ public interface PropertyResolver extends ValueResolver<String> {
      * @param keyFormat The key format to use for the keys. Default is kebab-case.
      * @return The properties
      */
-    default @NonNull Map<String, Object> getProperties(@Nullable String name, @Nullable StringConvention keyFormat) {
+    default Map<String, Object> getProperties(@Nullable String name, @Nullable StringConvention keyFormat) {
         return Collections.emptyMap();
     }
 
@@ -159,12 +156,12 @@ public interface PropertyResolver extends ValueResolver<String> {
      * @param <T>          The concrete type
      * @return An optional containing the property value if it exists
      */
-    default @NonNull <T> Optional<T> getProperty(@NonNull String name, @NonNull Class<T> requiredType, @NonNull ConversionContext context) {
+    default <T> Optional<T> getProperty(String name, Class<T> requiredType, ConversionContext context) {
         return getProperty(name, context.with(Argument.of(requiredType)));
     }
 
     @Override
-    default @NonNull <T> Optional<T> get(@NonNull String name, @NonNull ArgumentConversionContext<T> conversionContext) {
+    default <T> Optional<T> get(String name, ArgumentConversionContext<T> conversionContext) {
         return getProperty(name, conversionContext);
     }
 
@@ -176,7 +173,7 @@ public interface PropertyResolver extends ValueResolver<String> {
      * @param <T>          The concrete type
      * @return An optional containing the property value if it exists
      */
-    default @NonNull <T> Optional<T> getProperty(@NonNull String name, @NonNull Class<T> requiredType) {
+    default <T> Optional<T> getProperty(String name, Class<T> requiredType) {
         return getProperty(name, requiredType, ConversionContext.DEFAULT);
     }
 
@@ -189,7 +186,7 @@ public interface PropertyResolver extends ValueResolver<String> {
      * @param <T>          The concrete type
      * @return An optional containing the property value if it exists
      */
-    default @Nullable <T> T getProperty(@NonNull String name, @NonNull Class<T> requiredType, @Nullable T defaultValue) {
+    default @Nullable <T> T getProperty(String name, Class<T> requiredType, @Nullable T defaultValue) {
         return getProperty(name, requiredType).orElse(defaultValue);
     }
 
@@ -202,7 +199,7 @@ public interface PropertyResolver extends ValueResolver<String> {
      * @return The value of the property
      * @throws PropertyNotFoundException exception when property does not exist
      */
-    default @NonNull <T> T getRequiredProperty(@NonNull String name, @NonNull Class<T> requiredType) throws PropertyNotFoundException {
+    default <T> T getRequiredProperty(String name, Class<T> requiredType) throws PropertyNotFoundException {
         return getProperty(name, requiredType).orElseThrow(() ->
             new PropertyNotFoundException(name, requiredType)
         );
@@ -224,7 +221,6 @@ public interface PropertyResolver extends ValueResolver<String> {
      * @return An array of arrays.
      * @since 4.0.0
      */
-    @NonNull
-    Collection<List<String>> getPropertyPathMatches(@NonNull String pathPattern);
+    Collection<List<String>> getPropertyPathMatches(String pathPattern);
 
 }

@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.context;
-
-import org.jspecify.annotations.NonNull;
 import jakarta.inject.Provider;
 
 /**
@@ -51,7 +49,7 @@ public class ProviderUtils {
         private Provider<T> delegate = this::initialize;
         private boolean initialized;
 
-        MemoizingProvider(@NonNull Provider<T> actual) {
+        MemoizingProvider(Provider<T> actual) {
             this.actual = actual;
         }
 

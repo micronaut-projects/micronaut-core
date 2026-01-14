@@ -18,7 +18,6 @@ package io.micronaut.context;
 import io.micronaut.context.annotation.Context;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.type.Argument;
@@ -56,13 +55,12 @@ import java.util.stream.Collectors;
 public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, InstantiatableBeanDefinition<T>, BeanContextConditional {
 
     @Override
-    @NonNull
     default AnnotationMetadata getAnnotationMetadata() {
         return AnnotationMetadata.EMPTY_METADATA;
     }
 
     @Override
-    default boolean isEnabled(@NonNull BeanContext context, BeanResolutionContext resolutionContext) {
+    default boolean isEnabled(BeanContext context, BeanResolutionContext resolutionContext) {
         return true;
     }
 
@@ -127,8 +125,7 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, In
      * @param <B> The bean type
      * @since 3.6.0
      */
-    @NonNull
-    static <B> RuntimeBeanDefinition<B> of(@NonNull B bean) {
+    static <B> RuntimeBeanDefinition<B> of(B bean) {
         Objects.requireNonNull(bean, "Bean cannot be null");
         @SuppressWarnings("unchecked") Class<B> t = (Class<B>) bean.getClass();
         return builder(t, () -> bean).singleton(true).build();
@@ -144,10 +141,9 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, In
      * @param <B> The bean type
      * @since 3.6.0
      */
-    @NonNull
     static <B> RuntimeBeanDefinition<B> of(
-        @NonNull Class<B> beanType,
-        @NonNull Supplier<B> beanSupplier) {
+        Class<B> beanType,
+        Supplier<B> beanSupplier) {
         return builder(beanType, beanSupplier).build();
     }
 
@@ -157,8 +153,7 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, In
      * @return The builder
      * @param <B> The bean type
      */
-    @NonNull
-    static <B> Builder<B> builder(@NonNull B bean) {
+    static <B> Builder<B> builder(B bean) {
         Objects.requireNonNull(bean, "Bean cannot be null");
         @SuppressWarnings("unchecked")
         Argument<B> beanType = (Argument<B>) Argument.of(bean.getClass());
@@ -175,8 +170,7 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, In
      * @return The builder
      * @param <B> The bean type
      */
-    @NonNull
-    static <B> Builder<B> builder(@NonNull Class<B> beanType, @NonNull Supplier<B> beanSupplier) {
+    static <B> Builder<B> builder(Class<B> beanType, Supplier<B> beanSupplier) {
         return new DefaultRuntimeBeanDefinition.RuntimeBeanBuilder<>(
             Argument.of(beanType),
             beanSupplier
@@ -190,8 +184,7 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, In
      * @return The builder
      * @param <B> The bean type
      */
-    @NonNull
-    static <B> Builder<B> builder(@NonNull Argument<B> beanType, @NonNull Supplier<B> beanSupplier) {
+    static <B> Builder<B> builder(Argument<B> beanType, Supplier<B> beanSupplier) {
         return new DefaultRuntimeBeanDefinition.RuntimeBeanBuilder<>(
             beanType,
             beanSupplier
@@ -208,7 +201,6 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, In
          * @param qualifier The qualifier
          * @return This builder
          */
-        @NonNull
         Builder<B> qualifier(@Nullable Qualifier<B> qualifier);
 
         /**
@@ -217,7 +209,6 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, In
          * @return This bean builder
          * @since 4.0.0
          */
-        @NonNull
         Builder<B> replaces(@Nullable Class<? extends B> otherType);
 
         /**
@@ -226,7 +217,6 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, In
          * @return This builder
          * @since 3.7.0
          */
-        @NonNull
         default Builder<B> named(@Nullable String name) {
             if (name == null) {
                 qualifier(null);
@@ -241,7 +231,6 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, In
          * @param scope The scope
          * @return This builder
          */
-        @NonNull
         Builder<B> scope(@Nullable Class<? extends Annotation> scope);
 
         /**
@@ -249,7 +238,6 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, In
          * @param isSingleton True if it is singleton
          * @return This builder
          */
-        @NonNull
         Builder<B> singleton(boolean isSingleton);
 
         /**
@@ -257,7 +245,6 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, In
          * @param types The exposed types
          * @return This builder
          */
-        @NonNull
         Builder<B> exposedTypes(Class<?>...types);
 
         /**
@@ -265,7 +252,6 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, In
          * @param arguments The arguments
          * @return This builder
          */
-        @NonNull
         Builder<B> typeArguments(Argument<?>... arguments);
 
         /**
@@ -274,7 +260,6 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, In
          * @param arguments The arguments
          * @return This builder
          */
-        @NonNull
         Builder<B> typeArguments(Class<?> implementedType, Argument<?>... arguments);
 
         /**
@@ -282,14 +267,12 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, In
          * @param annotationMetadata The annotation metadata
          * @return This builder
          */
-        @NonNull
         Builder<B> annotationMetadata(@Nullable AnnotationMetadata annotationMetadata);
 
         /**
          * Builds the runtime bean.
          * @return The runtime bean
          */
-        @NonNull
         RuntimeBeanDefinition<B> build();
     }
 }

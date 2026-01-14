@@ -17,7 +17,6 @@ package io.micronaut.context.env;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
@@ -313,15 +312,13 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         return false;
     }
 
-    @NonNull
     @Override
-    public Collection<String> getPropertyEntries(@NonNull String name) {
+    public Collection<String> getPropertyEntries(String name) {
         return getPropertyEntries(name, PropertyCatalog.NORMALIZED);
     }
 
-    @NonNull
     @Override
-    public Collection<String> getPropertyEntries(@NonNull String name, @NonNull PropertyCatalog propertyCatalog) {
+    public Collection<String> getPropertyEntries(String name, PropertyCatalog propertyCatalog) {
         if (StringUtils.isEmpty(name)) {
             return Collections.emptySet();
         }
@@ -390,7 +387,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     }
 
     @Override
-    public @NonNull Map<String, Object> getProperties(String name, StringConvention keyFormat) {
+    public Map<String, Object> getProperties(String name, StringConvention keyFormat) {
         if (StringUtils.isEmpty(name)) {
             return Collections.emptyMap();
         }
@@ -425,7 +422,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     }
 
     @Override
-    public <T> Optional<T> getProperty(@NonNull String name, @NonNull ArgumentConversionContext<T> conversionContext) {
+    public <T> Optional<T> getProperty(String name, ArgumentConversionContext<T> conversionContext) {
         if (StringUtils.isEmpty(name)) {
             return Optional.empty();
         }
@@ -646,7 +643,6 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      * @param transformation The map transformation to apply
      * @return The resulting map
      */
-    @NonNull
     protected Map<String, Object> resolveSubMap(
             String name,
             Map<String, DefaultPropertyEntry> entries,
@@ -998,7 +994,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         }
     }
 
-    private record ConversionCacheKey(@NonNull String name, Class<?> requiredType) {
+    private record ConversionCacheKey(String name, Class<?> requiredType) {
 
         @Override
         public boolean equals(Object o) {

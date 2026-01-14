@@ -16,7 +16,6 @@
 package io.micronaut.core.io;
 
 import io.micronaut.core.annotation.Blocking;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.IOExceptionBiFunction;
 import org.slf4j.Logger;
@@ -79,7 +78,7 @@ public class IOUtils {
      */
     @Blocking
     @SuppressWarnings({"java:S2095", "S1141"})
-    public static void eachFile(@NonNull URL url, String path, @NonNull Consumer<Path> consumer) {
+    public static void eachFile(URL url, String path, Consumer<Path> consumer) {
         try {
             eachFile(url.toURI(), path, consumer);
         } catch (URISyntaxException e) {
@@ -97,7 +96,7 @@ public class IOUtils {
      */
     @Blocking
     @SuppressWarnings({"java:S2095", "java:S1141", "java:S3776"})
-    public static void eachFile(@NonNull URI uri, String path, @NonNull Consumer<Path> consumer) {
+    public static void eachFile(URI uri, String path, Consumer<Path> consumer) {
         List<Closeable> toClose = new ArrayList<>();
         try {
             Path myPath = resolvePath(uri, path, toClose, IOUtils::loadNestedJarUri);
@@ -152,14 +151,14 @@ public class IOUtils {
      * @since 4.7
      */
     @Nullable
-    public static Path resolvePath(@NonNull URI uri,
-                                   @NonNull String path,
-                                   @NonNull List<Closeable> toClose) throws IOException {
+    public static Path resolvePath(URI uri,
+ String path,
+ List<Closeable> toClose) throws IOException {
         return resolvePath(uri, path, toClose, IOUtils::loadNestedJarUri);
     }
 
     @Nullable
-    static Path resolvePath(@NonNull URI uri,
+    static Path resolvePath(URI uri,
                             String path,
                             List<Closeable> toClose,
                             IOExceptionBiFunction<List<Closeable>, String, Path> loadNestedJarUriFunction) throws IOException {

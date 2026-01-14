@@ -35,7 +35,7 @@ public interface BufferConsumer {
      *
      * @param rb The buffer
      */
-    void add(@NonNull ReadBuffer rb);
+    void add(ReadBuffer rb);
 
     /**
      * Signal normal completion of the stream.

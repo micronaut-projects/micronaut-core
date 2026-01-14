@@ -23,5 +23,7 @@
  * @see io.micronaut.core.beans.BeanIntrospector
  * @see io.micronaut.core.beans.BeanIntrospection
  */
+@NullMarked
 package io.micronaut.core.beans;
 
+import org.jspecify.annotations.NullMarked;

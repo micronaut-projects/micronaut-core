@@ -18,7 +18,6 @@ package io.micronaut.context;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.reflect.ClassUtils;
@@ -444,7 +443,6 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
             return returnType;
         }
 
-        @NonNull
         @Override
         public AnnotationMetadata getAnnotationMetadata() {
             return annotationMetadata;
@@ -553,7 +551,6 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         }
 
         @Override
-        @NonNull
         public Argument<R> asArgument() {
             return returnArgument;
         }

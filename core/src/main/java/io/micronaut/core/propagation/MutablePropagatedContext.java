@@ -16,7 +16,6 @@
 package io.micronaut.core.propagation;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -35,8 +34,7 @@ public interface MutablePropagatedContext {
      * @param propagatedContext The initial context
      * @return new mutable propagated context
      */
-    @NonNull
-    static MutablePropagatedContext of(@NonNull PropagatedContext propagatedContext) {
+    static MutablePropagatedContext of(PropagatedContext propagatedContext) {
         return new MutablePropagatedContextImpl(propagatedContext);
     }
 
@@ -46,8 +44,7 @@ public interface MutablePropagatedContext {
      * @param element The element element to be added
      * @return the current mutable propagated context.
      */
-    @NonNull
-    MutablePropagatedContext add(@NonNull PropagatedContextElement element);
+    MutablePropagatedContext add(PropagatedContextElement element);
 
     /**
      * Modifies the context by removing the provided element.
@@ -55,8 +52,7 @@ public interface MutablePropagatedContext {
      * @param element The context element to be removed
      * @return the current mutable propagated context.
      */
-    @NonNull
-    MutablePropagatedContext remove(@NonNull PropagatedContextElement element);
+    MutablePropagatedContext remove(PropagatedContextElement element);
 
     /**
      * Modifies the context by replacing the provided element.
@@ -65,9 +61,8 @@ public interface MutablePropagatedContext {
      * @param newElement The context element to be replaced with
      * @return the current mutable propagated context.
      */
-    @NonNull
-    MutablePropagatedContext replace(@NonNull PropagatedContextElement oldElement,
-                                     @NonNull PropagatedContextElement newElement);
+    MutablePropagatedContext replace(PropagatedContextElement oldElement,
+ PropagatedContextElement newElement);
 
     /**
      * The mutated context.

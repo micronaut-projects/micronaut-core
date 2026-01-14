@@ -18,8 +18,6 @@ package io.micronaut.inject.annotation;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
-
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import java.lang.annotation.Annotation;
 import java.util.*;
@@ -51,7 +49,7 @@ interface EnvironmentAnnotationMetadata extends AnnotationMetadata {
      * @return The enum value
      */
     @Internal
-    <E extends Enum<E>> Optional<E> enumValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Class<E> enumType, @Nullable Function<Object, Object> valueMapper);
+    <E extends Enum<E>> Optional<E> enumValue(Class<? extends Annotation> annotation, String member, Class<E> enumType, @Nullable Function<Object, Object> valueMapper);
 
     /**
      * Retrieve the enum value and optionally map its value.
@@ -63,7 +61,7 @@ interface EnvironmentAnnotationMetadata extends AnnotationMetadata {
      * @return The enum value
      */
     @Internal
-    <E extends Enum<E>> Optional<E> enumValue(@NonNull String annotation, @NonNull String member, Class<E> enumType, @Nullable Function<Object, Object> valueMapper);
+    <E extends Enum<E>> Optional<E> enumValue(String annotation, String member, Class<E> enumType, @Nullable Function<Object, Object> valueMapper);
 
     /**
      * Retrieve the enum values and optionally map its value.
@@ -75,7 +73,7 @@ interface EnvironmentAnnotationMetadata extends AnnotationMetadata {
      * @return The enum value
      */
     @Internal
-    <E extends Enum<E>> E[] enumValues(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Class<E> enumType, @Nullable Function<Object, Object> valueMapper);
+    <E extends Enum<E>> E[] enumValues(Class<? extends Annotation> annotation, String member, Class<E> enumType, @Nullable Function<Object, Object> valueMapper);
 
     /**
      * Retrieve the enum values and optionally map its value.
@@ -87,7 +85,7 @@ interface EnvironmentAnnotationMetadata extends AnnotationMetadata {
      * @return The enum value
      */
     @Internal
-    <E extends Enum<E>> E[] enumValues(@NonNull String annotation, @NonNull String member, Class<E> enumType, @Nullable Function<Object, Object> valueMapper);
+    <E extends Enum<E>> E[] enumValues(String annotation, String member, Class<E> enumType, @Nullable Function<Object, Object> valueMapper);
 
     /**
      * Retrieve the class value and optionally map its value.
@@ -96,7 +94,7 @@ interface EnvironmentAnnotationMetadata extends AnnotationMetadata {
      * @param valueMapper The value mapper
      * @return The class value
      */
-    Optional<Class> classValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Function<Object, Object> valueMapper);
+    Optional<Class> classValue(Class<? extends Annotation> annotation, String member, Function<Object, Object> valueMapper);
 
     /**
      * Retrieve the class value and optionally map its value.
@@ -106,7 +104,7 @@ interface EnvironmentAnnotationMetadata extends AnnotationMetadata {
      * @return The class value
      */
     @Internal
-    Optional<Class> classValue(@NonNull String annotation, @NonNull String member, @Nullable Function<Object, Object> valueMapper);
+    Optional<Class> classValue(String annotation, String member, @Nullable Function<Object, Object> valueMapper);
 
     /**
      * Retrieve the int value and optionally map its value.
@@ -116,7 +114,7 @@ interface EnvironmentAnnotationMetadata extends AnnotationMetadata {
      * @return The int value
      */
     @Internal
-    OptionalInt intValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member, @Nullable Function<Object, Object> valueMapper);
+    OptionalInt intValue(Class<? extends Annotation> annotation, String member, @Nullable Function<Object, Object> valueMapper);
 
     /**
     * Retrieve the boolean value and optionally map its value.
@@ -125,7 +123,7 @@ interface EnvironmentAnnotationMetadata extends AnnotationMetadata {
     * @param valueMapper The value mapper
     * @return The boolean value
     */
-    Optional<Boolean> booleanValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Function<Object, Object> valueMapper);
+    Optional<Boolean> booleanValue(Class<? extends Annotation> annotation, String member, Function<Object, Object> valueMapper);
 
     /**
      * Retrieve the boolean value and optionally map its value.
@@ -134,8 +132,7 @@ interface EnvironmentAnnotationMetadata extends AnnotationMetadata {
      * @param valueMapper The value mapper
      * @return The boolean value
      */
-    @NonNull
-    Optional<Boolean> booleanValue(@NonNull String annotation, @NonNull String member, @Nullable Function<Object, Object> valueMapper);
+    Optional<Boolean> booleanValue(String annotation, String member, @Nullable Function<Object, Object> valueMapper);
 
     /**
      * Retrieve the long value and optionally map its value.
@@ -145,7 +142,7 @@ interface EnvironmentAnnotationMetadata extends AnnotationMetadata {
      * @return The long value
      */
     @Internal
-    OptionalLong longValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member, @Nullable Function<Object, Object> valueMapper);
+    OptionalLong longValue(Class<? extends Annotation> annotation, String member, @Nullable Function<Object, Object> valueMapper);
 
     /**
      * Retrieve the long value and optionally map its value.
@@ -154,8 +151,7 @@ interface EnvironmentAnnotationMetadata extends AnnotationMetadata {
      * @param valueMapper The value mapper
      * @return The long value
      */
-    @NonNull
-    OptionalLong longValue(@NonNull String annotation, @NonNull String member, @Nullable Function<Object, Object> valueMapper);
+    OptionalLong longValue(String annotation, String member, @Nullable Function<Object, Object> valueMapper);
 
     /**
      * Retrieve the int value and optionally map its value.
@@ -164,8 +160,7 @@ interface EnvironmentAnnotationMetadata extends AnnotationMetadata {
      * @param valueMapper The value mapper
      * @return The int value
      */
-    @NonNull
-    OptionalInt intValue(@NonNull String annotation, @NonNull String member, @Nullable Function<Object, Object> valueMapper);
+    OptionalInt intValue(String annotation, String member, @Nullable Function<Object, Object> valueMapper);
 
     /**
      * Retrieve the string value and optionally map its value.
@@ -174,7 +169,7 @@ interface EnvironmentAnnotationMetadata extends AnnotationMetadata {
      * @param valueMapper The value mapper
      * @return The int value
      */
-    Optional<String> stringValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Function<Object, Object> valueMapper);
+    Optional<String> stringValue(Class<? extends Annotation> annotation, String member, Function<Object, Object> valueMapper);
 
     /**
      * Retrieve the string value and optionally map its value.
@@ -183,7 +178,7 @@ interface EnvironmentAnnotationMetadata extends AnnotationMetadata {
      * @param valueMapper The value mapper
      * @return The int value
      */
-    String @NonNull [] stringValues(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Function<Object, Object> valueMapper);
+    String [] stringValues(Class<? extends Annotation> annotation, String member, Function<Object, Object> valueMapper);
 
     /**
      * Retrieve the string value and optionally map its value.
@@ -192,7 +187,7 @@ interface EnvironmentAnnotationMetadata extends AnnotationMetadata {
      * @param valueMapper The value mapper
      * @return The int value
      */
-    String @NonNull [] stringValues(@NonNull String annotation, @NonNull String member, Function<Object, Object> valueMapper);
+    String [] stringValues(String annotation, String member, Function<Object, Object> valueMapper);
 
     /**
      * Retrieve the string value and optionally map its value.
@@ -201,8 +196,7 @@ interface EnvironmentAnnotationMetadata extends AnnotationMetadata {
      * @param valueMapper The value mapper
      * @return The string value
      */
-    @NonNull
-    Optional<String> stringValue(@NonNull String annotation, @NonNull String member, @Nullable Function<Object, Object> valueMapper);
+    Optional<String> stringValue(String annotation, String member, @Nullable Function<Object, Object> valueMapper);
 
     /**
      * Retrieve the boolean value and optionally map its value.
@@ -211,7 +205,7 @@ interface EnvironmentAnnotationMetadata extends AnnotationMetadata {
      * @param valueMapper The value mapper
      * @return The boolean value
      */
-    boolean isTrue(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Function<Object, Object> valueMapper);
+    boolean isTrue(Class<? extends Annotation> annotation, String member, Function<Object, Object> valueMapper);
 
     /**
      * Retrieve the boolean value and optionally map its value.
@@ -220,7 +214,7 @@ interface EnvironmentAnnotationMetadata extends AnnotationMetadata {
      * @param valueMapper The value mapper
      * @return The boolean value
      */
-    boolean isTrue(@NonNull String annotation, @NonNull String member, @Nullable Function<Object, Object> valueMapper);
+    boolean isTrue(String annotation, String member, @Nullable Function<Object, Object> valueMapper);
 
     /**
      * Retrieve the double value and optionally map its value.
@@ -230,7 +224,7 @@ interface EnvironmentAnnotationMetadata extends AnnotationMetadata {
      * @return The double value
      */
     @Internal
-    OptionalDouble doubleValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member, @Nullable Function<Object, Object> valueMapper);
+    OptionalDouble doubleValue(Class<? extends Annotation> annotation, String member, @Nullable Function<Object, Object> valueMapper);
 
     /**
      * Retrieve the double value and optionally map its value.
@@ -239,9 +233,8 @@ interface EnvironmentAnnotationMetadata extends AnnotationMetadata {
      * @param valueMapper The value mapper
      * @return The double value
      */
-    @NonNull
     @Internal
-    OptionalDouble doubleValue(@NonNull String annotation, @NonNull String member, Function<Object, Object> valueMapper);
+    OptionalDouble doubleValue(String annotation, String member, Function<Object, Object> valueMapper);
 
     /**
      * Resolves the given value performing type conversion as necessary.
@@ -252,6 +245,5 @@ interface EnvironmentAnnotationMetadata extends AnnotationMetadata {
      * @param <T> The generic type
      * @return The resolved value
      */
-    @NonNull
-    <T> Optional<T> getValue(@NonNull String annotation, @NonNull String member, @NonNull Argument<T> requiredType, @Nullable Function<Object, Object> valueMapper);
+    <T> Optional<T> getValue(String annotation, String member, Argument<T> requiredType, @Nullable Function<Object, Object> valueMapper);
 }

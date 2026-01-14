@@ -17,7 +17,6 @@ package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.type.Argument;
@@ -72,7 +71,7 @@ public final class ContextlessMessageBodyHandlerRegistry extends AbstractMessage
      * @param mediaType The media type the handler applies to
      * @param handler   The handler
      */
-    public void add(@NonNull MediaType mediaType, @NonNull MessageBodyHandler<?> handler) {
+    public void add(MediaType mediaType, MessageBodyHandler<?> handler) {
         writerEntries.add(new WriterEntry(handler, mediaType));
         readerEntries.add(new ReaderEntry(handler, mediaType));
     }
@@ -83,7 +82,7 @@ public final class ContextlessMessageBodyHandlerRegistry extends AbstractMessage
      * @param mediaType The media type the handler applies to
      * @param handler   The handler
      */
-    public void add(@NonNull MediaType mediaType, @NonNull MessageBodyWriter<?> handler) {
+    public void add(MediaType mediaType, MessageBodyWriter<?> handler) {
         writerEntries.add(new WriterEntry(handler, mediaType));
     }
 
@@ -93,7 +92,7 @@ public final class ContextlessMessageBodyHandlerRegistry extends AbstractMessage
      * @param mediaType The media type the handler applies to
      * @param handler   The handler
      */
-    public void add(@NonNull MediaType mediaType, @NonNull MessageBodyReader<?> handler) {
+    public void add(MediaType mediaType, MessageBodyReader<?> handler) {
         readerEntries.add(new ReaderEntry(handler, mediaType));
     }
 

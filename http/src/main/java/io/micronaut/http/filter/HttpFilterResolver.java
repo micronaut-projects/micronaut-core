@@ -17,13 +17,12 @@ package io.micronaut.http.filter;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.Objects;
@@ -32,15 +31,16 @@ import java.util.Set;
 /**
  * A contract for resolving filters for a given request.
  *
+ * @param <T> The resolution context type
  * @author James Kleeh
  * @author graemerocher
  * @since 1.3.0
- * @param <T> The resolution context type
  */
 public interface HttpFilterResolver<T extends AnnotationMetadataProvider> {
 
     /**
      * Resolves the initial list of filters.
+     *
      * @param context The context
      * @return The filters
      * @since 2.0
@@ -50,7 +50,7 @@ public interface HttpFilterResolver<T extends AnnotationMetadataProvider> {
     /**
      * Returns which filters should apply for the given request.
      *
-     * @param request The request
+     * @param request       The request
      * @param filterEntries the filter entries
      * @return The list of filters
      */
@@ -63,19 +63,17 @@ public interface HttpFilterResolver<T extends AnnotationMetadataProvider> {
         /**
          * @return The filter
          */
-        @NonNull
         GenericHttpFilter getFilter();
 
         /**
          * @return The filter methods.
          */
-        @NonNull
         Set<HttpMethod> getFilterMethods();
 
         /**
          * @return The filter patterns
          */
-        String @NonNull [] getPatterns();
+        String[] getPatterns();
 
         /**
          * @return The filter patterns
@@ -100,18 +98,19 @@ public interface HttpFilterResolver<T extends AnnotationMetadataProvider> {
 
         /**
          * Creates a filter entry for the given arguments.
-         * @param filter The filter
+         *
+         * @param filter             The filter
          * @param annotationMetadata The annotation metadata
-         * @param methods The methods
-         * @param patternStyle the pattern style
-         * @param patterns The patterns
+         * @param methods            The methods
+         * @param patternStyle       the pattern style
+         * @param patterns           The patterns
          * @return The filter entry
          */
         static FilterEntry of(
-            @NonNull HttpFilter filter,
+            HttpFilter filter,
             @Nullable AnnotationMetadata annotationMetadata,
             @Nullable Set<HttpMethod> methods,
-            @NonNull FilterPatternStyle patternStyle, String... patterns) {
+            FilterPatternStyle patternStyle, String... patterns) {
             return new DefaultFilterEntry(
                 GenericHttpFilter.createLegacyFilter(
                     Objects.requireNonNull(filter, "Filter cannot be null"),

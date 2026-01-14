@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.http;
-
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.convert.ConversionServiceAware;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.http.cookie.Cookie;
@@ -80,7 +78,7 @@ public interface MutableHttpRequest<B> extends HttpRequest<B>, MutableHttpMessag
      * @param consumer A consumer that accepts the URI
      * @return The modified request
      */
-    default @NonNull MutableHttpRequest<B> uri(@NonNull Consumer<UriBuilder> consumer) {
+    default MutableHttpRequest<B> uri(Consumer<UriBuilder> consumer) {
         Objects.requireNonNull(consumer, "URI builder cannot be null");
         UriBuilder builder = UriBuilder.of(getUri());
         consumer.accept(builder);

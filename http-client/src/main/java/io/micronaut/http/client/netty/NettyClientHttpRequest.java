@@ -16,7 +16,6 @@
 package io.micronaut.http.client.netty;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
@@ -242,7 +241,6 @@ public class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHt
         return httpMethodName;
     }
 
-    @NonNull
     @Override
     @Deprecated
     public FullHttpRequest toFullHttpRequest() {
@@ -281,7 +279,6 @@ public class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHt
         return req;
     }
 
-    @NonNull
     @Override
     @Deprecated
     public StreamedHttpRequest toStreamHttpRequest() {
@@ -297,7 +294,6 @@ public class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHt
         }
     }
 
-    @NonNull
     @Override
     @Deprecated
     public HttpRequest toHttpRequest() {

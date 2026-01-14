@@ -16,7 +16,7 @@
 package io.micronaut.core.io.buffer;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.functional.ThrowingConsumer;
 import org.jspecify.annotations.NonNull;
 
@@ -51,7 +51,6 @@ public class ReadBufferFactory {
      *
      * @return The factory
      */
-    @NonNull
     public static ReadBufferFactory getJdkFactory() {
         return INSTANCE;
     }
@@ -61,7 +60,6 @@ public class ReadBufferFactory {
      *
      * @return An empty buffer
      */
-    @NonNull
     public ReadBuffer createEmpty() {
         return adapt(ByteBuffer.allocate(0));
     }
@@ -73,7 +71,7 @@ public class ReadBufferFactory {
      * @param charset The charset to use for encoding
      * @return The text buffer
      */
-    public @NonNull ReadBuffer copyOf(@NonNull CharSequence cs, @NonNull Charset charset) {
+    public ReadBuffer copyOf(CharSequence cs, Charset charset) {
         return adapt(cs.toString().getBytes(charset));
     }
 
@@ -83,7 +81,7 @@ public class ReadBufferFactory {
      * @param stream The stream to read from
      * @return The buffer
      */
-    public @NonNull ReadBuffer copyOf(@NonNull InputStream stream) throws IOException {
+    public ReadBuffer copyOf(InputStream stream) throws IOException {
         return adapt(stream.readAllBytes());
     }
 
@@ -113,8 +111,7 @@ public class ReadBufferFactory {
      * @param nioBuffer A NIO buffer to read data from
      * @return The copied buffer
      */
-    @NonNull
-    public ReadBuffer copyOf(@NonNull ByteBuffer nioBuffer) {
+    public ReadBuffer copyOf(ByteBuffer nioBuffer) {
         ByteBuffer copy = ByteBuffer.allocate(nioBuffer.remaining());
         copy.put(nioBuffer.slice());
         copy.flip();
@@ -129,8 +126,7 @@ public class ReadBufferFactory {
      * @param nioBuffer A NIO buffer
      * @return The adapted buffer
      */
-    @NonNull
-    public ReadBuffer adapt(@NonNull ByteBuffer nioBuffer) {
+    public ReadBuffer adapt(ByteBuffer nioBuffer) {
         return new NioReadBuffer(nioBuffer);
     }
 
@@ -143,8 +139,7 @@ public class ReadBufferFactory {
      * @param buffer A buffer
      * @return The adapted buffer
      */
-    @NonNull
-    public ReadBuffer adapt(io.micronaut.core.io.buffer.@NonNull ByteBuffer<?> buffer) {
+    public ReadBuffer adapt(io.micronaut.core.io.buffer. ByteBuffer<?> buffer) {
         byte[] byteArray = buffer.toByteArray();
         if (buffer instanceof ReferenceCounted rc) {
             rc.release();
@@ -160,8 +155,7 @@ public class ReadBufferFactory {
      * @param array A byte array
      * @return The adapted buffer
      */
-    @NonNull
-    public ReadBuffer adapt(byte @NonNull [] array) {
+    public ReadBuffer adapt(byte[] array) {
         return adapt(ByteBuffer.wrap(array));
     }
 
@@ -174,8 +168,7 @@ public class ReadBufferFactory {
      * @return The written data
      * @throws T If the writer throws an exception
      */
-    @NonNull
-    public <T extends Throwable> ReadBuffer buffer(@NonNull ThrowingConsumer<@NonNull ? super OutputStream, T> writer) throws T {
+    public <T extends Throwable> ReadBuffer buffer(ThrowingConsumer<? super OutputStream, T> writer) throws T {
         var s = new NoCopyByteArrayOutputStream(NoCopyByteArrayOutputStream.DEFAULT_CAPACITY);
         writer.accept(s);
         return adapt(s.toByteBuffer());
@@ -200,11 +193,10 @@ public class ReadBufferFactory {
      *
      * @return The {@link ReadBufferFactory.BufferingOutputStream} wrapper
      */
-    public ReadBufferFactory.@NonNull BufferingOutputStream outputStreamBuffer() {
+    public ReadBufferFactory. BufferingOutputStream outputStreamBuffer() {
         return outputStreamBuffer(NoCopyByteArrayOutputStream.DEFAULT_CAPACITY);
     }
 
-    @NonNull
     private BufferingOutputStream outputStreamBuffer(int capacity) {
         return new BufferingOutputStream() {
             NoCopyByteArrayOutputStream out = new NoCopyByteArrayOutputStream(capacity);
@@ -243,8 +235,7 @@ public class ReadBufferFactory {
      * @return The composite buffer
      * @throws IllegalStateException If any given buffer is already closed or consumed
      */
-    @NonNull
-    public ReadBuffer compose(@NonNull Iterable<@NonNull ReadBuffer> buffers) {
+    public ReadBuffer compose(Iterable<ReadBuffer> buffers) {
         try {
             int capacity = 0;
             int n = 0;
@@ -290,7 +281,6 @@ public class ReadBufferFactory {
          * @throws IllegalStateException If the buffer has already
          *                               {@link #finishBuffer() been finalized}
          */
-        @NonNull
         OutputStream stream() throws IllegalStateException;
 
         /**
@@ -303,7 +293,6 @@ public class ReadBufferFactory {
          * @throws IOException           If there was an exception finishing up the buffer
          * @throws IllegalStateException If this method has already been called
          */
-        @NonNull
         ReadBuffer finishBuffer() throws IOException, IllegalStateException;
 
         /**

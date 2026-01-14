@@ -19,8 +19,6 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.DefaultBeanResolutionContext;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
-
 /**
  * <p>An type of {@link BeanDefinition} that supports post initialization bean dependencies injection.</p>
  *
@@ -38,8 +36,7 @@ public interface InjectableBeanDefinition<T> extends BeanDefinition<T> {
      * @param bean    The bean
      * @return The injected bean
      */
-    @NonNull
-    default T inject(@NonNull BeanContext context, @NonNull T bean) {
+    default T inject(BeanContext context, T bean) {
         try (DefaultBeanResolutionContext resolutionContext = new DefaultBeanResolutionContext(context, this)) {
             return inject(resolutionContext, context, bean);
         }
@@ -53,7 +50,6 @@ public interface InjectableBeanDefinition<T> extends BeanDefinition<T> {
      * @param bean              The bean
      * @return The injected bean
      */
-    @NonNull
-    T inject(@NonNull BeanResolutionContext resolutionContext, @NonNull BeanContext context, @NonNull T bean);
+    T inject(BeanResolutionContext resolutionContext, BeanContext context, T bean);
 
 }

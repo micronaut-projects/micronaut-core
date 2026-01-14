@@ -22,7 +22,6 @@ import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Indexes;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ArgumentCoercible;
@@ -93,7 +92,7 @@ public final class ApplicationEventPublisherFactory<T>
     }
 
     @Override
-    public Class<?> @NonNull [] getIndexes() {
+    public Class<?> [] getIndexes() {
         return new Class<?>[]{getBeanType()};
     }
 
@@ -190,7 +189,6 @@ public final class ApplicationEventPublisherFactory<T>
     }
 
     @Override
-    @NonNull
     public List<Argument<?>> getTypeArguments(Class<?> type) {
         if (type == getBeanType()) {
             return getTypeArguments();
@@ -199,7 +197,6 @@ public final class ApplicationEventPublisherFactory<T>
     }
 
     @Override
-    @NonNull
     public List<Argument<?>> getTypeArguments() {
         return Collections.singletonList(TYPE_VARIABLE);
     }
@@ -276,7 +273,7 @@ public final class ApplicationEventPublisherFactory<T>
         };
     }
 
-    private void notifyEventListeners(@NonNull Object event, ApplicationEventListener @NonNull [] eventListeners) {
+    private void notifyEventListeners(Object event, ApplicationEventListener [] eventListeners) {
         if (eventListeners.length == 0) {
             return;
         }

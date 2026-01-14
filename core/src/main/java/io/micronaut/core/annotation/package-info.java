@@ -21,5 +21,3 @@
  */
 @NullMarked
 package io.micronaut.core.annotation;
-
-import org.jspecify.annotations.NullMarked;

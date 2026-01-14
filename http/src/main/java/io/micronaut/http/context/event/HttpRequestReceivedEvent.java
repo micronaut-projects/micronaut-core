@@ -17,9 +17,6 @@ package io.micronaut.http.context.event;
 
 import io.micronaut.context.event.ApplicationEvent;
 import io.micronaut.http.HttpRequest;
-
-import org.jspecify.annotations.NonNull;
-
 /**
  * An event fired when an {@link HttpRequest} is received by the server. Not that the event is fired in a
  * non-blocking manner and access to the request body is not provided. Consumers can use this event to
@@ -33,12 +30,11 @@ public class HttpRequestReceivedEvent extends ApplicationEvent {
     /**
      * @param request The request. Never null.
      */
-    public HttpRequestReceivedEvent(@NonNull HttpRequest<?> request) {
+    public HttpRequestReceivedEvent(HttpRequest<?> request) {
         super(request);
     }
 
     @Override
-    @NonNull
     public HttpRequest<?> getSource() {
         return (HttpRequest<?>) super.getSource();
     }

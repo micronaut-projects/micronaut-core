@@ -16,7 +16,6 @@
 package io.micronaut.http.reactive.execution;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.async.propagation.ReactorPropagation;
 import io.micronaut.core.execution.DelayedExecutionFlow;
@@ -194,7 +193,7 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
     }
 
     @Override
-    public @NonNull ExecutionFlow<Object> putInContextIfAbsent(@NonNull String key, @NonNull Object value) {
+    public ExecutionFlow<Object> putInContextIfAbsent(String key, Object value) {
         this.value = this.value.contextWrite(context -> {
             if (!context.hasKey(key)) {
                 return context.put(key, value);

@@ -18,7 +18,6 @@ package io.micronaut.http.body;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
@@ -82,7 +81,6 @@ public final class DefaultMessageBodyHandlerRegistry extends AbstractMessageBody
             .orElse(null);
     }
 
-    @NonNull
     private List<MediaType> resolveMediaTypes(List<MediaType> mediaTypes) {
         if (codecConfigurations.isEmpty()) {
             return mediaTypes;

@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.context;
-
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
@@ -262,8 +260,7 @@ public interface ExecutionHandleLocator {
         throw new UnsupportedOperationException("No such method [" + method + "(" + Arrays.stream(method.getArgumentTypes()).map(Class::getName).collect(Collectors.joining(",")) + ") ] for bean [" + beanDefinition.getBeanType() + "]");
     }
 
-    @NonNull
-    private static NoSuchMethodException newNoSuchMethodException(@NonNull String bean, @NonNull String method, @NonNull Class<?>[] arguments) {
+    private static NoSuchMethodException newNoSuchMethodException(String bean, String method, Class<?>[] arguments) {
         return new NoSuchMethodException("No such method [" + method + "(" + Arrays.stream(arguments).map(Class::getName).collect(Collectors.joining(",")) + ")] for bean [" + bean + "]");
     }
 }

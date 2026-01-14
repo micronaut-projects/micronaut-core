@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.http.context;
-
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.StringUtils;
 
@@ -32,18 +30,15 @@ public final class ContextPathUtils {
     private ContextPathUtils() {
     }
 
-    @NonNull
-    public static URI prepend(@NonNull URI requestURI, @Nullable ServerContextPathProvider serverContextPathProvider) throws URISyntaxException {
+    public static URI prepend(URI requestURI, @Nullable ServerContextPathProvider serverContextPathProvider) throws URISyntaxException {
         return prepend(requestURI, serverContextPathProvider.getContextPath());
     }
 
-    @NonNull
-    public static URI prepend(@NonNull URI requestURI, @Nullable ClientContextPathProvider clientContextPathProvider) throws URISyntaxException {
+    public static URI prepend(URI requestURI, @Nullable ClientContextPathProvider clientContextPathProvider) throws URISyntaxException {
         return prepend(requestURI, clientContextPathProvider.getContextPath().orElse(null));
     }
 
-    @NonNull
-    public static URI prepend(@NonNull URI requestURI, @Nullable String contextPath) throws URISyntaxException {
+    public static URI prepend(URI requestURI, @Nullable String contextPath) throws URISyntaxException {
         if (StringUtils.isNotEmpty(contextPath)) {
             return new URI(StringUtils.prependUri(contextPath, requestURI.toString()));
         }

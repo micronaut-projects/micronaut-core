@@ -16,7 +16,6 @@
 package io.micronaut.http;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -810,7 +809,7 @@ public class MediaType implements CharSequence {
      *
      * @param name The name of the media type. For example application/json
      */
-    public MediaType(@NonNull String name) {
+    public MediaType(String name) {
         this(name, null, Collections.emptyMap());
     }
 
@@ -820,7 +819,7 @@ public class MediaType implements CharSequence {
      * @param name   The name of the media type. For example application/json
      * @param params The parameters
      */
-    public MediaType(@NonNull String name, @Nullable Map<String, String> params) {
+    public MediaType(String name, @Nullable Map<String, String> params) {
         this(name, null, params);
     }
 
@@ -830,7 +829,7 @@ public class MediaType implements CharSequence {
      * @param name      The name of the media type. For example application/json
      * @param extension The extension of the file using this media type if it differs from the subtype
      */
-    public MediaType(@NonNull String name, @Nullable String extension) {
+    public MediaType(String name, @Nullable String extension) {
         this(name, extension, Collections.emptyMap());
     }
 
@@ -841,7 +840,7 @@ public class MediaType implements CharSequence {
      * @param extension The extension of the file using this media type if it differs from the subtype
      * @param params    The parameters
      */
-    public MediaType(@NonNull String name, @Nullable String extension, @Nullable Map<String, String> params) {
+    public MediaType(String name, @Nullable String extension, @Nullable Map<String, String> params) {
         if (name == null) {
             throw new IllegalArgumentException("Argument [name] cannot be null");
         }
@@ -990,7 +989,7 @@ public class MediaType implements CharSequence {
      * @param expectedContentType   Content type to match against
      * @return if successful match
      */
-    public boolean matches(@NonNull MediaType expectedContentType) {
+    public boolean matches(MediaType expectedContentType) {
         //noinspection ConstantConditions
         if (expectedContentType == null) {
             return false;
@@ -1081,7 +1080,6 @@ public class MediaType implements CharSequence {
      * @return The parameters map of the media type
      * @since 4.8
      */
-    @NonNull
     public Map<CharSequence, String> getParametersMap() {
         if (parameters == null) {
             return Collections.emptyMap();

@@ -24,7 +24,6 @@ import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.ExecutableMethod;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.reflect.Method;
@@ -48,11 +47,11 @@ public abstract class AbstractExecutableBeanMethod<B, T> extends AbstractBeanMet
      * @param arguments          The argument types
      */
     protected AbstractExecutableBeanMethod(
-            @NonNull BeanIntrospection<B> introspection,
-            @NonNull Argument<T> returnType,
-            @NonNull String name,
-            @Nullable AnnotationMetadata annotationMetadata,
-            @Nullable Argument<?>... arguments) {
+        BeanIntrospection<B> introspection,
+        Argument<T> returnType,
+        String name,
+        @Nullable AnnotationMetadata annotationMetadata,
+        @Nullable Argument<?>... arguments) {
         super(introspection, returnType, name, annotationMetadata, arguments);
     }
 

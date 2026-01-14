@@ -19,5 +19,7 @@
  * @author graemerocher
  * @since 1.0
  */
+@NullMarked
 package io.micronaut.core.io.buffer;
 
+import org.jspecify.annotations.NullMarked;

@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.http.ssl;
-
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.http.HttpVersion;
@@ -281,11 +279,11 @@ public abstract class SslBuilder<T> {
         }
     }
 
-    private static @NonNull KeyStore createEmptyKeyStore(@Nullable String provider, String type) throws KeyStoreException, NoSuchProviderException {
+    private static KeyStore createEmptyKeyStore(@Nullable String provider, String type) throws KeyStoreException, NoSuchProviderException {
         return provider == null ? KeyStore.getInstance(type) : KeyStore.getInstance(type, provider);
     }
 
-    private void loadPem(@NonNull String resource, @Nullable String password, @Nullable String provider, KeyStore store) throws IOException, GeneralSecurityException, PemParser.NotPemException {
+    private void loadPem(String resource, @Nullable String password, @Nullable String provider, KeyStore store) throws IOException, GeneralSecurityException, PemParser.NotPemException {
         List<Object> items;
         try (InputStream s = resourceResolver.getResourceAsStream(resource).orElseThrow(resourceNotFound(resource))) {
             items = new PemParser(provider, password)
@@ -383,7 +381,6 @@ public abstract class SslBuilder<T> {
          *
          * @return The path
          */
-        @NonNull
         public String getPath() {
             return path;
         }
@@ -411,7 +408,6 @@ public abstract class SslBuilder<T> {
          *
          * @return The path
          */
-        @NonNull
         public String getKeyPath() {
             return keyPath;
         }
@@ -421,7 +417,6 @@ public abstract class SslBuilder<T> {
          *
          * @return The path
          */
-        @NonNull
         public String getCertificatePath() {
             return certificatePath;
         }

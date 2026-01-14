@@ -16,7 +16,6 @@
 package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.type.Argument;
@@ -77,7 +76,6 @@ final class TextStreamBodyWriter<T> implements MessageBodyWriter<T> {
     }
 
     @SuppressWarnings("unchecked")
-    @NonNull
     private static Argument<Object> getBodyType(Argument<?> type) {
         if (type.getType().equals(Event.class)) {
             return (Argument<Object>) type.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);

@@ -276,7 +276,6 @@ public final class StreamingFileUpload implements Closeable {
      * @return An {@link InputStream} that reads this file's contents
      * @since 4.2.0
      */
-    @NonNull
     public InputStream asInputStream() {
         InputStream s = field.byteBody().toInputStream();
         close();

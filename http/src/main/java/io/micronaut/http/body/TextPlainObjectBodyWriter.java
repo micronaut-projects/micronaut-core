@@ -16,7 +16,6 @@
 package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableHeaders;
@@ -65,7 +64,7 @@ final class TextPlainObjectBodyWriter implements TypedMessageBodyWriter<Object>,
     }
 
     @Override
-    public @NonNull CloseableByteBody writePiece(@NonNull ByteBodyFactory bodyFactory, @NonNull HttpRequest<?> request, @NonNull HttpResponse<?> response, @NonNull Argument<Object> type, @NonNull MediaType mediaType, Object object) throws CodecException {
+    public CloseableByteBody writePiece(ByteBodyFactory bodyFactory, HttpRequest<?> request, HttpResponse<?> response, Argument<Object> type, MediaType mediaType, Object object) throws CodecException {
         return bodyFactory.copyOf(object instanceof CharSequence cs ? cs : object.toString(), MessageBodyWriter.getCharset(mediaType, response.getHeaders()));
     }
 }

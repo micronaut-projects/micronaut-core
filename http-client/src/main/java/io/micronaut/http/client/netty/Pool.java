@@ -16,7 +16,6 @@
 package io.micronaut.http.client.netty;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.netty.channel.EventLoop;
@@ -40,7 +39,7 @@ sealed interface Pool permits Pool49, Pool40 {
      * @param eventLoop The event loop this failure happened on
      * @param error     The failure
      */
-    void onNewConnectionFailure(@NonNull EventLoop eventLoop, @Nullable Throwable error) throws Exception;
+    void onNewConnectionFailure(EventLoop eventLoop, @Nullable Throwable error) throws Exception;
 
     /**
      * Create a new {@link PendingRequest} that can be used to claim a connection from this pool.
@@ -48,7 +47,6 @@ sealed interface Pool permits Pool49, Pool40 {
      * @param blockHint The thread that is blocked waiting for this request
      * @return The request handle
      */
-    @NonNull
     PendingRequest createPendingRequest(@Nullable BlockHint blockHint);
 
     /**
@@ -58,8 +56,7 @@ sealed interface Pool permits Pool49, Pool40 {
      * @param connection The connection implementation
      * @return The pool entry
      */
-    @NonNull
-    Http1PoolEntry createHttp1PoolEntry(@NonNull EventLoop eventLoop, @NonNull ResizerConnection connection);
+    Http1PoolEntry createHttp1PoolEntry(EventLoop eventLoop, ResizerConnection connection);
 
     /**
      * Register a new HTTP/2 connection with this pool.
@@ -68,15 +65,14 @@ sealed interface Pool permits Pool49, Pool40 {
      * @param connection The connection implementation
      * @return The pool entry
      */
-    @NonNull
-    Http2PoolEntry createHttp2PoolEntry(@NonNull EventLoop eventLoop, @NonNull ResizerConnection connection);
+    Http2PoolEntry createHttp2PoolEntry(EventLoop eventLoop, ResizerConnection connection);
 
     /**
      * Iterate over all open connections.
      *
      * @param c The lambda to run
      */
-    void forEachConnection(@NonNull Consumer<ResizerConnection> c);
+    void forEachConnection(Consumer<ResizerConnection> c);
 
     /**
      * Hooks called by this pool.
@@ -88,7 +84,6 @@ sealed interface Pool permits Pool49, Pool40 {
          * @param error The failure
          * @return The wrapped failure
          */
-        @NonNull
         Throwable wrapError(@Nullable Throwable error);
 
         /**
@@ -96,7 +91,7 @@ sealed interface Pool permits Pool49, Pool40 {
          *
          * @param eventLoop The event loop the connection should live on
          */
-        void openNewConnection(@NonNull EventLoop eventLoop);
+        void openNewConnection(EventLoop eventLoop);
     }
 
     /**
@@ -122,7 +117,6 @@ sealed interface Pool permits Pool49, Pool40 {
          *
          * @return The flow
          */
-        @NonNull
         ExecutionFlow<ConnectionManager.PoolHandle> flow();
 
         /**

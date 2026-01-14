@@ -17,8 +17,6 @@ package io.micronaut.inject;
 
 import org.jspecify.annotations.Nullable;
 import io.micronaut.context.BeanContext;
-
-import org.jspecify.annotations.NonNull;
 import io.micronaut.context.BeanResolutionContext;
 
 /**
@@ -36,7 +34,7 @@ public interface BeanContextConditional {
      * @param context The context
      * @return True if it is
      */
-    default boolean isEnabled(@NonNull BeanContext context) {
+    default boolean isEnabled(BeanContext context) {
         return isEnabled(context, null);
     }
 
@@ -47,5 +45,5 @@ public interface BeanContextConditional {
      * @param resolutionContext The bean resolution context
      * @return True if it is
      */
-    boolean isEnabled(@NonNull BeanContext context, @Nullable BeanResolutionContext resolutionContext);
+    boolean isEnabled(BeanContext context, @Nullable BeanResolutionContext resolutionContext);
 }

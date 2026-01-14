@@ -17,7 +17,6 @@ package io.micronaut.inject.qualifiers;
 
 import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
@@ -76,8 +75,7 @@ public final class MatchArgumentQualifier<T> implements Qualifier<T> {
      * @param <T>             The bean type
      * @return The qualifier
      */
-    @NonNull
-    public static <T> MatchArgumentQualifier<T> covariant(@NonNull Class<T> beanType, @NonNull Argument<?> genericArgument) {
+    public static <T> MatchArgumentQualifier<T> covariant(Class<T> beanType, Argument<?> genericArgument) {
         Argument<?> covariantArgument = Argument.ofTypeVariable(genericArgument.getType(), null, genericArgument.getAnnotationMetadata(), genericArgument.getTypeParameters());
         return new MatchArgumentQualifier<>(
             Argument.of(beanType, covariantArgument),
@@ -101,8 +99,7 @@ public final class MatchArgumentQualifier<T> implements Qualifier<T> {
      * @param <T>             The bean type
      * @return The qualifier
      */
-    @NonNull
-    public static <T> MatchArgumentQualifier<T> contravariant(@NonNull Class<T> beanType, @NonNull Argument<?> genericArgument) {
+    public static <T> MatchArgumentQualifier<T> contravariant(Class<T> beanType, Argument<?> genericArgument) {
         return new MatchArgumentQualifier<>(
             Argument.of(beanType, Argument.ofTypeVariable(genericArgument.getType(), null, genericArgument.getAnnotationMetadata(), genericArgument.getTypeParameters())),
             null

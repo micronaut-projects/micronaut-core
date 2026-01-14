@@ -21,8 +21,6 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Executable;
 import io.micronaut.core.util.ArrayUtils;
-
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.ObjectUtils;
 
 import java.lang.reflect.Method;
@@ -110,7 +108,6 @@ abstract class AbstractExecutable implements Executable {
      * Resolves the target method.
      * @return The target method
      */
-    @NonNull
     @UsedByGeneratedCode
     protected Method resolveTargetMethod() {
         return ReflectionUtils.getRequiredMethod(declaringType, methodName, argTypes);

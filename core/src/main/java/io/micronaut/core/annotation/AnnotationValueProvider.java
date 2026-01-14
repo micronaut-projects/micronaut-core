@@ -14,9 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.core.annotation;
-
-import org.jspecify.annotations.NonNull;
-
 import java.lang.annotation.Annotation;
 
 /**
@@ -31,5 +28,5 @@ public interface AnnotationValueProvider<A extends Annotation> {
     /**
      * @return The annotation value. Never null.
      */
-    @NonNull AnnotationValue<A> annotationValue();
+ AnnotationValue<A> annotationValue();
 }

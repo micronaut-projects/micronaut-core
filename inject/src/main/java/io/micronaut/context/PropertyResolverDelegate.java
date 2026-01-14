@@ -16,7 +16,6 @@
 package io.micronaut.context;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
@@ -50,87 +49,87 @@ public interface PropertyResolverDelegate extends PropertyResolver, ValueResolve
     PropertyResolver delegate();
 
     @Override
-    default boolean containsProperty(@NonNull String name) {
+    default boolean containsProperty(String name) {
         return delegate().containsProperty(name);
     }
 
     @Override
-    default boolean containsProperties(@NonNull String name) {
+    default boolean containsProperties(String name) {
         return delegate().containsProperties(name);
     }
 
     @Override
-    default @NonNull <T> Optional<T> getProperty(@NonNull String name, @NonNull ArgumentConversionContext<T> conversionContext) {
+    default <T> Optional<T> getProperty(String name, ArgumentConversionContext<T> conversionContext) {
         return delegate().getProperty(name, conversionContext);
     }
 
     @Override
-    default @NonNull Collection<String> getPropertyEntries(@NonNull String name) {
+    default Collection<String> getPropertyEntries(String name) {
         return delegate().getPropertyEntries(name);
     }
 
     @Override
-    default @NonNull Collection<String> getPropertyEntries(@NonNull String name, @NonNull PropertyCatalog propertyCatalog) {
+    default Collection<String> getPropertyEntries(String name, PropertyCatalog propertyCatalog) {
         return delegate().getPropertyEntries(name, propertyCatalog);
     }
 
     @Override
-    default @NonNull <T> Optional<T> getProperty(@NonNull String name, @NonNull Argument<T> argument) {
+    default <T> Optional<T> getProperty(String name, Argument<T> argument) {
         return delegate().getProperty(name, argument);
     }
 
     @Override
-    default @NonNull Map<String, Object> getProperties(@NonNull String name) {
+    default Map<String, Object> getProperties(String name) {
         return delegate().getProperties(name);
     }
 
     @Override
-    default @NonNull Map<String, Object> getProperties(@Nullable String name, @Nullable StringConvention keyFormat) {
+    default Map<String, Object> getProperties(@Nullable String name, @Nullable StringConvention keyFormat) {
         return delegate().getProperties(name, keyFormat);
     }
 
     @Override
-    default @NonNull <T> Optional<T> getProperty(@NonNull String name, @NonNull Class<T> requiredType, @NonNull ConversionContext context) {
+    default <T> Optional<T> getProperty(String name, Class<T> requiredType, ConversionContext context) {
         return delegate().getProperty(name, requiredType, context);
     }
 
     @Override
-    default @NonNull <T> Optional<T> get(@NonNull String name, @NonNull ArgumentConversionContext<T> conversionContext) {
+    default <T> Optional<T> get(String name, ArgumentConversionContext<T> conversionContext) {
         return delegate().get(name, conversionContext);
     }
 
     @Override
-    default @NonNull <T> Optional<T> getProperty(@NonNull String name, @NonNull Class<T> requiredType) {
+    default <T> Optional<T> getProperty(String name, Class<T> requiredType) {
         return delegate().getProperty(name, requiredType);
     }
 
     @Override
-    default @Nullable <T> T getProperty(@NonNull String name, @NonNull Class<T> requiredType, @Nullable T defaultValue) {
+    default @Nullable <T> T getProperty(String name, Class<T> requiredType, @Nullable T defaultValue) {
         return delegate().getProperty(name, requiredType, defaultValue);
     }
 
     @Override
-    default @NonNull <T> T getRequiredProperty(@NonNull String name, @NonNull Class<T> requiredType) {
+    default <T> T getRequiredProperty(String name, Class<T> requiredType) {
         return delegate().getRequiredProperty(name, requiredType);
     }
 
     @Override
-    default @NonNull Collection<List<String>> getPropertyPathMatches(@NonNull String pathPattern) {
+    default Collection<List<String>> getPropertyPathMatches(String pathPattern) {
         return delegate().getPropertyPathMatches(pathPattern);
     }
 
     @Override
-    default @NonNull <T> Optional<T> get(@NonNull String name, @NonNull Class<T> requiredType) {
+    default <T> Optional<T> get(String name, Class<T> requiredType) {
         return delegate().get(name, requiredType);
     }
 
     @Override
-    default @NonNull <T> Optional<T> get(@NonNull String name, @NonNull Argument<T> requiredType) {
+    default <T> Optional<T> get(String name, Argument<T> requiredType) {
         return delegate().get(name, requiredType);
     }
 
     @Override
-    default <T> T get(@NonNull String name, @NonNull Class<T> requiredType, T defaultValue) {
+    default <T> T get(String name, Class<T> requiredType, T defaultValue) {
         return delegate().get(name, requiredType, defaultValue);
     }
 }

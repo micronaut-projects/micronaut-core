@@ -179,7 +179,6 @@ public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Itera
      * @param valueType The value type
      * @return The submap
      */
-    @SuppressWarnings("unchecked")
     default Map<String, V> subMap(String prefix, Class<V> valueType) {
         return subMap(prefix, Argument.of(valueType));
     }
@@ -191,7 +190,6 @@ public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Itera
      * @param valueType The value type
      * @return The submap
      */
-    @SuppressWarnings("unchecked")
     default Map<String, V> subMap(String prefix, Argument<V> valueType) {
         return subMap(prefix, ConversionContext.of(valueType));
     }
@@ -203,7 +201,6 @@ public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Itera
      * @param valueType The value type
      * @return The submap
      */
-    @SuppressWarnings("unchecked")
     default Map<String, V> subMap(String prefix, ArgumentConversionContext<V> valueType) {
         // special handling for maps for resolving sub keys
         String finalPrefix = prefix + '.';
@@ -212,7 +209,6 @@ public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Itera
             .collect(Collectors.toMap(name -> name.substring(finalPrefix.length()), name -> get(name, valueType).orElse(null)));
     }
 
-    @SuppressWarnings("NullableProblems")
     @Override
     default Iterator<Map.Entry<String, V>> iterator() {
         Iterator<String> names = names().iterator();
@@ -269,7 +265,7 @@ public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Itera
      * @return The values
      * @since 4.0.0
      */
-    static <T> ConvertibleValues<T> of(Map<? extends CharSequence, T> values, ConversionService conversionService) {
+    static <T> ConvertibleValues<T> of(@Nullable Map<? extends CharSequence, T> values, ConversionService conversionService) {
         if (values == null) {
             return ConvertibleValuesMap.empty();
         } else {

@@ -18,7 +18,6 @@ package io.micronaut.context.env;
 import io.micronaut.context.Qualifier;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.EachProperty;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.value.PropertyCatalog;
 import io.micronaut.core.value.PropertyResolver;
@@ -40,7 +39,6 @@ public sealed interface ConfigurationPath
     /**
      * @return Creates a new path.
      */
-    @NonNull
     static ConfigurationPath newPath() {
         return new DefaultConfigurationPath();
     }
@@ -50,7 +48,6 @@ public sealed interface ConfigurationPath
      * @param definitions The definitions
      * @return THe computed path
      */
-    @NonNull
     static ConfigurationPath of(BeanDefinition<?>... definitions) {
         ConfigurationPath configurationPath = ConfigurationPath.newPath();
         for (BeanDefinition<?> definition : definitions) {
@@ -75,7 +72,6 @@ public sealed interface ConfigurationPath
      *
      * @return The copied path
      */
-    @NonNull
     ConfigurationPath copy();
 
     /**
@@ -89,13 +85,11 @@ public sealed interface ConfigurationPath
      *
      * @return The resolved path
      */
-    @NonNull
     String prefix();
 
     /**
      * @return The path without segments substituted.
      */
-    @NonNull
     String path();
 
     /**
@@ -107,7 +101,7 @@ public sealed interface ConfigurationPath
     /**
      * @return The current kind
      */
-    ConfigurationSegment.@NonNull ConfigurationKind kind();
+    ConfigurationSegment. ConfigurationKind kind();
 
     /**
      * @return The current bound name if any.
@@ -125,7 +119,6 @@ public sealed interface ConfigurationPath
      *
      * @since 4.7.0
      */
-    @NonNull
     default PropertyCatalog propertyCatalog() {
         return PropertyCatalog.NORMALIZED;
     }
@@ -174,21 +167,21 @@ public sealed interface ConfigurationPath
      *
      * @param beanDefinition The bean definition
      */
-    void pushEachPropertyRoot(@NonNull BeanDefinition<?> beanDefinition);
+    void pushEachPropertyRoot(BeanDefinition<?> beanDefinition);
 
     /**
      * Push a new configuration segment for the given name and kind
      *
      * @param beanDefinition The bean definition
      */
-    void pushConfigurationReader(@NonNull BeanDefinition<?> beanDefinition);
+    void pushConfigurationReader(BeanDefinition<?> beanDefinition);
 
     /**
      * Adds a named segment.
      *
      * @param name The name of the segment
      */
-    void pushConfigurationSegment(@NonNull String name);
+    void pushConfigurationSegment(String name);
 
     /**
      * Adds a indexed segment.
@@ -203,7 +196,7 @@ public sealed interface ConfigurationPath
      * @return the last element from this path
      * @throws java.util.NoSuchElementException if there isn't any remaining elements.
      */
-    @NonNull ConfigurationSegment removeLast();
+    ConfigurationSegment removeLast();
 
 
     /**
@@ -217,7 +210,6 @@ public sealed interface ConfigurationPath
      * @param value The value
      * @return The resolved value
      */
-    @NonNull
     String resolveValue(String value);
 
     /**
@@ -239,16 +231,14 @@ public sealed interface ConfigurationPath
      * @param callback         The callback.
      */
     void traverseResolvableSegments(
-        @NonNull
         PropertyResolver propertyResolver,
-        @NonNull
         Consumer<ConfigurationPath> callback);
 
     /**
      * Push and adapt an existing configuration segment.
      * @param configurationSegment The configuration segment
      */
-    void pushConfigurationSegment(@NonNull ConfigurationSegment configurationSegment);
+    void pushConfigurationSegment(ConfigurationSegment configurationSegment);
 
     /**
      * Check whether the given prefix is within the current path.
@@ -298,7 +288,6 @@ public sealed interface ConfigurationPath
         /**
          * @return The configuration type
          */
-        @NonNull
         Class<?> type();
 
         /**

@@ -16,7 +16,6 @@
 package io.micronaut.http.client.netty;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
@@ -51,7 +50,7 @@ final class NettyClientByteBodyResponse implements ByteBodyHttpResponse<Object> 
     }
 
     @Override
-    public @NonNull ByteBody byteBody() {
+    public ByteBody byteBody() {
         return body;
     }
 
@@ -71,17 +70,17 @@ final class NettyClientByteBodyResponse implements ByteBodyHttpResponse<Object> 
     }
 
     @Override
-    public @NonNull NettyHttpHeaders getHeaders() {
+    public NettyHttpHeaders getHeaders() {
         return headers;
     }
 
     @Override
-    public @NonNull MutableConvertibleValues<Object> getAttributes() {
+    public MutableConvertibleValues<Object> getAttributes() {
         return attributes.get();
     }
 
     @Override
-    public @NonNull Optional<Object> getBody() {
+    public Optional<Object> getBody() {
         return Optional.empty();
     }
 }

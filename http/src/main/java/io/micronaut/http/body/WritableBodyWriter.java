@@ -17,7 +17,6 @@ package io.micronaut.http.body;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.io.Writable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ReferenceCounted;
@@ -108,7 +107,7 @@ public final class WritableBodyWriter implements TypedMessageBodyHandler<Writabl
     }
 
     @Override
-    public @NonNull CloseableByteBody writePiece(@NonNull ByteBodyFactory bodyFactory, @NonNull HttpRequest<?> request, @NonNull HttpResponse<?> response, @NonNull Argument<Writable> type, @NonNull MediaType mediaType, Writable object) throws CodecException {
+    public CloseableByteBody writePiece(ByteBodyFactory bodyFactory, HttpRequest<?> request, HttpResponse<?> response, Argument<Writable> type, MediaType mediaType, Writable object) throws CodecException {
         try {
             return bodyFactory.buffer(o -> object.writeTo(o, MessageBodyWriter.getCharset(mediaType, response.getHeaders())));
         } catch (IOException e) {

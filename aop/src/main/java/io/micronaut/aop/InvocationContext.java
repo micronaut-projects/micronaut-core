@@ -107,6 +107,7 @@ public interface InvocationContext<T, R> extends Executable<T, R>, AnnotationMet
      *
      * @return The bound {@link ArgumentValue} instances
      */
+    @Nullable
     default Object @NonNull [] getParameterValues() {
         return getParameters()
             .values()

@@ -16,7 +16,6 @@
 package io.micronaut.http.client.netty;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.MutableHttpRequest;
@@ -48,7 +47,7 @@ final class RawHttpRequestWrapper<B> extends MutableHttpRequestWrapper<B> implem
     }
 
     @Override
-    public @NonNull ByteBody byteBody() {
+    public ByteBody byteBody() {
         return byteBody;
     }
 
@@ -63,7 +62,7 @@ final class RawHttpRequestWrapper<B> extends MutableHttpRequestWrapper<B> implem
     }
 
     @Override
-    public @NonNull HttpRequest toHttpRequestWithoutBody() {
+    public HttpRequest toHttpRequestWithoutBody() {
         return NettyHttpRequestBuilder.asBuilder(getDelegate()).toHttpRequestWithoutBody();
     }
 

@@ -66,11 +66,11 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
     /**
      * Active subscribers.
      */
-    private List<@NonNull BufferConsumer> subscribers;
+    private List<BufferConsumer> subscribers;
     /**
      * Active subscribers that need the fully buffered body.
      */
-    private List<@NonNull DelayedExecutionFlow<ReadBuffer>> fullSubscribers;
+    private List<DelayedExecutionFlow<ReadBuffer>> fullSubscribers;
     /**
      * This flag is only used in tests, to verify that the BufferConsumer methods arent called
      * in a reentrant fashion.

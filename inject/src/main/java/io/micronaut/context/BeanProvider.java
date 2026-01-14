@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.context;
-
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
@@ -53,7 +51,6 @@ public interface BeanProvider<T> extends Iterable<T> {
      * @throws io.micronaut.context.exceptions.NoSuchBeanException if the bean doesn't exist
      * @throws io.micronaut.context.exceptions.NonUniqueBeanException if more than one bean matching the current qualifier exists and cannot be resolved unambiguously
      */
-    @NonNull
     T get();
 
     /**
@@ -61,7 +58,7 @@ public interface BeanProvider<T> extends Iterable<T> {
      * @return The jakarta provider.
      * @since 4.5.0
      */
-    default @NonNull Provider<T> asJakartaProvider() {
+    default Provider<T> asJakartaProvider() {
         return this::get;
     }
 
@@ -87,7 +84,6 @@ public interface BeanProvider<T> extends Iterable<T> {
      * @throws java.lang.UnsupportedOperationException If the BeanProvider was obtained via other means other than dependency injection
      * @since 3.2.0
      */
-    @NonNull
     default BeanDefinition<T> getDefinition() {
         throw new UnsupportedOperationException("BeanDefinition information can only be obtained from dependency injected providers");
     }
@@ -101,12 +97,10 @@ public interface BeanProvider<T> extends Iterable<T> {
      * @throws io.micronaut.context.exceptions.NoSuchBeanException if the bean doesn't exist
      * @throws io.micronaut.context.exceptions.NonUniqueBeanException if more than one bean matching the current qualifier exists and cannot be resolved unambiguously
      */
-    @NonNull
     default T get(@Nullable Qualifier<T> qualifier) {
         return get();
     }
 
-    @NonNull
     @Override
     default Iterator<T> iterator() {
         return Collections.singletonList(get()).iterator();
@@ -165,7 +159,7 @@ public interface BeanProvider<T> extends Iterable<T> {
      * @see #isPresent()
      * @throws io.micronaut.context.exceptions.NonUniqueBeanException if the bean is not unique
      */
-    default void ifPresent(@NonNull Consumer<T> consumer) {
+    default void ifPresent(Consumer<T> consumer) {
         if (isPresent()) {
             Objects.requireNonNull(consumer, "Consumer cannot be null")
                     .accept(get());
@@ -179,7 +173,7 @@ public interface BeanProvider<T> extends Iterable<T> {
      * @since 3.0.0
      * @see #isResolvable()
      */
-    default void ifResolvable(@NonNull Consumer<T> consumer) {
+    default void ifResolvable(Consumer<T> consumer) {
         if (isResolvable()) {
             Objects.requireNonNull(consumer, "Consumer cannot be null")
                     .accept(get());
@@ -208,7 +202,7 @@ public interface BeanProvider<T> extends Iterable<T> {
      * @return 3.0.0
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
-    static @NonNull <T1> Argument<BeanProvider<T1>> argumentOf(@NonNull Class<T1> type) {
+    static <T1> Argument<BeanProvider<T1>> argumentOf(Class<T1> type) {
         return (Argument) Argument.of(BeanProvider.class, Objects.requireNonNull(type, "Type cannot be null"));
     }
 }

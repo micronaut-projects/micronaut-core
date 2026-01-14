@@ -51,7 +51,6 @@ public final class BasicHttpAttributes {
      * @param request The request
      * @return The template, if present
      */
-    @NonNull
     public static Optional<String> getUriTemplate(HttpRequest<?> request) {
         return request.getAttribute(HttpAttributes.URI_TEMPLATE, String.class);
     }
@@ -62,7 +61,7 @@ public final class BasicHttpAttributes {
      * @param request     The request
      * @param uriTemplate The template, if present
      */
-    public static void setUriTemplate(@NonNull HttpRequest<?> request, @NonNull String uriTemplate) {
+    public static void setUriTemplate(HttpRequest<?> request, String uriTemplate) {
         request.setAttribute(HttpAttributes.URI_TEMPLATE, uriTemplate);
     }
 
@@ -72,8 +71,7 @@ public final class BasicHttpAttributes {
      * @param request The request
      * @return The client service ID
      */
-    @NonNull
-    public static Optional<String> getServiceId(@NonNull HttpRequest<?> request) {
+    public static Optional<String> getServiceId(HttpRequest<?> request) {
         return request.getAttribute(HttpAttributes.SERVICE_ID, String.class);
     }
 

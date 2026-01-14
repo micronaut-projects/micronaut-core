@@ -19,8 +19,6 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertyPlaceholderResolver;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
-
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
 import java.util.List;
@@ -92,29 +90,29 @@ class EnvironmentAnnotationValue<A extends Annotation> extends AnnotationValue<A
     }
 
     @Override
-    public @NonNull
+    public
     <T extends Annotation> List<AnnotationValue<T>> getAnnotations(String member, Class<T> type) {
         List<AnnotationValue<T>> annotationValues = super.getAnnotations(member, type);
         return annotationValues.stream().map(av -> new EnvironmentAnnotationValue<>(environment, av)).collect(Collectors.toList());
     }
 
     @Override
-    public @NonNull
+    public
     <T extends Annotation> List<AnnotationValue<T>> getAnnotations(String member) {
         List<AnnotationValue<T>> annotationValues = super.getAnnotations(member);
         return annotationValues.stream().map(av -> new EnvironmentAnnotationValue<>(environment, av)).collect(Collectors.toList());
     }
 
     @Override
-    public @NonNull
+    public
     <T extends Annotation> Optional<AnnotationValue<T>> getAnnotation(String member, Class<T> type) {
         Optional<AnnotationValue<T>> annotationValue = super.getAnnotation(member, type);
         return annotationValue.map(av -> new EnvironmentAnnotationValue<>(environment, av));
     }
 
     @Override
-    public @NonNull
-    <T extends Annotation> Optional<AnnotationValue<T>> getAnnotation(@NonNull String member) {
+    public
+    <T extends Annotation> Optional<AnnotationValue<T>> getAnnotation(String member) {
         Optional<AnnotationValue<T>> annotationValue = super.getAnnotation(member);
         return annotationValue.map(av -> new EnvironmentAnnotationValue<>(environment, av));
     }

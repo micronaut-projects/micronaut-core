@@ -20,7 +20,6 @@ import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.order.OrderUtil;
@@ -69,8 +68,8 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
     private int order;
 
     DefaultRuntimeBeanDefinition(
-        @NonNull Argument<T> beanType,
-        @NonNull Supplier<T> supplier,
+ Argument<T> beanType,
+ Supplier<T> supplier,
         @Nullable Qualifier<T> qualifier,
         @Nullable AnnotationMetadata annotationMetadata,
         boolean isSingleton,
@@ -131,7 +130,6 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
     }
 
     @Override
-    @NonNull
     public Set<Class<?>> getExposedTypes() {
         return ArrayUtils.isNotEmpty(exposedTypes) ?
             CollectionUtils.setOf(exposedTypes) :
@@ -149,7 +147,6 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
     }
 
     @Override
-    @NonNull
     public Argument<T> asArgument() {
         return beanType;
     }
@@ -175,7 +172,7 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
      * @param beanType The bean type
      * @return The bean name
      */
-    static String generateBeanName(@NonNull Class<?> beanType) {
+    static String generateBeanName(Class<?> beanType) {
         Objects.requireNonNull(beanType, MSG_BEAN_TYPE_CANNOT_BE_NULL);
         return beanType.getName() + "$DynamicDefinition" + REF_COUNT.incrementAndGet();
     }
@@ -186,7 +183,6 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
     }
 
     @Override
-    @NonNull
     public AnnotationMetadata getAnnotationMetadata() {
         return annotationMetadata;
     }
@@ -208,13 +204,12 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
 
     @SuppressWarnings("unchecked")
     @Override
-    @NonNull
     public List<Argument<?>> getTypeArguments() {
         return Arrays.asList(beanType.getTypeParameters());
     }
 
     @Override
-    public Class<?> @NonNull [] getTypeParameters() {
+    public Class<?>[] getTypeParameters() {
         return getTypeArguments()
             .stream()
             .map(Argument::getType)
@@ -324,7 +319,6 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
         }
 
         @Override
-        @NonNull
         public RuntimeBeanDefinition<B> build() {
             if (replacesType != null) {
                 MutableAnnotationMetadata mutableAnnotationMetadata;

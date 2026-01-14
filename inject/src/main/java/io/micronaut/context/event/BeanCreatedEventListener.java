@@ -16,8 +16,6 @@
 package io.micronaut.context.event;
 
 import io.micronaut.core.annotation.Indexed;
-import org.jspecify.annotations.NonNull;
-
 import java.util.EventListener;
 
 /**
@@ -41,5 +39,5 @@ public interface BeanCreatedEventListener<T> extends EventListener {
      * @param event The bean created event
      * @return The bean or a replacement bean of the same type
      */
-    T onCreated(@NonNull BeanCreatedEvent<T> event);
+    T onCreated(BeanCreatedEvent<T> event);
 }

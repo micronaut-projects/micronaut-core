@@ -37,7 +37,6 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.value.PropertyCatalog;
 import io.micronaut.core.value.PropertyResolver;
 import io.micronaut.inject.BeanConfiguration;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -114,7 +113,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
      *
      * @param configuration The configuration
      */
-    public DefaultEnvironment(@NonNull ApplicationContextConfiguration configuration) {
+    public DefaultEnvironment(ApplicationContextConfiguration configuration) {
         MutableConversionService conversionService = configuration.getConversionService().orElseGet(MutableConversionService::create);
         this.propertyPlaceholderResolver = new PropertySourcePropertyResolver(
             conversionService,

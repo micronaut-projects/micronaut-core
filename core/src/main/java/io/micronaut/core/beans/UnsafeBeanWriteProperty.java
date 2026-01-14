@@ -16,7 +16,6 @@
 package io.micronaut.core.beans;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -38,8 +37,7 @@ public interface UnsafeBeanWriteProperty<B, T> extends BeanWriteProperty<B, T> {
      * @param value The new value
      * @return Either the existing instance or the property is mutable or a newly created instance via the copy constructor pattern.
      */
-    @NonNull
-    B withValueUnsafe(@NonNull B bean, @Nullable T value);
+    B withValueUnsafe(B bean, @Nullable T value);
 
     /**
      * Unsafe version of {@link #set(Object, Object)}.
@@ -47,6 +45,6 @@ public interface UnsafeBeanWriteProperty<B, T> extends BeanWriteProperty<B, T> {
      * @param bean  The bean
      * @param value The value to write
      */
-    void setUnsafe(@NonNull B bean, @Nullable T value);
+    void setUnsafe(B bean, @Nullable T value);
 
 }

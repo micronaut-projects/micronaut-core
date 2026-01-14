@@ -19,8 +19,6 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
-
-import org.jspecify.annotations.NonNull;
 import java.lang.reflect.Method;
 
 /**
@@ -73,7 +71,6 @@ public interface ExecutionHandle<T, R> extends AnnotationMetadataDelegate {
      */
     static <T2, R2> MethodExecutionHandle<T2, R2> of(T2 bean, ExecutableMethod<T2, R2> method) {
         return new MethodExecutionHandle<>() {
-            @NonNull
             @Override
             public ExecutableMethod<T2, R2> getExecutableMethod() {
                 return method;

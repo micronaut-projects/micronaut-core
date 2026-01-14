@@ -17,7 +17,6 @@ package io.micronaut.context;
 
 import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.naming.NameUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -91,7 +90,7 @@ public enum BeanResolutionTraceMode {
      * @return The class names
      */
     @Internal
-    static @NonNull Set<String> getDefaultTraceClasses() {
+    static Set<String> getDefaultTraceClasses() {
         String classes = Optional
             .ofNullable(System.getProperty(CLASSES_SYS_PROP))
             .orElseGet(() -> System.getenv(CLASSES_ENV_VAR));

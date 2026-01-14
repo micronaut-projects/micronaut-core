@@ -20,7 +20,6 @@ import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.async.propagation.ReactivePropagation;
 import io.micronaut.core.async.publisher.Publishers;
@@ -284,12 +283,12 @@ public class DefaultHttpClient implements
      */
     @Deprecated
     public DefaultHttpClient(@Nullable LoadBalancer loadBalancer,
-                             @NonNull HttpClientConfiguration configuration,
+                             HttpClientConfiguration configuration,
                              @Nullable String contextPath,
                              @Nullable ThreadFactory threadFactory,
                              ClientSslBuilder nettyClientSslBuilder,
-                             @NonNull MediaTypeCodecRegistry codecRegistry,
-                             @NonNull MessageBodyHandlerRegistry handlerRegistry,
+                             MediaTypeCodecRegistry codecRegistry,
+                             MessageBodyHandlerRegistry handlerRegistry,
                              @Nullable AnnotationMetadataResolver annotationMetadataResolver,
                              ConversionService conversionService,
                              HttpClientFilter... filters) {
@@ -334,19 +333,19 @@ public class DefaultHttpClient implements
     @Deprecated
     public DefaultHttpClient(@Nullable LoadBalancer loadBalancer,
                              @Nullable HttpVersionSelection explicitHttpVersion,
-                             @NonNull HttpClientConfiguration configuration,
+                             HttpClientConfiguration configuration,
                              @Nullable String contextPath,
-                             @NonNull HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver,
-                             @NonNull List<HttpFilterResolver.FilterEntry> clientFilterEntries,
+                             HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver,
+                             List<HttpFilterResolver.FilterEntry> clientFilterEntries,
                              @Nullable ThreadFactory threadFactory,
-                             @NonNull ClientSslBuilder nettyClientSslBuilder,
-                             @NonNull MediaTypeCodecRegistry codecRegistry,
-                             @NonNull MessageBodyHandlerRegistry handlerRegistry,
-                             @NonNull WebSocketBeanRegistry webSocketBeanRegistry,
-                             @NonNull RequestBinderRegistry requestBinderRegistry,
+                             ClientSslBuilder nettyClientSslBuilder,
+                             MediaTypeCodecRegistry codecRegistry,
+                             MessageBodyHandlerRegistry handlerRegistry,
+                             WebSocketBeanRegistry webSocketBeanRegistry,
+                             RequestBinderRegistry requestBinderRegistry,
                              @Nullable EventLoopGroup eventLoopGroup,
-                             @NonNull ChannelFactory<? extends SocketChannel> socketChannelFactory,
-                             @NonNull ChannelFactory<? extends DatagramChannel> udpChannelFactory,
+                             ChannelFactory<? extends SocketChannel> socketChannelFactory,
+                             ChannelFactory<? extends DatagramChannel> udpChannelFactory,
                              NettyClientCustomizer clientCustomizer,
                              @Nullable String informationalServiceId,
                              ConversionService conversionService,
@@ -435,7 +434,7 @@ public class DefaultHttpClient implements
      * @deprecated Please go through the {@link #builder()} instead.
      */
     @Deprecated
-    public DefaultHttpClient(@Nullable URI uri, @NonNull HttpClientConfiguration configuration) {
+    public DefaultHttpClient(@Nullable URI uri, HttpClientConfiguration configuration) {
         this(
             builder()
                 .uri(uri)
@@ -452,7 +451,7 @@ public class DefaultHttpClient implements
      * @deprecated Please go through the {@link #builder()} instead.
      */
     @Deprecated
-    public DefaultHttpClient(@Nullable URI uri, @NonNull HttpClientConfiguration configuration, @NonNull ClientSslBuilder clientSslBuilder) {
+    public DefaultHttpClient(@Nullable URI uri, HttpClientConfiguration configuration, ClientSslBuilder clientSslBuilder) {
         this(
             builder()
                 .uri(uri)
@@ -481,7 +480,6 @@ public class DefaultHttpClient implements
      * @return The builder
      * @since 4.7.0
      */
-    @NonNull
     public static DefaultHttpClientBuilder builder() {
         return new DefaultHttpClientBuilder();
     }
@@ -562,7 +560,6 @@ public class DefaultHttpClient implements
      *
      * @return The handler registry
      */
-    @NonNull
     public final MessageBodyHandlerRegistry getHandlerRegistry() {
         return handlerRegistry;
     }
@@ -574,7 +571,7 @@ public class DefaultHttpClient implements
      * @deprecated Use builder instead
      */
     @Deprecated(forRemoval = true)
-    public final void setHandlerRegistry(@NonNull MessageBodyHandlerRegistry handlerRegistry) {
+    public final void setHandlerRegistry(MessageBodyHandlerRegistry handlerRegistry) {
         this.handlerRegistry = handlerRegistry;
     }
 
@@ -644,19 +641,18 @@ public class DefaultHttpClient implements
         };
     }
 
-    @NonNull
     private <I> MutableHttpRequest<?> toMutableRequest(io.micronaut.http.HttpRequest<I> request) {
         return MutableHttpRequestWrapper.wrapIfNecessary(conversionService, request);
     }
 
     @SuppressWarnings("SubscriberImplementation")
     @Override
-    public <I> Publisher<Event<ByteBuffer<?>>> eventStream(io.micronaut.http.@NonNull HttpRequest<I> request) {
+    public <I> Publisher<Event<ByteBuffer<?>>> eventStream(io.micronaut.http. HttpRequest<I> request) {
         setupConversionService(request);
         return eventStreamOrError(request, null);
     }
 
-    private <I> Publisher<Event<ByteBuffer<?>>> eventStreamOrError(io.micronaut.http.@NonNull HttpRequest<I> request, @NonNull Argument<?> errorType) {
+    private <I> Publisher<Event<ByteBuffer<?>>> eventStreamOrError(io.micronaut.http. HttpRequest<I> request, Argument<?> errorType) {
 
         if (request instanceof MutableHttpRequest<?> httpRequest) {
             httpRequest.accept(MediaType.TEXT_EVENT_STREAM_TYPE);
@@ -781,14 +777,14 @@ public class DefaultHttpClient implements
     }
 
     @Override
-    public <I, B> Publisher<Event<B>> eventStream(io.micronaut.http.@NonNull HttpRequest<I> request,
-                                                  @NonNull Argument<B> eventType) {
+    public <I, B> Publisher<Event<B>> eventStream(io.micronaut.http.HttpRequest<I> request,
+                                                  Argument<B> eventType) {
         setupConversionService(request);
         return eventStream(request, eventType, DEFAULT_ERROR_TYPE);
     }
 
     @Override
-    public <I, B> Publisher<Event<B>> eventStream(io.micronaut.http.@NonNull HttpRequest<I> request, @NonNull Argument<B> eventType, @NonNull Argument<?> errorType) {
+    public <I, B> Publisher<Event<B>> eventStream(io.micronaut.http. HttpRequest<I> request, Argument<B> eventType, Argument<?> errorType) {
         setupConversionService(request);
         MessageBodyReader<B> reader = handlerRegistry.getReader(eventType, List.of(MediaType.APPLICATION_JSON_TYPE));
         return Flux.from(eventStreamOrError(request, errorType)).map(byteBufferEvent -> {
@@ -800,13 +796,13 @@ public class DefaultHttpClient implements
     }
 
     @Override
-    public <I> Publisher<ByteBuffer<?>> dataStream(io.micronaut.http.@NonNull HttpRequest<I> request) {
+    public <I> Publisher<ByteBuffer<?>> dataStream(io.micronaut.http. HttpRequest<I> request) {
         setupConversionService(request);
         return dataStream(request, DEFAULT_ERROR_TYPE);
     }
 
     @Override
-    public <I> Publisher<ByteBuffer<?>> dataStream(io.micronaut.http.@NonNull HttpRequest<I> request, @NonNull Argument<?> errorType) {
+    public <I> Publisher<ByteBuffer<?>> dataStream(io.micronaut.http. HttpRequest<I> request, Argument<?> errorType) {
         setupConversionService(request);
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
         return new MicronautFlux<>(toMono(resolveRequestURI(request), propagatedContext)
@@ -834,12 +830,12 @@ public class DefaultHttpClient implements
     }
 
     @Override
-    public <I> Publisher<HttpResponse<ByteBuffer<?>>> exchangeStream(io.micronaut.http.@NonNull HttpRequest<I> request) {
+    public <I> Publisher<HttpResponse<ByteBuffer<?>>> exchangeStream(io.micronaut.http. HttpRequest<I> request) {
         return exchangeStream(request, DEFAULT_ERROR_TYPE);
     }
 
     @Override
-    public <I> Publisher<HttpResponse<ByteBuffer<?>>> exchangeStream(io.micronaut.http.@NonNull HttpRequest<I> request, @NonNull Argument<?> errorType) {
+    public <I> Publisher<HttpResponse<ByteBuffer<?>>> exchangeStream(io.micronaut.http. HttpRequest<I> request, Argument<?> errorType) {
         setupConversionService(request);
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
         return new MicronautFlux<>(toMono(resolveRequestURI(request), propagatedContext)
@@ -853,12 +849,12 @@ public class DefaultHttpClient implements
     }
 
     @Override
-    public <I, O> Publisher<O> jsonStream(io.micronaut.http.@NonNull HttpRequest<I> request, @NonNull Argument<O> type) {
+    public <I, O> Publisher<O> jsonStream(io.micronaut.http. HttpRequest<I> request, Argument<O> type) {
         return jsonStream(request, type, DEFAULT_ERROR_TYPE);
     }
 
     @Override
-    public <I, O> Publisher<O> jsonStream(io.micronaut.http.@NonNull HttpRequest<I> request, @NonNull Argument<O> type, @NonNull Argument<?> errorType) {
+    public <I, O> Publisher<O> jsonStream(io.micronaut.http. HttpRequest<I> request, Argument<O> type, Argument<?> errorType) {
         setupConversionService(request);
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
         return Flux.from(toMono(resolveRequestURI(request), propagatedContext)
@@ -867,24 +863,23 @@ public class DefaultHttpClient implements
 
     @SuppressWarnings("unchecked")
     @Override
-    public <I> Publisher<Map<String, Object>> jsonStream(io.micronaut.http.@NonNull HttpRequest<I> request) {
+    public <I> Publisher<Map<String, Object>> jsonStream(io.micronaut.http. HttpRequest<I> request) {
         return (Publisher) jsonStream(request, Map.class);
     }
 
     @Override
-    public <I, O> Publisher<O> jsonStream(io.micronaut.http.@NonNull HttpRequest<I> request, @NonNull Class<O> type) {
+    public <I, O> Publisher<O> jsonStream(io.micronaut.http. HttpRequest<I> request, Class<O> type) {
         setupConversionService(request);
         return jsonStream(request, Argument.of(type));
     }
 
     @Override
-    public <I, O, E> Publisher<HttpResponse<O>> exchange(io.micronaut.http.@NonNull HttpRequest<I> request, @NonNull Argument<O> bodyType, @NonNull Argument<E> errorType) {
+    public <I, O, E> Publisher<HttpResponse<O>> exchange(io.micronaut.http. HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
         return exchange(request, bodyType, errorType, null)
             // some tests expect flux...
             .flux();
     }
 
-    @NonNull
     private <I, O, E> Mono<HttpResponse<O>> exchange(io.micronaut.http.HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType, @Nullable BlockHint blockHint) {
         setupConversionService(request);
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
@@ -926,7 +921,7 @@ public class DefaultHttpClient implements
         return toMono(mono, propagatedContext);
     }
 
-    private <O, E> @NonNull ExecutionFlow<FullNettyClientHttpResponse<O>> handleExchangeResponse(Argument<O> bodyType, Argument<E> errorType, NettyClientByteBodyResponse resp, CloseableAvailableByteBody av) {
+    private <O, E> ExecutionFlow<FullNettyClientHttpResponse<O>> handleExchangeResponse(Argument<O> bodyType, Argument<E> errorType, NettyClientByteBodyResponse resp, CloseableAvailableByteBody av) {
         ByteBuf buf = NettyByteBodyFactory.toByteBuf(av);
         DefaultFullHttpResponse fullHttpResponse = new DefaultFullHttpResponse(
             resp.nettyResponse.protocolVersion(),
@@ -1145,10 +1140,10 @@ public class DefaultHttpClient implements
      */
     @SuppressWarnings("MagicNumber")
     private <I> ExecutionFlow<HttpResponse<?>> buildStreamExchange(
-            @Nullable PropagatedContext propagatedContext,
-            @NonNull MutableHttpRequest<I> request,
-            @NonNull URI requestURI,
-            @Nullable Argument<?> errorType) {
+        @Nullable PropagatedContext propagatedContext,
+        MutableHttpRequest<I> request,
+        URI requestURI,
+        @Nullable Argument<?> errorType) {
         return this.sendRequestWithRedirects(
             propagatedContext,
             null,
@@ -1193,12 +1188,12 @@ public class DefaultHttpClient implements
     }
 
     @Override
-    public Publisher<MutableHttpResponse<?>> proxy(io.micronaut.http.@NonNull HttpRequest<?> request) {
+    public Publisher<MutableHttpResponse<?>> proxy(io.micronaut.http. HttpRequest<?> request) {
         return proxy(request, ProxyRequestOptions.getDefault());
     }
 
     @Override
-    public Publisher<MutableHttpResponse<?>> proxy(io.micronaut.http.@NonNull HttpRequest<?> request, @NonNull ProxyRequestOptions options) {
+    public Publisher<MutableHttpResponse<?>> proxy(io.micronaut.http. HttpRequest<?> request, ProxyRequestOptions options) {
         Objects.requireNonNull(options, "options");
         setupConversionService(request);
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
@@ -1402,7 +1397,7 @@ public class DefaultHttpClient implements
         }
     }
 
-    private ExecutionFlow<HttpResponse<?>> readBodyOnError(@Nullable Argument<?> errorType, @NonNull ExecutionFlow<HttpResponse<?>> publisher) {
+    private ExecutionFlow<HttpResponse<?>> readBodyOnError(@Nullable Argument<?> errorType, ExecutionFlow<HttpResponse<?>> publisher) {
         if (errorType != null && errorType != HttpClient.DEFAULT_ERROR_TYPE) {
             return publisher.onErrorResume(clientException -> {
                 if (clientException instanceof HttpClientResponseException exception) {
@@ -1942,9 +1937,8 @@ public class DefaultHttpClient implements
         }
         if (bodyValue instanceof MultipartBody multipartBody) {
             postRequestEncoder.setBodyHttpDatas(multipartBody.getData(new MultipartDataFactory<>() {
-                @NonNull
                 @Override
-                public InterfaceHttpData createFileUpload(@NonNull String name, @NonNull String filename, @NonNull MediaType contentType, @Nullable String encoding, @Nullable Charset charset, long length) {
+                public InterfaceHttpData createFileUpload(String name, String filename, MediaType contentType, @Nullable String encoding, @Nullable Charset charset, long length) {
                     return factory.createFileUpload(
                             baseRequest,
                             name,
@@ -1956,9 +1950,8 @@ public class DefaultHttpClient implements
                     );
                 }
 
-                @NonNull
                 @Override
-                public InterfaceHttpData createAttribute(@NonNull String name, @NonNull String value) {
+                public InterfaceHttpData createAttribute(String name, String value) {
                     return factory.createAttribute(
                             baseRequest,
                             name,
@@ -2041,7 +2034,7 @@ public class DefaultHttpClient implements
         return HttpClientExceptionUtils.populateServiceId(exc, informationalServiceId, configuration);
     }
 
-    private @NonNull HttpClientException handleResponseError(io.micronaut.http.HttpRequest<?> finalRequest, Throwable cause) {
+    private HttpClientException handleResponseError(io.micronaut.http.HttpRequest<?> finalRequest, Throwable cause) {
         String message = cause.getMessage();
         if (message == null) {
             message = cause.getClass().getSimpleName();

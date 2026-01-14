@@ -18,7 +18,6 @@ package io.micronaut.http.client.netty;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.ArgumentUtils;
@@ -69,7 +68,6 @@ public final class DefaultHttpClientBuilder {
     HttpClientConfiguration configuration;
     @Nullable
     String contextPath = null;
-    @NonNull
     AnnotationMetadataResolver annotationMetadataResolver = AnnotationMetadataResolver.DEFAULT;
     HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver;
     List<HttpFilterResolver.FilterEntry> clientFilterEntries = null;
@@ -80,19 +78,15 @@ public final class DefaultHttpClientBuilder {
     BeanProvider<CertificateProvider> certificateProviders;
     MediaTypeCodecRegistry codecRegistry;
     MessageBodyHandlerRegistry handlerRegistry;
-    @NonNull
     WebSocketBeanRegistry webSocketBeanRegistry = WebSocketBeanRegistry.EMPTY;
     RequestBinderRegistry requestBinderRegistry;
     @Nullable
     EventLoopGroup eventLoopGroup = null;
-    @NonNull
     ChannelFactory<? extends Channel> socketChannelFactory = NioSocketChannel::new;
-    @NonNull
     ChannelFactory<? extends Channel> udpChannelFactory = NioDatagramChannel::new;
     NettyClientCustomizer clientCustomizer = CompositeNettyClientCustomizer.EMPTY;
     @Nullable
     String informationalServiceId = null;
-    @NonNull
     ConversionService conversionService = ConversionService.SHARED;
     @Nullable
     AddressResolverGroup<?> resolverGroup = null;
@@ -102,7 +96,6 @@ public final class DefaultHttpClientBuilder {
     DefaultHttpClientBuilder() {
     }
 
-    @NonNull
     DefaultHttpClientBuilder loadBalancer(@Nullable LoadBalancer loadBalancer) {
         this.loadBalancer = loadBalancer;
         return this;
@@ -114,12 +107,10 @@ public final class DefaultHttpClientBuilder {
      * @param uri The URI
      * @return This builder
      */
-    @NonNull
     public DefaultHttpClientBuilder uri(@Nullable URI uri) {
         return loadBalancer(uri == null ? null : LoadBalancer.fixed(uri));
     }
 
-    @NonNull
     DefaultHttpClientBuilder explicitHttpVersion(@Nullable HttpVersionSelection explicitHttpVersion) {
         this.explicitHttpVersion = explicitHttpVersion;
         return this;
@@ -131,27 +122,23 @@ public final class DefaultHttpClientBuilder {
      * @param configuration The client configuration
      * @return This builder
      */
-    @NonNull
-    public DefaultHttpClientBuilder configuration(@NonNull HttpClientConfiguration configuration) {
+    public DefaultHttpClientBuilder configuration(HttpClientConfiguration configuration) {
         ArgumentUtils.requireNonNull("configuration", configuration);
         this.configuration = configuration;
         return this;
     }
 
-    @NonNull
     DefaultHttpClientBuilder contextPath(@Nullable String contextPath) {
         this.contextPath = contextPath;
         return this;
     }
 
-    @NonNull
-    DefaultHttpClientBuilder filterResolver(@NonNull HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver) {
+    DefaultHttpClientBuilder filterResolver(HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver) {
         ArgumentUtils.requireNonNull("filterResolver", filterResolver);
         this.filterResolver = filterResolver;
         return this;
     }
 
-    @NonNull
     DefaultHttpClientBuilder annotationMetadataResolver(@Nullable AnnotationMetadataResolver annotationMetadataResolver) {
         if (annotationMetadataResolver != null) {
             this.annotationMetadataResolver = annotationMetadataResolver;
@@ -159,18 +146,15 @@ public final class DefaultHttpClientBuilder {
         return this;
     }
 
-    @NonNull
     DefaultHttpClientBuilder filters(HttpClientFilter... filters) {
         return filterResolver(new DefaultHttpClientFilterResolver(null, annotationMetadataResolver, Arrays.asList(filters)));
     }
 
-    @NonNull
     DefaultHttpClientBuilder clientFilterEntries(@Nullable List<HttpFilterResolver.FilterEntry> clientFilterEntries) {
         this.clientFilterEntries = clientFilterEntries;
         return this;
     }
 
-    @NonNull
     DefaultHttpClientBuilder threadFactory(@Nullable ThreadFactory threadFactory) {
         this.threadFactory = threadFactory;
         return this;
@@ -183,15 +167,13 @@ public final class DefaultHttpClientBuilder {
      * @param nettyClientSslBuilder The SSL context builder
      * @return This builder
      */
-    @NonNull
-    public DefaultHttpClientBuilder nettyClientSslBuilder(@NonNull ClientSslBuilder nettyClientSslBuilder) {
+    public DefaultHttpClientBuilder nettyClientSslBuilder(ClientSslBuilder nettyClientSslBuilder) {
         ArgumentUtils.requireNonNull("nettyClientSslBuilder", nettyClientSslBuilder);
         this.nettyClientSslBuilder = nettyClientSslBuilder;
         return this;
     }
 
-    @NonNull
-    public DefaultHttpClientBuilder sslFactory(@NonNull NettyClientSslFactory sslFactory, @NonNull BeanProvider<CertificateProvider> certificateProviders) {
+    public DefaultHttpClientBuilder sslFactory(NettyClientSslFactory sslFactory, BeanProvider<CertificateProvider> certificateProviders) {
         ArgumentUtils.requireNonNull("sslFactory", sslFactory);
         ArgumentUtils.requireNonNull("certificateProviders", certificateProviders);
         this.sslFactory = sslFactory;
@@ -206,82 +188,70 @@ public final class DefaultHttpClientBuilder {
      * @return This builder
      * @deprecated Use body handlers instead
      */
-    @NonNull
     @Deprecated
-    DefaultHttpClientBuilder codecRegistry(@NonNull MediaTypeCodecRegistry codecRegistry) {
+    DefaultHttpClientBuilder codecRegistry(MediaTypeCodecRegistry codecRegistry) {
         ArgumentUtils.requireNonNull("codecRegistry", codecRegistry);
         this.codecRegistry = codecRegistry;
         return this;
     }
 
-    @NonNull
-    DefaultHttpClientBuilder handlerRegistry(@NonNull MessageBodyHandlerRegistry handlerRegistry) {
+    DefaultHttpClientBuilder handlerRegistry(MessageBodyHandlerRegistry handlerRegistry) {
         ArgumentUtils.requireNonNull("handlerRegistry", handlerRegistry);
         this.handlerRegistry = handlerRegistry;
         return this;
     }
 
-    @NonNull
-    DefaultHttpClientBuilder webSocketBeanRegistry(@NonNull WebSocketBeanRegistry webSocketBeanRegistry) {
+    DefaultHttpClientBuilder webSocketBeanRegistry(WebSocketBeanRegistry webSocketBeanRegistry) {
         ArgumentUtils.requireNonNull("webSocketBeanRegistry", webSocketBeanRegistry);
         this.webSocketBeanRegistry = webSocketBeanRegistry;
         return this;
     }
 
-    @NonNull
-    DefaultHttpClientBuilder requestBinderRegistry(@NonNull RequestBinderRegistry requestBinderRegistry) {
+    DefaultHttpClientBuilder requestBinderRegistry(RequestBinderRegistry requestBinderRegistry) {
         ArgumentUtils.requireNonNull("requestBinderRegistry", requestBinderRegistry);
         this.requestBinderRegistry = requestBinderRegistry;
         return this;
     }
 
-    @NonNull
     DefaultHttpClientBuilder eventLoopGroup(@Nullable EventLoopGroup eventLoopGroup) {
         this.eventLoopGroup = eventLoopGroup;
         return this;
     }
 
-    @NonNull
-    DefaultHttpClientBuilder socketChannelFactory(@NonNull ChannelFactory<? extends Channel> socketChannelFactory) {
+    DefaultHttpClientBuilder socketChannelFactory(ChannelFactory<? extends Channel> socketChannelFactory) {
         ArgumentUtils.requireNonNull("socketChannelFactory", socketChannelFactory);
         this.socketChannelFactory = socketChannelFactory;
         return this;
     }
 
-    @NonNull
-    DefaultHttpClientBuilder udpChannelFactory(@NonNull ChannelFactory<? extends Channel> udpChannelFactory) {
+    DefaultHttpClientBuilder udpChannelFactory(ChannelFactory<? extends Channel> udpChannelFactory) {
         ArgumentUtils.requireNonNull("udpChannelFactory", udpChannelFactory);
         this.udpChannelFactory = udpChannelFactory;
         return this;
     }
 
-    @NonNull
-    DefaultHttpClientBuilder clientCustomizer(@NonNull NettyClientCustomizer clientCustomizer) {
+    DefaultHttpClientBuilder clientCustomizer(NettyClientCustomizer clientCustomizer) {
         ArgumentUtils.requireNonNull("clientCustomizer", clientCustomizer);
         this.clientCustomizer = clientCustomizer;
         return this;
     }
 
-    @NonNull
     DefaultHttpClientBuilder informationalServiceId(@Nullable String informationalServiceId) {
         this.informationalServiceId = informationalServiceId;
         return this;
     }
 
-    @NonNull
-    DefaultHttpClientBuilder conversionService(@NonNull ConversionService conversionService) {
+    DefaultHttpClientBuilder conversionService(ConversionService conversionService) {
         ArgumentUtils.requireNonNull("conversionService", conversionService);
         this.conversionService = conversionService;
         return this;
     }
 
-    @NonNull
     DefaultHttpClientBuilder resolverGroup(@Nullable AddressResolverGroup<?> resolverGroup) {
         this.resolverGroup = resolverGroup;
         return this;
     }
 
-    @NonNull
     DefaultHttpClientBuilder blockingExecutor(@Nullable ExecutorService blockingExecutor) {
         this.blockingExecutor = blockingExecutor;
         return this;
@@ -292,7 +262,6 @@ public final class DefaultHttpClientBuilder {
      *
      * @return The client
      */
-    @NonNull
     public DefaultHttpClient build() {
         return new DefaultHttpClient(this);
     }

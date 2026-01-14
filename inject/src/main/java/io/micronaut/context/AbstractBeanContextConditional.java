@@ -21,7 +21,6 @@ import io.micronaut.context.condition.Failure;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.BeanConfiguration;
 import io.micronaut.inject.BeanContextConditional;
@@ -38,7 +37,7 @@ import org.slf4j.LoggerFactory;
 abstract class AbstractBeanContextConditional implements BeanContextConditional, AnnotationMetadataProvider {
 
     @Override
-    public boolean isEnabled(@NonNull BeanContext context, @Nullable BeanResolutionContext resolutionContext) {
+    public boolean isEnabled(BeanContext context, @Nullable BeanResolutionContext resolutionContext) {
         AnnotationMetadata annotationMetadata = getAnnotationMetadata();
         Condition condition = annotationMetadata.hasStereotype(Requires.class) ? new RequiresCondition(annotationMetadata) : null;
         if (condition == null) {

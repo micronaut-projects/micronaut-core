@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.core.execution;
-
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.CompletionException;
@@ -75,7 +73,7 @@ public sealed interface DelayedExecutionFlow<T> extends ExecutionFlow<T> permits
      * @param hook The hook to call on cancellation
      * @since 4.8.0
      */
-    void onCancel(@NonNull Runnable hook);
+    void onCancel(Runnable hook);
 
     /**
      * Complete this flow from the given flow.
@@ -83,7 +81,7 @@ public sealed interface DelayedExecutionFlow<T> extends ExecutionFlow<T> permits
      * @param flow The input flow
      * @since 4.7.0
      */
-    void completeFrom(@NonNull ExecutionFlow<T> flow);
+    void completeFrom(ExecutionFlow<T> flow);
 
     /**
      * Complete the flow with value / exception.

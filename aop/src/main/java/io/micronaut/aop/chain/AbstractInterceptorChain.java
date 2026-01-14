@@ -56,7 +56,7 @@ abstract class AbstractInterceptorChain<B, R> implements InvocationContext<B, R>
     protected static final Logger LOG = LoggerFactory.getLogger(InterceptorChain.class);
 
     protected final Interceptor<B, R>[] interceptors;
-    protected final Object[] originalParameters;
+    protected final @Nullable Object[] originalParameters;
     protected final int interceptorCount;
     protected volatile MutableConvertibleValues<Object> attributes;
     protected int index = 0;
@@ -69,6 +69,7 @@ abstract class AbstractInterceptorChain<B, R> implements InvocationContext<B, R>
     }
 
     @Override
+    @Nullable
     public Object @NonNull [] getParameterValues() {
         return originalParameters;
     }
@@ -98,62 +99,8 @@ abstract class AbstractInterceptorChain<B, R> implements InvocationContext<B, R>
                     Argument<?>[] arguments = getArguments();
                     localParameters = CollectionUtils.newLinkedHashMap(arguments.length);
                     for (int i = 0; i < arguments.length; i++) {
-                        Argument argument = arguments[i];
-                        int finalIndex = i;
-                        localParameters.put(argument.getName(), new MutableArgumentValue<>() {
-                            @NonNull
-                            @Override
-                            public AnnotationMetadata getAnnotationMetadata() {
-                                return argument.getAnnotationMetadata();
-                            }
-
-                            @Override
-                            public Optional<Argument<?>> getFirstTypeVariable() {
-                                return argument.getFirstTypeVariable();
-                            }
-
-                            @Override
-                            public Argument[] getTypeParameters() {
-                                return argument.getTypeParameters();
-                            }
-
-                            @Override
-                            public Map<String, Argument<?>> getTypeVariables() {
-                                return argument.getTypeVariables();
-                            }
-
-                            @NonNull
-                            @Override
-                            public String getName() {
-                                return argument.getName();
-                            }
-
-                            @NonNull
-                            @Override
-                            public Class<Object> getType() {
-                                return argument.getType();
-                            }
-
-                            @Override
-                            public boolean equalsType(@Nullable Argument<?> other) {
-                                return argument.equalsType(other);
-                            }
-
-                            @Override
-                            public int typeHashCode() {
-                                return argument.typeHashCode();
-                            }
-
-                            @Override
-                            public Object getValue() {
-                                return originalParameters[finalIndex];
-                            }
-
-                            @Override
-                            public void setValue(Object value) {
-                                originalParameters[finalIndex] = value;
-                            }
-                        });
+                        Argument<?> argument = arguments[i];
+                        localParameters.put(argument.getName(), create(argument, i));
                     }
                     localParameters = Collections.unmodifiableMap(localParameters);
                     this.parameters = localParameters;
@@ -161,6 +108,64 @@ abstract class AbstractInterceptorChain<B, R> implements InvocationContext<B, R>
             }
         }
         return localParameters;
+    }
+
+    private <T> MutableArgumentValue<T> create(Argument<T> argument, int finalIndex) {
+        return new MutableArgumentValue<>() {
+            @NonNull
+            @Override
+            public AnnotationMetadata getAnnotationMetadata() {
+                return argument.getAnnotationMetadata();
+            }
+
+            @Override
+            public Optional<Argument<?>> getFirstTypeVariable() {
+                return argument.getFirstTypeVariable();
+            }
+
+            @Override
+            public Argument<?>[] getTypeParameters() {
+                return argument.getTypeParameters();
+            }
+
+            @Override
+            public Map<String, Argument<?>> getTypeVariables() {
+                return argument.getTypeVariables();
+            }
+
+            @NonNull
+            @Override
+            public String getName() {
+                return argument.getName();
+            }
+
+            @NonNull
+            @Override
+            public Class<T> getType() {
+                return argument.getType();
+            }
+
+            @Override
+            public boolean equalsType(@Nullable Argument<?> other) {
+                return argument.equalsType(other);
+            }
+
+            @Override
+            public int typeHashCode() {
+                return argument.typeHashCode();
+            }
+
+            @Override
+            @Nullable
+            public T getValue() {
+                return (T) originalParameters[finalIndex];
+            }
+
+            @Override
+            public void setValue(Object value) {
+                originalParameters[finalIndex] = value;
+            }
+        };
     }
 
     @Override

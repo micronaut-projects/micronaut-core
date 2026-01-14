@@ -17,11 +17,10 @@ package io.micronaut.context;
 
 import io.micronaut.context.exceptions.NoSuchMessageException;
 import io.micronaut.core.annotation.Indexed;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.util.ArgumentUtils;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.Locale;
@@ -42,105 +41,111 @@ public interface MessageSource extends Ordered {
      * An empty message source.
      */
     MessageSource EMPTY = new MessageSource() {
-        @NonNull
         @Override
-        public Optional<String> getRawMessage(@NonNull String code, @NonNull MessageContext context) {
+        public Optional<String> getRawMessage(String code, MessageContext context) {
             return Optional.empty();
         }
 
-        @NonNull
         @Override
-        public String interpolate(@NonNull String template, @NonNull MessageContext context) {
+        public String interpolate(String template, MessageContext context) {
             return template;
         }
     };
 
     /**
      * Resolve a message for the given code and context.
-     * @param code The code
+     *
+     * @param code   The code
      * @param locale The locale to use to resolve messages.
      * @return A message if present
      */
-    default @NonNull Optional<String> getMessage(@NonNull String code, @NonNull Locale locale) {
+    default Optional<String> getMessage(String code, Locale locale) {
         return getMessage(code, MessageContext.of(locale));
     }
 
     /**
      * Resolve a message for the given code and context.
-     * @param code The code
-     * @param locale The locale to use to resolve messages.
+     *
+     * @param code      The code
+     * @param locale    The locale to use to resolve messages.
      * @param variables The variables to use resolve message placeholders
      * @return A message if present
      */
-    default @NonNull Optional<String> getMessage(@NonNull String code, @NonNull Locale locale, @NonNull Object... variables) {
+    default Optional<String> getMessage(String code, Locale locale, Object... variables) {
         return getMessage(code, locale, MessageSourceUtils.variables(variables));
     }
 
     /**
      * Resolve a message for the given code and context.
-     * @param code The code
-     * @param locale The locale to use to resolve messages.
+     *
+     * @param code      The code
+     * @param locale    The locale to use to resolve messages.
      * @param variables The variables to use resolve message placeholders
      * @return A message if present
      */
-    default @NonNull Optional<String> getMessage(@NonNull String code, @NonNull Locale locale, @NonNull Map<String, Object> variables) {
+    default Optional<String> getMessage(String code, Locale locale, Map<String, Object> variables) {
         return getMessage(code, MessageContext.of(locale, variables));
     }
 
     /**
      * Resolve a message for the given code and context.
-     * @param code The code
+     *
+     * @param code    The code
      * @param context The context
      * @return A message if present
      */
-    default @NonNull Optional<String> getMessage(@NonNull String code, @NonNull MessageContext context) {
+    default Optional<String> getMessage(String code, MessageContext context) {
         Optional<String> rawMessage = getRawMessage(code, context);
         return rawMessage.map(message -> this.interpolate(message, context));
     }
 
     /**
      * Resolve a message for the given code and context.
-     * @param code The code
+     *
+     * @param code           The code
      * @param defaultMessage The default message to use if no other message is found
-     * @param locale The locale to use to resolve messages.
+     * @param locale         The locale to use to resolve messages.
      * @return A message if present
      */
-    default @NonNull String getMessage(@NonNull String code, @NonNull String defaultMessage, @NonNull Locale locale) {
+    default String getMessage(String code, String defaultMessage, Locale locale) {
         return getMessage(code, MessageContext.of(locale), defaultMessage);
     }
 
     /**
      * Resolve a message for the given code and context.
-     * @param code The code
+     *
+     * @param code           The code
      * @param defaultMessage The default message to use if no other message is found
-     * @param locale The locale to use to resolve messages.
-     * @param variables The variables to use resolve message placeholders
+     * @param locale         The locale to use to resolve messages.
+     * @param variables      The variables to use resolve message placeholders
      * @return A message if present
      */
-    default @NonNull String getMessage(@NonNull String code, @NonNull String defaultMessage, @NonNull Locale locale, @NonNull Map<String, Object> variables) {
+    default String getMessage(String code, String defaultMessage, Locale locale, Map<String, Object> variables) {
         return getMessage(code, MessageContext.of(locale, variables), defaultMessage);
     }
 
     /**
      * Resolve a message for the given code and context.
-     * @param code The code
+     *
+     * @param code           The code
      * @param defaultMessage The default message to use if no other message is found
-     * @param locale The locale to use to resolve messages.
-     * @param variables The variables to use resolve message placeholders
+     * @param locale         The locale to use to resolve messages.
+     * @param variables      The variables to use resolve message placeholders
      * @return A message if present
      */
-    default @NonNull String getMessage(@NonNull String code, @NonNull String defaultMessage, @NonNull Locale locale, @NonNull Object... variables) {
+    default String getMessage(String code, String defaultMessage, Locale locale, Object... variables) {
         return getMessage(code, defaultMessage, locale, MessageSourceUtils.variables(variables));
     }
 
     /**
      * Resolve a message for the given code and context.
-     * @param code The code
-     * @param context The context
+     *
+     * @param code           The code
+     * @param context        The context
      * @param defaultMessage The default message to use if no other message is found
      * @return A message if present
      */
-    default @NonNull String getMessage(@NonNull String code, @NonNull MessageContext context, @NonNull String defaultMessage) {
+    default String getMessage(String code, MessageContext context, String defaultMessage) {
         ArgumentUtils.requireNonNull("defaultMessage", defaultMessage);
         String rawMessage = getRawMessage(code, context, defaultMessage);
         return interpolate(rawMessage, context);
@@ -148,42 +153,45 @@ public interface MessageSource extends Ordered {
 
     /**
      * Resolve a message for the given code and context.
-     * @param code The code
+     *
+     * @param code    The code
      * @param context The context
      * @return A message if present
      */
-    @NonNull Optional<String> getRawMessage(@NonNull String code, @NonNull MessageContext context);
+    Optional<String> getRawMessage(String code, MessageContext context);
 
     /**
      * Resolve a message for the given code and context.
-     * @param code The code
-     * @param context The context
+     *
+     * @param code           The code
+     * @param context        The context
      * @param defaultMessage The default message to use if no other message is found
      * @return A message if present
      */
-    default @NonNull String getRawMessage(@NonNull String code, @NonNull MessageContext context, @NonNull String defaultMessage) {
+    default String getRawMessage(String code, MessageContext context, String defaultMessage) {
         ArgumentUtils.requireNonNull("defaultMessage", defaultMessage);
         return getRawMessage(code, context).orElse(defaultMessage);
     }
 
     /**
      * Interpolate the given message template.
+     *
      * @param template The template
-     * @param context The context to use.
+     * @param context  The context to use.
      * @return The interpolated message.
      * @throws IllegalArgumentException If any argument specified is null
      */
-    @NonNull String interpolate(@NonNull String template, @NonNull MessageContext context);
+    String interpolate(String template, MessageContext context);
 
     /**
      * Resolve a message for the given code and context or throw an exception.
      *
-     * @param code The code
+     * @param code    The code
      * @param context The context
      * @return The message
      * @throws NoSuchMessageException if the message is not found
      */
-    default @NonNull String getRequiredMessage(@NonNull String code, @NonNull MessageContext context) {
+    default String getRequiredMessage(String code, MessageContext context) {
         return getMessage(code, context).orElseThrow(() ->
             new NoSuchMessageException(code)
         );
@@ -192,14 +200,14 @@ public interface MessageSource extends Ordered {
     /**
      * Resolve a message for the given code and context or throw an exception.
      *
-     * @param code The code
+     * @param code    The code
      * @param context The context
      * @return The message
      * @throws NoSuchMessageException if the message is not found
      */
-    default @NonNull String getRequiredRawMessage(@NonNull String code, @NonNull MessageContext context) {
+    default String getRequiredRawMessage(String code, MessageContext context) {
         return getRawMessage(code, context).orElseThrow(() ->
-                new NoSuchMessageException(code)
+            new NoSuchMessageException(code)
         );
     }
 
@@ -210,57 +218,63 @@ public interface MessageSource extends Ordered {
         /**
          * The default message context.
          */
-        MessageContext DEFAULT = new MessageContext() { };
+        MessageContext DEFAULT = new MessageContext() {
+        };
 
         /**
          * The locale to use to resolve messages.
+         *
          * @return The locale
          */
-        @NonNull default Locale getLocale() {
+        default Locale getLocale() {
             return Locale.getDefault();
         }
 
         /**
          * The locale to use to resolve messages.
+         *
          * @param defaultLocale The locale to use if no locale is present
          * @return The locale
          */
-        @NonNull default Locale getLocale(@Nullable Locale defaultLocale) {
+        default Locale getLocale(@Nullable Locale defaultLocale) {
             return defaultLocale != null ? defaultLocale : getLocale();
         }
 
         /**
          * @return The variables to use resolve message placeholders
          */
-        @NonNull default Map<String, Object> getVariables() {
+        default Map<String, Object> getVariables() {
             return Collections.emptyMap();
         }
 
         /**
          * Obtain a message context for the given locale.
+         *
          * @param locale The locale
          * @return The message context
          */
-        static @NonNull MessageContext of(@Nullable Locale locale) {
+        static MessageContext of(@Nullable Locale locale) {
             return new DefaultMessageContext(locale, null);
         }
 
         /**
          * Obtain a message context for the given variables.
+         *
          * @param variables The variables.
          * @return The message context
          */
-        static @NonNull MessageContext of(@Nullable Map<String, Object> variables) {
+        static MessageContext of(@Nullable Map<String, Object> variables) {
             return new DefaultMessageContext(null, variables);
         }
 
         /**
          * Obtain a message context for the given locale and variables.
-         * @param locale The locale
+         *
+         * @param locale    The locale
          * @param variables The variables.
          * @return The message context
          */
-        static @NonNull MessageContext of(@Nullable Locale locale, @Nullable Map<String, Object> variables) {
+        static MessageContext of(@Nullable Locale locale, @Nullable Map<String, Object> variables) {
             return new DefaultMessageContext(locale, variables);
         }
     }

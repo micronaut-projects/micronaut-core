@@ -32,7 +32,6 @@ import io.micronaut.context.exceptions.DependencyInjectionException;
 import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.DefaultMutableConversionService;
@@ -93,7 +92,7 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
      *
      * @param environmentNames The environment names
      */
-    public DefaultApplicationContext(@NonNull String... environmentNames) {
+    public DefaultApplicationContext(String... environmentNames) {
         this(ClassPathResourceLoader.defaultLoader(DefaultApplicationContext.class.getClassLoader()), environmentNames);
     }
 
@@ -103,23 +102,21 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
      * @param environmentNames The environment names
      * @param resourceLoader   The class loader
      */
-    public DefaultApplicationContext(@NonNull ClassPathResourceLoader resourceLoader, @NonNull String... environmentNames) {
+    public DefaultApplicationContext(ClassPathResourceLoader resourceLoader, String... environmentNames) {
         this(new ApplicationContextConfiguration() {
 
-            @NonNull
             @Override
             public ClassLoader getClassLoader() {
                 return getResourceLoader().getClassLoader();
             }
 
             @Override
-            public @NonNull
+            public
             ClassPathResourceLoader getResourceLoader() {
                 ArgumentUtils.requireNonNull("resourceLoader", resourceLoader);
                 return resourceLoader;
             }
 
-            @NonNull
             @Override
             public List<String> getEnvironments() {
                 ArgumentUtils.requireNonNull("environmentNames", environmentNames);
@@ -133,7 +130,7 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
      *
      * @param configuration The application context configuration
      */
-    public DefaultApplicationContext(@NonNull ApplicationContextConfiguration configuration) {
+    public DefaultApplicationContext(ApplicationContextConfiguration configuration) {
         super(configuration);
         ArgumentUtils.requireNonNull("configuration", configuration);
         this.configuration = configuration;
@@ -148,8 +145,8 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
      * @param configuration      The application context configuration
      * @param environment        The environment
      */
-    DefaultApplicationContext(@NonNull ApplicationContextConfiguration configuration,
-                              @NonNull Environment environment) {
+    DefaultApplicationContext(ApplicationContextConfiguration configuration,
+ Environment environment) {
         super(configuration);
         ArgumentUtils.requireNonNull("configuration", configuration);
         ArgumentUtils.requireNonNull("environment", environment);
@@ -183,8 +180,7 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
     }
 
     @Override
-    @NonNull
-    public <T> ApplicationContext registerSingleton(@NonNull Class<T> type, @NonNull T singleton, @Nullable Qualifier<T> qualifier, boolean inject) {
+    public <T> ApplicationContext registerSingleton(Class<T> type, T singleton, @Nullable Qualifier<T> qualifier, boolean inject) {
         return (ApplicationContext) super.registerSingleton(type, singleton, qualifier, inject);
     }
 
@@ -194,8 +190,7 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
      * @param configuration The application context configuration
      * @return The environment instance
      */
-    @NonNull
-    private Environment createEnvironment(@NonNull ApplicationContextConfiguration configuration) {
+    private Environment createEnvironment(ApplicationContextConfiguration configuration) {
         if (configuration.isEnableDefaultPropertySources() && isBootstrapEnabled(configuration)) {
             return Environment.create(new ApplicationContextConfigurationDelegate(configuration) {
 
@@ -280,19 +275,16 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
     }
 
     @Override
-    @NonNull
     public MutableConversionService getConversionService() {
         return getEnvironment().getConversionService();
     }
 
     @Override
-    @NonNull
     public Environment getEnvironment() {
         return environment;
     }
 
     @Override
-    @NonNull
     public synchronized ApplicationContext start() {
         environment.start();
         return (ApplicationContext) super.start();
@@ -312,7 +304,6 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
     }
 
     @Override
-    @NonNull
     public synchronized ApplicationContext stop() {
         super.stop();
         if (environmentManaged) {
@@ -490,9 +481,9 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
 
     @Override
     protected <T> void collectIterableBeans(@Nullable BeanResolutionContext resolutionContext,
-                                            @NonNull BeanDefinition<T> iterableBean,
-                                            @NonNull Set<BeanDefinition<T>> targetSet,
-                                            @NonNull Argument<T> beanType) {
+                                            BeanDefinition<T> iterableBean,
+                                            Set<BeanDefinition<T>> targetSet,
+                                            Argument<T> beanType) {
         try (BeanResolutionContext rc = newResolutionContext(iterableBean, resolutionContext)) {
             if (iterableBean.hasDeclaredStereotype(EachProperty.class)) {
                 transformEachPropertyBeanDefinition(rc, iterableBean, targetSet);
@@ -575,10 +566,10 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
         }
     }
 
-    private <T> void transformEachBeanBeanDefinition(@NonNull BeanResolutionContext resolutionContext,
+    private <T> void transformEachBeanBeanDefinition(BeanResolutionContext resolutionContext,
                                                      BeanDefinition<T> originBeanDefinition,
                                                      Set<BeanDefinition<T>> transformedCandidates,
-                                                     @NonNull Argument<T> beanType) {
+                                                     Argument<T> beanType) {
         AnnotationValue<EachBean> annotationValue = originBeanDefinition.getAnnotation(EachBean.class);
         if (annotationValue == null) {
             transformedCandidates.add(originBeanDefinition);
@@ -633,9 +624,9 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
         }
     }
 
-    private <T> void transformEachPropertyBeanDefinition(@NonNull BeanResolutionContext resolutionContext,
-                                                         @NonNull BeanDefinition<T> candidate,
-                                                         @NonNull Set<BeanDefinition<T>> transformedCandidates) {
+    private <T> void transformEachPropertyBeanDefinition(BeanResolutionContext resolutionContext,
+                                                         BeanDefinition<T> candidate,
+                                                         Set<BeanDefinition<T>> transformedCandidates) {
         try {
             final String prefix = candidate.stringValue(ConfigurationReader.class, ConfigurationReader.PREFIX).orElse(null);
             if (prefix != null) {

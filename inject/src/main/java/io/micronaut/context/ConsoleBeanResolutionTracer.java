@@ -19,7 +19,6 @@ import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertyEntry;
 import io.micronaut.context.env.PropertySource;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.order.OrderUtil;
@@ -163,7 +162,7 @@ abstract sealed class ConsoleBeanResolutionTracer
      * Write the output for the tracer.
      * @param output The output
      */
-    protected abstract void writeOutput(@NonNull String output);
+    protected abstract void writeOutput(String output);
 
     @Override
     public void traceBeanCreation(
@@ -344,7 +343,6 @@ abstract sealed class ConsoleBeanResolutionTracer
     }
 
 
-    @NonNull
     private static String padLeft(BeanResolutionContext resolutionContext, int amount) {
         int size = resolutionContext.getPath().size() + amount;
         String prefix = "";
