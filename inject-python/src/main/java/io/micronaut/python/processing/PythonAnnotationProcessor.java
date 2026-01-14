@@ -41,13 +41,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -137,20 +131,18 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             String[] srcDirs = annotation.src();
             boolean hasSrcDirs = srcDirs != null && srcDirs.length != 0;
             if (hasSrcDirs) {
-                for (var srcDir : srcDirs) {
-                    try {
-                        List<Source> sourceList = transformedList
-                            .stream()
-                            .map(PythonAstParser.TransformResult::transformedSource)
-                            .toList();
-                        environment = parser.parse(
-                            sourceList,
-                            srcDir,
-                            javaVisitorContext
-                        );
-                    } catch (Exception e) {
-                        throw new ProcessingException(originatingElement, "Error parsing transformed python code: " + e.getMessage());
-                    }
+                try {
+                    List<Source> sourceList = transformedList
+                        .stream()
+                        .map(PythonAstParser.TransformResult::transformedSource)
+                        .toList();
+                    environment = parser.parse(
+                        sourceList,
+                        Arrays.asList(srcDirs),
+                        javaVisitorContext
+                    );
+                } catch (Exception e) {
+                    throw new ProcessingException(originatingElement, "Error parsing transformed python code: " + e.getMessage());
                 }
             }
 
@@ -159,20 +151,15 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             if (StringUtils.isNotEmpty(annotation.code())) {
                 mainPy = annotation.code();
                 // Write original Python code to META-INF
-                if (mainPy != null) {
-                    javaVisitorContext.visitMetaInfFile(APPLICATION_LAUNCHER_PATH, originatingElement)
-                        .ifPresent(generatedFile -> {
-                            try (var writer = generatedFile.openWriter()) {
-                                writer.write(mainPy);
-                            } catch (IOException e) {
-                                throw new ProcessingException(originatingElement, "Failed to write Python code to [" + APPLICATION_LAUNCHER_PATH + "]: " + e.getMessage(), e);
-                            }
-                        });
-                }
+                javaVisitorContext.visitMetaInfFile(APPLICATION_LAUNCHER_PATH, originatingElement)
+                    .ifPresent(generatedFile -> {
+                        try (var writer = generatedFile.openWriter()) {
+                            writer.write(mainPy);
+                        } catch (IOException e) {
+                            throw new ProcessingException(originatingElement, "Failed to write Python code to [" + APPLICATION_LAUNCHER_PATH + "]: " + e.getMessage(), e);
+                        }
+                    });
             } else {
-                // on concrete main
-                mainPy = null;
-
                 if (hasSrcDirs) {
                     // source mode, so we need to write out each source to META-INF
                     Map<PathEntry, List<String>> allModules = new LinkedHashMap<>();

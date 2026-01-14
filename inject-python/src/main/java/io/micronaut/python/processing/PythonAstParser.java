@@ -21,15 +21,6 @@ import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.processing.visitor.ClassDef;
 import io.micronaut.python.processing.visitor.DecoratorDef;
 import io.micronaut.python.processing.visitor.ScriptDef;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.StringWriter;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.function.Function;
-
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.HostAccess;
 import org.graalvm.polyglot.Source;
@@ -38,6 +29,15 @@ import org.graalvm.python.embedding.GraalPyResources;
 import org.graalvm.python.embedding.VirtualFileSystem;
 import org.intellij.lang.annotations.Language;
 import org.jetbrains.annotations.NotNull;
+
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
 
 public final class PythonAstParser {
 
@@ -123,18 +123,18 @@ public final class PythonAstParser {
      * @return The parsed environment
      */
     public PythonEnvironment parse(List<Source> sources, String srcDir) {
-        return parse(sources, srcDir, null);
+        return parse(sources, List.of(srcDir), null);
     }
 
     /**
      * Parse the given sources located within the given source directory.
      *
      * @param sources The sources
-     * @param srcDir  The source directory
+     * @param srcDirs  The source directories
      * @param visitorContext The visitor context for constant resolution
      * @return The parsed environment
      */
-    public PythonEnvironment parse(List<Source> sources, String srcDir, VisitorContext visitorContext) {
+    public PythonEnvironment parse(List<Source> sources, List<String> srcDirs, VisitorContext visitorContext) {
         Map<String, DecoratorDef> decorators = new LinkedHashMap<>();
         Map<String, ClassDef> classes = new LinkedHashMap<>();
         Map<String, ScriptDef> scripts = new LinkedHashMap<>();
@@ -154,15 +154,19 @@ public final class PythonAstParser {
         });
 
         for (Source source : sources) {
-            String packageName = getPackageNameOfSource(srcDir, source);
-            bindings.putMember("src", source.getCharacters());
-            bindings.putMember("package_name", packageName);
-            bindings.putMember("file_name", source.getName());
-            bindings.putMember("visitor_context", visitorContext);
-            context.eval(Source.create(
-                PYTHON,
-                getSource()
-            ));
+            for (String srcDir : srcDirs) {
+                if (source.getPath().startsWith(srcDir)) {
+                    String packageName = getPackageNameOfSource(srcDir, source);
+                    bindings.putMember("src", source.getCharacters());
+                    bindings.putMember("package_name", packageName);
+                    bindings.putMember("file_name", source.getName());
+                    bindings.putMember("visitor_context", visitorContext);
+                    context.eval(Source.create(
+                        PYTHON,
+                        getSource()
+                    ));
+                }
+            }
         }
         return new PythonEnvironment(
             classes,
