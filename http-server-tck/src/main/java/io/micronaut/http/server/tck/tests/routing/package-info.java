@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2022 original authors
+ * Copyright 2017-2026 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,21 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.tck;
-
-import io.micronaut.core.annotation.Experimental;
-import java.util.Map;
-
-/**
- * {@link ServerUnderTestProvider} implemntation which returns an instance of {@link EmbeddedServerUnderTest}.
- * @author Sergio del Amo
- * @since 3.8.0
- */
-@Experimental
-public class EmbeddedServerUnderTestProvider implements ServerUnderTestProvider {
-
-    @Override
-    public ServerUnderTest getServer(Map<String, Object> properties) {
-        return new EmbeddedServerUnderTest(properties);
-    }
-}
+/** * The package info. */
+@NullMarked
+package io.micronaut.http.server.tck.tests.routing; import org.jspecify.annotations.NullMarked;

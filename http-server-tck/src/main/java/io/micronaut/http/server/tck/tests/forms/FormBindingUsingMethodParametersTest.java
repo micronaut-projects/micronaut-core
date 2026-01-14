@@ -17,7 +17,6 @@ package io.micronaut.http.server.tck.tests.forms;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Introspected;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.http.HttpRequest;
@@ -84,6 +83,6 @@ public class FormBindingUsingMethodParametersTest {
 
     @Introspected
     @ReflectiveAccess
-    record Book(@NonNull String title, @Nullable Integer pages) {
+    record Book(String title, @Nullable Integer pages) {
     }
 }

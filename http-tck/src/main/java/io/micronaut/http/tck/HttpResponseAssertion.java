@@ -16,7 +16,6 @@
 package io.micronaut.http.tck;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -48,7 +47,6 @@ public final class HttpResponseAssertion {
         this.responseConsumer = responseConsumer;
     }
 
-    @NonNull
     public Optional<Consumer<HttpResponse<?>>> getResponseConsumer() {
         return Optional.ofNullable(responseConsumer);
     }

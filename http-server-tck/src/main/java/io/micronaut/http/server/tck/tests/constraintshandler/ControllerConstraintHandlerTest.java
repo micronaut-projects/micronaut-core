@@ -18,7 +18,6 @@ package io.micronaut.http.server.tck.tests.constraintshandler;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Introspected;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.core.type.Argument;
@@ -259,26 +258,22 @@ public class ControllerConstraintHandlerTest {
     static class CredentialsWithNonNull {
         @NotBlank
         @Email
-        @NonNull
         private final String username;
 
         @NotBlank
-        @NonNull
         private final String password;
 
-        CredentialsWithNonNull(@JsonProperty("username") @NonNull String username, // @JsonProperty for JacksonDatabind
-                               @JsonProperty("password") @NonNull String password // @JsonProperty for JacksonDatabind
+        CredentialsWithNonNull(@JsonProperty("username") String username, // @JsonProperty for JacksonDatabind
+                               @JsonProperty("password") String password // @JsonProperty for JacksonDatabind
         ) {
             this.username = username;
             this.password = password;
         }
 
-        @NonNull
         public String getUsername() {
             return username;
         }
 
-        @NonNull
         public String getPassword() {
             return password;
         }

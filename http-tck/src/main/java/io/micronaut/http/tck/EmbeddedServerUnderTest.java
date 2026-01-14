@@ -17,7 +17,6 @@ package io.micronaut.http.tck;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -44,7 +43,7 @@ public class EmbeddedServerUnderTest implements ServerUnderTest {
     private HttpClient httpClient;
     private BlockingHttpClient client;
 
-    public EmbeddedServerUnderTest(@NonNull Map<String, Object> properties) {
+    public EmbeddedServerUnderTest(Map<String, Object> properties) {
         properties.putIfAbsent("micronaut.server.port", -1);
         properties.putIfAbsent("micronaut.server.ssl.port", -1);
         this.embeddedServer = ApplicationContext.run(EmbeddedServer.class, properties);
@@ -94,18 +93,15 @@ public class EmbeddedServerUnderTest implements ServerUnderTest {
     }
 
     @Override
-    @NonNull
     public Optional<Integer> getPort() {
         return Optional.ofNullable(embeddedServer).map(EmbeddedServer::getPort);
     }
 
     @Override
-    @NonNull
     public Optional<URL> getURL() {
         return Optional.ofNullable(embeddedServer).map(EmbeddedServer::getURL);
     }
 
-    @NonNull
     private HttpClient getHttpClient() {
         if (httpClient == null) {
             this.httpClient = getApplicationContext().createBean(HttpClient.class, embeddedServer.getURL());
@@ -113,7 +109,6 @@ public class EmbeddedServerUnderTest implements ServerUnderTest {
         return httpClient;
     }
 
-    @NonNull
     private BlockingHttpClient getBlockingHttpClient() {
         if (client == null) {
             this.client = getHttpClient().toBlocking();
