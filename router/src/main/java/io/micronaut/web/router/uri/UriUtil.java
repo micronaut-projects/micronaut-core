@@ -14,9 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.web.router.uri;
-
-import org.jspecify.annotations.NonNull;
-
 import java.net.URI;
 
 /**
@@ -77,7 +74,7 @@ public final class UriUtil {
      * @param requestTarget The HTTP request line
      * @return {@code true} iff this is a valid relative URI
      */
-    public static boolean isValidPath(@NonNull String requestTarget) {
+    public static boolean isValidPath(String requestTarget) {
         if (requestTarget.isEmpty() || requestTarget.charAt(0) != '/') {
             return false;
         }
@@ -121,7 +118,7 @@ public final class UriUtil {
      * @param requestTarget The HTTP request target
      * @return {@code true} if this URL is relative
      */
-    public static boolean isRelative(@NonNull String requestTarget) {
+    public static boolean isRelative(String requestTarget) {
         // yes this code is weird. There's a fuzz test that checks it against the whatwg spec
         boolean start = true;
         for (int i = 0; i < requestTarget.length(); i++) {

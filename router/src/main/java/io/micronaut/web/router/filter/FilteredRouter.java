@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.web.router.filter;
-
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
@@ -62,9 +60,8 @@ public class FilteredRouter implements Router {
         this.routeFilter = routeFilter;
     }
 
-    @NonNull
     @Override
-    public <T, R> Stream<UriRouteMatch<T, R>> findAny(@NonNull CharSequence uri, @Nullable HttpRequest<?> context) {
+    public <T, R> Stream<UriRouteMatch<T, R>> findAny(CharSequence uri, @Nullable HttpRequest<?> context) {
         final Stream<UriRouteMatch<T, R>> matchStream = router.findAny(uri, context);
         if (context != null) {
             return matchStream.filter(routeFilter.filter(context));
@@ -73,8 +70,7 @@ public class FilteredRouter implements Router {
     }
 
     @Override
-    @NonNull
-    public <T, R> List<UriRouteMatch<T, R>> findAny(@NonNull HttpRequest<?> request) {
+    public <T, R> List<UriRouteMatch<T, R>> findAny(HttpRequest<?> request) {
         return router.<T, R>findAny(request).stream().filter(routeFilter.filter(request)).toList();
     }
 
@@ -88,9 +84,8 @@ public class FilteredRouter implements Router {
         router.applyDefaultPorts(ports);
     }
 
-    @NonNull
     @Override
-    public <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpMethod httpMethod, @NonNull CharSequence uri, @Nullable HttpRequest<?> context) {
+    public <T, R> Stream<UriRouteMatch<T, R>> find(HttpMethod httpMethod, CharSequence uri, @Nullable HttpRequest<?> context) {
         final Stream<UriRouteMatch<T, R>> matchStream = router.find(httpMethod, uri, context);
         if (context != null) {
             return matchStream.filter(routeFilter.filter(context));
@@ -98,73 +93,70 @@ public class FilteredRouter implements Router {
         return matchStream;
     }
 
-    @NonNull
     @Override
-    public <T, R> List<UriRouteMatch<T, R>> findAllClosest(@NonNull HttpRequest<?> request) {
+    public <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request) {
         List<UriRouteMatch<T, R>> closestMatches = router.findAllClosest(request);
         return closestMatches.stream().filter(routeFilter.filter(request))
                     .collect(Collectors.toList());
     }
 
-    @NonNull
     @Override
-    public <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpRequest<?> request, @NonNull CharSequence uri) {
+    public <T, R> Stream<UriRouteMatch<T, R>> find(HttpRequest<?> request, CharSequence uri) {
         return router.find(request, uri);
     }
 
-    @NonNull
     @Override
     public Stream<UriRouteInfo<?, ?>> uriRoutes() {
         return router.uriRoutes();
     }
 
     @Override
-    public <T, R> Optional<UriRouteMatch<T, R>> route(@NonNull HttpMethod httpMethod, @NonNull CharSequence uri) {
+    public <T, R> Optional<UriRouteMatch<T, R>> route(HttpMethod httpMethod, CharSequence uri) {
         return router.route(httpMethod, uri);
     }
 
     @Override
-    public <R> Optional<RouteMatch<R>> route(@NonNull HttpStatus status) {
+    public <R> Optional<RouteMatch<R>> route(HttpStatus status) {
         return router.route(status);
     }
 
     @Override
-    public <R> Optional<RouteMatch<R>> route(@NonNull Class<?> originatingClass, @NonNull HttpStatus status) {
+    public <R> Optional<RouteMatch<R>> route(Class<?> originatingClass, HttpStatus status) {
         return router.route(originatingClass, status);
     }
 
     @Override
-    public <R> Optional<RouteMatch<R>> route(@NonNull Throwable error) {
+    public <R> Optional<RouteMatch<R>> route(Throwable error) {
         return router.route(error);
     }
 
     @Override
-    public <R> Optional<RouteMatch<R>> route(@NonNull Class<?> originatingClass, @NonNull Throwable error) {
+    public <R> Optional<RouteMatch<R>> route(Class<?> originatingClass, Throwable error) {
         return router.route(originatingClass, error);
     }
 
     @Override
-    public <R> Optional<RouteMatch<R>> findErrorRoute(@NonNull Class<?> originatingClass, @NonNull Throwable error, HttpRequest<?> request) {
+    public <R> Optional<RouteMatch<R>> findErrorRoute(Class<?> originatingClass, Throwable error, HttpRequest<?> request) {
         return router.findErrorRoute(originatingClass, error, request);
     }
 
     @Override
-    public <R> Optional<RouteMatch<R>> findErrorRoute(@NonNull Throwable error, HttpRequest<?> request) {
+    public <R> Optional<RouteMatch<R>> findErrorRoute(Throwable error, HttpRequest<?> request) {
         return router.findErrorRoute(error, request);
     }
 
     @Override
-    public <R> Optional<RouteMatch<R>> findStatusRoute(@NonNull Class<?> originatingClass, @NonNull HttpStatus status, HttpRequest<?> request) {
+    public <R> Optional<RouteMatch<R>> findStatusRoute(Class<?> originatingClass, HttpStatus status, HttpRequest<?> request) {
         return router.findStatusRoute(originatingClass, status, request);
     }
 
     @Override
-    public <R> Optional<RouteMatch<R>> findStatusRoute(@NonNull Class<?> originatingClass, int statusCode, HttpRequest<?> request) {
+    public <R> Optional<RouteMatch<R>> findStatusRoute(Class<?> originatingClass, int statusCode, HttpRequest<?> request) {
         return router.findStatusRoute(originatingClass, statusCode, request);
     }
 
     @Override
-    public <R> Optional<RouteMatch<R>> findStatusRoute(@NonNull HttpStatus status, HttpRequest<?> request) {
+    public <R> Optional<RouteMatch<R>> findStatusRoute(HttpStatus status, HttpRequest<?> request) {
         return router.findStatusRoute(status, request);
     }
 
@@ -173,9 +165,8 @@ public class FilteredRouter implements Router {
         return router.findStatusRoute(statusCode, request);
     }
 
-    @NonNull
     @Override
-    public List<GenericHttpFilter> findFilters(@NonNull HttpRequest<?> request) {
+    public List<GenericHttpFilter> findFilters(HttpRequest<?> request) {
         return router.findFilters(request);
     }
 
@@ -190,43 +181,42 @@ public class FilteredRouter implements Router {
     }
 
     @Override
-    public <T, R> Optional<UriRouteMatch<T, R>> GET(@NonNull CharSequence uri) {
+    public <T, R> Optional<UriRouteMatch<T, R>> GET(CharSequence uri) {
         return router.GET(uri);
     }
 
     @Override
-    public <T, R> Optional<UriRouteMatch<T, R>> POST(@NonNull CharSequence uri) {
+    public <T, R> Optional<UriRouteMatch<T, R>> POST(CharSequence uri) {
         return router.POST(uri);
     }
 
     @Override
-    public <T, R> Optional<UriRouteMatch<T, R>> PUT(@NonNull CharSequence uri) {
+    public <T, R> Optional<UriRouteMatch<T, R>> PUT(CharSequence uri) {
         return router.PUT(uri);
     }
 
     @Override
-    public <T, R> Optional<UriRouteMatch<T, R>> PATCH(@NonNull CharSequence uri) {
+    public <T, R> Optional<UriRouteMatch<T, R>> PATCH(CharSequence uri) {
         return router.PATCH(uri);
     }
 
     @Override
-    public <T, R> Optional<UriRouteMatch<T, R>> DELETE(@NonNull CharSequence uri) {
+    public <T, R> Optional<UriRouteMatch<T, R>> DELETE(CharSequence uri) {
         return router.DELETE(uri);
     }
 
     @Override
-    public <T, R> Optional<UriRouteMatch<T, R>> OPTIONS(@NonNull CharSequence uri) {
+    public <T, R> Optional<UriRouteMatch<T, R>> OPTIONS(CharSequence uri) {
         return router.OPTIONS(uri);
     }
 
     @Override
-    public <T, R> Optional<UriRouteMatch<T, R>> HEAD(@NonNull CharSequence uri) {
+    public <T, R> Optional<UriRouteMatch<T, R>> HEAD(CharSequence uri) {
         return router.HEAD(uri);
     }
 
-    @NonNull
     @Override
-    public <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpRequest<?> request) {
+    public <T, R> Stream<UriRouteMatch<T, R>> find(HttpRequest<?> request) {
         Stream<UriRouteMatch<T, R>> matches = router.find(request);
         return matches.filter(routeFilter.filter(request));
     }

@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.websocket;
-
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.client.HttpClientConfiguration;
 
@@ -41,7 +39,6 @@ public interface WebSocketClientFactory {
      * @return The client
      * @deprecated Use {@link #createWebSocketClient(URI)} instead
      */
-    @NonNull
     @Deprecated
     default WebSocketClient createWebSocketClient(@Nullable URL url) {
         try {
@@ -60,9 +57,8 @@ public interface WebSocketClientFactory {
      * @return The client
      * @deprecated Use {@link #createWebSocketClient(URI, HttpClientConfiguration)} instead
      */
-    @NonNull
     @Deprecated
-    default WebSocketClient createWebSocketClient(@Nullable URL url, @NonNull HttpClientConfiguration configuration) {
+    default WebSocketClient createWebSocketClient(@Nullable URL url, HttpClientConfiguration configuration) {
         try {
             return createWebSocketClient(url != null ? url.toURI() : null, configuration);
         } catch (URISyntaxException e) {
@@ -78,7 +74,6 @@ public interface WebSocketClientFactory {
      * @return The client
      * @since 3.2.0
      */
-    @NonNull
     default WebSocketClient createWebSocketClient(@Nullable URI uri) {
         try {
             return createWebSocketClient(uri != null ? uri.toURL() : null);
@@ -96,8 +91,7 @@ public interface WebSocketClientFactory {
      * @return The client
      * @since 3.2.0
      */
-    @NonNull
-    default WebSocketClient createWebSocketClient(@Nullable URI uri, @NonNull HttpClientConfiguration configuration) {
+    default WebSocketClient createWebSocketClient(@Nullable URI uri, HttpClientConfiguration configuration) {
         try {
             return createWebSocketClient(uri != null ? uri.toURL() : null, configuration);
         } catch (MalformedURLException e) {

@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.web.router;
-
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.reflect.ClassUtils;
@@ -219,28 +217,24 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         this.ports = new HashSet<>(ports);
     }
 
-    @NonNull
     @Override
-    public <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpRequest<?> request, @NonNull CharSequence uri) {
+    public <T, R> Stream<UriRouteMatch<T, R>> find(HttpRequest<?> request, CharSequence uri) {
         return this.<T, R>toMatches(uri.toString(), findInternal(request)).stream();
     }
 
-    @NonNull
     @Override
-    public <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpRequest<?> request) {
+    public <T, R> Stream<UriRouteMatch<T, R>> find(HttpRequest<?> request) {
         return this.<T, R>toMatches(request.getPath(), findInternal(request)).stream();
     }
 
-    @NonNull
     @Override
-    public <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpMethod httpMethod, @NonNull CharSequence uri, @Nullable HttpRequest<?> context) {
+    public <T, R> Stream<UriRouteMatch<T, R>> find(HttpMethod httpMethod, CharSequence uri, @Nullable HttpRequest<?> context) {
         return this.<T, R>toMatches(
                 uri.toString(),
             allRoutesByMethod.getOrDefault(httpMethod.name(), EMPTY)
         ).stream();
     }
 
-    @NonNull
     @Override
     public Stream<UriRouteInfo<?, ?>> uriRoutes() {
         return Stream.concat(
@@ -250,7 +244,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     }
 
     @Override
-    public <T, R> UriRouteMatch<T, R> findClosest(@NonNull HttpRequest<?> request) throws DuplicateRouteException {
+    public <T, R> UriRouteMatch<T, R> findClosest(HttpRequest<?> request) throws DuplicateRouteException {
         List<UriRouteInfo<Object, Object>> routes = findInternal(request);
         if (routes.isEmpty()) {
             return null;
@@ -283,9 +277,8 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         return null;
     }
 
-    @NonNull
     @Override
-    public <T, R> List<UriRouteMatch<T, R>> findAllClosest(@NonNull HttpRequest<?> request) {
+    public <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request) {
         List<UriRouteInfo<Object, Object>> routes = findInternal(request);
         if (routes.isEmpty()) {
             return Collections.emptyList();
@@ -399,9 +392,8 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         return uriRoutes;
     }
 
-    @NonNull
     @Override
-    public <T, R> Optional<UriRouteMatch<T, R>> route(@NonNull HttpMethod httpMethod, @NonNull CharSequence uri) {
+    public <T, R> Optional<UriRouteMatch<T, R>> route(HttpMethod httpMethod, CharSequence uri) {
         for (UriRouteInfo<Object, Object> uriRouteInfo : methodRoutesByMethod.getOrDefault(httpMethod, EMPTY)) {
             Optional<UriRouteMatch<Object, Object>> match = uriRouteInfo.match(uri.toString());
             if (match.isPresent()) {
@@ -412,7 +404,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     }
 
     @Override
-    public <R> Optional<RouteMatch<R>> route(@NonNull HttpStatus status) {
+    public <R> Optional<RouteMatch<R>> route(HttpStatus status) {
         for (StatusRouteInfo<Object, Object> statusRouteInfo : statusRoutes) {
             if (statusRouteInfo.originatingType() == null) {
                 Optional<RouteMatch<Object>> match = statusRouteInfo.match(status);
@@ -425,7 +417,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     }
 
     @Override
-    public <R> Optional<RouteMatch<R>> route(@NonNull Class<?> originatingClass, @NonNull HttpStatus status) {
+    public <R> Optional<RouteMatch<R>> route(Class<?> originatingClass, HttpStatus status) {
         for (StatusRouteInfo<Object, Object> statusRouteInfo : statusRoutes) {
             Optional<RouteMatch<Object>> match = statusRouteInfo.match(originatingClass, status);
             if (match.isPresent()) {
@@ -436,7 +428,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     }
 
     @Override
-    public <R> Optional<RouteMatch<R>> route(@NonNull Class<?> originatingClass, @NonNull Throwable error) {
+    public <R> Optional<RouteMatch<R>> route(Class<?> originatingClass, Throwable error) {
         var matchedRoutes = new ArrayList<RouteMatch<R>>();
         for (ErrorRouteInfo<Object, Object> errorRouteInfo : errorRoutes) {
             Optional match = errorRouteInfo.match(originatingClass, error);
@@ -449,15 +441,15 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
 
     @Override
     public <R> Optional<RouteMatch<R>> findErrorRoute(
-            @NonNull Class<?> originatingClass,
-            @NonNull Throwable error,
-            HttpRequest<?> request) {
+        Class<?> originatingClass,
+        Throwable error,
+        HttpRequest<?> request) {
         return findErrorRouteInternal(originatingClass, error, request);
     }
 
     private <R> Optional<RouteMatch<R>> findErrorRouteInternal(
-            @Nullable Class<?> originatingClass,
-            @NonNull Throwable error, HttpRequest<?> request) {
+        @Nullable Class<?> originatingClass,
+        Throwable error, HttpRequest<?> request) {
         Collection<MediaType> accept = request.accept();
         final boolean hasAcceptHeader = CollectionUtils.isNotEmpty(accept);
         if (hasAcceptHeader) {
@@ -502,25 +494,25 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     }
 
     @Override
-    public <R> Optional<RouteMatch<R>> findErrorRoute(@NonNull Throwable error, HttpRequest<?> request) {
+    public <R> Optional<RouteMatch<R>> findErrorRoute(Throwable error, HttpRequest<?> request) {
         return findErrorRouteInternal(null, error, request);
     }
 
     @Override
     public <R> Optional<RouteMatch<R>> findStatusRoute(
-            @NonNull Class<?> originatingClass,
-            @NonNull HttpStatus status,
-            HttpRequest<?> request) {
+        Class<?> originatingClass,
+        HttpStatus status,
+        HttpRequest<?> request) {
         return findStatusInternal(originatingClass, status.getCode(), request);
     }
 
     @Override
-    public <R> Optional<RouteMatch<R>> findStatusRoute(@NonNull HttpStatus status, HttpRequest<?> request) {
+    public <R> Optional<RouteMatch<R>> findStatusRoute(HttpStatus status, HttpRequest<?> request) {
         return findStatusInternal(null, status.getCode(), request);
     }
 
     @Override
-    public <R> Optional<RouteMatch<R>> findStatusRoute(@NonNull Class<?> originatingClass, int statusCode, HttpRequest<?> request) {
+    public <R> Optional<RouteMatch<R>> findStatusRoute(Class<?> originatingClass, int statusCode, HttpRequest<?> request) {
         return findStatusInternal(originatingClass, statusCode, request);
     }
 
@@ -571,7 +563,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     }
 
     @Override
-    public <R> Optional<RouteMatch<R>> route(@NonNull Throwable error) {
+    public <R> Optional<RouteMatch<R>> route(Throwable error) {
         var matchedRoutes = new ArrayList<RouteMatch<R>>();
         for (ErrorRouteInfo<Object, Object> errorRouteInfo : errorRoutes) {
             if (errorRouteInfo.originatingType() == null) {
@@ -582,9 +574,8 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         return findRouteMatch(matchedRoutes, error);
     }
 
-    @NonNull
     @Override
-    public List<GenericHttpFilter> findFilters(@NonNull HttpRequest<?> request) {
+    public List<GenericHttpFilter> findFilters(HttpRequest<?> request) {
         if (preconditionFilterRoutes.isEmpty()) {
             // for perf, this needs to be placed in an ArrayList variable first
             @SuppressWarnings("UnnecessaryLocalVariable")
@@ -608,9 +599,8 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         return Collections.unmodifiableList(httpFilters);
     }
 
-    @NonNull
     @Override
-    public List<GenericHttpFilter> findFilters(@NonNull HttpRequest<?> request, @Nullable RouteMatch<?> routeMatch) {
+    public List<GenericHttpFilter> findFilters(HttpRequest<?> request, @Nullable RouteMatch<?> routeMatch) {
         if (preconditionFilterRoutes.isEmpty()) {
             // for perf, this needs to be placed in an ArrayList variable first
             @SuppressWarnings("UnnecessaryLocalVariable")
@@ -631,9 +621,8 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         return Collections.unmodifiableList(httpFilters);
     }
 
-    @NonNull
     @Override
-    public List<GenericHttpFilter> findPreMatchingFilters(@NonNull HttpRequest<?> request) {
+    public List<GenericHttpFilter> findPreMatchingFilters(HttpRequest<?> request) {
         if (preMatchingPreconditionFilterRoutes.isEmpty()) {
             // for perf, this needs to be placed in an ArrayList variable first
             @SuppressWarnings("UnnecessaryLocalVariable")
@@ -652,9 +641,8 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     }
 
     @SuppressWarnings("unchecked")
-    @NonNull
     @Override
-    public <T, R> Stream<UriRouteMatch<T, R>> findAny(@NonNull CharSequence uri, @Nullable HttpRequest<?> request) {
+    public <T, R> Stream<UriRouteMatch<T, R>> findAny(CharSequence uri, @Nullable HttpRequest<?> request) {
         var matchedRoutes = new ArrayList<UriRouteMatch<T, R>>(5);
         final String uriStr = uri.toString();
         for (UriRouteInfo<Object, Object>[] routes : allRoutesByMethod.values()) {
@@ -677,8 +665,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     }
 
     @Override
-    @NonNull
-    public <T, R> List<UriRouteMatch<T, R>> findAny(@NonNull HttpRequest<?> request) {
+    public <T, R> List<UriRouteMatch<T, R>> findAny(HttpRequest<?> request) {
         String path = request.getPath();
         var matchedRoutes = new ArrayList<UriRouteMatch<T, R>>(5);
         for (UriRouteInfo<Object, Object>[] routes : allRoutesByMethod.values()) {

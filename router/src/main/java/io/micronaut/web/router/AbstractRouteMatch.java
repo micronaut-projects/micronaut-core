@@ -16,7 +16,6 @@
 package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
@@ -113,14 +112,12 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
         return routeInfo.getTargetMethod().getTarget();
     }
 
-    @NonNull
     @Override
     public ExecutableMethod<T, R> getExecutableMethod() {
         return executableMethod;
     }
 
     @Override
-    @NonNull
     public AnnotationMetadata getAnnotationMetadata() {
         return executableMethod.getAnnotationMetadata();
     }

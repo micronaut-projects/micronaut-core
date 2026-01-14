@@ -16,7 +16,6 @@
 package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
@@ -93,7 +92,6 @@ public final class DefaultErrorRouteInfo<T, R> extends DefaultRequestMatcher<T, 
     }
 
     @Override
-    @NonNull
     public HttpStatus findStatus(HttpStatus defaultStatus) {
         return super.findStatus(defaultStatus == null ? HttpStatus.INTERNAL_SERVER_ERROR : defaultStatus);
     }
