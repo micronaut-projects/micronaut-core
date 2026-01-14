@@ -17,7 +17,6 @@ package io.micronaut.context.visitor;
 
 import io.micronaut.context.annotation.Configuration;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.ast.PackageElement;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.PackageElementVisitor;
@@ -52,7 +51,7 @@ public final class PackageConfigurationImportVisitor implements PackageElementVi
     }
 
     @Override
-    public TypeElementVisitor.@NonNull VisitorKind getVisitorKind() {
+    public TypeElementVisitor. VisitorKind getVisitorKind() {
         return TypeElementVisitor.VisitorKind.ISOLATING;
     }
 

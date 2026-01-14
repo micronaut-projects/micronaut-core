@@ -18,7 +18,6 @@ package io.micronaut.context.visitor;
 import io.micronaut.context.ApplicationContextConfigurer;
 import io.micronaut.context.annotation.ContextConfigurer;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementQuery;
@@ -41,7 +40,7 @@ public class ContextConfigurerVisitor implements TypeElementVisitor<ContextConfi
     );
 
     @Override
-    public @NonNull VisitorKind getVisitorKind() {
+    public VisitorKind getVisitorKind() {
         return VisitorKind.ISOLATING;
     }
 
@@ -75,7 +74,6 @@ public class ContextConfigurerVisitor implements TypeElementVisitor<ContextConfi
                 });
     }
 
-    @NonNull
     private static RuntimeException typeShouldNotHaveConstructorsWithArgs(String type) {
         return new IllegalStateException(type + " is annotated with @ContextConfigurer but has at least one constructor with arguments, which isn't supported. To resolve this create a separate class with no constructor arguments annotated with @ContextConfigurer, which sole role is configuring the application context.");
     }

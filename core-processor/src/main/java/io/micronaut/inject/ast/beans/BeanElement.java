@@ -18,8 +18,6 @@ package io.micronaut.inject.ast.beans;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.Set;
-
-import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.visitor.VisitorContext;
@@ -38,13 +36,11 @@ public interface BeanElement extends Element {
      *
      * @return The injection points for the bean.
      */
-    @NonNull
     Collection<Element> getInjectionPoints();
 
     /**
      * @return The originating element.
      */
-    @NonNull
     Element getOriginatingElement();
 
     /**
@@ -53,7 +49,6 @@ public interface BeanElement extends Element {
      *
      * @return The declaring class of the bean.
      */
-    @NonNull
     ClassElement getDeclaringClass();
 
     /**
@@ -62,27 +57,23 @@ public interface BeanElement extends Element {
      *
      * @return The producing element
      */
-    @NonNull
     Element getProducingElement();
 
     /**
      * The type names produced by the bean.
      * @return A set of types
      */
-    @NonNull
     Set<ClassElement> getBeanTypes();
 
     /**
      * The scope of the bean.
      * @return The fully qualified name of the scope or empty if no scope is defined.
      */
-    @NonNull
     Optional<String> getScope();
 
     /**
      * @return One or more fully qualified qualifier types defined by the bean.
      */
-    @NonNull
     Collection<String> getQualifiers();
 
     /**
@@ -94,8 +85,7 @@ public interface BeanElement extends Element {
      * @param visitorContext The visitor context
      * @return A bean builder
      */
-    default @NonNull
-    BeanElementBuilder addAssociatedBean(@NonNull ClassElement type, @NonNull VisitorContext visitorContext) {
+    default BeanElementBuilder addAssociatedBean(ClassElement type, VisitorContext visitorContext) {
         throw new UnsupportedOperationException("Element of type [" + getClass() + "] does not support adding associated beans at compilation time");
     }
 }

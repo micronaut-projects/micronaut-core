@@ -17,7 +17,6 @@ package io.micronaut.expressions.context;
 
 import io.micronaut.context.annotation.AnnotationExpressionContext;
 import io.micronaut.core.annotation.AnnotationClassValue;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.expressions.EvaluatedExpressionReference;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
@@ -48,28 +47,24 @@ public final class DefaultExpressionCompilationContextFactory implements Express
         this.visitorContext = visitorContext;
     }
 
-    @NonNull
     private DefaultExpressionEvaluationContext recreateContext() {
         return new DefaultExpressionEvaluationContext(CONTEXT_TYPES.toArray(ClassElement[]::new));
     }
 
     @Override
-    @NonNull
-    public ExpressionEvaluationContext buildContextForMethod(@NonNull EvaluatedExpressionReference expression,
-                                                             @NonNull MethodElement methodElement) {
+    public ExpressionEvaluationContext buildContextForMethod(EvaluatedExpressionReference expression,
+                                                             MethodElement methodElement) {
         return buildForExpression(expression, null)
                  .extendWith(methodElement);
     }
 
     @Override
-    @NonNull
     public ExpressionEvaluationContext buildContext(EvaluatedExpressionReference expression, ClassElement thisElement) {
         return buildForExpression(expression, thisElement);
     }
 
-    @NonNull
     @Override
-    public ExpressionCompilationContextFactory registerContextClass(@NonNull ClassElement contextClass) {
+    public ExpressionCompilationContextFactory registerContextClass(ClassElement contextClass) {
         CONTEXT_TYPES.add(contextClass);
         this.sharedContext = recreateContext();
         return this;

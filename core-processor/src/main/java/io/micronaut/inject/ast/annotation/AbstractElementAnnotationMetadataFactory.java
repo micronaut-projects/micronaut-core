@@ -18,7 +18,6 @@ package io.micronaut.inject.ast.annotation;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
@@ -257,8 +256,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
         return metadataBuilder.lookupOrBuildForType(getNativeElement(wildcardElement));
     }
 
-    @NonNull
-    private AbstractElementAnnotationMetadata buildForProperty(@NonNull PropertyElement propertyElement) {
+    private AbstractElementAnnotationMetadata buildForProperty(PropertyElement propertyElement) {
         return new AbstractElementAnnotationMetadata() {
 
             @Override
@@ -273,8 +271,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
         };
     }
 
-    @NonNull
-    private AbstractElementAnnotationMetadata buildForEnumConstantElement(@NonNull EnumConstantElement enumConstantElement) {
+    private AbstractElementAnnotationMetadata buildForEnumConstantElement(EnumConstantElement enumConstantElement) {
         return new AbstractElementAnnotationMetadata() {
 
             @Override
@@ -289,8 +286,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
         };
     }
 
-    @NonNull
-    private AbstractElementAnnotationMetadata buildForPackage(@NonNull PackageElement packageElement) {
+    private AbstractElementAnnotationMetadata buildForPackage(PackageElement packageElement) {
         return new AbstractElementAnnotationMetadata() {
 
             @Override
@@ -305,8 +301,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
         };
     }
 
-    @NonNull
-    private AbstractElementAnnotationMetadata buildForParameter(@NonNull ParameterElement parameterElement) {
+    private AbstractElementAnnotationMetadata buildForParameter(ParameterElement parameterElement) {
         return new AbstractElementAnnotationMetadata() {
 
             @Override
@@ -322,8 +317,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
         };
     }
 
-    @NonNull
-    private AbstractElementAnnotationMetadata buildForField(@NonNull FieldElement fieldElement) {
+    private AbstractElementAnnotationMetadata buildForField(FieldElement fieldElement) {
         return new AbstractElementAnnotationMetadata() {
 
             @Override
@@ -338,8 +332,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
         };
     }
 
-    @NonNull
-    private AbstractElementAnnotationMetadata buildForMethod(@NonNull MethodElement methodElement) {
+    private AbstractElementAnnotationMetadata buildForMethod(MethodElement methodElement) {
         return new AbstractElementAnnotationMetadata() {
 
             @Override
@@ -354,8 +347,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
         };
     }
 
-    @NonNull
-    private AbstractElementAnnotationMetadata buildForConstructor(@NonNull ConstructorElement constructorElement) {
+    private AbstractElementAnnotationMetadata buildForConstructor(ConstructorElement constructorElement) {
         return new AbstractElementAnnotationMetadata() {
 
             @Override
@@ -370,8 +362,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
         };
     }
 
-    @NonNull
-    private AbstractElementAnnotationMetadata buildTypeAnnotationsForClass(@NonNull ClassElement classElement) {
+    private AbstractElementAnnotationMetadata buildTypeAnnotationsForClass(ClassElement classElement) {
         return new AbstractElementAnnotationMetadata() {
 
             @Override
@@ -386,8 +377,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
         };
     }
 
-    @NonNull
-    private AbstractElementAnnotationMetadata buildForClass(@NonNull ClassElement classElement) {
+    private AbstractElementAnnotationMetadata buildForClass(ClassElement classElement) {
         return new AbstractElementAnnotationMetadata() {
 
             @Override
@@ -402,8 +392,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
         };
     }
 
-    @NonNull
-    private AbstractElementAnnotationMetadata buildTypeAnnotationsForGenericPlaceholder(@NonNull GenericPlaceholderElement placeholderElement) {
+    private AbstractElementAnnotationMetadata buildTypeAnnotationsForGenericPlaceholder(GenericPlaceholderElement placeholderElement) {
         return new AbstractElementAnnotationMetadata() {
 
             @Override
@@ -418,8 +407,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
         };
     }
 
-    @NonNull
-    private AbstractElementAnnotationMetadata buildTypeAnnotationsForWildcard(@NonNull WildcardElement wildcardElement) {
+    private AbstractElementAnnotationMetadata buildTypeAnnotationsForWildcard(WildcardElement wildcardElement) {
         return new AbstractElementAnnotationMetadata() {
 
             @Override
@@ -528,7 +516,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
 
         @Override
         @SuppressWarnings("java:S1192")
-        public <T extends Annotation> AnnotationMetadata annotate(@NonNull String annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
+        public <T extends Annotation> AnnotationMetadata annotate(String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
             ArgumentUtils.requireNonNull("annotationType", annotationType);
             AnnotationValueBuilder<T> builder = AnnotationValue.builder(annotationType, metadataBuilder.getRetentionPolicy(annotationType));
             //noinspection ConstantConditions
@@ -547,19 +535,19 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
         }
 
         @Override
-        public AnnotationMetadata removeAnnotation(@NonNull String annotationType) {
+        public AnnotationMetadata removeAnnotation(String annotationType) {
             ArgumentUtils.requireNonNull("annotationType", annotationType);
             return replaceAnnotationsInternal(metadataBuilder.removeAnnotation(getAnnotationMetadataToModify(), annotationType));
         }
 
         @Override
-        public <T extends Annotation> AnnotationMetadata removeAnnotationIf(@NonNull Predicate<AnnotationValue<T>> predicate) {
+        public <T extends Annotation> AnnotationMetadata removeAnnotationIf(Predicate<AnnotationValue<T>> predicate) {
             ArgumentUtils.requireNonNull("predicate", predicate);
             return replaceAnnotationsInternal(metadataBuilder.removeAnnotationIf(getAnnotationMetadataToModify(), predicate));
         }
 
         @Override
-        public AnnotationMetadata removeStereotype(@NonNull String annotationType) {
+        public AnnotationMetadata removeStereotype(String annotationType) {
             ArgumentUtils.requireNonNull("annotationType", annotationType);
             return replaceAnnotationsInternal(metadataBuilder.removeStereotype(getAnnotationMetadataToModify(), annotationType));
         }

@@ -17,7 +17,6 @@ package io.micronaut.expressions.context;
 
 import io.micronaut.context.annotation.AnnotationExpressionContext;
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 
@@ -42,7 +41,7 @@ public interface ExpressionEvaluationContextRegistrar extends TypeElementVisitor
     String getContextClassName();
 
     @Override
-    default @NonNull VisitorKind getVisitorKind() {
+    default VisitorKind getVisitorKind() {
         return VisitorKind.ISOLATING;
     }
 }

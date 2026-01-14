@@ -17,8 +17,6 @@ package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
-
 import java.util.Collections;
 import java.util.Map;
 
@@ -44,15 +42,13 @@ final class SimpleClassElement implements ClassElement {
         this.typeArguments = typeArguments;
     }
 
-    @NonNull
     @Override
     public Map<String, ClassElement> getTypeArguments() {
         return this.typeArguments;
     }
 
-    @NonNull
     @Override
-    public Map<String, ClassElement> getTypeArguments(@NonNull String type) {
+    public Map<String, ClassElement> getTypeArguments(String type) {
         if (this.typeName.equals(type)) {
             return this.typeArguments;
         } else {
@@ -90,7 +86,6 @@ final class SimpleClassElement implements ClassElement {
         throw new UnsupportedOperationException("Cannot convert class elements produced by from an array");
     }
 
-    @NonNull
     @Override
     public String getName() {
         return typeName;
@@ -111,7 +106,6 @@ final class SimpleClassElement implements ClassElement {
         return false;
     }
 
-    @NonNull
     @Override
     public Object getNativeType() {
         return typeName;

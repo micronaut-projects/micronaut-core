@@ -16,7 +16,6 @@
 package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.sourcegen.model.ClassTypeDef;
 import io.micronaut.sourcegen.model.ExpressionDef;
@@ -60,11 +59,11 @@ public final class GenUtils {
      * @param <T>             The value type
      * @return The expression
      */
-    public static <T> ExpressionDef stringMapOf(@NonNull
+    public static <T> ExpressionDef stringMapOf(
                                                 Map<? extends CharSequence, T> map,
                                                 boolean skipEmpty,
                                                 @Nullable T empty,
-                                                @NonNull Function<T, ExpressionDef> objAsExpression) {
+                                                Function<T, ExpressionDef> objAsExpression) {
         return stringMapOf(map, skipEmpty, empty, null, objAsExpression);
     }
 
@@ -79,13 +78,13 @@ public final class GenUtils {
      * @param <T>             The value type
      * @return The expression
      */
-    public static <T> ExpressionDef stringMapOf(@NonNull
+    public static <T> ExpressionDef stringMapOf(
                                                 Map<? extends CharSequence, T> map,
                                                 boolean skipEmpty,
                                                 @Nullable T empty,
                                                 @Nullable
                                                 Predicate<T> valuePredicate,
-                                                @NonNull Function<T, ExpressionDef> objAsExpression) {
+                                                Function<T, ExpressionDef> objAsExpression) {
         Set<? extends Map.Entry<String, T>> entrySet = map != null ? map.entrySet()
             .stream()
             .filter(e -> !skipEmpty || (e.getKey() != null) && (valuePredicate == null || valuePredicate.test(e.getValue())))
@@ -143,8 +142,7 @@ public final class GenUtils {
      * @param strings The strings
      * @return the expression
      */
-    @NonNull
-    public static ExpressionDef listOfString(@NonNull List<String> strings) {
+    public static ExpressionDef listOfString(List<String> strings) {
         return listOf(strings.stream().<ExpressionDef>map(ExpressionDef::constant).toList());
     }
 
@@ -153,8 +151,7 @@ public final class GenUtils {
      * @param values The values
      * @return the expression
      */
-    @NonNull
-    public static ExpressionDef listOf(@NonNull List<ExpressionDef> values) {
+    public static ExpressionDef listOf(List<ExpressionDef> values) {
         if (values != null) {
             values = values.stream().filter(Objects::nonNull).toList();
         }
@@ -179,8 +176,7 @@ public final class GenUtils {
      * @param values The values
      * @return the expression
      */
-    @NonNull
-    public static ExpressionDef setOf(@NonNull List<ExpressionDef> values) {
+    public static ExpressionDef setOf(List<ExpressionDef> values) {
         if (values != null) {
             values = values.stream().filter(Objects::nonNull).toList();
         }
@@ -203,8 +199,7 @@ public final class GenUtils {
      * @param array The array
      * @return the expression
      */
-    @NonNull
-    public static ExpressionDef setOfArray(@NonNull ExpressionDef array) {
+    public static ExpressionDef setOfArray(ExpressionDef array) {
         if (!array.type().isArray()) {
             throw new IllegalArgumentException("Argument must be an array");
         }

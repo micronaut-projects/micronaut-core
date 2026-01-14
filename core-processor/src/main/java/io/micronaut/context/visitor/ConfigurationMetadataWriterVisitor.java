@@ -27,7 +27,6 @@ import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.type.DefaultArgument;
 import io.micronaut.inject.ast.ClassElement;
@@ -73,7 +72,6 @@ public class ConfigurationMetadataWriterVisitor implements TypeElementVisitor<Co
 
     private ConfigurationMetadataBuilder metadataBuilder = new ConfigurationMetadataBuilder();
 
-    @NonNull
     @Override
     public VisitorKind getVisitorKind() {
         return VisitorKind.AGGREGATING;

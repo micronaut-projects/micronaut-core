@@ -16,8 +16,6 @@
 package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
-
 import java.lang.reflect.GenericDeclaration;
 import java.lang.reflect.TypeVariable;
 import java.util.Arrays;
@@ -53,14 +51,12 @@ final class ReflectGenericPlaceholderElement
         return arrayDimensions;
     }
 
-    @NonNull
     @Override
     public List<? extends ClassElement> getBounds() {
         return Arrays.stream(type.getBounds()).map(ClassElement::of).collect(Collectors.toList());
     }
 
     @Override
-    @NonNull
     public String getVariableName() {
         return type.getName();
     }

@@ -17,7 +17,6 @@ package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.NextMajorVersion;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.annotation.ReflectiveAccess;
 
 import java.util.Collections;
@@ -76,7 +75,7 @@ public interface MemberElement extends Element {
      * @return Will return {@code true} if reflection is required.
      * @since 3.4.0
      */
-    default boolean isReflectionRequired(@NonNull ClassElement callingType) {
+    default boolean isReflectionRequired(ClassElement callingType) {
         return !isAccessible(callingType, false);
     }
 
@@ -109,7 +108,7 @@ public interface MemberElement extends Element {
      * @since 4.3.0
      */
     @NextMajorVersion("The ReflectiveAccess should not be checked here and accessibility should fail if ReflectiveAccess is not present")
-    default boolean isAccessible(@NonNull ClassElement callingType, boolean allowReflection) {
+    default boolean isAccessible(ClassElement callingType, boolean allowReflection) {
         if (isPublic()) {
             return true;
         }
@@ -156,7 +155,7 @@ public interface MemberElement extends Element {
      * @return Will return {@code true} if is accessible.
      * @since 3.7.0
      */
-    default boolean isAccessible(@NonNull ClassElement callingType) {
+    default boolean isAccessible(ClassElement callingType) {
         return isAccessible(callingType, true);
     }
 
@@ -172,7 +171,7 @@ public interface MemberElement extends Element {
      * @return true if this member element hides passed field element
      * @since 4.0.0
      */
-    default boolean hides(@NonNull MemberElement hidden) {
+    default boolean hides(MemberElement hidden) {
         return false;
     }
 }

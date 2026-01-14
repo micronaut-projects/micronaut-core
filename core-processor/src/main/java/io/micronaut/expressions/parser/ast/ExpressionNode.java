@@ -16,7 +16,6 @@
 package io.micronaut.expressions.parser.ast;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.inject.ast.ClassElement;
@@ -44,7 +43,7 @@ public abstract class ExpressionNode {
      * @param ctx expression compilation context
      * @return The expression definition
      */
-    public final ExpressionDef compile(@NonNull ExpressionCompilationContext ctx) {
+    public final ExpressionDef compile(ExpressionCompilationContext ctx) {
         resolveType(ctx);
         return generateExpression(ctx);
     }
@@ -55,7 +54,7 @@ public abstract class ExpressionNode {
      * @param ctx expression compilation context
      * @return The expression definition
      */
-    protected abstract ExpressionDef generateExpression(@NonNull ExpressionCompilationContext ctx);
+    protected abstract ExpressionDef generateExpression(ExpressionCompilationContext ctx);
 
     /**
      * On resolution stage type information is collected and node validity is checked. Once type
@@ -65,8 +64,7 @@ public abstract class ExpressionNode {
      *
      * @return resolved type
      */
-    @NonNull
-    public final TypeDef resolveType(@NonNull ExpressionVisitorContext ctx) {
+    public final TypeDef resolveType(ExpressionVisitorContext ctx) {
         if (nodeType == null) {
             nodeType = doResolveType(ctx);
         }
@@ -81,8 +79,7 @@ public abstract class ExpressionNode {
      *
      * @return resolved type
      */
-    @NonNull
-    public final TypeDef resolveType(@NonNull ExpressionCompilationContext ctx) {
+    public final TypeDef resolveType(ExpressionCompilationContext ctx) {
         return resolveType(ctx.evaluationVisitorContext());
     }
 
@@ -94,8 +91,7 @@ public abstract class ExpressionNode {
      *
      * @return resolved type
      */
-    @NonNull
-    public final ClassElement resolveClassElement(@NonNull ExpressionVisitorContext ctx) {
+    public final ClassElement resolveClassElement(ExpressionVisitorContext ctx) {
         if (classElement == null) {
             classElement = doResolveClassElement(ctx);
         }
@@ -110,8 +106,7 @@ public abstract class ExpressionNode {
      *
      * @return resolved type
      */
-    @NonNull
-    public final ClassElement resolveClassElement(@NonNull ExpressionCompilationContext ctx) {
+    public final ClassElement resolveClassElement(ExpressionCompilationContext ctx) {
         return resolveClassElement(ctx.evaluationVisitorContext());
     }
 
@@ -150,8 +145,7 @@ public abstract class ExpressionNode {
      *
      * @return resolved type
      */
-    @NonNull
-    protected TypeDef doResolveType(@NonNull ExpressionVisitorContext ctx) {
+    protected TypeDef doResolveType(ExpressionVisitorContext ctx) {
         return TypeDef.erasure(doResolveClassElement(ctx));
     }
 }

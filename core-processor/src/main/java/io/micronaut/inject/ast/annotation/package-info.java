@@ -21,6 +21,9 @@
  * @since 1.0
  */
 @Internal
+@NullMarked
 package io.micronaut.inject.ast.annotation;
 
+
+import org.jspecify.annotations.NullMarked;
 import io.micronaut.core.annotation.Internal;

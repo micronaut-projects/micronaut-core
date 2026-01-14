@@ -16,7 +16,6 @@
 package io.micronaut.validation.visitor.async;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
@@ -44,7 +43,6 @@ public final class AsyncTypeElementVisitor implements TypeElementVisitor<Object,
         return Set.of(ANN);
     }
 
-    @NonNull
     @Override
     public VisitorKind getVisitorKind() {
         return VisitorKind.ISOLATING;

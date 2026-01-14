@@ -16,7 +16,6 @@
 package io.micronaut.inject.visitor;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.util.Toggleable;
@@ -42,13 +41,12 @@ public interface PackageElementVisitor<A> extends Ordered, Toggleable {
      * @param element The package element
      * @param context The visitor context
      */
-    default void visitPackage(@NonNull PackageElement element, @NonNull VisitorContext context) throws ProcessingException {
+    default void visitPackage(PackageElement element, VisitorContext context) throws ProcessingException {
     }
 
     /**
      * @return The supported default annotation names.
      */
-    @NonNull
     default Set<String> getSupportedAnnotationNames() {
         Optional<Class<?>> clazz = GenericTypeUtils.resolveInterfaceTypeArgument(getClass(), PackageElementVisitor.class);
         if (clazz.isPresent()) {
@@ -69,7 +67,7 @@ public interface PackageElementVisitor<A> extends Ordered, Toggleable {
     /**
      * @return The visitor kind.
      */
-    default TypeElementVisitor.@NonNull VisitorKind getVisitorKind() {
+    default TypeElementVisitor.VisitorKind getVisitorKind() {
         return TypeElementVisitor.VisitorKind.AGGREGATING;
     }
 
@@ -78,7 +76,6 @@ public interface PackageElementVisitor<A> extends Ordered, Toggleable {
      *
      * @return The fully qualified name of the annotation class as a string.
      */
-    @NonNull
     default String getPackageAnnotationName() {
         return Object.class.getName();
     }

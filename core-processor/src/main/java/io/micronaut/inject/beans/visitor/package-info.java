@@ -19,4 +19,7 @@
  * @author graemerocher
  * @since 1.1
  */
+@NullMarked
 package io.micronaut.inject.beans.visitor;
+
+import org.jspecify.annotations.NullMarked;

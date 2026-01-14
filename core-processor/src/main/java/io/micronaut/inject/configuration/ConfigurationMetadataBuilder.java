@@ -19,7 +19,6 @@ import io.micronaut.context.annotation.BeanProperties;
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
@@ -63,7 +62,7 @@ public class ConfigurationMetadataBuilder {
     /**
      * @return The originating elements for the builder.
      */
-    public Element @NonNull [] getOriginatingElements() {
+    public Element[] getOriginatingElements() {
         return originatingElements.getOriginatingElements();
     }
 

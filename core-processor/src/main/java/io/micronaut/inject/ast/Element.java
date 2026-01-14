@@ -19,7 +19,6 @@ import io.micronaut.core.annotation.AnnotatedElement;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.naming.Described;
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 
@@ -49,7 +48,7 @@ public interface Element extends MutableAnnotationMetadataDelegate<Element>, Ann
      * @return The name of the element. For a type this represents the binary name.
      */
     @Override
-    @NonNull String getName();
+    String getName();
 
     /**
      * @return True if the element is package private.
@@ -85,7 +84,7 @@ public interface Element extends MutableAnnotationMetadataDelegate<Element>, Ann
      *
      * @return The native type
      */
-    @NonNull Object getNativeType();
+    Object getNativeType();
 
     /**
      * @return The {@link ElementModifier} types for this class element
@@ -100,7 +99,7 @@ public interface Element extends MutableAnnotationMetadataDelegate<Element>, Ann
      *
      * @return The simple name
      */
-    default @NonNull String getSimpleName() {
+    default String getSimpleName() {
         return getName();
     }
 
@@ -148,13 +147,11 @@ public interface Element extends MutableAnnotationMetadataDelegate<Element>, Ann
         return false;
     }
 
-    @NonNull
     @Override
     default String getDescription() {
         return getDescription(true);
     }
 
-    @NonNull
     @Override
     default String getDescription(boolean simple) {
         if (simple) {
@@ -175,63 +172,53 @@ public interface Element extends MutableAnnotationMetadataDelegate<Element>, Ann
         throw new UnsupportedOperationException("Element of type [" + getClass() + "] does not support copy constructor");
     }
 
-    @NonNull
     @Override
-    default <T extends Annotation> Element annotate(@NonNull String annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
+    default <T extends Annotation> Element annotate(String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
         return MutableAnnotationMetadataDelegate.super.annotate(annotationType, consumer);
     }
 
-    @NonNull
     @Override
-    default Element removeAnnotation(@NonNull String annotationType) {
+    default Element removeAnnotation(String annotationType) {
         return MutableAnnotationMetadataDelegate.super.removeAnnotation(annotationType);
     }
 
-    @NonNull
     @Override
-    default <T extends Annotation> Element removeAnnotation(@NonNull Class<T> annotationType) {
+    default <T extends Annotation> Element removeAnnotation(Class<T> annotationType) {
         return MutableAnnotationMetadataDelegate.super.removeAnnotation(annotationType);
     }
 
-    @NonNull
     @Override
-    default <T extends Annotation> Element removeAnnotationIf(@NonNull Predicate<AnnotationValue<T>> predicate) {
+    default <T extends Annotation> Element removeAnnotationIf(Predicate<AnnotationValue<T>> predicate) {
         return MutableAnnotationMetadataDelegate.super.removeAnnotationIf(predicate);
     }
 
-    @NonNull
     @Override
-    default Element removeStereotype(@NonNull String annotationType) {
+    default Element removeStereotype(String annotationType) {
         return MutableAnnotationMetadataDelegate.super.removeStereotype(annotationType);
     }
 
-    @NonNull
     @Override
-    default <T extends Annotation> Element removeStereotype(@NonNull Class<T> annotationType) {
+    default <T extends Annotation> Element removeStereotype(Class<T> annotationType) {
         return MutableAnnotationMetadataDelegate.super.removeStereotype(annotationType);
     }
 
-    @NonNull
     @Override
-    default Element annotate(@NonNull String annotationType) {
+    default Element annotate(String annotationType) {
         return MutableAnnotationMetadataDelegate.super.annotate(annotationType);
     }
 
-    @NonNull
     @Override
-    default <T extends Annotation> Element annotate(@NonNull Class<T> annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
+    default <T extends Annotation> Element annotate(Class<T> annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
         return MutableAnnotationMetadataDelegate.super.annotate(annotationType, consumer);
     }
 
-    @NonNull
     @Override
-    default <T extends Annotation> Element annotate(@NonNull Class<T> annotationType) {
+    default <T extends Annotation> Element annotate(Class<T> annotationType) {
         return MutableAnnotationMetadataDelegate.super.annotate(annotationType);
     }
 
-    @NonNull
     @Override
-    default <T extends Annotation> Element annotate(@NonNull AnnotationValue<T> annotationValue) {
+    default <T extends Annotation> Element annotate(AnnotationValue<T> annotationValue) {
         return MutableAnnotationMetadataDelegate.super.annotate(annotationValue);
     }
 }

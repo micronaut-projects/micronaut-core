@@ -16,7 +16,6 @@
 package io.micronaut.inject.visitor;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.ast.Element;
 
 /**
@@ -33,12 +32,11 @@ public final class ElementPostponedToNextRoundException extends RuntimeException
     /**
      * @param originatingElement The originating element
      */
-    public ElementPostponedToNextRoundException(@NonNull Element originatingElement) {
+    public ElementPostponedToNextRoundException(Element originatingElement) {
         super("Original element: " + originatingElement.getName() + " is postponed to the next round!");
         this.originatingElement = originatingElement;
     }
 
-    @NonNull
     public Element getOriginatingElement() {
         return originatingElement;
     }

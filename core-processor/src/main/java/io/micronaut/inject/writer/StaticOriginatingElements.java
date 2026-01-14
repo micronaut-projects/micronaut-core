@@ -16,7 +16,6 @@
 package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.ast.Element;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -37,7 +36,7 @@ public final class StaticOriginatingElements implements OriginatingElements {
     }
 
     @Override
-    public void addOriginatingElement(@NonNull Element element) {
+    public void addOriginatingElement(Element element) {
         Objects.requireNonNull(element, "Element cannot be null");
         originatingElements.put(
                 element.getName(),
@@ -45,7 +44,6 @@ public final class StaticOriginatingElements implements OriginatingElements {
         );
     }
 
-    @NonNull
     @Override
     public Element[] getOriginatingElements() {
         return originatingElements.values().toArray(Element.EMPTY_ELEMENT_ARRAY);

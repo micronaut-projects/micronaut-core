@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.inject.writer;
-
-import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.ast.Element;
 
 /**
@@ -28,14 +26,14 @@ public interface OriginatingElements {
      * @return The elements where the bean definition originated from as an array.
      * @since 2.1.1
      */
-    Element @NonNull [] getOriginatingElements();
+    Element[] getOriginatingElements();
 
     /**
      * Add another element that should be included in the originating elements.
      * @param element The element to add
      * @since 2.1.1
      */
-    void addOriginatingElement(@NonNull Element element);
+    void addOriginatingElement(Element element);
 
     /**
      * Factory to create the originating elements.

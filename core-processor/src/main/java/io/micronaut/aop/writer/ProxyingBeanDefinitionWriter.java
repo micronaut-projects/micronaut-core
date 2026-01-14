@@ -39,7 +39,6 @@ import io.micronaut.inject.writer.ClassOutputWriter;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import io.micronaut.inject.writer.OriginatingElements;
 import io.micronaut.inject.writer.ProxyingBeanDefinitionVisitor;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 import java.io.File;
@@ -314,7 +313,6 @@ public abstract class ProxyingBeanDefinitionWriter implements ProxyingBeanDefini
         );
     }
 
-    @NonNull
     @Override
     public String getBeanDefinitionReferenceClassName() {
         return proxyBeanDefinitionWriter.getBeanDefinitionReferenceClassName();
@@ -387,7 +385,6 @@ public abstract class ProxyingBeanDefinitionWriter implements ProxyingBeanDefini
     public void postConstructor() {
     }
 
-    @NonNull
     @Override
     public ClassElement[] getTypeArguments() {
         return proxyBeanDefinitionWriter.getTypeArguments();
@@ -627,7 +624,7 @@ public abstract class ProxyingBeanDefinitionWriter implements ProxyingBeanDefini
     }
 
     @Override
-    public Element @NonNull [] getOriginatingElements() {
+    public Element[] getOriginatingElements() {
         return originatingElements.getOriginatingElements();
     }
 
