@@ -27,8 +27,6 @@ import jakarta.annotation.PreDestroy;
 import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import org.jspecify.annotations.NonNull;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.*;
@@ -156,7 +154,7 @@ public class DefaultWatchThread implements LifeCycle<DefaultWatchThread> {
     /**
      * @return The watch service used.
      */
-    public @NonNull WatchService getWatchService() {
+    public WatchService getWatchService() {
         return watchService;
     }
 
@@ -180,7 +178,7 @@ public class DefaultWatchThread implements LifeCycle<DefaultWatchThread> {
      * @return The watch key
      * @throws IOException if an error occurs.
      */
-    protected @NonNull WatchKey registerPath(@NonNull Path dir) throws IOException {
+    protected WatchKey registerPath(Path dir) throws IOException {
         return dir.register(watchService,
                 StandardWatchEventKinds.ENTRY_CREATE,
                 StandardWatchEventKinds.ENTRY_DELETE,

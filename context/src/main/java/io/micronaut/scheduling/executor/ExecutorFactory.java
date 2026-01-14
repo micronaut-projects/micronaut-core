@@ -19,7 +19,6 @@ import io.micronaut.context.BeanLocator;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.graceful.GracefulShutdownCapable;
@@ -138,7 +137,7 @@ public class ExecutorFactory implements GracefulShutdownCapable {
     }
 
     @Override
-    public @NonNull CompletionStage<?> shutdownGracefully() {
+    public CompletionStage<?> shutdownGracefully() {
         List<GracefulShutdownCapable> copy;
         synchronized (this) {
             if (gracefulShutdownCapable == null) {

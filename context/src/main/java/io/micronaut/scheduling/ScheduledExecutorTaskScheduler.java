@@ -18,7 +18,6 @@ package io.micronaut.scheduling;
 import static io.micronaut.core.util.ArgumentUtils.check;
 
 import io.micronaut.context.annotation.Primary;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.scheduling.cron.CronExpression;
@@ -67,7 +66,7 @@ public class ScheduledExecutorTaskScheduler implements TaskScheduler {
     }
 
     @Override
-    public <V> ScheduledFuture<V> schedule(@NonNull String cron, @Nullable String timezoneId, @NonNull Callable<V> command) {
+    public <V> ScheduledFuture<V> schedule(String cron, @Nullable String timezoneId, Callable<V> command) {
         if (StringUtils.isEmpty(cron)) {
             throw new IllegalArgumentException("Blank cron expression not allowed");
         }

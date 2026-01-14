@@ -17,7 +17,6 @@ package io.micronaut.runtime.graceful;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Requires;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
@@ -37,7 +36,6 @@ public final class GracefulShutdownConfiguration implements Toggleable {
     public static final String ENABLED = PREFIX + ".enabled";
 
     private boolean enabled;
-    @NonNull
     private Duration gracePeriod = Duration.ofSeconds(15);
 
     /**
@@ -64,7 +62,6 @@ public final class GracefulShutdownConfiguration implements Toggleable {
      *
      * @return The maximum graceful shutdown duration
      */
-    @NonNull
     public Duration getGracePeriod() {
         return gracePeriod;
     }
@@ -74,7 +71,7 @@ public final class GracefulShutdownConfiguration implements Toggleable {
      *
      * @param gracePeriod The maximum graceful shutdown duration
      */
-    public void setGracePeriod(@NonNull Duration gracePeriod) {
+    public void setGracePeriod(Duration gracePeriod) {
         this.gracePeriod = gracePeriod;
     }
 }

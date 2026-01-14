@@ -21,7 +21,6 @@ import io.micronaut.context.exceptions.BeanDestructionException;
 import io.micronaut.context.scope.BeanCreationContext;
 import io.micronaut.context.scope.CreatedBean;
 import io.micronaut.context.scope.CustomScope;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.inject.BeanDefinition;
@@ -129,7 +128,7 @@ final class ThreadLocalCustomScope implements CustomScope<ThreadLocal>, LifeCycl
     }
 
     @Override
-    public @NonNull ThreadLocalCustomScope stop() {
+    public ThreadLocalCustomScope stop() {
         for (Cleaner.Cleanable cleanable : toClean) {
             cleanable.clean();
         }
