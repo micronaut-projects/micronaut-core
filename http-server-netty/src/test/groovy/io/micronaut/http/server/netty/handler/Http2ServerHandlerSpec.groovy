@@ -1,7 +1,11 @@
 package io.micronaut.http.server.netty.handler
 
+<<<<<<< HEAD
 
 import org.jspecify.annotations.NonNull
+=======
+import io.micronaut.core.annotation.NonNull
+>>>>>>> 4.10.x
 import io.micronaut.http.body.CloseableByteBody
 import io.micronaut.http.body.InternalByteBody
 import io.micronaut.http.body.stream.InputStreamByteBody
@@ -413,9 +417,12 @@ class Http2ServerHandlerSpec extends Specification {
         Throwable err = null
         CompositeByteBuf received = ByteBufAllocator.DEFAULT.compositeBuffer()
         boolean complete = false
+        boolean responseWritten = false
+        OutboundAccess outboundAccessR = null
         def (server, client, duplexHandler) = configure(new RequestHandler() {
             @Override
             void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                outboundAccessR = outboundAccess
                 NettyByteBodyFactory.toByteBufs(body).subscribe(new Subscriber<ByteBuf>() {
                     @Override
                     void onSubscribe(Subscription s) {
@@ -437,6 +444,11 @@ class Http2ServerHandlerSpec extends Specification {
                         complete = true
                     }
                 })
+            }
+
+            @Override
+            void responseWritten(Object attachment) {
+                responseWritten = true
             }
 
             @Override
@@ -471,6 +483,12 @@ class Http2ServerHandlerSpec extends Specification {
         EmbeddedTestUtil.advance(server, client)
         then:
         err instanceof ClosedChannelException
+        !responseWritten
+
+        when:
+        outboundAccessR.write(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), NettyByteBodyFactory.empty())
+        then:
+        responseWritten
 
         cleanup:
         received.release()

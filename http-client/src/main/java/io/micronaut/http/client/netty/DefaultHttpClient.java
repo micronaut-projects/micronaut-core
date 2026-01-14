@@ -180,7 +180,6 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.HttpURLConnection;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -226,25 +225,24 @@ public class DefaultHttpClient implements
     private static final int DEFAULT_HTTPS_PORT = 443;
 
     /**
-     * Which headers <i>not</i> to copy from the first request when redirecting to a second request. There doesn't
-     * appear to be a spec for this. {@link HttpURLConnection} seems to drop all headers, but that would be a
-     * breaking change.
-     * <p>
-     * Stored as a {@link HttpHeaders} with empty values because presumably someone thought about optimizing those
-     * already.
+     * When following a 307 or 308 redirect, body related headers should be kept. Standard hop-by-hop
+     * and host-specific headers are still dropped.
      */
-    private static final HttpHeaders REDIRECT_HEADER_BLOCKLIST;
+    private static final HttpHeaders REDIRECT_HEADER_BLOCKLIST_PRESERVE_BODY = new DefaultHttpHeaders()
+        .add(HttpHeaderNames.HOST, "")
+        .add(HttpHeaderNames.CONNECTION, "");
 
-    static {
-        REDIRECT_HEADER_BLOCKLIST = new DefaultHttpHeaders();
-        // The host should be recalculated based on the location
-        REDIRECT_HEADER_BLOCKLIST.add(HttpHeaderNames.HOST, "");
-        // post body headers
-        REDIRECT_HEADER_BLOCKLIST.add(HttpHeaderNames.CONTENT_TYPE, "");
-        REDIRECT_HEADER_BLOCKLIST.add(HttpHeaderNames.CONTENT_LENGTH, "");
-        REDIRECT_HEADER_BLOCKLIST.add(HttpHeaderNames.TRANSFER_ENCODING, "");
-        REDIRECT_HEADER_BLOCKLIST.add(HttpHeaderNames.CONNECTION, "");
-    }
+    /**
+     * When following 3xx responses (that are not 307 or 308) the request bodies are dropped and converted
+     * to GET requests. Therefore, headers related to the content and length of the request body must
+     * also be stripped along with standard hop-by-hop and host-specific headers.
+     */
+    private static final HttpHeaders REDIRECT_HEADER_BLOCKLIST = new DefaultHttpHeaders()
+        .add(HttpHeaderNames.HOST, "")
+        .add(HttpHeaderNames.TRANSFER_ENCODING, "")
+        .add(HttpHeaderNames.CONNECTION, "")
+        .add(HttpHeaderNames.CONTENT_TYPE, "")
+        .add(HttpHeaderNames.CONTENT_LENGTH, "");
 
     protected MediaTypeCodecRegistry mediaTypeCodecRegistry;
     protected final ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory = new NettyByteBufferFactory();
@@ -1641,11 +1639,12 @@ public class DefaultHttpClient implements
                     if (code == 307 || code == 308) {
                         redirectRequest = io.micronaut.http.HttpRequest.create(request.getMethod(), location);
                         request.getBody().ifPresent(redirectRequest::body);
+                        setRedirectHeaders(request, redirectRequest, REDIRECT_HEADER_BLOCKLIST_PRESERVE_BODY);
                     } else {
                         redirectRequest = io.micronaut.http.HttpRequest.GET(location);
+                        setRedirectHeaders(request, redirectRequest, REDIRECT_HEADER_BLOCKLIST);
                     }
 
-                    setRedirectHeaders(request, redirectRequest);
                     return resolveRedirectURI(request, redirectRequest)
                         .flatMap(uri -> sendRequestWithRedirects(propagatedContext, blockHint, redirectRequest.uri(uri), readResponse));
                 } else {
@@ -2059,10 +2058,12 @@ public class DefaultHttpClient implements
         return result;
     }
 
-    private static void setRedirectHeaders(io.micronaut.http.@Nullable HttpRequest<?> request, MutableHttpRequest<Object> redirectRequest) {
+    private static void setRedirectHeaders(io.micronaut.http.@Nullable HttpRequest<?> request,
+                                           MutableHttpRequest<Object> redirectRequest,
+                                           HttpHeaders headersToBlock) {
         if (request != null) {
             for (Map.Entry<String, List<String>> originalHeader : request.getHeaders()) {
-                if (!REDIRECT_HEADER_BLOCKLIST.contains(originalHeader.getKey())) {
+                if (!headersToBlock.contains(originalHeader.getKey())) {
                     final List<String> originalHeaderValue = originalHeader.getValue();
                     if (originalHeaderValue != null && !originalHeaderValue.isEmpty()) {
                         for (String value : originalHeaderValue) {

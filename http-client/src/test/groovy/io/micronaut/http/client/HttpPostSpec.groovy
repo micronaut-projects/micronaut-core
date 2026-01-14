@@ -415,6 +415,42 @@ class HttpPostSpec extends Specification {
         res.getBody(String).get() == 'foo'
     }
 
+    void "test 307 temporary redirect preserves body and relevant headers"() {
+        given:
+        def book = new Book(title: "The Stand", pages: 1000)
+
+        when:
+        def res = client.toBlocking().exchange(
+                HttpRequest.POST('/post/tempRedirect', book).contentType(MediaType.APPLICATION_FORM_URLENCODED),
+                Book
+        )
+        def receivedBook = res.body()
+
+        then:
+        res.status == HttpStatus.OK
+        receivedBook != null
+        receivedBook.title == book.title
+        receivedBook.pages == book.pages
+    }
+
+    void "test 308 permanent redirect preserves body and relevant headers"() {
+        given:
+        def book = new Book(title: "The Stand", pages: 1000)
+
+        when:
+        def res = client.toBlocking().exchange(
+                HttpRequest.POST('/post/permanentRedirect', book).contentType(MediaType.APPLICATION_FORM_URLENCODED),
+                Book
+        )
+        def receivedBook = res.body()
+
+        then:
+        res.status == HttpStatus.OK
+        receivedBook != null
+        receivedBook.title == book.title
+        receivedBook.pages == book.pages
+    }
+
     void 'test format dates in form body with @Format'() {
         given:
         def client = this.postClient
@@ -543,6 +579,26 @@ class HttpPostSpec extends Specification {
         @Post(uri = "/redirectTarget")
         String redirectTargetPost() {
             return 'bar'
+        }
+
+        @Post(uri = "/tempRedirect", consumes = MediaType.APPLICATION_FORM_URLENCODED)
+        HttpResponse tempRedirect() {
+            return HttpResponse.temporaryRedirect(URI.create("/post/tempRedirectTarget"))
+        }
+
+        @Post(uri = "/tempRedirectTarget", consumes = MediaType.APPLICATION_FORM_URLENCODED)
+        Book tempRedirectTarget(@Body Book book) {
+            return book
+        }
+
+        @Post(uri = "/permanentRedirect", consumes = MediaType.APPLICATION_FORM_URLENCODED)
+        HttpResponse permanentRedirect() {
+            return HttpResponse.permanentRedirect(URI.create("/post/permanentRedirectTarget"))
+        }
+
+        @Post(uri = "/permanentRedirectTarget", consumes = MediaType.APPLICATION_FORM_URLENCODED)
+        Book permanentRedirectTarget(@Body Book book) {
+            return book
         }
 
         @Post(uri = "/form/date", consumes = MediaType.APPLICATION_FORM_URLENCODED)

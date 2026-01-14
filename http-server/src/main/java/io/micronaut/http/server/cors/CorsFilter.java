@@ -23,6 +23,7 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ImmutableArgumentConversionContext;
 import io.micronaut.core.io.socket.SocketUtils;
 import io.micronaut.core.order.Ordered;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
@@ -40,11 +41,14 @@ import io.micronaut.http.server.annotation.PreMatching;
 import io.micronaut.http.server.util.HttpHostResolver;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteMatch;
+import io.micronaut.web.router.resource.StaticResourceResolver;
 import jakarta.inject.Inject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.URI;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.regex.Matcher;
@@ -86,31 +90,48 @@ public class CorsFilter implements Ordered, ConditionalFilter {
 
     private final Router router;
 
+    @Nullable
+    private final StaticResourceResolver staticResourceResolver;
+
     /**
      * @param corsConfiguration The {@link CorsOriginConfiguration} instance
      * @param httpHostResolver  HTTP Host resolver
-     * @deprecated use {@link CorsFilter(HttpServerConfiguration.CorsConfiguration, HttpHostResolver, Router)} instead.
+     * @deprecated Use {@link CorsFilter(HttpServerConfiguration, StaticResourceResolver, Router, HttpHostResolver)} instead.
      */
     @Deprecated(since = "4.7", forRemoval = true)
     public CorsFilter(HttpServerConfiguration.CorsConfiguration corsConfiguration,
                       @Nullable HttpHostResolver httpHostResolver) {
-        this.corsConfiguration = corsConfiguration;
-        this.httpHostResolver = httpHostResolver;
-        this.router = null;
+        this(corsConfiguration, httpHostResolver, null);
     }
 
     /**
      * @param corsConfiguration The {@link CorsOriginConfiguration} instance
      * @param httpHostResolver  HTTP Host resolver
      * @param router  Router
+     * @deprecated Use {@link CorsFilter(HttpServerConfiguration, StaticResourceResolver, Router, HttpHostResolver)} instead.
      */
-    @Inject
+    @Deprecated(forRemoval = true, since = "4.10.12")
     public CorsFilter(HttpServerConfiguration.CorsConfiguration corsConfiguration,
                       @Nullable HttpHostResolver httpHostResolver,
                       Router router) {
+        this(corsConfiguration, null,  router, httpHostResolver);
+    }
+
+    /**
+     * @param corsConfiguration The {@link CorsOriginConfiguration} instance
+     * @param staticResourceResolver Static Resource Resolver
+     * @param router  Router
+     * @param httpHostResolver  HTTP Host resolver
+     */
+    @Inject
+    public CorsFilter(HttpServerConfiguration.CorsConfiguration corsConfiguration,
+                      StaticResourceResolver staticResourceResolver,
+                      Router router,
+                      @Nullable HttpHostResolver httpHostResolver) {
         this.corsConfiguration = corsConfiguration;
         this.httpHostResolver = httpHostResolver;
         this.router = router;
+        this.staticResourceResolver = staticResourceResolver;
     }
 
     @Override
@@ -391,10 +412,12 @@ public class CorsFilter implements Ordered, ConditionalFilter {
         if (requestOrigin == null) {
             return Optional.empty();
         }
-        for (UriRouteMatch<Object, Object> routeMatch : router.findAny(request)) {
-            Optional<CorsOriginConfiguration> corsOriginConfiguration = CrossOriginUtil.getCorsOriginConfiguration(routeMatch);
-            if (corsOriginConfiguration.isPresent() && matchesOrigin(corsOriginConfiguration.get(), requestOrigin)) {
-                return corsOriginConfiguration;
+        if (router != null) {
+            for (UriRouteMatch<Object, Object> routeMatch : router.findAny(request)) {
+                Optional<CorsOriginConfiguration> corsOriginConfiguration = CrossOriginUtil.getCorsOriginConfiguration(routeMatch);
+                if (corsOriginConfiguration.isPresent() && matchesOrigin(corsOriginConfiguration.get(), requestOrigin)) {
+                    return corsOriginConfiguration;
+                }
             }
         }
         if (!corsConfiguration.isEnabled()) {
@@ -503,7 +526,7 @@ public class CorsFilter implements Ordered, ConditionalFilter {
         if (!CorsUtil.isPreflightRequest(request)) {
             return false;
         }
-        List<HttpMethod> availableHttpMethods = router.findAny(request).stream().map(UriRouteMatch::getHttpMethod).toList();
+        List<HttpMethod> availableHttpMethods = availableHttpMethods(request);
         if (availableHttpMethods.stream().noneMatch(method -> method.equals(methodToMatch))) {
             return false;
         }
@@ -519,5 +542,18 @@ public class CorsFilter implements Ordered, ConditionalFilter {
             }
         }
         return true;
+    }
+
+    private List<HttpMethod> availableHttpMethods(@NonNull HttpRequest<?> request) {
+        List<HttpMethod> methods = new ArrayList<>(router != null
+            ? router.findAny(request).stream().map(UriRouteMatch::getHttpMethod).toList()
+            : Collections.emptyList()
+        );
+        if (CollectionUtils.isEmpty(methods) &&
+            staticResourceResolver != null &&
+            staticResourceResolver.resolve(request.getUri().getPath()).isPresent()) {
+            methods.add(HttpMethod.GET);
+        }
+        return methods;
     }
 }

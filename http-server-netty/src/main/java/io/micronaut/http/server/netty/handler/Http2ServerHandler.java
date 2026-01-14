@@ -289,6 +289,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         private final Http2ServerHandler frameListener;
         private Http2AccessLogManager.Factory accessLogManagerFactory;
         private Http2AccessLogManager accessLogManager;
+        private boolean decompress = true;
 
         public ConnectionHandlerBuilder(RequestHandler requestHandler) {
             frameListener = new Http2ServerHandler(requestHandler);
@@ -326,10 +327,15 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
             return this;
         }
 
+        public ConnectionHandlerBuilder decompress(boolean decompress) {
+            this.decompress = decompress;
+            return this;
+        }
+
         @Override
         public ConnectionHandler build() {
             connection(new DefaultHttp2Connection(isServer(), maxReservedStreams()));
-            Http2FrameListener fl = new DelegatingDecompressorFrameListener(connection(), frameListener, false);
+            Http2FrameListener fl = decompress ? new DelegatingDecompressorFrameListener(connection(), frameListener, false) : frameListener;
             if (accessLogManagerFactory != null) {
                 accessLogManager = new Http2AccessLogManager(accessLogManagerFactory, connection());
                 fl = new Http2AccessLogFrameListener(fl, accessLogManager);
