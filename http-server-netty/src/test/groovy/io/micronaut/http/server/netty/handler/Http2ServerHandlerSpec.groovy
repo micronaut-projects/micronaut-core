@@ -1,11 +1,5 @@
 package io.micronaut.http.server.netty.handler
 
-<<<<<<< HEAD
-
-import org.jspecify.annotations.NonNull
-=======
-import io.micronaut.core.annotation.NonNull
->>>>>>> 4.10.x
 import io.micronaut.http.body.CloseableByteBody
 import io.micronaut.http.body.InternalByteBody
 import io.micronaut.http.body.stream.InputStreamByteBody
@@ -41,12 +35,12 @@ import io.netty.handler.codec.http2.Http2Frame
 import io.netty.handler.codec.http2.Http2FrameCodec
 import io.netty.handler.codec.http2.Http2FrameCodecBuilder
 import io.netty.handler.codec.http2.Http2HeadersFrame
-import io.netty.handler.codec.http2.Http2PingFrame
 import io.netty.handler.codec.http2.Http2ResetFrame
 import io.netty.handler.codec.http2.Http2SettingsAckFrame
 import io.netty.handler.codec.http2.Http2SettingsFrame
 import io.netty.handler.codec.http2.Http2StreamFrame
 import io.netty.util.AsciiString
+import org.jspecify.annotations.NonNull
 import org.junit.jupiter.api.Assertions
 import org.reactivestreams.Publisher
 import org.reactivestreams.Subscriber
