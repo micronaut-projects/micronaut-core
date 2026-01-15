@@ -15,8 +15,8 @@
  */
 package io.micronaut.http.multipart;
 
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.MediaType;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Form field metadata provided by a client. This is untrusted data! Each attribute is optional.

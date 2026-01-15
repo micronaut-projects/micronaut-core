@@ -16,7 +16,6 @@
 package io.micronaut.core.execution;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
@@ -152,7 +151,7 @@ final class ImperativeExecutionFlowImpl implements ImperativeExecutionFlow<Objec
     }
 
     @Override
-    public void cancel(@NonNull Consumer<Object> discard) {
+    public void cancel(Consumer<Object> discard) {
         if (value != null) {
             discard.accept(value);
         }

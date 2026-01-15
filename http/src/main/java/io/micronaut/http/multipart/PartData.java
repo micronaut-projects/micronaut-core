@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.multipart;
 
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.MediaType;
 
@@ -33,7 +32,7 @@ import java.util.Optional;
  * @author James Kleeh
  * @since 1.0
  */
-public record PartData(@NonNull FormFieldMetadata fieldMetadata, @NonNull ReadBuffer readBuffer) implements Closeable {
+public record PartData(FormFieldMetadata fieldMetadata, ReadBuffer readBuffer) implements Closeable {
 
     /**
      * Gets the content of this chunk as an {@code InputStream}.
@@ -41,7 +40,6 @@ public record PartData(@NonNull FormFieldMetadata fieldMetadata, @NonNull ReadBu
      * @return The content of this chunk as an {@code InputStream}
      * @throws IOException If an error occurs in retrieving the content
      */
-    @NonNull
     public InputStream getInputStream() throws IOException {
         return readBuffer.toInputStream();
     }
@@ -52,7 +50,7 @@ public record PartData(@NonNull FormFieldMetadata fieldMetadata, @NonNull ReadBu
      * @return The content of this chunk as a {@code byte[]}
      * @throws IOException If an error occurs in retrieving the content
      */
-    public byte @NonNull [] getBytes() throws IOException {
+    public byte[] getBytes() throws IOException {
         return readBuffer.toArray();
     }
 
@@ -62,7 +60,6 @@ public record PartData(@NonNull FormFieldMetadata fieldMetadata, @NonNull ReadBu
      * @return The content of this chunk as a {@code ByteBuffer}
      * @throws IOException If an error occurs in retrieving the content
      */
-    @NonNull
     public ByteBuffer getByteBuffer() throws IOException {
         return ByteBuffer.wrap(getBytes());
     }
@@ -72,7 +69,6 @@ public record PartData(@NonNull FormFieldMetadata fieldMetadata, @NonNull ReadBu
      *
      * @return The content type of this chunk.
      */
-    @NonNull
     public Optional<MediaType> getContentType() {
         return Optional.ofNullable(fieldMetadata.mediaType());
     }

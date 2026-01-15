@@ -16,7 +16,6 @@
 package io.micronaut.http;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.http.uri.UriMatchInfo;
 
@@ -82,9 +81,8 @@ public final class BasicHttpAttributes {
      * @param request The request
      * @return The condition to wait for
      */
-    @NonNull
     @Experimental
-    public static ExecutionFlow<?> getRouteWaitsFor(@NonNull HttpRequest<?> request) {
+    public static ExecutionFlow<?> getRouteWaitsFor(HttpRequest<?> request) {
         @SuppressWarnings("rawtypes")
         Optional<ExecutionFlow> attr = request.getAttribute(ROUTE_WAITS_FOR, ExecutionFlow.class);
         return attr.orElseGet(ExecutionFlow::empty);
@@ -99,7 +97,7 @@ public final class BasicHttpAttributes {
      */
     @Experimental
     @SuppressWarnings({"rawtypes", "unchecked"})
-    public static void addRouteWaitsFor(@NonNull HttpRequest<?> request, @NonNull ExecutionFlow<?> flowToAdd) {
+    public static void addRouteWaitsFor(HttpRequest<?> request, ExecutionFlow<?> flowToAdd) {
         Optional<ExecutionFlow> attr = request.getAttribute(ROUTE_WAITS_FOR, ExecutionFlow.class);
         if (attr.isPresent()) {
             request.setAttribute(ROUTE_WAITS_FOR, attr.get().then(() -> flowToAdd));

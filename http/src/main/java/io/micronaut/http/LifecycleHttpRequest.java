@@ -16,7 +16,6 @@
 package io.micronaut.http;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.NonNull;
 
 /**
  * A server HTTP request that cleans up resources at the end of its lifecycle.
@@ -31,5 +30,5 @@ public interface LifecycleHttpRequest<B> extends HttpRequest<B> {
      *
      * @param dispose The task to run for disposal
      */
-    void addDisposalResource(@NonNull Runnable dispose);
+    void addDisposalResource(Runnable dispose);
 }

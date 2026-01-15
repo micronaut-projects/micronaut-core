@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.form;
 
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.LifecycleHttpRequest;
 import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.multipart.RawFormField;
@@ -34,7 +33,6 @@ public interface FormCapableHttpRequest<B> extends ServerHttpRequest<B>, Lifecyc
      * @return The raw form fields
      * @throws IllegalStateException If this request does not contain a form body
      */
-    @NonNull
     Publisher<RawFormField> getRawFormFields() throws IllegalStateException;
 
     /**

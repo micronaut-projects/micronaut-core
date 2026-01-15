@@ -19,7 +19,7 @@ import io.micronaut.core.io.buffer.LeakTracker;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.util.functional.ThrowingSupplier;
 import io.micronaut.http.body.CloseableByteBody;
-import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -50,16 +50,15 @@ import java.util.concurrent.locks.StampedLock;
 public final class StreamingFileUpload implements Closeable {
     private static final LeakTracker.Factory<StreamingFileUpload> TRACKER_FACTORY = LeakTracker.Factory.forClass(StreamingFileUpload.class);
 
+    @Nullable
     private final LeakTracker<StreamingFileUpload> tracker = TRACKER_FACTORY.track(this);
 
-    @NonNull
     private final RawFormField field;
-    @NonNull
     private final Executor ioExecutor;
 
     public StreamingFileUpload(
-        @NonNull RawFormField field,
-        @NonNull Executor ioExecutor
+        RawFormField field,
+        Executor ioExecutor
     ) {
         this.field = field;
         this.ioExecutor = ioExecutor;
@@ -70,7 +69,7 @@ public final class StreamingFileUpload implements Closeable {
      *
      * @return The metadata
      */
-    public @NonNull FormFieldMetadata metadata() {
+    public FormFieldMetadata metadata() {
         return field.metadata();
     }
 
@@ -80,7 +79,6 @@ public final class StreamingFileUpload implements Closeable {
      *
      * @return The streaming data
      */
-    @NonNull
     public CloseableByteBody streamingBody() {
         CloseableByteBody bb = field.byteBody().move();
         close();
@@ -92,7 +90,6 @@ public final class StreamingFileUpload implements Closeable {
      *
      * @return The final upload size
      */
-    @NonNull
     public OptionalLong getDefinedSize() {
         return field.byteBody().expectedLength();
     }
@@ -103,7 +100,6 @@ public final class StreamingFileUpload implements Closeable {
      * @return The form field name
      * @see FormFieldMetadata#name()
      */
-    @NonNull
     public String getName() {
         String name = metadata().name();
         if (name == null) {
@@ -118,7 +114,6 @@ public final class StreamingFileUpload implements Closeable {
      * @return The file name
      * @see FormFieldMetadata#fileName()
      */
-    @NonNull
     public String getFilename() {
         String name = metadata().fileName();
         if (name == null) {
@@ -176,8 +171,8 @@ public final class StreamingFileUpload implements Closeable {
             // lock for subscription and outputStream. Used to make sure onSubscribe completes
             // before onError/onComplete processing.
             final StampedLock outputLock = new StampedLock();
-            Subscription subscription;
-            OutputStream outputStream;
+            @Nullable Subscription subscription;
+            @Nullable OutputStream outputStream;
 
             @Override
             public void onSubscribe(Subscription s) {
@@ -207,6 +202,8 @@ public final class StreamingFileUpload implements Closeable {
 
             @Override
             public void onNext(ReadBuffer readBuffer) {
+                assert subscription != null;
+                assert outputStream != null;
                 // if there is an onComplete immediately after onNext, this lock delays it until
                 // the onNext execute is done.
                 long stamp = outputLock.tryWriteLock();
@@ -240,6 +237,7 @@ public final class StreamingFileUpload implements Closeable {
                 ioExecutor.execute(() -> {
                     long stamp = outputLock.writeLock();
                     try {
+                        assert outputStream != null;
                         outputStream.close();
                     } catch (IOException ex) {
                         t.addSuppressed(ex);
@@ -255,6 +253,7 @@ public final class StreamingFileUpload implements Closeable {
                 ioExecutor.execute(() -> {
                     long stamp = outputLock.writeLock();
                     try {
+                        assert outputStream != null;
                         outputStream.close();
                         sink.tryEmitEmpty();
                     } catch (IOException ex) {

@@ -17,7 +17,6 @@ package io.micronaut.core.io.buffer;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.functional.ThrowingConsumer;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 import java.io.ByteArrayOutputStream;
@@ -92,7 +91,7 @@ public class ReadBufferFactory {
      * @param n The maximum number of bytes to read
      * @return The bytes read, or {@code null} if we hit EOF
      */
-    public @Nullable ReadBuffer copyOf(@NonNull ScatteringByteChannel channel, int n) throws IOException {
+    public @Nullable ReadBuffer copyOf(ScatteringByteChannel channel, int n) throws IOException {
         ByteBuffer buffer = ByteBuffer.allocate(n);
         int read = channel.read(buffer);
         if (read < 0) {
@@ -199,6 +198,7 @@ public class ReadBufferFactory {
 
     private BufferingOutputStream outputStreamBuffer(int capacity) {
         return new BufferingOutputStream() {
+            @Nullable
             NoCopyByteArrayOutputStream out = new NoCopyByteArrayOutputStream(capacity);
 
             @Override

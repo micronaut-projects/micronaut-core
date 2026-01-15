@@ -15,19 +15,18 @@
  */
 package io.micronaut.core.io.buffer;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.netty.util.LeakPresenceDetector;
 import io.netty.util.ResourceLeakDetector;
 import io.netty.util.ResourceLeakDetectorFactory;
 import io.netty.util.ResourceLeakTracker;
+import org.jspecify.annotations.Nullable;
 
 import java.util.function.Supplier;
 
 /**
- * Platform agnostic leak tracking API. Currently only implemented when netty is available.
+ * Platform-agnostic leak tracking API. Currently only implemented when netty is available.
  *
- * @param <T>
+ * @param <T> Type to track
  * @since 5.0.0
  */
 public interface LeakTracker<T> {
@@ -37,8 +36,13 @@ public interface LeakTracker<T> {
      * @param trackedObject The tracked object, must match the one passed to
      * {@link Factory#track(Object)}
      */
-    void close(@NonNull T trackedObject);
+    void close(T trackedObject);
 
+    /**
+     * Factory.
+     *
+     * @param <T> Type to track
+     */
     interface Factory<T> {
         /**
          * Create a new leak tracker.
@@ -47,7 +51,7 @@ public interface LeakTracker<T> {
          * @return The leak tracker, o {@code null} if this object should not be tracked
          */
         @Nullable
-        LeakTracker<T> track(@NonNull T object);
+        LeakTracker<T> track(T object);
 
         /**
          * Create a new leak tracker factory for the given tracked object type.
@@ -56,8 +60,7 @@ public interface LeakTracker<T> {
          * @param <T> The tracked type
          * @return The tracker factory
          */
-        @NonNull
-        static <T> Factory<T> forClass(@NonNull Class<T> trackedClass) {
+        static <T> Factory<T> forClass(Class<T> trackedClass) {
             if (LeakTrackerFactoryHolder.nettyAvailable) {
                 try {
                     return new NettyLeakTrackerFactory<>(trackedClass);
@@ -94,6 +97,7 @@ class LeakTrackerFactoryHolder {
 
 class NettyLeakTrackerFactory<T> implements LeakTracker.Factory<T> {
     private final Class<T> trackedClass;
+    @Nullable
     private volatile ResourceLeakDetector<T> detector;
 
     static {
@@ -126,13 +130,7 @@ class NettyLeakTrackerFactory<T> implements LeakTracker.Factory<T> {
         }
     }
 
-    private static final class NettyLeakTracker<T> implements LeakTracker<T> {
-        private final ResourceLeakTracker<T> tracker;
-
-        NettyLeakTracker(ResourceLeakTracker<T> tracker) {
-            this.tracker = tracker;
-        }
-
+    private record NettyLeakTracker<T>(ResourceLeakTracker<T> tracker) implements LeakTracker<T> {
         @Override
         public void close(T trackedObject) {
             tracker.close(trackedObject);

@@ -16,9 +16,8 @@
 package io.micronaut.core.io.file;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.buffer.LeakTracker;
+import org.jspecify.annotations.Nullable;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -38,15 +37,16 @@ import java.util.concurrent.atomic.AtomicReference;
 public final class TemporaryFileResource implements Closeable {
     private static final LeakTracker.Factory<TemporaryFileResource> TRACKER_FACTORY = LeakTracker.Factory.forClass(TemporaryFileResource.class);
 
+    @Nullable
     private final LeakTracker<TemporaryFileResource> tracker = TRACKER_FACTORY.track(this);
-    private final AtomicReference<Path> path;
+    private final AtomicReference<@Nullable Path> path;
 
     /**
      * Create a new file resource. Ownership of the path is transferred to the resource.
      *
      * @param path The path
      */
-    public TemporaryFileResource(@NonNull Path path) {
+    public TemporaryFileResource(Path path) {
         this.path = new AtomicReference<>(Objects.requireNonNull(path, "path"));
     }
 
@@ -56,7 +56,6 @@ public final class TemporaryFileResource implements Closeable {
      * @return The path
      * @throws IllegalStateException if this resource is closed or has been moved
      */
-    @NonNull
     public Path getPath() {
         Path path = this.path.get();
         if (path == null) {
@@ -77,7 +76,6 @@ public final class TemporaryFileResource implements Closeable {
         return p;
     }
 
-    @NonNull
     private Path claimPath() {
         Path p = claimPathOrNull();
         if (p == null) {
@@ -94,7 +92,6 @@ public final class TemporaryFileResource implements Closeable {
      * @return The new resource managing this path
      * @throws IllegalStateException if this resource is already closed or has been moved
      */
-    @NonNull
     public TemporaryFileResource moveResource() {
         return new TemporaryFileResource(claimPath());
     }
@@ -107,7 +104,7 @@ public final class TemporaryFileResource implements Closeable {
      * @throws IOException If the file cannot be moved. Note that the file will be deleted in this
      * case, the resource still becomes invalid
      */
-    public void moveFile(@NonNull Path destination) throws IOException {
+    public void moveFile(Path destination) throws IOException {
         Path p = claimPath();
         try {
             Files.move(p, destination);

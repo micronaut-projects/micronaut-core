@@ -16,7 +16,6 @@
 package io.micronaut.http.multipart;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.io.buffer.ReadBufferFactory;
 import io.micronaut.core.io.file.TemporaryFileResource;
@@ -51,12 +50,12 @@ import java.util.concurrent.Executor;
 public abstract sealed class CompletedFileUpload extends CompletedPart {
     private static final Logger LOG = LoggerFactory.getLogger(CompletedFileUpload.class);
 
-    CompletedFileUpload(@NonNull FormFieldMetadata metadata) {
+    CompletedFileUpload(FormFieldMetadata metadata) {
         super(metadata);
     }
 
     @Override
-    public abstract @NonNull CompletedFileUpload moveResource();
+    public abstract CompletedFileUpload moveResource();
 
     /**
      * Create a new memory-backed file upload. Ownership of the data buffer transfers to the file
@@ -66,8 +65,7 @@ public abstract sealed class CompletedFileUpload extends CompletedPart {
      * @param memory   The field data
      * @return The file upload structure
      */
-    @NonNull
-    public static CompletedFileUpload ofMemory(@NonNull FormFieldMetadata metadata, @NonNull ReadBuffer memory) {
+    public static CompletedFileUpload ofMemory(FormFieldMetadata metadata, ReadBuffer memory) {
         return new Memory(metadata, memory);
     }
 
@@ -80,9 +78,8 @@ public abstract sealed class CompletedFileUpload extends CompletedPart {
      * @param size     The size of the backing file
      * @return The file upload structure
      */
-    @NonNull
     @Experimental
-    public static CompletedFileUpload ofFile(@NonNull FormFieldMetadata metadata, @NonNull TemporaryFileResource path, long size) {
+    public static CompletedFileUpload ofFile(FormFieldMetadata metadata, TemporaryFileResource path, long size) {
         return new File(metadata, path, size);
     }
 
@@ -92,7 +89,6 @@ public abstract sealed class CompletedFileUpload extends CompletedPart {
      * @return The content type
      * @see FormFieldMetadata#mediaType()
      */
-    @NonNull
     public final Optional<MediaType> getContentType() {
         return Optional.ofNullable(getMetadata().mediaType());
     }
@@ -103,7 +99,6 @@ public abstract sealed class CompletedFileUpload extends CompletedPart {
      * @return The file name
      * @see FormFieldMetadata#fileName()
      */
-    @NonNull
     public final String getFilename() {
         return Objects.requireNonNull(getMetadata().fileName(), "Field name not given");
     }
@@ -114,14 +109,13 @@ public abstract sealed class CompletedFileUpload extends CompletedPart {
      *
      * @param destination The target file
      */
-    public abstract void transferTo(@NonNull Path destination) throws IOException;
+    public abstract void transferTo(Path destination) throws IOException;
 
     static final class Memory extends CompletedFileUpload {
-        @NonNull
         private final ReadBuffer buffer;
         private final int size;
 
-        Memory(@NonNull FormFieldMetadata metadata, @NonNull ReadBuffer buffer) {
+        Memory(FormFieldMetadata metadata, ReadBuffer buffer) {
             super(metadata);
             this.buffer = buffer;
             this.size = buffer.readable();
@@ -134,7 +128,7 @@ public abstract sealed class CompletedFileUpload extends CompletedPart {
         }
 
         @Override
-        public void closeAsync(@NonNull Executor ioExecutor) {
+        public void closeAsync(Executor ioExecutor) {
             close();
         }
 
@@ -154,7 +148,7 @@ public abstract sealed class CompletedFileUpload extends CompletedPart {
         }
 
         @Override
-        public @NonNull CompletedFileUpload moveResource() {
+        public CompletedFileUpload moveResource() {
             return new Memory(getMetadata(), toReadBuffer());
         }
 
@@ -171,7 +165,7 @@ public abstract sealed class CompletedFileUpload extends CompletedPart {
         private final TemporaryFileResource path;
         private final long actualSize;
 
-        File(@NonNull FormFieldMetadata metadata, @NonNull TemporaryFileResource path, long actualSize) {
+        File(FormFieldMetadata metadata, TemporaryFileResource path, long actualSize) {
             super(metadata);
             this.path = path;
             this.actualSize = actualSize;
@@ -187,7 +181,7 @@ public abstract sealed class CompletedFileUpload extends CompletedPart {
         }
 
         @Override
-        public void closeAsync(@NonNull Executor ioExecutor) {
+        public void closeAsync(Executor ioExecutor) {
             TemporaryFileResource p = path;
             if (p.isOpen()) {
                 closeTracker();
@@ -223,7 +217,7 @@ public abstract sealed class CompletedFileUpload extends CompletedPart {
         }
 
         @Override
-        public @NonNull CompletedFileUpload moveResource() {
+        public CompletedFileUpload moveResource() {
             return new File(getMetadata(), path.moveResource(), actualSize);
         }
 

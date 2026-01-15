@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.multipart;
 
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.buffer.ReadBuffer;
 
 import java.io.InputStream;
@@ -27,7 +26,7 @@ import java.util.concurrent.Executor;
 public final class CompletedAttribute extends CompletedPart {
     private final ReadBuffer readBuffer;
 
-    private CompletedAttribute(@NonNull FormFieldMetadata metadata, ReadBuffer readBuffer) {
+    private CompletedAttribute(FormFieldMetadata metadata, ReadBuffer readBuffer) {
         super(metadata);
         this.readBuffer = readBuffer;
     }
@@ -40,8 +39,7 @@ public final class CompletedAttribute extends CompletedPart {
      * @param readBuffer The attribute memory
      * @return The attribute
      */
-    @NonNull
-    public static CompletedAttribute create(@NonNull FormFieldMetadata metadata, @NonNull ReadBuffer readBuffer) {
+    public static CompletedAttribute create(FormFieldMetadata metadata, ReadBuffer readBuffer) {
         return new CompletedAttribute(metadata, readBuffer);
     }
 
@@ -61,12 +59,12 @@ public final class CompletedAttribute extends CompletedPart {
     }
 
     @Override
-    public @NonNull CompletedPart moveResource() {
+    public CompletedPart moveResource() {
         return create(getMetadata(), toReadBuffer());
     }
 
     @Override
-    public void closeAsync(@NonNull Executor ioExecutor) {
+    public void closeAsync(Executor ioExecutor) {
         close();
     }
 

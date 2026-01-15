@@ -15,9 +15,9 @@
  */
 package io.micronaut.http.multipart;
 
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.buffer.LeakTracker;
 import io.micronaut.core.io.buffer.ReadBuffer;
+import org.jspecify.annotations.Nullable;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -34,12 +34,12 @@ import java.util.concurrent.Executor;
 public abstract sealed class CompletedPart implements Closeable permits CompletedAttribute, CompletedFileUpload {
     private static final LeakTracker.Factory<CompletedPart> TRACKER_FACTORY = LeakTracker.Factory.forClass(CompletedPart.class);
 
+    @Nullable
     private final LeakTracker<CompletedPart> tracker = TRACKER_FACTORY.track(this);
 
-    @NonNull
     private final FormFieldMetadata metadata;
 
-    CompletedPart(@NonNull FormFieldMetadata metadata) {
+    CompletedPart(FormFieldMetadata metadata) {
         this.metadata = metadata;
     }
 
@@ -48,7 +48,6 @@ public abstract sealed class CompletedPart implements Closeable permits Complete
      *
      * @return The metadata
      */
-    @NonNull
     public final FormFieldMetadata getMetadata() {
         return metadata;
     }
@@ -59,7 +58,6 @@ public abstract sealed class CompletedPart implements Closeable permits Complete
      * @return The field name
      * @see FormFieldMetadata#name()
      */
-    @NonNull
     public final String getName() {
         return Objects.requireNonNull(metadata.name(), "Field name not given");
     }
@@ -76,7 +74,7 @@ public abstract sealed class CompletedPart implements Closeable permits Complete
      *
      * @param ioExecutor The executor
      */
-    public abstract void closeAsync(@NonNull Executor ioExecutor);
+    public abstract void closeAsync(Executor ioExecutor);
 
     /**
      * Get the definite size in bytes of the form field value. Remains accessible after this part
@@ -133,6 +131,5 @@ public abstract sealed class CompletedPart implements Closeable permits Complete
      *
      * @return A new completed part
      */
-    @NonNull
     public abstract CompletedPart moveResource();
 }

@@ -16,12 +16,12 @@
 package io.micronaut.core.async.publisher;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.optim.StaticOptimizations;
 import io.micronaut.core.reflect.ClassUtils;
+import org.jspecify.annotations.NonNull;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -583,7 +583,9 @@ public class Publishers {
      * publisher.
      *
      * @param source The source to read from
+     * @param <E> The element type
      * @return The publisher to consume the buffered elements
+     * @since 5.0.0
      */
     @NonNull
     public static <E> Flux<E> bufferNow(@NonNull Publisher<E> source) {
