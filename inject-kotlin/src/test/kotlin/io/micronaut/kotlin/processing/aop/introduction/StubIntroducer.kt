@@ -7,7 +7,7 @@ import io.micronaut.core.util.StringUtils
 import jakarta.inject.Singleton
 
 @Singleton
-class StubIntroducer : MethodInterceptor<Any?, Any?> {
+class StubIntroducer : MethodInterceptor<Any, Any> {
 
     override fun getOrder(): Int {
         return POSITION
@@ -17,7 +17,7 @@ class StubIntroducer : MethodInterceptor<Any?, Any?> {
         const val POSITION = 0
     }
 
-    override fun intercept(context: MethodInvocationContext<Any?, Any?>): Any? {
+    override fun intercept(context: MethodInvocationContext<Any, Any>): Any {
         return context.stringValue(// <3>
             Stub::class.java
         ).filter { StringUtils.isNotEmpty(it) }.orElseGet {
