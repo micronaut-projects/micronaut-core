@@ -18,7 +18,6 @@ package io.micronaut.scheduling.executor;
 import io.micronaut.context.annotation.ConfigurationInject;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.ArgumentUtils;
 
@@ -87,7 +86,6 @@ public class UserExecutorConfiguration implements ExecutorConfiguration {
         this.threadFactoryClass = threadFactoryClass;
     }
 
-    @NonNull
     @Override
     public String getName() {
         return name;

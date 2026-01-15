@@ -20,7 +20,6 @@ import ch.qos.logback.classic.spi.Configurator;
 import ch.qos.logback.classic.util.DefaultJoranConfigurator;
 import ch.qos.logback.core.joran.spi.JoranException;
 import ch.qos.logback.core.status.InfoStatus;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.logging.LoggingSystemException;
 
@@ -50,9 +49,9 @@ public final class LogbackUtils {
      * @param context            Logger Context
      * @param logbackXmlLocation the location of the xml logback config file
      */
-    public static void configure(@NonNull ClassLoader classLoader,
-                                 @NonNull LoggerContext context,
-                                 @NonNull String logbackXmlLocation) {
+    public static void configure(ClassLoader classLoader,
+                                 LoggerContext context,
+                                 String logbackXmlLocation) {
         configure(context, logbackXmlLocation, () -> {
             // Check classpath first
             URL resource = classLoader.getResource(logbackXmlLocation);
@@ -84,8 +83,8 @@ public final class LogbackUtils {
      * @param resourceSupplier   A resource for example logback.xml
      */
     private static void configure(
-        @NonNull LoggerContext context,
-        @NonNull String logbackXmlLocation,
+        LoggerContext context,
+        String logbackXmlLocation,
         Supplier<URL> resourceSupplier,
         ClassLoader classLoader) {
 
@@ -114,8 +113,8 @@ public final class LogbackUtils {
     /**
      * Taken from {@link ch.qos.logback.classic.util.ContextInitializer#autoConfig}.
      */
-    private static void programmaticConfiguration(@NonNull LoggerContext context,
-                                                  @NonNull Configurator configurator) {
+    private static void programmaticConfiguration(LoggerContext context,
+                                                  Configurator configurator) {
         try {
             configurator.setContext(context);
             configurator.configure(context);

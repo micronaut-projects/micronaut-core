@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.scheduling.instrument;
-
-import org.jspecify.annotations.NonNull;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -33,22 +31,22 @@ public interface InstrumentedScheduledExecutorService extends InstrumentedExecut
     ScheduledExecutorService getTarget();
 
     @Override
-    default ScheduledFuture<?> schedule(@NonNull Runnable command, long delay, @NonNull TimeUnit unit) {
+    default ScheduledFuture<?> schedule(Runnable command, long delay, TimeUnit unit) {
         return getTarget().schedule(instrument(command), delay, unit);
     }
 
     @Override
-    default <V> ScheduledFuture<V> schedule(@NonNull Callable<V> callable, long delay, @NonNull TimeUnit unit) {
+    default <V> ScheduledFuture<V> schedule(Callable<V> callable, long delay, TimeUnit unit) {
         return getTarget().schedule(instrument(callable), delay, unit);
     }
 
     @Override
-    default ScheduledFuture<?> scheduleAtFixedRate(@NonNull Runnable command, long initialDelay, long period, @NonNull TimeUnit unit) {
+    default ScheduledFuture<?> scheduleAtFixedRate(Runnable command, long initialDelay, long period, TimeUnit unit) {
         return getTarget().scheduleAtFixedRate(instrument(command), initialDelay, period, unit);
     }
 
     @Override
-    default ScheduledFuture<?> scheduleWithFixedDelay(@NonNull Runnable command, long initialDelay, long delay, @NonNull TimeUnit unit) {
+    default ScheduledFuture<?> scheduleWithFixedDelay(Runnable command, long initialDelay, long delay, TimeUnit unit) {
         return getTarget().scheduleWithFixedDelay(instrument(command), initialDelay, delay, unit);
     }
 }

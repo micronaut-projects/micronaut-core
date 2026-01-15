@@ -56,7 +56,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.ThreadLocalRandom
 
 class Http2ServerHandlerSpec extends Specification {
-    private static final class DuplexHandler extends Http2ChannelDuplexHandler {
+    private static class DuplexHandler extends Http2ChannelDuplexHandler {
         Http2FrameCodec frameCodec
         CompositeByteBuf received
 

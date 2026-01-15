@@ -19,7 +19,6 @@ import java.util.Map;
 import java.util.Set;
 
 import io.micronaut.context.event.ApplicationEventListener;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.util.CollectionUtils;
 
@@ -62,7 +61,6 @@ public interface RefreshEventListener extends ApplicationEventListener<RefreshEv
      * Returns the set of observed configuration prefixes that the event listener should listen for.
      * @return A set of prefixes
      */
-    @NonNull
     Set<String> getObservedConfigurationPrefixes();
 
     @Override
