@@ -744,7 +744,7 @@ public final class RouteExecutor {
         ).contextWrite(cv -> ReactorPropagation.addPropagatedContext(cv, propagatedContext).put(ServerRequestContext.KEY, request));
 
         return Mono.<MutableHttpResponse<?>>just(response
-            .header(HttpHeaders.CONTENT_TYPE, mediaType)
+            .contentType(mediaType)
             .body(ReactivePropagation.propagate(propagatedContext, bodyPublisher)))
             .contextWrite(context -> ReactorPropagation.addPropagatedContext(context, propagatedContext).put(ServerRequestContext.KEY, request));
     }
