@@ -17,12 +17,14 @@ class StubIntroducer : MethodInterceptor<Any, Any> {
         const val POSITION = 0
     }
 
-    override fun intercept(context: MethodInvocationContext<Any, Any>): Any {
-        return context.stringValue(// <3>
+    override fun intercept(context: MethodInvocationContext<Any, Any>): Any? {
+        val value = context.stringValue(// <3>
             Stub::class.java
-        ).filter { StringUtils.isNotEmpty(it) }.orElseGet {
-            val iterator: Iterator<MutableArgumentValue<*>> = context.parameters.values.iterator()
-            if (iterator.hasNext()) iterator.next().value?.toString() else null
+        ).orElse(null)
+        if (StringUtils.isNotEmpty(value)) {
+            return value
         }
+        val iterator: Iterator<MutableArgumentValue<*>> = context.parameters.values.iterator()
+        return if (iterator.hasNext()) iterator.next().value?.toString() else null
     }
 }
