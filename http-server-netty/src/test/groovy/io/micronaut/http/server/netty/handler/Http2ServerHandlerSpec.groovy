@@ -1,11 +1,6 @@
 package io.micronaut.http.server.netty.handler
 
-<<<<<<< HEAD
-
-import org.jspecify.annotations.NonNull
-=======
 import io.micronaut.core.annotation.NonNull
->>>>>>> 4.10.x
 import io.micronaut.http.body.CloseableByteBody
 import io.micronaut.http.body.InternalByteBody
 import io.micronaut.http.body.stream.InputStreamByteBody
@@ -61,7 +56,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.ThreadLocalRandom
 
 class Http2ServerHandlerSpec extends Specification {
-    private static final class DuplexHandler extends Http2ChannelDuplexHandler {
+    private static class DuplexHandler extends Http2ChannelDuplexHandler {
         Http2FrameCodec frameCodec
         CompositeByteBuf received
 
