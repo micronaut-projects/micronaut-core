@@ -641,7 +641,7 @@ public interface ClassElement extends TypedElement {
      */
     @Experimental
     @Nullable
-    default ClassElement foldBoundGenericTypes(Function<ClassElement, ClassElement> fold) {
+    default ClassElement foldBoundGenericTypes(Function<ClassElement, @Nullable ClassElement> fold) {
         List<ClassElement> typeArgs = getBoundGenericTypes().stream().map(arg -> arg.foldBoundGenericTypes(fold)).toList();
         if (typeArgs.contains(null)) {
             typeArgs = Collections.emptyList();

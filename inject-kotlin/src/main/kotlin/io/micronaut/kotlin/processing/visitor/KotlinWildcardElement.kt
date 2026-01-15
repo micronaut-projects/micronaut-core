@@ -78,7 +78,7 @@ internal class KotlinWildcardElement(
 
     override fun getGenericNativeType() = internalGenericNativeType
 
-    override fun foldBoundGenericTypes(fold: Function<ClassElement, ClassElement>): ClassElement? {
+    override fun foldBoundGenericTypes(fold: Function<ClassElement, ClassElement?>): ClassElement? {
         val upperBounds: List<KotlinClassElement?> = this.upperBounds
             .map { ele ->
                 toKotlinClassElement(
