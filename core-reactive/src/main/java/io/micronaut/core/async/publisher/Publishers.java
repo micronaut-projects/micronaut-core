@@ -588,7 +588,7 @@ public class Publishers {
      * @since 5.0.0
      */
     @NonNull
-    public static <E> Flux<E> bufferNow(@NonNull Publisher<E> source) {
+    public static <E> Publisher<E> bufferNow(@NonNull Publisher<E> source) {
         Sinks.Many<E> sink = Sinks.many().unicast().onBackpressureBuffer();
         var subscriber = new Subscriber<E>() {
             volatile Subscription subscription;
