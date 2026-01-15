@@ -275,30 +275,27 @@ class MicronautAstVisitor(ast.NodeVisitor):
                 if node.module:
                     for alias in node.names:
                         # Handle relative imports
-                        java_module = node.module
                         is_relative = node.level > 0
+                        level = node.level
+                        base_pkg = node.module
+
                         if is_relative:
-                            # Relative import: resolve relative to current package
-                            relative_module = node.module.lstrip('.')
-                            if relative_module:
-                                # from .Module import Class -> current_package.Module
-                                java_module = f"{self.package_name}.{relative_module}"
+                            parts = self.package_name.split('.') if self.package_name else []
+
+                            if level == 1:
+                                base_pkg = self.package_name
                             else:
-                                # from . import Class -> current_package
-                                java_module = self.package_name
+                                up = level - 1
+                                base_pkg = '.'.join(parts[:max(0, len(parts) - up)])
+
+                            full_name = f"{base_pkg}.{alias.name}"
                         else:
                             # Absolute import: map Python import modules to Java packages
                             # Micronaut packages (micronaut.*) need 'io.' prefix added back
                             # Other packages (jakarta.*, user packages) keep their names
                             if not node.module.startswith('io.') and node.module.startswith('micronaut.'):
-                                java_module = f"io.{node.module}"
-
-                        # For relative imports, the full name is the module path
-                        # For absolute imports, the full name is module.name
-                        if is_relative:
-                            full_name = java_module
-                        else:
-                            full_name = f"{java_module}.{alias.name}"
+                                base_pkg = f"io.{node.module}"
+                            full_name = f"{base_pkg}.{alias.name}"
 
                         if alias.asname:
                             self.imported_types[alias.asname] = full_name

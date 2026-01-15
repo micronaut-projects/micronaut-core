@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing.annotation;
 
+import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationValue;
@@ -289,7 +290,11 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
 
     @Override
     protected Optional<ElementDef> getAnnotationMirror(String annotationName) {
-        Optional<AnnotationValue<?>> annotationValue = visitorContext.getJavaVisitorContext().getAnnotationMetadataBuilder().buildAnnotation(annotationName);
+        JavaVisitorContext javaVisitorContext = visitorContext.getJavaVisitorContext();
+        if (javaVisitorContext == null) {
+            return Optional.empty();
+        }
+        Optional<AnnotationValue<?>> annotationValue = javaVisitorContext.getAnnotationMetadataBuilder().buildAnnotation(annotationName);
         if (annotationValue.isPresent()) {
             AnnotationValue<?> av = annotationValue.get();
             return Optional.of(new ClassDef(

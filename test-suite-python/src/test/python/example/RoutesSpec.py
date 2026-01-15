@@ -18,7 +18,15 @@ class RoutesSpec:
         response = self.client.toBlocking().retrieve("/route-from-script") # <3>
         assert response == "Hello from Python service!" # <4>
 # end::class[]
+
     @Test
     def test_hello_world_response2(self) -> None:
+        response = self.client.toBlocking().retrieve("/route-from-script2") # <3>
+        assert response == "Hello from Another Python service!" # <4>
+
+
+    @Test
+    def test_hello_world_response3(self) -> None:
         response = self.client.toBlocking().retrieve("/another-route-from-script") # <3>
         assert response == "Hello from Python service!!" # <4>
+

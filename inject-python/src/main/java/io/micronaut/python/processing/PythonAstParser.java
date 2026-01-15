@@ -87,6 +87,7 @@ public final class PythonAstParser {
         bindings.putMember("src", sources);
         bindings.putMember("package_name", packageName != null ? packageName : "");
         bindings.putMember("visitor_context", visitorContext);
+        bindings.putMember("file_name", "Unknown");
         context.eval(Source.create(
             PYTHON,
             getSource()
