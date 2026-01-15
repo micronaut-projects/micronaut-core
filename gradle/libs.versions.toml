@@ -89,7 +89,7 @@ managed-snakeyaml = "2.4"
 managed-java-parser-core = "3.27.1"
 managed-ksp = "2.3.4"
 managed-jspecify = "1.0.0"
-sonatype-scan = "3.0.0"
+sonatype-scan = "3.1.4"
 micronaut-docs = "3.0.0"
 
 [libraries]
