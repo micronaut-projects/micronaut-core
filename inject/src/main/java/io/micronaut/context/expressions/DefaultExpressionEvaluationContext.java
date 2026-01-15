@@ -39,18 +39,20 @@ import io.micronaut.inject.BeanIdentifier;
 @Internal
 public final class DefaultExpressionEvaluationContext implements ConfigurableExpressionEvaluationContext {
 
-    private final Object thisObject;
-    private final Object[] args;
-    private final BeanContext beanContext;
-    private final BeanDefinition<?> owningBean;
+    private final @Nullable Object thisObject;
+    private final @Nullable Object @Nullable [] args;
+    private final @Nullable BeanContext beanContext;
+    private final @Nullable BeanDefinition<?> owningBean;
 
+    @Nullable
     private BeanResolutionContext resolutionContext;
 
     public DefaultExpressionEvaluationContext() {
         this(null, null, null, null);
     }
 
-    public DefaultExpressionEvaluationContext(@Nullable Object thisObject, Object @Nullable [] args,
+    public DefaultExpressionEvaluationContext(@Nullable Object thisObject,
+                                              @Nullable Object @Nullable [] args,
                                               @Nullable BeanContext beanContext,
                                               @Nullable BeanDefinition<?> owningBean) {
         this.thisObject = thisObject;
@@ -60,7 +62,7 @@ public final class DefaultExpressionEvaluationContext implements ConfigurableExp
     }
 
     @Override
-    public ConfigurableExpressionEvaluationContext withArguments(Object thisObject, Object[] args) {
+    public ConfigurableExpressionEvaluationContext withArguments(@Nullable Object thisObject, @Nullable Object @Nullable [] args) {
         DefaultExpressionEvaluationContext evaluationContext = new DefaultExpressionEvaluationContext(
             thisObject, args,
             this.beanContext,
@@ -101,22 +103,22 @@ public final class DefaultExpressionEvaluationContext implements ConfigurableExp
     }
 
     @Override
+    @Nullable
     public Object getArgument(int index) {
         if (args == null || args.length == 0 || args.length < index) {
             throw new ExpressionEvaluationException(
                 "Can not obtain argument at index [" + index + "] since arguments are not provided");
         }
-
         return args[index];
     }
 
     @Override
+    @Nullable
     public String getProperty(String name) {
         if (beanContext == null || !(beanContext instanceof ApplicationContext applicationContext)) {
             throw new ExpressionEvaluationException("Can not obtain environment property [" + name + "] " +
                                                         "since application context is not set");
         }
-
         return applicationContext.getProperty(name, String.class)
                    .orElse(null);
     }

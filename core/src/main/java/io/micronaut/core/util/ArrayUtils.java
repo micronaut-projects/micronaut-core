@@ -145,7 +145,7 @@ public final class ArrayUtils {
      * @param array The array
      * @return True if it is
      */
-    public static boolean isEmpty(Object @Nullable[] array) {
+    public static boolean isEmpty(@Nullable Object @Nullable[] array) {
         return array == null || array.length == 0;
     }
 
@@ -155,7 +155,7 @@ public final class ArrayUtils {
      * @param array The array
      * @return True if it is
      */
-    public static boolean isNotEmpty(Object @Nullable[] array) {
+    public static boolean isNotEmpty(@Nullable Object @Nullable[] array) {
         return !isEmpty(array);
     }
 
@@ -165,7 +165,7 @@ public final class ArrayUtils {
      * @param array The array
      * @return The string representation
      */
-    public static String toString(Object @Nullable[] array) {
+    public static String toString(@Nullable Object @Nullable[] array) {
         String delimiter = ",";
         return toString(delimiter, array);
     }
@@ -177,7 +177,7 @@ public final class ArrayUtils {
      * @param array     The array
      * @return The string representation
      */
-    public static String toString(String delimiter, Object @Nullable[] array) {
+    public static String toString(String delimiter, @Nullable Object @Nullable[] array) {
         if (isEmpty(array)) {
             return "";
         }

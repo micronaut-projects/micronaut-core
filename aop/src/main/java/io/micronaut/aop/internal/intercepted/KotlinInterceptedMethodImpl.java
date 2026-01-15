@@ -22,7 +22,6 @@ import io.micronaut.aop.util.DelegatingContextContinuation;
 import io.micronaut.aop.util.KotlinInterceptedMethodHelper;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.async.propagation.KotlinCoroutinePropagation;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
@@ -176,7 +175,6 @@ final class KotlinInterceptedMethodImpl implements io.micronaut.aop.kotlin.Kotli
         throw (E) exception;
     }
 
-    @NonNull
     @Override
     public CoroutineContext getCoroutineContext() {
         return continuation.getContext();
@@ -184,7 +182,7 @@ final class KotlinInterceptedMethodImpl implements io.micronaut.aop.kotlin.Kotli
 
     @SuppressWarnings("unchecked")
     @Override
-    public void updateCoroutineContext(@NonNull CoroutineContext coroutineContext) {
+    public void updateCoroutineContext(CoroutineContext coroutineContext) {
         continuation = new DelegatingContextContinuation((Continuation<Object>) continuation, coroutineContext);
     }
 }

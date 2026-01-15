@@ -25,7 +25,6 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.ReturnType;
@@ -54,8 +53,7 @@ public final class InterceptedMethodUtil {
      * @return The {@link InterceptedMethod}
      * @since 4.0.0
      */
-    @NonNull
-    public static InterceptedMethod of(@NonNull MethodInvocationContext<?, ?> context, @NonNull ConversionService conversionService) {
+    public static InterceptedMethod of(MethodInvocationContext<?, ?> context, ConversionService conversionService) {
         if (context.isSuspend()) {
             KotlinInterceptedMethodImpl kotlinInterceptedMethod = KotlinInterceptedMethodImpl.of(context);
             if (kotlinInterceptedMethod != null) {

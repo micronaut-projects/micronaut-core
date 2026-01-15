@@ -17,7 +17,6 @@ package io.micronaut.aop.kotlin;
 
 import io.micronaut.aop.InterceptedMethod;
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import kotlin.coroutines.CoroutineContext;
 
 /**
@@ -32,7 +31,6 @@ public interface KotlinInterceptedMethod extends InterceptedMethod {
     /**
      * @return Coroutine's context
      */
-    @NonNull
     CoroutineContext getCoroutineContext();
 
     /**
@@ -40,6 +38,6 @@ public interface KotlinInterceptedMethod extends InterceptedMethod {
      *
      * @param coroutineContext The context
      */
-    void updateCoroutineContext(@NonNull CoroutineContext coroutineContext);
+    void updateCoroutineContext(CoroutineContext coroutineContext);
 
 }

@@ -6,9 +6,9 @@ import io.micronaut.core.type.MutableArgumentValue
 import jakarta.inject.Singleton
 
 @Singleton
-class ArgMutatingInterceptor : Interceptor<Any?, Any?> {
+class ArgMutatingInterceptor : Interceptor<Any, Any> {
 
-    override fun intercept(context: InvocationContext<Any?, Any?>): Any? {
+    override fun intercept(context: InvocationContext<Any, Any>): Any? {
         val m = context.stringValue(
             Mutating::class.java
         )

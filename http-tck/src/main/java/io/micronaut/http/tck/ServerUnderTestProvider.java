@@ -16,8 +16,6 @@
 package io.micronaut.http.tck;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
-
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -36,7 +34,6 @@ public interface ServerUnderTestProvider {
      * @param properties Properties supplied to application context started.
      * @return The server under test.
      */
-    @NonNull
     ServerUnderTest getServer(Map<String, Object> properties);
 
     /**
@@ -45,7 +42,6 @@ public interface ServerUnderTestProvider {
      * @param properties Properties supplied to application context started.
      * @return Server under test
      */
-    @NonNull
     default ServerUnderTest getServer(String specName, Map<String, Object> properties) {
         Map<String, Object> props = properties != null ? new HashMap<>(properties) : new HashMap<>();
         if (specName != null) {
@@ -59,7 +55,6 @@ public interface ServerUnderTestProvider {
      * @param specName value of {@literal spec.name} property used to avoid bean pollution.
      * @return Server under test
      */
-    @NonNull
     default ServerUnderTest getServer(String specName) {
         return getServer(specName, Collections.emptyMap());
     }
