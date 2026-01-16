@@ -45,6 +45,7 @@ final class NettyReadBuffer extends ReadBuffer {
      */
     private static final boolean STRICT_REFCNT = Boolean.getBoolean("io.micronaut.buffer.netty.NettyReadBuffer.STRICT_REFCNT");
 
+    @Nullable
     ByteBuf buf;
 
     NettyReadBuffer(ByteBuf buf) {

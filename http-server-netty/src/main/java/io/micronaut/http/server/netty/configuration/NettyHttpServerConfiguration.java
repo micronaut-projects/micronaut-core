@@ -862,6 +862,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * @return The maximum number of bytes
      * @since 5.0.0
      */
+    @ReadableBytes
     public long getFieldMaxBufferedBytes() {
         return fieldMaxBufferedBytes;
     }
@@ -873,7 +874,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * @param fieldMaxBufferedBytes The maximum number of bytes
      * @since 5.0.0
      */
-    public void setFieldMaxBufferedBytes(long fieldMaxBufferedBytes) {
+    public void setFieldMaxBufferedBytes(@ReadableBytes long fieldMaxBufferedBytes) {
         this.fieldMaxBufferedBytes = fieldMaxBufferedBytes;
     }
 
@@ -884,6 +885,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * @return The maximum number of bytes
      * @since 5.0.0
      */
+    @ReadableBytes
     public long getFieldMaxBytes() {
         return fieldMaxBytes;
     }
@@ -895,7 +897,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * @param fieldMaxBytes The maximum number of bytes
      * @since 5.0.0
      */
-    public void setFieldMaxBytes(long fieldMaxBytes) {
+    public void setFieldMaxBytes(@ReadableBytes long fieldMaxBytes) {
         this.fieldMaxBytes = fieldMaxBytes;
     }
 
@@ -906,6 +908,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * @return The maximum number of buffered bytes
      * @since 4.6.0
      */
+    @ReadableBytes
     public long getFormMaxBufferedBytes() {
         return formMaxBufferedBytes;
     }
@@ -917,7 +920,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * @param formMaxBufferedBytes The maximum number of buffered bytes
      * @since 4.6.0
      */
-    public void setFormMaxBufferedBytes(long formMaxBufferedBytes) {
+    public void setFormMaxBufferedBytes(@ReadableBytes long formMaxBufferedBytes) {
         this.formMaxBufferedBytes = formMaxBufferedBytes;
     }
 
@@ -928,6 +931,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * @return The maximum number of bytes
      * @since 5.0.0
      */
+    @ReadableBytes
     public long getFormMaxBytes() {
         return formMaxBytes;
     }
@@ -939,7 +943,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * @param formMaxBytes The maximum number of bytes
      * @since 5.0.0
      */
-    public void setFormMaxBytes(long formMaxBytes) {
+    public void setFormMaxBytes(@ReadableBytes long formMaxBytes) {
         this.formMaxBytes = formMaxBytes;
     }
 

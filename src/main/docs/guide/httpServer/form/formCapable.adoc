@@ -58,6 +58,6 @@ A api:io.micronaut.http.multipart.PartData[] object represents a _piece_ of a fo
 
 This publisher exerts backpressure as described for `StreamingFileUpload`.
 
-=== … of anything else
+==== … of anything else
 
 A publisher of any other type will be created by taking a publisher of completed parts as described above, and converting the parts to the target type. For file uploads where a media type is given, this may include conversion from e.g. JSON.

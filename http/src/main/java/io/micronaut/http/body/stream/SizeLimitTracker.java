@@ -94,11 +94,21 @@ public sealed interface SizeLimitTracker {
      * @param bufferedSize The tracker for buffered size
      */
     record TrackerPair(
-        @NonNull SizeLimitTracker totalSize,
-        @NonNull SizeLimitTracker bufferedSize
+        SizeLimitTracker totalSize,
+        SizeLimitTracker bufferedSize
     ) {
         public TrackerPair makeBothAtomic() {
             return new TrackerPair(totalSize.makeAtomic(), bufferedSize.makeAtomic());
+        }
+
+        @Nullable
+        public Exception add(long value) {
+            return Composite.addAtomic(totalSize, bufferedSize, value);
+        }
+
+        public void subtract(long value) {
+            totalSize.subtract(value);
+            bufferedSize.subtract(value);
         }
     }
 }
@@ -119,7 +129,7 @@ final class Unlimited implements SizeLimitTracker {
     }
 
     @Override
-    public @NonNull SizeLimitTracker makeAtomic() {
+    public SizeLimitTracker makeAtomic() {
         return this;
     }
 
@@ -147,6 +157,7 @@ final class NotThreadSafe implements SizeLimitTracker {
     }
 
     @Contract(pure = true)
+    @Nullable
     static Exception checkAdd(long value, long bytes, long limit, boolean buffer) {
         if (bytes < 0) {
             throw new IllegalArgumentException("bytes < 0");
@@ -159,6 +170,7 @@ final class NotThreadSafe implements SizeLimitTracker {
     }
 
     @Override
+    @Nullable
     public Exception add(long bytes) {
         long oldValue = value;
         Exception exc = checkAdd(value, bytes, limit, buffer);
@@ -185,7 +197,7 @@ final class NotThreadSafe implements SizeLimitTracker {
     }
 
     @Override
-    public @NonNull SizeLimitTracker makeAtomic() {
+    public SizeLimitTracker makeAtomic() {
         Atomic atomic = new Atomic(limit, buffer);
         atomic.set(value);
         return atomic;
@@ -224,7 +236,7 @@ final class Atomic extends AtomicLong implements SizeLimitTracker {
     }
 
     @Override
-    public @NonNull SizeLimitTracker makeAtomic() {
+    public SizeLimitTracker makeAtomic() {
         return this;
     }
 
@@ -255,6 +267,10 @@ final class Composite implements SizeLimitTracker {
 
     @Override
     public @Nullable Exception add(long bytes) {
+        return addAtomic(a, b, bytes);
+    }
+
+    static @Nullable Exception addAtomic(SizeLimitTracker a, SizeLimitTracker b, long bytes) {
         Exception exc = a.add(bytes);
         if (exc != null) {
             return exc;
@@ -273,7 +289,7 @@ final class Composite implements SizeLimitTracker {
     }
 
     @Override
-    public @NonNull SizeLimitTracker makeAtomic() {
+    public SizeLimitTracker makeAtomic() {
         SizeLimitTracker a = this.a.makeAtomic();
         SizeLimitTracker b = this.b.makeAtomic();
         if (a == this.a && b == this.b) {

@@ -18,7 +18,6 @@ package io.micronaut.http.server.netty.multipart;
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.MediaType;
@@ -75,6 +74,7 @@ public final class FormDemuxer implements BufferConsumer {
 
     private final Sinks.Many<RawFormField> sink = Sinks.many().unicast().onBackpressureBuffer();
 
+    @Nullable
     private State state = new BeforeField(null);
 
     private boolean fieldsPublisherCancelled = false;
@@ -106,7 +106,7 @@ public final class FormDemuxer implements BufferConsumer {
             }
             // we delay streaming until the upstream is set, so let's do that now.
             if (state instanceof OptimisticBufferingContent opt) {
-                opt.devolveToStreaming();
+                opt.devolveToStreaming(false);
             }
         }
     }
@@ -158,7 +158,7 @@ public final class FormDemuxer implements BufferConsumer {
             if (event == null) {
                 // delay until all available input is processed
                 if (upstream != null && state instanceof OptimisticBufferingContent opt) {
-                    opt.devolveToStreaming();
+                    opt.devolveToStreaming(false);
                 }
                 break;
             } else {
@@ -213,7 +213,7 @@ public final class FormDemuxer implements BufferConsumer {
     }
 
     @Override
-    public void add(@NonNull ReadBuffer rb) {
+    public void add(ReadBuffer rb) {
         assert eventLoop == null || eventLoop.inEventLoop();
 
         if (state == null) {
@@ -277,7 +277,7 @@ public final class FormDemuxer implements BufferConsumer {
         }
     }
 
-    private static @NonNull RuntimeException unexpectedEvent(PostBodyDecoder.Event event) {
+    private static RuntimeException unexpectedEvent(PostBodyDecoder.Event event) {
         return new IllegalStateException("Unexpected event " + event);
     }
 
@@ -307,8 +307,11 @@ public final class FormDemuxer implements BufferConsumer {
     private final class Headers extends State {
         private final @Nullable Headers mixedHeaders;
 
+        @Nullable
         private ContentDisposition disposition = null;
+        @Nullable
         private Long contentLength = null;
+        @Nullable
         private MediaType mediaType = null;
 
         Headers(@Nullable Headers mixedHeaders) {
@@ -346,11 +349,11 @@ public final class FormDemuxer implements BufferConsumer {
     }
 
     private final class OptimisticBufferingContent extends State {
-        private final @NonNull Headers headers;
+        private final Headers headers;
         private final List<ByteBuf> buffers = new ArrayList<>(1);
-        private long accumulated;
+        private final SizeLimitTracker.TrackerPair tracker = SizeLimitTracker.combine(SizeLimitTracker.notThreadSafe(fieldLimits), totalTracker);
 
-        OptimisticBufferingContent(@NonNull Headers headers) {
+        OptimisticBufferingContent(Headers headers) {
             this.headers = headers;
         }
 
@@ -358,10 +361,9 @@ public final class FormDemuxer implements BufferConsumer {
         void accept(PostBodyDecoder.Event event) {
             if (event == PostBodyDecoder.Event.CONTENT) {
                 ByteBuf content = decoder.decodedContent();
-                accumulated = accumulated + content.readableBytes();
                 buffers.add(content);
-                if (accumulated > fieldLimits.maxBufferSize() || accumulated > fieldLimits.maxBodySize()) {
-                    this.devolveToStreaming();
+                if (tracker.add(content.readableBytes()) != null) {
+                    this.devolveToStreaming(true);
                 }
             } else if (event == PostBodyDecoder.Event.FIELD_COMPLETE) {
                 ByteBuf combined;
@@ -378,7 +380,8 @@ public final class FormDemuxer implements BufferConsumer {
                 }
                 FormFieldMetadata metadata = headers.computeMetadata();
                 buffers.clear(); // avoid double release
-                try (CloseableByteBody body = byteBodyFactory.createChecked(fieldLimits, ((NettyReadBufferFactory) byteBodyFactory.readBufferFactory()).adapt(combined))) {
+                // sizes already checked above
+                try (CloseableByteBody body = byteBodyFactory.adapt(((NettyReadBufferFactory) byteBodyFactory.readBufferFactory()).adapt(combined))) {
                     emit(metadata, body);
                 }
 
@@ -395,14 +398,20 @@ public final class FormDemuxer implements BufferConsumer {
             buffers.clear();
         }
 
-        void devolveToStreaming() {
+        void devolveToStreaming(boolean fromOverflow) {
             StreamingContent sc = new StreamingContent(headers);
             state = sc;
             try (sc.rootBody) {
                 // do this early in case there's an error
                 FormFieldMetadata metadata = headers.computeMetadata();
 
-                for (ByteBuf buffer : buffers) {
+                for (int i = 0; i < buffers.size(); i++) {
+                    ByteBuf buffer = buffers.get(i);
+                    if (!fromOverflow || i != buffers.size() - 1) {
+                        // remove the buffer from the tracker, the SC will track on its own.
+                        // on overflow, we didn't add the last buffer to the tracker, so skip that one.
+                        tracker.subtract(buffer.readableBytes());
+                    }
                     sc.add(buffer);
                 }
                 buffers.clear();

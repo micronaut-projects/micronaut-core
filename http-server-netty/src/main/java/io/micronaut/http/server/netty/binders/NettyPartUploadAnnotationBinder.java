@@ -88,10 +88,17 @@ final class NettyPartUploadAnnotationBinder<T> implements AnnotatedRequestArgume
         CompletableFuture<Optional<T>> completableFuture = Mono.from(completer.subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.WAITS_FOR_FULL, context.getArgument())))
             .flatMap(rff -> Mono.from(ReactiveExecutionFlow.toPublisher(formFactory.completePart(nettyRequest, rff))))
             .map(d -> {
+                boolean skipClose = false;
                 try {
-                    return conversionService.convert(d, context);
+                    Optional<T> converted = conversionService.convert(d, context);
+                    if (converted.isPresent() && converted.get() == d) {
+                        skipClose = true;
+                    }
+                    return converted;
                 } finally {
-                    d.closeAsync(formFactory.getDiskWriteExecutor());
+                    if (!skipClose) {
+                        d.closeAsync(formFactory.getDiskWriteExecutor());
+                    }
                 }
             })
             .toFuture();
