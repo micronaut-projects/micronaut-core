@@ -19,13 +19,8 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.event.BeanDestroyedEvent;
 import io.micronaut.context.event.BeanDestroyedEventListener;
-import io.micronaut.context.event.ShutdownEvent;
-import io.micronaut.core.annotation.Order;
 import io.micronaut.core.order.Ordered;
-import io.micronaut.runtime.event.ApplicationShutdownEvent;
-import io.micronaut.runtime.event.annotation.EventListener;
 import io.micronaut.runtime.exceptions.ApplicationStartupException;
-import jakarta.annotation.PreDestroy;
 import jakarta.inject.Singleton;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.HostAccess;
@@ -34,6 +29,7 @@ import org.graalvm.python.embedding.GraalPyResources;
 import org.graalvm.python.embedding.VirtualFileSystem;
 import org.jspecify.annotations.NonNull;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -49,7 +45,9 @@ import java.nio.file.Path;
 @Factory
 public class GraalPyContextFactory implements BeanDestroyedEventListener<org.graalvm.polyglot.Context>, Ordered {
     public static final String APPLICATION_PATH = "META-INF/GRAALPY-VFS/micronaut-application";
-    public static final String APPLICATION_LAUNCHER_PATH = APPLICATION_PATH + "/src/__main__.py";
+    public static final String APPLICATION_SRC_PATH = APPLICATION_PATH + "/src/";
+    public static final String INTERNAL_MAIN = "__main__.py";
+    public static final String APPLICATION_MAIN = "main.py";
     public static final String PYRONAUT_MAIN_CLASS = "pyronaut_application.PyronautMain";
 
     private final ApplicationContext applicationContext;
@@ -100,29 +98,8 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             var context = builder.build();
             context.initialize(GraalPyRuntimeUtil.PYTHON);
             // Try to load the generated pyronaut_application.py from META-INF
-            try (InputStream inputStream = classLoader
-                .getResourceAsStream(APPLICATION_LAUNCHER_PATH)) {
-
-                if (inputStream != null) {
-                    String scriptContent = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
-                    Source source = Source.newBuilder(GraalPyRuntimeUtil.PYTHON, scriptContent, "__main__.py")
-                        .build();
-                    context.eval(source);
-                }
-            }
-
-            // Try to load the generated pyronaut_application.py from META-INF
-            try (InputStream inputStream = classLoader
-                .getResourceAsStream(APPLICATION_LAUNCHER_PATH)) {
-
-                if (inputStream != null) {
-                    String scriptContent = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
-                    Source source = Source.newBuilder(GraalPyRuntimeUtil.PYTHON, scriptContent, "__main__.py")
-                        .build();
-                    context.eval(source);
-                }
-            }
-
+            evaluateMain(classLoader, INTERNAL_MAIN, context);
+            evaluateMain(classLoader, APPLICATION_MAIN, context);
 
             // Make context available to bridge classes
             ContextHolder.setContext(context);
@@ -132,6 +109,19 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
         } catch (Exception e) {
             throw new ApplicationStartupException(
                 "Failed to initialize GraalPy context: " + e.getMessage(), e);
+        }
+    }
+
+    private static void evaluateMain(ClassLoader classLoader, String mainPy, Context context) throws IOException {
+        try (InputStream inputStream = classLoader
+            .getResourceAsStream(APPLICATION_SRC_PATH + mainPy)) {
+
+            if (inputStream != null) {
+                String scriptContent = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+                Source source = Source.newBuilder(GraalPyRuntimeUtil.PYTHON, scriptContent, mainPy)
+                    .build();
+                context.eval(source);
+            }
         }
     }
 

@@ -165,7 +165,7 @@ class MyNamedService:
         then:
         tempDir.exists()
         // Check that META-INF file was generated
-        def transformedFile = new File(tempDir, GraalPyContextFactory.APPLICATION_LAUNCHER_PATH)
+        def transformedFile = new File(tempDir, GraalPyContextFactory.APPLICATION_SRC_PATH)
         transformedFile.exists()
 
         def transformedContent = transformedFile.text
