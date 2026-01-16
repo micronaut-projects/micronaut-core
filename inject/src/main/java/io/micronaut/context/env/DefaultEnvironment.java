@@ -34,6 +34,10 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.convert.ConversionContext;
+import io.micronaut.core.type.Argument;
+import io.micronaut.core.value.ExternalPropertyResolver;
 import io.micronaut.core.value.PropertyCatalog;
 import io.micronaut.core.value.PropertyResolver;
 import io.micronaut.inject.BeanConfiguration;
@@ -100,6 +104,8 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     private final Collection<String> configLocations;
     private final PropertySourcePropertyResolver propertyPlaceholderResolver;
     private final PropertyResolver propertyResolver;
+    @Nullable
+    private final ExternalPropertyResolver externalPropertyResolver;
 
     private final List<PropertySource> refreshablePropertySources = new ArrayList<>(10);
     private final Map<String, PropertySource> propertySources = Collections.synchronizedMap(CollectionUtils.newLinkedHashMap(10));
@@ -125,6 +131,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
             throw new ConfigurationException("Application name cannot be blank");
         }
         this.propertyResolver = propertyPlaceholderResolver;
+        this.externalPropertyResolver = configuration.getExternalPropertyResolver();
         this.mutableConversionService = conversionService;
         this.configuration = configuration;
         this.resourceLoader = configuration.getResourceLoader();
@@ -155,6 +162,60 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     @Override
     public PropertyResolver delegate() {
         return propertyResolver;
+    }
+
+    @Override
+    public boolean containsProperty(@NonNull String name) {
+        // When external resolver is configured, it is the exclusive source
+        if (externalPropertyResolver != null) {
+            return externalPropertyResolver.contains(name);
+        }
+        return PropertyResolverDelegate.super.containsProperty(name);
+    }
+
+    @Override
+    public boolean containsProperties(@NonNull String name) {
+        // When external resolver is configured, it is the exclusive source
+        if (externalPropertyResolver != null) {
+            return externalPropertyResolver.containsProperties(name);
+        }
+        return PropertyResolverDelegate.super.containsProperties(name);
+    }
+
+    @Override
+    public @NonNull <T> Optional<T> getProperty(@NonNull String name, @NonNull ArgumentConversionContext<T> conversionContext) {
+        // When external resolver is configured, it is the exclusive source
+        if (externalPropertyResolver != null) {
+            return externalPropertyResolver.resolve(name, conversionContext);
+        }
+        return PropertyResolverDelegate.super.getProperty(name, conversionContext);
+    }
+
+    @Override
+    public @NonNull <T> Optional<T> getProperty(@NonNull String name, @NonNull Class<T> requiredType) {
+        // When external resolver is configured, route to our overridden method
+        if (externalPropertyResolver != null) {
+            return getProperty(name, ConversionContext.of(requiredType));
+        }
+        return PropertyResolverDelegate.super.getProperty(name, requiredType);
+    }
+
+    @Override
+    public @NonNull <T> Optional<T> getProperty(@NonNull String name, @NonNull Argument<T> argument) {
+        // When external resolver is configured, route to our overridden method
+        if (externalPropertyResolver != null) {
+            return getProperty(name, ConversionContext.of(argument));
+        }
+        return PropertyResolverDelegate.super.getProperty(name, argument);
+    }
+
+    @Override
+    public @NonNull <T> Optional<T> getProperty(@NonNull String name, @NonNull Class<T> requiredType, @NonNull ConversionContext context) {
+        // When external resolver is configured, route to our overridden method
+        if (externalPropertyResolver != null) {
+            return getProperty(name, context.with(Argument.of(requiredType)));
+        }
+        return PropertyResolverDelegate.super.getProperty(name, requiredType, context);
     }
 
     @Override

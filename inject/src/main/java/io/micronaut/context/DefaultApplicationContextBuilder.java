@@ -20,6 +20,7 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.env.PropertySourcesLocator;
 import io.micronaut.context.env.SystemPropertiesPropertySource;
+import io.micronaut.core.value.ExternalPropertyResolver;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.cli.CommandLine;
@@ -88,6 +89,8 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private Predicate<QualifiedBeanType<?>> beansPredicate;
     @Nullable
     private Predicate<BeanConfiguration> beanConfigurationsPredicate;
+    @Nullable
+    private ExternalPropertyResolver externalPropertyResolver;
 
     /**
      * Default constructor.
@@ -451,6 +454,18 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     @Override
     public List<PropertySourcesLocator> getPropertySourcesLocators() {
         return propertySourcesLocators;
+    }
+
+    @Override
+    public ApplicationContextBuilder externalPropertyResolver(@Nullable ExternalPropertyResolver resolver) {
+        this.externalPropertyResolver = resolver;
+        return this;
+    }
+
+    @Override
+    @Nullable
+    public ExternalPropertyResolver getExternalPropertyResolver() {
+        return externalPropertyResolver;
     }
 
     @Override

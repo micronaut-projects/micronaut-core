@@ -18,6 +18,7 @@ package io.micronaut.context;
 import io.micronaut.context.env.EnvironmentNamesDeducer;
 import io.micronaut.context.env.EnvironmentPackagesDeducer;
 import io.micronaut.context.env.PropertySourcesLocator;
+import io.micronaut.core.value.ExternalPropertyResolver;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.MutableConversionService;
@@ -205,6 +206,18 @@ public interface ApplicationContextConfiguration extends BeanContextConfiguratio
      */
     default Collection<PropertySourcesLocator> getPropertySourcesLocators() {
         return Collections.emptyList();
+    }
+
+    /**
+     * Returns the external property resolver that should be consulted before the internal property catalog.
+     *
+     * @return The external property resolver, or null if not set
+     * @since 5.0
+     * @see ExternalPropertyResolver
+     */
+    @Nullable
+    default ExternalPropertyResolver getExternalPropertyResolver() {
+        return null;
     }
 
 }

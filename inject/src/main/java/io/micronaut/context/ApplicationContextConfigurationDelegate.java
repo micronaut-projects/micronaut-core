@@ -19,6 +19,7 @@ import io.micronaut.context.env.EnvironmentNamesDeducer;
 import io.micronaut.context.env.EnvironmentPackagesDeducer;
 import io.micronaut.context.env.PropertySourcesLocator;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.value.ExternalPropertyResolver;
 import io.micronaut.inject.BeanConfiguration;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -139,6 +140,11 @@ class ApplicationContextConfigurationDelegate implements ApplicationContextConfi
     @Override
     public Collection<PropertySourcesLocator> getPropertySourcesLocators() {
         return delegate.getPropertySourcesLocators();
+    }
+
+    @Override
+    public @Nullable ExternalPropertyResolver getExternalPropertyResolver() {
+        return delegate.getExternalPropertyResolver();
     }
 
     @Override

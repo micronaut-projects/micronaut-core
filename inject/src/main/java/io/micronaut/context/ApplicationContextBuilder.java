@@ -18,6 +18,7 @@ package io.micronaut.context;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.env.PropertySourcesLocator;
+import io.micronaut.core.value.ExternalPropertyResolver;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
@@ -398,6 +399,25 @@ public interface ApplicationContextBuilder {
      * @since 5.0
      */
     ApplicationContextBuilder propertySourcesLocator(PropertySourcesLocator propertySourcesLocator);
+
+    /**
+     * Sets an external property resolver that is consulted before Micronaut's internal property catalog.
+     *
+     * <p>This allows external property systems (such as Spring's Environment) to be the source of truth
+     * for property resolution, enabling full integration without subclassing internal classes.</p>
+     *
+     * <p>When set, the resolver's {@link ExternalPropertyResolver#contains} method is called for
+     * {@code containsProperty()} checks, and {@link ExternalPropertyResolver#resolve} is called
+     * for property value resolution, both before consulting the internal catalog.</p>
+     *
+     * @param resolver the external property resolver, or null to clear
+     * @return This builder
+     * @since 5.0
+     * @see ExternalPropertyResolver
+     */
+    default ApplicationContextBuilder externalPropertyResolver(@Nullable ExternalPropertyResolver resolver) {
+        return this;
+    }
 
     /**
      * Starts the {@link ApplicationContext}.
