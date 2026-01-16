@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.inject.ast;
-
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import org.jspecify.annotations.Nullable;
 
@@ -103,7 +101,6 @@ public final class PrimitiveElement implements ArrayableClassElement {
     }
 
     @Override
-    @NonNull
     public String getName() {
         return typeName;
     }
@@ -118,7 +115,6 @@ public final class PrimitiveElement implements ArrayableClassElement {
         return true;
     }
 
-    @NonNull
     @Override
     public Object getNativeType() {
         throw new UnsupportedOperationException("There is no native types for primitives");

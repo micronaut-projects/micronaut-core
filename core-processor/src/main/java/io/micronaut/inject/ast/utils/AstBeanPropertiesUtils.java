@@ -28,6 +28,7 @@ import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.PropertyElementQuery;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -73,7 +74,7 @@ public final class AstBeanPropertiesUtils {
                                                               Set<String> propertyFields,
                                                               Function<MethodElement, Optional<String>> customReaderPropertyNameResolver,
                                                               Function<MethodElement, Optional<String>> customWriterPropertyNameResolver,
-                                                              Function<BeanPropertyData, PropertyElement> propertyCreator) {
+                                                              Function<BeanPropertyData, @Nullable PropertyElement> propertyCreator) {
         BeanProperties.Visibility visibility = configuration.getVisibility();
         Set<BeanProperties.AccessKind> accessKinds = configuration.getAccessKinds();
 

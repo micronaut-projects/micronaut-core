@@ -16,8 +16,6 @@
 package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
-
 import java.lang.reflect.Array;
 import java.util.Arrays;
 import java.util.List;
@@ -85,7 +83,6 @@ class ReflectClassElement extends ReflectTypeElement<Class<?>> {
         return new ReflectClassElement(type.getComponentType());
     }
 
-    @NonNull
     @Override
     public List<? extends GenericPlaceholderElement> getDeclaredGenericPlaceholders() {
         return Arrays.stream(type.getTypeParameters())

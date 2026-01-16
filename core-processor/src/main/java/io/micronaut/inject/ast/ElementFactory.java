@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.inject.ast;
-
-import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 
 import java.util.Map;
@@ -40,8 +38,7 @@ public interface ElementFactory<E, C extends E, M extends E, F extends E> {
      * @return The class element
      * @since 4.0.0
      */
-    @NonNull
-    ClassElement newClassElement(@NonNull C type, ElementAnnotationMetadataFactory annotationMetadataFactory);
+    ClassElement newClassElement(C type, ElementAnnotationMetadataFactory annotationMetadataFactory);
 
     /**
      * Builds a new class element for the given type.
@@ -53,11 +50,10 @@ public interface ElementFactory<E, C extends E, M extends E, F extends E> {
      * @since 4.0.0
      * @deprecated no longer used
      */
-    @NonNull
     @Deprecated
-    default ClassElement newClassElement(@NonNull C type,
-                                 @NonNull ElementAnnotationMetadataFactory annotationMetadataFactory,
-                                 @NonNull Map<String, ClassElement> typeArguments) {
+    default ClassElement newClassElement(C type,
+ ElementAnnotationMetadataFactory annotationMetadataFactory,
+ Map<String, ClassElement> typeArguments) {
         return newClassElement(type, annotationMetadataFactory).withTypeArguments(typeArguments);
     }
 
@@ -71,8 +67,7 @@ public interface ElementFactory<E, C extends E, M extends E, F extends E> {
      * @return The class element
      * @since 4.0.0
      */
-    @NonNull
-    ClassElement newSourceClassElement(@NonNull C type, @NonNull ElementAnnotationMetadataFactory elementAnnotationMetadataFactory);
+    ClassElement newSourceClassElement(C type, ElementAnnotationMetadataFactory elementAnnotationMetadataFactory);
 
     /**
      * Builds a new source method element for the given method. This method
@@ -85,10 +80,9 @@ public interface ElementFactory<E, C extends E, M extends E, F extends E> {
      * @return The class element
      * @since 4.0.0
      */
-    @NonNull
-    MethodElement newSourceMethodElement(@NonNull ClassElement owningClass,
-                                         @NonNull M method,
-                                         @NonNull ElementAnnotationMetadataFactory elementAnnotationMetadataFactory);
+    MethodElement newSourceMethodElement(ClassElement owningClass,
+                                         M method,
+                                         ElementAnnotationMetadataFactory elementAnnotationMetadataFactory);
 
     /**
      * Builds a new method element for the given type.
@@ -99,10 +93,9 @@ public interface ElementFactory<E, C extends E, M extends E, F extends E> {
      * @return The method element
      * @since 4.0.0
      */
-    @NonNull
-    MethodElement newMethodElement(@NonNull ClassElement owningClass,
-                                   @NonNull M method,
-                                   @NonNull ElementAnnotationMetadataFactory elementAnnotationMetadataFactory);
+    MethodElement newMethodElement(ClassElement owningClass,
+                                   M method,
+                                   ElementAnnotationMetadataFactory elementAnnotationMetadataFactory);
 
     /**
      * Builds a new constructor element for the given type.
@@ -113,10 +106,9 @@ public interface ElementFactory<E, C extends E, M extends E, F extends E> {
      * @return The constructor element
      * @since 4.0.0
      */
-    @NonNull
-    ConstructorElement newConstructorElement(@NonNull ClassElement owningClass,
-                                             @NonNull M constructor,
-                                             @NonNull ElementAnnotationMetadataFactory elementAnnotationMetadataFactory);
+    ConstructorElement newConstructorElement(ClassElement owningClass,
+                                             M constructor,
+                                             ElementAnnotationMetadataFactory elementAnnotationMetadataFactory);
 
     /**
      * Builds a new enum constant element for the given type.
@@ -127,10 +119,9 @@ public interface ElementFactory<E, C extends E, M extends E, F extends E> {
      * @return The enum constant element
      * @since 4.0.0
      */
-    @NonNull
-    EnumConstantElement newEnumConstantElement(@NonNull ClassElement owningClass,
-                                               @NonNull F enumConstant,
-                                               @NonNull ElementAnnotationMetadataFactory elementAnnotationMetadataFactory);
+    EnumConstantElement newEnumConstantElement(ClassElement owningClass,
+                                               F enumConstant,
+                                               ElementAnnotationMetadataFactory elementAnnotationMetadataFactory);
 
     /**
      * Builds a new field element for the given type.
@@ -141,9 +132,8 @@ public interface ElementFactory<E, C extends E, M extends E, F extends E> {
      * @return The field element
      * @since 4.0.0
      */
-    @NonNull
-    FieldElement newFieldElement(@NonNull ClassElement owningClass,
-                                 @NonNull F field,
-                                 @NonNull ElementAnnotationMetadataFactory elementAnnotationMetadataFactory);
+    FieldElement newFieldElement(ClassElement owningClass,
+                                 F field,
+                                 ElementAnnotationMetadataFactory elementAnnotationMetadataFactory);
 
 }

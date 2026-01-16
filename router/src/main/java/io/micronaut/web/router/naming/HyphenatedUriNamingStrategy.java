@@ -16,7 +16,6 @@
 package io.micronaut.web.router.naming;
 
 import io.micronaut.context.annotation.Value;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.conventions.TypeConvention;
@@ -64,7 +63,7 @@ public class HyphenatedUriNamingStrategy implements RouteBuilder.UriNamingStrate
     }
 
     @Override
-    public @NonNull String resolveUri(BeanDefinition<?> beanDefinition) {
+    public String resolveUri(BeanDefinition<?> beanDefinition) {
         String uri = beanDefinition.stringValue(UriMapping.class).orElseGet(() ->
                 beanDefinition.stringValue(Controller.class).orElse(UriMapping.DEFAULT_URI)
         );
@@ -72,7 +71,7 @@ public class HyphenatedUriNamingStrategy implements RouteBuilder.UriNamingStrate
     }
 
     @Override
-    public @NonNull String resolveUri(String property) {
+    public String resolveUri(String property) {
         if (StringUtils.isEmpty(property)) {
             return contextPath + "/";
         }

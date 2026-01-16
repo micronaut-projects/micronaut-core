@@ -91,7 +91,7 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
         element.presetAnnotationMetadata = presetAnnotationMetadata
     }
 
-    override fun withAnnotationMetadata(annotationMetadata: AnnotationMetadata): Element? {
+    override fun withAnnotationMetadata(annotationMetadata: AnnotationMetadata): Element {
         val kotlinElement: AbstractKotlinElement<T> = makeCopy()
         kotlinElement.presetAnnotationMetadata = annotationMetadata
         return kotlinElement

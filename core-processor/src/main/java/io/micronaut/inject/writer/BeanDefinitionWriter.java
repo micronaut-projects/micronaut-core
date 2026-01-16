@@ -153,7 +153,6 @@ import io.micronaut.sourcegen.model.StatementDef;
 import io.micronaut.sourcegen.model.TypeDef;
 import io.micronaut.sourcegen.model.VariableDef;
 import jakarta.inject.Singleton;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 import javax.lang.model.element.Modifier;
@@ -901,8 +900,7 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
         return executableMethodsDefinitionWriter;
     }
 
-    @NonNull
-    private String getAssociatedBeanName(@NonNull Integer uniqueIdentifier, ClassElement originatingClass) {
+    private String getAssociatedBeanName(Integer uniqueIdentifier, ClassElement originatingClass) {
         return originatingClass.getPackageName() + "." + prefixClassName(originatingClass.getSimpleName()) + prefixClassName(beanSimpleClassName) + uniqueIdentifier + CLASS_SUFFIX;
     }
 
@@ -931,12 +929,10 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
         }
     }
 
-    @NonNull
     private static String getBeanDefinitionName(String packageName, String className) {
         return packageName + "." + prefixClassName(className) + CLASS_SUFFIX;
     }
 
-    @NonNull
     private static String getCustomBeanDefinitionName(String customBeanDefinitionName) {
         return NameUtils.getPackageName(customBeanDefinitionName) + "." + prefixClassName(NameUtils.getSimpleName(customBeanDefinitionName)) + CLASS_SUFFIX;
     }
@@ -948,7 +944,6 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
         return "$" + className;
     }
 
-    @NonNull
     @Override
     public ClassElement[] getTypeArguments() {
         if (hasTypeArguments()) {
@@ -961,7 +956,6 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
     }
 
     @Override
-    @NonNull
     public Map<String, ClassElement> getTypeArgumentMap() {
         if (hasTypeArguments()) {
             Map<String, ClassElement> args = this.typeArguments.get(this.getBeanTypeName());
@@ -977,7 +971,6 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
      * @return The name of the bean definition reference class.
      */
     @Override
-    @NonNull
     public String getBeanDefinitionReferenceClassName() {
         throw new IllegalStateException("Not supported!");
     }
@@ -5262,13 +5255,10 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
         }
     }
 
-    private record StaticBlock(@NonNull
+    private record StaticBlock(
                                StatementDef statement,
-                               @NonNull
                                FieldDef annotationMetadataField,
-                               @NonNull
                                FieldDef failedInitializationField,
-                               @NonNull
                                FieldDef constructorRefField,
                                @Nullable
                                FieldDef injectionMethodsField,
@@ -5280,7 +5270,6 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                                FieldDef typeArgumentsField,
                                @Nullable
                                FieldDef executableMethodsField,
-                               @NonNull
                                FieldDef precalculatedInfoField,
                                @Nullable
                                FieldDef preStartConditionsField,

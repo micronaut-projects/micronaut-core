@@ -16,7 +16,6 @@
 package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.bind.annotation.Bindable;
@@ -166,7 +165,7 @@ sealed class DefaultMethodBasedRouteInfo<T, R> extends DefaultRouteInfo<R> imple
      * @param argument the argument
      * @return the name
      */
-    private static @NonNull String resolveInputName(@NonNull Argument<?> argument) {
+    private static String resolveInputName(Argument<?> argument) {
         String inputName = argument.getAnnotationMetadata().stringValue(Bindable.NAME).orElse(null);
         if (StringUtils.isEmpty(inputName)) {
             inputName = argument.getName();

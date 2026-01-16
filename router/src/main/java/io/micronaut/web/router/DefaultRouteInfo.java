@@ -17,7 +17,6 @@ package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.beans.BeanIntrospector;
 import io.micronaut.core.type.Argument;
@@ -201,7 +200,6 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     }
 
     @Override
-    @NonNull
     public Argument<?> getResponseBodyType() {
         return bodyType;
     }
@@ -314,7 +312,6 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     }
 
     @Override
-    @NonNull
     public HttpStatus findStatus(HttpStatus defaultStatus) {
         if (definedStatus != null) {
             return definedStatus;
@@ -346,7 +343,6 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     }
 
     @Override
-    @NonNull
     public AnnotationMetadata getAnnotationMetadata() {
         return annotationMetadata;
     }

@@ -19,7 +19,6 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 
 import java.lang.annotation.Annotation;
@@ -57,13 +56,11 @@ class ReflectParameterElement implements ParameterElement {
         return classElement.getArrayDimensions();
     }
 
-    @NonNull
     @Override
     public ClassElement getType() {
         return classElement;
     }
 
-    @NonNull
     @Override
     public String getName() {
         return name;
@@ -79,21 +76,18 @@ class ReflectParameterElement implements ParameterElement {
         return true;
     }
 
-    @NonNull
     @Override
     public Object getNativeType() {
         return classElement.getNativeType();
     }
 
-    @NonNull
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
         return this.annotationMetadata;
     }
 
-    @NonNull
     @Override
-    public <T extends Annotation> Element annotate(@NonNull String annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
+    public <T extends Annotation> Element annotate(String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
         if (annotationMetadata == AnnotationMetadata.EMPTY_METADATA) {
             final MutableAnnotationMetadata mutableAnnotationMetadata = new MutableAnnotationMetadata();
             this.annotationMetadata = mutableAnnotationMetadata;

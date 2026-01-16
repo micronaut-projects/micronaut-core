@@ -16,8 +16,6 @@
 package io.micronaut.inject.beans.visitor;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
-
 /**
  * Handle mapped super class.
  *
@@ -26,7 +24,6 @@ import org.jspecify.annotations.NonNull;
  */
 @Internal
 public class MappedSuperClassIntrospectionMapper extends EntityIntrospectedAnnotationMapper {
-    @NonNull
     @Override
     public String getName() {
         return "javax.persistence.MappedSuperclass";

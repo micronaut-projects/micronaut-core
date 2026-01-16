@@ -20,7 +20,6 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Generated;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanIntrospectionReference;
@@ -299,9 +298,9 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
      * @param isReadOnly  Is read only
      */
     void visitProperty(
-        @NonNull ClassElement type,
-        @NonNull ClassElement genericType,
-        @NonNull String name,
+        ClassElement type,
+        ClassElement genericType,
+        String name,
         @Nullable MemberElement readMember,
         @Nullable MemberElement writeMember,
         @Nullable ClassElement readType,
@@ -973,13 +972,11 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
         }
     }
 
-    @NonNull
     private static String computeShortIntrospectionName(String packageName, String className) {
         final String shortName = NameUtils.getSimpleName(className);
         return packageName + ".$" + shortName + INTROSPECTION_SUFFIX;
     }
 
-    @NonNull
     private static String computeIntrospectionName(String packageName, String className) {
         return packageName + ".$" + className.replace('.', '_') + INTROSPECTION_SUFFIX;
     }
@@ -1011,14 +1008,13 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
         }
     }
 
-    @NonNull
     @Override
     public Element[] getOriginatingElements() {
         return originatingElements.getOriginatingElements();
     }
 
     @Override
-    public void addOriginatingElement(@NonNull Element element) {
+    public void addOriginatingElement(Element element) {
         originatingElements.addOriginatingElement(element);
     }
 
@@ -1277,8 +1273,8 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
      * @param withMethodDispatchIndex
      * @param isReadOnly
      */
-    private record BeanPropertyData(@NonNull String name,
-                                    @NonNull ClassElement type,
+    private record BeanPropertyData(String name,
+                                    ClassElement type,
                                     @Nullable ClassElement readType,
                                     @Nullable ClassElement writeType,
                                     int getDispatchIndex,
@@ -1293,7 +1289,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
      * @param annotationName The annotation name
      * @param value          The annotation value
      */
-    private record AnnotationWithValue(@NonNull String annotationName, @Nullable String value) {
+    private record AnnotationWithValue(String annotationName, @Nullable String value) {
 
         @Override
         public boolean equals(Object o) {

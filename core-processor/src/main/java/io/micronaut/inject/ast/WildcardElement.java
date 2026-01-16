@@ -16,8 +16,6 @@
 package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
-
 import java.util.List;
 
 /**
@@ -34,14 +32,12 @@ public interface WildcardElement extends GenericElement {
      * @return The upper bounds of this wildcard. Never empty. To match this wildcard, a type must be assignable to all
      * upper bounds (must extend all upper bounds).
      */
-    @NonNull
     List<? extends ClassElement> getUpperBounds();
 
     /**
      * @return The lower bounds of this wildcard. May be empty. To match this wildcard, a type must be assignable from
      * all lower bounds (must be a supertype of all lower bounds).
      */
-    @NonNull
     List<? extends ClassElement> getLowerBounds();
 
     /**
@@ -60,8 +56,7 @@ public interface WildcardElement extends GenericElement {
      * @param <T> The class element type
      * @return the most upper type
      */
-    @NonNull
-    static <T extends ClassElement> T findUpperType(@NonNull List<T> bounds1, @NonNull List<T> bounds2) {
+    static <T extends ClassElement> T findUpperType(List<T> bounds1, List<T> bounds2) {
         T upper = null;
         for (T lowerBound : bounds2) {
             if (upper == null || lowerBound.isAssignable(upper)) {

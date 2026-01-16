@@ -18,7 +18,6 @@ package io.micronaut.inject.ast.beans;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
@@ -47,7 +46,7 @@ public interface BeanElementBuilder extends ConfigurableElement {
      * @return This bean method
      * @since 3.5.2
      */
-    default @NonNull BeanElementBuilder intercept(AnnotationValue<?>... annotationValue) {
+    default BeanElementBuilder intercept(AnnotationValue<?>... annotationValue) {
         if (annotationValue != null) {
             for (AnnotationValue<?> value : annotationValue) {
                 annotate(value);
@@ -59,19 +58,16 @@ public interface BeanElementBuilder extends ConfigurableElement {
     /**
      * @return The originating element
      */
-    @NonNull
     Element getOriginatingElement();
 
     /**
      * @return The bean type
      */
-    @NonNull
     ClassElement getBeanType();
 
     /**
      * @return The element that produces the bean.
      */
-    @NonNull
     default Element getProducingElement() {
         return getBeanType();
     }
@@ -81,7 +77,6 @@ public interface BeanElementBuilder extends ConfigurableElement {
      *
      * @return The element declares the bean.
      */
-    @NonNull
     default ClassElement getDeclaringElement() {
         return getBeanType();
     }
@@ -100,15 +95,13 @@ public interface BeanElementBuilder extends ConfigurableElement {
      * @param element The element
      * @return This bean builder
      */
-    @NonNull
-    BeanElementBuilder createWith(@NonNull MethodElement element);
+    BeanElementBuilder createWith(MethodElement element);
 
     /**
      * Alters the exposed types for the bean limiting the exposed type to the given types.
      * @param types 1 or more types to expose
      * @return This builder
      */
-    @NonNull
     BeanElementBuilder typed(ClassElement... types);
 
     /**
@@ -117,8 +110,7 @@ public interface BeanElementBuilder extends ConfigurableElement {
      * @return This bean builder
      */
     @Override
-    @NonNull
-    BeanElementBuilder typeArguments(@NonNull ClassElement... types);
+    BeanElementBuilder typeArguments(ClassElement... types);
 
     /**
      * Fills the type arguments for the given interface or super class with the given types.
@@ -126,8 +118,7 @@ public interface BeanElementBuilder extends ConfigurableElement {
      * @param types The types
      * @return This bean builder
      */
-    @NonNull
-    BeanElementBuilder typeArgumentsForType(@Nullable ClassElement type, @NonNull ClassElement... types);
+    BeanElementBuilder typeArgumentsForType(@Nullable ClassElement type, ClassElement... types);
 
     /**
      * Adds a scope for the given annotation value to the bean.
@@ -135,8 +126,7 @@ public interface BeanElementBuilder extends ConfigurableElement {
      * @param scope The scope
      * @return This bean element builder
      */
-    default @NonNull
-    BeanElementBuilder scope(@NonNull AnnotationValue<?> scope) {
+    default BeanElementBuilder scope(AnnotationValue<?> scope) {
         Objects.requireNonNull(scope, "Scope cannot be null");
         annotate(scope.getAnnotationName(), (builder) -> builder.members(scope.getValues()));
         return this;
@@ -148,8 +138,7 @@ public interface BeanElementBuilder extends ConfigurableElement {
      * @param scope The full qualified scope annotation name
      * @return This bean element builder
      */
-    default @NonNull
-    BeanElementBuilder scope(@NonNull String scope) {
+    default BeanElementBuilder scope(String scope) {
         Objects.requireNonNull(scope, "Scope cannot be null");
         annotate(scope);
         return this;
@@ -160,8 +149,7 @@ public interface BeanElementBuilder extends ConfigurableElement {
      * @param constructorElement The constructor element
      * @return This bean builder
      */
-    @NonNull
-    BeanElementBuilder withConstructor(@NonNull Consumer<BeanConstructorElement> constructorElement);
+    BeanElementBuilder withConstructor(Consumer<BeanConstructorElement> constructorElement);
 
     /**
      * Allows configuring methods of the bean.
@@ -169,10 +157,9 @@ public interface BeanElementBuilder extends ConfigurableElement {
      * @param beanMethods A consumer that receives each {@link BeanMethodElement}
      * @return This builder
      */
-    @NonNull
     BeanElementBuilder withMethods(
-            @NonNull ElementQuery<MethodElement> methods,
-            @NonNull Consumer<BeanMethodElement> beanMethods);
+        ElementQuery<MethodElement> methods,
+        Consumer<BeanMethodElement> beanMethods);
 
     /**
      * Allows configuring fields of the bean.
@@ -180,79 +167,71 @@ public interface BeanElementBuilder extends ConfigurableElement {
      * @param beanFields The bean fields
      * @return This builder
      */
-    @NonNull
     BeanElementBuilder withFields(
-            @NonNull ElementQuery<FieldElement> fields,
-            @NonNull Consumer<BeanFieldElement> beanFields);
+        ElementQuery<FieldElement> fields,
+        Consumer<BeanFieldElement> beanFields);
 
     /**
      * Allows configuring the parameters for the current constructor.
      * @param parameters The parameters
      * @return This builder
      */
-    @NonNull
     BeanElementBuilder withParameters(Consumer<BeanParameterElement[]> parameters);
 
-    @NonNull
     @Override
     default BeanElementBuilder qualifier(@Nullable String qualifier) {
         return (BeanElementBuilder) ConfigurableElement.super.qualifier(qualifier);
     }
 
-    @NonNull
     @Override
-    default BeanElementBuilder qualifier(@NonNull AnnotationValue<?> qualifier) {
+    default BeanElementBuilder qualifier(AnnotationValue<?> qualifier) {
         return (BeanElementBuilder) ConfigurableElement.super.qualifier(qualifier);
     }
 
-    @NonNull
     @Override
-    default <T extends Annotation> BeanElementBuilder annotate(@NonNull String annotationType,
-                                                               @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
+    default <T extends Annotation> BeanElementBuilder annotate(String annotationType,
+                                                               Consumer<AnnotationValueBuilder<T>> consumer) {
         return (BeanElementBuilder) ConfigurableElement.super.annotate(annotationType, consumer);
     }
 
     @Override
-    default BeanElementBuilder removeAnnotation(@NonNull String annotationType) {
+    default BeanElementBuilder removeAnnotation(String annotationType) {
         return (BeanElementBuilder) ConfigurableElement.super.removeAnnotation(annotationType);
     }
 
     @Override
-    default <T extends Annotation> BeanElementBuilder removeAnnotation(@NonNull Class<T> annotationType) {
+    default <T extends Annotation> BeanElementBuilder removeAnnotation(Class<T> annotationType) {
         return (BeanElementBuilder) ConfigurableElement.super.removeAnnotation(annotationType);
     }
 
     @Override
-    default <T extends Annotation> BeanElementBuilder removeAnnotationIf(@NonNull Predicate<AnnotationValue<T>> predicate) {
+    default <T extends Annotation> BeanElementBuilder removeAnnotationIf(Predicate<AnnotationValue<T>> predicate) {
         return (BeanElementBuilder) ConfigurableElement.super.removeAnnotationIf(predicate);
     }
 
     @Override
-    default BeanElementBuilder removeStereotype(@NonNull String annotationType) {
+    default BeanElementBuilder removeStereotype(String annotationType) {
         return (BeanElementBuilder) ConfigurableElement.super.removeStereotype(annotationType);
     }
 
     @Override
-    default <T extends Annotation> BeanElementBuilder removeStereotype(@NonNull Class<T> annotationType) {
+    default <T extends Annotation> BeanElementBuilder removeStereotype(Class<T> annotationType) {
         return (BeanElementBuilder) ConfigurableElement.super.removeStereotype(annotationType);
     }
 
-    @NonNull
     @Override
-    default BeanElementBuilder annotate(@NonNull String annotationType) {
+    default BeanElementBuilder annotate(String annotationType) {
         return (BeanElementBuilder) ConfigurableElement.super.annotate(annotationType);
     }
 
-    @NonNull
     @Override
-    default <T extends Annotation> BeanElementBuilder annotate(@NonNull Class<T> annotationType,
-                                                               @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
+    default <T extends Annotation> BeanElementBuilder annotate(Class<T> annotationType,
+                                                               Consumer<AnnotationValueBuilder<T>> consumer) {
         return (BeanElementBuilder) ConfigurableElement.super.annotate(annotationType, consumer);
     }
 
-    @NonNull
     @Override
-    default <T extends Annotation> BeanElementBuilder annotate(@NonNull Class<T> annotationType) {
+    default <T extends Annotation> BeanElementBuilder annotate(Class<T> annotationType) {
         return (BeanElementBuilder) ConfigurableElement.super.annotate(annotationType);
     }
 

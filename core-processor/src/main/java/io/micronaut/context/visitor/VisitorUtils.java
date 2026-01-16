@@ -21,7 +21,6 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Creator;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.annotation.Vetoed;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
@@ -48,7 +47,6 @@ import java.util.stream.Collectors;
 @Internal
 public class VisitorUtils {
 
-    @NonNull
     public static List<ClassElement> collectImportedElements(ClassElement element, VisitorContext context) {
         List<ClassElement> importedElements = new ArrayList<>();
         AnnotationValue<ClassImport> annotation = element.getAnnotation(ClassImport.class);

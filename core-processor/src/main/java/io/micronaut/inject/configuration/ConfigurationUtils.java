@@ -19,7 +19,6 @@ import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
 
@@ -105,7 +104,6 @@ public final class ConfigurationUtils {
         return prefix;
     }
 
-    @NonNull
     private static String computeIterablePrefix(AnnotationMetadata annotationMetadata, String prefix) {
         if (prefix == null) {
             prefix = StringUtils.EMPTY_STRING;

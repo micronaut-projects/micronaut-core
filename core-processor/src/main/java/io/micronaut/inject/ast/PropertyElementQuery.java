@@ -19,7 +19,6 @@ import io.micronaut.context.annotation.BeanProperties;
 import io.micronaut.core.annotation.AccessorsStyle;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
@@ -61,7 +60,7 @@ public final class PropertyElementQuery {
      * @param annotationMetadata The metadata
      * @return The query
      */
-    public static @NonNull PropertyElementQuery of(@NonNull AnnotationMetadata annotationMetadata) {
+    public static PropertyElementQuery of(AnnotationMetadata annotationMetadata) {
         PropertyElementQuery conf = new PropertyElementQuery();
 
         AnnotationValue<BeanProperties> annotation = annotationMetadata.getAnnotation(BeanProperties.class);
@@ -107,7 +106,7 @@ public final class PropertyElementQuery {
      * @param shouldIgnore True if they should be ignored.
      * @return This PropertyElementQuery
      */
-    public @NonNull PropertyElementQuery ignoreSettersWithDifferingType(boolean shouldIgnore) {
+    public PropertyElementQuery ignoreSettersWithDifferingType(boolean shouldIgnore) {
         this.ignoreSettersWithDifferingType = shouldIgnore;
         return this;
     }
@@ -116,7 +115,7 @@ public final class PropertyElementQuery {
      * @return The visibility strategy.
      * @see io.micronaut.context.annotation.BeanProperties.Visibility
      */
-    public BeanProperties.@NonNull Visibility getVisibility() {
+    public BeanProperties.Visibility getVisibility() {
         return visibility;
     }
 
@@ -126,7 +125,7 @@ public final class PropertyElementQuery {
      * @return This PropertyElementQuery
      * @see io.micronaut.context.annotation.BeanProperties.Visibility
      */
-    public @NonNull PropertyElementQuery visibility(BeanProperties.Visibility visibility) {
+    public PropertyElementQuery visibility(BeanProperties.Visibility visibility) {
         this.visibility = Objects.requireNonNullElse(visibility, BeanProperties.Visibility.DEFAULT);
         return this;
     }
@@ -136,7 +135,6 @@ public final class PropertyElementQuery {
      * @return A set of access kinds
      * @see BeanProperties.AccessKind
      */
-    @NonNull
     public Set<BeanProperties.AccessKind> getAccessKinds() {
         return accessKinds;
     }
@@ -146,7 +144,7 @@ public final class PropertyElementQuery {
      * @param accessKinds The access kinds
      * @return This PropertyElementQuery
      */
-    public @NonNull PropertyElementQuery accessKinds(@Nullable Set<BeanProperties.AccessKind> accessKinds) {
+    public PropertyElementQuery accessKinds(@Nullable Set<BeanProperties.AccessKind> accessKinds) {
         if (CollectionUtils.isNotEmpty(accessKinds)) {
             this.accessKinds = Collections.unmodifiableSet(accessKinds);
         } else {
@@ -159,7 +157,6 @@ public final class PropertyElementQuery {
      * The property names to include.
      * @return The includes.
      */
-    @NonNull
     public Set<String> getIncludes() {
         return includes;
     }
@@ -169,7 +166,6 @@ public final class PropertyElementQuery {
      * @param includes The includes
      * @return This PropertyElementQuery
      */
-    @NonNull
     public PropertyElementQuery includes(@Nullable Set<String> includes) {
         if (CollectionUtils.isNotEmpty(includes)) {
             this.includes = Collections.unmodifiableSet(includes);
@@ -183,7 +179,6 @@ public final class PropertyElementQuery {
      * The property names to exclude.
      * @return The excludes
      */
-    @NonNull
     public Set<String> getExcludes() {
         return excludes;
     }
@@ -193,7 +188,7 @@ public final class PropertyElementQuery {
      * @param excludes The property names to exclude
      * @return This PropertyElementQuery
      */
-    public @NonNull PropertyElementQuery excludes(@Nullable Set<String> excludes) {
+    public PropertyElementQuery excludes(@Nullable Set<String> excludes) {
         if (CollectionUtils.isNotEmpty(excludes)) {
             this.excludes = Collections.unmodifiableSet(excludes);
         } else {
@@ -205,7 +200,7 @@ public final class PropertyElementQuery {
     /**
      * @return The read method prefixes.
      */
-    public String @NonNull [] getReadPrefixes() {
+    public String[] getReadPrefixes() {
         return readPrefixes;
     }
 
@@ -214,7 +209,7 @@ public final class PropertyElementQuery {
      * @param readPrefixes The read methos prefixes
      * @return This PropertyElementQuery
      */
-    public @NonNull PropertyElementQuery readPrefixes(String... readPrefixes) {
+    public PropertyElementQuery readPrefixes(String... readPrefixes) {
         if (ArrayUtils.isNotEmpty(readPrefixes)) {
             this.readPrefixes = readPrefixes;
         } else {
@@ -226,7 +221,7 @@ public final class PropertyElementQuery {
     /**
      * @return The write method prefixes.
      */
-    public String @NonNull [] getWritePrefixes() {
+    public String [] getWritePrefixes() {
         return writePrefixes;
     }
 
@@ -235,7 +230,7 @@ public final class PropertyElementQuery {
      * @param writePrefixes The write prefixes
      * @return This PropertyElementQuery
      */
-    public PropertyElementQuery writePrefixes(String @NonNull [] writePrefixes) {
+    public PropertyElementQuery writePrefixes(String [] writePrefixes) {
         if (ArrayUtils.isNotEmpty(writePrefixes)) {
             this.writePrefixes = writePrefixes;
         } else {
@@ -256,7 +251,7 @@ public final class PropertyElementQuery {
      * @param allowSetterWithZeroArgs True to allow zero argument setters
      * @return This PropertyElementQuery
      */
-    public @NonNull PropertyElementQuery allowSetterWithZeroArgs(boolean allowSetterWithZeroArgs) {
+    public PropertyElementQuery allowSetterWithZeroArgs(boolean allowSetterWithZeroArgs) {
         this.allowSetterWithZeroArgs = allowSetterWithZeroArgs;
         return this;
     }
@@ -274,7 +269,7 @@ public final class PropertyElementQuery {
      * @param allowSetterWithMultipleArgs True if setters with multiple arguments are allowed.
      * @return This PropertyElementQuery
      */
-    public @NonNull PropertyElementQuery allowSetterWithMultipleArgs(boolean allowSetterWithMultipleArgs) {
+    public PropertyElementQuery allowSetterWithMultipleArgs(boolean allowSetterWithMultipleArgs) {
         this.allowSetterWithMultipleArgs = allowSetterWithMultipleArgs;
         return this;
     }
@@ -291,7 +286,7 @@ public final class PropertyElementQuery {
      * @param allowStaticProperties True if static properties are allowed.
      * @return This PropertyElementQuery
      */
-    public @NonNull PropertyElementQuery allowStaticProperties(boolean allowStaticProperties) {
+    public PropertyElementQuery allowStaticProperties(boolean allowStaticProperties) {
         this.allowStaticProperties = allowStaticProperties;
         return this;
     }
@@ -299,7 +294,6 @@ public final class PropertyElementQuery {
     /**
      * @return The excludes annotation names.
      */
-    @NonNull
     public Set<String> getExcludedAnnotations() {
         return excludedAnnotations;
     }
@@ -309,7 +303,7 @@ public final class PropertyElementQuery {
      * @param excludedAnnotations The excluded annotation names
      * @return This PropertyElementQuery
      */
-    public @NonNull PropertyElementQuery excludedAnnotations(@Nullable Set<String> excludedAnnotations) {
+    public PropertyElementQuery excludedAnnotations(@Nullable Set<String> excludedAnnotations) {
         if (CollectionUtils.isNotEmpty(excludedAnnotations)) {
             this.excludedAnnotations = Collections.unmodifiableSet(excludedAnnotations);
         } else {

@@ -16,7 +16,6 @@
 package io.micronaut.expressions.parser.ast.access;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.expressions.ExpressionEvaluationContext;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
@@ -64,7 +63,7 @@ public final class EnvironmentAccess extends ExpressionNode {
     }
 
     @Override
-    protected TypeDef doResolveType(@NonNull ExpressionVisitorContext ctx) {
+    protected TypeDef doResolveType(ExpressionVisitorContext ctx) {
         TypeDef propertyNameType = propertyName.resolveType(ctx);
         if (!propertyNameType.equals(STRING)) {
             throw new ExpressionCompilationException("Invalid environment access operation. The expression inside environment " +

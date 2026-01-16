@@ -17,8 +17,6 @@ package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
-
 import java.lang.reflect.Array;
 import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.Modifier;
@@ -78,7 +76,6 @@ abstract class ReflectTypeElement<T extends Type> implements ClassElement {
         return type.getTypeName();
     }
 
-    @NonNull
     @Override
     public String getName() {
         Class<?> erasure = getErasure();
@@ -123,13 +120,11 @@ abstract class ReflectTypeElement<T extends Type> implements ClassElement {
         return false;
     }
 
-    @NonNull
     @Override
     public Object getNativeType() {
         return type;
     }
 
-    @NonNull
     @Override
     public ClassElement getRawClassElement() {
         return ClassElement.of(getErasure());
@@ -140,7 +135,7 @@ abstract class ReflectTypeElement<T extends Type> implements ClassElement {
      * @param type The type
      * @return The erased class, never {@code null}
      */
-    static @NonNull Class<?> getErasure(@NonNull Type type) {
+    static Class<?> getErasure(Type type) {
         if (type instanceof Class<?> class1) {
             return class1;
         } else if (type instanceof GenericArrayType arrayType) {

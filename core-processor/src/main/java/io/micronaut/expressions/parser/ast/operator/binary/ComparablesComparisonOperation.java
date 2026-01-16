@@ -16,7 +16,6 @@
 package io.micronaut.expressions.parser.ast.operator.binary;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
@@ -64,7 +63,7 @@ public final class ComparablesComparisonOperation extends ExpressionNode {
     }
 
     @Override
-    protected TypeDef doResolveType(@NonNull ExpressionVisitorContext ctx) {
+    protected TypeDef doResolveType(ExpressionVisitorContext ctx) {
         // resolving non-primitive class elements is necessary to handle cases
         // when one of expression nodes is of primitive type, but other expression node
         // is comparable to respective boxed type

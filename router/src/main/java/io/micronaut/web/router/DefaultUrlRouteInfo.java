@@ -16,7 +16,6 @@
 package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
@@ -99,7 +98,7 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     }
 
     @Override
-    public UriRouteMatch<T, R> tryMatch(@NonNull String uri) {
+    public UriRouteMatch<T, R> tryMatch(String uri) {
         UriMatchInfo matchInfo = uriTemplateMatcher.tryMatch(uri);
         if (matchInfo != null) {
             return new DefaultUriRouteMatch<>(matchInfo, this, defaultCharset, conversionService);
@@ -113,7 +112,7 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     }
 
     @Override
-    public int compareTo(@NonNull UriRouteInfo o) {
+    public int compareTo(UriRouteInfo o) {
         return uriTemplateMatcher.compareTo(((DefaultUrlRouteInfo) o).uriTemplateMatcher);
     }
 

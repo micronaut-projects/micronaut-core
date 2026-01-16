@@ -16,7 +16,6 @@
 package io.micronaut.expressions.parser.ast.access;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.expressions.context.ExpressionEvaluationContext;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
@@ -66,7 +65,7 @@ public final class ContextElementAccess extends ExpressionNode {
     }
 
     @Override
-    public TypeDef doResolveType(@NonNull ExpressionVisitorContext ctx) {
+    public TypeDef doResolveType(ExpressionVisitorContext ctx) {
         return resolveContextOperation(ctx).resolveType(ctx);
     }
 

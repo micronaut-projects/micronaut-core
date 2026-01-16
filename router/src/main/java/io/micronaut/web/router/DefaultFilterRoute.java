@@ -18,7 +18,6 @@ package io.micronaut.web.router;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.PathMatcher;
 import io.micronaut.core.util.StringUtils;
@@ -128,7 +127,6 @@ final class DefaultFilterRoute implements FilterRoute {
         return matchingAnnotation;
     }
 
-    @NonNull
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
         AnnotationMetadata annotationMetadata = this.annotationMetadata;
@@ -145,7 +143,6 @@ final class DefaultFilterRoute implements FilterRoute {
     }
 
     @Override
-    @NonNull
     public GenericHttpFilter getFilter() {
         GenericHttpFilter filter = this.filter;
         if (filter == null) {
@@ -160,13 +157,11 @@ final class DefaultFilterRoute implements FilterRoute {
         return filter;
     }
 
-    @NonNull
     @Override
     public Set<HttpMethod> getFilterMethods() {
         return httpMethods;
     }
 
-    @NonNull
     @Override
     public String[] getPatterns() {
         return patterns.toArray(StringUtils.EMPTY_STRING_ARRAY);

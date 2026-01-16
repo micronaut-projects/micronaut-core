@@ -17,7 +17,6 @@ package io.micronaut.context.visitor;
 
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.ast.KotlinParameterElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
@@ -34,7 +33,6 @@ import io.micronaut.inject.visitor.VisitorContext;
 @Internal
 public class ExecutableVisitor implements TypeElementVisitor<Object, Executable> {
 
-    @NonNull
     @Override
     public VisitorKind getVisitorKind() {
         return VisitorKind.ISOLATING;

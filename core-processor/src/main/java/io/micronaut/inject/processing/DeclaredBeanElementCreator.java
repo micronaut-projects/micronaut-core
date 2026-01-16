@@ -32,7 +32,6 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.inject.writer.ProxyingBeanDefinitionVisitor;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
@@ -119,7 +118,6 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
      *
      * @return the visitor
      */
-    @NonNull
     protected BeanDefinitionVisitor createBeanDefinitionVisitor() {
         BeanDefinitionVisitor beanDefinitionWriter = new BeanDefinitionWriter(classElement, visitorContext);
         beanDefinitionWriters.add(beanDefinitionWriter);

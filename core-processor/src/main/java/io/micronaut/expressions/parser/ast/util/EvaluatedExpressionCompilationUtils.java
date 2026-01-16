@@ -16,7 +16,6 @@
 package io.micronaut.expressions.parser.ast.util;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.PrimitiveElement;
@@ -46,8 +45,8 @@ public final class EvaluatedExpressionCompilationUtils {
      * @param argument checked argument
      * @return whether argument is assignable to parameter
      */
-    public static boolean isAssignable(@NonNull ClassElement parameter,
-                                       @NonNull ClassElement argument) {
+    public static boolean isAssignable(ClassElement parameter,
+                                       ClassElement argument) {
         if (!argument.isAssignable(parameter)) {
             TypeDef parameterType = TypeDef.erasure(parameter);
             TypeDef argumentType = TypeDef.erasure(argument);
@@ -74,7 +73,6 @@ public final class EvaluatedExpressionCompilationUtils {
      * @return resolved class element
      * @throws ExpressionCompilationException if class element can not be obtained
      */
-    @NonNull
     public static ClassElement getRequiredClassElement(TypeDef type,
                                                        VisitorContext visitorContext) {
 

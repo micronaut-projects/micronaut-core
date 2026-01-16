@@ -16,7 +16,6 @@
 package io.micronaut.expressions.parser.ast.operator.binary;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.ast.literal.StringLiteral;
@@ -67,7 +66,7 @@ public final class MatchesOperator extends ExpressionNode {
     }
 
     @Override
-    protected TypeDef doResolveType(@NonNull ExpressionVisitorContext ctx) {
+    protected TypeDef doResolveType(ExpressionVisitorContext ctx) {
         if (!operand.resolveType(ctx).equals(STRING)) {
             throw new ExpressionCompilationException(
                 "Operator 'matches' can only be applied to String operand");

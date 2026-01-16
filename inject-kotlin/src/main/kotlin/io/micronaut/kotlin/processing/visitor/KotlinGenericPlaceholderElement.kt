@@ -125,7 +125,7 @@ internal class KotlinGenericPlaceholderElement(
 
     override fun getDeclaringElement(): Optional<Element> = Optional.ofNullable(declaringElement)
 
-    override fun foldBoundGenericTypes(fold: Function<ClassElement?, ClassElement?>) =
+    override fun foldBoundGenericTypes(fold: Function<ClassElement, ClassElement?>) =
         fold.apply(this)
 
     companion object {
