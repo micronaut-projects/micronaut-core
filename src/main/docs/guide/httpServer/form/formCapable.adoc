@@ -42,8 +42,6 @@ A publisher of api:io.micronaut.http.multipart.CompletedPart[], api:io.micronaut
 
 Note that there is _no backpressure_ on this publisher. To avoid deadlocks with other parameters, the fields will be read in their entirety immediately, even if you haven't subscribed to the publisher yet. Configured form field count and size limits still apply.
 
-// TODO: configurable max file size _shared across multiple files_
-
 ==== … of StreamingFileUpload
 
 Similar to the `StreamingFileUpload` parameter described above, except that the controller can be called before the `StreamingFileUpload` is received, and that the publisher can contain multiple uploads of the same name.

@@ -94,7 +94,11 @@ public class HttpConverterRegistrar implements TypeConverterRegistrar {
                 if (argument.isAssignableFrom(InputStream.class)) {
                     return Optional.of(object.getInputStream());
                 } else if (argument.isAssignableFrom(ReadBuffer.class)) {
-                    return Optional.of(object.toReadBuffer()); // TODO: limit size
+                    if (!object.isInMemory()) {
+                        context.reject(new IllegalStateException("File upload was stored on disk, refusing to copy it to memory for conversion to " + targetType));
+                        return Optional.empty();
+                    }
+                    return Optional.of(object.toReadBuffer());
                 }
 
                 MediaType mediaType = object.getContentType().orElse(null);
@@ -107,7 +111,11 @@ public class HttpConverterRegistrar implements TypeConverterRegistrar {
                         return Optional.empty();
                     }
                 } else {
-                    try (ReadBuffer rb = object.toReadBuffer()) { // TODO: limit size
+                    if (!object.isInMemory()) {
+                        context.reject(new IllegalStateException("File upload was stored on disk, refusing to copy it to memory for conversion to " + targetType));
+                        return Optional.empty();
+                    }
+                    try (ReadBuffer rb = object.toReadBuffer()) {
                         return conversionService.convert(rb, targetType, context);
                     }
                 }

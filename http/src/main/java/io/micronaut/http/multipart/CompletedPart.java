@@ -68,6 +68,8 @@ public abstract sealed class CompletedPart implements Closeable permits Complete
         }
     }
 
+    public abstract boolean isInMemory();
+
     /**
      * {@link #close()} may be a blocking operation. This method closes this part asynchronously
      * instead, on the given executor, if a blocking operation needs to be performed.

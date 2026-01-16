@@ -44,6 +44,11 @@ public final class CompletedAttribute extends CompletedPart {
     }
 
     @Override
+    public boolean isInMemory() {
+        return true;
+    }
+
+    @Override
     public long getSize() {
         return readBuffer.readable();
     }

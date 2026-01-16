@@ -122,6 +122,11 @@ public abstract sealed class CompletedFileUpload extends CompletedPart {
         }
 
         @Override
+        public boolean isInMemory() {
+            return true;
+        }
+
+        @Override
         public void close() {
             closeTracker();
             buffer.close();
@@ -169,6 +174,11 @@ public abstract sealed class CompletedFileUpload extends CompletedPart {
             super(metadata);
             this.path = path;
             this.actualSize = actualSize;
+        }
+
+        @Override
+        public boolean isInMemory() {
+            return false;
         }
 
         @Override
