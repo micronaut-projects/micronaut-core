@@ -23,6 +23,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -107,7 +108,7 @@ public final class TemporaryFileResource implements Closeable {
     public void moveFile(Path destination) throws IOException {
         Path p = claimPath();
         try {
-            Files.move(p, destination);
+            Files.move(p, destination, StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException e) {
             try {
                 Files.delete(p);
