@@ -27,7 +27,6 @@ import io.netty.channel.WriteBufferWaterMark;
 import io.netty.handler.codec.http.multipart.HttpData;
 import io.netty.handler.logging.LogLevel;
 
-import java.io.IOException;
 import java.util.Map;
 import java.util.Optional;
 
