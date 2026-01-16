@@ -52,14 +52,7 @@ public final class NettyConvertersSpi implements TypeConverterRegistrar {
         conversionService.addConverter(
                 PartData.class,
                 byte[].class,
-                (upload, targetType, context) -> {
-                    try {
-                        return Optional.of(upload.getBytes());
-                    } catch (IOException e2) {
-                        context.reject(e2);
-                        return Optional.empty();
-                    }
-                }
+                (upload, targetType, context) -> Optional.of(upload.getBytes())
         );
 
         conversionService.addConverter(

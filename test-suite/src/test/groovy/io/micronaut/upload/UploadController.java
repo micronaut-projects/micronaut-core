@@ -173,11 +173,7 @@ public class UploadController {
     public Publisher<HttpResponse> receiveFlowParts(Publisher<PartData> data) {
         return Flux.from(data).collectList().doOnSuccess(parts -> {
             for (PartData part : parts) {
-                try {
-                    part.getBytes(); //intentionally releasing the parts after all data has been received
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+                part.close(); //intentionally releasing the parts after all data has been received
             }
         }).map(parts -> HttpResponse.ok());
     }
@@ -291,15 +287,9 @@ public class UploadController {
             Publisher<PartData> data) {
         return Flux.from(data).subscribeOn(Schedulers.boundedElastic())
                 .map((pd) -> {
-                    try {
-                        final byte[] bytes = pd.getBytes();
-                        System.out.println("received " + bytes.length + " bytes");
-                        return bytes;
-                    } catch (IOException e) {
-                        System.out.println("caught exception");
-                        System.out.println(e);
-                        throw Exceptions.propagate(e);
-                    }
+                    final byte[] bytes = pd.getBytes();
+                    System.out.println("received " + bytes.length + " bytes");
+                    return bytes;
                 })
                 .collect(LongAdder::new, (adder, bytes) -> adder.add((long)bytes.length))
                 .map((adder) -> {
@@ -367,13 +357,8 @@ public class UploadController {
 
                 @Override
                 public void onNext(PartData data) {
-                    try {
-                        datas.add(new String(data.getBytes(), StandardCharsets.UTF_8));
-                        s.request(1);
-                    } catch (IOException e) {
-                        s.cancel();
-                        emitter.error(e);
-                    }
+                    datas.add(new String(data.getBytes(), StandardCharsets.UTF_8));
+                    s.request(1);
                 }
 
                 @Override

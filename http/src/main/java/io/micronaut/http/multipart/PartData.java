@@ -38,9 +38,8 @@ public record PartData(FormFieldMetadata fieldMetadata, ReadBuffer readBuffer) i
      * Gets the content of this chunk as an {@code InputStream}.
      *
      * @return The content of this chunk as an {@code InputStream}
-     * @throws IOException If an error occurs in retrieving the content
      */
-    public InputStream getInputStream() throws IOException {
+    public InputStream getInputStream() {
         return readBuffer.toInputStream();
     }
 
@@ -48,9 +47,8 @@ public record PartData(FormFieldMetadata fieldMetadata, ReadBuffer readBuffer) i
      * Gets the content of this chunk as a {@code byte[]}.
      *
      * @return The content of this chunk as a {@code byte[]}
-     * @throws IOException If an error occurs in retrieving the content
      */
-    public byte[] getBytes() throws IOException {
+    public byte[] getBytes() {
         return readBuffer.toArray();
     }
 
@@ -58,9 +56,8 @@ public record PartData(FormFieldMetadata fieldMetadata, ReadBuffer readBuffer) i
      * Gets the content of this chunk as a {@code ByteBuffer}.
      *
      * @return The content of this chunk as a {@code ByteBuffer}
-     * @throws IOException If an error occurs in retrieving the content
      */
-    public ByteBuffer getByteBuffer() throws IOException {
+    public ByteBuffer getByteBuffer() {
         return ByteBuffer.wrap(getBytes());
     }
 
