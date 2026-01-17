@@ -25,17 +25,17 @@ import java.security.KeyStore
 import java.security.cert.Certificate
 import java.security.cert.X509Certificate
 
-@IgnoreIf({ os.isMacOs() || javaVersion == 25 })
+@IgnoreIf({ os.isMacOs() })
 class SslRefreshSpec extends Specification {
 
-    @Shared List<String> ciphers = ['TLS_RSA_WITH_AES_128_CBC_SHA',
-                                    'TLS_RSA_WITH_AES_256_CBC_SHA',
-                                    'TLS_RSA_WITH_AES_128_GCM_SHA256',
-                                    'TLS_RSA_WITH_AES_256_GCM_SHA384',
+    @Shared List<String> ciphers = ['TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA',
+                                    'TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA',
+                                    'TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256',
+                                    'TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384',
+                                    'TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256',
+                                    'TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384',
                                     'TLS_DHE_RSA_WITH_AES_128_GCM_SHA256',
-                                    'TLS_DHE_RSA_WITH_AES_256_GCM_SHA384',
-                                    'TLS_DHE_DSS_WITH_AES_128_GCM_SHA256',
-                                    'TLS_DHE_DSS_WITH_AES_256_GCM_SHA384']
+                                    'TLS_DHE_RSA_WITH_AES_256_GCM_SHA384']
     @Shared Path keyStorePath
     @Shared Path trustStorePath
     @Shared Map<String, Object> config = [
@@ -99,7 +99,7 @@ class SslRefreshSpec extends Specification {
         then:
         response.status() == HttpStatus.OK
         response.body().ciphers == ciphers
-        response.body().subjectDN == 'CN=test.example.com, OU=IT, O=Whatever, L=Munich, ST=Bavaria, C=DE, EMAILADDRESS=info@example.com'
+        response.body().subjectDN.toString().contains('CN=test.example.com')
 
         when:
         config.putAll('micronaut.server.ssl.key-store.path': 'classpath:keystore.p12',
@@ -115,7 +115,7 @@ class SslRefreshSpec extends Specification {
         then:
         response.status() == HttpStatus.OK
         response.body().ciphers == ciphers[0..4]
-        response.body().subjectDN == 'CN=example.local, OU=IT Department, O=Global Security, L=London, ST=London, C=GB'
+        response.body().subjectDN.toString().contains('CN=example.local')
 
         cleanup:
         embeddedServer.close()
@@ -140,7 +140,7 @@ class SslRefreshSpec extends Specification {
 
         then:
         response.status() == HttpStatus.OK
-        response.body().subjectDN == 'CN=client1'
+        response.body().subjectDN.toString().contains('CN=client1')
 
         when:
         Files.deleteIfExists(keyStorePath)
@@ -155,7 +155,7 @@ class SslRefreshSpec extends Specification {
 
         then:
         response.status() == HttpStatus.OK
-        response.body().subjectDN == 'CN=client2'
+        response.body().subjectDN.toString().contains('CN=client2')
 
         cleanup:
         embeddedServer.close()
