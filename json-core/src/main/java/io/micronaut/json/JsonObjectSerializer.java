@@ -48,7 +48,7 @@ public final class JsonObjectSerializer implements ObjectSerializer {
     @Override
     public Optional<byte[]> serialize(@Nullable Object object) throws SerializationException {
         try {
-            return Optional.of(jsonMapper.writeValueAsBytes(object));
+            return Optional.ofNullable(jsonMapper.writeValueAsBytes(object));
         } catch (IOException e) {
             throw new SerializationException("Error serializing object to JSON: " + e.getMessage(), e);
         }
@@ -69,7 +69,7 @@ public final class JsonObjectSerializer implements ObjectSerializer {
             return Optional.empty();
         }
         try {
-            return Optional.of(jsonMapper.readValue(bytes, Argument.of(requiredType)));
+            return Optional.ofNullable(jsonMapper.readValue(bytes, Argument.of(requiredType)));
         } catch (IOException e) {
             throw new SerializationException("Error deserializing object from JSON: " + e.getMessage(), e);
         }
@@ -81,7 +81,7 @@ public final class JsonObjectSerializer implements ObjectSerializer {
             return Optional.empty();
         }
         try {
-            return Optional.of(jsonMapper.readValue(inputStream, Argument.of(requiredType)));
+            return Optional.ofNullable(jsonMapper.readValue(inputStream, Argument.of(requiredType)));
         } catch (IOException e) {
             throw new SerializationException("Error deserializing object from JSON: " + e.getMessage(), e);
         }
@@ -93,7 +93,7 @@ public final class JsonObjectSerializer implements ObjectSerializer {
             return Optional.empty();
         }
         try {
-            return Optional.of(jsonMapper.readValue(bytes, requiredType));
+            return Optional.ofNullable(jsonMapper.readValue(bytes, requiredType));
         } catch (IOException e) {
             throw new SerializationException("Error deserializing object from JSON: " + e.getMessage(), e);
         }
@@ -105,7 +105,7 @@ public final class JsonObjectSerializer implements ObjectSerializer {
             return Optional.empty();
         }
         try {
-            return Optional.of(jsonMapper.readValue(inputStream, requiredType));
+            return Optional.ofNullable(jsonMapper.readValue(inputStream, requiredType));
         } catch (IOException e) {
             throw new SerializationException("Error deserializing object from JSON: " + e.getMessage(), e);
         }

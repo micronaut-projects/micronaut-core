@@ -52,7 +52,7 @@ public class JacksonObjectSerializer implements ObjectSerializer {
     @Override
     public Optional<byte[]> serialize(@Nullable Object object) throws SerializationException {
         try {
-            return Optional.of(objectMapper.writeValueAsBytes(object));
+            return Optional.ofNullable(objectMapper.writeValueAsBytes(object));
         } catch (JacksonException e) {
             throw new SerializationException("Error serializing object to JSON: " + e.getMessage(), e);
         }
@@ -73,7 +73,7 @@ public class JacksonObjectSerializer implements ObjectSerializer {
             return Optional.empty();
         }
         try {
-            return Optional.of(objectMapper.readValue(bytes, requiredType));
+            return Optional.ofNullable(objectMapper.readValue(bytes, requiredType));
         } catch (JacksonException e) {
             throw new SerializationException("Error deserializing object from JSON: " + e.getMessage(), e);
         }
@@ -85,7 +85,7 @@ public class JacksonObjectSerializer implements ObjectSerializer {
             return Optional.empty();
         }
         try {
-            return Optional.of(objectMapper.readValue(inputStream, requiredType));
+            return Optional.ofNullable(objectMapper.readValue(inputStream, requiredType));
         } catch (JacksonException e) {
             throw new SerializationException("Error deserializing object from JSON: " + e.getMessage(), e);
         }
@@ -98,7 +98,7 @@ public class JacksonObjectSerializer implements ObjectSerializer {
         }
         try {
             JavaType javaType = JacksonConfiguration.constructType(requiredType, objectMapper.getTypeFactory());
-            return Optional.of(objectMapper.readValue(bytes, javaType));
+            return Optional.ofNullable(objectMapper.readValue(bytes, javaType));
         } catch (JacksonException e) {
             throw new SerializationException("Error deserializing object from JSON: " + e.getMessage(), e);
         }
@@ -111,7 +111,7 @@ public class JacksonObjectSerializer implements ObjectSerializer {
         }
         try {
             JavaType javaType = JacksonConfiguration.constructType(requiredType, objectMapper.getTypeFactory());
-            return Optional.of(objectMapper.readValue(inputStream, javaType));
+            return Optional.ofNullable(objectMapper.readValue(inputStream, javaType));
         } catch (JacksonException e) {
             throw new SerializationException("Error deserializing object from JSON: " + e.getMessage(), e);
         }
