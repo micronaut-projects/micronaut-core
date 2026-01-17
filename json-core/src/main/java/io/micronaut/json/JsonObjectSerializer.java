@@ -47,9 +47,6 @@ public final class JsonObjectSerializer implements ObjectSerializer {
 
     @Override
     public Optional<byte[]> serialize(@Nullable Object object) throws SerializationException {
-        if (object == null) {
-            return Optional.empty();
-        }
         try {
             return Optional.of(jsonMapper.writeValueAsBytes(object));
         } catch (IOException e) {
@@ -59,9 +56,6 @@ public final class JsonObjectSerializer implements ObjectSerializer {
 
     @Override
     public void serialize(@Nullable Object object, OutputStream outputStream) throws SerializationException {
-        if (object == null) {
-            return;
-        }
         try {
             jsonMapper.writeValue(outputStream, object);
         } catch (IOException e) {

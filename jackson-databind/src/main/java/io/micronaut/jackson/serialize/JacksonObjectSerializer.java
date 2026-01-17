@@ -51,9 +51,6 @@ public class JacksonObjectSerializer implements ObjectSerializer {
 
     @Override
     public Optional<byte[]> serialize(@Nullable Object object) throws SerializationException {
-        if (object == null) {
-            return Optional.empty();
-        }
         try {
             return Optional.of(objectMapper.writeValueAsBytes(object));
         } catch (JacksonException e) {
@@ -63,9 +60,6 @@ public class JacksonObjectSerializer implements ObjectSerializer {
 
     @Override
     public void serialize(@Nullable Object object, OutputStream outputStream) throws SerializationException {
-        if (object == null) {
-            return;
-        }
         try {
             objectMapper.writeValue(outputStream, object);
         } catch (JacksonException e) {

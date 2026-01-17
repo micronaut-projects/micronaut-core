@@ -55,9 +55,6 @@ public final class JdkSerializer implements ObjectSerializer {
 
     @Override
     public void serialize(@Nullable Object object, OutputStream outputStream) throws SerializationException {
-        if (object == null) {
-            return;
-        }
         try {
             try (ObjectOutputStream objectOut = createObjectOutput(outputStream)) {
                 objectOut.writeObject(object);
@@ -117,7 +114,7 @@ public final class JdkSerializer implements ObjectSerializer {
      * @return A new {@link ObjectOutputStream}
      * @throws IOException if there is an error
      */
-    protected ObjectOutputStream createObjectOutput(OutputStream outputStream) throws IOException {
+    private ObjectOutputStream createObjectOutput(OutputStream outputStream) throws IOException {
         return new ObjectOutputStream(outputStream);
     }
 
@@ -127,7 +124,7 @@ public final class JdkSerializer implements ObjectSerializer {
      * @return A {@link ObjectOutputStream}
      * @throws IOException if there is an error
      */
-    protected ObjectInputStream createObjectInput(InputStream inputStream, Class<?> requiredType) throws IOException {
+    private ObjectInputStream createObjectInput(InputStream inputStream, Class<?> requiredType) throws IOException {
         return new ObjectInputStream(inputStream) {
             @Override
             protected Class<?> resolveClass(ObjectStreamClass desc) throws IOException, ClassNotFoundException {
