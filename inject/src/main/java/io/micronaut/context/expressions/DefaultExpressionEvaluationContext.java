@@ -28,6 +28,8 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
 
+import java.util.Objects;
+
 /**
  * Default implementation of {@link ConfigurableExpressionEvaluationContext}.
  * For this implementation, the methods mutating evaluation context return new instance of
@@ -73,7 +75,7 @@ public final class DefaultExpressionEvaluationContext implements ConfigurableExp
     }
 
     @Override
-    public ConfigurableExpressionEvaluationContext withOwningBean(BeanDefinition<?> beanDefinition) {
+    public ConfigurableExpressionEvaluationContext withOwningBean(@Nullable BeanDefinition<?> beanDefinition) {
         DefaultExpressionEvaluationContext evaluationContext = new DefaultExpressionEvaluationContext(
             thisObject, this.args,
             this.beanContext,
@@ -84,7 +86,7 @@ public final class DefaultExpressionEvaluationContext implements ConfigurableExp
     }
 
     @Override
-    public ConfigurableExpressionEvaluationContext withBeanContext(BeanContext beanContext) {
+    public ConfigurableExpressionEvaluationContext withBeanContext(@Nullable BeanContext beanContext) {
         DefaultExpressionEvaluationContext evaluationContext = new DefaultExpressionEvaluationContext(
             thisObject, this.args,
             beanContext,
@@ -139,7 +141,7 @@ public final class DefaultExpressionEvaluationContext implements ConfigurableExp
             } else {
                 Argument<T> t = Argument.of(type);
                 try (BeanResolutionContext.Path ignored =
-                         resolutionContext.getPath().pushAnnotationResolve(owningBean, t)) {
+                         resolutionContext.getPath().pushAnnotationResolve(Objects.requireNonNull(owningBean),t)) {
                     BeanRegistration<T> beanRegistration = abstractBeanResolutionContext.getBeanRegistration(t, null);
                     resolutionContext.addInFlightBean(identifier, beanRegistration);
                     return beanRegistration.getBean();

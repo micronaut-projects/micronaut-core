@@ -80,9 +80,9 @@ public final class EvaluatedAnnotationMetadata extends MappingAnnotationMetadata
         evaluationContext = evaluationContext.withOwningBean(beanDefinition);
     }
 
-    public static AnnotationMetadata wrapIfNecessary(AnnotationMetadata targetMetadata) {
+    public static AnnotationMetadata wrapIfNecessary(@Nullable AnnotationMetadata targetMetadata) {
         if (targetMetadata == null) {
-            return null;
+            return AnnotationMetadata.EMPTY_METADATA;
         } else if (targetMetadata instanceof EvaluatedAnnotationMetadata) {
             return targetMetadata;
         } else if (targetMetadata.hasEvaluatedExpressions()) {

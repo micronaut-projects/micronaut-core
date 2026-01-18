@@ -49,6 +49,7 @@ class DefaultFieldInjectionPoint<B, T> implements FieldInjectionPoint<B, T>, Env
     private final String field;
     private final AnnotationMetadata annotationMetadata;
     private final Argument[] typeArguments;
+    @Nullable
     private Environment environment;
 
     /**
@@ -140,6 +141,7 @@ class DefaultFieldInjectionPoint<B, T> implements FieldInjectionPoint<B, T>, Env
     }
 
     @Override
+    @Nullable
     public <T extends Annotation> T synthesize(Class<T> annotationClass) {
         return getAnnotationMetadata().synthesize(annotationClass);
     }

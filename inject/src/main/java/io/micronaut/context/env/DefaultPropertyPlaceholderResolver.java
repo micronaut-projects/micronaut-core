@@ -59,6 +59,7 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
     private final PropertyResolver environment;
     private final ConversionService conversionService;
     private final String prefix;
+    @Nullable
     private Collection<PropertyExpressionResolver> expressionResolvers;
 
     /**
@@ -358,6 +359,7 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
 
         private final String placeholder;
         private final List<String> expressions = new ArrayList<>();
+        @Nullable
         private String defaultValue;
 
         /**

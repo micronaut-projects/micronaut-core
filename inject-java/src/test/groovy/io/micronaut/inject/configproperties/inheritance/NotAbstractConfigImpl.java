@@ -4,7 +4,7 @@ import io.micronaut.context.annotation.ConfigurationInject;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
 @EachProperty("teams")
 public class NotAbstractConfigImpl extends NotAbstractConfig {

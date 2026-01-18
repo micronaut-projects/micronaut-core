@@ -18,6 +18,7 @@ package io.micronaut.http.simple;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequestFactory;
 import io.micronaut.http.MutableHttpRequest;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Simple {@link HttpRequestFactory} implementation.
@@ -59,7 +60,7 @@ public class SimpleHttpRequestFactory implements HttpRequestFactory {
     }
 
     @Override
-    public <T> MutableHttpRequest<T> delete(String uri, T body) {
+    public <T> MutableHttpRequest<T> delete(String uri, @Nullable T body) {
         return new SimpleHttpRequest<>(HttpMethod.DELETE, uri, body);
     }
 

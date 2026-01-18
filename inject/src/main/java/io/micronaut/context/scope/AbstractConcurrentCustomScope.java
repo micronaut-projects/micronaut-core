@@ -62,6 +62,7 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
      * @return Obtains the scope map, never null
      * @throws java.lang.IllegalStateException if the scope map cannot be obtained in the current context
      */
+    @Nullable
     protected abstract Map<BeanIdentifier, CreatedBean<?>> getScopeMap(boolean forCreation);
 
     @Override
@@ -121,7 +122,7 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
     public final <T> T getOrCreate(BeanCreationContext<T> creationContext) {
         r.lock();
         try {
-            final Map<BeanIdentifier, CreatedBean<?>> scopeMap = getScopeMap(true);
+            final Map<BeanIdentifier, CreatedBean<?>> scopeMap = Objects.requireNonNull(getScopeMap(true));
             final BeanIdentifier id = creationContext.id();
             CreatedBean<?> createdBean = scopeMap.get(id);
             if (createdBean != null) {
@@ -215,6 +216,9 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
             try {
                 scopeMap = getScopeMap(false);
             } catch (Exception e) {
+                return Optional.empty();
+            }
+            if (scopeMap == null) {
                 return Optional.empty();
             }
             for (CreatedBean<?> createdBean : scopeMap.values()) {

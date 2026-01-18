@@ -19,6 +19,7 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.context.processor.BeanDefinitionProcessor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.order.OrderUtil;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.Order;
 import io.micronaut.core.bind.ArgumentBinder;
@@ -133,8 +134,9 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements BeanD
         }
     }
 
+    @Nullable
     private Executor getExecutor(FilterMetadata metadata) {
-        if (metadata.executeOn != null) {
+        if (beanContext != null && metadata.executeOn != null) {
             return beanContext.getBean(Executor.class, Qualifiers.byName(metadata.executeOn));
         } else {
             return null;
@@ -220,7 +222,7 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements BeanD
             annotationMetadata.enumValue(annotationType, "patternStyle", FilterPatternStyle.class).orElse(FilterPatternStyle.ANT),
             ArrayUtils.isNotEmpty(patterns) ? Arrays.asList(patterns) : null,
             ArrayUtils.isNotEmpty(methods) ? Arrays.asList(methods) : null,
-            order.isPresent() ? new FilterOrder.Fixed(order.getAsInt()) : null,
+            order.isPresent() ? new FilterOrder.Fixed(order.getAsInt()) : new FilterOrder.Dynamic(OrderUtil.getOrder(annotationMetadata)),
             annotationMetadata.stringValue(ExecuteOn.class).orElse(null),
             ArrayUtils.isNotEmpty(serviceId) ? Arrays.asList(serviceId) : null,
             ArrayUtils.isNotEmpty(excludeServiceId) ? Arrays.asList(excludeServiceId) : null,
@@ -233,7 +235,7 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements BeanD
         FilterPatternStyle patternStyle,
         @Nullable List<String> patterns,
         @Nullable List<HttpMethod> methods,
-        @Nullable FilterOrder order,
+        FilterOrder order,
         @Nullable String executeOn,
         @Nullable List<String> serviceId,
         @Nullable List<String> excludeServiceId,

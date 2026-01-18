@@ -17,6 +17,7 @@ package io.micronaut.context.env;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.order.Ordered;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Map;
 import java.util.Objects;
@@ -46,6 +47,7 @@ public interface PropertySource extends Iterable<String>, Ordered {
      * @param key The key
      * @return The value
      */
+    @Nullable
     Object get(String key);
 
     /**

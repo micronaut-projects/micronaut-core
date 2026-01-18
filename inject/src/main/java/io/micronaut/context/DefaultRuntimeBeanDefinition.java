@@ -60,22 +60,25 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
     private final Supplier<T> supplier;
     private final AnnotationMetadata annotationMetadata;
     private final String beanName;
+    @Nullable
     private final Qualifier<T> qualifier;
     private final boolean isSingleton;
+    @Nullable
     private final Class<? extends Annotation> scope;
     private final Class<?>[] exposedTypes;
+    @Nullable
     private Map<Class<?>, List<Argument<?>>> typeArguments;
-    private int order;
+    private final int order;
 
-    DefaultRuntimeBeanDefinition(
- Argument<T> beanType,
- Supplier<T> supplier,
-        @Nullable Qualifier<T> qualifier,
-        @Nullable AnnotationMetadata annotationMetadata,
-        boolean isSingleton,
-        @Nullable Class<? extends Annotation> scope,
-        Class<?>[] exposedTypes, Map<Class<?>,
-        List<Argument<?>>> typeArguments) {
+    DefaultRuntimeBeanDefinition(Argument<T> beanType,
+                                 Supplier<T> supplier,
+                                 @Nullable Qualifier<T> qualifier,
+                                 @Nullable AnnotationMetadata annotationMetadata,
+                                 boolean isSingleton,
+                                 @Nullable Class<? extends Annotation> scope,
+                                 Class<?>[] exposedTypes,
+                                 @Nullable
+                                 Map<Class<?>, List<Argument<?>>> typeArguments) {
         Objects.requireNonNull(beanType, MSG_BEAN_TYPE_CANNOT_BE_NULL);
         Objects.requireNonNull(supplier, "Bean supplier cannot be null");
 
@@ -157,12 +160,14 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
     }
 
     @Override
+    @Nullable
     public Qualifier<T> getDeclaredQualifier() {
         return this.qualifier != null ? this.qualifier :
             RuntimeBeanDefinition.super.getDeclaredQualifier();
     }
 
     @Override
+    @Nullable
     public Qualifier<T> resolveDynamicQualifier() {
         return qualifier;
     }
@@ -233,22 +238,27 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
     static final class RuntimeBeanBuilder<B> implements RuntimeBeanDefinition.Builder<B> {
         private Argument<B> beanType;
         private final Supplier<B> supplier;
+        @Nullable
         private Qualifier<B> qualifier;
         private boolean singleton;
         private AnnotationMetadata annotationMetadata;
+        @Nullable
         private Class<? extends Annotation> scope;
         private Class<?>[] exposedTypes = ReflectionUtils.EMPTY_CLASS_ARRAY;
 
+        @Nullable
         private Map<Class<?>, List<Argument<?>>> typeArguments;
+        @Nullable
         private Class<? extends B> replacesType;
 
         RuntimeBeanBuilder(Argument<B> beanType, Supplier<B> supplier) {
             this.beanType = Objects.requireNonNull(beanType, MSG_BEAN_TYPE_CANNOT_BE_NULL);
             this.supplier = Objects.requireNonNull(supplier, "Bean supplier cannot be null");
+            this.annotationMetadata = AnnotationMetadata.EMPTY_METADATA;
         }
 
         @Override
-        public Builder<B> qualifier(Qualifier<B> qualifier) {
+        public Builder<B> qualifier(@Nullable Qualifier<B> qualifier) {
             this.qualifier = qualifier;
             if (qualifier instanceof TypeArgumentQualifier<B> typeArgumentQualifier) {
                 Argument<?>[] arguments = Arrays.stream(typeArgumentQualifier.getTypeArguments())
@@ -265,14 +275,14 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
         }
 
         @Override
-        public Builder<B> replaces(Class<? extends B> otherType) {
+        public Builder<B> replaces(@Nullable Class<? extends B> otherType) {
             this.replacesType = otherType;
             return this;
         }
 
         @Override
         @SuppressWarnings("java:S1872")
-        public Builder<B> scope(Class<? extends Annotation> scope) {
+        public Builder<B> scope(@Nullable Class<? extends Annotation> scope) {
             this.scope = scope;
             if (scope != null && scope.getSimpleName().equals("Singleton")) {
                 this.singleton = true;
@@ -313,8 +323,8 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
         }
 
         @Override
-        public Builder<B> annotationMetadata(AnnotationMetadata annotationMetadata) {
-            this.annotationMetadata = annotationMetadata;
+        public Builder<B> annotationMetadata(@Nullable AnnotationMetadata annotationMetadata) {
+            this.annotationMetadata = annotationMetadata == null ? AnnotationMetadata.EMPTY_METADATA : annotationMetadata;
             return this;
         }
 
@@ -322,9 +332,9 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
         public RuntimeBeanDefinition<B> build() {
             if (replacesType != null) {
                 MutableAnnotationMetadata mutableAnnotationMetadata;
-                if (this.annotationMetadata instanceof MutableAnnotationMetadata mm) {
+                if (annotationMetadata instanceof MutableAnnotationMetadata mm) {
                     mutableAnnotationMetadata = mm;
-                } else if (this.annotationMetadata == null || this.annotationMetadata == EMPTY_METADATA) {
+                } else if (annotationMetadata == EMPTY_METADATA) {
                     mutableAnnotationMetadata = new MutableAnnotationMetadata();
                     this.annotationMetadata = mutableAnnotationMetadata;
                 } else {

@@ -72,7 +72,7 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     private final Argument<?> bodyType;
     private final boolean isErrorRoute;
     private final boolean isPermitsBody;
-    private final MessageBodyWriter<R> messageBodyWriter;
+    private final @Nullable MessageBodyWriter<R> messageBodyWriter;
 
     public DefaultRouteInfo(ReturnType<? extends R> returnType,
                             Class<?> declaringType,
@@ -155,7 +155,7 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     }
 
     @Override
-    public MessageBodyWriter<R> getMessageBodyWriter() {
+    public @Nullable MessageBodyWriter<R> getMessageBodyWriter() {
         return messageBodyWriter;
     }
 
@@ -225,7 +225,7 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     }
 
     @Override
-    public boolean doesConsume(MediaType contentType) {
+    public boolean doesConsume(@Nullable MediaType contentType) {
         return contentType == null || consumesMediaTypesContainsAll || explicitlyConsumes(contentType);
     }
 
@@ -244,7 +244,7 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
         return producesMediaTypesContainsAll || acceptableType == null || acceptableType.equals(MediaType.ALL_TYPE) || producesMediaTypes.contains(acceptableType);
     }
 
-    private boolean anyMediaTypesMatch(List<MediaType> producedMediaTypes, Collection<MediaType> acceptableTypes) {
+    private boolean anyMediaTypesMatch(List<MediaType> producedMediaTypes, @Nullable Collection<MediaType> acceptableTypes) {
         if (CollectionUtils.isEmpty(acceptableTypes)) {
             return true;
         }
@@ -257,13 +257,13 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     }
 
     @Override
-    public boolean explicitlyConsumes(MediaType contentType) {
-        return consumesMediaTypes.contains(contentType);
+    public boolean explicitlyConsumes(@Nullable MediaType contentType) {
+        return contentType != null && consumesMediaTypes.contains(contentType);
     }
 
     @Override
-    public boolean explicitlyProduces(MediaType contentType) {
-        return producesMediaTypes == null || producesMediaTypes.isEmpty() || producesMediaTypes.contains(contentType);
+    public boolean explicitlyProduces(@Nullable MediaType contentType) {
+        return producesMediaTypes == null || producesMediaTypes.isEmpty() || (contentType != null && producesMediaTypes.contains(contentType));
     }
 
     @Override
@@ -338,7 +338,7 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     }
 
     @Override
-    public ExecutorService getExecutor(ThreadSelection threadSelection) {
+    public @Nullable ExecutorService getExecutor(@Nullable ThreadSelection threadSelection) {
         return null;
     }
 

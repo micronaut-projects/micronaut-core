@@ -83,7 +83,7 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
      * @param annotationMetadata The annotation metadata
      * @param genericTypes       The generic types
      */
-    public DefaultArgument(Class<T> type, @Nullable String name, @Nullable AnnotationMetadata annotationMetadata, Argument<?>... genericTypes) {
+    public DefaultArgument(Class<T> type, @Nullable String name, @Nullable AnnotationMetadata annotationMetadata, Argument<?> @Nullable ... genericTypes) {
         this(type,
              name,
              annotationMetadata,
@@ -97,7 +97,7 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
      * @param annotationMetadata The annotation metadata
      * @param genericTypes       The generic types
      */
-    public DefaultArgument(Class<T> type, @Nullable AnnotationMetadata annotationMetadata, Argument<?>... genericTypes) {
+    public DefaultArgument(Class<T> type, @Nullable AnnotationMetadata annotationMetadata, Argument<?> @Nullable ... genericTypes) {
         this(type,
                 null,
                 annotationMetadata,
@@ -113,7 +113,7 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
      * @param typeParameters     The map of parameters
      * @param typeParameterArray The array of arguments
      */
-    public DefaultArgument(Class<T> type, @Nullable String name, @Nullable AnnotationMetadata annotationMetadata, Map<String, Argument<?>> typeParameters, Argument<?>[] typeParameterArray) {
+    public DefaultArgument(Class<T> type, @Nullable String name, @Nullable AnnotationMetadata annotationMetadata, Map<String, Argument<?>> typeParameters, Argument<?> @Nullable [] typeParameterArray) {
         this(type, name, annotationMetadata, typeParameters, typeParameterArray, false);
     }
 
@@ -124,7 +124,7 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
      * @param isTypeVariable     Is this argument a type variable
      * @param genericTypes       The generic types
      */
-    public DefaultArgument(Class<T> type, @Nullable String name, @Nullable AnnotationMetadata annotationMetadata, boolean isTypeVariable, Argument<?>... genericTypes) {
+    public DefaultArgument(Class<T> type, @Nullable String name, @Nullable AnnotationMetadata annotationMetadata, boolean isTypeVariable, Argument<?> @Nullable ... genericTypes) {
         this(type,
                 name,
                 annotationMetadata,
@@ -142,7 +142,11 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
      * @param typeParameterArray The array of arguments
      * @param isTypeVariable     Is the argument a type variable
      */
-    protected DefaultArgument(Class<T> type, @Nullable String name, @Nullable AnnotationMetadata annotationMetadata, Map<String, Argument<?>> typeParameters, Argument<?> @Nullable [] typeParameterArray, boolean isTypeVariable) {
+    protected DefaultArgument(Class<T> type,
+                              @Nullable String name,
+                              @Nullable AnnotationMetadata annotationMetadata,
+                              Map<String, Argument<?>> typeParameters,
+                              Argument<?> @Nullable [] typeParameterArray, boolean isTypeVariable) {
         this.type = Objects.requireNonNull(type, "Type cannot be null");
         this.name = name;
         this.annotationMetadata = annotationMetadata != null ? annotationMetadata : AnnotationMetadata.EMPTY_METADATA;

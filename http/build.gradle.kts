@@ -1,6 +1,7 @@
 plugins {
     id("io.micronaut.build.internal.convention-library")
     id("io.micronaut.build.internal.kotlin-base")
+    id("io.micronaut.build.internal.convention-nullaway")
     alias(libs.plugins.managed.kotlin.jvm)
 }
 
@@ -16,6 +17,7 @@ dependencies {
     compileOnly(libs.managed.netty.pkitesting)
 
     compileOnly(libs.managed.jackson.annotations)
+    compileOnly(libs.managed.jspecify)
 
     testCompileOnly(projects.micronautInjectGroovy)
     testAnnotationProcessor(projects.micronautInjectJava)

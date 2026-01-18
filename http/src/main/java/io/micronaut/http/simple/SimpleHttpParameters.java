@@ -19,6 +19,7 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleMultiValuesMap;
 import io.micronaut.http.MutableHttpParameters;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -73,7 +74,7 @@ public class SimpleHttpParameters implements MutableHttpParameters {
     }
 
     @Override
-    public String get(CharSequence name) {
+    public @Nullable String get(CharSequence name) {
         return values.get(name);
     }
 

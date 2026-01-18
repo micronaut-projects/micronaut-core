@@ -48,6 +48,7 @@ public class CachedEnvironment {
     /**
      * Operator used to replace {@link System#getenv(String)} in testing.
      */
+    @Nullable
     private static UnaryOperator<String> getenv;
 
     static {

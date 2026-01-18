@@ -30,7 +30,7 @@ class CookieHttpCookieAdapter implements Cookie {
     private static final CookieComparator COMPARATOR = new CookieComparator();
 
     private final HttpCookie httpCookie;
-    private SameSite sameSite = null;
+    private @Nullable SameSite sameSite;
 
     public CookieHttpCookieAdapter(HttpCookie httpCookie) {
         this.httpCookie = httpCookie;
@@ -116,7 +116,7 @@ class CookieHttpCookieAdapter implements Cookie {
     }
 
     @Override
-    public Cookie sameSite(SameSite sameSite) {
+    public Cookie sameSite(@Nullable SameSite sameSite) {
         this.sameSite = sameSite;
         return this;
     }

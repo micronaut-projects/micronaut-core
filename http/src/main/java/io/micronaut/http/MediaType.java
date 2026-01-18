@@ -780,7 +780,7 @@ public class MediaType implements CharSequence {
 
     @SuppressWarnings("ConstantName")
     private static final String MIME_TYPES_FILE_NAME = "META-INF/http/mime.types";
-    private static Map<String, String> mediaTypeFileExtensions;
+    private static @Nullable Map<String, String> mediaTypeFileExtensions;
     @SuppressWarnings("ConstantName")
     private static final List<Pattern> textTypePatterns = new ArrayList<>(4);
 
@@ -1104,7 +1104,7 @@ public class MediaType implements CharSequence {
     /**
      * @return The version of the Mime type
      */
-    public String getVersion() {
+    public @Nullable String getVersion() {
         return parameters.getOrDefault(V_PARAMETER, null);
     }
 
@@ -1369,7 +1369,7 @@ public class MediaType implements CharSequence {
     }
 
     @SuppressWarnings("MagicNumber")
-    private static Map<String, String> getMediaTypeFileExtensions() {
+    private static @Nullable Map<String, String> getMediaTypeFileExtensions() {
         Map<String, String> extensions = mediaTypeFileExtensions;
         if (extensions == null) {
             synchronized (MediaType.class) { // double check

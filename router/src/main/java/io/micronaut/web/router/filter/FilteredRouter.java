@@ -171,7 +171,7 @@ public class FilteredRouter implements Router {
     }
 
     @Override
-    public List<GenericHttpFilter> findFilters(HttpRequest<?> request, RouteMatch<?> routeMatch) {
+    public List<GenericHttpFilter> findFilters(HttpRequest<?> request, @Nullable RouteMatch<?> routeMatch) {
         return router.findFilters(request, routeMatch);
     }
 

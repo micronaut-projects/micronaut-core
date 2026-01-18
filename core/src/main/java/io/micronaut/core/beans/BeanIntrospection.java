@@ -123,7 +123,7 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
      * @return An instance
      * @throws InstantiationException If the bean cannot be instantiated.
      */
-    default T instantiate(@Nullable Object @Nullable... arguments) throws InstantiationException {
+    default T instantiate(@Nullable Object... arguments) throws InstantiationException {
         return instantiate(true, arguments);
     }
 
@@ -135,7 +135,7 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
      * @return An instance
      * @throws InstantiationException If the bean cannot be instantiated.
      */
-    T instantiate(boolean strictNullable, @Nullable Object @Nullable... arguments) throws InstantiationException;
+    T instantiate(boolean strictNullable, @Nullable Object... arguments) throws InstantiationException;
 
     /**
      * The bean type.

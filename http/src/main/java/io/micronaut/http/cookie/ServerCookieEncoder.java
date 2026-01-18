@@ -35,7 +35,13 @@ public interface ServerCookieEncoder {
             .load(ServerCookieEncoder.class)
             .firstOr("io.micronaut.http.cookie.DefaultServerCookieEncoder", ServerCookieEncoder.class.getClassLoader())
             .map(ServiceDefinition::load)
-            .orElse(null);
+            .orElseGet(() -> cookies -> {
+                java.util.List<String> encoded = new java.util.ArrayList<>(cookies.length);
+                for (Cookie c : cookies) {
+                    encoded.add(c.getName() + "=" + c.getValue());
+                }
+                return encoded;
+            });
 
     /**
      *

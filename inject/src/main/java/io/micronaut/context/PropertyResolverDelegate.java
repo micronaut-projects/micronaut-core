@@ -104,7 +104,7 @@ public interface PropertyResolverDelegate extends PropertyResolver, ValueResolve
     }
 
     @Override
-    default @Nullable <T> T getProperty(String name, Class<T> requiredType, @Nullable T defaultValue) {
+    default <T> T getProperty(String name, Class<T> requiredType, T defaultValue) {
         return delegate().getProperty(name, requiredType, defaultValue);
     }
 

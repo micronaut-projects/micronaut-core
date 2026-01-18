@@ -28,6 +28,7 @@ import io.micronaut.core.util.AnsiColour;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -206,7 +207,7 @@ abstract sealed class ConsoleBeanResolutionTracer
     }
 
     @Override
-    public <T> void traceBeanResolved(BeanResolutionContext resolutionContext, Argument<T> beanType, Qualifier<T> qualifier, T bean) {
+    public <T> void traceBeanResolved(BeanResolutionContext resolutionContext, Argument<T> beanType, @Nullable Qualifier<T> qualifier, @Nullable T bean) {
         String prefix = padLeft(resolutionContext, 1) + RIGHT_ARROW;
         StringWriter sw = new StringWriter();
         try (BufferedWriter writer = new BufferedWriter(sw)) {
@@ -240,7 +241,7 @@ abstract sealed class ConsoleBeanResolutionTracer
     }
 
     @Override
-    public <T> void traceBeanDisabled(BeanResolutionContext resolutionContext, Argument<T> beanType, Qualifier<T> qualifier, String disabledBeanMessage) {
+    public <T> void traceBeanDisabled(BeanResolutionContext resolutionContext, Argument<T> beanType, @Nullable Qualifier<T> qualifier, String disabledBeanMessage) {
         String[] lines = disabledBeanMessage.split("\\r?\\n");
         String prefix = padLeft(resolutionContext, 3);
         StringWriter sw = new StringWriter();
@@ -266,7 +267,7 @@ abstract sealed class ConsoleBeanResolutionTracer
     }
 
     @Override
-    public <T> void traceValueResolved(BeanResolutionContext resolutionContext, Argument<T> argument, String property, T value) {
+    public <T> void traceValueResolved(BeanResolutionContext resolutionContext, Argument<T> argument, String property, @Nullable T value) {
         BeanContext context = resolutionContext.getContext();
         if (context instanceof ApplicationContext applicationContext) {
             Environment environment = applicationContext.getEnvironment();

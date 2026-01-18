@@ -51,7 +51,7 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     private final UriMatchTemplate uriMatchTemplate;
     private final UriTemplateMatcher uriTemplateMatcher;
     private final Charset defaultCharset;
-    private final Integer port;
+    private final @Nullable Integer port;
     private final ConversionService conversionService;
     private final ExecutorSelector executorSelector;
     @Nullable
@@ -68,7 +68,8 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
                                List<MediaType> consumesMediaTypes,
                                List<MediaType> producesMediaTypes,
                                List<Predicate<HttpRequest<?>>> predicates,
-                               Integer port,
+                                @Nullable Integer port,
+
                                ConversionService conversionService,
                                ExecutorSelector executorSelector,
                                MessageBodyHandlerRegistry messageBodyHandlerRegistry) {
@@ -98,7 +99,7 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     }
 
     @Override
-    public UriRouteMatch<T, R> tryMatch(String uri) {
+    public @Nullable UriRouteMatch<T, R> tryMatch(String uri) {
         UriMatchInfo matchInfo = uriTemplateMatcher.tryMatch(uri);
         if (matchInfo != null) {
             return new DefaultUriRouteMatch<>(matchInfo, this, defaultCharset, conversionService);
@@ -107,7 +108,7 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     }
 
     @Override
-    public Integer getPort() {
+    public @Nullable Integer getPort() {
         return port;
     }
 
@@ -125,11 +126,11 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     }
 
     @Override
-    public ExecutorService getExecutor(ThreadSelection threadSelection) {
+    public @Nullable ExecutorService getExecutor(@Nullable ThreadSelection threadSelection) {
         if (executorService != null || noExecutor) {
             return executorService;
         }
-        ExecutorService es = executorSelector.select(getTargetMethod(), threadSelection).orElse(null);
+        ExecutorService es = executorSelector.select(getTargetMethod(), threadSelection == null ? ThreadSelection.AUTO : threadSelection).orElse(null);
         if (es == null) {
             noExecutor = true;
             return null;

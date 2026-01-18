@@ -33,7 +33,7 @@ public interface ClientCookieEncoder {
             .load(ClientCookieEncoder.class)
             .firstOr("io.micronaut.http.cookie.DefaultClientCookieEncoder", ClientCookieEncoder.class.getClassLoader())
             .map(ServiceDefinition::load)
-            .orElse(null);
+            .orElseGet(() -> cookie -> cookie.getName() + "=" + cookie.getValue());
 
     /**
      * Encodes a {@link Cookie} into a String. Typically used to set the {@link io.micronaut.http.HttpHeaders#COOKIE} value for example in an HTTP Client.

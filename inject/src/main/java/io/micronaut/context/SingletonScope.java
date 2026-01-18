@@ -92,7 +92,7 @@ final class SingletonScope {
      * @param <T>          The singleton type
      * @return The new registration
      */
-    <T> BeanRegistration<T> registerSingletonBean(BeanRegistration<T> registration, Qualifier qualifier) {
+    <T> BeanRegistration<T> registerSingletonBean(BeanRegistration<T> registration, @Nullable Qualifier qualifier) {
 
         BeanDefinition<T> beanDefinition = registration.beanDefinition;
         singletonByBeanDefinition.put(BeanDefinitionIdentity.of(beanDefinition), registration);
@@ -120,7 +120,7 @@ final class SingletonScope {
      * @param <T>       The singleton type
      * @return true if contains, false doesn't mean the singleton is not present.
      */
-    <T> boolean containsBean(Argument<T> beanType, Qualifier<T> qualifier) {
+    <T> boolean containsBean(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         ArgumentUtils.requireNonNull("beanType", beanType);
         DefaultBeanContext.BeanKey<T> beanKey = new DefaultBeanContext.BeanKey<>(beanType, qualifier);
         return singletonByArgumentAndQualifier.containsKey(beanKey);

@@ -18,6 +18,7 @@ package io.micronaut.http.body;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A body reader {@link MessageBodyReader} with a type argument.
@@ -35,7 +36,7 @@ public interface TypedMessageBodyReader<T> extends MessageBodyReader<T> {
     Argument<T> getType();
 
     @Override
-    default boolean isReadable(Argument<T> type, MediaType mediaType) {
+    default boolean isReadable(Argument<T> type, @Nullable MediaType mediaType) {
         return type.isAssignableFrom(getType()) && !type.getType().equals(Object.class);
     }
 }

@@ -103,9 +103,9 @@ public class ArgumentUtils {
      * @param values The values
      */
     public static void validateArguments(
- Described described,
+            Described described,
             Argument<?>[] arguments,
-            Object[] values) {
+            @Nullable Object[] values) {
         int requiredCount = arguments.length;
         @SuppressWarnings("ConstantConditions") int actualCount = ArrayUtils.isEmpty(values) ? 0 : values.length;
         if (requiredCount != actualCount) {
@@ -117,7 +117,7 @@ public class ArgumentUtils {
                 Class<?> type = argument.getWrapperType();
                 Object value = values[i];
                 if (value != null && !type.isInstance(value)) {
-                    throw new IllegalArgumentException("Invalid type [" + values[i].getClass().getName() + "] for argument [" + argument + "] of " + (described instanceof Executable ? "method" : "constructor") + ": " + described.getDescription());
+                    throw new IllegalArgumentException("Invalid type [" + value.getClass().getName() + "] for argument [" + argument + "] of " + (described instanceof Executable ? "method" : "constructor") + ": " + described.getDescription());
                 }
             }
         }

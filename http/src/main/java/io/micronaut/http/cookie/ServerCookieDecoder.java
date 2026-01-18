@@ -33,7 +33,7 @@ public interface ServerCookieDecoder {
             .load(ServerCookieDecoder.class)
             .firstOr("io.micronaut.http.cookie.DefaultServerCookieDecoder", ServerCookieDecoder.class.getClassLoader())
             .map(ServiceDefinition::load)
-            .orElse(null);
+            .orElseGet(DefaultServerCookieDecoder::new);
 
     /**
      *

@@ -1226,7 +1226,7 @@ public interface RouteBuilder {
          * @param uri The URI
          * @return The normalized URI or null
          */
-        default String normalizeUri(@Nullable String uri) {
+         default @Nullable String normalizeUri(@Nullable String uri) {
             if (uri != null) {
                 int len = uri.length();
                 if (len > 0 && uri.charAt(0) != '/') {

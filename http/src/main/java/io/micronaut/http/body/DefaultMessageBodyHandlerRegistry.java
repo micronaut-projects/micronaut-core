@@ -30,6 +30,7 @@ import io.micronaut.inject.qualifiers.FilteringQualifier;
 import io.micronaut.inject.qualifiers.MatchArgumentQualifier;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
@@ -66,6 +67,7 @@ public final class DefaultMessageBodyHandlerRegistry extends AbstractMessageBody
 
     @SuppressWarnings({"unchecked"})
     @Override
+    @Nullable
     protected <T> MessageBodyReader<T> findReaderImpl(Argument<T> type, List<MediaType> mediaTypes) {
         List<MediaType> resolvedMediaTypes = resolveMediaTypes(mediaTypes);
         return beanLocator.getBeansOfType(
@@ -103,6 +105,7 @@ public final class DefaultMessageBodyHandlerRegistry extends AbstractMessageBody
 
     @SuppressWarnings({"unchecked"})
     @Override
+    @Nullable
     protected <T> MessageBodyWriter<T> findWriterImpl(Argument<T> type, List<MediaType> mediaTypes) {
         List<MediaType> resolvedMediaTypes = resolveMediaTypes(mediaTypes);
         return beanLocator.getBeansOfType(

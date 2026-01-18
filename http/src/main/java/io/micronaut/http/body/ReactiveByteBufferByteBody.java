@@ -51,7 +51,7 @@ public final class ReactiveByteBufferByteBody extends BaseStreamingByteBody<Reac
     }
 
     @Override
-    public BufferConsumer.Upstream primary(BufferConsumer primary) {
+    public BufferConsumer.Upstream primary(@Nullable BufferConsumer primary) {
         BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {
             failClaim();

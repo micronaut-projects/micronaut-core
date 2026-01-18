@@ -36,7 +36,7 @@ import java.util.OptionalLong;
 @Internal
 public abstract class BaseStreamingByteBody<SB extends BaseSharedBuffer> extends InternalByteBody implements CloseableByteBody {
     protected final SB sharedBuffer;
-    protected BufferConsumer.Upstream upstream;
+    protected BufferConsumer. @Nullable Upstream upstream;
 
     protected BaseStreamingByteBody(SB sharedBuffer, BufferConsumer.Upstream upstream) {
         this.sharedBuffer = sharedBuffer;

@@ -42,11 +42,11 @@ import java.util.function.Predicate;
 @Internal
 public final class DefaultStatusRouteInfo<T, R> extends DefaultRequestMatcher<T, R> implements StatusRouteInfo<T, R> {
 
-    private final Class<?> originatingType;
+    private final @Nullable Class<?> originatingType;
     private final int statusCode;
     private final ConversionService conversionService;
 
-    public DefaultStatusRouteInfo(Class<?> originatingType,
+    public DefaultStatusRouteInfo(@Nullable Class<?> originatingType,
                                   int statusCode,
                                   MethodExecutionHandle<T, R> targetMethod,
                                   @Nullable
@@ -65,7 +65,7 @@ public final class DefaultStatusRouteInfo<T, R> extends DefaultRequestMatcher<T,
     }
 
     @Override
-    public Class<?> originatingType() {
+    public @Nullable Class<?> originatingType() {
         return originatingType;
     }
 
@@ -85,7 +85,7 @@ public final class DefaultStatusRouteInfo<T, R> extends DefaultRequestMatcher<T,
     }
 
     @Override
-    public Optional<RouteMatch<R>> match(Class<?> originatingClass, HttpStatus status) {
+    public Optional<RouteMatch<R>> match(@Nullable Class<?> originatingClass, HttpStatus status) {
         if (originatingClass == this.originatingType && this.statusCode == status.getCode()) {
             return Optional.of(new StatusRouteMatch<>(this, conversionService));
         }
@@ -109,7 +109,7 @@ public final class DefaultStatusRouteInfo<T, R> extends DefaultRequestMatcher<T,
     }
 
     @Override
-    public Optional<RouteMatch<R>> match(Class<?> originatingClass, int statusCode) {
+    public Optional<RouteMatch<R>> match(@Nullable Class<?> originatingClass, int statusCode) {
         if (originatingClass == this.originatingType && this.statusCode == statusCode) {
             return Optional.of(new StatusRouteMatch<>(this, conversionService));
         }

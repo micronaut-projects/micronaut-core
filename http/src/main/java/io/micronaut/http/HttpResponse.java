@@ -43,7 +43,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     @Override
-    default HttpResponse<B> setAttribute(CharSequence name, Object value) {
+    default HttpResponse<B> setAttribute(CharSequence name, @Nullable Object value) {
         return (HttpResponse<B>) HttpMessage.super.setAttribute(name, value);
     }
 

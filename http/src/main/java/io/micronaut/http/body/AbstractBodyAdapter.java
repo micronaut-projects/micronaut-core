@@ -36,9 +36,9 @@ import java.util.function.LongUnaryOperator;
  */
 @Internal
 public class AbstractBodyAdapter implements BufferConsumer.Upstream, Subscriber<ReadBuffer> {
-    private BaseSharedBuffer sharedBuffer;
+    private @Nullable BaseSharedBuffer sharedBuffer;
 
-    private volatile Subscription subscription;
+    private volatile @Nullable Subscription subscription;
     private final AtomicLong demand = new AtomicLong(1);
 
     private final Publisher<ReadBuffer> source;
@@ -71,7 +71,9 @@ public class AbstractBodyAdapter implements BufferConsumer.Upstream, Subscriber<
         long oldDemand = this.demand.getAndUpdate(add);
         long newDemand = add.applyAsLong(oldDemand);
         if (oldDemand <= 0 && newDemand > 0) {
-            subscription.request(1);
+            if (subscription != null) {
+                subscription.request(1);
+            }
         }
     }
 
@@ -107,19 +109,21 @@ public class AbstractBodyAdapter implements BufferConsumer.Upstream, Subscriber<
     @Override
     public void onNext(ReadBuffer buffer) {
         long newDemand = demand.addAndGet(-buffer.readable());
-        sharedBuffer.add(buffer);
+        java.util.Objects.requireNonNull(sharedBuffer).add(buffer);
         if (newDemand > 0) {
-            subscription.request(1);
+            if (subscription != null) {
+                subscription.request(1);
+            }
         }
     }
 
     @Override
     public void onError(Throwable t) {
-        sharedBuffer.error(t);
+        java.util.Objects.requireNonNull(sharedBuffer).error(t);
     }
 
     @Override
     public void onComplete() {
-        sharedBuffer.complete();
+        java.util.Objects.requireNonNull(sharedBuffer).complete();
     }
 }

@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 package io.micronaut.http.uri;
+import org.jspecify.annotations.NullUnmarked;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.ObjectUtils;
@@ -39,6 +40,7 @@ import static io.micronaut.core.util.ArrayUtils.EMPTY_OBJECT_ARRAY;
  * @author Graeme Rocher
  * @since 1.0
  */
+@NullUnmarked
 public class UriMatchTemplate extends UriTemplate implements UriMatcher {
 
     protected static final String VARIABLE_MATCH_PATTERN = "([^/?#(?!{)&;+]";

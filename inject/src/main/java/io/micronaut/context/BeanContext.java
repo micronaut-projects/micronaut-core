@@ -271,7 +271,7 @@ public interface BeanContext extends
     }
 
     @Override
-    default <T> BeanContext registerSingleton(Class<T> type, T singleton, Qualifier<T> qualifier) {
+    default <T> BeanContext registerSingleton(Class<T> type, T singleton, @Nullable Qualifier<T> qualifier) {
         return registerSingleton(type, singleton, qualifier, true);
     }
 

@@ -22,6 +22,7 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Array;
@@ -353,6 +354,7 @@ public abstract sealed class MappingAnnotationMetadataDelegate implements Annota
     }
 
     @Override
+    @Nullable
     public <T extends Annotation> AnnotationValue<T> getDeclaredAnnotation(Class<T> annotationClass) {
         AnnotationValue<T> av = getAnnotationMetadata().getDeclaredAnnotation(annotationClass);
         if (av != null) {
@@ -362,11 +364,13 @@ public abstract sealed class MappingAnnotationMetadataDelegate implements Annota
     }
 
     @Override
+    @Nullable
     public <T extends Annotation> AnnotationValue<T> getAnnotation(Class<T> annotationClass) {
         return getAnnotation(annotationClass.getName());
     }
 
     @Override
+    @Nullable
     public <T extends Annotation> AnnotationValue<T> getAnnotation(String annotation) {
         AnnotationValue<T> av = getAnnotationMetadata().getAnnotation(annotation);
         if (av != null) {
@@ -420,6 +424,7 @@ public abstract sealed class MappingAnnotationMetadataDelegate implements Annota
     }
 
     @Override
+    @Nullable
     public <T extends Annotation> T synthesizeDeclared(Class<T> annotationClass) {
         return findDeclaredAnnotation(annotationClass)
                    .map(av -> AnnotationMetadataSupport.buildAnnotation(annotationClass, av))
@@ -427,6 +432,7 @@ public abstract sealed class MappingAnnotationMetadataDelegate implements Annota
     }
 
     @Override
+    @Nullable
     public <T extends Annotation> T synthesize(Class<T> annotationClass) {
         return findAnnotation(annotationClass)
                    .map(av -> AnnotationMetadataSupport.buildAnnotation(annotationClass, av))
@@ -434,6 +440,7 @@ public abstract sealed class MappingAnnotationMetadataDelegate implements Annota
     }
 
     @Override
+    @Nullable
     public <T extends Annotation> T synthesize(Class<T> annotationClass, String sourceAnnotation) {
         AnnotationValue<T> av = getAnnotation(sourceAnnotation);
         if (av != null) {
@@ -443,6 +450,7 @@ public abstract sealed class MappingAnnotationMetadataDelegate implements Annota
     }
 
     @Override
+    @Nullable
     public <T extends Annotation> T synthesizeDeclared(Class<T> annotationClass, String sourceAnnotation) {
         AnnotationValue<T> av = getDeclaredAnnotation(sourceAnnotation);
         if (av != null) {
@@ -462,7 +470,7 @@ public abstract sealed class MappingAnnotationMetadataDelegate implements Annota
     }
 
     @Override
-    public <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByStereotype(String stereotype) {
+    public <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByStereotype(@Nullable String stereotype) {
         return getAnnotationValues(() -> getAnnotationMetadata().getAnnotationValuesByStereotype(stereotype));
     }
 

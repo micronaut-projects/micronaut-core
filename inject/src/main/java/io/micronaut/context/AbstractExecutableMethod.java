@@ -47,7 +47,9 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
     private final ReturnType returnType;
     private final Argument<?> genericReturnType;
     private final int hashCode;
+    @Nullable
     private Environment environment;
+    @Nullable
     private AnnotationMetadata methodAnnotationMetadata;
 
     /**
@@ -157,7 +159,8 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
     }
 
     @Override
-    public final Object invoke(Object instance, Object... arguments) {
+    @Nullable
+    public final Object invoke(Object instance, @Nullable Object... arguments) {
         if (arguments.length > 0) {
             ArgumentUtils.validateArguments(this, getArguments(), arguments);
         }
@@ -165,7 +168,8 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
     }
 
     @Override
-    public Object invokeUnsafe(Object instance, Object... arguments) {
+    @Nullable
+    public Object invokeUnsafe(Object instance, @Nullable Object... arguments) {
         return invokeInternal(instance, arguments);
     }
 
@@ -176,7 +180,8 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
      */
     @SuppressWarnings("WeakerAccess")
     @UsedByGeneratedCode
-    protected abstract Object invokeInternal(Object instance, Object[] arguments);
+    @Nullable
+    protected abstract Object invokeInternal(Object instance, @Nullable Object[] arguments);
 
     /**
      * Resolves the annotation metadata for this method. Subclasses

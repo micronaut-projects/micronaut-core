@@ -18,6 +18,7 @@ package io.micronaut.http.uri;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.ArgumentUtils;
+import org.jspecify.annotations.Nullable;
 
 import java.net.URI;
 import java.nio.ByteBuffer;
@@ -70,8 +71,8 @@ public final class QueryStringDecoder {
     private final int maxParams;
     private final boolean semicolonIsNormalChar;
     private int pathEndIdx;
-    private String path;
-    private Map<String, List<String>> params;
+    private @Nullable String path;
+    private @Nullable Map<String, List<String>> params;
 
     /**
      * Creates a new decoder that decodes the specified URI. The decoder will

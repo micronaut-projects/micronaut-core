@@ -45,6 +45,7 @@ import java.security.UnrecoverableKeyException;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
@@ -64,6 +65,7 @@ public final class FileCertificateProvider implements CertificateProvider {
 
     private final String name;
     private final Flux<KeyStore> flux;
+    @Nullable
     private final WatchService watchService;
 
     /**
@@ -88,7 +90,10 @@ public final class FileCertificateProvider implements CertificateProvider {
 
             WatchService ws = null;
             if (config.refreshMode == RefreshMode.FILE_WATCHER || config.refreshMode == RefreshMode.FILE_WATCHER_OR_SCHEDULER) {
-                Path directory = config.path.getParent();
+                Path directory = config.getPath().getParent();
+                if (directory == null) {
+                    throw new UnsupportedOperationException("No parent directory for certificate path: " + config.getPath());
+                }
                 try {
                     ws = directory.getFileSystem().newWatchService();
                     directory.register(ws, StandardWatchEventKinds.ENTRY_CREATE, StandardWatchEventKinds.ENTRY_MODIFY);
@@ -120,7 +125,7 @@ public final class FileCertificateProvider implements CertificateProvider {
                             WatchKey key = finalWs.take();
                             boolean changed = false;
                             for (WatchEvent<?> event : key.pollEvents()) {
-                                if (event.context() instanceof Path ctx && (ctx.getFileName().equals(config.path.getFileName()) || (config.certificatePath != null && ctx.getFileName().equals(config.certificatePath.getFileName())))) {
+                                if (event.context() instanceof Path ctx && (ctx.getFileName().equals(config.getPath().getFileName()) || (config.certificatePath != null && ctx.getFileName().equals(config.certificatePath.getFileName())))) {
                                     changed = true;
                                     break;
                                 }
@@ -156,7 +161,9 @@ public final class FileCertificateProvider implements CertificateProvider {
      */
     @PreDestroy
     void close() throws IOException {
-        watchService.close();
+        if (watchService != null) {
+            watchService.close();
+        }
     }
 
     private static void loadSafe(Sinks.Many<KeyStore> sink, Config config) {
@@ -168,7 +175,7 @@ public final class FileCertificateProvider implements CertificateProvider {
     }
 
     private static KeyStore load(Config config) throws GeneralSecurityException, PemParser.NotPemException, IOException {
-        byte[] mainBytes = Files.readAllBytes(config.path);
+        byte[] mainBytes = Files.readAllBytes(config.getPath());
         byte[] certBytes;
         if (config.certificatePath != null) {
             if (config.format != Format.PEM) {
@@ -182,7 +189,7 @@ public final class FileCertificateProvider implements CertificateProvider {
         return load(config, mainBytes, certBytes);
     }
 
-    static KeyStore load(AbstractCertificateFileConfig config, byte[] mainBytes, byte[] certBytes) throws GeneralSecurityException, PemParser.NotPemException, IOException {
+    static KeyStore load(AbstractCertificateFileConfig config, byte[] mainBytes, byte @Nullable [] certBytes) throws GeneralSecurityException, PemParser.NotPemException, IOException {
         KeyStore ks;
         if (config.format == null) {
             try {
@@ -260,7 +267,7 @@ public final class FileCertificateProvider implements CertificateProvider {
     @EachProperty(CONFIG_PREFIX + ".file")
     @BootstrapContextCompatible
     public static final class Config extends AbstractCertificateFileConfig {
-        private Path path;
+        private @Nullable Path path;
         @Nullable
         private Path certificatePath;
         private RefreshMode refreshMode = RefreshMode.FILE_WATCHER_OR_SCHEDULER;
@@ -278,7 +285,7 @@ public final class FileCertificateProvider implements CertificateProvider {
          * @return the path to the certificate file
          */
         public Path getPath() {
-            return path;
+            return Objects.requireNonNull(path, "Path must be set");
         }
 
         /**

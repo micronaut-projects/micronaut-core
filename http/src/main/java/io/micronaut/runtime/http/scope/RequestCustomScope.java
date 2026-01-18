@@ -26,6 +26,7 @@ import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.context.event.HttpRequestTerminatedEvent;
 import io.micronaut.inject.BeanIdentifier;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -67,6 +68,7 @@ class RequestCustomScope extends AbstractConcurrentCustomScope<RequestScope> imp
     }
 
     @Override
+    @Nullable
     protected Map<BeanIdentifier, CreatedBean<?>> getScopeMap(boolean forCreation) {
         final HttpRequest<Object> request = ServerRequestContext.currentRequest().orElse(null);
         if (request != null) {
@@ -82,7 +84,7 @@ class RequestCustomScope extends AbstractConcurrentCustomScope<RequestScope> imp
         final HttpRequest<Object> request = ServerRequestContext.currentRequest().orElse(null);
         final CreatedBean<T> createdBean = super.doCreate(creationContext);
         final T bean = createdBean.bean();
-        if (bean instanceof RequestAware aware) {
+        if (bean instanceof RequestAware aware && request != null) {
             aware.setRequest(request);
         }
         return createdBean;
@@ -101,7 +103,7 @@ class RequestCustomScope extends AbstractConcurrentCustomScope<RequestScope> imp
         }
     }
 
-    private <T> ConcurrentHashMap<BeanIdentifier, CreatedBean<?>> getRequestAttributeMap(HttpRequest<T> httpRequest, boolean create) {
+    private <T> @Nullable ConcurrentHashMap<BeanIdentifier, CreatedBean<?>> getRequestAttributeMap(HttpRequest<T> httpRequest, boolean create) {
         MutableConvertibleValues<Object> attrs = httpRequest.getAttributes();
         Object o = attrs.getValue(SCOPED_BEANS_ATTRIBUTE);
         if (o instanceof ConcurrentHashMap) {

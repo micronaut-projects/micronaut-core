@@ -30,6 +30,7 @@ import io.micronaut.core.type.Executable;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.qualifiers.Qualifiers;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -55,7 +56,7 @@ public final class DefaultExecutableBeanContextBinder implements ExecutableBeanC
         if (arguments.length == 0) {
             return new ContextBoundExecutable<>(target, ArrayUtils.EMPTY_OBJECT_ARRAY);
         }
-        Object[] bound = new Object[arguments.length];
+        @Nullable Object[] bound = new Object[arguments.length];
         for (int i = 0; i < arguments.length; i++) {
             Argument<?> argument = arguments[i];
             Optional<String> v = argument.getAnnotationMetadata().stringValue(Value.class);
@@ -118,6 +119,7 @@ public final class DefaultExecutableBeanContextBinder implements ExecutableBeanC
      * @return The resolved qualifier
      */
     @SuppressWarnings("unchecked")
+    @Nullable
     private static <T> Qualifier<T> resolveQualifier(Argument<?> argument) {
         AnnotationMetadata annotationMetadata = Objects.requireNonNull(argument, "Argument cannot be null").getAnnotationMetadata();
         boolean hasMetadata = annotationMetadata != AnnotationMetadata.EMPTY_METADATA;
@@ -141,19 +143,20 @@ public final class DefaultExecutableBeanContextBinder implements ExecutableBeanC
         return null;
     }
 
-    private record ContextBoundExecutable<T, R> (Executable<T, R> target, Object[] bound) implements BoundExecutable<T, R> {
+    private record ContextBoundExecutable<T, R> (Executable<T, R> target, @Nullable Object[] bound) implements BoundExecutable<T, R> {
         @Override
         public Executable<T, R> getTarget() {
             return target;
         }
 
         @Override
+        @Nullable
         public R invoke(T instance) {
             return target.invoke(instance, bound);
         }
 
         @Override
-        public Object[] getBoundArguments() {
+        public @Nullable Object[] getBoundArguments() {
             return bound;
         }
 

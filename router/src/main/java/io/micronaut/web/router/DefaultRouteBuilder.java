@@ -83,11 +83,11 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     protected final UriNamingStrategy uriNamingStrategy;
     protected final ConversionService conversionService;
     protected final Charset defaultCharset;
-    private final ExecutorSelector executorSelector;
+    private final @Nullable ExecutorSelector executorSelector;
 
     private final MessageBodyHandlerRegistry messageBodyHandlerRegistry;
 
-    private DefaultUriRoute currentParentRoute;
+    private @Nullable DefaultUriRoute currentParentRoute;
     private final List<UriRoute> uriRoutes = new ArrayList<>();
     private final List<StatusRoute> statusRoutes = new ArrayList<>();
     private final List<ErrorRoute> errorRoutes = new ArrayList<>();
@@ -188,7 +188,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     }
 
     @Override
-    public StatusRoute status(Class<?> originatingClass, HttpStatus status, Class<?> type, String method, Class<?>[] parameterTypes) {
+    public StatusRoute status(Class<?> originatingClass, HttpStatus status, Class<?> type, String method, Class<?>... parameterTypes) {
         Optional<MethodExecutionHandle<Object, Object>> executionHandle = executionHandleLocator.findExecutionHandle((Class<Object>) type, method, parameterTypes);
 
         MethodExecutionHandle<Object, Object> executableHandle = executionHandle.orElseThrow(() ->
@@ -214,7 +214,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     }
 
     @Override
-    public ErrorRoute error(Class<?> originatingClass, Class<? extends Throwable> error, Class<?> type, String method, Class<?>[] parameterTypes) {
+    public ErrorRoute error(Class<?> originatingClass, Class<? extends Throwable> error, Class<?> type, String method, Class<?>... parameterTypes) {
         Optional<MethodExecutionHandle<Object, Object>> executionHandle = executionHandleLocator.findExecutionHandle((Class<Object>) type, method, parameterTypes);
 
         MethodExecutionHandle<Object, Object> executableHandle = executionHandle.orElseThrow(() ->
@@ -461,8 +461,8 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         protected final ConversionService conversionService;
         protected List<MediaType> consumesMediaTypes;
         protected List<MediaType> producesMediaTypes = List.of();
-        protected String bodyArgumentName;
-        protected Argument<?> bodyArgument;
+        protected @Nullable String bodyArgumentName;
+        protected @Nullable Argument<?> bodyArgument;
 
         /**
          * @param targetMethod The target method execution handle
@@ -556,10 +556,11 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     final class DefaultErrorRoute extends AbstractRoute implements ErrorRoute {
 
         private final Class<? extends Throwable> error;
-        private final Class<?> originatingClass;
+        private final @Nullable Class<?> originatingClass;
 
-        /**
-         * @param error The throwable
+         /**
+          * @param error The throwable
+
          * @param targetMethod The target method execution handle
          * @param conversionService The conversion service
          */
@@ -573,7 +574,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
          * @param targetMethod The target method execution handle
          * @param conversionService The conversion service
          */
-        public DefaultErrorRoute(Class<?> originatingClass,
+        public DefaultErrorRoute(@Nullable Class<?> originatingClass,
                                  Class<? extends Throwable> error,
                                  MethodExecutionHandle<Object, Object> targetMethod,
                                  ConversionService conversionService) {
@@ -669,6 +670,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     final class DefaultStatusRoute extends AbstractRoute implements StatusRoute {
 
         private final int statusCode;
+        @Nullable
         private final Class<?> originatingClass;
 
         /**
@@ -686,7 +688,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
          * @param targetMethod The target method execution handle
          * @param conversionService The conversion service
          */
-        public DefaultStatusRoute(Class<?> originatingClass, HttpStatus status, MethodExecutionHandle<Object, Object> targetMethod, ConversionService conversionService) {
+        public DefaultStatusRoute(@Nullable Class<?> originatingClass, HttpStatus status, MethodExecutionHandle<Object, Object> targetMethod, ConversionService conversionService) {
             super(targetMethod, conversionService, Collections.emptyList());
             this.originatingClass = originatingClass;
             this.statusCode = status.getCode();
@@ -773,7 +775,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         final HttpMethod httpMethod;
         final UriMatchTemplate uriMatchTemplate;
         final List<DefaultUriRoute> nestedRoutes = new ArrayList<>(2);
-        private Integer port;
+        private @Nullable Integer port;
         private final RouteExecutorSelector executorSelector = new RouteExecutorSelector();
 
         /**
@@ -918,7 +920,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public Integer getPort() {
+        public @Nullable Integer getPort() {
             return port;
         }
 

@@ -18,6 +18,7 @@ package io.micronaut.core.convert;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.type.Argument;
+import org.jetbrains.annotations.Contract;
 
 import java.util.Optional;
 
@@ -137,6 +138,7 @@ public interface ConversionService {
      * @throws ConversionErrorException if the value cannot be converted
      * @since 1.1.4
      */
+    @Contract("null, _ -> null")
     default @Nullable <T> T convertRequired(@Nullable Object value, Class<T> type) {
         if (value == null) {
             return null;
@@ -154,7 +156,7 @@ public interface ConversionService {
      * @throws ConversionErrorException if the value cannot be converted
      * @since 1.1.4
      */
-    default @Nullable <T> T convertRequired(@Nullable Object value, Argument<T> argument) {
+    default <T> T convertRequired(@Nullable Object value, Argument<T> argument) {
         ArgumentConversionContext<T> context = ConversionContext.of(argument);
         return convertRequired(value, context);
     }

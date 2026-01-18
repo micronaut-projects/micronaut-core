@@ -27,6 +27,7 @@ import io.micronaut.http.cookie.ClientCookieEncoder;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.simple.cookies.SimpleCookies;
+import org.jspecify.annotations.Nullable;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -49,7 +50,7 @@ public class SimpleHttpRequest<B> implements MutableHttpRequest<B> {
 
     private final HttpMethod method;
     private URI uri;
-    private Object body;
+    private @Nullable Object body;
 
     /**
      * Simple {@link MutableHttpRequest} implementation.
@@ -58,7 +59,7 @@ public class SimpleHttpRequest<B> implements MutableHttpRequest<B> {
      * @param url    the URI of the request
      * @param body   the optional body of the request
      */
-    public SimpleHttpRequest(HttpMethod method, String url, B body) {
+    public SimpleHttpRequest(HttpMethod method, String url, @Nullable B body) {
         this.method = method;
         try {
             this.uri = new URI(url);

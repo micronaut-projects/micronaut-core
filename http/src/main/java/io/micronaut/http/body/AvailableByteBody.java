@@ -43,6 +43,7 @@ public interface AvailableByteBody extends ByteBody {
      * @see ByteBody#split()
      * @return A body with the same content as this one
      */
+    @Override
     CloseableAvailableByteBody split();
 
     /**

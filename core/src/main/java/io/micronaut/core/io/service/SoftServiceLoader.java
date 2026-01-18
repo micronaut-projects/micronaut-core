@@ -86,7 +86,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
      * @return A new service loader
      */
     public static <S> SoftServiceLoader<S> load(Class<S> service,
-                                                ClassLoader loader) {
+                                                @Nullable ClassLoader loader) {
         return new SoftServiceLoader<>(service, loader);
     }
 
@@ -100,8 +100,8 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
      * @return A new service loader
      */
     public static <S> SoftServiceLoader<S> load(Class<S> service,
-                                                ClassLoader loader,
-                                                Predicate<String> condition) {
+                                                @Nullable ClassLoader loader,
+                                                @Nullable Predicate<String> condition) {
         return new SoftServiceLoader<>(service, loader, condition);
     }
 

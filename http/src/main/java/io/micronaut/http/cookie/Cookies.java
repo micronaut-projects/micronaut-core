@@ -16,6 +16,7 @@
 package io.micronaut.http.cookie;
 
 import io.micronaut.core.convert.value.ConvertibleValues;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Optional;
 import java.util.Set;
@@ -48,7 +49,7 @@ public interface Cookies extends ConvertibleValues<Cookie> {
      * @param name The name of the cookie
      * @return The Cookie instance
      */
-    default Cookie get(CharSequence name) {
+    default @Nullable Cookie get(CharSequence name) {
         return findCookie(name).orElse(null);
     }
 

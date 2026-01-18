@@ -68,7 +68,7 @@ public class AbstractExecutor<C> implements ApplicationContextProvider, Closeabl
      * @return The function name
      */
     protected String resolveFunctionName(Environment env) {
-        return env.getProperty(LocalFunctionRegistry.FUNCTION_NAME, String.class, (String) null);
+        return env.getProperty(LocalFunctionRegistry.FUNCTION_NAME, String.class).orElse(null);
     }
 
     /**

@@ -47,11 +47,11 @@ public class ConcatenatingSubscriber implements BufferConsumer.Upstream, CoreSub
     private long forwarded;
     private long consumed;
 
-    private Subscription subscription;
+    private @Nullable Subscription subscription;
     private boolean cancelled;
     private volatile boolean disregardBackpressure;
     private boolean first = true;
-    private BufferConsumer.Upstream currentComponent;
+    private BufferConsumer.@Nullable Upstream currentComponent;
     private boolean start = false;
     private boolean delayedSubscriberCompletion = false;
     private boolean currentComponentDone = false;
@@ -216,7 +216,9 @@ public class ConcatenatingSubscriber implements BufferConsumer.Upstream, CoreSub
             currentComponent.onBytesConsumed(bytesConsumed);
         } else if (requestNewComponent) {
             // Previous component is now fully consumed, request a new one.
-            subscription.request(1);
+            if (subscription != null) {
+                subscription.request(1);
+            }
         }
     }
 
@@ -271,14 +273,19 @@ public class ConcatenatingSubscriber implements BufferConsumer.Upstream, CoreSub
             onComplete();
         } else if (requestNextComponent) {
             // current component completed. request the next ByteBody
-            subscription.request(1);
+            if (subscription != null) {
+                subscription.request(1);
+            }
         }
         // if requestNextComponent is false, then the last component has not been fully consumed yet. we'll request the next later.
     }
 
     @Override
     public final void error(Throwable e) {
-        subscription.cancel();
+        Subscription s = subscription;
+        if (s != null) {
+            s.cancel();
+        }
         forwardError(e);
     }
 

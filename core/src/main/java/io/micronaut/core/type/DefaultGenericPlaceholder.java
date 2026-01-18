@@ -44,7 +44,7 @@ final class DefaultGenericPlaceholder<T>
             Class<T> type,
             @Nullable String name,
             @Nullable AnnotationMetadata annotationMetadata,
-            Argument<?>... genericTypes) {
+            Argument<?> @Nullable ... genericTypes) {
         super(type, name, annotationMetadata, genericTypes);
         this.variableName = name;
     }

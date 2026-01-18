@@ -288,6 +288,7 @@ public sealed interface ConfigurationPath
         /**
          * @return The configuration type
          */
+        @Nullable
         Class<?> type();
 
         /**

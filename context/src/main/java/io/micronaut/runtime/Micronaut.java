@@ -196,12 +196,12 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     }
 
     @Override
-    public Micronaut include(@Nullable String... configurations) {
+    public Micronaut include(String @Nullable ... configurations) {
         return (Micronaut) super.include(configurations);
     }
 
     @Override
-    public Micronaut exclude(@Nullable String... configurations) {
+    public Micronaut exclude(String @Nullable ... configurations) {
         return (Micronaut) super.exclude(configurations);
     }
 
@@ -231,7 +231,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     }
 
     @Override
-    public Micronaut singletons(Object... beans) {
+    public Micronaut singletons(Object @Nullable ... beans) {
         return (Micronaut) super.singletons(beans);
     }
 

@@ -79,7 +79,7 @@ public record MatchesPropertyCondition(String property,
                     yield result;
                 }
                 case PATTERN -> {
-                    boolean result = resolved != null && resolved.matches(value);
+                    boolean result = resolved != null && resolved.matches(Objects.requireNonNull(value, "Regexp is required"));
                     if (!result) {
                         context.fail("Property [" + property + "] with value [" + resolved + "] does not match required pattern: " + value);
                     }
@@ -92,7 +92,8 @@ public record MatchesPropertyCondition(String property,
         return false;
     }
 
-    private String resolvePropertyValue(String property, PropertyResolver propertyResolver, String defaultValue) {
+    @Nullable
+    private String resolvePropertyValue(String property, PropertyResolver propertyResolver, @Nullable String defaultValue) {
         return propertyResolver.getProperty(property, ConversionContext.STRING).orElse(defaultValue);
     }
 

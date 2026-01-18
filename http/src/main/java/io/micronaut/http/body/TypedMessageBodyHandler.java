@@ -31,5 +31,6 @@ public interface TypedMessageBodyHandler<T> extends MessageBodyHandler<T>, Typed
     /**
      * @return The body type.
      */
+    @Override
     Argument<T> getType();
 }

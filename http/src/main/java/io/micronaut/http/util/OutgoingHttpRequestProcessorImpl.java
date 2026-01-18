@@ -18,6 +18,7 @@ package io.micronaut.http.util;
 import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpRequest;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Optional;
 
@@ -50,7 +51,7 @@ public class OutgoingHttpRequestProcessorImpl implements OutgoingHttpRequestProc
      * @param uri The URI of the request being processed
      * @return true if the request should be processed
      */
-    public boolean shouldProcessRequest(OutgoingRequestProcessorMatcher matcher, String serviceId, String uri) {
+    public boolean shouldProcessRequest(OutgoingRequestProcessorMatcher matcher, @Nullable String serviceId, @Nullable String uri) {
         if (matcher.getServiceIdPattern() != null && serviceId != null && matcher.getServiceIdPattern().matcher(serviceId).matches()) {
             return true;
         }
