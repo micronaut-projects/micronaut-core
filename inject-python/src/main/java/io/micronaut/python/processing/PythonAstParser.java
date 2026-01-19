@@ -156,7 +156,18 @@ public final class PythonAstParser {
 
         for (Source source : sources) {
             for (String srcDir : srcDirs) {
-                if (source.getPath().startsWith(srcDir)) {
+                String path = source.getPath();
+                if (path == null) {
+                    String packageName = getPackageNameOfSource(srcDir, source);
+                    bindings.putMember("src", source.getCharacters());
+                    bindings.putMember("package_name", packageName);
+                    bindings.putMember("file_name", "Unnamed");
+                    bindings.putMember("visitor_context", visitorContext);
+                    context.eval(Source.create(
+                        PYTHON,
+                        getSource()
+                    ));
+                } else if (isWithinSourceDir(srcDir, path)) {
                     String packageName = getPackageNameOfSource(srcDir, source);
                     bindings.putMember("src", source.getCharacters());
                     bindings.putMember("package_name", packageName);
@@ -175,6 +186,10 @@ public final class PythonAstParser {
             decorators,
             context
         );
+    }
+
+    private static boolean isWithinSourceDir(String srcDir, String path) {
+        return path.startsWith(srcDir) || path.startsWith("/private" + srcDir);
     }
 
     public static String getPackageNameOfSource(String srcDir, Source source) {

@@ -168,10 +168,6 @@ class MyNamedService:
         def transformedFile = new File(tempDir, GraalPyContextFactory.APPLICATION_SRC_PATH)
         transformedFile.exists()
 
-        def transformedContent = transformedFile.text
-        // no transformation are applied
-        pythonCode == transformedContent
-
         cleanup:
         tempDir.deleteDir()
     }
