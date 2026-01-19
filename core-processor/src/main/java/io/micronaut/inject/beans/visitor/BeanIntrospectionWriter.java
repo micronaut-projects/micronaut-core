@@ -613,7 +613,14 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
             classDefBuilder.addField(beanPropertiesField);
             ClassTypeDef beanPropertyRefType = ClassTypeDef.of(AbstractInitializableBeanIntrospection.BeanPropertyRef.class);
             List<ExpressionDef> propsExpressions = new ArrayList<>();
+            Set<String> processedPropertyNames = new HashSet<>();
             for (BeanPropertyData beanProperty : beanProperties) {
+                // Skip duplicate properties
+                if (processedPropertyNames.contains(beanProperty.name)) {
+                    continue;
+                }
+                processedPropertyNames.add(beanProperty.name);
+
                 MethodDef metadataMethod = MethodDef.builder("$property$" + beanProperty.name + "$metadata")
                     .addModifiers(Modifier.PRIVATE, Modifier.STATIC)
                     .returns(beanPropertyRefType)

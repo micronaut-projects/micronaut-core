@@ -2489,4 +2489,31 @@ class MyMessage: Message()
         then:
         noExceptionThrown()
     }
+
+    void "test create bean introspection for duplicate properties from multiples interfaces"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.C','''
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+interface A {
+    val foo: String
+}
+
+interface B {
+    val foo: String
+}
+
+@Introspected
+class C(
+    override val foo: String
+) : A, B
+''')
+        when:
+        def properties = introspection.getBeanProperties()
+
+        then:
+        properties.size() == 1
+    }
 }
