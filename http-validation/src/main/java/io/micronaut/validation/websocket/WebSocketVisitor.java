@@ -48,6 +48,7 @@ public class WebSocketVisitor implements TypeElementVisitor<WebSocketComponent, 
     private static final String WEB_SOCKET_COMPONENT = "io.micronaut.websocket.annotation.WebSocketComponent";
     private static final String WEB_SOCKET_SESSION = "io.micronaut.websocket.WebSocketSession";
     private static final String HTTP_REQUEST = "io.micronaut.http.HttpRequest";
+    private static final String AUTHENTICATION = "io.micronaut.security.authentication.Authentication";
     private static final String CLOSE_REASON = "io.micronaut.websocket.CloseReason";
     private static final String ON_OPEN = "io.micronaut.websocket.annotation.OnOpen";
     private static final String ON_CLOSE = "io.micronaut.websocket.annotation.OnClose";
@@ -65,7 +66,7 @@ public class WebSocketVisitor implements TypeElementVisitor<WebSocketComponent, 
     @Override
     public Set<String> getSupportedAnnotationNames() {
         return CollectionUtils.setOf(
-                WebSocketComponent.class.getName()
+            WebSocketComponent.class.getName()
         );
     }
 
@@ -87,29 +88,29 @@ public class WebSocketVisitor implements TypeElementVisitor<WebSocketComponent, 
 
             if (element.hasAnnotation(ON_OPEN)) {
                 for (ParameterElement parameter : parameters) {
-                    if (isInvalidParameter(variables, parameter, WEB_SOCKET_SESSION, HTTP_REQUEST)) {
-                        context.fail("Parameter to @OnOpen must either be a URI variable, a WebSocketSession , the HttpRequest, or annotated with an HTTP binding annotation (such as @Header)", parameter);
+                    if (isInvalidParameter(variables, parameter, WEB_SOCKET_SESSION, HTTP_REQUEST, AUTHENTICATION)) {
+                        context.fail("Parameter to @OnOpen must either be a URI variable, a WebSocketSession, an Authentication, the HttpRequest, or annotated with an HTTP binding annotation (such as @Header)", parameter);
                         break;
                     }
                 }
             } else if (element.hasAnnotation(ON_CLOSE)) {
                 for (ParameterElement parameter : parameters) {
-                    if (isInvalidParameter(variables, parameter, WEB_SOCKET_SESSION, CLOSE_REASON)) {
-                        context.fail("Parameter to @OnClose must either be a URI variable, a CloseReason, a WebSocketSession or annotated with an HTTP binding annotation (such as @Header)", parameter);
+                    if (isInvalidParameter(variables, parameter, WEB_SOCKET_SESSION, CLOSE_REASON, AUTHENTICATION)) {
+                        context.fail("Parameter to @OnClose must either be a URI variable, a CloseReason, an Authentication, a WebSocketSession or annotated with an HTTP binding annotation (such as @Header)", parameter);
                         break;
                     }
                 }
             } else if (element.hasAnnotation(ON_ERROR)) {
                 for (ParameterElement parameter : parameters) {
-                    if (isInvalidParameter(variables, parameter, WEB_SOCKET_SESSION, Throwable.class.getName())) {
-                        context.fail("Parameter to @OnError must either be a URI variable, a Throwable, a WebSocketSession or annotated with an HTTP binding annotation (such as @Header)", parameter);
+                    if (isInvalidParameter(variables, parameter, WEB_SOCKET_SESSION, AUTHENTICATION, Throwable.class.getName())) {
+                        context.fail("Parameter to @OnError must either be a URI variable, a Throwable, an Authentication, a WebSocketSession or annotated with an HTTP binding annotation (such as @Header)", parameter);
                         break;
                     }
                 }
             } else if (element.hasAnnotation(ON_MESSAGE)) {
                 List<ParameterElement> bodyParameters = new ArrayList<>(3);
                 for (ParameterElement parameter : parameters) {
-                    if (isInvalidParameter(variables, parameter, WEB_SOCKET_SESSION)) {
+                    if (isInvalidParameter(variables, parameter, WEB_SOCKET_SESSION, AUTHENTICATION)) {
                         // potential body parameter
                         bodyParameters.add(parameter);
                     }
