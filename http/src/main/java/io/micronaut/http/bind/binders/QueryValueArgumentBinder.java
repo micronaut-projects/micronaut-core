@@ -153,8 +153,9 @@ public class QueryValueArgumentBinder<T> extends AbstractArgumentBinder<T> imple
                                       Argument<T> argument) {
         Optional<BeanIntrospection<T>> introspectionOpt = BeanIntrospector.SHARED.findIntrospection(argument.getType());
         if (introspectionOpt.isEmpty()) {
-            Optional<ConversionError> error = context.getLastError();
-            if (error.isPresent()) {
+            // If bindPojo couldn't bind, propagate error from bindSimple if exists
+            if (context.hasErrors()) {
+                Optional<ConversionError> error = context.getLastError();
                 return propagateConversionError(error);
             }
             return BindingResult.unsatisfied();
@@ -189,8 +190,7 @@ public class QueryValueArgumentBinder<T> extends AbstractArgumentBinder<T> imple
                 if (conversionError != null) {
                     Exception cause = conversionError.getCause();
                     context.reject(builderArg, cause);
-                    Optional<ConversionError> error = context.getLastError();
-                    return propagateConversionError(error);
+                    return propagateConversionError(context.getLastError());
                 }
             }
         }
@@ -199,8 +199,7 @@ public class QueryValueArgumentBinder<T> extends AbstractArgumentBinder<T> imple
             T instance = introspectionBuilder.build();
             return () -> Optional.of(instance);
         } catch (Exception e) {
-            context.reject(argument, e);
-            return propagateConversionError(context.getLastError());
+            return BindingResult.unsatisfied();
         }
     }
 
