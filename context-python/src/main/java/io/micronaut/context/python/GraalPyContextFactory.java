@@ -75,6 +75,8 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
         try {
             var classLoader = applicationContext.getClassLoader();
             var beacon = findBeacon(classLoader);
+            System.setProperty("org.graalvm.python.vfs.allow_multiple", "true");
+            System.setProperty("org.graalvm.python.vfs.multiple_vfs_checks_as_warning", "true");
             var builder = GraalPyResources.contextBuilder(VirtualFileSystem.newBuilder()
                     .resourceDirectory(APPLICATION_PATH)
                     .resourceLoadingClass(beacon).build())
