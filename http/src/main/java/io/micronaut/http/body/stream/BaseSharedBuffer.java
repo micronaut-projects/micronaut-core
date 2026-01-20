@@ -21,7 +21,6 @@ import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.io.buffer.ReadBufferFactory;
 import io.micronaut.http.body.ByteBody;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,6 +56,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
     /**
      * Any stream error.
      */
+    @Nullable
     private Throwable error;
     /**
      * Number of reserved subscriber spots. A new subscription MUST be preceded by a
@@ -66,10 +66,12 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
     /**
      * Active subscribers.
      */
+    @Nullable
     private List<BufferConsumer> subscribers;
     /**
      * Active subscribers that need the fully buffered body.
      */
+    @Nullable
     private List<DelayedExecutionFlow<ReadBuffer>> fullSubscribers;
     /**
      * This flag is only used in tests, to verify that the BufferConsumer methods arent called
@@ -90,7 +92,9 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      * If not all {@link #subscribers} are ready or there are {@link #fullSubscribers}, this list
      * buffers input data.
      */
+    @Nullable
     private List<ReadBuffer> buffer;
+    @Nullable
     private Exception bufferSizeExceeded = null;
 
     public BaseSharedBuffer(ReadBufferFactory readBufferFactory, BodySizeLimits limits, BufferConsumer.Upstream rootUpstream) {
@@ -111,7 +115,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      *
      * @param sizeLimitTrackers The additional tracker
      */
-    public void addSizeLimitTrackers(SizeLimitTracker.@NonNull TrackerPair sizeLimitTrackers) {
+    public void addSizeLimitTrackers(SizeLimitTracker.TrackerPair sizeLimitTrackers) {
         this.sizeLimitTrackers = SizeLimitTracker.combine(this.sizeLimitTrackers, sizeLimitTrackers);
     }
 
@@ -130,7 +134,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         return rootUpstream;
     }
 
-    public final void setExpectedLengthFrom(String contentLength) {
+    public final void setExpectedLengthFrom(@Nullable String contentLength) {
         if (contentLength == null) {
             return;
         }
