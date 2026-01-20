@@ -336,7 +336,11 @@ public class IOUtils {
         if (p.endsWith(path)) {
             Path subpath = Paths.get(path);
             for (int i = 0; i < subpath.getNameCount(); i++) {
-                p = p.getParent();
+                Path parent = p.getParent();
+                if (parent == null) {
+                    break;
+                }
+                p = parent;
             }
             uri = p.toUri();
         }

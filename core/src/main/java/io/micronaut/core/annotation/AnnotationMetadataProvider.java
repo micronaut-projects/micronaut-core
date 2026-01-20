@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 package io.micronaut.core.annotation;
+import org.jspecify.annotations.Nullable;
+
 import java.lang.annotation.Annotation;
 import java.util.Optional;
 
@@ -35,6 +37,7 @@ public interface AnnotationMetadataProvider extends AnnotationSource {
     }
 
     @Override
+    @Nullable
     default <T extends Annotation> T synthesize(Class<T> annotationClass) {
         return getAnnotationMetadata().synthesize(annotationClass);
     }
@@ -60,6 +63,7 @@ public interface AnnotationMetadataProvider extends AnnotationSource {
     }
 
     @Override
+    @Nullable
     default <T extends Annotation> T synthesizeDeclared(Class<T> annotationClass) {
         return getAnnotationMetadata().synthesizeDeclared(annotationClass);
     }

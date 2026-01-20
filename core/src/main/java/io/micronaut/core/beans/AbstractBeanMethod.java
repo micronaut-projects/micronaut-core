@@ -49,12 +49,11 @@ public abstract class AbstractBeanMethod<B, T> implements BeanMethod<B, T> {
      * @param arguments The argument types
      */
     @UsedByGeneratedCode
-    protected AbstractBeanMethod(
- BeanIntrospection<B> introspection,
- Argument<T> returnType,
- String name,
-            @Nullable AnnotationMetadata annotationMetadata,
-            @Nullable Argument<?>... arguments) {
+    protected AbstractBeanMethod(BeanIntrospection<B> introspection,
+                                 Argument<T> returnType,
+                                 String name,
+                                 @Nullable AnnotationMetadata annotationMetadata,
+                                 Argument<?> @Nullable ... arguments) {
         this.introspection = introspection;
         this.name = name;
         this.annotationMetadata = annotationMetadata == null ? AnnotationMetadata.EMPTY_METADATA : annotationMetadata;
@@ -109,6 +108,7 @@ public abstract class AbstractBeanMethod<B, T> implements BeanMethod<B, T> {
 
     @SuppressWarnings("java:S2638")
     @Override
+    @Nullable
     public T invoke(B instance, @Nullable Object... arguments) {
         return invokeInternal(instance, arguments);
     }
@@ -121,5 +121,6 @@ public abstract class AbstractBeanMethod<B, T> implements BeanMethod<B, T> {
      */
     @UsedByGeneratedCode
     @Internal
-    protected abstract T invokeInternal(B instance, Object... arguments);
+    @Nullable
+    protected abstract T invokeInternal(B instance, @Nullable Object... arguments);
 }

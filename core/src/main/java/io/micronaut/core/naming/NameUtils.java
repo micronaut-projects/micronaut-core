@@ -17,9 +17,10 @@ package io.micronaut.core.naming;
 
 import io.micronaut.core.annotation.AccessorsStyle;
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.StringUtils;
+import org.jetbrains.annotations.Contract;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Locale;
 import java.util.regex.Pattern;
@@ -577,6 +578,7 @@ public class NameUtils {
      * @param name The String to decapitalize
      * @return The decapitalized version of the String
      */
+    @Contract("!null -> !null")
     public static @Nullable String decapitalize(@Nullable String name) {
         if (name == null) {
             return null;

@@ -85,7 +85,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param retentionPolicy The retention policy
      */
     @Internal
-    AnnotationValueBuilder(AnnotationValue<T> value, RetentionPolicy retentionPolicy) {
+    AnnotationValueBuilder(AnnotationValue<T> value, @Nullable RetentionPolicy retentionPolicy) {
         this.annotationName = value.getAnnotationName();
         this.values.putAll(value.getValues());
         this.defaultValues = value.getDefaultValues();

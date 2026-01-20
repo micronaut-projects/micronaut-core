@@ -52,7 +52,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
     private static final MethodType VOID_TYPE = MethodType.methodType(void.class);
     private final Class<S> serviceType;
     private final ClassLoader classLoader;
-    private Collection<ServiceDefinition<S>> servicesForIterator;
+    private @Nullable Collection<ServiceDefinition<S>> servicesForIterator;
     private final Predicate<String> condition;
     private boolean allowFork = true;
 
@@ -60,7 +60,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
         this(serviceType, classLoader, (String name) -> true);
     }
 
-    private SoftServiceLoader(Class<S> serviceType, @Nullable ClassLoader classLoader, Predicate<String> condition) {
+    private SoftServiceLoader(Class<S> serviceType, @Nullable ClassLoader classLoader, @Nullable Predicate<String> condition) {
         this.serviceType = serviceType;
         this.classLoader = classLoader == null ? ClassLoader.getSystemClassLoader() : classLoader;
         this.condition = condition == null ? (String name) -> true : condition;
@@ -175,7 +175,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
 
     private void collectDynamicServices(
             Collection<S> values,
-            Predicate<S> predicate,
+            @Nullable Predicate<S> predicate,
             String name) {
         ServiceCollector<S> collector = newCollector(name, condition, classLoader, className -> {
             try {
@@ -197,7 +197,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
         collector.collect(values, allowFork);
     }
 
-    private void collectStaticServices(Collection<S> values, Predicate<S> predicate, StaticServiceLoader<S> loader) {
+    private void collectStaticServices(Collection<S> values, @Nullable Predicate<S> predicate, StaticServiceLoader<S> loader) {
         values.addAll(loader.load(predicate));
     }
 
@@ -225,7 +225,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
      * @param predicate The predicated to filter the instances or null if not needed.
      * @return The instances of this service.
      */
-    public List<S> collectAll(Predicate<S> predicate) {
+    public List<S> collectAll(@Nullable Predicate<S> predicate) {
         List<S> values = new ArrayList<>();
         collectAll(values, predicate);
         return values;
@@ -265,7 +265,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
      * @param loadedClass The loaded class
      * @return The service definition
      */
-    private ServiceDefinition<S> createService(String name, Class<S> loadedClass) {
+    private ServiceDefinition<S> createService(String name, @Nullable Class<S> loadedClass) {
         return new DefaultServiceDefinition<>(name, loadedClass);
     }
 
@@ -339,11 +339,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
         default void collect(Consumer<? super S> consumer) {
             List<S> values = new ArrayList<>();
             collect(values);
-            values.forEach(e -> {
-                if (e != null) {
-                    consumer.accept(e);
-                }
-            });
+            values.forEach(consumer);
         }
     }
 
@@ -355,12 +351,12 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
     public interface StaticServiceLoader<S> {
         Stream<StaticDefinition<S>> findAll(Predicate<String> predicate);
 
-        default List<S> load(Predicate<S> predicate) {
+        default List<S> load(@Nullable Predicate<S> predicate) {
             return load(n -> true, predicate);
         }
 
-        default List<S> load(Predicate<String> condition, Predicate<S> predicate) {
-            return findAll(condition)
+        default List<S> load(@Nullable Predicate<String> condition, @Nullable Predicate<S> predicate) {
+            return findAll(condition == null ? n -> true : condition)
                     .map(ServiceDefinition::load)
                     .filter(s -> predicate == null || predicate.test(s))
                     .toList();

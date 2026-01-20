@@ -125,7 +125,7 @@ public class DefaultFileSystemResourceLoader implements FileSystemResourceLoader
     @SuppressWarnings("MagicNumber")
     private static String normalize(String path) {
         if (path == null) {
-            return null;
+            return "";
         }
         if (path.startsWith("file:")) {
             path = path.substring(5);
@@ -152,7 +152,7 @@ public class DefaultFileSystemResourceLoader implements FileSystemResourceLoader
 
     private static final class BaseDir {
         final boolean exists;
-        final Path dir;
+        final @org.jspecify.annotations.Nullable Path dir;
 
         BaseDir() {
             exists = true;

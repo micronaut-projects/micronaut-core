@@ -122,6 +122,7 @@ final class ImmutableSortedStringsArrayMap<V> implements Map<String, V> {
     }
 
     @Override
+    @Nullable
     public V get(Object key) {
         Objects.requireNonNull(key);
         int keyIndex = findKeyIndex(key);

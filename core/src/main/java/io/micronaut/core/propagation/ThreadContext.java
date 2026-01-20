@@ -18,6 +18,8 @@ package io.micronaut.core.propagation;
 import io.micronaut.core.annotation.Internal;
 import io.netty.util.concurrent.FastThreadLocal;
 import io.netty.util.concurrent.FastThreadLocalThread;
+import org.jspecify.annotations.NullUnmarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * This class holds the {@link ThreadLocal} for the propagated context, or the
@@ -30,6 +32,7 @@ import io.netty.util.concurrent.FastThreadLocalThread;
 @Internal
 @SuppressWarnings("unchecked")
 final class ThreadContext {
+    @Nullable
     private static final Object FAST;
     private static final ThreadLocal<PropagatedContextImpl> SLOW = new ThreadLocal<>() {
         @Override
@@ -52,6 +55,7 @@ final class ThreadContext {
         return FAST == null || !(Thread.currentThread() instanceof FastThreadLocalThread);
     }
 
+    @NullUnmarked
     static void remove() {
         if (useSlow()) {
             SLOW.remove();
@@ -60,6 +64,8 @@ final class ThreadContext {
         }
     }
 
+    @Nullable
+    @NullUnmarked
     static PropagatedContextImpl get() {
         if (useSlow()) {
             return SLOW.get();
@@ -68,6 +74,7 @@ final class ThreadContext {
         }
     }
 
+    @NullUnmarked
     static void set(PropagatedContextImpl value) {
         if (useSlow()) {
             SLOW.set(value);

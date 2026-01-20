@@ -22,6 +22,7 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.AnsiColour;
 import io.micronaut.core.util.ArrayUtils;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
@@ -254,6 +255,7 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
             }
 
             @Override
+            @Nullable
             public Type getOwnerType() {
                 return null;
             }

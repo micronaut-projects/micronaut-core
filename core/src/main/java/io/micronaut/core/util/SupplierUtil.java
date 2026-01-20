@@ -15,6 +15,8 @@
  */
 package io.micronaut.core.util;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.Optional;
 import java.util.function.Supplier;
 
@@ -33,12 +35,14 @@ public class SupplierUtil {
      * @param <T> The type of result
      * @return A new supplier that will cache the result
      */
-    public static <T> Supplier<T> memoized(Supplier<T> valueSupplier) {
+    public static <T> Supplier<T> memoized(Supplier<@Nullable T> valueSupplier) {
         return new Supplier<>() {
             private volatile boolean initialized;
+            @Nullable
             private T value; // Doesn't need to be volatile
 
             @Override
+            @Nullable
             public T get() {
                 // Double check locking
                 if (!initialized) {
@@ -65,11 +69,13 @@ public class SupplierUtil {
      * @param <T> The type of result
      * @return A new supplier that will cache the result
      */
-    public static <T> Supplier<T> memoizedNonEmpty(Supplier<T> valueSupplier) {
+    public static <T> Supplier<T> memoizedNonEmpty(Supplier<@Nullable T> valueSupplier) {
         return new Supplier<>() {
             private volatile boolean initialized;
+            @Nullable
             private T value; // Doesn't need to be volatile
 
+            @Nullable
             @Override
             public T get() {
                 // Double check locking

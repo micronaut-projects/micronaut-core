@@ -17,6 +17,7 @@ package io.micronaut.core.annotation;
 
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.util.ArgumentUtils;
+import org.jspecify.annotations.Nullable;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -36,9 +37,11 @@ public final class AnnotationClassValue<T> implements CharSequence, Named {
      */
     public static final AnnotationClassValue<?>[] ZERO_ANNOTATION_CLASS_VALUES = new AnnotationClassValue[0];
 
+    @Nullable
     final Class<T> theClass;
 
     private final String name;
+    @Nullable
     private final T instance;
     private final boolean instantiated;
 

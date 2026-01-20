@@ -49,5 +49,5 @@ public interface Executable<T, R> extends AnnotationMetadataProvider {
      * @param arguments The arguments
      * @return The result
      */
-    @Nullable R invoke(@Nullable T instance, @Nullable Object... arguments);
+    @Nullable R invoke(T instance, @Nullable Object... arguments);
 }
