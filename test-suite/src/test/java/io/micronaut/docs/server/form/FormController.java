@@ -1,22 +1,18 @@
 package io.micronaut.docs.server.form;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.async.publisher.Publishers;
-import io.micronaut.core.convert.ConversionService;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
-import io.micronaut.http.annotation.Produces;
+import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.multipart.CompletedFileUpload;
 import io.micronaut.http.multipart.PartData;
 import io.micronaut.http.multipart.StreamingFileUpload;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
-import io.micronaut.core.async.annotation.SingleResult;
 import org.reactivestreams.Publisher;
-import org.reactivestreams.Subscriber;
-import org.reactivestreams.Subscription;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -32,6 +28,17 @@ import java.util.stream.Collectors;
 @Controller("/form")
 public class FormController {
 //end::class[]
+
+    //tag::String[]
+    @Consumes(MediaType.MULTIPART_FORM_DATA)
+    @Post("/string")
+    public String setUserName(int userId, String userName) {
+        if (!userName.matches("[a-z]+")) {
+            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Invalid username");
+        }
+        return "New user name for user ID " + userId + ": " + userName;
+    }
+    //end::String[]
 
 //tag::CompletedFileUpload[]
     @Consumes(MediaType.MULTIPART_FORM_DATA)

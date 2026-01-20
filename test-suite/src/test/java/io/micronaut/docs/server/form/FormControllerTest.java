@@ -16,6 +16,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 public class FormControllerTest {
 
     @Test
+    void testString(@Client("/") HttpClient httpClient) {
+        assertEquals("New user name for user ID 5: yawkat", httpClient.toBlocking().retrieve((HttpRequest<?>) HttpRequest.POST("/form/string", MultipartBody.builder()
+            .addPart("userId", "5")
+            .addPart("userName", "yawkat")
+            .build()).contentType(MediaType.MULTIPART_FORM_DATA)));
+    }
+
+    @Test
     void testFileUpload(@Client("/") HttpClient httpClient) {
         assertEquals("Uploaded avatar for user 5: 16 bytes", httpClient.toBlocking().retrieve((HttpRequest<?>) HttpRequest.POST("/form/file-upload", MultipartBody.builder()
             .addPart("userId", "5")
