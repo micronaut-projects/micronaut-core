@@ -2515,5 +2515,12 @@ class C(
 
         then:
         properties.size() == 1
+
+        and:
+        def value = "bar"
+        def bean = introspection.instantiate(value)
+
+        expect:
+        bean.getFoo() == value
     }
 }

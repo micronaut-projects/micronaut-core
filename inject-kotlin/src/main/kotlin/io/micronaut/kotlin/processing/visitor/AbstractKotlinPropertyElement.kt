@@ -15,6 +15,9 @@
  */
 package io.micronaut.kotlin.processing.visitor
 
+import com.google.devtools.ksp.getAllSuperTypes
+import com.google.devtools.ksp.symbol.ClassKind
+import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import io.micronaut.core.annotation.AnnotationMetadata
@@ -25,7 +28,6 @@ import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.ParameterElement
 import io.micronaut.inject.ast.PropertyElement
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
-import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate
 import io.micronaut.inject.ast.annotation.PropertyElementAnnotationMetadata
 import java.util.*
 
@@ -74,8 +76,16 @@ internal abstract class AbstractKotlinPropertyElement<T : KotlinNativeElement>(
         val overriddenNativeType = overridden.nativeType.element
         if (nativeType == overriddenNativeType) {
             return false
-        } else if (nativeType is KSPropertyDeclaration) {
-            return overriddenNativeType == nativeType.findOverridee()
+        } else if (nativeType is KSPropertyDeclaration && overriddenNativeType is KSPropertyDeclaration) {
+            val declaration = nativeType.parentDeclaration as? KSClassDeclaration
+            val overriddenDeclaration = overriddenNativeType.parentDeclaration as? KSClassDeclaration
+
+            return if (declaration?.classKind == ClassKind.CLASS && overriddenDeclaration?.classKind == ClassKind.INTERFACE) {
+                // manually check overridden properties of interfaces as findOverridee() only works for the first declared interface
+                declaration.getAllSuperTypes().any { superType -> superType.declaration == overriddenDeclaration }
+            } else {
+                overriddenNativeType == nativeType.findOverridee()
+            }
         }
         return false
     }
