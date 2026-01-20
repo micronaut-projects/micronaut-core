@@ -18,6 +18,7 @@ package io.micronaut.python.annotation.processing.test
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanIntrospection
+import io.micronaut.python.compiler.Serdeable
 
 /**
  * Tests for Python bean introspection.
@@ -142,6 +143,45 @@ class TestPropertyClass:
         instance.full_name() == 'John Doe'
         // Note: Property access will depend on whether getters/setters are properly generated
         // This test verifies the basic structure is in place
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test @Serdeable on Python @dataclass"() {
+        given:
+        def pythonCode = '''
+from micronaut.core.annotation import Introspected
+from dataclasses import dataclass
+from micronaut.python.compiler import Serdeable
+
+@Serdeable
+@dataclass
+class SerdeableDataClass:
+    name: str
+    age: int = 25
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def introspection = getBeanIntrospection(context, "python.SerdeableDataClass")
+
+        then:
+        introspection != null
+        introspection.hasStereotype(Serdeable.Serializable)
+        introspection.hasStereotype(Serdeable.Deserializable)
+        introspection.getBeanType().getSimpleName() == "SerdeableDataClass"
+        introspection.getPropertyNames().length == 2
+        introspection.getProperty("name").isPresent()
+        introspection.getProperty("age").isPresent()
+
+        when:"instantiating with constructor arguments"
+        def instance = introspection.instantiate("John", 30)
+
+        then:"instance is created correctly"
+        instance != null
+        introspection.getRequiredProperty("name", String).get(instance) == "John"
+        introspection.getRequiredProperty("age", int).get(instance) == 30
 
         cleanup:
         context?.close()
