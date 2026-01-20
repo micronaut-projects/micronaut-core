@@ -33,6 +33,7 @@ import java.util.function.Function;
 final class NioReadBuffer extends ReadBuffer {
     private static final LeakTracker.Factory<NioReadBuffer> TRACKER_FACTORY = LeakTracker.Factory.forClass(NioReadBuffer.class);
 
+    @Nullable
     private final LeakTracker<NioReadBuffer> tracker = TRACKER_FACTORY.track(this);
 
     private final ByteBuffer buffer;

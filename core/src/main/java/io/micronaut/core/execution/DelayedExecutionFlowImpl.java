@@ -455,6 +455,7 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
 
     private static final class Cancel<E> extends Step<E, E> {
         private static final ExecutionFlow ERR = ExecutionFlow.error(new AssertionError("Should never be hit, no further steps are allowed after cancel"));
+        @Nullable
         private final Consumer<E> discard;
 
         public Cancel(@Nullable Consumer<E> discard) {

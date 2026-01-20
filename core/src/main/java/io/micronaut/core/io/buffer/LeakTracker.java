@@ -95,6 +95,7 @@ class LeakTrackerFactoryHolder {
     static boolean nettyAvailable = true;
 }
 
+@SuppressWarnings({"ReturnValueIgnored", "ResultOfMethodCallIgnored"})
 class NettyLeakTrackerFactory<T> implements LeakTracker.Factory<T> {
     private final Class<T> trackedClass;
     @Nullable
@@ -102,7 +103,6 @@ class NettyLeakTrackerFactory<T> implements LeakTracker.Factory<T> {
 
     static {
         // only allow initializing this class if netty is available
-        //noinspection ResultOfMethodCallIgnored
         ResourceLeakDetector.class.getName();
     }
 
