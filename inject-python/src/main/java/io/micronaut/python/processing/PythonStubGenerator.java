@@ -279,8 +279,16 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         builder.addMethod(MethodDef.builder(FROM_POLYGLOT_VALUE)
                             .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
                             .addParameter(POLYGLOT_VALUE)
-                            .returns(thisType).build(((aThis, methodParameters) ->
-                                thisType.instantiate(methodParameters).returning()))
+                            .returns(thisType)
+                            .build(((aThis, methodParameters) -> {
+                                var val = methodParameters.get(0);
+                                return val.invoke("isNull", TypeDef.Primitive.BOOLEAN)
+                                    .isTrue()
+                                    .doIfElse(
+                                        ExpressionDef.nullValue().returning(),
+                                        thisType.instantiate(methodParameters).returning()
+                                    );
+                            }))
                         );
                     }
 

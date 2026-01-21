@@ -85,4 +85,33 @@ class StereotypeService:
         cleanup:
         context?.close()
     }
+
+    def "method returning None maps to Java null for Python class return"() {
+        given:
+        def pythonCode = '''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+
+class Book:
+    def __init__(self, title: str):
+        self.title = title
+
+@Singleton
+class Service:
+    @Executable
+    def show(self, title: str) -> Book:
+        return None
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def bean = getBean(context, "python.Service")
+
+        then:
+        bean != null
+        bean.show("a title") == null
+
+        cleanup:
+        context?.close()
+    }
 }
