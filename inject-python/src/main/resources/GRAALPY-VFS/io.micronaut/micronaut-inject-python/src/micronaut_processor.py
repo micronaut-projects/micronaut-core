@@ -255,16 +255,16 @@ class MicronautAstVisitor(ast.NodeVisitor):
             case ast.Assign():
                 # Track java.type() assignments first
                 self._track_java_type_assignments(node)
-                # Handle class attribute assignments
-                if self.current_class is not None:
+                # Handle class attribute assignments (only at class body level, not inside methods)
+                if self.current_class is not None and not self.in_function:
                     self._handle_assign(node)
                 # Handle script attribute assignments
                 elif self.current_class is None and self._is_script_assignment(node):
                     self._handle_script_assign(node)
                 return node
             case ast.AnnAssign():
-                # Handle annotated assignments (type hints)
-                if self.current_class is not None:
+                # Handle annotated assignments (type hints) only at class body level, not inside methods
+                if self.current_class is not None and not self.in_function:
                     self._handle_ann_assign(node)
                 # Handle script attribute assignments
                 elif self.current_class is None and self._is_script_assignment(node):
