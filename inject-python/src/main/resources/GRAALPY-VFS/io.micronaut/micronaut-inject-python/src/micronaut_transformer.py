@@ -388,6 +388,10 @@ def micronaut_annotation(name, repeated=None):
         for meta_annotation_name in annotation_names:
             # Skip retention and other built-in annotations that aren't user-facing
             if not meta_annotation_name.startswith('java.lang.annotation.'):
+                # Skip nested annotations (annotations with $ in their names)
+                if '$' in meta_annotation_name:
+                    continue
+
                 # Generate decorator for the meta-annotation if not already generated
                 meta_class_element = self.callback_get_class_element(meta_annotation_name)
                 if meta_class_element and self._is_annotation_class(meta_class_element):
@@ -405,6 +409,10 @@ def micronaut_annotation(name, repeated=None):
 
         for meta_annotation_name in annotation_metadata.getAnnotationNames():
             if not meta_annotation_name.startswith('java.lang.annotation.'):
+                # Skip nested annotations (annotations with $ in their names)
+                if '$' in meta_annotation_name:
+                    continue
+
                 meta_package = '.'.join(meta_annotation_name.split('.')[:-1])
                 meta_simple_name = meta_annotation_name.split('.')[-1]
 
@@ -581,37 +589,39 @@ def {decorator_name}({param_signature}):
                             # Check if this is a method that returns an annotation type
                             if hasattr(element, 'getKind') and hasattr(element.getKind(), 'name'):
                                 if element.getKind().name() == 'METHOD':
-                                    # Get the return type
-                                    return_type = None
-                                    if hasattr(element, 'getReturnType'):
-                                        return_type = element.getReturnType()
+                                     # Get the return type
+                                     return_type = None
+                                     if hasattr(element, 'getReturnType'):
+                                         return_type = element.getReturnType()
 
-                                    if return_type and hasattr(return_type, 'toString'):
-                                        return_type_name = return_type.toString()
-                                        # Check if the return type is an annotation
-                                        nested_annotation_element = self.callback_get_class_element(return_type_name)
-                                        if nested_annotation_element and self._is_annotation_class(nested_annotation_element):
-                                            # Generate decorator for the nested annotation (use the annotation's actual name)
-                                            # We don't need a special nested-named decorator, just ensure the annotation decorator exists
-                                            # Handle nested classes by extracting the simple name after the $
-                                            full_name = nested_annotation_element.getName()
-                                            if '$' in full_name:
-                                                annotation_simple_name = full_name.split('$')[-1]
-                                            else:
-                                                annotation_simple_name = nested_annotation_element.getSimpleName()
+                                     if return_type and hasattr(return_type, 'toString'):
+                                         return_type_name = return_type.toString()
+                                         # Check if the return type is an annotation
+                                         nested_annotation_element = self.callback_get_class_element(return_type_name)
+                                         if nested_annotation_element and self._is_annotation_class(nested_annotation_element):
+                                             # Skip nested annotations (annotations defined within the current annotation)
+                                             nested_name = nested_annotation_element.getName()
+                                             if nested_name.startswith(parent_name.replace('.', '$') + '$'):
+                                                 continue
 
-                                            if annotation_simple_name not in self.generated_decorators:
-                                                # Create a modified ClassElement with the dot notation name for proper annotation name
-                                                original_name = nested_annotation_element.getName()
-                                                dot_name = original_name.replace('$', '.')
-                                                modified_annotation_name = dot_name
+                                             # Generate decorator for the nested annotation (use the annotation's actual name)
+                                             # We don't need a special nested-named decorator, just ensure the annotation decorator exists
+                                             # Handle nested classes by extracting the simple name after the $
+                                             full_name = nested_name
+                                             if '$' in full_name:
+                                                 annotation_simple_name = full_name.split('$')[-1]
+                                             else:
+                                                 annotation_simple_name = nested_annotation_element.getSimpleName()
 
-                                                # Generate the decorator with the correct annotation name
-                                                nested_decorator_code = self._generate_decorator_from_class_element_with_name(
-                                                    nested_annotation_element, annotation_simple_name, modified_annotation_name
-                                                )
-                                                if nested_decorator_code:
-                                                    self.transformed_code.append(nested_decorator_code)
+                                             if annotation_simple_name not in self.generated_decorators:
+                                                 # Create a modified ClassElement with the dot notation name for proper annotation name
+                                                 original_name = nested_annotation_element.getName()
+                                                 dot_name = original_name.replace('$', '.')
+                                                 modified_annotation_name = dot_name
+
+                                                 # Generate the decorator with the correct annotation name
+                                                 self._generate_decorator_from_class_element_with_name(
+                                                     nested_annotation_element, annotation_simple_name, modified_annotation_name)
         except Exception as e:
             print(f"Error generating nested decorators for {class_element.getName()}: {e}")
 
