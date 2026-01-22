@@ -1642,7 +1642,7 @@ def is_micronaut_decorator(funcdef, visitor=None):
             # Check decorator name
             is_target = (
                     (isinstance(dec.func, ast.Name) and dec.func.id == 'micronaut_annotation')
-                    or (isinstance(dec.func, ast.Attribute) and dec.attr == 'micronaut_annotation')
+                    or (isinstance(dec.func, ast.Attribute) and dec.func.attr == 'micronaut_annotation')
             )
             if is_target:
                 return True
