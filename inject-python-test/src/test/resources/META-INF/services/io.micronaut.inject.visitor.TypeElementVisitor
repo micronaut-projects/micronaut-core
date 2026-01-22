@@ -3,3 +3,4 @@ io.micronaut.python.annotation.processing.test.annotate.AnnotatePropertySpec$Ann
 io.micronaut.python.annotation.processing.test.annotate.AnnotateMethodParameterSpec$AnnotateMethodParameterVisitor
 io.micronaut.python.annotation.processing.test.annotate.AnnotateMethodReturnSpec$AnnotateMethodReturnVisitor
 io.micronaut.python.annotation.processing.test.annotate.AnnotateMethodSpec$AnnotationMethodVisitor
+io.micronaut.python.annotation.processing.test.visitor.AllElementsVisitor

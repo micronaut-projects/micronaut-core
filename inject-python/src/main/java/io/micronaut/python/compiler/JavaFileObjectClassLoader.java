@@ -87,10 +87,21 @@ final class JavaFileObjectClassLoader extends ClassLoader {
 
     @Override
     protected Enumeration<URL> findResources(String name) throws IOException {
-        String fileName = "/CLASS_OUTPUT/" + name;
+        String expectedPath = "/CLASS_OUTPUT/" + name;
         List<JavaFileObject> generated = new ArrayList<>();
         for (JavaFileObject file : files) {
-            if (file.getName().startsWith(fileName)) {
+            String uriPath = file.toUri() != null ? file.toUri().getPath() : null;
+            String fileName = file.getName();
+            boolean matches = false;
+            if (uriPath != null) {
+                // Typical in-memory URIs look like: mem:///CLASS_OUTPUT/META-INF/...
+                matches = uriPath.endsWith("/" + name) || uriPath.equals(expectedPath) || uriPath.contains(expectedPath);
+            }
+            if (!matches && fileName != null) {
+                // Fallback to name-based matching
+                matches = fileName.endsWith("/" + name) || fileName.contains(expectedPath);
+            }
+            if (matches) {
                 generated.add(file);
             }
         }
