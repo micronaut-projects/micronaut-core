@@ -110,11 +110,17 @@ public class PythonVisitorContext implements VisitorContext {
 
     @Override
     public Optional<GeneratedFile> visitMetaInfFile(String path, Element... originatingElements) {
+        if (javaVisitorContext != null) {
+            return javaVisitorContext.visitMetaInfFile(path, originatingElements);
+        }
         return Optional.empty();
     }
 
     @Override
     public Optional<GeneratedFile> visitGeneratedFile(String path) {
+        if (javaVisitorContext != null) {
+            return javaVisitorContext.visitGeneratedFile(path);
+        }
         return Optional.empty();
     }
 
