@@ -18,7 +18,6 @@ package io.micronaut.python.processing;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -33,7 +32,6 @@ import io.micronaut.aop.Around;
 import io.micronaut.aop.InterceptorBinding;
 import io.micronaut.aop.Introduction;
 import io.micronaut.context.annotation.Bean;
-import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Vetoed;
@@ -61,8 +59,6 @@ import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.processing.visitor.AbstractPythonClassElement;
 import io.micronaut.python.processing.visitor.PythonClassElement;
 import io.micronaut.python.processing.visitor.PythonScriptElement;
-import io.micronaut.python.processing.visitor.PythonPropertyGetterMethodElement;
-import io.micronaut.python.processing.visitor.PythonPropertySetterMethodElement;
 import io.micronaut.sourcegen.generator.SourceGenerator;
 import io.micronaut.sourcegen.generator.SourceGenerators;
 import io.micronaut.sourcegen.model.ClassDef;
@@ -74,6 +70,7 @@ import io.micronaut.sourcegen.model.ParameterDef;
 import io.micronaut.sourcegen.model.StatementDef;
 import io.micronaut.sourcegen.model.TypeDef;
 import io.micronaut.sourcegen.model.VariableDef;
+import io.micronaut.python.processing.util.ObjectHelper;
 
 public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
@@ -457,24 +454,28 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             addSetterPojo(beanProperty, builder, field);
                             addGetterPojo(beanProperty, builder, field);
                         } else {
-                            addSetterDynamic(beanProperty, builder);
-                            addGetterDynamic(beanProperty, builder);
-                            beanProperty.getWriteMethod().ifPresent(m -> {
-                                String beanStyle = beanSetterName(beanProperty.getName());
-                                if (!m.getName().equals(beanStyle)) {
-                                    addNamedSetterDynamic(beanProperty, builder);
-                                }
-                            });
-                            beanProperty.getReadMethod().ifPresent(m -> {
-                                String beanStyle = beanGetterName(beanProperty.getName(), beanProperty.getType());
-                                if (!m.getName().equals(beanStyle)) {
-                                    addNamedGetterDynamic(beanProperty, builder);
-                                }
-                            });
-                        }
-                    }
+                             addSetterDynamic(beanProperty, builder);
+                             addGetterDynamic(beanProperty, builder);
+                             beanProperty.getWriteMethod().ifPresent(m -> {
+                                 String beanStyle = beanSetterName(beanProperty.getName());
+                                 if (!m.getName().equals(beanStyle)) {
+                                     addNamedSetterDynamic(beanProperty, builder);
+                                 }
+                             });
+                             beanProperty.getReadMethod().ifPresent(m -> {
+                                 String beanStyle = beanGetterName(beanProperty.getName(), beanProperty.getType());
+                                 if (!m.getName().equals(beanStyle)) {
+                                     addNamedGetterDynamic(beanProperty, builder);
+                                 }
+                             });
+                         }
+                     }
 
-                } catch (ProcessingException e) {
+                     if (isIntrospectedBean) {
+                         ObjectHelper.addObjectMethods(builder, ClassTypeDef.of(typeName), beanProperties, propertyFields);
+                     }
+
+                 } catch (ProcessingException e) {
                     throw e;
                 } catch (Exception e) {
                     context.fail("Failed to generate stub for Python type [" + element.getSimpleName() + "]: " + e.getMessage(), null);

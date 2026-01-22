@@ -186,4 +186,59 @@ class SerdeableDataClass:
         cleanup:
         context?.close()
     }
+
+    void "equals/hashCode/toString for @Introspected Python dataclass"() {
+        given:
+        def pythonCode = '''
+from micronaut.core.annotation import Introspected
+from dataclasses import dataclass
+from typing import List
+
+@Introspected
+@dataclass
+class Address:
+    street: str
+    zip: int
+
+@Introspected
+@dataclass
+class Person:
+    name: str
+    age: int
+    tags: List[str]
+    scores: List[int]
+    address: Address
+    nums: list[int]
+'''
+        when:
+        def context = buildContext(pythonCode)
+        def personIntrospection = getBeanIntrospection(context, "python.Person")
+        def addressIntrospection = getBeanIntrospection(context, "python.Address")
+
+        then:
+        personIntrospection != null
+        addressIntrospection != null
+
+        when:
+        def addr1 = addressIntrospection.instantiate("Main", 94105)
+        def addr2 = addressIntrospection.instantiate("Main", 94105)
+        def p1 = personIntrospection.instantiate("Sally", 30, ["a","b"], [1,2], addr1, [1,2,3])
+        def p2 = personIntrospection.instantiate("Sally", 30, ["a","b"], [1,2], addr2, [1,2,3])
+
+        then:
+        p1.equals(p2)
+        p1.hashCode() == p2.hashCode()
+        p1.toString().contains("Person[")
+        p1.toString().contains("name=Sally")
+        p1.toString().contains("nums=")
+
+        when:
+        // change an array component to ensure deep equality is enforced
+        def p3 = personIntrospection.instantiate("Sally", 30, ["a","b"], [1,2], addr2, [1,2,4])
+        then:
+        !p1.equals(p3)
+
+        cleanup:
+        context?.close()
+    }
 }
