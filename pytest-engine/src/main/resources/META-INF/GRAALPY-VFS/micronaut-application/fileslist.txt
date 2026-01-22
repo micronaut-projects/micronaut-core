@@ -1,5 +1,0 @@
-/META-INF/GRAALPY-VFS/micronaut-application/src/pyronaut/test/pytest_listener.py
-/META-INF/GRAALPY-VFS/micronaut-application/src/pyronaut/test/pytest_runner.py
-/META-INF/GRAALPY-VFS/micronaut-application/src/pyronaut/test/__init__.py
-/META-INF/GRAALPY-VFS/micronaut-application/src/pyronaut/test/test.py
-/META-INF/GRAALPY-VFS/micronaut-application/src/pyronaut/__init__.py
