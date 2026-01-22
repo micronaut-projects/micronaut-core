@@ -65,7 +65,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
      */
     @io.micronaut.context.annotation.Context
     @Singleton
-    public org.graalvm.polyglot.Context graalPyContext() {
+    public org.graalvm.polyglot.Context graalPyContext(HostAccess hostAccess) {
         if (ContextHolder.isInitialized() && ContextHolder.isReuseContext()) {
             providedContext = true;
             // Reuse context: this is an optimization for reloading
@@ -88,9 +88,9 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
                 .allowCreateProcess(true)
                 .option("python.IsolateNativeModules", "true")
                 .option("python.WarnExperimentalFeatures", "false")
-                // Allow access to host classes
-                .allowHostAccess(HostAccess.ALL)
-                .allowHostClassLookup(name -> true);
+                 // Allow access to host classes
+                 .allowHostAccess(hostAccess)
+                 .allowHostClassLookup(name -> true);
             var pyEnv = System.getenv("PYENV_VERSION");
             var venv = System.getenv("VIRTUAL_ENV");
             if (pyEnv != null && venv != null && pyEnv.startsWith("graalpy")) {
