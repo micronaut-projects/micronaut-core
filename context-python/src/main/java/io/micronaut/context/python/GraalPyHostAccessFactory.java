@@ -16,6 +16,7 @@
 package io.micronaut.context.python;
 
 import io.micronaut.context.annotation.Factory;
+import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.graalvm.polyglot.HostAccess;
 import org.graalvm.polyglot.Value;
@@ -42,6 +43,7 @@ final class GraalPyHostAccessFactory {
      * @return A HostAccess configured with custom target type mappings
      */
     @Singleton
+    @Named(GraalPyRuntimeUtil.PYTHON)
     @NonNull
     HostAccess hostAccess(Collection<TargetTypeMapping<?>> mappings) {
         HostAccess.Builder builder = HostAccess.newBuilder(HostAccess.ALL);

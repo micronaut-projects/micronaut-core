@@ -21,6 +21,7 @@ import io.micronaut.context.event.BeanDestroyedEvent;
 import io.micronaut.context.event.BeanDestroyedEventListener;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.runtime.exceptions.ApplicationStartupException;
+import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.HostAccess;
@@ -65,7 +66,8 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
      */
     @io.micronaut.context.annotation.Context
     @Singleton
-    public org.graalvm.polyglot.Context graalPyContext(HostAccess hostAccess) {
+    @Named(GraalPyRuntimeUtil.PYTHON)
+    public org.graalvm.polyglot.Context graalPyContext(@Named(GraalPyRuntimeUtil.PYTHON) HostAccess hostAccess) {
         if (ContextHolder.isInitialized() && ContextHolder.isReuseContext()) {
             providedContext = true;
             // Reuse context: this is an optimization for reloading
