@@ -16,7 +16,6 @@
 package io.micronaut.http.client;
 
 import io.micronaut.aop.MethodInvocationContext;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpRequest;
 
@@ -40,7 +39,7 @@ public final class ClientAttributes {
      * @param serviceId The client service ID
      * @see io.micronaut.http.BasicHttpAttributes#getServiceId(HttpRequest)
      */
-    public static void setServiceId(@NonNull HttpRequest<?> request, @NonNull String serviceId) {
+    public static void setServiceId(HttpRequest<?> request, String serviceId) {
         request.setAttribute(HttpAttributes.SERVICE_ID, serviceId);
     }
 
@@ -51,8 +50,7 @@ public final class ClientAttributes {
      * @return The invocation context, if present
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
-    @NonNull
-    public static Optional<MethodInvocationContext<?, ?>> getInvocationContext(@NonNull HttpRequest<?> request) {
+    public static Optional<MethodInvocationContext<?, ?>> getInvocationContext(HttpRequest<?> request) {
         return (Optional) request.getAttribute(HttpAttributes.INVOCATION_CONTEXT, MethodInvocationContext.class);
     }
 
@@ -62,7 +60,7 @@ public final class ClientAttributes {
      * @param request           The request
      * @param invocationContext The invocation context
      */
-    public static void setInvocationContext(@NonNull HttpRequest<?> request, @NonNull MethodInvocationContext<?, ?> invocationContext) {
+    public static void setInvocationContext(HttpRequest<?> request, MethodInvocationContext<?, ?> invocationContext) {
         request.setAttribute(HttpAttributes.INVOCATION_CONTEXT, invocationContext);
     }
 }

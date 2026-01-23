@@ -24,7 +24,6 @@ import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
@@ -164,7 +163,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         Optional<Class<? extends Annotation>> httpMethodMapping = context.getAnnotationTypeByStereotype(HttpMethodMapping.class);
         HttpClient httpClient = clientFactory.getClient(annotationMetadata);
         if (httpMethodMapping.isPresent() && context.hasStereotype(HttpMethodMapping.class) && httpClient != null) {
-            AnnotationValue<HttpMethodMapping> mapping = context.getAnnotation(HttpMethodMapping.class);
+            AnnotationValue<HttpMethodMapping> mapping = Objects.requireNonNull(context.getAnnotation(HttpMethodMapping.class));
             String uri = mapping.getRequiredValue(String.class);
             if (StringUtils.isEmpty(uri)) {
                 uri = "/" + context.getMethodName();
@@ -224,7 +223,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             return binderResult.errorResult;
         }
 
-        MutableHttpRequest<?> request = binderResult.request;
+        MutableHttpRequest<?> request = Objects.requireNonNull(binderResult.request);
 
         if (void.class == javaReturnType || httpMethod == HttpMethod.HEAD) {
             request.getHeaders().remove(HttpHeaders.ACCEPT);
@@ -238,7 +237,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     errorType
                 ));
         } else if (void.class == javaReturnType) {
-            return handleBlockingCall(clientName, javaReturnType, () -> blockingHttpClient.exchange(request, null, errorType));
+            return handleBlockingCall(clientName, javaReturnType, () -> blockingHttpClient.exchange(request, Argument.OBJECT_ARGUMENT, errorType));
         } else {
             return handleBlockingCall(clientName, javaReturnType,
                 () -> blockingHttpClient.retrieve(request, returnType.asArgument(), errorType));
@@ -263,7 +262,9 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         Publisher<?> csPublisher = httpClientResponsePublisher(httpClient, csRequestPublisher, returnType, errorType, valueType);
         CompletableFuture<Object> future = new CompletableFuture<>();
         csPublisher.subscribe(new CompletionAwareSubscriber<Object>() {
+            @Nullable
             Object message;
+            @Nullable
             Subscription subscription;
 
             @Override
@@ -278,7 +279,9 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     this.message = message;
                 }
                 // we only want the first item
-                subscription.cancel();
+                if (subscription != null) {
+                    subscription.cancel();
+                }
                 doOnComplete();
             }
 
@@ -352,7 +355,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         return finalPublisher;
     }
 
-    @NonNull
     private RequestBinderResult bindRequest(MethodInvocationContext<Object, Object> context,
                                             HttpMethod httpMethod,
                                             String httpMethodName,
@@ -443,7 +445,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         return RequestBinderResult.withRequest(request);
     }
 
-    private void bindPathParams(List<String> uriVariables, Map<String, Object> pathParams, Object body) {
+    private void bindPathParams(List<String> uriVariables, Map<String, Object> pathParams, @Nullable Object body) {
         boolean variableSatisfied = uriVariables.isEmpty() || pathParams.keySet().containsAll(uriVariables);
         if (body != null && !variableSatisfied) {
             if (body instanceof Map<?, ?> map) {
@@ -471,16 +473,17 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     private Object bindRequestBody(MutableHttpRequest<?> request, List<Argument<?>> bodyArguments, Map<String, MutableArgumentValue<?>> parameters) {
         Object body = request.getBody().orElse(null);
         if (body == null && !bodyArguments.isEmpty()) {
-            Map<String, Object> bodyMap = new LinkedHashMap<>();
+            Map<String, @Nullable Object> bodyMap = new LinkedHashMap<>();
 
             for (Argument<?> bodyArgument : bodyArguments) {
                 String argumentName = bodyArgument.getName();
-                MutableArgumentValue<?> value = parameters.get(argumentName);
+                MutableArgumentValue<?> value = Objects.requireNonNull(parameters.get(argumentName));
+                Object argumentValue = value.getValue();
                 if (bodyArgument.getAnnotationMetadata().hasStereotype(Format.class)) {
-                    conversionService.convert(value.getValue(), ConversionContext.STRING.with(bodyArgument.getAnnotationMetadata()))
+                    conversionService.convert(argumentValue, ConversionContext.STRING.with(bodyArgument.getAnnotationMetadata()))
                         .ifPresent(v -> bodyMap.put(argumentName, v));
                 } else {
-                    bodyMap.put(argumentName, value.getValue());
+                    bodyMap.put(argumentName, argumentValue);
                 }
             }
             body = bodyMap;
@@ -489,7 +492,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         return body;
     }
 
-    @NonNull
     private ClientArgumentRequestBinder<Object> buildDefaultBinder(Map<String, Object> pathParams, List<Argument<?>> bodyArguments) {
         return (ctx, uriCtx, value, req) -> {
             Argument<?> argument = ctx.getArgument();
@@ -510,7 +512,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         };
     }
 
-    @NonNull
     private Optional<Object> bindArguments(MethodInvocationContext<Object, Object> context,
                                            Map<String, MutableArgumentValue<?>> parameters,
                                            ClientArgumentRequestBinder<Object> defaultBinder,
@@ -599,11 +600,12 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         }).switchIfEmpty(requestFlux.mapNotNull(RequestBinderResult::errorResult));
     }
 
-    private Object getValue(Argument argument,
+    @Nullable
+    private Object getValue(Argument<?> argument,
                             MethodInvocationContext<?, ?> context,
                             Map<String, MutableArgumentValue<?>> parameters) {
         String argumentName = argument.getName();
-        MutableArgumentValue<?> value = parameters.get(argumentName);
+        MutableArgumentValue<?> value = Objects.requireNonNull(parameters.get(argumentName));
 
         Object definedValue = value.getValue();
 
@@ -618,14 +620,16 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             );
         }
 
-        if (definedValue instanceof Optional optional) {
+        if (definedValue instanceof Optional<?> optional) {
             return optional.orElse(null);
         } else {
             return definedValue;
         }
     }
 
-    private Object handleBlockingCall(String clientName, Class returnType, Supplier<Object> supplier) {
+    @Nullable
+    @SuppressWarnings("ReturnValueIgnored")
+    private Object handleBlockingCall(String clientName, Class<?> returnType, Supplier<Object> supplier) {
         try {
             if (void.class == returnType) {
                 supplier.get();
@@ -679,6 +683,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         }
     }
 
+    @Nullable
     private String getClientId(AnnotationMetadata clientAnn) {
         return clientAnn.stringValue(Client.class).orElse(null);
     }
@@ -710,7 +715,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         boolean isError
     ) {
 
-        static RequestBinderResult withRequest(@NonNull MutableHttpRequest<?> request) {
+        static RequestBinderResult withRequest(MutableHttpRequest<?> request) {
             Objects.requireNonNull(request, "Bound HTTP request must not be null");
             return new RequestBinderResult(request, null, false);
         }

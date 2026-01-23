@@ -20,7 +20,6 @@ import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.ArrayUtils;
@@ -130,9 +129,9 @@ public class DefaultHttpClientFilterResolver extends BaseFilterProcessor<ClientF
         ));
     }
 
-    private boolean matchesFilterEntry(@NonNull HttpMethod method,
-                                       @NonNull String requestPath,
-                                       @NonNull FilterEntry filterEntry) {
+    private boolean matchesFilterEntry(HttpMethod method,
+                                       String requestPath,
+                                       FilterEntry filterEntry) {
         boolean matches = true;
         if (filterEntry.hasMethods()) {
             matches = anyMethodMatches(method, filterEntry.getFilterMethods());
@@ -143,8 +142,8 @@ public class DefaultHttpClientFilterResolver extends BaseFilterProcessor<ClientF
         return matches;
     }
 
-    private boolean matchesClientFilterEntry(@NonNull ClientFilterResolutionContext context,
-                                             @NonNull ClientFilterEntry entry) {
+    private boolean matchesClientFilterEntry(ClientFilterResolutionContext context,
+                                             ClientFilterEntry entry) {
         AnnotationMetadata annotationMetadata = entry.getAnnotationMetadata();
         boolean matches = !annotationMetadata.hasStereotype(FilterMatcher.class);
         String filterAnnotation = annotationMetadata.getAnnotationNameByStereotype(FilterMatcher.class).orElse(null);
@@ -161,9 +160,8 @@ public class DefaultHttpClientFilterResolver extends BaseFilterProcessor<ClientF
         return matches;
     }
 
-    @NonNull
-    private ClientFilterEntry createClientFilterEntry(@NonNull AnnotationMetadataResolver annotationMetadataResolver,
-                                                      @NonNull HttpClientFilter httpClientFilter) {
+    private ClientFilterEntry createClientFilterEntry(AnnotationMetadataResolver annotationMetadataResolver,
+                                                      HttpClientFilter httpClientFilter) {
         AnnotationMetadata annotationMetadata = annotationMetadataResolver.resolveMetadata(httpClientFilter);
         FilterPatternStyle patternStyle = annotationMetadata.enumValue(Filter.class,
             "patternStyle", FilterPatternStyle.class).orElse(FilterPatternStyle.ANT);
@@ -179,23 +177,22 @@ public class DefaultHttpClientFilterResolver extends BaseFilterProcessor<ClientF
     }
 
     @Nullable
-    private static List<String> excludeServiceIdsForFilter(@NonNull AnnotationMetadata annotationMetadata) {
+    private static List<String> excludeServiceIdsForFilter(AnnotationMetadata annotationMetadata) {
         return idsForFilter(annotationMetadata, "excludeServiceId");
     }
 
     @Nullable
-    private static List<String> serviceIdsForFilter(@NonNull AnnotationMetadata annotationMetadata) {
+    private static List<String> serviceIdsForFilter(AnnotationMetadata annotationMetadata) {
         return idsForFilter(annotationMetadata, "serviceId");
     }
 
     @Nullable
-    private static List<String> idsForFilter(@NonNull AnnotationMetadata annotationMetadata, @NonNull String member) {
+    private static List<String> idsForFilter(AnnotationMetadata annotationMetadata, String member) {
         String[] ids = annotationMetadata.stringValues(Filter.class, member);
         return ArrayUtils.isNotEmpty(ids) ? List.of(ids) : null;
     }
 
-    @NonNull
-    private static Set<HttpMethod> methodsForFilter(@NonNull AnnotationMetadata annotationMetadata) {
+    private static Set<HttpMethod> methodsForFilter(AnnotationMetadata annotationMetadata) {
         HttpMethod[] methods = annotationMetadata.enumValues(Filter.class, "methods", HttpMethod.class);
         final Set<HttpMethod> httpMethods = new HashSet<>(Arrays.asList(methods));
         if (annotationMetadata.hasStereotype(FilterMatcher.class)) {
@@ -211,12 +208,12 @@ public class DefaultHttpClientFilterResolver extends BaseFilterProcessor<ClientF
         AnnotationMetadata annotationMetadata,
         Set<HttpMethod> httpMethods,
         FilterPatternStyle patternStyle,
+        @Nullable
         List<String> patterns,
         @Nullable List<String> serviceIds,
         @Nullable List<String> excludeServiceIds
     ) implements FilterEntry {
 
-        @NonNull
         @Override
         public AnnotationMetadata getAnnotationMetadata() {
             return annotationMetadata;
@@ -234,7 +231,7 @@ public class DefaultHttpClientFilterResolver extends BaseFilterProcessor<ClientF
 
         @Override
         public String[] getPatterns() {
-            return patterns.toArray(String[]::new);
+            return patterns == null ? new String[0] : patterns.toArray(String[]::new);
         }
 
         @Override

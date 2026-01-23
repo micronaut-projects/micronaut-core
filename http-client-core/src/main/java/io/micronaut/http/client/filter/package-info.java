@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2026 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 /**
- * Client filter implementations.
- *
- * @author graemerocher
- * @since 1.0
+ * HTTP filters.
  */
-package io.micronaut.http.client.filters;
+@NullMarked
+package io.micronaut.http.client.filter;
+
+import org.jspecify.annotations.NullMarked;

@@ -18,7 +18,6 @@ package io.micronaut.http.client;
 import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NextMajorVersion;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.core.util.ArgumentUtils;
@@ -134,27 +133,37 @@ public abstract class HttpClientConfiguration {
 
     private Map<String, Object> channelOptions = Collections.emptyMap();
 
+    @Nullable
     private Integer numOfThreads = null;
 
     /**
      * The thread factory to use for creating threads.
      */
+    @Nullable
     private Class<? extends ThreadFactory> threadFactory;
 
+    @Nullable
     private Duration connectTimeout;
 
+    @Nullable
     private Duration connectTtl;
 
+    @Nullable
     private Duration readTimeout = Duration.ofSeconds(DEFAULT_READ_TIMEOUT_SECONDS);
 
+    @Nullable
     private Duration requestTimeout = null;
 
+    @Nullable
     private Duration readIdleTimeout = Duration.of(DEFAULT_READ_IDLE_TIMEOUT_MINUTES, ChronoUnit.MINUTES);
 
+    @Nullable
     private Duration connectionPoolIdleTimeout = DEFAULT_CONNECTION_POOL_IDLE_TIMEOUT_SECONDS == 0 ? null : Duration.ofSeconds(DEFAULT_CONNECTION_POOL_IDLE_TIMEOUT_SECONDS);
 
+    @Nullable
     private Duration shutdownQuietPeriod = Duration.ofMillis(DEFAULT_SHUTDOWN_QUIET_PERIOD_MILLISECONDS);
 
+    @Nullable
     private Duration shutdownTimeout = Duration.ofMillis(DEFAULT_SHUTDOWN_TIMEOUT_MILLISECONDS);
 
     private int maxContentLength = DEFAULT_MAX_CONTENT_LENGTH;
@@ -163,12 +172,16 @@ public abstract class HttpClientConfiguration {
 
     private Proxy.Type proxyType = Proxy.Type.DIRECT;
 
+    @Nullable
     private SocketAddress proxyAddress;
 
+    @Nullable
     private String proxyUsername;
 
+    @Nullable
     private String proxyPassword;
 
+    @Nullable
     private ProxySelector proxySelector;
 
     private Charset defaultCharset = StandardCharsets.UTF_8;
@@ -180,6 +193,7 @@ public abstract class HttpClientConfiguration {
 
     private SslConfiguration sslConfiguration = new ClientSslConfiguration();
 
+    @Nullable
     private String loggerName;
 
     private String eventLoopGroup = "default";
@@ -195,6 +209,7 @@ public abstract class HttpClientConfiguration {
         HttpVersionSelection.ALPN_HTTP_1
     );
 
+    @Nullable
     private LogLevel logLevel;
 
     private boolean allowBlockEventLoop = DEFAULT_ALLOW_BLOCK_EVENT_LOOP;
@@ -204,6 +219,7 @@ public abstract class HttpClientConfiguration {
     @Nullable
     private String addressResolverGroupName = null;
 
+    @Nullable
     private String pcapLoggingPathPattern = null;
 
     /**
@@ -215,7 +231,7 @@ public abstract class HttpClientConfiguration {
     /**
      * @param applicationConfiguration The application configuration
      */
-    public HttpClientConfiguration(ApplicationConfiguration applicationConfiguration) {
+    public HttpClientConfiguration(@Nullable ApplicationConfiguration applicationConfiguration) {
         if (applicationConfiguration != null) {
             this.defaultCharset = applicationConfiguration.getDefaultCharset();
         }
@@ -226,7 +242,7 @@ public abstract class HttpClientConfiguration {
      *
      * @param copy The client configuration to copy settings from
      */
-    public HttpClientConfiguration(HttpClientConfiguration copy) {
+    public HttpClientConfiguration(@Nullable HttpClientConfiguration copy) {
         if (copy != null) {
             this.channelOptions = copy.channelOptions;
             this.numOfThreads = copy.numOfThreads;
@@ -264,6 +280,7 @@ public abstract class HttpClientConfiguration {
      * {@link #alpnModes}.
      */
     @Deprecated
+    @Nullable
     public HttpVersion getHttpVersion() {
         return httpVersion;
     }
@@ -312,7 +329,7 @@ public abstract class HttpClientConfiguration {
     /**
      * @param eventLoopGroup Sets the event loop group to use for the client.
      */
-    public void setEventLoopGroup(@NonNull String eventLoopGroup) {
+    public void setEventLoopGroup(String eventLoopGroup) {
         ArgumentUtils.requireNonNull("eventLoopGroup", eventLoopGroup);
         this.eventLoopGroup = eventLoopGroup;
     }
@@ -811,7 +828,7 @@ public abstract class HttpClientConfiguration {
      * @return The plaintext connection mode.
      * @since 4.0.0
      */
-    public HttpVersionSelection.@NonNull PlaintextMode getPlaintextMode() {
+    public HttpVersionSelection.PlaintextMode getPlaintextMode() {
         return plaintextMode;
     }
 
@@ -823,7 +840,7 @@ public abstract class HttpClientConfiguration {
      * @param plaintextMode The plaintext connection mode.
      * @since 4.0.0
      */
-    public void setPlaintextMode(HttpVersionSelection.@NonNull PlaintextMode plaintextMode) {
+    public void setPlaintextMode(HttpVersionSelection.PlaintextMode plaintextMode) {
         this.plaintextMode = Objects.requireNonNull(plaintextMode, "plaintextMode");
     }
 
@@ -837,7 +854,6 @@ public abstract class HttpClientConfiguration {
      * @return The supported ALPN protocols.
      * @since 4.0.0
      */
-    @NonNull
     public List<String> getAlpnModes() {
         return alpnModes;
     }
@@ -851,7 +867,7 @@ public abstract class HttpClientConfiguration {
      * @param alpnModes The supported ALPN protocols.
      * @since 4.0.0
      */
-    public void setAlpnModes(@NonNull List<String> alpnModes) {
+    public void setAlpnModes(List<String> alpnModes) {
         this.alpnModes = Objects.requireNonNull(alpnModes, "alpnModes");
     }
 
@@ -888,7 +904,6 @@ public abstract class HttpClientConfiguration {
      * @return The DNS resolution mode
      * @since 4.6.0
      */
-    @NonNull
     public DnsResolutionMode getDnsResolutionMode() {
         return dnsResolutionMode;
     }
@@ -900,7 +915,7 @@ public abstract class HttpClientConfiguration {
      * @param dnsResolutionMode The DNS resolution mode
      * @since 4.6.0
      */
-    public void setDnsResolutionMode(@NonNull DnsResolutionMode dnsResolutionMode) {
+    public void setDnsResolutionMode(DnsResolutionMode dnsResolutionMode) {
         this.dnsResolutionMode = dnsResolutionMode;
     }
 
@@ -943,6 +958,7 @@ public abstract class HttpClientConfiguration {
      * @return The path pattern, or {@code null} if logging is disabled.
      */
     @Internal
+    @Nullable
     public String getPcapLoggingPathPattern() {
         return pcapLoggingPathPattern;
     }
@@ -981,13 +997,13 @@ public abstract class HttpClientConfiguration {
 
         private int maxPendingAcquires = Integer.MAX_VALUE;
 
+        @Nullable
         private Duration acquireTimeout;
 
         private boolean enabled = DEFAULT_ENABLED;
 
-        private HttpClientConfiguration.ConnectionPoolConfiguration.@NonNull ConnectionLocality connectionLocality = ConnectionLocality.PREFERRED;
+        private HttpClientConfiguration.ConnectionPoolConfiguration.ConnectionLocality connectionLocality = ConnectionLocality.PREFERRED;
 
-        @NonNull
         private PoolVersion version = PoolVersion.V4_9;
 
         /**
@@ -1136,7 +1152,7 @@ public abstract class HttpClientConfiguration {
          * @return The locality configuration
          * @since 4.8.0
          */
-        public HttpClientConfiguration.ConnectionPoolConfiguration.@NonNull ConnectionLocality getConnectionLocality() {
+        public HttpClientConfiguration.ConnectionPoolConfiguration.ConnectionLocality getConnectionLocality() {
             return connectionLocality;
         }
 
@@ -1147,7 +1163,7 @@ public abstract class HttpClientConfiguration {
          * @param connectionLocality The locality configuration
          * @since 4.8.0
          */
-        public void setConnectionLocality(HttpClientConfiguration.ConnectionPoolConfiguration.@NonNull ConnectionLocality connectionLocality) {
+        public void setConnectionLocality(HttpClientConfiguration.ConnectionPoolConfiguration.ConnectionLocality connectionLocality) {
             this.connectionLocality = connectionLocality;
         }
 
@@ -1157,7 +1173,7 @@ public abstract class HttpClientConfiguration {
          *
          * @return The pool version
          */
-        public @NonNull PoolVersion getVersion() {
+        public PoolVersion getVersion() {
             return version;
         }
 
@@ -1167,7 +1183,7 @@ public abstract class HttpClientConfiguration {
          *
          * @param version The pool version
          */
-        public void setVersion(@NonNull PoolVersion version) {
+        public void setVersion(PoolVersion version) {
             this.version = version;
         }
 
@@ -1277,10 +1293,13 @@ public abstract class HttpClientConfiguration {
         @SuppressWarnings("WeakerAccess")
         public static final int DEFAULT_MAX_HEADER_LIST_SIZE = 8192;
 
+        @Nullable
         private Duration pingIntervalRead = null;
 
+        @Nullable
         private Duration pingIntervalWrite = null;
 
+        @Nullable
         private Duration pingIntervalIdle = null;
 
         private int maxHeaderListSize = DEFAULT_MAX_HEADER_LIST_SIZE;

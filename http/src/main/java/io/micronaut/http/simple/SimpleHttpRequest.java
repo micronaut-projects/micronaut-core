@@ -99,7 +99,7 @@ public class SimpleHttpRequest<B> implements MutableHttpRequest<B> {
     }
 
     @Override
-    public <T> MutableHttpRequest<T> body(T body) {
+    public <T> MutableHttpRequest<T> body(@Nullable T body) {
         this.body = body;
         return (MutableHttpRequest<T>) this;
     }

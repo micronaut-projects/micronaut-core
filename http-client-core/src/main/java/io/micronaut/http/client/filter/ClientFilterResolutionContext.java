@@ -17,7 +17,6 @@ package io.micronaut.http.client.filter;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
@@ -45,7 +44,6 @@ public class ClientFilterResolutionContext implements AnnotationMetadataProvider
         this.annotationMetadata = annotationMetadata;
     }
 
-    @NonNull
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
         return annotationMetadata;
@@ -54,7 +52,7 @@ public class ClientFilterResolutionContext implements AnnotationMetadataProvider
     /**
      * @return The client ID.
      */
-    public @Nullable List<String> getClientIds() {
+    public List<String> getClientIds() {
         if (clientIds != null) {
             return clientIds;
         }

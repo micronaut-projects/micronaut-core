@@ -16,7 +16,6 @@
 package io.micronaut.http.client.bind;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.type.Argument;
 
 import java.util.Optional;
@@ -37,7 +36,7 @@ public interface HttpClientBinderRegistry {
      * @param <T>      The argument type
      * @return An {@link Optional} of {@link ClientArgumentRequestBinder}
      */
-    <T> Optional<ClientArgumentRequestBinder<?>> findArgumentBinder(@NonNull Argument<T> argument);
+    <T> Optional<ClientArgumentRequestBinder<?>> findArgumentBinder(Argument<T> argument);
 
     /**
      * Locate an {@link AnnotatedClientRequestBinder} for a given annotation type
@@ -46,5 +45,5 @@ public interface HttpClientBinderRegistry {
      * @param annotationType - the type of annotation
      * @return An {@link Optional} of {@link AnnotatedClientRequestBinder}
      */
-    Optional<AnnotatedClientRequestBinder<?>> findAnnotatedBinder(@NonNull Class<?> annotationType);
+    Optional<AnnotatedClientRequestBinder<?>> findAnnotatedBinder(Class<?> annotationType);
 }

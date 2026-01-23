@@ -18,6 +18,7 @@ import io.micronaut.core.convert.ConversionServiceAware;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.uri.UriBuilder;
+import org.jspecify.annotations.Nullable;
 
 import java.net.URI;
 import java.util.Map;
@@ -64,7 +65,7 @@ public interface MutableHttpRequest<B> extends HttpRequest<B>, MutableHttpMessag
     MutableHttpRequest<B> uri(URI uri);
 
     @Override
-    <T> MutableHttpRequest<T> body(T body);
+    <T> MutableHttpRequest<T> body(@Nullable T body);
 
     @Override
     MutableHttpHeaders getHeaders();

@@ -112,7 +112,7 @@ public class MutableHttpRequestWrapper<B> extends HttpRequestWrapper<B> implemen
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T> MutableHttpRequest<T> body(T body) {
+    public <T> MutableHttpRequest<T> body(@Nullable T body) {
         this.body = (B) body;
         return (MutableHttpRequest<T>) this;
     }

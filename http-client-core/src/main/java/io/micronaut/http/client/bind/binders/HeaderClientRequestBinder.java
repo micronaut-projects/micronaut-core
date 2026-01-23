@@ -17,7 +17,6 @@ package io.micronaut.http.client.bind.binders;
 
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.core.annotation.AnnotationValue;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpRequest;
@@ -32,11 +31,9 @@ import java.util.List;
  */
 public class HeaderClientRequestBinder implements AnnotatedClientRequestBinder<Header> {
     @Override
-    public void bind(
-            @NonNull MethodInvocationContext<Object, Object> context,
-            @NonNull ClientRequestUriContext uriContext,
-            @NonNull MutableHttpRequest<?> request
-    ) {
+    public void bind(MethodInvocationContext<Object, Object> context,
+                     ClientRequestUriContext uriContext,
+                     MutableHttpRequest<?> request) {
         List<AnnotationValue<Header>> headerAnnotations = context.getAnnotationValuesByType(Header.class);
         for (AnnotationValue<Header> headerAnnotation : headerAnnotations) {
             String headerName = headerAnnotation.stringValue("name").orElse(null);
@@ -50,7 +47,6 @@ public class HeaderClientRequestBinder implements AnnotatedClientRequestBinder<H
     }
 
     @Override
-    @NonNull
     public Class<Header> getAnnotationType() {
         return Header.class;
     }

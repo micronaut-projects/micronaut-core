@@ -66,6 +66,7 @@ public class HttpClientResponseException extends HttpClientException implements 
     }
 
     @Override
+    @Nullable
     public String getMessage() {
         Optional<Argument<?>> errorType = Optional.ofNullable(getErrorType(response));
         if (errorType.isPresent() && errorDecoder != null) {
@@ -115,6 +116,7 @@ public class HttpClientResponseException extends HttpClientException implements 
         }
     }
 
+    @Nullable
     private Argument<?> getErrorType(HttpResponse<?> response) {
         Optional<MediaType> contentType = response.getContentType();
         Argument<?> errorType = null;

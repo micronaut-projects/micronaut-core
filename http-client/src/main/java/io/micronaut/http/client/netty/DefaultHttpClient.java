@@ -586,7 +586,7 @@ public class DefaultHttpClient implements
             }
 
             @Override
-            public <I, O, E> HttpResponse<O> exchange(io.micronaut.http.HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
+            public <I, O, E> HttpResponse<O> exchange(io.micronaut.http.HttpRequest<I> request, @Nullable Argument<O> bodyType, Argument<E> errorType) {
                 if (!configuration.isAllowBlockEventLoop() && Thread.currentThread() instanceof FastThreadLocalThread) {
                     throw new HttpClientException("""
                         You are trying to run a BlockingHttpClient operation on a netty event \
@@ -883,7 +883,7 @@ public class DefaultHttpClient implements
             .flux();
     }
 
-    private <I, O, E> Mono<HttpResponse<O>> exchange(io.micronaut.http.HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType, @Nullable BlockHint blockHint) {
+    private <I, O, E> Mono<HttpResponse<O>> exchange(io.micronaut.http.HttpRequest<I> request, @Nullable Argument<O> bodyType, Argument<E> errorType, @Nullable BlockHint blockHint) {
         setupConversionService(request);
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
         // if a connection is available immediately, we can use its executor for the timeout
@@ -924,7 +924,7 @@ public class DefaultHttpClient implements
         return toMono(mono, propagatedContext);
     }
 
-    private <O, E> ExecutionFlow<FullNettyClientHttpResponse<O>> handleExchangeResponse(Argument<O> bodyType, Argument<E> errorType, NettyClientByteBodyResponse resp, CloseableAvailableByteBody av) {
+    private <O, E> ExecutionFlow<FullNettyClientHttpResponse<O>> handleExchangeResponse(@Nullable Argument<O> bodyType, Argument<E> errorType, NettyClientByteBodyResponse resp, CloseableAvailableByteBody av) {
         ByteBuf buf = NettyByteBodyFactory.toByteBuf(av);
         DefaultFullHttpResponse fullHttpResponse = new DefaultFullHttpResponse(
             resp.nettyResponse.protocolVersion(),
@@ -2089,8 +2089,11 @@ public class DefaultHttpClient implements
 
     private static <O, E> boolean shouldConvertWithBodyType(io.netty.handler.codec.http.HttpResponse msg,
                                                             HttpClientConfiguration configuration,
-                                                            Argument<O> bodyType,
+                                                            @Nullable Argument<O> bodyType,
                                                             Argument<E> errorType) {
+        if (bodyType == null) {
+            return false;
+        }
         if (msg.status().code() < 400) {
             return true;
         }

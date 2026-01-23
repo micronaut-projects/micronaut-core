@@ -16,6 +16,7 @@
 package io.micronaut.http.client.multipart;
 
 import io.micronaut.http.MediaType;
+import org.jspecify.annotations.Nullable;
 
 import java.io.File;
 
@@ -44,7 +45,7 @@ class FilePart extends AbstractFilePart<File> {
      * @param contentType The type of the content, example - "application/json", "text/plain" etc
      * @param data        The file to copy the content from
      */
-    FilePart(String name, String filename, MediaType contentType, File data) {
+    FilePart(String name, String filename, @Nullable MediaType contentType, File data) {
         super(name, filename, contentType);
         this.data = data;
     }
