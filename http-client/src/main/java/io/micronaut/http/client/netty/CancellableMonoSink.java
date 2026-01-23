@@ -23,6 +23,7 @@ import org.reactivestreams.Subscription;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 
+import java.util.Objects;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
@@ -40,10 +41,13 @@ final class CancellableMonoSink<T> implements Publisher<T>, Sinks.One<T>, Subscr
     @Nullable
     private final BlockHint blockHint;
 
+    @Nullable
     private T value;
+    @Nullable
     private Throwable failure;
     private boolean complete = false;
     private boolean cancelled = false;
+    @Nullable
     private Subscriber<? super T> subscriber = null;
     private boolean subscriberWaiting = false;
 
@@ -73,8 +77,9 @@ final class CancellableMonoSink<T> implements Publisher<T>, Sinks.One<T>, Subscr
 
     private void tryForward() {
         if (subscriberWaiting && complete && !cancelled) {
+            Objects.requireNonNull(subscriber);
             if (failure == null) {
-                if (value != EMPTY) {
+                if (value != EMPTY && value != null) {
                     subscriber.onNext(value);
                 }
                 subscriber.onComplete();
@@ -155,6 +160,7 @@ final class CancellableMonoSink<T> implements Publisher<T>, Sinks.One<T>, Subscr
     }
 
     @Override
+    @Nullable
     public Object scanUnsafe(Attr key) {
         return null;
     }

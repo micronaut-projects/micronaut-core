@@ -37,11 +37,13 @@ import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.DefaultLastHttpContent;
 import io.netty.handler.codec.http.FullHttpResponse;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -64,6 +66,7 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, NettyHtt
     private final ByteBuf unpooledContent;
     private final Map<Argument, Optional> convertedBodies = new ConcurrentHashMap<>();
     private final MessageBodyHandlerRegistry handlerRegistry;
+    @Nullable
     private final B body;
     private final ConversionService conversionService;
 
@@ -77,6 +80,7 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, NettyHtt
     FullNettyClientHttpResponse(
         FullHttpResponse fullHttpResponse,
         MessageBodyHandlerRegistry handlerRegistry,
+        @Nullable
         Argument<B> bodyType,
         boolean convertBody,
         ConversionService conversionService
@@ -92,6 +96,7 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, NettyHtt
         this.nettyCookies = new NettyCookies(fullHttpResponse.headers(), conversionService);
         Class<?> rawBodyType = bodyType != null ? bodyType.getType() : null;
         if (rawBodyType != null && !HttpStatus.class.isAssignableFrom(rawBodyType)) {
+            Objects.requireNonNull(bodyType);
             if (HttpResponse.class.isAssignableFrom(bodyType.getType())) {
                 Optional<Argument<?>> responseBodyType = bodyType.getFirstTypeVariable();
                 if (responseBodyType.isPresent()) {
@@ -217,7 +222,7 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, NettyHtt
                 MessageBodyReader<T> r = reader.get();
                 MediaType ct = contentType.get();
                 if (r.isReadable(type, ct)) {
-                    return Optional.of(r.read(type, ct, headers, NettyByteBufferFactory.DEFAULT.wrap(unpooledContent.slice())));
+                    return Optional.ofNullable(r.read(type, ct, headers, NettyByteBufferFactory.DEFAULT.wrap(unpooledContent.slice())));
                 }
             }
         } else if (LOG.isTraceEnabled()) {

@@ -71,6 +71,7 @@ public abstract class SslBuilder<T> {
      *
      * @return The {@link TrustManagerFactory}
      */
+    @Nullable
     protected TrustManagerFactory getTrustManagerFactory(SslConfiguration ssl) {
         Optional<KeyStore> store;
         try {
@@ -127,6 +128,7 @@ public abstract class SslBuilder<T> {
      *
      * @return The {@link KeyManagerFactory}
      */
+    @Nullable
     protected KeyManagerFactory getKeyManagerFactory(SslConfiguration ssl) {
         try {
             Optional<KeyStore> keyStore = getKeyStore(ssl);

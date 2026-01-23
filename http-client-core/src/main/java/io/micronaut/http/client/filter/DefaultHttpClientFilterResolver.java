@@ -71,6 +71,7 @@ public class DefaultHttpClientFilterResolver extends BaseFilterProcessor<ClientF
      * @param legacyClientFilters        All client filters
      */
     public DefaultHttpClientFilterResolver(
+        @Nullable
         BeanContext beanContext,
         AnnotationMetadataResolver annotationMetadataResolver,
         List<HttpClientFilter> legacyClientFilters) {

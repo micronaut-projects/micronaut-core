@@ -20,6 +20,7 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpResponseProvider;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Optional;
 
@@ -31,6 +32,7 @@ import java.util.Optional;
  */
 public class HttpClientResponseException extends HttpClientException implements HttpResponseProvider {
     private final HttpResponse<?> response;
+    @Nullable
     private final HttpClientErrorDecoder errorDecoder;
 
     /**
@@ -46,7 +48,7 @@ public class HttpClientResponseException extends HttpClientException implements 
      * @param cause    The throwable
      * @param response The Http response
      */
-    public HttpClientResponseException(String message, Throwable cause, HttpResponse<?> response) {
+    public HttpClientResponseException(String message, @Nullable Throwable cause, HttpResponse<?> response) {
         this(message, cause, response, HttpClientErrorDecoder.DEFAULT);
     }
 
@@ -56,7 +58,7 @@ public class HttpClientResponseException extends HttpClientException implements 
      * @param response The Http response
      * @param errorDecoder The error decoder
      */
-    public HttpClientResponseException(String message, Throwable cause, HttpResponse<?> response, HttpClientErrorDecoder errorDecoder) {
+    public HttpClientResponseException(String message, @Nullable Throwable cause, HttpResponse<?> response, @Nullable HttpClientErrorDecoder errorDecoder) {
         super(message, cause);
         this.errorDecoder = errorDecoder;
         this.response = response;
@@ -66,7 +68,7 @@ public class HttpClientResponseException extends HttpClientException implements 
     @Override
     public String getMessage() {
         Optional<Argument<?>> errorType = Optional.ofNullable(getErrorType(response));
-        if (errorType.isPresent()) {
+        if (errorType.isPresent() && errorDecoder != null) {
             return getResponse().getBody(errorType.get()).flatMap(errorDecoder::getMessage).orElse(super.getMessage());
         } else {
             return super.getMessage();

@@ -2,6 +2,7 @@ import org.apache.tools.ant.taskdefs.condition.Os
 
 plugins {
     id("io.micronaut.build.internal.convention-library")
+    id("io.micronaut.build.internal.convention-nullaway")
 }
 
 micronautBuild {

@@ -253,12 +253,14 @@ public class DefaultHttpClient implements
     private final List<HttpFilterResolver.FilterEntry> clientFilterEntries;
     private final LoadBalancer loadBalancer;
     private final HttpClientConfiguration configuration;
+    @Nullable
     private final String contextPath;
     private final Charset defaultCharset;
     private final Logger log;
     private final HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver;
     private final WebSocketBeanRegistry webSocketRegistry;
     private final RequestBinderRegistry requestBinderRegistry;
+    @Nullable
     private final String informationalServiceId;
     private final ConversionService conversionService;
     @Nullable
@@ -374,7 +376,7 @@ public class DefaultHttpClient implements
     }
 
     DefaultHttpClient(DefaultHttpClientBuilder builder) {
-        this.loadBalancer = builder.loadBalancer;
+        this.loadBalancer = Objects.requireNonNull(builder.loadBalancer);
         this.configuration = builder.configuration == null ? new DefaultHttpClientConfiguration() : builder.configuration;
         this.defaultCharset = configuration.getDefaultCharset();
         if (StringUtils.isNotEmpty(builder.contextPath)) {
@@ -392,11 +394,11 @@ public class DefaultHttpClient implements
         if (builder.filterResolver == null) {
             builder.filters();
         }
-        this.filterResolver = builder.filterResolver;
+        this.filterResolver = Objects.requireNonNull(builder.filterResolver);
         if (builder.clientFilterEntries != null) {
             this.clientFilterEntries = builder.clientFilterEntries;
         } else {
-            this.clientFilterEntries = builder.filterResolver.resolveFilterEntries(
+            this.clientFilterEntries = filterResolver.resolveFilterEntries(
                     new ClientFilterResolutionContext(null, AnnotationMetadata.EMPTY_METADATA)
             );
         }
@@ -650,7 +652,7 @@ public class DefaultHttpClient implements
         return eventStreamOrError(request, null);
     }
 
-    private <I> Publisher<Event<ByteBuffer<?>>> eventStreamOrError(io.micronaut.http. HttpRequest<I> request, Argument<?> errorType) {
+    private <I> Publisher<Event<ByteBuffer<?>>> eventStreamOrError(io.micronaut.http. HttpRequest<I> request, @Nullable Argument<?> errorType) {
 
         if (request instanceof MutableHttpRequest<?> httpRequest) {
             httpRequest.accept(MediaType.TEXT_EVENT_STREAM_TYPE);
@@ -658,13 +660,15 @@ public class DefaultHttpClient implements
 
         return Flux.create(emitter ->
                 dataStream(request, errorType).subscribe(new Subscriber<>() {
+                    @Nullable
                     private Subscription dataSubscription;
+                    @Nullable
                     private CurrentEvent currentEvent;
 
                     @Override
                     public void onSubscribe(Subscription s) {
                         this.dataSubscription = s;
-                        Disposable cancellable = () -> dataSubscription.cancel();
+                        Disposable cancellable = s::cancel;
                         emitter.onCancel(cancellable);
                         if (!emitter.isCancelled() && emitter.requestedFromDownstream() > 0) {
                             // request the first chunk
@@ -682,7 +686,7 @@ public class DefaultHttpClient implements
                             // emit the current event
                             if (len == 0) {
                                 try {
-                                    Event event = Event.of(byteBufferFactory.wrap(currentEvent.data))
+                                    Event event = Event.of(byteBufferFactory.wrap(Objects.requireNonNull(currentEvent).data))
                                             .name(currentEvent.name)
                                             .retry(currentEvent.retry)
                                             .id(currentEvent.id);
@@ -712,7 +716,7 @@ public class DefaultHttpClient implements
                                             case "data" -> {
                                                 ByteBuffer<?> content = buffer.slice(fromIndex, toIndex);
                                                 byte[] d = currentEvent.data;
-                                                if (d == null) {
+                                                if (d.length == 0) {
                                                     currentEvent.data = content.toByteArray();
                                                 } else {
                                                     currentEvent.data = ArrayUtils.concat(d, content.toByteArray());
@@ -742,7 +746,7 @@ public class DefaultHttpClient implements
                             }
 
                             if (emitter.requestedFromDownstream() > 0 && !emitter.isCancelled()) {
-                                dataSubscription.request(1);
+                                Objects.requireNonNull(dataSubscription).request(1);
                             }
                         } catch (Throwable e) {
                             onError(e);
@@ -755,7 +759,7 @@ public class DefaultHttpClient implements
 
                     @Override
                     public void onError(Throwable t) {
-                        dataSubscription.cancel();
+                        Objects.requireNonNull(dataSubscription).cancel();
                         if (t instanceof HttpClientException) {
                             emitter.error(t);
                         } else {
@@ -789,7 +793,7 @@ public class DefaultHttpClient implements
             ByteBuffer<?> data = byteBufferEvent.getData();
 
             B decoded = reader.read(eventType, MediaType.APPLICATION_JSON_TYPE, request.getHeaders(), data);
-            return Event.of(byteBufferEvent, decoded);
+            return Event.of(byteBufferEvent, Objects.requireNonNull(decoded));
         });
     }
 
@@ -800,7 +804,7 @@ public class DefaultHttpClient implements
     }
 
     @Override
-    public <I> Publisher<ByteBuffer<?>> dataStream(io.micronaut.http. HttpRequest<I> request, Argument<?> errorType) {
+    public <I> Publisher<ByteBuffer<?>> dataStream(io.micronaut.http. HttpRequest<I> request, @Nullable Argument<?> errorType) {
         setupConversionService(request);
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
         return new MicronautFlux<>(toMono(resolveRequestURI(request), propagatedContext)
@@ -907,7 +911,7 @@ public class DefaultHttpClient implements
         }
         if (requestTimeout != null) {
             if (!requestTimeout.isNegative()) {
-                mono = mono.timeout(requestTimeout, scheduler.get(), null)
+                mono = mono.timeout(requestTimeout, Objects.requireNonNull(scheduler.get()), null)
                     .onErrorResume(throwable -> {
                         if (throwable instanceof TimeoutException) {
                             return ExecutionFlow.error(ReadTimeoutException.TIMEOUT_EXCEPTION);
@@ -1027,7 +1031,7 @@ public class DefaultHttpClient implements
         stop();
     }
 
-    private <T> Publisher<T> connectWebSocket(URI uri, MutableHttpRequest<?> request, Class<T> clientEndpointType, WebSocketBean<T> webSocketBean) {
+    private <T> Publisher<T> connectWebSocket(URI uri, MutableHttpRequest<?> request, Class<T> clientEndpointType, @Nullable WebSocketBean<T> webSocketBean) {
         RequestKey requestKey;
         try {
             requestKey = new RequestKey(this, uri);
@@ -1115,7 +1119,7 @@ public class DefaultHttpClient implements
         });
     }
 
-    private <I> Flux<ByteBuffer<?>> dataStreamImpl(MutableHttpRequest<I> request, Argument<?> errorType, PropagatedContext propagatedContext, URI requestURI) {
+    private <I> Flux<ByteBuffer<?>> dataStreamImpl(MutableHttpRequest<I> request, @Nullable Argument<?> errorType, PropagatedContext propagatedContext, URI requestURI) {
         Flux<HttpResponse<?>> streamResponsePublisher = toMono(buildStreamExchange(propagatedContext, request, requestURI, errorType), propagatedContext).flux();
         Function<HttpContent, ByteBuffer<?>> contentMapper = message -> {
             ByteBuf byteBuf = message.content();
@@ -1138,7 +1142,7 @@ public class DefaultHttpClient implements
      */
     @SuppressWarnings("MagicNumber")
     private <I> ExecutionFlow<HttpResponse<?>> buildStreamExchange(
-        @Nullable PropagatedContext propagatedContext,
+        PropagatedContext propagatedContext,
         MutableHttpRequest<I> request,
         URI requestURI,
         @Nullable Argument<?> errorType) {
@@ -1405,6 +1409,7 @@ public class DefaultHttpClient implements
                         final StreamedHttpResponse nettyResponse = streamedResponse.getNettyResponse();
                         nettyResponse.subscribe(new Subscriber<>() {
                             final CompositeByteBuf buffer = byteBufferFactory.getNativeAllocator().compositeBuffer();
+                            @Nullable
                             Subscription s;
                             @Override
                             public void onSubscribe(Subscription s) {
@@ -1415,7 +1420,7 @@ public class DefaultHttpClient implements
                             @Override
                             public void onNext(HttpContent httpContent) {
                                 buffer.addComponent(true, httpContent.content());
-                                s.request(1);
+                                Objects.requireNonNull(s).request(1);
                             }
 
                             @Override
@@ -2045,7 +2050,7 @@ public class DefaultHttpClient implements
 
         HttpClientException result;
         if (cause instanceof io.micronaut.http.exceptions.ContentLengthExceededException clee) {
-            result = decorate(new ContentLengthExceededException(clee.getMessage()));
+            result = decorate(new ContentLengthExceededException(Objects.requireNonNull(clee.getMessage(), "Content length exceeded")));
         } else if (cause instanceof BufferLengthExceededException blee) {
             result = decorate(new ContentLengthExceededException(blee.getAdvertisedLength(), blee.getReceivedLength()));
         } else if (cause instanceof io.netty.handler.timeout.ReadTimeoutException) {
@@ -2113,7 +2118,7 @@ public class DefaultHttpClient implements
     /**
      * Create a {@link HttpClientResponseException} from a response with a failed HTTP status.
      */
-    private HttpClientResponseException makeErrorFromRequestBody(Argument<?> errorType, HttpResponseStatus status, FullNettyClientHttpResponse<?> response) {
+    private HttpClientResponseException makeErrorFromRequestBody(@Nullable Argument<?> errorType, HttpResponseStatus status, FullNettyClientHttpResponse<?> response) {
         if (errorType != null && errorType != HttpClient.DEFAULT_ERROR_TYPE) {
             return decorate(new HttpClientResponseException(
                 status.reasonPhrase(),
@@ -2232,9 +2237,12 @@ public class DefaultHttpClient implements
      * Used as a holder for the current SSE event.
      */
     private static final class CurrentEvent {
-        byte[] data;
+        byte[] data = new byte[0];
+        @Nullable
         String id;
+        @Nullable
         String name;
+        @Nullable
         Duration retry;
     }
 }

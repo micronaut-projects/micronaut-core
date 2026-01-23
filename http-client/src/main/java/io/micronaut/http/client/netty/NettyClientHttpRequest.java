@@ -46,6 +46,7 @@ import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.QueryStringDecoder;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 
 import java.net.URI;
@@ -73,7 +74,9 @@ public class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHt
     private final String httpMethodName;
     private final Map<String, String> cookies = new LinkedHashMap<>(1);
     private URI uri;
+    @Nullable
     private Object body;
+    @Nullable
     private NettyHttpParameters httpParameters;
     private ConversionService conversionService = ConversionService.SHARED;
 
@@ -159,7 +162,7 @@ public class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHt
     }
 
     @Override
-    public <T> MutableHttpRequest<T> body(T body) {
+    public <T> MutableHttpRequest<T> body(@Nullable T body) {
         this.body = body;
         return (MutableHttpRequest<T>) this;
     }

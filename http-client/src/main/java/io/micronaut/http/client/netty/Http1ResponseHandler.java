@@ -33,6 +33,7 @@ import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.util.ReferenceCountUtil;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -160,6 +161,7 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
     private final class BufferedContent extends ReaderState<HttpContent> {
         private final ResponseListener listener;
         private final HttpResponse response;
+        @Nullable
         private List<ByteBuf> buffered;
 
         BufferedContent(ResponseListener listener, HttpResponse response) {

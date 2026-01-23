@@ -57,6 +57,7 @@ import io.netty.handler.codec.http.websocketx.PongWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketVersion;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -93,12 +94,15 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     protected final Map<String, Object> uriVariables;
     protected final WebSocketBean<?> webSocketBean;
     protected final HttpRequest<?> originatingRequest;
+    @Nullable
     protected final MethodExecutionHandle<?, ?> messageHandler;
+    @Nullable
     protected final MethodExecutionHandle<?, ?> pongHandler;
     protected final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     protected final MessageBodyHandlerRegistry messageBodyHandlerRegistry;
     protected final WebSocketVersion webSocketVersion;
     protected final String subProtocol;
+    @Nullable
     protected final WebSocketSessionRepository webSocketSessionRepository;
     protected final ConversionService conversionService;
     private final AtomicBoolean closed = new AtomicBoolean(false);
@@ -127,6 +131,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
             Map<String, Object> uriVariables,
             WebSocketVersion version,
             String subProtocol,
+            @Nullable
             WebSocketSessionRepository webSocketSessionRepository,
             ConversionService conversionService) {
         this.subProtocol = subProtocol;

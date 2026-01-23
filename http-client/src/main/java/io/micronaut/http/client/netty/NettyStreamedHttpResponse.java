@@ -46,8 +46,11 @@ final class NettyStreamedHttpResponse<B> implements MutableHttpResponse<B>, Nett
     private final StreamedHttpResponse nettyResponse;
     private final NettyHttpHeaders headers;
     @GuardedBy("this")
+    @Nullable
     private NettyCookies nettyCookies; // initialized lazily
+    @Nullable
     private B body;
+    @Nullable
     private MutableConvertibleValues<Object> attributes;
 
     /**
@@ -157,7 +160,7 @@ final class NettyStreamedHttpResponse<B> implements MutableHttpResponse<B>, Nett
     }
 
     @Override
-    public MutableHttpResponse<B> status(int status, CharSequence message) {
+    public MutableHttpResponse<B> status(int status, @Nullable CharSequence message) {
         if (message == null) {
             nettyResponse.setStatus(HttpResponseStatus.valueOf(status));
         } else {

@@ -127,7 +127,6 @@ public interface Event<T> {
      * @return The event instance
      */
     static <ET> Event<ET> of(Event event, ET data) {
-        ArgumentUtils.check("data", data).notNull();
         return new DefaultEvent<>(data)
             .id(event.getId())
             .comment(event.getComment())
