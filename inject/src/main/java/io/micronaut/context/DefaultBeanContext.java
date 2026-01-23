@@ -3000,8 +3000,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     private void configureAndStartContext() {
-        configureContextInternal();
         registerConversionService();
+        configureContextInternal();
         initializeEventListeners();
         initializeTypeConverters();
         initializeContext();
