@@ -251,6 +251,7 @@ public class DefaultHttpClient implements
 
     private MessageBodyHandlerRegistry handlerRegistry;
     private final List<HttpFilterResolver.FilterEntry> clientFilterEntries;
+    @Nullable
     private final LoadBalancer loadBalancer;
     private final HttpClientConfiguration configuration;
     @Nullable
@@ -376,7 +377,7 @@ public class DefaultHttpClient implements
     }
 
     DefaultHttpClient(DefaultHttpClientBuilder builder) {
-        this.loadBalancer = Objects.requireNonNull(builder.loadBalancer);
+        this.loadBalancer = builder.loadBalancer;
         this.configuration = builder.configuration == null ? new DefaultHttpClientConfiguration() : builder.configuration;
         this.defaultCharset = configuration.getDefaultCharset();
         if (StringUtils.isNotEmpty(builder.contextPath)) {
