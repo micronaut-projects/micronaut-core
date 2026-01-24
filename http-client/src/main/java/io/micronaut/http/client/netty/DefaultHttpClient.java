@@ -2091,13 +2091,10 @@ public class DefaultHttpClient implements
                                                             HttpClientConfiguration configuration,
                                                             @Nullable Argument<O> bodyType,
                                                             Argument<E> errorType) {
-        if (bodyType == null) {
-            return false;
-        }
         if (msg.status().code() < 400) {
             return true;
         }
-        return !configuration.isExceptionOnErrorStatus() && bodyType.equalsType(errorType);
+        return !configuration.isExceptionOnErrorStatus() && bodyType != null && bodyType.equalsType(errorType);
     }
 
     /**
