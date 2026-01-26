@@ -16,7 +16,6 @@
 package io.micronaut.http.server.cors;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
@@ -51,8 +50,7 @@ public final class CrossOriginUtil {
      * @param request the HTTP request for the configuration
      * @return the cors origin configuration for the given request
      */
-    @NonNull
-    public static Optional<CorsOriginConfiguration> getCorsOriginConfigurationForRequest(@NonNull HttpRequest<?> request) {
+    public static Optional<CorsOriginConfiguration> getCorsOriginConfigurationForRequest(HttpRequest<?> request) {
         return RouteAttributes.getRouteMatch(request)
             .flatMap(rm -> getCorsOriginConfiguration((AnnotationMetadata) rm));
     }
@@ -61,7 +59,7 @@ public final class CrossOriginUtil {
      * @param annotationMetadata The route annotation metadata
      * @return The possible CORS configuration
      */
-    public static Optional<CorsOriginConfiguration> getCorsOriginConfiguration(@NonNull AnnotationMetadata annotationMetadata) {
+    public static Optional<CorsOriginConfiguration> getCorsOriginConfiguration(AnnotationMetadata annotationMetadata) {
         if (!annotationMetadata.hasAnnotation(CrossOrigin.class)) {
             return Optional.empty();
         }

@@ -43,6 +43,7 @@ import io.micronaut.json.body.CustomizableJsonHandler;
 import io.micronaut.json.body.JsonMessageHandler;
 import io.netty.buffer.ByteBuf;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
@@ -79,7 +80,7 @@ public final class NettyJsonHandler<T> implements MessageBodyHandler<T>, Chunked
     }
 
     @Override
-    public Publisher<T> readChunked(Argument<T> type, MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
+    public Publisher<T> readChunked(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
         JsonChunkedProcessor processor = new JsonChunkedProcessor();
         if (Iterable.class.isAssignableFrom(type.getType())) {
             // Publisher<List<T>> is parsed as a single item of type List
@@ -97,22 +98,22 @@ public final class NettyJsonHandler<T> implements MessageBodyHandler<T>, Chunked
     }
 
     @Override
-    public boolean isReadable(Argument<T> type, MediaType mediaType) {
+    public boolean isReadable(Argument<T> type, @Nullable MediaType mediaType) {
         return jsonMessageHandler.isReadable(type, mediaType);
     }
 
     @Override
-    public T read(Argument<T> type, MediaType mediaType, Headers httpHeaders, ByteBuffer<?> byteBuffer) throws CodecException {
+    public T read(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, ByteBuffer<?> byteBuffer) throws CodecException {
         return jsonMessageHandler.read(type, mediaType, httpHeaders, byteBuffer);
     }
 
     @Override
-    public T read(Argument<T> type, MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
+    public T read(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
         return jsonMessageHandler.read(type, mediaType, httpHeaders, inputStream);
     }
 
     @Override
-    public boolean isWriteable(Argument<T> type, MediaType mediaType) {
+    public boolean isWriteable(Argument<T> type, @Nullable MediaType mediaType) {
         return jsonMessageHandler.isWriteable(type, mediaType);
     }
 

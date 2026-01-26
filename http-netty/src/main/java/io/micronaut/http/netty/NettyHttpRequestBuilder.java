@@ -141,7 +141,7 @@ public interface NettyHttpRequestBuilder {
                 break;
             }
 
-            supportDirect &= wrapper.getBody() == wrapper.getDelegate().getBody();
+            supportDirect &= wrapper.getBody().equals(wrapper.getDelegate().getBody());
             request = wrapper.getDelegate();
         }
 

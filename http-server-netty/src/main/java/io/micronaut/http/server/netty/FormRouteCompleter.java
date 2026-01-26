@@ -28,6 +28,7 @@ import io.micronaut.http.server.netty.multipart.NettyPartData;
 import io.micronaut.web.router.RouteMatch;
 import io.netty.channel.EventLoop;
 import io.netty.handler.codec.http.multipart.FileUpload;
+import org.jspecify.annotations.NullUnmarked;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
@@ -55,6 +56,7 @@ import java.util.function.BiFunction;
  * @since 4.0.0
  * @author Jonas Konrad
  */
+@NullUnmarked
 @Internal
 public final class FormRouteCompleter implements Subscriber<Object> {
     private static final Logger LOG = LoggerFactory.getLogger(FormRouteCompleter.class);

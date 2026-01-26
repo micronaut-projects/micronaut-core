@@ -80,7 +80,7 @@ public final class DefaultStatusRouteInfo<T, R> extends DefaultRequestMatcher<T,
     }
 
     @Override
-    public HttpStatus findStatus(HttpStatus defaultStatus) {
+    public HttpStatus findStatus(@Nullable HttpStatus defaultStatus) {
         return super.findStatus(status());
     }
 

@@ -53,6 +53,7 @@ import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.handler.codec.http.DefaultLastHttpContent;
 import io.netty.handler.codec.http.multipart.InterfaceHttpData;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -114,6 +115,7 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
 
         return new PendingRequestBindingResult<>() {
             @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
+            @Nullable
             Optional<T> result;
 
             {
@@ -137,7 +139,7 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
 
             @Override
             public Optional<T> getValue() {
-                return result;
+                return result == null ? Optional.empty() : result;
             }
 
             @Override
@@ -184,7 +186,7 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
                 }
                 intermediate = map;
             } else if (data.size() == 1) {
-                intermediate = data.get(0);
+                intermediate = data.getFirst();
                 if (intermediate instanceof ByteBufHolder bbh) {
                     intermediate = bbh.content();
                 }
@@ -218,7 +220,8 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
         return composite;
     }
 
-    private T read(ArgumentConversionContext<T> context, MessageBodyReader<T> reader, HttpHeaders headers, MediaType mediaType, ByteBuffer<?> byteBuffer) {
+    @Nullable
+    private T read(ArgumentConversionContext<T> context, MessageBodyReader<T> reader, HttpHeaders headers, @Nullable MediaType mediaType, ByteBuffer<?> byteBuffer) {
         boolean success = false;
         try {
             T result = reader.read(context.getArgument(), mediaType, headers, byteBuffer);

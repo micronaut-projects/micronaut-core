@@ -23,7 +23,6 @@ import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.core.util.StringUtils;
@@ -36,6 +35,7 @@ import io.netty.handler.logging.LogLevel;
 import io.netty.handler.ssl.ApplicationProtocolNames;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -193,7 +193,9 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
 
     private Map<ChannelOption, Object> childOptions = Collections.emptyMap();
     private Map<ChannelOption, Object> options = Collections.emptyMap();
+    @Nullable
     private Worker worker;
+    @Nullable
     private Parent parent;
     private FileTypeHandlerConfiguration fileTypeHandlerConfiguration = new FileTypeHandlerConfiguration();
     private int maxInitialLineLength = DEFAULT_MAXINITIALLINELENGTH;
@@ -205,18 +207,22 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private boolean chunkedSupported = DEFAULT_CHUNKSUPPORTED;
     private boolean validateHeaders = DEFAULT_VALIDATEHEADERS;
     private int initialBufferSize = DEFAULT_INITIALBUFFERSIZE;
+    @Nullable
     private LogLevel logLevel;
     private int compressionThreshold = DEFAULT_COMPRESSIONTHRESHOLD;
     private int compressionLevel = DEFAULT_COMPRESSIONLEVEL;
     private int maxZstdEncodeSize = DEFAULT_MAX_ZSTD_ENCODE_SIZE;
     private boolean useNativeTransport = DEFAULT_USE_NATIVE_TRANSPORT;
     private String fallbackProtocol = ApplicationProtocolNames.HTTP_1_1;
+    @Nullable
     private AccessLogger accessLogger;
     private Http2Settings http2Settings = new Http2Settings();
     private Http3Settings http3Settings = new Http3Settings();
     private boolean keepAliveOnServerError = DEFAULT_KEEP_ALIVE_ON_SERVER_ERROR;
+    @Nullable
     private String pcapLoggingPathPattern = null;
-    private List<NettyListenerConfiguration> listeners = null;
+    @Nullable
+    private List<NettyListenerConfiguration> listeners;
     private boolean eagerParsing = DEFAULT_EAGER_PARSING;
     private int jsonBufferMaxComponents = DEFAULT_JSON_BUFFER_MAX_COMPONENTS;
     private boolean legacyMultiplexHandlers = false;
@@ -236,7 +242,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     /**
      * @param applicationConfiguration The application configuration
      */
-    public NettyHttpServerConfiguration(ApplicationConfiguration applicationConfiguration) {
+    public NettyHttpServerConfiguration(@Nullable ApplicationConfiguration applicationConfiguration) {
         this(applicationConfiguration, Collections.emptyList());
     }
 
@@ -245,9 +251,8 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * @param pipelineCustomizers A list of pipeline customizers
      */
     @Inject
-    public NettyHttpServerConfiguration(
-            ApplicationConfiguration applicationConfiguration,
-            List<ChannelPipelineListener> pipelineCustomizers) {
+    public NettyHttpServerConfiguration(@Nullable ApplicationConfiguration applicationConfiguration,
+                                        List<ChannelPipelineListener> pipelineCustomizers) {
         super(applicationConfiguration);
         this.pipelineCustomizers = pipelineCustomizers;
     }
@@ -299,6 +304,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * Returns the AccessLogger configuration.
      * @return The AccessLogger configuration.
      */
+    @Nullable
     public AccessLogger getAccessLogger() {
         return accessLogger;
     }
@@ -343,7 +349,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * @param http3Settings The Http3Settings.
      */
     @Experimental
-    public void setHttp3Settings(Http3Settings http3Settings) {
+    public void setHttp3Settings(@Nullable Http3Settings http3Settings) {
         if (http3Settings != null) {
             this.http3Settings = http3Settings;
         }
@@ -370,7 +376,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * @param fallbackProtocol The fallback protocol to use when negotiating via ALPN
      * @see ApplicationProtocolNames
      */
-    public void setFallbackProtocol(String fallbackProtocol) {
+    public void setFallbackProtocol(@Nullable String fallbackProtocol) {
         if (fallbackProtocol != null) {
             this.fallbackProtocol = fallbackProtocol;
         }
@@ -512,6 +518,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     /**
      * @return Configuration for the worker {@link io.netty.channel.EventLoopGroup}
      */
+    @Nullable
     public Worker getWorker() {
         return worker;
     }
@@ -539,6 +546,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     /**
      * @return Configuration for the parent {@link io.netty.channel.EventLoopGroup}
      */
+    @Nullable
     public Parent getParent() {
         return parent;
     }
@@ -702,6 +710,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * @return The path pattern, or {@code null} if logging is disabled.
      */
     @Internal
+    @Nullable
     public String getPcapLoggingPathPattern() {
         return pcapLoggingPathPattern;
     }
@@ -721,6 +730,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * Get the explicit netty listener configurations, or {@code null} if they should be implicit.
      * @return The listeners
      */
+    @Nullable
     public List<NettyListenerConfiguration> getListeners() {
         return listeners;
     }
@@ -930,7 +940,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          * @param value The header table size.
          * @throws IllegalArgumentException if verification of the setting fails.
          */
-        public void setHeaderTableSize(Long value) {
+        public void setHeaderTableSize(@Nullable Long value) {
             if (value != null) {
                 settings.headerTableSize(value);
             }
@@ -999,7 +1009,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          * @param value The {@code SETTINGS_INITIAL_WINDOW_SIZE} value.
          * @throws IllegalArgumentException if verification of the setting fails.
          */
-        public void setInitialWindowSize(Integer value) {
+        public void setInitialWindowSize(@Nullable Integer value) {
             if (value != null) {
                 settings.initialWindowSize(value);
             }
@@ -1020,7 +1030,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          * @param value The {@code SETTINGS_MAX_FRAME_SIZE} value.
          * @throws IllegalArgumentException if verification of the setting fails.
          */
-        public void setMaxFrameSize(Integer value) {
+        public void setMaxFrameSize(@Nullable Integer value) {
             if (value != null) {
                 settings.maxFrameSize(value);
             }
@@ -1138,8 +1148,11 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     @ConfigurationProperties("access-logger")
     public static class AccessLogger {
         private boolean enabled;
+        @Nullable
         private String loggerName;
+        @Nullable
         private String logFormat;
+        @Nullable
         private List<String> exclusions;
 
         /**
@@ -1162,6 +1175,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          * The logger name to use. Access logs will be logged at info level.
          * @return The logger name.
          */
+        @Nullable
         public String getLoggerName() {
             return loggerName;
         }
@@ -1178,6 +1192,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          * Returns the log format to use.
          * @return The log format.
          */
+        @Nullable
         public String getLogFormat() {
             return logFormat;
         }
@@ -1193,6 +1208,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         /**
          * @return The URI patterns to exclude from the access log.
          */
+        @Nullable
         public List<String> getExclusions() {
             return exclusions;
         }
@@ -1348,9 +1364,12 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     public abstract static class EventLoopConfig implements EventLoopGroupConfiguration {
         private int threads;
         private double threadCoreRatio = DEFAULT_THREAD_CORE_RATIO;
+        @Nullable
         private Integer ioRatio;
+        @Nullable
         private String executor;
         private boolean preferNativeTransport = false;
+        @Nullable
         private List<String> transport;
         private Duration shutdownQuietPeriod = Duration.ofSeconds(DEFAULT_SHUTDOWN_QUIET_PERIOD);
         private Duration shutdownTimeout = Duration.ofSeconds(DEFAULT_SHUTDOWN_TIMEOUT);
@@ -1418,7 +1437,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         /**
          * @param shutdownQuietPeriod Set the shutdown quiet period
          */
-        public void setShutdownQuietPeriod(Duration shutdownQuietPeriod) {
+        public void setShutdownQuietPeriod(@Nullable Duration shutdownQuietPeriod) {
             if (shutdownQuietPeriod != null) {
                 this.shutdownQuietPeriod = shutdownQuietPeriod;
             }
@@ -1427,7 +1446,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         /**
          * @param shutdownTimeout Set the shutdown timeout (must be >= shutdownQuietPeriod)
          */
-        public void setShutdownTimeout(Duration shutdownTimeout) {
+        public void setShutdownTimeout(@Nullable Duration shutdownTimeout) {
             if (shutdownTimeout != null) {
                 this.shutdownTimeout = shutdownTimeout;
             }
@@ -1543,15 +1562,20 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         private final String name;
         private Family family = Family.TCP;
         private boolean ssl;
+        @Nullable
         private String keyName;
+        @Nullable
         private String trustName;
         @Nullable
         private String host;
         private int port;
+        @Nullable
         private String path;
         private boolean exposeDefaultRoutes = true;
         private boolean supportGracefulShutdown = true;
+        @Nullable
         private Integer fd = null;
+        @Nullable
         private Integer acceptedFd = null;
         private boolean bind = true;
         private boolean serverSocket = true;
@@ -1725,6 +1749,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          * For UNIX domain sockets, the path of the socket. For abstract domain sockets, this should start with a NUL byte.
          * @return For UNIX domain sockets, the path of the socket. For abstract domain sockets, this should start with a NUL byte.
          */
+        @Nullable
         public String getPath() {
             return path;
         }
@@ -1785,6 +1810,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          *
          * @return The file descriptor
          */
+        @Nullable
         public Integer getFd() {
             return fd;
         }
@@ -1844,6 +1870,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          *
          * @return The fd to register
          */
+        @Nullable
         public Integer getAcceptedFd() {
             return acceptedFd;
         }

@@ -17,7 +17,6 @@ package io.micronaut.http.server;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
@@ -65,7 +64,6 @@ final class ExecutableRouteInfo<T, R> extends DefaultRouteInfo<R> implements Met
     }
 
     @Override
-    @NonNull
     public AnnotationMetadata getAnnotationMetadata() {
         return method.getAnnotationMetadata();
     }

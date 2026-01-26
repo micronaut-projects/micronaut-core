@@ -20,6 +20,7 @@ import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.netty.util.internal.PlatformDependent;
+import org.jspecify.annotations.NullUnmarked;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
@@ -37,6 +38,7 @@ import java.util.concurrent.ForkJoinPool;
  */
 @Internal
 @Experimental
+@NullUnmarked
 public final class PrivateLoomSupport {
     private static final MethodHandle DEFAULT_SCHEDULER;
     private static final MethodHandle BUILDER_SCHEDULER;

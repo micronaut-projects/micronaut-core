@@ -76,7 +76,7 @@ public class NioEventLoopGroupFactory implements EventLoopGroupFactory {
     }
 
     @Override
-    public Channel channelInstance(NettyChannelType type, @Nullable EventLoopGroupConfiguration configuration, Channel parent, int fd) {
+    public Channel channelInstance(NettyChannelType type, @Nullable EventLoopGroupConfiguration configuration, @Nullable Channel parent, int fd) {
         if (fd != 0) {
             throw new IllegalArgumentException("With nio, only channel fd 0 is supported. Either switch to fd 0, or use the epoll transport that supports any fd.");
         }

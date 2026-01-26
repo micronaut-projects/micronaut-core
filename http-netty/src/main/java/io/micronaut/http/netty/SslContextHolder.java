@@ -21,6 +21,8 @@ import io.netty.handler.codec.quic.QuicSslContext;
 import io.netty.handler.ssl.SslContext;
 import io.netty.util.ReferenceCountUtil;
 
+import java.util.Objects;
+
 /**
  * Holder for Netty SSL context instances for TCP ({@link SslContext}) and QUIC/HTTP3
  * ({@link QuicSslContext}). Manages Netty reference counting via {@link #retain()} and
@@ -62,6 +64,6 @@ public record SslContextHolder(
     }
 
     public QuicSslContext quicSslContext() {
-        return (QuicSslContext) quicSslContextObject;
+        return (QuicSslContext) Objects.requireNonNull(quicSslContextObject);
     }
 }

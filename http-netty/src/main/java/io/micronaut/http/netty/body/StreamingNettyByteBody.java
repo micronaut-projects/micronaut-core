@@ -71,7 +71,7 @@ public final class StreamingNettyByteBody extends BaseStreamingByteBody<Streamin
     }
 
     @Override
-    public BufferConsumer.Upstream primary(BufferConsumer primary) {
+    public BufferConsumer.Upstream primary(@Nullable BufferConsumer primary) {
         touch();
         BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {

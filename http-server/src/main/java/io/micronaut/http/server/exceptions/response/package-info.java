@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2026 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,12 +14,9 @@
  * limitations under the License.
  */
 /**
- * HTTP server exceptions.
- *
- * @author Graeme Rocher
- * @since 1.0
+ * HTTP server response exceptions.
  */
 @NullMarked
-package io.micronaut.http.server.exceptions;
+package io.micronaut.http.server.exceptions.response;
 
 import org.jspecify.annotations.NullMarked;

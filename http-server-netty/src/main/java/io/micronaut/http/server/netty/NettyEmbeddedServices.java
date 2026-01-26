@@ -161,7 +161,7 @@ public interface NettyEmbeddedServices {
      * @deprecated Use {@link #getChannelInstance(NettyChannelType, EventLoopGroupConfiguration)} instead
      */
     @Deprecated(since = "4.5.0", forRemoval = true)
-    default ServerSocketChannel getServerSocketChannelInstance(EventLoopGroupConfiguration workerConfig) {
+    default ServerSocketChannel getServerSocketChannelInstance(@Nullable EventLoopGroupConfiguration workerConfig) {
         return (ServerSocketChannel) getChannelInstance(NettyChannelType.SERVER_SOCKET, workerConfig);
     }
 
@@ -173,7 +173,7 @@ public interface NettyEmbeddedServices {
      * @deprecated Use {@link #getChannelInstance(NettyChannelType, EventLoopGroupConfiguration)} instead
      */
     @Deprecated(since = "4.5.0", forRemoval = true)
-    default ServerChannel getDomainServerChannelInstance(EventLoopGroupConfiguration workerConfig) {
+    default ServerChannel getDomainServerChannelInstance(@Nullable EventLoopGroupConfiguration workerConfig) {
         return (ServerChannel) getChannelInstance(NettyChannelType.DOMAIN_SERVER_SOCKET, workerConfig);
     }
 
@@ -184,7 +184,7 @@ public interface NettyEmbeddedServices {
      * @return The channel
      * @throws UnsupportedOperationException if domain sockets are not supported.
      */
-    default Channel getChannelInstance(NettyChannelType type, EventLoopGroupConfiguration workerConfig) {
+    default Channel getChannelInstance(NettyChannelType type, @Nullable EventLoopGroupConfiguration workerConfig) {
         return switch (type) {
             case SERVER_SOCKET -> getServerSocketChannelInstance(workerConfig);
             case DOMAIN_SERVER_SOCKET -> getDomainServerChannelInstance(workerConfig);
@@ -201,7 +201,7 @@ public interface NettyEmbeddedServices {
      * @return The channel
      * @throws UnsupportedOperationException if domain sockets are not supported.
      */
-    default Channel getChannelInstance(NettyChannelType type, EventLoopGroupConfiguration workerConfig, Channel parent, int fd) {
+    default Channel getChannelInstance(NettyChannelType type, @Nullable EventLoopGroupConfiguration workerConfig, @Nullable Channel parent, int fd) {
         throw new UnsupportedOperationException("File descriptor channels not supported");
     }
 

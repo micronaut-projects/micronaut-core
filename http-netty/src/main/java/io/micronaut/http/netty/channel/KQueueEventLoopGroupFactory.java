@@ -85,7 +85,7 @@ public class KQueueEventLoopGroupFactory implements EventLoopGroupFactory {
     }
 
     @Override
-    public Channel channelInstance(NettyChannelType type, EventLoopGroupConfiguration configuration, Channel parent, int fd) {
+    public Channel channelInstance(NettyChannelType type, @Nullable EventLoopGroupConfiguration configuration, @Nullable Channel parent, int fd) {
         if (parent != null) {
             LOG.warn("kqueue does not support FD-based channels with a parent channel. This may cause issues with HTTP2.");
         }

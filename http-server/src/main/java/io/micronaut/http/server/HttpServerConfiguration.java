@@ -18,8 +18,6 @@ package io.micronaut.http.server;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
@@ -30,11 +28,13 @@ import io.micronaut.http.server.util.locale.HttpLocaleResolutionConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.scheduling.executor.ThreadSelection;
 import jakarta.inject.Inject;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -42,6 +42,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
@@ -139,22 +140,33 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
 
     private static final Logger LOG = LoggerFactory.getLogger(HttpServerConfiguration.class);
 
+    @Nullable
     private Integer port;
+    @Nullable
     private String host;
+    @Nullable
     private Integer readTimeout;
     private long maxRequestSize = DEFAULT_MAX_REQUEST_SIZE;
     private long maxRequestBufferSize = DEFAULT_MAX_REQUEST_BUFFER_SIZE;
+    @Nullable
     private Duration readIdleTimeout = null;
+    @Nullable
     private Duration writeIdleTimeout = null;
+    @Nullable
     private Duration idleTimeout = Duration.ofMinutes(DEFAULT_IDLE_TIME_MINUTES);
     private MultipartConfiguration multipart = new MultipartConfiguration();
     private CorsConfiguration cors = new CorsConfiguration();
+    @Nullable
     private String serverHeader;
     private boolean dateHeader = DEFAULT_DATEHEADER;
     private boolean logHandledExceptions = DEFAULT_LOG_HANDLED_EXCEPTIONS;
+    @Nullable
     private HostResolutionConfiguration hostResolution;
+    @Nullable
     private HttpLocaleResolutionConfigurationProperties localeResolution;
+    @Nullable
     private String clientAddressHeader;
+    @Nullable
     private String contextPath;
     private boolean dualProtocol = DEFAULT_DUAL_PROTOCOL;
     private boolean httpToHttpsRedirect = DEFAULT_HTTP_TO_HTTPS_REDIRECT;
@@ -163,6 +175,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
 
     private HttpVersion httpVersion = HttpVersion.HTTP_1_1;
     private final ApplicationConfiguration applicationConfiguration;
+    @Nullable
     private Charset defaultCharset;
     private ThreadSelection threadSelection = ThreadSelection.MANUAL;
     private boolean validateUrl = true;
@@ -182,7 +195,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
      * @param applicationConfiguration The application configuration
      */
     @Inject
-    public HttpServerConfiguration(ApplicationConfiguration applicationConfiguration) {
+    public HttpServerConfiguration(@Nullable ApplicationConfiguration applicationConfiguration) {
         if (applicationConfiguration != null) {
             this.defaultCharset = applicationConfiguration.getDefaultCharset();
         }
@@ -202,7 +215,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
      * Sets the HTTP version to use. Defaults to {@link HttpVersion#HTTP_1_1}.
      * @param httpVersion The http version
      */
-    public void setHttpVersion(HttpVersion httpVersion) {
+    public void setHttpVersion(@Nullable HttpVersion httpVersion) {
         if (httpVersion != null) {
             this.httpVersion = httpVersion;
         }
@@ -211,7 +224,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     /**
      * @return The {@link ThreadSelection} model to use for the server.
      */
-    public @NonNull ThreadSelection getThreadSelection() {
+    public ThreadSelection getThreadSelection() {
         return threadSelection;
     }
 
@@ -219,7 +232,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
      * Sets the {@link io.micronaut.scheduling.executor.ThreadSelection} model to use for the server. Default value MANUAL.
      * @param threadSelection The thread selection model
      */
-    public void setThreadSelection(ThreadSelection threadSelection) {
+    public void setThreadSelection(@Nullable ThreadSelection threadSelection) {
         if (threadSelection != null) {
             this.threadSelection = threadSelection;
         }
@@ -236,7 +249,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
      * @return The default charset to use
      */
     public Charset getDefaultCharset() {
-        return defaultCharset;
+        return Objects.requireNonNullElse(defaultCharset, StandardCharsets.UTF_8);
     }
 
     /**
@@ -307,6 +320,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     /**
      * @return The time to allow an idle connection for
      */
+    @Nullable
     public Duration getIdleTimeout() {
         return idleTimeout;
     }
@@ -352,6 +366,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     /**
      * @return Which header stores the original client
      */
+    @Nullable
     public String getClientAddressHeader() {
         return clientAddressHeader;
     }
@@ -359,6 +374,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     /**
      * @return the context path for the web server
      */
+    @Nullable
     @Override
     public String getContextPath() {
         return contextPath;
@@ -481,7 +497,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
      *
      * @param idleTimeout The idle time
      */
-    public void setIdleTimeout(Duration idleTimeout) {
+    public void setIdleTimeout(@Nullable Duration idleTimeout) {
         if (idleTimeout != null) {
             this.idleTimeout = idleTimeout;
         }
@@ -718,8 +734,10 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
         @SuppressWarnings("WeakerAccess")
         public static final long DEFAULT_THRESHOLD = 1024L * 1024 * 10; // 10MB
 
+        @Nullable
         private File location;
         private long maxFileSize = DEFAULT_MAX_FILE_SIZE;
+        @Nullable
         private Boolean enabled;
         private boolean disk = DEFAULT_DISK;
         private boolean mixed = DEFAULT_MIXED;
@@ -848,7 +866,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
 
         private Map<String, CorsOriginConfiguration> configurations = Collections.emptyMap();
 
-        private Map<String, CorsOriginConfiguration> defaultConfiguration = new LinkedHashMap<>(1);
+        private final Map<String, CorsOriginConfiguration> defaultConfiguration = new LinkedHashMap<>(1);
 
         /**
          * @return Whether cors is enabled. Defaults to false.
@@ -931,8 +949,11 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
 
         private static final Boolean DEFAULT_PORT_IN_HOST = false;
 
+        @Nullable
         private String hostHeader;
+        @Nullable
         private String protocolHeader;
+        @Nullable
         private String portHeader;
         private boolean portInHost = DEFAULT_PORT_IN_HOST;
         private List<Pattern> allowedHosts = Collections.emptyList();
@@ -940,6 +961,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
         /**
          * @return The host header name
          */
+        @Nullable
         public String getHostHeader() {
             return hostHeader;
         }
@@ -954,6 +976,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
         /**
          * @return The protocol header name
          */
+        @Nullable
         public String getProtocolHeader() {
             return protocolHeader;
         }
@@ -968,6 +991,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
         /**
          * @return The port header name
          */
+        @Nullable
         public String getPortHeader() {
             return portHeader;
         }
@@ -1031,8 +1055,11 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
         public static final String PREFIX = HttpServerConfiguration.PREFIX + ".locale-resolution";
         private static final boolean DEFAULT_HEADER_RESOLUTION = true;
 
+        @Nullable
         private Locale fixed;
+        @Nullable
         private String sessionAttribute;
+        @Nullable
         private String cookieName;
         private boolean header = DEFAULT_HEADER_RESOLUTION;
         private Locale defaultLocale = Locale.getDefault();
@@ -1041,7 +1068,6 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
          * @return The fixed locale
          */
         @Override
-        @NonNull
         public Optional<Locale> getFixed() {
             return Optional.ofNullable(fixed);
         }
@@ -1060,7 +1086,6 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
          * @return The key in the session that stores the locale
          */
         @Override
-        @NonNull
         public Optional<String> getSessionAttribute() {
             return Optional.ofNullable(sessionAttribute);
         }
@@ -1078,7 +1103,6 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
          * @return The locale to be used if one cannot be resolved.
          */
         @Override
-        @NonNull
         public Locale getDefaultLocale() {
             return defaultLocale;
         }
@@ -1089,7 +1113,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
          *
          * @param defaultLocale The default locale.
          */
-        public void setDefaultLocale(@NonNull Locale defaultLocale) {
+        public void setDefaultLocale(Locale defaultLocale) {
             this.defaultLocale = defaultLocale;
         }
 
@@ -1097,7 +1121,6 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
          * @return The name of the cookie that contains the locale.
          */
         @Override
-        @NonNull
         public Optional<String> getCookieName() {
             return Optional.ofNullable(cookieName);
         }
@@ -1235,7 +1258,6 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
             /**
              * @return True if the cache control should be public
              */
-            @NonNull
             public boolean getPublic() {
                 return publicCache;
             }

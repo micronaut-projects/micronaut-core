@@ -22,6 +22,7 @@ import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.optim.StaticOptimizations;
 import io.micronaut.core.reflect.ClassUtils;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -459,7 +460,7 @@ public class Publishers {
      * @param object The object
      * @return True if it is
      */
-    public static boolean isConvertibleToPublisher(Object object) {
+    public static boolean isConvertibleToPublisher(@Nullable Object object) {
         if (object == null ||
             // check some common types for performance
             object instanceof String || object instanceof byte[]) {
@@ -525,7 +526,7 @@ public class Publishers {
      * @since 4.6.0
      */
     @NonNull
-    public static <T> Publisher<T> convertToPublisher(@NonNull ConversionService conversionService, @NonNull Object object) {
+    public static <T> Publisher<T> convertToPublisher(@NonNull ConversionService conversionService, @Nullable Object object) {
         Objects.requireNonNull(object, "Argument [object] cannot be null");
         if (object instanceof Publisher<?> publisher) {
             return (Publisher<T>) publisher;

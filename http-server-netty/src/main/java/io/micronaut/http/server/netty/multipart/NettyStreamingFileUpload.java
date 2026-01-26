@@ -29,6 +29,7 @@ import io.micronaut.http.multipart.StreamingFileUpload;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -43,6 +44,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -169,7 +171,9 @@ public final class NettyStreamingFileUpload implements StreamingFileUpload {
 
                 subject.publishOn(Schedulers.fromExecutorService(ioExecutor))
                         .subscribe(new Subscriber<>() {
+                            @Nullable
                             Subscription subscription;
+                            @Nullable
                             OutputStream outputStream;
 
                             @Override
@@ -186,8 +190,8 @@ public final class NettyStreamingFileUpload implements StreamingFileUpload {
                             @Override
                             public void onNext(PartData o) {
                                 try {
-                                    outputStream.write(o.getBytes());
-                                    subscription.request(1);
+                                    Objects.requireNonNull(outputStream).write(o.getBytes());
+                                    Objects.requireNonNull(subscription).request(1);
                                 } catch (IOException e) {
                                     handleError(e);
                                 }
@@ -212,7 +216,7 @@ public final class NettyStreamingFileUpload implements StreamingFileUpload {
                             public void onComplete() {
                                 discard();
                                 try {
-                                    outputStream.close();
+                                    Objects.requireNonNull(outputStream).close();
                                     emitter.success(true);
                                 } catch (IOException e) {
                                     if (LOG.isWarnEnabled()) {
@@ -223,7 +227,7 @@ public final class NettyStreamingFileUpload implements StreamingFileUpload {
                             }
 
                             private void handleError(Throwable t) {
-                                subscription.cancel();
+                                Objects.requireNonNull(subscription).cancel();
                                 onError(new MultipartException("Error transferring file: " + fileUpload.getName(), t));
                             }
                         })

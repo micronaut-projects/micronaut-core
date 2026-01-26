@@ -27,6 +27,7 @@ import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.util.ResourceLeakDetector;
 import io.netty.util.ResourceLeakDetectorFactory;
 import io.netty.util.ResourceLeakTracker;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -49,6 +50,7 @@ public class NettyCompletedFileUpload implements CompletedFileUpload {
     private final FileUpload fileUpload;
     private final boolean controlRelease;
 
+    @Nullable
     private final ResourceLeakTracker<NettyCompletedFileUpload> tracker;
 
     /**

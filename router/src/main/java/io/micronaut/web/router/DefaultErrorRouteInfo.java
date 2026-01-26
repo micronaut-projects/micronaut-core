@@ -92,7 +92,7 @@ public final class DefaultErrorRouteInfo<T, R> extends DefaultRequestMatcher<T, 
     }
 
     @Override
-    public HttpStatus findStatus(HttpStatus defaultStatus) {
+    public HttpStatus findStatus(@Nullable HttpStatus defaultStatus) {
         return super.findStatus(defaultStatus == null ? HttpStatus.INTERNAL_SERVER_ERROR : defaultStatus);
     }
 

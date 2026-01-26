@@ -16,7 +16,6 @@
 package io.micronaut.http.server.util;
 
 import io.micronaut.context.annotation.DefaultImplementation;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.HttpRequest;
 
@@ -34,6 +33,6 @@ public interface HttpClientAddressResolver {
      * @return The client address
      */
     @Nullable
-    String resolve(@NonNull HttpRequest request);
+    String resolve(HttpRequest request);
 
 }

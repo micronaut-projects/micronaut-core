@@ -18,6 +18,7 @@ package io.micronaut.http.netty.channel.loom;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.NullUnmarked;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.scheduling.LoomSupport;
 import io.netty.channel.EventLoopGroup;
@@ -55,6 +56,7 @@ import java.util.concurrent.locks.LockSupport;
  * @since 4.9.0
  * @author Jonas Konrad
  */
+@NullUnmarked
 @Internal
 @Experimental
 public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {

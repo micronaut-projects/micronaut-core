@@ -18,7 +18,6 @@ package io.micronaut.http.server.exceptions.response;
 import io.micronaut.context.MessageSource;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.LocaleResolver;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpRequest;
@@ -26,6 +25,7 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.util.HtmlSanitizer;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 
 import java.text.MessageFormat;
 import java.util.ArrayList;
@@ -142,12 +142,12 @@ final class DefaultHtmlErrorResponseBodyProvider implements HtmlErrorResponseBod
     }
 
     @Override
-    public String body(@NonNull ErrorContext errorContext, @NonNull HttpResponse<?> response) {
+    public String body(ErrorContext errorContext, HttpResponse<?> response) {
         HtmlErrorPage key = error(errorContext, response);
         return cache.computeIfAbsent(key, this::html);
     }
 
-    private String html(@NonNull HtmlErrorPage htmlErrorPage) {
+    private String html(HtmlErrorPage htmlErrorPage) {
         final String errorTitleCode = htmlErrorPage.httpStatusCode() + ".error.title";
         final String errorTitle = messageSource.getMessage(errorTitleCode, htmlErrorPage.httpStatusReason(), htmlErrorPage.locale());
         String header = "<h1>" + errorTitle + "</h1>";
@@ -160,8 +160,8 @@ final class DefaultHtmlErrorResponseBodyProvider implements HtmlErrorResponseBod
                 article(htmlErrorPage));
     }
 
-    private HtmlErrorPage error(@NonNull ErrorContext errorContext,
-                                @NonNull HttpResponse<?> response) {
+    private HtmlErrorPage error(ErrorContext errorContext,
+                                HttpResponse<?> response) {
         int httpStatusCode = response.code();
         Locale locale = localeResolver.resolveOrDefault(errorContext.getRequest());
         final String errorBoldCode = httpStatusCode + ".error.bold";
@@ -185,7 +185,7 @@ final class DefaultHtmlErrorResponseBodyProvider implements HtmlErrorResponseBod
         return new HtmlErrorPage(locale, httpStatusCode, httpStatusReason, error, errorBold, messages);
     }
 
-    private String article(@NonNull HtmlErrorPage htmlErrorPage) {
+    private String article(HtmlErrorPage htmlErrorPage) {
         StringBuilder sb = new StringBuilder();
 
         for (String message : htmlErrorPage.messages) {
@@ -213,8 +213,8 @@ final class DefaultHtmlErrorResponseBodyProvider implements HtmlErrorResponseBod
     private record HtmlErrorPage(Locale locale,
                                  int httpStatusCode,
                                  String httpStatusReason,
-                                 String error,
-                                 String errorBold,
+                                 @Nullable String error,
+                                 @Nullable String errorBold,
                                  List<String> messages) {
     }
 }

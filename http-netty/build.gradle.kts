@@ -1,5 +1,7 @@
 plugins {
     id("io.micronaut.build.internal.convention-library")
+    id("io.micronaut.build.internal.convention-nullaway")
+
 }
 
 micronautBuild {

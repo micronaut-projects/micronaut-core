@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.scheduling.LoomSupport;
+import org.jspecify.annotations.NullUnmarked;
 
 import java.lang.invoke.LambdaMetafactory;
 import java.lang.invoke.MethodHandle;
@@ -33,6 +34,7 @@ import java.util.function.Supplier;
  * @since 4.10.0
  * @author Jonas Konrad
  */
+@NullUnmarked
 @Internal
 @Experimental
 public final class LoomBranchSupport {

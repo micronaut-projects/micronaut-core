@@ -38,6 +38,7 @@ import io.micronaut.http.codec.CodecException;
 import io.micronaut.json.JsonFeatures;
 import io.micronaut.json.JsonMapper;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -87,7 +88,7 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Custo
     }
 
     @Override
-    public boolean isReadable(Argument<T> type, MediaType mediaType) {
+    public boolean isReadable(Argument<T> type, @Nullable MediaType mediaType) {
         return mediaType != null && mediaType.matchesAllOrWildcardOrExtension(MediaType.EXTENSION_JSON);
     }
 
@@ -101,7 +102,7 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Custo
     }
 
     @Override
-    public T read(Argument<T> type, MediaType mediaType, Headers httpHeaders, ByteBuffer<?> byteBuffer) throws CodecException {
+    public T read(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, ByteBuffer<?> byteBuffer) throws CodecException {
         T decoded;
         try {
             decoded = jsonMapper.readValue(byteBuffer, type);
@@ -115,7 +116,7 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Custo
     }
 
     @Override
-    public T read(Argument<T> type, MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
+    public T read(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
         try {
             return jsonMapper.readValue(inputStream, type);
         } catch (IOException e) {
@@ -124,7 +125,7 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Custo
     }
 
     @Override
-    public boolean isWriteable(Argument<T> type, MediaType mediaType) {
+    public boolean isWriteable(Argument<T> type, @Nullable MediaType mediaType) {
         return mediaType != null && mediaType.matchesAllOrWildcardOrExtension(MediaType.EXTENSION_JSON);
     }
 
@@ -133,7 +134,7 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Custo
     }
 
     @Override
-    public void writeTo(Argument<T> type, MediaType mediaType, T object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
+    public void writeTo(Argument<T> type, @Nullable MediaType mediaType, T object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
         outgoingHeaders.set(HttpHeaders.CONTENT_TYPE, mediaType != null ? mediaType : MediaType.APPLICATION_JSON_TYPE);
         try {
             if (type.getType() == Object.class && object instanceof CharSequence charSequence) {

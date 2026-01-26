@@ -119,7 +119,7 @@ public final class NettyConverters implements TypeConverterRegistrar {
                         }
                         MessageBodyReader<Object> messageBodyReader = messageBodyHandlerRegistries.get().findReader(argument, mediaType).orElse(null);
                         if (messageBodyReader != null) {
-                            return Optional.of(
+                            return Optional.ofNullable(
                                 messageBodyReader.read(argument, mediaType, new SimpleHttpHeaders(), NettyByteBufferFactory.DEFAULT.wrap(byteBuf))
                             );
                         }

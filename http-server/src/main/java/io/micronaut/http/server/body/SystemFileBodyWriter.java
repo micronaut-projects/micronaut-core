@@ -17,7 +17,6 @@ package io.micronaut.http.server.body;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableHeaders;
@@ -79,16 +78,16 @@ public final class SystemFileBodyWriter extends AbstractFileBodyWriter implement
     }
 
     @Override
-    public ByteBodyHttpResponse<?> write(@NonNull ByteBodyFactory bodyFactory,
+    public ByteBodyHttpResponse<?> write(ByteBodyFactory bodyFactory,
                                          HttpRequest<?> request,
-                                         @NonNull MutableHttpResponse<SystemFile> httpResponse,
-                                         @NonNull Argument<SystemFile> type,
-                                         @NonNull MediaType mediaType,
+                                         MutableHttpResponse<SystemFile> httpResponse,
+                                         Argument<SystemFile> type,
+                                         MediaType mediaType,
                                          SystemFile object) throws CodecException {
         return write(bodyFactory, request, httpResponse, object);
     }
 
-    public ByteBodyHttpResponse<?> write(@NonNull ByteBodyFactory bodyFactory, HttpRequest<?> request, MutableHttpResponse<SystemFile> response, SystemFile systemFile) throws CodecException {
+    public ByteBodyHttpResponse<?> write(ByteBodyFactory bodyFactory, HttpRequest<?> request, MutableHttpResponse<SystemFile> response, SystemFile systemFile) throws CodecException {
         if (!systemFile.getFile().canRead()) {
             throw new MessageBodyException("Could not find file");
         }
@@ -132,22 +131,22 @@ public final class SystemFileBodyWriter extends AbstractFileBodyWriter implement
                 throw new MessageBodyException("Could not find file", e);
             }
 
-            @NonNull InputStream stream = new RangeInputStream(is, position, contentLength);
+            InputStream stream = new RangeInputStream(is, position, contentLength);
             return ByteBodyHttpResponseWrapper.wrap(response, InputStreamByteBody.create(stream, OptionalLong.of(contentLength), ioExecutor, bodyFactory));
         }
     }
 
     @Override
-    public CloseableByteBody writePiece(@NonNull ByteBodyFactory bodyFactory,
-                                        @NonNull HttpRequest<?> request,
-                                        @NonNull HttpResponse<?> response,
-                                        @NonNull Argument<SystemFile> type,
-                                        @NonNull MediaType mediaType,
+    public CloseableByteBody writePiece(ByteBodyFactory bodyFactory,
+                                        HttpRequest<?> request,
+                                        HttpResponse<?> response,
+                                        Argument<SystemFile> type,
+                                        MediaType mediaType,
                                         SystemFile object) {
         return writePiece(bodyFactory, object);
     }
 
-    public @NonNull CloseableByteBody writePiece(@NonNull ByteBodyFactory bodyFactory, SystemFile object) {
+    public CloseableByteBody writePiece(ByteBodyFactory bodyFactory, SystemFile object) {
         long fileLength = object.getLength();
         InputStream is;
         try {
@@ -238,7 +237,7 @@ public final class SystemFileBodyWriter extends AbstractFileBodyWriter implement
         }
 
         @Override
-        public int read(byte @NonNull [] b, int off, int len) throws IOException {
+        public int read(byte[] b, int off, int len) throws IOException {
             if (!doSkip()) {
                 return -1;
             }

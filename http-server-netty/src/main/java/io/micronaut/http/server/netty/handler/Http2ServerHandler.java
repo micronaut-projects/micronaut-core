@@ -16,7 +16,6 @@
 package io.micronaut.http.server.netty.handler;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.server.netty.HttpCompressionStrategy;
@@ -47,10 +46,12 @@ import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
+import org.jspecify.annotations.Nullable;
 
 import java.nio.channels.ClosedChannelException;
 import java.util.EnumMap;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * HTTP/2-specific server handler.
@@ -62,8 +63,9 @@ import java.util.Map;
 public final class Http2ServerHandler extends MultiplexedServerHandler implements Http2FrameListener {
     private static final Map<Http2Error, Exception> HTTP2_ERRORS = new EnumMap<>(Http2Error.class);
 
+    @Nullable
     private Http2ConnectionHandler connectionHandler;
-    private Http2Connection.PropertyKey streamKey;
+    private Http2Connection. @Nullable PropertyKey streamKey;
     private boolean reading = false;
     private boolean upgradedFromHttp1 = false;
 
@@ -88,18 +90,22 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         streamKey = connectionHandler.connection().newKey();
     }
 
+    private Http2ConnectionHandler requiredConnectionHandler() {
+        return Objects.requireNonNull(connectionHandler, "Connection handler not initialized");
+    }
+
     @Override
     void flush() {
         // while reading, hold back flushes for efficiency.
         // Http2ConnectionHandler.readComplete does a flush.
         if (!reading) {
-            connectionHandler.flush(ctx);
+            requiredConnectionHandler().flush(requiredCtx());
         }
     }
 
     @Override
     public int onDataRead(ChannelHandlerContext ctx, int streamId, ByteBuf data, int padding, boolean endOfStream) throws Http2Exception {
-        MultiplexedStream stream = connectionHandler.connection().stream(streamId).getProperty(streamKey);
+        MultiplexedStream stream = requiredConnectionHandler().connection().stream(streamId).getProperty(streamKey);
         if (stream == null) {
             return padding; // data not consumed
         }
@@ -113,7 +119,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
 
     @Override
     public void onHeadersRead(ChannelHandlerContext ctx, int streamId, Http2Headers headers, int streamDependency, short weight, boolean exclusive, int padding, boolean endOfStream) throws Http2Exception {
-        io.netty.handler.codec.http2.Http2Stream str = connectionHandler.connection().stream(streamId);
+        io.netty.handler.codec.http2.Http2Stream str = requiredConnectionHandler().connection().stream(streamId);
         Http2Stream stream = new Http2Stream(str);
         Http2Stream existing = str.setProperty(streamKey, stream);
         if (existing != null) {
@@ -130,14 +136,14 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
     }
 
     @Override
-    public void onRstStreamRead(ChannelHandlerContext ctx, int streamId, long errorCode) throws Http2Exception {
-        MultiplexedStream stream = connectionHandler.connection().stream(streamId).getProperty(streamKey);
+    public void onRstStreamRead(ChannelHandlerContext ctx, int streamId, long errorCode) {
+        MultiplexedStream stream = requiredConnectionHandler().connection().stream(streamId).getProperty(streamKey);
         if (stream != null) {
             Http2Error http2Error = Http2Error.valueOf(errorCode);
             if (http2Error == null) {
                 http2Error = Http2Error.INTERNAL_ERROR;
             }
-            stream.onRstStreamRead(HTTP2_ERRORS.get(http2Error));
+            stream.onRstStreamRead(Objects.requireNonNull(HTTP2_ERRORS.get(http2Error)));
         }
     }
 
@@ -173,10 +179,10 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
             http2Error = Http2Error.INTERNAL_ERROR;
         }
         Exception e = HTTP2_ERRORS.get(http2Error);
-        connectionHandler.connection().forEachActiveStream(s -> {
+        requiredConnectionHandler().connection().forEachActiveStream(s -> {
             Http2ServerHandler.Http2Stream stream = s.getProperty(streamKey);
             if (stream != null) {
-                stream.onGoAwayRead(e);
+                stream.onGoAwayRead(Objects.requireNonNull(e));
             }
             return true;
         });
@@ -200,7 +206,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         @Nullable
         private final Http2AccessLogManager accessLogManager;
 
-        private ConnectionHandler(Http2ConnectionDecoder decoder, Http2ConnectionEncoder encoder, Http2Settings initialSettings, boolean decoupleCloseAndGoAway, boolean flushPreface, Http2ServerHandler handler, Http2AccessLogManager accessLogManager) {
+        private ConnectionHandler(Http2ConnectionDecoder decoder, Http2ConnectionEncoder encoder, Http2Settings initialSettings, boolean decoupleCloseAndGoAway, boolean flushPreface, Http2ServerHandler handler, @Nullable Http2AccessLogManager accessLogManager) {
             super(decoder, encoder, initialSettings, decoupleCloseAndGoAway, flushPreface);
             this.handler = handler;
             this.accessLogManager = accessLogManager;
@@ -287,7 +293,8 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
      */
     public static final class ConnectionHandlerBuilder extends AbstractHttp2ConnectionHandlerBuilder<ConnectionHandler, ConnectionHandlerBuilder> {
         private final Http2ServerHandler frameListener;
-        private Http2AccessLogManager.Factory accessLogManagerFactory;
+        private Http2AccessLogManager.@Nullable Factory accessLogManagerFactory;
+        @Nullable
         private Http2AccessLogManager accessLogManager;
         private boolean decompress = true;
 
@@ -371,7 +378,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
                 return;
             }
             try {
-                connectionHandler.connection().local().flowController().consumeBytes(stream, n);
+                requiredConnectionHandler().connection().local().flowController().consumeBytes(stream, n);
             } catch (Http2Exception e) {
                 throw new IllegalArgumentException("n > unconsumedBytes", e);
             }
@@ -380,13 +387,13 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         @Override
         boolean reset(Throwable cause) {
             if (cause instanceof Http2Exception h2e) {
-                connectionHandler.encoder().writeRstStream(ctx, stream.id(), h2e.error().code(), ctx.voidPromise());
+                requiredConnectionHandler().encoder().writeRstStream(requiredCtx(), stream.id(), h2e.error().code(), requiredCtx().voidPromise());
                 return true;
             } else if (cause instanceof ByteBody.BodyDiscardedException) {
-                connectionHandler.encoder().writeRstStream(ctx, stream.id(), Http2Error.CANCEL.code(), ctx.voidPromise());
+                requiredConnectionHandler().encoder().writeRstStream(requiredCtx(), stream.id(), Http2Error.CANCEL.code(), requiredCtx().voidPromise());
                 return true;
             } else {
-                connectionHandler.encoder().writeRstStream(ctx, stream.id(), Http2Error.INTERNAL_ERROR.code(), ctx.voidPromise());
+                requiredConnectionHandler().encoder().writeRstStream(requiredCtx(), stream.id(), Http2Error.INTERNAL_ERROR.code(), requiredCtx().voidPromise());
                 return false;
             }
         }
@@ -395,7 +402,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         void closeInput() {
             closeInput = true;
             if (stream.state() == io.netty.handler.codec.http2.Http2Stream.State.HALF_CLOSED_LOCAL) {
-                connectionHandler.encoder().writeRstStream(ctx, stream.id(), Http2Error.CANCEL.code(), ctx.voidPromise());
+                requiredConnectionHandler().encoder().writeRstStream(requiredCtx(), stream.id(), Http2Error.CANCEL.code(), requiredCtx().voidPromise());
                 flush();
             }
         }
@@ -406,7 +413,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
                 promise = promise.unvoid();
                 promise.addListener(future -> closeInput());
             }
-            connectionHandler.encoder().writeHeaders(ctx, stream.id(), HttpConversionUtil.toHttp2Headers(headers, true), 0, endStream, promise);
+            requiredConnectionHandler().encoder().writeHeaders(requiredCtx(), stream.id(), HttpConversionUtil.toHttp2Headers(headers, true), 0, endStream, promise);
         }
 
         @Override
@@ -415,7 +422,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
                 promise = promise.unvoid();
                 promise.addListener(future -> closeInput());
             }
-            connectionHandler.encoder().writeData(ctx, stream.id(), data, 0, endStream, promise);
+            requiredConnectionHandler().encoder().writeData(requiredCtx(), stream.id(), data, 0, endStream, promise);
         }
     }
 

@@ -38,6 +38,7 @@ import io.netty.handler.codec.http.multipart.HttpPostStandardRequestDecoder;
 import io.netty.handler.codec.http.multipart.InterfaceHttpData;
 import io.netty.handler.codec.http.multipart.InterfaceHttpPostRequestDecoder;
 import io.netty.util.ReferenceCountUtil;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.charset.Charset;
@@ -198,6 +199,7 @@ public final class FormDataHttpContentProcessor {
         }
     }
 
+    @Nullable
     private RuntimeException mapFormException(RuntimeException original) {
         if (original instanceof HttpPostRequestDecoder.EndOfDataDecoderException ||
             instanceOfSafe(original, () -> io.netty.contrib.multipart.vintage.HttpPostRequestDecoder.EndOfDataDecoderException.class)) {
@@ -206,17 +208,19 @@ public final class FormDataHttpContentProcessor {
         } else if (original instanceof HttpPostRequestDecoder.ErrorDataDecoderException ||
             instanceOfSafe(original, () -> io.netty.contrib.multipart.vintage.HttpPostRequestDecoder.ErrorDataDecoderException.class)) {
             Throwable cause = original.getCause();
-            if (cause instanceof IOException && cause.getMessage().equals("Size exceed allowed maximum capacity")) {
-                String partName = decoder.currentPartialHttpData().getName();
-                return new ContentLengthExceededException("The part named [" + partName + "] exceeds the maximum allowed content length [" + partMaxSize + "]");
-            } else {
-                return original;
+            if (cause != null) {
+                String message = cause.getMessage();
+                if (cause instanceof IOException && message != null && message.equals("Size exceed allowed maximum capacity")) {
+                    String partName = decoder.currentPartialHttpData().getName();
+                    return new ContentLengthExceededException("The part named [" + partName + "] exceeds the maximum allowed content length [" + partMaxSize + "]");
+                }
             }
+            return original;
         } else if (original instanceof HttpPostRequestDecoder.TooManyFormFieldsException ||
             instanceOfSafe(original, () -> TooManyFormFieldsException.class)) {
             return new ContentLengthExceededException("Number of form fields exceeds configured limit of [" + configuration.getFormMaxFields() + "]");
         } else if (original instanceof HttpPostRequestDecoder.TooLongFormFieldException ||
-            (instanceOfSafe(original, () -> FormDecoderException.class) && original.getMessage().equals("Undecoded data limit exceeded"))) {
+            (instanceOfSafe(original, () -> FormDecoderException.class) && original.getMessage() != null && original.getMessage().equals("Undecoded data limit exceeded"))) {
             return new ContentLengthExceededException("Length of buffered form field exceeds configured limit of [" + configuration.getFormMaxBufferedBytes() + "]");
         } else {
             return original;

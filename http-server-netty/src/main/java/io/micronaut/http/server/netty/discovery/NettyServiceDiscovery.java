@@ -38,6 +38,7 @@ import jakarta.inject.Singleton;
 final class NettyServiceDiscovery {
     private final ApplicationEventPublisher<ServiceReadyEvent> serviceReadyEventApplicationEventPublisher;
     private final ApplicationEventPublisher<ServiceStoppedEvent> serviceStoppedEventApplicationEventPublisher;
+    @Nullable
     private NettyEmbeddedServerInstance createdInstance;
 
     NettyServiceDiscovery(ApplicationEventPublisher<ServiceReadyEvent> serviceReadyEventApplicationEventPublisher,

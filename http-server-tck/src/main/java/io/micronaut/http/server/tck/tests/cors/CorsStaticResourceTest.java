@@ -22,7 +22,6 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.tck.AssertionUtils;
-import io.micronaut.http.tck.HttpResponseAssertion;
 import io.micronaut.http.uri.UriBuilder;
 import org.junit.jupiter.api.Test;
 

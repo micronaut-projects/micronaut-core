@@ -89,6 +89,7 @@ public class DefaultNettyEmbeddedServerFactory
     private final EventLoopGroupFactory eventLoopGroupFactory;
     private final EventLoopGroupRegistry eventLoopGroupRegistry;
     private final Map<Class<?>, ApplicationEventPublisher<?>> cachedEventPublishers = new ConcurrentHashMap<>(5);
+    @Nullable
     private final WebSocketUpgradeHandlerFactory webSocketUpgradeHandlerFactory;
     private final MessageBodyHandlerRegistry messageBodyHandlerRegistry;
     private final NettyServerSslFactory sslFactory;
@@ -256,6 +257,7 @@ public class DefaultNettyEmbeddedServerFactory
     }
 
     @Override
+    @Nullable
     public ServerSslBuilder getServerSslBuilder() {
         return serverSslBuilder;
     }
@@ -294,12 +296,12 @@ public class DefaultNettyEmbeddedServerFactory
     }
 
     @Override
-    public Channel getChannelInstance(NettyChannelType type, EventLoopGroupConfiguration workerConfig) {
+    public Channel getChannelInstance(NettyChannelType type, @Nullable EventLoopGroupConfiguration workerConfig) {
         return eventLoopGroupFactory.channelInstance(type, workerConfig);
     }
 
     @Override
-    public Channel getChannelInstance(NettyChannelType type, EventLoopGroupConfiguration workerConfig, Channel parent, int fd) {
+    public Channel getChannelInstance(NettyChannelType type, @Nullable EventLoopGroupConfiguration workerConfig, @Nullable Channel parent, int fd) {
         return eventLoopGroupFactory.channelInstance(type, workerConfig, parent, fd);
     }
 
@@ -322,7 +324,7 @@ public class DefaultNettyEmbeddedServerFactory
     }
 
     @Override
-    public EventLoopGroup createEventLoopGroup(int numThreads, ExecutorService executorService, Integer ioRatio) {
+    public EventLoopGroup createEventLoopGroup(int numThreads, ExecutorService executorService, @Nullable Integer ioRatio) {
         return eventLoopGroupFactory.createEventLoopGroup(
                 numThreads,
                 executorService,

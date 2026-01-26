@@ -39,6 +39,7 @@ import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.Unpooled;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
@@ -64,17 +65,17 @@ public final class NettyByteBufMessageBodyHandler implements TypedMessageBodyHan
     }
 
     @Override
-    public Publisher<ByteBuf> readChunked(Argument<ByteBuf> type, MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
+    public Publisher<ByteBuf> readChunked(Argument<ByteBuf> type, @Nullable MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
         return Flux.from(input).map(bb -> (ByteBuf) bb.asNativeBuffer());
     }
 
     @Override
-    public ByteBuf read(Argument<ByteBuf> type, MediaType mediaType, Headers httpHeaders, ByteBuffer<?> byteBuffer) throws CodecException {
+    public ByteBuf read(Argument<ByteBuf> type, @Nullable MediaType mediaType, Headers httpHeaders, ByteBuffer<?> byteBuffer) throws CodecException {
         return (ByteBuf) byteBuffer.asNativeBuffer();
     }
 
     @Override
-    public ByteBuf read(Argument<ByteBuf> type, MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
+    public ByteBuf read(Argument<ByteBuf> type, @Nullable MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
         try {
             return Unpooled.wrappedBuffer(inputStream.readAllBytes());
         } catch (IOException e) {

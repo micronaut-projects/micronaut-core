@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.NullUnmarked;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.server.HttpServerConfiguration;
@@ -64,6 +65,7 @@ import java.util.function.Supplier;
  *
  * @param <D> This {@link HttpData} type, for {@code return (D) this} on various methods
  */
+@NullUnmarked
 @Internal
 public abstract sealed class MicronautHttpData<D extends HttpData> extends AbstractReferenceCounted implements HttpData {
     @SuppressWarnings("rawtypes")

@@ -70,7 +70,7 @@ public final class NettyByteBodyFactory extends ByteBodyFactory {
     }
 
     @Override
-    protected AbstractBodyAdapter createBodyAdapter(Publisher<ReadBuffer> publisher, Runnable onDiscard) {
+    protected AbstractBodyAdapter createBodyAdapter(Publisher<ReadBuffer> publisher, @Nullable Runnable onDiscard) {
         return new NettyBodyAdapter(loop, publisher, onDiscard);
     }
 
