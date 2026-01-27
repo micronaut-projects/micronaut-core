@@ -28,6 +28,8 @@ public class ControllerScriptElementProcessor implements PythonScriptElementProc
     public void process(ClassElement classElement, MemberElement memberElement) {
         if (memberElement.hasStereotype("io.micronaut.http.annotation.HttpMethodMapping")) {
             classElement.annotate("io.micronaut.http.annotation.Controller");
+            // Mark pooled to opt the script into pooled stub generation
+            classElement.annotate("io.micronaut.context.python.scope.Pooled");
         }
     }
 }

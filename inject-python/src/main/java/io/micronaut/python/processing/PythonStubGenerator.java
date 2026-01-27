@@ -119,9 +119,31 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         if (context instanceof PythonVisitorContext) {
 
             if (element instanceof PythonScriptElement scriptElement) {
-                // Handle script elements
-                visitScript(scriptElement, context);
+                boolean hasRoute = !scriptElement.getEnclosedElements(
+                    ElementQuery.ALL_METHODS
+                        .onlyAccessible()
+                        .onlyInstance()
+                        .onlyDeclared()
+                        .annotated(ann -> ann.hasStereotype("io.micronaut.http.annotation.HttpMethodMapping"))
+                ).isEmpty();
+                if (hasRoute || scriptElement.hasStereotype("io.micronaut.context.python.scope.Pooled")) {
+                    if (classBuilders.containsKey(scriptElement.getName())) {
+                        return;
+                    }
+                    var builder = PythonPooledStubGenerator.generatePooledScript(scriptElement, context, allClasses);
+                    classBuilders.put(scriptElement.getName(), new StubEntry(builder, scriptElement, Map.of()));
+                } else {
+                    visitScript(scriptElement, context);
+                }
             } else if (element instanceof AbstractPythonClassElement classElement) {
+                if (classElement.hasStereotype("io.micronaut.context.python.scope.Pooled")) {
+                    if (classBuilders.containsKey(classElement.getName())) {
+                        return;
+                    }
+                    var builder = PythonPooledStubGenerator.generatePooledClass(classElement, context, allClasses);
+                    classBuilders.put(classElement.getName(), new StubEntry(builder, classElement, Map.of()));
+                    return;
+                }
 
                 try {
                     if (classBuilders.containsKey(classElement.getName())) {
@@ -631,15 +653,17 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             parameters.add(RUNTIME_UTIL.invokeStatic("coerceMap", TypeDef.of(Map.class), methodParam));
         } else if (genericType.isAssignable(List.class) && genericType.getTypeArguments().get("E") instanceof PythonClassElement) {
             parameters.add(RUNTIME_UTIL.invokeStatic("coerceList", TypeDef.of(List.class), methodParam));
-        } else if (genericType instanceof PythonClassElement) {
-            if (param.hasAnnotation("jakarta.annotation.Nullable")) {
-                // Handle nullable Python class parameters
-                parameters.add(
-                    methodParam.isNull().doIfElse(
+        } else if (genericType instanceof PythonClassElement pce) {
+            boolean isPooled = pce.hasStereotype("io.micronaut.context.python.scope.Pooled");
+            if (isPooled) {
+                // For pooled Python classes, inject the Java stub (host object), not the polyglot Value.
+                // This ensures method calls go through the Java wrapper which proxies to pooled contexts.
+                parameters.add(methodParam);
+            } else if (param.hasAnnotation("jakarta.annotation.Nullable")) {
+                parameters.add(methodParam.isNull().doIfElse(
                         ExpressionDef.nullValue(),
                         methodParam.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE)
-                    )
-                );
+                ));
             } else {
                 parameters.add(methodParam.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE));
             }

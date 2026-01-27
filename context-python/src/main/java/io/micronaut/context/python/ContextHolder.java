@@ -39,18 +39,52 @@ public final class ContextHolder {
 
     private static final AtomicBoolean REUSE_CONTEXT = new AtomicBoolean();
     private static volatile Context context;
+    private static volatile PythonPool pythonPool;
 
     private ContextHolder() {
-        // Utility class
     }
 
-    /**
-     * Get the shared GraalPy context for Python execution.
-     * The context is initialized lazily by the GraalPyContextFactory bean.
-     *
-     * @return The GraalPy context
-     * @throws IllegalStateException if the context has not been initialized
-     */
+    public static void setPythonPool(PythonPool pool) {
+        ContextHolder.pythonPool = pool;
+    }
+
+    public static PythonPool getPythonPool() {
+        PythonPool pool = pythonPool;
+        if (pool == null) {
+            throw new IllegalStateException("PythonPool has not been initialized.");
+        }
+        return pool;
+    }
+
+    // Pooled convenience APIs used by generated code
+    public static Value getPooled(@Nullable String packageName, String simpleName) {
+        return getPythonPool().getAnyClass(packageName, simpleName);
+    }
+
+    public static <T> T withPooled(@Nullable String packageName, String simpleName, java.util.function.Function<Value, T> fn) {
+        return getPythonPool().withClass(packageName, simpleName, fn);
+    }
+
+    public static Value getPooledScript(String packageName, String scriptName) {
+        return getPythonPool().getAnyScript(packageName, scriptName);
+    }
+
+    public static <T> T withPooledScript(String packageName, String scriptName, java.util.function.Function<Value, T> fn) {
+        return getPythonPool().withScript(packageName, scriptName, fn);
+    }
+
+    public static void injectedPooledScript(String packageName, String scriptName, String attribute, Value value) {
+        getPythonPool().injectScriptAll(packageName, scriptName, attribute, value);
+    }
+
+    public static Value invokePooled(String packageName, String simpleName, String methodName, Object... args) {
+        return withPooled(packageName, simpleName, v -> v.getMember(methodName).execute(args));
+    }
+
+    public static Value invokePooledScript(String packageName, String scriptName, String methodName, Object... args) {
+        return withPooledScript(packageName, scriptName, v -> v.getMember(methodName).execute(args));
+    }
+
     public static Context getContext() {
         Context ctx = context;
         if (ctx == null) {
@@ -60,14 +94,6 @@ public final class ContextHolder {
         return ctx;
     }
 
-    /**
-     * Create an instance that is abstract and fill out the abstract methods with stubs to be later populated.
-     *
-     * @param packageName The package name
-     * @param simpleName  The simple name
-     * @param args        The args
-     * @return The new instance
-     */
     @UsedByGeneratedCode
     public static Value newIntroduction(@Nullable String packageName, String simpleName, Object... args) {
         Value pythonClass = findClass(packageName, simpleName);
@@ -78,7 +104,6 @@ public final class ContextHolder {
                 Value iterator = abstractMethods.getIterator();
                 while (iterator.hasIteratorNextElement()) {
                     String methodName = iterator.getIteratorNextElement().asString();
-                    // populate a stub that will be filled out later by PythonAopSetup
                     ProxyExecutable stub = (execArgs) -> null;
                     pythonClass.putMember(methodName, stub);
                 }
@@ -94,14 +119,6 @@ public final class ContextHolder {
         return instantiate(packageName, simpleName, args, pythonClass);
     }
 
-    /**
-     * Create a new instance for the given package name, simple name and args.
-     *
-     * @param packageName The package name
-     * @param simpleName  The simple name
-     * @param args        The args
-     * @return The new instance
-     */
     @UsedByGeneratedCode
     public static Value newInstance(@Nullable String packageName, String simpleName, Object... args) {
         Value pythonClass = findClass(packageName, simpleName);
@@ -117,13 +134,6 @@ public final class ContextHolder {
         }
     }
 
-    /**
-     * Create a new instance for the given simple name and args.
-     *
-     * @param simpleName The simple name
-     * @param args       The args
-     * @return The new instance
-     */
     public static Value newInstance(String simpleName, Object... args) {
         Value pythonClass = findClass(simpleName);
         return instantiate(null, simpleName, args, pythonClass);
@@ -157,13 +167,6 @@ public final class ContextHolder {
         return v;
     }
 
-    /**
-     * Find a Python script.
-     * @param packageName The package name
-     * @param scriptName The script name
-     * @return The value
-     * @throws InstantiationException if the script cannot be found
-     */
     public static @NotNull Value findScript(String packageName, String scriptName) {
         Context ctx = getContext();
         Value v = ctx.getBindings(PYTHON);
@@ -192,15 +195,6 @@ public final class ContextHolder {
         }
     }
 
-    /**
-     * Invoke a static method on the given Python class.
-     *
-     * @param packageName The package name
-     * @param simpleName  The simple class name
-     * @param methodName  The method name
-     * @param args        The method arguments
-     * @return The method result
-     */
     public static Value invokeStaticMethod(String packageName, String simpleName, String methodName, Object... args) {
         if (packageName == null || PYTHON.equals(packageName)) {
             return invokeStaticMethod(simpleName, methodName, args);
@@ -211,14 +205,6 @@ public final class ContextHolder {
         }
     }
 
-    /**
-     * Invoke a static method on the given Python class.
-     *
-     * @param simpleName The simple name
-     * @param methodName The method name
-     * @param args       The args
-     * @return The new instance
-     */
     public static Value invokeStaticMethod(String simpleName, String methodName, Object... args) {
         Context ctx = getContext();
         Value v = ctx.getBindings(PYTHON).getMember(simpleName);
@@ -235,32 +221,16 @@ public final class ContextHolder {
         }
     }
 
-    /**
-     * Set the GraalPy context. This method is called by GraalPyContextFactory
-     * during application startup.
-     *
-     * @param context The GraalPy context to set
-     */
     public static void setContext(Context context) {
         ContextHolder.context = context;
     }
 
-    /**
-     * Check if the context has been initialized.
-     *
-     * @return true if the context is available, false otherwise
-     */
     public static boolean isInitialized() {
         return context != null;
     }
 
-    /**
-     * Reset the context to null. This method is called during application shutdown
-     * to ensure proper cleanup and prevent memory leaks.
-     */
     public static void resetContext() {
         if (REUSE_CONTEXT.get()) {
-            // Not sufficient for now, probably because of use of Class as resourceLoader
             context.eval(Source.create("python", """
                 import importlib
                 import sys
@@ -275,18 +245,10 @@ public final class ContextHolder {
         context = null;
     }
 
-    /**
-     * If context reuse is set to true, then the context will never be cleared.
-     * @param reuse tells if the context should be reused
-     */
     public static void setReuseContext(boolean reuse) {
         REUSE_CONTEXT.set(reuse);
     }
 
-    /**
-     * Returns true if the context should be reused
-     * @return the reuse flag
-     */
     public static boolean isReuseContext() {
         return REUSE_CONTEXT.get();
     }

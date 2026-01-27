@@ -68,9 +68,8 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
     @Singleton
     @Named(GraalPyRuntimeUtil.PYTHON)
     public org.graalvm.polyglot.Context graalPyContext(@Named(GraalPyRuntimeUtil.PYTHON) HostAccess hostAccess) {
-        if (ContextHolder.isInitialized() && ContextHolder.isReuseContext()) {
+        if (ContextHolder.isInitialized()) {
             providedContext = true;
-            // Reuse context: this is an optimization for reloading
             return ContextHolder.getContext();
         }
 
@@ -144,15 +143,15 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
      */
     @Override
     public void onDestroyed(@NonNull BeanDestroyedEvent<Context> event) {
-        if (!ContextHolder.isReuseContext()) {
-            var ctx = ContextHolder.isInitialized() ? ContextHolder.getContext() : null;
-            if (ctx != null) {
-                ctx.close(false);
-            }
-            if (!providedContext) {
+            if (!ContextHolder.isReuseContext()) {
+                var ctx = ContextHolder.isInitialized() ? ContextHolder.getContext() : null;
+                if (ctx != null) {
+                    ctx.close(false);
+                }
+                // reset legacy context regardless of pool presence
                 ContextHolder.resetContext();
             }
-        }
+
     }
 
     @Override
