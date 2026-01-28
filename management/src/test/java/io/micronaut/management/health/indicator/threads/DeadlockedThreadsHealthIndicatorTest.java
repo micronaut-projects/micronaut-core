@@ -11,8 +11,6 @@ import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.management.endpoint.health.DetailsVisibility;
-import io.micronaut.management.endpoint.health.HealthEndpoint;
-import io.micronaut.management.health.aggregator.DefaultHealthAggregator;
 import io.micronaut.runtime.server.EmbeddedServer;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
@@ -22,10 +20,13 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.Consumer;
 
 import static org.awaitility.Awaitility.await;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DeadlockedThreadsHealthIndicatorTest {
     @Test
@@ -93,6 +94,8 @@ class DeadlockedThreadsHealthIndicatorTest {
     @Singleton
     static class DeadLockBean implements io.micronaut.context.event.ApplicationEventListener<StartupEvent> {
         private static final Logger LOG = LoggerFactory.getLogger(DeadLockBean.class);
+
+        @Override
         public void onApplicationEvent(StartupEvent event) {
             final Object lock1 = new Object();
             final Object lock2 = new Object();
