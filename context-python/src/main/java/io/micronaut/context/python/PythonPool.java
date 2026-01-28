@@ -104,7 +104,12 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, Ordered {
      */
     @PostConstruct
     void init() {
-        // Create primary context synchronously (not pooled) and expose as legacy Context
+        // If reuseContext is enabled, skip pool initialization entirely
+        if (ContextHolder.isReuseContext()) {
+            LOG.debug("Context reuse enabled; skipping Python context pool initialization");
+            return;
+        }
+        // Register pool and prepare caches
         ContextHolder.setPythonPool(this);
         cache.put(primaryContext, new ConcurrentHashMap<>());
         final int toCreate = targetSize;
