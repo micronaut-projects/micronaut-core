@@ -60,6 +60,7 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, Ordered {
     private final HostAccess hostAccess;
     private final ApplicationContext applicationContext;
     private final boolean syncInit;
+    private final long warnThresholdMs;
 
     private final Context primaryContext;
     private final BlockingDeque<Context> pooledQueue = new LinkedBlockingDeque<>();
@@ -81,6 +82,7 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, Ordered {
         this.applicationContext = applicationContext;
         int configuredPoolSize = configuration.size();
         this.syncInit = configuration.syncInit();
+        this.warnThresholdMs = configuration.warnWaitMs();
         int processors = Runtime.getRuntime().availableProcessors();
         int defaultSize = Math.max(1, processors * 2);
         this.targetSize = configuredPoolSize > 0 ? configuredPoolSize : defaultSize;
@@ -129,8 +131,22 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, Ordered {
 
 
     Context borrow() {
+        long waitedMs = 0L;
         try {
-            return pooledQueue.takeFirst();
+            while (true) {
+                Context ctx = pooledQueue.pollFirst();
+                if (ctx != null) {
+                    if (waitedMs >= warnThresholdMs && LOG.isWarnEnabled()) {
+                        LOG.warn("Borrowed context after waiting {} ms (pool size: {}, queue: {})", waitedMs, size.get(), pooledQueue.size());
+                    }
+                    return ctx;
+                }
+                Thread.sleep(100);
+                waitedMs += 100;
+                if (warnThresholdMs > 0 && waitedMs % warnThresholdMs == 0 && LOG.isWarnEnabled()) {
+                    LOG.warn("No available Python contexts; waiting {} ms so far (pool target: {}, current: {}, queue: {})", waitedMs, targetSize, size.get(), pooledQueue.size());
+                }
+            }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException(e);
@@ -178,15 +194,21 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, Ordered {
     }
 
     /**
-     * Broadcasts attribute value injection into all pooled contexts for a given script.
+     * Injects an attribute value into the most recently created pooled context for a given script.
+     * This avoids broadcasting to all contexts and aligns with synchronous object creation flows.
      */
-    void injectScriptAll(String packageName, String scriptName, String attribute, Value value) {
-        for (Context c : snapshot()) {
-            Map<String, Value> m = cache.computeIfAbsent(c, k -> new ConcurrentHashMap<>());
-            String key = scriptKey(packageName, scriptName);
-            Value script = m.computeIfAbsent(key, k -> loadScript(c, packageName, scriptName));
-            script.putMember(attribute, value);
+    void injectMostRecent(String packageName, String scriptName, String attribute, Value value) {
+        Context target;
+        if (!pooledQueue.isEmpty()) {
+            target = pooledQueue.getFirst();
+        } else {
+            // fallback to primary if no pooled contexts exist yet
+            target = primaryContext;
         }
+        Map<String, Value> m = cache.computeIfAbsent(target, k -> new ConcurrentHashMap<>());
+        String key = scriptKey(packageName, scriptName);
+        Value script = m.computeIfAbsent(key, k -> loadScript(target, packageName, scriptName));
+        script.putMember(attribute, value);
     }
 
     private synchronized void addPooledContext() {
@@ -251,15 +273,7 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, Ordered {
     }
 
     private static Value loadScript(Context ctx, String packageName, String scriptName) {
-        if (PYTHON.equals(packageName)) {
-            if ("Unnamed".equals(scriptName)) {
-                return ctx.getBindings(PYTHON);
-            } else {
-                return ctx.eval(PYTHON, "import " + scriptName).getMember(scriptName);
-            }
-        } else {
-            return ctx.eval(PYTHON, "from " + packageName + " import " + scriptName).getMember(scriptName);
-        }
+        return ContextHolder.findScript(packageName, scriptName, ctx);
     }
 
     @Override
@@ -267,6 +281,7 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, Ordered {
         List<Context> snapshot = snapshot();
         pooledContexts.removeAll(snapshot);
         pooledQueue.removeAll(snapshot);
+        cache.clear();
         for (Context context : snapshot) {
             try {
                 context.close(false);

@@ -118,7 +118,7 @@ public final class ContextHolder {
      */
     @UsedByGeneratedCode
     public static void injectedPooledScript(String packageName, String scriptName, String attribute, Value value) {
-        getPythonPool().injectScriptAll(packageName, scriptName, attribute, value);
+        getPythonPool().injectMostRecent(packageName, scriptName, attribute, value);
     }
 
     /**
@@ -267,13 +267,17 @@ public final class ContextHolder {
     @UsedByGeneratedCode
     public static @NotNull Value findScript(String packageName, String scriptName) {
         Context ctx = getContext();
+        return findScript(packageName, scriptName, ctx);
+    }
+
+    static @NotNull Value findScript(String packageName, String scriptName, Context ctx) {
         Value v = ctx.getBindings(PYTHON);
         if (v != null) {
             if (PYTHON.equals(packageName)) {
                 if ("Unnamed".equals(scriptName)) {
                     return v;
                 } else {
-                    Value member = ctx.eval(PYTHON, "import " + scriptName )
+                    Value member = ctx.eval(PYTHON, "import " + scriptName)
                         .getMember(scriptName);
                     if (member == null) {
                         throw new InstantiationException("Cannot find Python module: " + packageName);
@@ -281,7 +285,7 @@ public final class ContextHolder {
                     return member;
                 }
             } else {
-                Value member = ctx.eval(PYTHON, "from " + packageName + " import " + scriptName )
+                Value member = ctx.eval(PYTHON, "from " + packageName + " import " + scriptName)
                     .getMember(scriptName);
                 if (member == null) {
                     throw new InstantiationException("Cannot find Python module: " + packageName);
