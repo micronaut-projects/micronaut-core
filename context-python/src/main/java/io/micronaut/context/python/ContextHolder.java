@@ -297,6 +297,15 @@ public final class ContextHolder {
         }
     }
 
+    /**
+     * Invoke a static method on the given Python class.
+     *
+     * @param packageName The package name
+     * @param simpleName  The simple class name
+     * @param methodName  The method name
+     * @param args        The method arguments
+     * @return The method result
+     */
     public static Value invokeStaticMethod(String packageName, String simpleName, String methodName, Object... args) {
         if (packageName == null || PYTHON.equals(packageName)) {
             return invokeStaticMethod(simpleName, methodName, args);
@@ -307,6 +316,14 @@ public final class ContextHolder {
         }
     }
 
+    /**
+     * Invoke a static method on the given Python class.
+     *
+     * @param simpleName  The simple class name
+     * @param methodName  The method name
+     * @param args        The method arguments
+     * @return The method result
+     */
     public static Value invokeStaticMethod(String simpleName, String methodName, Object... args) {
         Context ctx = getContext();
         Value v = ctx.getBindings(PYTHON).getMember(simpleName);
@@ -323,14 +340,29 @@ public final class ContextHolder {
         }
     }
 
+    /**
+     * Set the GraalPy context. This method is called by GraalPyContextFactory
+     * during application startup.
+     *
+     * @param context The GraalPy context to set
+     */
     public static void setContext(Context context) {
         ContextHolder.context = context;
     }
 
+    /**
+     * Check if the context has been initialized.
+     *
+     * @return true if the context is available, false otherwise
+     */
     public static boolean isInitialized() {
         return context != null;
     }
 
+    /**
+     * Reset the context to null. This method is called during application shutdown
+     * to ensure proper cleanup and prevent memory leaks.
+     */
     public static void resetContext() {
         if (REUSE_CONTEXT.get()) {
             context.eval(Source.create("python", """
@@ -347,10 +379,18 @@ public final class ContextHolder {
         context = null;
     }
 
+    /**
+     * If context reuse is set to true, then the context will never be cleared.
+     * @param reuse tells if the context should be reused
+     */
     public static void setReuseContext(boolean reuse) {
         REUSE_CONTEXT.set(reuse);
     }
 
+    /**
+     * Returns true if the context should be reused
+     * @return the reuse flag
+     */
     public static boolean isReuseContext() {
         return REUSE_CONTEXT.get();
     }
