@@ -17,8 +17,8 @@ package io.micronaut.health;
 
 import com.fasterxml.jackson.annotation.JsonValue;
 import io.micronaut.core.annotation.Introspected;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.annotation.ReflectiveAccess;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Optional;
 
@@ -59,8 +59,11 @@ public class HealthStatus implements Comparable<HealthStatus> {
     public static final HealthStatus UNKNOWN = new HealthStatus("UNKNOWN");
 
     private final String name;
+    @Nullable
     private final String description;
+    @Nullable
     private final Boolean operational;
+    @Nullable
     private final Integer severity;
 
     /**
@@ -69,10 +72,12 @@ public class HealthStatus implements Comparable<HealthStatus> {
      * @param operational If it's operational
      * @param severity The severity, the higher the value, the more sever is situation.
      */
-    public HealthStatus(
-        String name,
+    public HealthStatus(String name,
+        @Nullable
         String description,
+        @Nullable
         Boolean operational,
+        @Nullable
         Integer severity) {
         if (name == null) {
             throw new IllegalArgumentException("Name cannot be null when creating a health status");
@@ -86,7 +91,7 @@ public class HealthStatus implements Comparable<HealthStatus> {
     /**
      * @param name The name of the status
      */
-    public HealthStatus(@NonNull String name) {
+    public HealthStatus(String name) {
         this(name, null, null, null);
     }
 
@@ -165,9 +170,9 @@ public class HealthStatus implements Comparable<HealthStatus> {
         if (operational != null && o.operational != null) {
             return operational.compareTo(o.operational) * -1;
         } else if (operational != null) {
-            return operational == Boolean.TRUE ? -1 : 1;
+            return operational ? -1 : 1;
         } else if (o.operational != null) {
-            return o.operational == Boolean.TRUE ? 1 : -1;
+            return o.operational ? 1 : -1;
         } else {
             if (severity != null && o.severity != null) {
                 return severity.compareTo(o.severity);

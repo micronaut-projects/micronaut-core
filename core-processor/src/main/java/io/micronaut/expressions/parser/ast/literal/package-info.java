@@ -16,7 +16,7 @@
 /**
  * The package info.
  */
-@NullMarked
+@NullUnmarked
 package io.micronaut.expressions.parser.ast.literal;
 
-import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.NullUnmarked;

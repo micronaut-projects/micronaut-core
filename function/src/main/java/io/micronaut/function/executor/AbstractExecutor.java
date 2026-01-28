@@ -27,6 +27,7 @@ import io.micronaut.inject.ExecutableMethod;
 import jakarta.annotation.PreDestroy;
 
 import java.io.Closeable;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -41,6 +42,7 @@ public class AbstractExecutor<C> implements ApplicationContextProvider, Closeabl
     /**
      * The current {@link ApplicationContext}.
      */
+    @Nullable
     protected ApplicationContext applicationContext;
 
     /**
@@ -50,7 +52,7 @@ public class AbstractExecutor<C> implements ApplicationContextProvider, Closeabl
      * @param functionName The function name
      * @return The method
      */
-    protected ExecutableMethod<Object, Object> resolveFunction(LocalFunctionRegistry localFunctionRegistry, String functionName) {
+    protected ExecutableMethod<Object, Object> resolveFunction(LocalFunctionRegistry localFunctionRegistry, @Nullable String functionName) {
         Optional<? extends ExecutableMethod<Object, Object>> registeredMethod;
         if (functionName == null) {
             registeredMethod = localFunctionRegistry.findFirst();
@@ -67,6 +69,7 @@ public class AbstractExecutor<C> implements ApplicationContextProvider, Closeabl
      * @param env The environment
      * @return The function name
      */
+    @Nullable
     protected String resolveFunctionName(Environment env) {
         return env.getProperty(LocalFunctionRegistry.FUNCTION_NAME, String.class).orElse(null);
     }
@@ -128,14 +131,16 @@ public class AbstractExecutor<C> implements ApplicationContextProvider, Closeabl
 
     @Override
     public ApplicationContext getApplicationContext() {
-        return this.applicationContext;
+        return Objects.requireNonNull(applicationContext);
     }
 
     @Override
     @PreDestroy
     public void close() {
         try {
-            applicationContext.close();
+            if (applicationContext != null) {
+                applicationContext.close();
+            }
         } catch (Exception e) {
             // ignore
         }

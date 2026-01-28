@@ -27,6 +27,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.core.LoggerContext;
 import org.apache.logging.log4j.core.config.Configurator;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collection;
 
@@ -78,6 +79,7 @@ public class Log4jLoggingSystem implements ManagedLoggingSystem, io.micronaut.lo
      * @param logLevel The micronaut {@link LogLevel} to convert
      * @return The converted log4j {@link Level}
      */
+    @Nullable
     private static Level toLog4jLevel(LogLevel logLevel) {
         if (logLevel == LogLevel.NOT_SPECIFIED) {
             return null;

@@ -117,7 +117,7 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
                 LOG.trace("Proceeded to next interceptor [{}] in chain for constructor invocation: {}", interceptor, beanConstructor);
             }
 
-            return interceptor.intercept(this);
+            return Objects.requireNonNull(interceptor.intercept(this), "Constructor interceptor cannot return null");
         }
     }
 

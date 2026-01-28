@@ -153,6 +153,7 @@ import io.micronaut.sourcegen.model.StatementDef;
 import io.micronaut.sourcegen.model.TypeDef;
 import io.micronaut.sourcegen.model.VariableDef;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.NullUnmarked;
 import org.jspecify.annotations.Nullable;
 
 import javax.lang.model.element.Modifier;
@@ -213,6 +214,7 @@ import static io.micronaut.inject.visitor.BeanElementVisitor.VISITORS;
  * @see BeanDefinition
  * @since 1.0
  */
+@NullUnmarked
 @Internal
 public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefinitionVisitor, BeanElement, Toggleable {
     @NextMajorVersion("Inline as true")

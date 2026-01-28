@@ -17,6 +17,7 @@ package io.micronaut.websocket.context;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.Qualifier;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.ExecutionHandle;
@@ -28,6 +29,7 @@ import io.micronaut.websocket.annotation.OnError;
 import io.micronaut.websocket.annotation.OnMessage;
 import io.micronaut.websocket.annotation.OnOpen;
 import io.micronaut.websocket.exceptions.WebSocketException;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
@@ -42,7 +44,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * @author graemerocher
  * @since 1.0
  */
-class DefaultWebSocketBeanRegistry implements WebSocketBeanRegistry {
+@Internal
+final class DefaultWebSocketBeanRegistry implements WebSocketBeanRegistry {
 
     private final BeanContext beanContext;
     private final Class<? extends Annotation> stereotype;
@@ -52,7 +55,7 @@ class DefaultWebSocketBeanRegistry implements WebSocketBeanRegistry {
      * Default constructor.
      *
      * @param beanContext The bean context
-     * @param stereotype Stereotype to use for bean lookup
+     * @param stereotype  Stereotype to use for bean lookup
      */
     DefaultWebSocketBeanRegistry(BeanContext beanContext, Class<? extends Annotation> stereotype) {
         this.beanContext = beanContext;
@@ -132,24 +135,12 @@ class DefaultWebSocketBeanRegistry implements WebSocketBeanRegistry {
      * @param <T>
      * @author graemerocher
      */
-    private static final class DefaultWebSocketBean<T> implements WebSocketBean<T> {
-        private final T bean;
-        private final BeanDefinition<T> definition;
-        private final MethodExecutionHandle<T, ?> onOpen;
-        private final MethodExecutionHandle<T, ?> onClose;
-        private final MethodExecutionHandle<T, ?> onMessage;
-        private final MethodExecutionHandle<T, ?> onPong;
-        private final MethodExecutionHandle<T, ?> onError;
-
-        DefaultWebSocketBean(T bean, BeanDefinition<T> definition, MethodExecutionHandle<T, ?> onOpen, MethodExecutionHandle<T, ?> onClose, MethodExecutionHandle<T, ?> onMessage, MethodExecutionHandle<T, ?> onPong, MethodExecutionHandle<T, ?> onError) {
-            this.bean = bean;
-            this.definition = definition;
-            this.onOpen = onOpen;
-            this.onClose = onClose;
-            this.onMessage = onMessage;
-            this.onPong = onPong;
-            this.onError = onError;
-        }
+    private record DefaultWebSocketBean<T>(T bean, BeanDefinition<T> definition,
+                                           @Nullable MethodExecutionHandle<T, ?> onOpen,
+                                           @Nullable MethodExecutionHandle<T, ?> onClose,
+                                           MethodExecutionHandle<T, ?> onMessage,
+                                           @Nullable MethodExecutionHandle<T, ?> onPong,
+                                           @Nullable MethodExecutionHandle<T, ?> onError) implements WebSocketBean<T> {
 
         @Override
         public BeanDefinition<T> getBeanDefinition() {

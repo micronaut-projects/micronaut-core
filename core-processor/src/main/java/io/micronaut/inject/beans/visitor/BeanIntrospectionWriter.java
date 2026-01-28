@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Generated;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
+import org.jspecify.annotations.NullUnmarked;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanIntrospectionReference;
@@ -91,6 +92,7 @@ import java.util.stream.IntStream;
  * @author Denis Stepanov
  * @since 1.1
  */
+@NullUnmarked
 @Internal
 final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputWriter {
     private static final String INTROSPECTION_SUFFIX = "$Introspection";

@@ -1,5 +1,6 @@
 plugins {
     id("io.micronaut.build.internal.convention-core-library")
+
 }
 dependencies {
     annotationProcessor(projects.micronautInjectJava)

@@ -43,6 +43,7 @@ import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.RouteMatch;
 import org.reactivestreams.Publisher;
 
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletionStage;
@@ -177,7 +178,7 @@ public final class FilterVisitor implements TypeElementVisitor<Object, Object> {
                 }
             }
         } catch (IllegalArgumentException e) {
-            context.fail(e.getMessage(), element);
+            context.fail(Objects.requireNonNullElse(e.getMessage(), "Illegal argument"), element);
         }
     }
 

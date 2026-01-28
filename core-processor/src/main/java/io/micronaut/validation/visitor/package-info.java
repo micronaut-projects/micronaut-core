@@ -19,4 +19,4 @@
  * @author graemerocher
  * @since 1.0
  */
-package io.micronaut.validation.visitor.async;
+package io.micronaut.validation.visitor;

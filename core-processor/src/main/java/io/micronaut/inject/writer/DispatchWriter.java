@@ -17,6 +17,7 @@ package io.micronaut.inject.writer;
 
 import io.micronaut.context.AbstractExecutableMethodsDefinition;
 import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.NullUnmarked;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.CollectionUtils;
@@ -51,6 +52,7 @@ import java.util.stream.IntStream;
  * @since 4.7
  */
 @Internal
+@NullUnmarked
 public final class DispatchWriter implements ClassOutputWriter {
 
     private static final Method GET_ACCESSIBLE_TARGET_METHOD = ReflectionUtils.getRequiredInternalMethod(

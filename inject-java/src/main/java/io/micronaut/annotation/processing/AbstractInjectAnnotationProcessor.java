@@ -23,6 +23,7 @@ import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.visitor.TypeElementVisitor;
+import org.jspecify.annotations.Nullable;
 
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.Filer;
@@ -245,7 +246,7 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
      * @param msg The message
      * @param args The string format args
      */
-    protected final void error(Element e, String msg, Object... args) {
+    protected final void error(@Nullable Element e, String msg, Object... args) {
         if (messager == null) {
             illegalState();
             return;

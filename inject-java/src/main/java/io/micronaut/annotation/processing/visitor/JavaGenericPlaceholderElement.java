@@ -64,7 +64,7 @@ final class JavaGenericPlaceholderElement extends JavaClassElement implements Ge
                                   @NonNull ElementAnnotationMetadataFactory annotationMetadataFactory,
                                   int arrayDimensions,
                                   boolean isRawType,
-                                  String doc) {
+                                  @Nullable String doc) {
         this(genericNativeType,
             realTypeVariable,
             declaredElement,
@@ -86,7 +86,7 @@ final class JavaGenericPlaceholderElement extends JavaClassElement implements Ge
                                   @NonNull ElementAnnotationMetadataFactory annotationMetadataFactory,
                                   int arrayDimensions,
                                   boolean isRawType,
-                                  String doc) {
+                                  @Nullable String doc) {
         super(
             classElementRepresentingThisPlaceholder.getNativeType(),
             annotationMetadataFactory,
@@ -110,7 +110,7 @@ final class JavaGenericPlaceholderElement extends JavaClassElement implements Ge
         if (resolved != null) {
             return resolved;
         }
-        return WildcardElement.findUpperType(bounds, bounds);
+        return Objects.requireNonNull(WildcardElement.findUpperType(bounds, bounds));
     }
 
     @Override

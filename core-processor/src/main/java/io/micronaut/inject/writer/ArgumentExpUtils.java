@@ -18,6 +18,7 @@ package io.micronaut.inject.writer;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.NullUnmarked;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
@@ -55,6 +56,7 @@ import java.util.function.Function;
  * @author Denis Stepanov
  * @since 4.8
  */
+@NullUnmarked
 @Internal
 public final class ArgumentExpUtils {
 

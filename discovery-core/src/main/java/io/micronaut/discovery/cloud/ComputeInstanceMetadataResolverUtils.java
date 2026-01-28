@@ -15,6 +15,7 @@
  */
 package io.micronaut.discovery.cloud;
 
+import org.jspecify.annotations.Nullable;
 import tools.jackson.core.json.JsonFactory;
 import tools.jackson.core.JsonParser;
 import tools.jackson.databind.ObjectMapper;
@@ -93,6 +94,7 @@ public class ComputeInstanceMetadataResolverUtils {
      * @since 3.3.0
      */
     @Experimental
+    @Nullable
     public static JsonNode readMetadataUrl(URL url, int connectionTimeoutMs, int readTimeoutMs, JsonMapper jsonMapper, Map<String, String> requestProperties) throws IOException {
         try (InputStream in = openMetadataUrl(url, connectionTimeoutMs, readTimeoutMs, requestProperties)) {
             return jsonMapper.readValue(in, Argument.of(JsonNode.class));

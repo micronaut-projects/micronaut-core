@@ -111,9 +111,9 @@ final class JavaPropertyElement extends AbstractJavaMemberElement implements Pro
         return (PropertyElement) super.withAnnotationMetadata(annotationMetadata);
     }
 
-    private static JavaNativeElement selectNativeType(MethodElement getter,
-                                                      MethodElement setter,
-                                                      FieldElement field) {
+    private static JavaNativeElement selectNativeType(@Nullable MethodElement getter,
+                                                      @Nullable MethodElement setter,
+                                                      @Nullable FieldElement field) {
         if (getter != null) {
             return (JavaNativeElement) getter.getNativeType();
         }

@@ -19,6 +19,8 @@ import io.micronaut.context.annotation.Bean;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -31,15 +33,21 @@ import java.util.function.Predicate;
 final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, ElementQuery.Result<T> {
     private static final ClassElement ONLY_ACCESSIBLE_MARKER = ClassElement.of(DefaultElementQuery.class);
     private final Class<T> elementType;
+    @Nullable
     private final ClassElement onlyAccessibleType;
     private final boolean onlyDeclared;
     private final boolean onlyAbstract;
     private final boolean onlyConcrete;
     private final boolean onlyInjected;
+    @Nullable
     private final List<Predicate<String>> namePredicates;
+    @Nullable
     private final List<Predicate<AnnotationMetadata>> annotationPredicates;
+    @Nullable
     private final List<Predicate<Set<ElementModifier>>> modifiersPredicates;
+    @Nullable
     private final List<Predicate<T>> elementPredicates;
+    @Nullable
     private final List<Predicate<ClassElement>> typePredicates;
     private final boolean onlyInstance;
     private final boolean onlyStatic;
@@ -56,6 +64,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
     @SuppressWarnings("checkstyle:ParameterNumber")
     DefaultElementQuery(
         Class<T> elementType,
+        @Nullable
         ClassElement onlyAccessibleType,
         boolean onlyDeclared,
         boolean onlyAbstract,
@@ -67,10 +76,15 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
         boolean includeOverriddenMethods,
         boolean includeHiddenElements,
         boolean excludePropertyElements,
+        @Nullable
         List<Predicate<AnnotationMetadata>> annotationPredicates,
+        @Nullable
         List<Predicate<Set<ElementModifier>>> modifiersPredicates,
+        @Nullable
         List<Predicate<T>> elementPredicates,
-        List<Predicate<String>> namePredicates, List<Predicate<ClassElement>> typePredicates) {
+        @Nullable
+        List<Predicate<String>> namePredicates,
+        @Nullable List<Predicate<ClassElement>> typePredicates) {
         this.elementType = elementType;
         this.onlyAccessibleType = onlyAccessibleType;
         this.onlyDeclared = onlyDeclared;

@@ -30,6 +30,7 @@ import io.micronaut.validation.routes.rules.MissingParameterRule;
 import io.micronaut.validation.routes.rules.NullableParameterRule;
 import io.micronaut.validation.routes.rules.RequestBeanParameterRule;
 import io.micronaut.validation.routes.rules.RouteValidationRule;
+import org.jspecify.annotations.NullUnmarked;
 
 import javax.annotation.processing.SupportedOptions;
 import java.util.ArrayList;
@@ -45,6 +46,7 @@ import java.util.Set;
  * @since 1.0
  */
 @SupportedOptions(RouteValidationVisitor.VALIDATION_OPTION)
+@NullUnmarked
 public class RouteValidationVisitor implements TypeElementVisitor<Object, Object> {
 
     static final String VALIDATION_OPTION = "micronaut.route.validation";

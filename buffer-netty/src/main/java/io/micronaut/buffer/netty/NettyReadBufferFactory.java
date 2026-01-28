@@ -23,6 +23,7 @@ import io.netty.buffer.ByteBufOutputStream;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -173,6 +174,7 @@ public final class NettyReadBufferFactory extends ReadBufferFactory {
     @Override
     public ReadBufferFactory. BufferingOutputStream outputStreamBuffer() {
         return new ReadBufferFactory.BufferingOutputStream() {
+            @Nullable
             ByteBufOutputStream out = new ByteBufOutputStream(allocator.buffer());
 
             @Override

@@ -23,6 +23,7 @@ import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.sourcegen.model.ClassTypeDef;
 import io.micronaut.sourcegen.model.ExpressionDef;
 import io.micronaut.sourcegen.model.TypeDef;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Abstract evaluated expression AST node.
@@ -33,7 +34,9 @@ import io.micronaut.sourcegen.model.TypeDef;
 @Internal
 public abstract class ExpressionNode {
 
+    @Nullable
     protected TypeDef nodeType;
+    @Nullable
     protected ClassElement classElement;
 
     /**

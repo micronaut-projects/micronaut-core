@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.NonNull;
 import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
+import org.jspecify.annotations.NullUnmarked;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -37,6 +38,7 @@ import reactor.util.context.Context;
  * @author Jonas Konrad
  */
 @Internal
+@NullUnmarked
 public final class LazySendingSubscriber<T> implements CoreSubscriber<T>, CorePublisher<T>, Subscription {
     private final DelayedExecutionFlow<Publisher<T>> result = DelayedExecutionFlow.create();
     private boolean receivedFirst = false;

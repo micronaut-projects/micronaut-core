@@ -103,11 +103,13 @@ public final class NettyJsonHandler<T> implements MessageBodyHandler<T>, Chunked
     }
 
     @Override
+    @Nullable
     public T read(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, ByteBuffer<?> byteBuffer) throws CodecException {
         return jsonMessageHandler.read(type, mediaType, httpHeaders, byteBuffer);
     }
 
     @Override
+    @Nullable
     public T read(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
         return jsonMessageHandler.read(type, mediaType, httpHeaders, inputStream);
     }

@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.util.Objects;
@@ -117,6 +118,7 @@ public interface ParameterElement extends TypedElement {
         Objects.requireNonNull(type, "Type cannot be null");
         return new ReflectParameterElement(type, name) {
 
+            @Nullable
             private AnnotationMetadata annotationMetadata;
 
             @Override

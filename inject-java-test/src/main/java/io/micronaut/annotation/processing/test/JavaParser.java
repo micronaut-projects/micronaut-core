@@ -69,6 +69,7 @@ public class JavaParser implements Closeable {
     private final JavaCompiler compiler;
     private final InMemoryJavaFileManager fileManager;
     private final DiagnosticCollector<JavaFileObject> diagnosticCollector;
+    @Nullable
     private JavacTask lastTask;
 
     /**

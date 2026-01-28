@@ -244,6 +244,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         }
     }
 
+    @Nullable
     private Object handleCompletionStage(MethodInvocationContext<Object, Object> context,
                                          HttpMethod httpMethod,
                                          String httpMethodName,
@@ -316,6 +317,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         return interceptedMethod.handleResult(future);
     }
 
+    @Nullable
     private Object handlePublisher(MethodInvocationContext<Object, Object> context,
                                    ReturnType<?> returnType,
                                    Class<?> reactiveValueType,
@@ -349,8 +351,10 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         }
 
         Object finalPublisher = interceptedMethod.handleResult(publisher);
-        for (ReactiveClientResultTransformer transformer : transformers) {
-            finalPublisher = transformer.transform(finalPublisher);
+        if (finalPublisher != null) {
+            for (ReactiveClientResultTransformer transformer : transformers) {
+                finalPublisher = transformer.transform(finalPublisher);
+            }
         }
         return finalPublisher;
     }

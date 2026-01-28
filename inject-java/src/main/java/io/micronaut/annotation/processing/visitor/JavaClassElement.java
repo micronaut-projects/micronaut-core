@@ -71,6 +71,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
@@ -101,9 +102,13 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
     final List<? extends TypeMirror> typeArguments;
 
     private final boolean isTypeVariable;
+    @Nullable
     private List<PropertyElement> beanProperties;
+    @Nullable
     private String simpleName;
+    @Nullable
     private String name;
+    @Nullable
     private String packageName;
     @Nullable
     private Map<String, ClassElement> resolvedTypeArguments;
@@ -160,9 +165,11 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
     JavaClassElement(JavaNativeElement.Class nativeType,
                      ElementAnnotationMetadataFactory annotationMetadataFactory,
                      JavaVisitorContext visitorContext,
+                     @Nullable
                      List<? extends TypeMirror> typeArguments,
                      @Nullable
                      Map<String, ClassElement> resolvedTypeArguments,
+                     @Nullable
                      String doc) {
         this(nativeType, annotationMetadataFactory, visitorContext, typeArguments, resolvedTypeArguments, 0, false, doc);
     }
@@ -178,6 +185,7 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
     JavaClassElement(JavaNativeElement.Class nativeType,
                      ElementAnnotationMetadataFactory annotationMetadataFactory,
                      JavaVisitorContext visitorContext,
+                     @Nullable
                      List<? extends TypeMirror> typeArguments,
                      @Nullable
                      Map<String, ClassElement> resolvedTypeArguments,
@@ -197,11 +205,12 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
     JavaClassElement(JavaNativeElement.Class nativeType,
                      ElementAnnotationMetadataFactory annotationMetadataFactory,
                      JavaVisitorContext visitorContext,
+                     @Nullable
                      List<? extends TypeMirror> typeArguments,
                      @Nullable
                      Map<String, ClassElement> resolvedTypeArguments,
                      int arrayDimensions,
-                     String doc) {
+                     @Nullable String doc) {
         this(nativeType, annotationMetadataFactory, visitorContext, typeArguments, resolvedTypeArguments, arrayDimensions, false, doc);
     }
 
@@ -852,6 +861,7 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
     private final class JavaEnclosedElementsQuery extends EnclosedElementsQuery<TypeElement, Element> {
 
         private final boolean isSource;
+        @Nullable
         private List<? extends Element> enclosedElements;
 
         private JavaEnclosedElementsQuery(boolean isSource) {
@@ -870,7 +880,7 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
 
         @Override
         protected Element getNativeType(io.micronaut.inject.ast.Element element) {
-            return ((AbstractJavaElement) element).getNativeType().element();
+            return Objects.requireNonNull(((AbstractJavaElement) element).getNativeType().element());
         }
 
         @Override
@@ -893,6 +903,7 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
         }
 
         @Override
+        @Nullable
         protected TypeElement getSuperClass(TypeElement classNode) {
             TypeMirror superclass = classNode.getSuperclass();
             if (superclass instanceof DeclaredType dt) {

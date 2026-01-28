@@ -47,6 +47,7 @@ public class UserExecutorConfiguration implements ExecutorConfiguration {
     private Integer parallelism;
     private Integer corePoolSize;
     private boolean virtual;
+    @Nullable
     private Class<? extends ThreadFactory> threadFactoryClass;
 
     /**
@@ -70,7 +71,7 @@ public class UserExecutorConfiguration implements ExecutorConfiguration {
      * @param threadFactoryClass the thread factory class
      */
     @ConfigurationInject
-    protected UserExecutorConfiguration(@Nullable @Parameter String name,
+    protected UserExecutorConfiguration(@Parameter String name,
                                         @Nullable Integer nThreads,
                                         @Nullable ExecutorType type,
                                         @Nullable Integer parallelism,
@@ -202,7 +203,7 @@ public class UserExecutorConfiguration implements ExecutorConfiguration {
      */
     public static UserExecutorConfiguration of(ExecutorType type) {
         ArgumentUtils.check("type", type).notNull();
-        UserExecutorConfiguration configuration = new UserExecutorConfiguration(null);
+        UserExecutorConfiguration configuration = new UserExecutorConfiguration("default");
         configuration.type = type;
         return configuration;
     }

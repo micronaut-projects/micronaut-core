@@ -15,6 +15,8 @@
  */
 package io.micronaut.discovery.cloud;
 
+import org.jspecify.annotations.NullUnmarked;
+
 import java.io.Serializable;
 
 /**
@@ -24,6 +26,7 @@ import java.io.Serializable;
  * @author Graeme Rocher
  * @since 1.0
  */
+@NullUnmarked
 public class NetworkInterface implements Serializable {
     private String ipv4;
     private String ipv6;

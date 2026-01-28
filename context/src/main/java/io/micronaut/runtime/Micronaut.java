@@ -241,7 +241,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     }
 
     @Override
-    public Micronaut propertySources(@Nullable PropertySource... propertySources) {
+    public Micronaut propertySources(PropertySource @Nullable ... propertySources) {
         return (Micronaut) super.propertySources(propertySources);
     }
 
@@ -251,12 +251,12 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     }
 
     @Override
-    public Micronaut environmentVariableIncludes(@Nullable String... environmentVariables) {
+    public Micronaut environmentVariableIncludes(String @Nullable ... environmentVariables) {
         return (Micronaut) super.environmentVariableIncludes(environmentVariables);
     }
 
     @Override
-    public Micronaut environmentVariableExcludes(@Nullable String... environmentVariables) {
+    public Micronaut environmentVariableExcludes(String @Nullable... environmentVariables) {
         return (Micronaut) super.environmentVariableExcludes(environmentVariables);
     }
 
@@ -271,22 +271,22 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     }
 
     @Override
-    public Micronaut args(@Nullable String... args) {
+    public Micronaut args(String @Nullable ... args) {
         return (Micronaut) super.args(args);
     }
 
     @Override
-    public Micronaut environments(@Nullable String... environments) {
+    public Micronaut environments(String @Nullable ... environments) {
         return (Micronaut) super.environments(environments);
     }
 
     @Override
-    public Micronaut defaultEnvironments(@Nullable String... environments) {
+    public Micronaut defaultEnvironments(String @Nullable ... environments) {
         return (Micronaut) super.defaultEnvironments(environments);
     }
 
     @Override
-    public Micronaut packages(@Nullable String... packages) {
+    public Micronaut packages(String @Nullable ... packages) {
         return (Micronaut) super.packages(packages);
     }
 

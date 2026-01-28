@@ -1,6 +1,5 @@
 plugins {
     id("io.micronaut.build.internal.convention-core-library")
-    id("io.micronaut.build.internal.convention-nullaway")
 }
 
 micronautBuild {
@@ -20,6 +19,7 @@ dependencies {
     compileOnly(libs.managed.snakeyaml)
     compileOnly(libs.managed.groovy)
     compileOnly(libs.managed.kotlin.stdlib.jdk8)
+    compileOnly(libs.jetbrains.annotations)
 
     testImplementation(projects.micronautContext)
     testImplementation(projects.micronautInjectGroovy)

@@ -110,7 +110,9 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         }
     }
 
+    @Nullable
     private List<LoadedVisitor> loadedVisitors;
+    @Nullable
     private Collection<? extends TypeElementVisitor<?, ?>> typeElementVisitors;
 
     /**
@@ -196,7 +198,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
     @Override
     public Set<String> getSupportedAnnotationTypes() {
-        if (loadedVisitors.isEmpty()) {
+        if (loadedVisitors == null || loadedVisitors.isEmpty()) {
             return Collections.emptySet();
         } else {
             return super.getSupportedAnnotationTypes();
@@ -226,7 +228,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         "It should not be possible to process elements without at least one annotation present and this call breaks that assumption")
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
-        if (!loadedVisitors.isEmpty() && !processingGeneratedAnnotation(annotations)) {
+        if (loadedVisitors != null && !loadedVisitors.isEmpty() && !processingGeneratedAnnotation(annotations)) {
 
             TypeElement groovyObjectTypeElement = elementUtils.getTypeElement("groovy.lang.GroovyObject");
             TypeMirror groovyObjectType = groovyObjectTypeElement != null ? groovyObjectTypeElement.asType() : null;

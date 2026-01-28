@@ -93,6 +93,7 @@ public class ConfigurationIntroductionAdvice implements MethodInterceptor<Object
         }
     }
 
+    @Nullable
     private Object resolveProperty(MethodInvocationContext<Object, Object> context, ReturnType<Object> rt, Argument<Object> argument) {
         String property = context.stringValue(Property.class, MEMBER_NAME).orElse(null);
         if (property == null) {
@@ -124,6 +125,7 @@ public class ConfigurationIntroductionAdvice implements MethodInterceptor<Object
         }
     }
 
+    @Nullable
     private Object resolveBean(MethodInvocationContext<Object, Object> context, Class<Object> returnType, Argument<Object> argument) {
         final Qualifier<Object> qualifier = configurationPath.beanQualifier();
         if (Iterable.class.isAssignableFrom(returnType)) {

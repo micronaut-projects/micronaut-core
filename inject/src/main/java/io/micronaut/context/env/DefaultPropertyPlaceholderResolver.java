@@ -118,7 +118,7 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
     public Object resolveRequiredPlaceholdersObject(String str) throws ConfigurationException {
         List<Segment> segments = buildSegments(str);
         if (segments.size() == 1) {
-            return segments.get(0).getValue(Object.class);
+            return segments.getFirst().getValue(Object.class);
         }
         return resolveRequiredPlaceholdersString(segments);
     }
@@ -135,7 +135,7 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
     public <T> T resolveRequiredPlaceholder(String str, Class<T> type) throws ConfigurationException {
         List<Segment> segments = buildSegments(str);
         if (segments.size() == 1) {
-            return segments.get(0).getValue(type);
+            return segments.getFirst().getValue(type);
         } else {
             throw new ConfigurationException("Cannot convert a multi segment placeholder to a specified type");
         }
@@ -145,7 +145,7 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
     public <T> Optional<T> resolveOptionalPlaceholder(String str, Class<T> type) throws ConfigurationException {
         List<Segment> segments = buildSegments(str, false);
         if (segments.size() == 1) {
-            return segments.get(0).findValue(type);
+            return segments.getFirst().findValue(type);
         } else {
             return Optional.empty();
         }

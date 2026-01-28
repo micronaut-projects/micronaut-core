@@ -16,6 +16,7 @@
 package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.NullUnmarked;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.sourcegen.model.ClassTypeDef;
 import io.micronaut.sourcegen.model.ExpressionDef;
@@ -38,6 +39,7 @@ import java.util.stream.Collectors;
  * @author Denis Stepanov
  * @since 4.8
  */
+@NullUnmarked
 @Internal
 public final class GenUtils {
 

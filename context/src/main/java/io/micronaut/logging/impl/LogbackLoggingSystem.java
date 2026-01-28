@@ -82,6 +82,7 @@ public final class LogbackLoggingSystem implements LoggingSystem {
      * @param logLevel The micronaut {@link LogLevel} to convert
      * @return The converted logback {@link Level}
      */
+    @Nullable
     private static Level toLevel(LogLevel logLevel) {
         if (logLevel == LogLevel.NOT_SPECIFIED) {
             return null;

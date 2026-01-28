@@ -52,6 +52,7 @@ public final class ComparablesComparisonOperation extends ExpressionNode {
     private final ExpressionNode leftOperand;
     private final ExpressionNode rightOperand;
     private final ExpressionDef.ComparisonOperation.OpType type;
+    @Nullable
     private ComparisonType comparisonType;
 
     public ComparablesComparisonOperation(ExpressionNode leftOperand,

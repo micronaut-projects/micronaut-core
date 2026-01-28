@@ -46,15 +46,21 @@ import java.util.List;
 public class JdkBlockingHttpClient extends AbstractJdkHttpClient implements BlockingHttpClient {
 
     public JdkBlockingHttpClient(
+        @Nullable
         LoadBalancer loadBalancer,
+        @Nullable
         HttpVersionSelection httpVersion,
         HttpClientConfiguration configuration,
+        @Nullable
         String contextPath,
         @Nullable HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver,
         @Nullable List<HttpFilterResolver.FilterEntry> clientFilterEntries,
+        @Nullable
         MediaTypeCodecRegistry mediaTypeCodecRegistry,
+        @Nullable
         MessageBodyHandlerRegistry messageBodyHandlerRegistry,
         RequestBinderRegistry requestBinderRegistry,
+        @Nullable
         String clientId,
         ConversionService conversionService,
         JdkClientSslBuilder sslBuilder,

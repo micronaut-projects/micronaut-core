@@ -39,6 +39,7 @@ import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -79,7 +80,7 @@ public final class JdkClientSslBuilder extends SslBuilder<SSLContext> {
             return null;
         }
         TrustManagerFactory trustManagerFactory = getTrustManagerFactory(ssl);
-        KeyManagerFactory keyManagerFactory = getKeyManagerFactory(ssl);
+        KeyManagerFactory keyManagerFactory = Objects.requireNonNull(getKeyManagerFactory(ssl), "KeyManagerFactory cannot be null");
         try {
             SSLContext tls = SSLContext.getInstance(ssl.getProtocol().orElse("TLS"));
             if (trustManagerFactory == null) {

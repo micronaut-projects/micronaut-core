@@ -1,7 +1,6 @@
 plugins {
     id("io.micronaut.build.internal.convention-library")
     id("io.micronaut.build.internal.kotlin-base")
-    id("io.micronaut.build.internal.convention-nullaway")
     alias(libs.plugins.managed.kotlin.jvm)
 }
 

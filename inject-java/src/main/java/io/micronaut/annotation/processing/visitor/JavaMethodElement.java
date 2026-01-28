@@ -49,6 +49,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -65,12 +66,18 @@ public class JavaMethodElement extends AbstractJavaMemberElement implements Meth
 
     protected final JavaClassElement owningType;
     protected final ExecutableElement executableElement;
+    @Nullable
     private JavaClassElement resolvedDeclaringClass;
-    private ParameterElement[] parameters;
+    private ParameterElement @Nullable [] parameters;
+    @Nullable
     private ParameterElement continuationParameter;
+    @Nullable
     private ClassElement genericReturnType;
+    @Nullable
     private ClassElement returnType;
+    @Nullable
     private Map<String, ClassElement> typeArguments;
+    @Nullable
     private Map<String, ClassElement> declaredTypeArguments;
     private final MethodElementAnnotationsHelper helper;
 
@@ -291,7 +298,7 @@ public class JavaMethodElement extends AbstractJavaMemberElement implements Meth
     public ParameterElement[] getSuspendParameters() {
         ParameterElement[] parameters = getParameters();
         if (isSuspend()) {
-            return ArrayUtils.concat(parameters, continuationParameter);
+            return ArrayUtils.concat(parameters, Objects.requireNonNull(continuationParameter));
         } else {
             return parameters;
         }
@@ -335,9 +342,9 @@ public class JavaMethodElement extends AbstractJavaMemberElement implements Meth
 
     private ClassElement returnType(Map<String, ClassElement> genericInfo) {
         VariableElement varElement = CollectionUtils.last(executableElement.getParameters());
-        if (isSuspend(varElement)) {
+        if (varElement != null && isSuspend(varElement)) {
             DeclaredType dType = (DeclaredType) varElement.asType();
-            TypeMirror tm = dType.getTypeArguments().iterator().next();
+            TypeMirror tm = dType.getTypeArguments().getFirst();
             if (tm.getKind() == TypeKind.WILDCARD) {
                 tm = ((WildcardType) tm).getSuperBound();
             }
@@ -345,10 +352,11 @@ public class JavaMethodElement extends AbstractJavaMemberElement implements Meth
             if ((tm instanceof DeclaredType dt) && sameType("kotlin.Unit", dt)) {
                 return PrimitiveElement.VOID;
             } else {
-                return newClassElement(tm, genericInfo);
+                return newClassElement(Objects.requireNonNull(tm), genericInfo);
             }
         }
         final TypeMirror returnType = executableElement.getReturnType();
+
         String docComment = visitorContext.getElements().getDocComment(executableElement);
         ClassElement returnClassElement = newClassElement(getNativeType(), returnType, genericInfo, findReturnDoc(docComment));
         if (canBeMarkedWithNonNull(returnClassElement)) {
@@ -380,7 +388,7 @@ public class JavaMethodElement extends AbstractJavaMemberElement implements Meth
         return (elt instanceof TypeElement te) && type.equals(te.getQualifiedName().toString());
     }
 
-    private boolean isSuspend(VariableElement ve) {
+    private boolean isSuspend(@Nullable VariableElement ve) {
         if (ve != null && ve.asType() instanceof DeclaredType dt) {
             return sameType("kotlin.coroutines.Continuation", dt);
         }

@@ -26,6 +26,7 @@ import io.micronaut.management.endpoint.annotation.Selector;
 import io.micronaut.management.endpoint.annotation.Write;
 import io.micronaut.web.router.UriRoute;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
 
@@ -58,7 +59,7 @@ public class WriteEndpointRouteBuilder extends AbstractEndpointRouteBuilder {
     }
 
     @Override
-    protected void registerRoute(ExecutableMethod<?, ?> method, String id, Integer port) {
+    protected void registerRoute(ExecutableMethod<?, ?> method, String id, @Nullable Integer port) {
         Class<?> declaringType = method.getDeclaringType();
         UriTemplate template = buildUriTemplate(method, id);
         String[] consumes = method.stringValues(Write.class, "consumes");

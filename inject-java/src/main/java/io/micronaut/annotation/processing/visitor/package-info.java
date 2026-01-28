@@ -20,6 +20,8 @@
  * @since 1.0
  */
 @Internal
+@NullMarked
 package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.NullMarked;

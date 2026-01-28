@@ -22,6 +22,7 @@ import io.micronaut.logging.LoggingSystem;
 import jakarta.inject.Singleton;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.core.config.Configurator;
+import org.jspecify.annotations.Nullable;
 
 /**
  * An implementation of {@link LoggingSystem} that works with Log4j.
@@ -47,6 +48,7 @@ public class Log4jLoggingSystem implements LoggingSystem {
      * @param logLevel The micronaut {@link LogLevel} to convert
      * @return The converted log4j {@link Level}
      */
+    @Nullable
     private static Level toLevel(LogLevel logLevel) {
         if (logLevel == LogLevel.NOT_SPECIFIED) {
             return null;

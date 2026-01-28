@@ -106,6 +106,7 @@ public class LogbackLoggingSystem implements ManagedLoggingSystem, io.micronaut.
      * @param logLevel The micronaut {@link io.micronaut.logging.LogLevel} to convert
      * @return The converted logback {@link Level}
      */
+    @Nullable
     private static Level toLevel(LogLevel logLevel) {
         if (logLevel == LogLevel.NOT_SPECIFIED) {
             return null;

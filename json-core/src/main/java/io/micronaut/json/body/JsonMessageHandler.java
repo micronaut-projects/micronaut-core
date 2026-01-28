@@ -102,6 +102,7 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Custo
     }
 
     @Override
+    @Nullable
     public T read(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, ByteBuffer<?> byteBuffer) throws CodecException {
         T decoded;
         try {
@@ -116,6 +117,7 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Custo
     }
 
     @Override
+    @Nullable
     public T read(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
         try {
             return jsonMapper.readValue(inputStream, type);

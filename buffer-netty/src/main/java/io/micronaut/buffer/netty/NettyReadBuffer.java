@@ -36,6 +36,7 @@ import java.util.function.Function;
  */
 @Internal
 final class NettyReadBuffer extends ReadBuffer {
+    @Nullable
     ByteBuf buf;
 
     NettyReadBuffer(ByteBuf buf) {

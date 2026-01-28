@@ -367,13 +367,13 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
         }
     }
 
-    private void checkForPostponedOriginalElement(io.micronaut.inject.ast.Element originatingElement) {
+    private void checkForPostponedOriginalElement(io.micronaut.inject.ast. @Nullable Element originatingElement) {
         if (originatingElement != null && postponedTypes.contains(originatingElement.getName())) {
             throw new ElementPostponedToNextRoundException(originatingElement);
         }
     }
 
-    private void checkForPostponedOriginalElements(io.micronaut.inject.ast.Element[] originatingElements) {
+    private void checkForPostponedOriginalElements(io.micronaut.inject.ast.Element @Nullable [] originatingElements) {
         if (originatingElements != null) {
             for (io.micronaut.inject.ast.Element originatingElement : originatingElements) {
                 checkForPostponedOriginalElement(originatingElement);
@@ -384,7 +384,7 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
     @Override
     public OutputStream visitClass(String classname, io.micronaut.inject.ast.@Nullable Element originatingElement) throws IOException {
         checkForPostponedOriginalElement(originatingElement);
-        return outputVisitor.visitClass(classname, new io.micronaut.inject.ast.Element[] {originatingElement});
+        return outputVisitor.visitClass(classname, originatingElement == null ? new io.micronaut.inject.ast.Element[0] : new io.micronaut.inject.ast.Element[] {originatingElement});
     }
 
     @Override

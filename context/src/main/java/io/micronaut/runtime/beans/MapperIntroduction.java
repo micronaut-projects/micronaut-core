@@ -27,6 +27,7 @@ import io.micronaut.context.expressions.ConfigurableExpressionEvaluationContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.NullUnmarked;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanIntrospection.Builder;
@@ -60,6 +61,7 @@ import java.util.function.Function;
 /**
  * Introduction advice for {@link Mapper}.
  */
+@NullUnmarked
 @InterceptorBean(Mapper.class)
 @Internal
 @BootstrapContextCompatible

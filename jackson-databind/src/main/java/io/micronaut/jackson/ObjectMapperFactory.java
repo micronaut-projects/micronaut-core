@@ -23,7 +23,6 @@ import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Type;
-import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.jackson.serialize.MicronautDeserializers;
@@ -70,9 +69,7 @@ public class ObjectMapperFactory {
     public static final String MICRONAUT_MODULE = "micronaut";
 
     @Inject
-    protected ConversionService conversionService;
-
-    @Inject
+    @Nullable
     protected BeanContext beanContext;
 
     @Inject
@@ -156,8 +153,7 @@ public class ObjectMapperFactory {
                                    @Nullable JsonFactory jsonFactory) {
         JsonMapper.Builder builder = jsonFactory != null ? JsonMapper.builder(jsonFactory) : JsonMapper.builder();
 
-        final boolean hasConfiguration = jacksonConfiguration != null;
-        if (!hasConfiguration || jacksonConfiguration.isModuleScan()) {
+        if (jacksonConfiguration == null || jacksonConfiguration.isModuleScan()) {
             builder.findAndAddModules();
         }
         builder.addModules(jacksonModules);
@@ -166,7 +162,9 @@ public class ObjectMapperFactory {
         }
 
         SimpleModule module = new SimpleModule(MICRONAUT_MODULE);
-        module.setDeserializers(new MicronautDeserializers(conversionService));
+        if (beanContext != null) {
+            module.setDeserializers(new MicronautDeserializers(beanContext.getConversionService()));
+        }
 
         for (ValueSerializer serializer : serializers) {
             Class<? extends ValueSerializer> type = serializer.getClass();
@@ -200,9 +198,10 @@ public class ObjectMapperFactory {
             }
         }
 
-        if (hasConfiguration && jacksonConfiguration.isTrimStrings()) {
+        if (jacksonConfiguration != null && jacksonConfiguration.isTrimStrings()) {
             module.addDeserializer(String.class, new StringDeserializer() {
                 @Override
+                @Nullable
                 public String deserialize(JsonParser p, DeserializationContext ctxt) {
                     String value = super.deserialize(p, ctxt);
                     return StringUtils.trimToNull(value);
@@ -233,7 +232,7 @@ public class ObjectMapperFactory {
             .configure(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY, true)
             .configure(DeserializationFeature.UNWRAP_SINGLE_VALUE_ARRAYS, true);
 
-        if (hasConfiguration) {
+        if (jacksonConfiguration != null) {
 
             DefaultTyping defaultTyping = jacksonConfiguration.getDefaultTyping();
             if (defaultTyping != null) {

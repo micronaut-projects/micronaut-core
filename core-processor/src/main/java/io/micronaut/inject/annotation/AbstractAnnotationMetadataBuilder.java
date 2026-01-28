@@ -73,6 +73,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * Names of annotations that should produce deprecation warnings.
      * The key in the map is the deprecated annotation the value the replacement.
      */
+    @Nullable
     protected static final AnnotatedElementValidator ELEMENT_VALIDATOR;
     private static final Map<String, String> DEPRECATED_ANNOTATION_NAMES = Collections.emptyMap();
     private static final Map<String, List<AnnotationMapper<?>>> ANNOTATION_MAPPERS = new HashMap<>(10);
@@ -591,8 +592,10 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         resolvedDefaults.put(annotationTypeName, defaults);
         Map<? extends T, ?> nativeDefaultValues = readAnnotationDefaultValues(annotationTypeName, annotationElement);
         Map<CharSequence, Object> annotationDefaults = getAnnotationDefaults(annotationElement, annotationTypeName, nativeDefaultValues, resolvedDefaults);
-        defaults.putAll(annotationDefaults);
-        return annotationDefaults;
+        if (annotationDefaults != null) {
+            defaults.putAll(annotationDefaults);
+        }
+        return defaults;
     }
 
     /**
@@ -663,6 +666,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @param <K>            The annotation type
      * @return The mappers
      */
+    @Nullable
     protected <K extends Annotation> List<AnnotationMapper<K>> getAnnotationMappers(String annotationName) {
         return (List) ANNOTATION_MAPPERS.get(annotationName);
     }
@@ -674,6 +678,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @param <K>            The annotation type
      * @return The transformers
      */
+    @Nullable
     protected <K extends Annotation> List<AnnotationTransformer<K>> getAnnotationTransformers(String annotationName) {
         return (List) ANNOTATION_TRANSFORMERS.get(annotationName);
     }
@@ -685,9 +690,10 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      */
     protected abstract VisitorContext getVisitorContext();
 
+    @Nullable
     private Map<CharSequence, Object> getAnnotationDefaults(T originatingElement,
                                                             String annotationName,
-                                                            Map<? extends T, ?> elementDefaultValues,
+                                                            @Nullable Map<? extends T, ?> elementDefaultValues,
                                                             Map<String, Map<CharSequence, Object>> resolvedDefaults) {
         if (elementDefaultValues == null) {
             return null;
@@ -1240,7 +1246,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             }
         }
         // The container should be this annotation value name
-        return findRepeatableContainerNameForType(repeatableAnnotationName) != null;
+        return repeatableAnnotationName != null && findRepeatableContainerNameForType(repeatableAnnotationName) != null;
     }
 
     private ProcessedAnnotation processAliases(ProcessedAnnotation processedAnnotation,
@@ -1425,7 +1431,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         ).toList();
     }
 
-    private <K> List<K> eliminateProcessed(ProcessingContext context, List<K> visitors) {
+    private <K> List<K> eliminateProcessed(ProcessingContext context, @Nullable List<K> visitors) {
         if (visitors == null) {
             return Collections.emptyList();
         }
@@ -1771,7 +1777,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             return new ProcessedAnnotation(annotationType, annotationValue);
         }
 
-        public ProcessedAnnotation withAnnotationType(T annotationType) {
+        public ProcessedAnnotation withAnnotationType(@Nullable T annotationType) {
             return new ProcessedAnnotation(annotationType, annotationValue);
         }
 

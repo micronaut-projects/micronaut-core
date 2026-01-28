@@ -16,6 +16,7 @@
 package io.micronaut.core.async.publisher;
 
 import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.NullUnmarked;
 import org.reactivestreams.Processor;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -31,6 +32,7 @@ import org.reactivestreams.Subscription;
  * @author Jonas Konrad
  * @since 4.4.0
  */
+@NullUnmarked
 @Internal
 public final class DelayedSubscriber<T> implements Processor<T, T>, Subscription {
     private static final Object COMPLETE = new Object();

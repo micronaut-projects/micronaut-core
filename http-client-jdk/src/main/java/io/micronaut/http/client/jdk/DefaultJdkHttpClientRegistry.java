@@ -25,7 +25,6 @@ import io.micronaut.context.annotation.Primary;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.Order;
 import io.micronaut.core.convert.ConversionService;
@@ -236,7 +235,7 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
 
             final List<String> filterAnnotations = clientKey.filterAnnotations;
             final String path = clientKey.path;
-            if (clientBean != null && path == null && configurationClass == null && filterAnnotations.isEmpty()) {
+            if (clientBean != null && path == null && configurationClass == null && (filterAnnotations == null || filterAnnotations.isEmpty())) {
                 return clientBean;
             }
 
@@ -284,18 +283,21 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
             if (jsonFeatures != null) {
                 List<MediaTypeCodec> codecs = new ArrayList<>(2);
                 MediaTypeCodecRegistry codecRegistry = client.getMediaTypeCodecRegistry();
-                for (MediaTypeCodec codec : codecRegistry.getCodecs()) {
-                    if (codec instanceof MapperMediaTypeCodec mapper) {
-                        codecs.add(mapper.cloneWithFeatures(jsonFeatures));
-                    } else {
-                        codecs.add(codec);
+                if (codecRegistry != null) {
+                    for (MediaTypeCodec codec : codecRegistry.getCodecs()) {
+                        if (codec instanceof MapperMediaTypeCodec mapper) {
+                            codecs.add(mapper.cloneWithFeatures(jsonFeatures));
+                        } else {
+                            codecs.add(codec);
+                        }
                     }
-                }
-                if (codecRegistry.findCodec(MediaType.APPLICATION_JSON_TYPE).isEmpty()) {
-                    codecs.add(createNewJsonCodec(this.beanContext, jsonFeatures));
+                    if (codecRegistry.findCodec(MediaType.APPLICATION_JSON_TYPE).isEmpty()) {
+                        codecs.add(createNewJsonCodec(this.beanContext, jsonFeatures));
+                    }
                 }
                 client.setMediaTypeCodecRegistry(MediaTypeCodecRegistry.of(codecs));
                 client.setMessageBodyHandlerRegistry(new MessageBodyHandlerRegistry() {
+                    @Nullable
                     final MessageBodyHandlerRegistry delegate = client.getMessageBodyHandlerRegistry();
 
                     @SuppressWarnings("unchecked")
@@ -307,12 +309,18 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
                     }
 
                     @Override
-                    public <T> Optional<MessageBodyReader<T>> findReader(Argument<T> type, List<MediaType> mediaType) {
+                    public <T> Optional<MessageBodyReader<T>> findReader(Argument<T> type, @Nullable List<MediaType> mediaType) {
+                        if (delegate == null) {
+                            return Optional.empty();
+                        }
                         return delegate.findReader(type, mediaType).map(this::customize);
                     }
 
                     @Override
                     public <T> Optional<MessageBodyWriter<T>> findWriter(Argument<T> type, List<MediaType> mediaType) {
+                        if (delegate == null) {
+                            return Optional.empty();
+                        }
                         return delegate.findWriter(type, mediaType).map(this::customize);
                     }
                 });
@@ -322,10 +330,14 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
     }
 
     private DefaultJdkHttpClient buildClient(
+        @Nullable
         LoadBalancer loadBalancer,
+        @Nullable
         HttpVersionSelection httpVersion,
         HttpClientConfiguration configuration,
+        @Nullable
         String clientId,
+        @Nullable
         String contextPath,
         BeanContext beanContext,
         AnnotationMetadata annotationMetadata
@@ -352,7 +364,7 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
     }
 
     @Override
-    public DefaultJdkHttpClient getClient(HttpVersionSelection httpVersion, String clientId, String path) {
+    public DefaultJdkHttpClient getClient(HttpVersionSelection httpVersion, String clientId, @Nullable String path) {
         final ClientKey key = new ClientKey(
             httpVersion,
             clientId,
@@ -365,7 +377,7 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
     }
 
     @Override
-    public HttpClient resolveClient(InjectionPoint<?> injectionPoint, LoadBalancer loadBalancer, HttpClientConfiguration configuration, BeanContext beanContext) {
+    public HttpClient resolveClient(@Nullable InjectionPoint<?> injectionPoint, @Nullable LoadBalancer loadBalancer, @Nullable HttpClientConfiguration configuration, BeanContext beanContext) {
         return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext);
     }
 
@@ -393,7 +405,7 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
     }
 
     @Override
-    public @NonNull RawHttpClient getRawClient(@NonNull HttpVersionSelection httpVersion, @NonNull String clientId, @Nullable String path) {
+    public RawHttpClient getRawClient(HttpVersionSelection httpVersion, String clientId, @Nullable String path) {
         return new JdkRawHttpClient(getClient(httpVersion, clientId, path));
     }
 
@@ -409,11 +421,17 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
      */
     @Internal
     private record ClientKey(
+        @Nullable
         HttpVersionSelection httpVersion,
+        @Nullable
         String clientId,
+        @Nullable
         List<String> filterAnnotations,
+        @Nullable
         String path,
+        @Nullable
         Class<?> configurationClass,
+        @Nullable
         JsonFeatures jsonFeatures
     ) {
     }

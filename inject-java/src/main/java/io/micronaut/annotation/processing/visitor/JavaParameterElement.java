@@ -45,7 +45,9 @@ final class JavaParameterElement extends AbstractTypeAwareJavaElement implements
 
     private final JavaClassElement owningType;
     private final JavaMethodElement methodElement;
+    @Nullable
     private ClassElement typeElement;
+    @Nullable
     private ClassElement genericTypeElement;
 
     /**

@@ -328,7 +328,6 @@ nullaway = { module = "com.uber.nullaway:nullaway", version.ref = "nullaway" }
 error-prone-core = { module = "com.google.errorprone:error_prone_core", version.ref = "error_prone_core" }
 
 gradle-errorprone = { module = "net.ltgt.errorprone:net.ltgt.errorprone.gradle.plugin", version.ref = "errorprone-gradle-plugin"}
-gradle-nullaway = { module = "net.ltgt.errorprone:net.ltgt.errorprone.gradle.plugin", version.ref = "errorprone-gradle-plugin"}
 
 [plugins]
 managed-kotlin-allopen = { id = "org.jetbrains.kotlin.plugin.allopen", version.ref = "managed-kotlin" }

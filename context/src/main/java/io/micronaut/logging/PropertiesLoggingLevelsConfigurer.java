@@ -26,6 +26,7 @@ import io.micronaut.core.naming.conventions.StringConvention;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -117,6 +118,7 @@ final class PropertiesLoggingLevelsConfigurer implements ApplicationEventListene
         }
     }
 
+    @Nullable
     private static LogLevel toLogLevel(String logLevel) {
         if (StringUtils.isEmpty(logLevel)) {
             return LogLevel.NOT_SPECIFIED;

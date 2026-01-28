@@ -35,6 +35,7 @@ import java.util.concurrent.ExecutorService;
 public class ContextPropagatingExecutorService implements InstrumentedExecutorService {
     private final ExecutorService target;
 
+    @Nullable
     private final PropagatedContext propagatedContext;
 
     public ContextPropagatingExecutorService(ExecutorService target) {

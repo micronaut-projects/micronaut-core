@@ -144,7 +144,8 @@ final class JavaWildcardElement extends JavaClassElement implements WildcardElem
         return fold.apply(upperBounds.contains(null) || lowerBounds.contains(null) ? null : new JavaWildcardElement(elementAnnotationMetadataFactory, wildcardType, upperBound, upperBounds, lowerBounds, doc));
     }
 
-    private JavaClassElement toJavaClassElement(ClassElement element) {
+    @Nullable
+    private JavaClassElement toJavaClassElement(@Nullable ClassElement element) {
         if (element == null) {
             return null;
         }

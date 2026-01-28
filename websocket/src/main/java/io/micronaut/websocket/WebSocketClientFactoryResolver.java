@@ -16,8 +16,10 @@
 package io.micronaut.websocket;
 
 import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Iterator;
+import java.util.Objects;
 import java.util.ServiceLoader;
 
 /**
@@ -29,6 +31,7 @@ import java.util.ServiceLoader;
 @Internal
 final class WebSocketClientFactoryResolver {
 
+    @Nullable
     private static volatile WebSocketClientFactory factory;
 
     static WebSocketClientFactory getFactory() {
@@ -39,7 +42,7 @@ final class WebSocketClientFactoryResolver {
                 }
             }
         }
-        return factory;
+        return Objects.requireNonNull(factory);
     }
 
     private static WebSocketClientFactory resolveClientFactory() {

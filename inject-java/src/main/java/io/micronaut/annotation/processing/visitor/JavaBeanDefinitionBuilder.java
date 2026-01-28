@@ -24,7 +24,6 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ClassElement;
@@ -38,6 +37,8 @@ import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
 import io.micronaut.inject.writer.BeanDefinitionVisitor;
 import io.micronaut.inject.writer.BeanDefinitionWriter;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.util.function.BiConsumer;
@@ -150,7 +151,7 @@ class JavaBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
             elementAnnotationMetadataFactory,
             (JavaVisitorContext) JavaBeanDefinitionBuilder.this.visitorContext
         ) {
-            BeanParameterElement[] parameters;
+            BeanParameterElement @Nullable [] parameters;
 
             @NonNull
             @Override

@@ -16,6 +16,7 @@
 package io.micronaut.function.client;
 
 import io.micronaut.core.type.Argument;
+import org.jspecify.annotations.Nullable;
 
 /**
  * @param <I> input type
@@ -33,5 +34,6 @@ public interface FunctionInvoker<I, O> {
      * @param outputType The response type
      * @return The result
      */
-    O invoke(FunctionDefinition definition, I input, Argument<O> outputType);
+    @Nullable
+    O invoke(FunctionDefinition definition, @Nullable I input, Argument<O> outputType);
 }

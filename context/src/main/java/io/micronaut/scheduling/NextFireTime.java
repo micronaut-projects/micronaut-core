@@ -15,13 +15,13 @@
  */
 package io.micronaut.scheduling;
 
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.scheduling.cron.CronExpression;
+
 import java.time.Duration;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.function.Supplier;
-
-import io.micronaut.core.annotation.Internal;
-import io.micronaut.scheduling.cron.CronExpression;
 
 /**
  * Represents the next fire time for a cron expression.
@@ -31,7 +31,6 @@ import io.micronaut.scheduling.cron.CronExpression;
  */
 @Internal
 final class NextFireTime implements Supplier<Duration> {
-    private Duration duration;
     private ZonedDateTime nextFireTime;
     private final CronExpression cron;
     private final ZoneId zoneId;
@@ -59,12 +58,11 @@ final class NextFireTime implements Supplier<Duration> {
     public Duration get() {
         ZonedDateTime now = ZonedDateTime.now(zoneId);
         // check if the task have fired too early
-        computeNextFireTime(now.isAfter(nextFireTime) ? now : nextFireTime);
-        return duration;
+        return computeNextFireTime(now.isAfter(nextFireTime) ? now : nextFireTime);
     }
 
-    private void computeNextFireTime(ZonedDateTime currentFireTime) {
+    private Duration computeNextFireTime(ZonedDateTime currentFireTime) {
         nextFireTime = cron.nextTimeAfter(currentFireTime);
-        duration = Duration.ofMillis(nextFireTime.toInstant().toEpochMilli() - ZonedDateTime.now(zoneId).toInstant().toEpochMilli());
+        return Duration.ofMillis(nextFireTime.toInstant().toEpochMilli() - ZonedDateTime.now(zoneId).toInstant().toEpochMilli());
     }
 }

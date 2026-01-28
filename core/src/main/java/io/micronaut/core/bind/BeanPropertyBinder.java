@@ -42,7 +42,6 @@ public interface BeanPropertyBinder extends ArgumentBinder<Object, Map<CharSeque
      * @return The bound instance
      * @throws ConversionErrorException if the object cannot be bound
      */
-    @SuppressWarnings("unchecked")
     <T2> T2 bind(Class<T2> type, Set<? extends Map.Entry<? extends CharSequence, Object>> source) throws ConversionErrorException;
 
     /**
@@ -76,7 +75,6 @@ public interface BeanPropertyBinder extends ArgumentBinder<Object, Map<CharSeque
      * @return The bound instance
      * @throws ConversionErrorException if the object cannot be bound
      */
-    @SuppressWarnings("unchecked")
     default <T2> T2 bind(Class<T2> type, Map<? extends CharSequence, Object> source) throws ConversionErrorException {
         return bind(type, source.entrySet());
     }

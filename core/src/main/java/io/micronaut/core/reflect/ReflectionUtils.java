@@ -217,7 +217,8 @@ public class ReflectionUtils {
      * @param <T>       The instance type
      * @return The result
      */
-    public static <R, T> R invokeMethod(T instance, Method method, Object... arguments) {
+    @Nullable
+    public static <R, T> R invokeMethod(T instance, Method method, @Nullable Object... arguments) {
         try {
             return (R) method.invoke(instance, arguments);
         } catch (IllegalAccessException e) {
@@ -238,8 +239,9 @@ public class ReflectionUtils {
      * @return The result
      * @since 4.8
      */
+    @Nullable
     @UsedByGeneratedCode
-    public static <R, T> R invokeInaccessibleMethod(T instance, Method method, Object... arguments) {
+    public static <R, T> R invokeInaccessibleMethod(T instance, Method method, @Nullable Object... arguments) {
         try {
             method.setAccessible(true);
             return (R) method.invoke(instance, arguments);
@@ -487,10 +489,7 @@ public class ReflectionUtils {
      * @param instance The instance
      * @param value The value
      */
-    public static void setField(
- Field field,
- Object instance,
-            @Nullable Object value) {
+    public static void setField(Field field, Object instance, @Nullable Object value) {
         try {
             ClassUtils.REFLECTION_LOGGER.debug("Reflectively setting field {} to value {} on object {}", field, value, value);
             field.setAccessible(true);
@@ -512,6 +511,7 @@ public class ReflectionUtils {
      * @since 3.7.0
      */
     @UsedByGeneratedCode
+    @Nullable
     public static Object getField(Class<?> clazz, String fieldName, Object instance) {
         try {
             ClassUtils.REFLECTION_LOGGER.debug("Reflectively getting field {} of class {} and instance {}", fieldName, clazz, instance);
@@ -532,8 +532,8 @@ public class ReflectionUtils {
      * @since 4.0.0
      */
     public static void setField(Class<?> clazz,
- String fieldName,
- Object instance,
+                                String fieldName,
+                                Object instance,
                                 @Nullable Object value) {
         try {
             Field field = findField(clazz, fieldName)

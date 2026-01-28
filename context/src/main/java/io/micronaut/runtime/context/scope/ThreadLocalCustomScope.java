@@ -50,7 +50,7 @@ final class ThreadLocalCustomScope implements CustomScope<ThreadLocal>, LifeCycl
 
     private static final Supplier<Cleaner> LIFECYCLE_CLEANER = SupplierUtil.memoized(Cleaner::create);
 
-    private final java.lang.ThreadLocal<LocalHolder> threadScope = new java.lang.ThreadLocal<>();
+    private final java.lang.ThreadLocal<@Nullable LocalHolder> threadScope = new java.lang.ThreadLocal<>();
     private final Set<Cleaner.Cleanable> toClean = ConcurrentHashMap.newKeySet();
 
     @Override
@@ -137,6 +137,7 @@ final class ThreadLocalCustomScope implements CustomScope<ThreadLocal>, LifeCycl
 
     private final class LocalHolder {
         final Map<BeanIdentifier, CreatedBean<?>> beans = new HashMap<>();
+        @Nullable
         LifecycleBeanHolder lifecycleBeans;
 
         void add(CreatedBean<?> createdBean) {
@@ -165,7 +166,7 @@ final class ThreadLocalCustomScope implements CustomScope<ThreadLocal>, LifeCycl
 
     private final class LifecycleBeanHolder implements Runnable {
         final Set<CreatedBean<?>> lifecycleBeans = new HashSet<>();
-        Cleaner.Cleanable cleanable;
+        Cleaner. @Nullable Cleanable cleanable;
 
         @Override
         public void run() {

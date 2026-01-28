@@ -22,6 +22,7 @@ import io.micronaut.jackson.core.tree.JsonStreamTransfer;
 import io.micronaut.jackson.core.tree.TreeGenerator;
 import io.micronaut.json.JsonStreamConfig;
 import io.micronaut.json.tree.JsonNode;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Subscriber;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,6 +50,7 @@ public class JacksonCoreProcessor extends SingleThreadedBufferingProcessor<byte[
     private static final Logger LOG = LoggerFactory.getLogger(JacksonCoreProcessor.class);
 
     private NonBlockingByteArrayJsonParser currentNonBlockingByteArrayJsonParser;
+    @Nullable
     private TreeGenerator currentGenerator = null;
 
     private final TokenStreamFactory jsonFactory;
