@@ -103,11 +103,9 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
         var builder = GraalPyResources.contextBuilder(VirtualFileSystem.newBuilder()
                 .resourceDirectory(APPLICATION_PATH)
                 .resourceLoadingClass(beacon).build())
-//                .option("python.ExposeInternalSources", StringUtils.TRUE)
-            // required for reloading
             .allowExperimentalOptions(true)
             .allowCreateProcess(true)
-            .option("python.IsolateNativeModules", "true")
+            .allowValueSharing(true)
             .option("python.WarnExperimentalFeatures", "false")
              // Allow access to host classes
              .allowHostAccess(hostAccess)
