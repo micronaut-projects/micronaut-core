@@ -117,7 +117,7 @@ public final class ContextHolder {
      * @param value The value to inject
      */
     @UsedByGeneratedCode
-    public static void injectedPooledScript(String packageName, String scriptName, String attribute, Value value) {
+    public static void injectedPooledScript(String packageName, String scriptName, String attribute, Object value) {
         getPythonPool().injectMostRecent(packageName, scriptName, attribute, value);
     }
 

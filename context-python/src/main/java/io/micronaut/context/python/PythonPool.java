@@ -19,6 +19,7 @@ import io.micronaut.context.ApplicationContext;
 
 import io.micronaut.context.event.BeanDestroyedEvent;
 import io.micronaut.context.event.BeanDestroyedEventListener;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.runtime.exceptions.ApplicationStartupException;
 import jakarta.annotation.PostConstruct;
@@ -54,6 +55,7 @@ import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
  */
 @Singleton
 @io.micronaut.context.annotation.Context
+@Internal
 final class PythonPool implements BeanDestroyedEventListener<Context>, Ordered {
     private static final Logger LOG = LoggerFactory.getLogger(PythonPool.class);
     private final Engine engine;
@@ -114,9 +116,12 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, Ordered {
                 addPooledContext();
             }
         } else {
+            LOG.debug("Initial Python Context pool size is {}", toCreate);
+            addPooledContext();
+
             Thread t = new Thread(() -> {
                 try {
-                    for (int i = 0; i < toCreate; i++) {
+                    for (int i = 1; i < toCreate; i++) {
                         addPooledContext();
                     }
                 } catch (IllegalStateException ignored) {
@@ -197,7 +202,7 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, Ordered {
      * Injects an attribute value into the most recently created pooled context for a given script.
      * This avoids broadcasting to all contexts and aligns with synchronous object creation flows.
      */
-    void injectMostRecent(String packageName, String scriptName, String attribute, Value value) {
+    void injectMostRecent(String packageName, String scriptName, String attribute, Object value) {
         Context target;
         if (!pooledQueue.isEmpty()) {
             target = pooledQueue.getFirst();

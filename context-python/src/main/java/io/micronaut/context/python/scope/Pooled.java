@@ -25,10 +25,10 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Marker annotation indicating that the generated Java stub for a Python type
- * should use pooled GraalPy contexts instead of a single cached polyglot value.
+ * An annotation that can be applied to Python types to indicate the type should use a {@link org.graalvm.polyglot.Context}
+ * retrieved from a Pool to avoid GIL contention when running with multiple threads.
  *
- * This annotation is consumed at compile time by the Python stub generators.
+ * <p>This annotation is implicitly applied to Python scripts and is recommended for Python controllers</p>
  */
 @Documented
 @Retention(RetentionPolicy.CLASS)
