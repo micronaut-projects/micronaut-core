@@ -133,6 +133,13 @@ final class DefaultWebSocketBeanRegistry implements WebSocketBeanRegistry {
      * Default web socket impl.
      *
      * @param <T>
+     * @param bean       The bean
+     * @param definition The definition
+     * @param onOpen     The on open method
+     * @param onClose    The on close method
+     * @param onMessage  The on message method
+     * @param onPong     The on pong method
+     * @param onError    The on error method
      * @author graemerocher
      */
     private record DefaultWebSocketBean<T>(T bean, BeanDefinition<T> definition,
