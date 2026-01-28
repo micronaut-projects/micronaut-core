@@ -17,22 +17,23 @@ package io.micronaut.context.python;
 
 import io.micronaut.context.ApplicationContext;
 
+import io.micronaut.context.event.BeanDestroyedEvent;
+import io.micronaut.context.event.BeanDestroyedEventListener;
+import io.micronaut.core.order.Ordered;
+import io.micronaut.runtime.exceptions.ApplicationStartupException;
 import jakarta.annotation.PostConstruct;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.graalvm.polyglot.Context;
-import org.graalvm.polyglot.Context.Builder;
 import org.graalvm.polyglot.Engine;
 import org.graalvm.polyglot.HostAccess;
-import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.Value;
-import org.graalvm.python.embedding.GraalPyResources;
-import org.graalvm.python.embedding.VirtualFileSystem;
+import org.jspecify.annotations.NonNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -42,11 +43,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static io.micronaut.context.python.GraalPyContextFactory.APPLICATION_MAIN;
-import static io.micronaut.context.python.GraalPyContextFactory.APPLICATION_PATH;
-import static io.micronaut.context.python.GraalPyContextFactory.APPLICATION_SRC_PATH;
-import static io.micronaut.context.python.GraalPyContextFactory.INTERNAL_MAIN;
-import static io.micronaut.context.python.GraalPyContextFactory.PYRONAUT_MAIN_CLASS;
 import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
 
 /**
@@ -58,34 +54,42 @@ import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
  */
 @Singleton
 @io.micronaut.context.annotation.Context
-final class PythonPool {
+final class PythonPool implements BeanDestroyedEventListener<Context>, Ordered {
+    private static final Logger LOG = LoggerFactory.getLogger(PythonPool.class);
     private final Engine engine;
     private final HostAccess hostAccess;
     private final ApplicationContext applicationContext;
-    private final int configuredPoolSize;
     private final boolean syncInit;
 
-    private volatile Context primaryContext;
+    private final Context primaryContext;
     private final BlockingDeque<Context> pooledQueue = new LinkedBlockingDeque<>();
     private final List<Context> pooledContexts = new ArrayList<>();
     private final Map<Context, Map<String, Value>> cache = new ConcurrentHashMap<>();
 
     private final AtomicInteger size = new AtomicInteger(0);
-    private volatile int targetSize;
+    private final int targetSize;
 
     @Inject
     PythonPool(@Named(GraalPyRuntimeUtil.PYTHON) Engine engine,
                @Named(GraalPyRuntimeUtil.PYTHON) HostAccess hostAccess,
+               @Named(GraalPyRuntimeUtil.PYTHON) Context primaryContext,
                ApplicationContext applicationContext,
                PythonPoolConfiguration configuration) {
         this.engine = engine;
+        this.primaryContext = primaryContext;
         this.hostAccess = hostAccess;
         this.applicationContext = applicationContext;
-        this.configuredPoolSize = configuration.size();
+        int configuredPoolSize = configuration.size();
         this.syncInit = configuration.syncInit();
         int processors = Runtime.getRuntime().availableProcessors();
         int defaultSize = Math.max(1, processors * 2);
         this.targetSize = configuredPoolSize > 0 ? configuredPoolSize : defaultSize;
+    }
+
+
+    @Override
+    public int getOrder() {
+        return Ordered.LOWEST_PRECEDENCE;
     }
 
     /**
@@ -96,12 +100,9 @@ final class PythonPool {
      */
     @PostConstruct
     void init() {
-        ContextHolder.setPythonPool(this);
         // Create primary context synchronously (not pooled) and expose as legacy Context
-        this.primaryContext = createContext();
+        ContextHolder.setPythonPool(this);
         cache.put(primaryContext, new ConcurrentHashMap<>());
-        ContextHolder.setContext(primaryContext);
-
         final int toCreate = targetSize;
         if (toCreate <= 0) {
             return;
@@ -192,7 +193,16 @@ final class PythonPool {
         if (size.get() >= targetSize) {
             return;
         }
-        Context c = createContext();
+        Context c;
+        try {
+            c = GraalPyContextFactory.buildContext(
+                hostAccess,
+                engine,
+                applicationContext.getClassLoader()
+            );
+        } catch (IOException e) {
+            throw new ApplicationStartupException("Failed to create Python context: " + e.getMessage(), e);
+        }
         pooledContexts.add(c);
         cache.put(c, new ConcurrentHashMap<>());
         pooledQueue.addLast(c);
@@ -201,57 +211,6 @@ final class PythonPool {
 
     private List<Context> snapshot() {
         return new ArrayList<>(pooledContexts);
-    }
-
-    private Context createContext() {
-        ClassLoader classLoader = applicationContext.getClassLoader();
-        Class<?> beacon = findBeacon(classLoader);
-        System.setProperty("org.graalvm.python.vfs.allow_multiple", "true");
-        System.setProperty("org.graalvm.python.vfs.multiple_vfs_checks_as_warning", "true");
-        Builder builder = GraalPyResources.contextBuilder(VirtualFileSystem.newBuilder()
-                .resourceDirectory(APPLICATION_PATH)
-                .resourceLoadingClass(beacon)
-                .build())
-            .engine(engine)
-            .allowExperimentalOptions(true)
-            .allowCreateProcess(true)
-            .option("python.IsolateNativeModules", "true")
-            .option("python.WarnExperimentalFeatures", "false")
-            .allowHostAccess(hostAccess)
-            .allowHostClassLookup(name -> true);
-        String pyEnv = System.getenv("PYENV_VERSION");
-        String venv = System.getenv("VIRTUAL_ENV");
-        if (pyEnv != null && venv != null && pyEnv.startsWith("graalpy")) {
-            builder.option("python.Executable", Path.of(venv).resolve("bin/python").toString());
-        }
-        Context context = builder.build();
-        context.initialize(PYTHON);
-        // set a per-context unique id for tests and tracing via builtins
-        String id = java.util.UUID.randomUUID().toString();
-        context.eval(PYTHON, "import builtins; builtins.__MN_CTX_ID__ = '" + id + "'");
-        evaluateMain(classLoader, INTERNAL_MAIN, context);
-        evaluateMain(classLoader, APPLICATION_MAIN, context);
-        return context;
-    }
-
-    private static void evaluateMain(ClassLoader classLoader, String mainPy, Context context) {
-        try (InputStream inputStream = classLoader.getResourceAsStream(APPLICATION_SRC_PATH + mainPy)) {
-            if (inputStream != null) {
-                String scriptContent = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
-                Source source = Source.newBuilder(PYTHON, scriptContent, mainPy).build();
-                context.eval(source);
-            }
-        } catch (Exception e) {
-            throw new IllegalStateException(e);
-        }
-    }
-
-    private static Class<?> findBeacon(ClassLoader classLoader) {
-        try {
-            return classLoader.loadClass(PYRONAUT_MAIN_CLASS);
-        } catch (ClassNotFoundException e) {
-            return GraalPyContextFactory.class;
-        }
     }
 
     private Value getOrCreateClass(Context c, String packageName, String simpleName) {
@@ -300,6 +259,20 @@ final class PythonPool {
             }
         } else {
             return ctx.eval(PYTHON, "from " + packageName + " import " + scriptName).getMember(scriptName);
+        }
+    }
+
+    @Override
+    public void onDestroyed(@NonNull BeanDestroyedEvent<Context> event) {
+        List<Context> snapshot = snapshot();
+        pooledContexts.removeAll(snapshot);
+        pooledQueue.removeAll(snapshot);
+        for (Context context : snapshot) {
+            try {
+                context.close(false);
+            } catch (Exception e) {
+                LOG.warn("Error while closing context: " + e.getMessage(), e);
+            }
         }
     }
 }

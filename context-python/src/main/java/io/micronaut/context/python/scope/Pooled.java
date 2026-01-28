@@ -16,6 +16,7 @@
 package io.micronaut.context.python.scope;
 
 import io.micronaut.context.annotation.Executable;
+import io.micronaut.context.annotation.Prototype;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -33,5 +34,6 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.TYPE)
 @Executable
+@Prototype
 public @interface Pooled {
 }
