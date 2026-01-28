@@ -87,7 +87,7 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, Ordered {
         this.warnThresholdMs = configuration.warnWaitMs();
         int processors = Runtime.getRuntime().availableProcessors();
         int defaultSize = Math.max(1, processors * 2);
-        this.targetSize = configuredPoolSize > 0 ? configuredPoolSize : defaultSize;
+        this.targetSize = configuration.enabled() ? (configuredPoolSize > 0 ? configuredPoolSize : defaultSize) : 0;
     }
 
 
@@ -107,15 +107,18 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, Ordered {
         // If reuseContext is enabled, skip pool initialization entirely
         if (ContextHolder.isReuseContext()) {
             LOG.debug("Context reuse enabled; skipping Python context pool initialization");
+            ContextHolder.setPythonPool(null);
             return;
         }
-        // Register pool and prepare caches
+        // Register pool and prepare caches if enabled
+        if (targetSize <= 0) {
+            LOG.debug("Python context pool disabled via configuration; skipping initialization");
+            ContextHolder.setPythonPool(null);
+            return;
+        }
         ContextHolder.setPythonPool(this);
         cache.put(primaryContext, new ConcurrentHashMap<>());
         final int toCreate = targetSize;
-        if (toCreate <= 0) {
-            return;
-        }
         if (syncInit) {
             for (int i = 0; i < toCreate; i++) {
                 addPooledContext();

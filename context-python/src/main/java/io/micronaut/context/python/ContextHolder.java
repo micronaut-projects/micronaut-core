@@ -71,7 +71,7 @@ public final class ContextHolder {
      */
     @UsedByGeneratedCode
     public static Value getPooled(@Nullable String packageName, String simpleName) {
-        if (isReuseContext()) {
+        if (isReuseContext() || pythonPool == null) {
             return findClass(packageName, simpleName);
         }
         return getPythonPool().getAnyClass(packageName, simpleName);
@@ -86,7 +86,7 @@ public final class ContextHolder {
      */
     @UsedByGeneratedCode
     public static <T> T withPooled(@Nullable String packageName, String simpleName, java.util.function.Function<Value, T> fn) {
-        if (isReuseContext()) {
+        if (isReuseContext() || pythonPool == null) {
             return fn.apply(findClass(packageName, simpleName));
         }
         return getPythonPool().withClass(packageName, simpleName, fn);
@@ -100,7 +100,7 @@ public final class ContextHolder {
      */
     @UsedByGeneratedCode
     public static Value getPooledScript(String packageName, String scriptName) {
-        if (isReuseContext()) {
+        if (isReuseContext() || pythonPool == null) {
             return findScript(packageName, scriptName);
         }
         return getPythonPool().getAnyScript(packageName, scriptName);
@@ -115,7 +115,7 @@ public final class ContextHolder {
      */
     @UsedByGeneratedCode
     public static <T> T withPooledScript(String packageName, String scriptName, java.util.function.Function<Value, T> fn) {
-        if (isReuseContext()) {
+        if (isReuseContext() || pythonPool == null) {
             return fn.apply(findScript(packageName, scriptName));
         }
         return getPythonPool().withScript(packageName, scriptName, fn);
@@ -130,7 +130,7 @@ public final class ContextHolder {
      */
     @UsedByGeneratedCode
     public static void injectedPooledScript(String packageName, String scriptName, String attribute, Object value) {
-        if (isReuseContext()) {
+        if (isReuseContext() || pythonPool == null) {
             Value script = findScript(packageName, scriptName);
             script.putMember(attribute, (value instanceof Value v) ? v : Value.asValue(value));
             return;

@@ -27,6 +27,7 @@ import io.micronaut.core.bind.annotation.Bindable;
  */
 @ConfigurationProperties("micronaut.python.pool")
 public record PythonPoolConfiguration(
+    @Bindable(defaultValue = "true") boolean enabled,
     @Bindable(defaultValue = "0") int size,
     @Bindable(defaultValue = "false") boolean syncInit,
     @Bindable(defaultValue = "2000") long warnWaitMs
