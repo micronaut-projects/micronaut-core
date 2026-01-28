@@ -26,7 +26,7 @@ import java.util.concurrent.CompletableFuture
 @InterceptorBean(MyRepository::class)
 @Singleton
 class MyRepositoryInterceptorImpl(val conversionService: ConversionService) : MethodInterceptor<Any, Any> {
-    override fun intercept(context: MethodInvocationContext<Any, Any>): Any {
+    override fun intercept(context: MethodInvocationContext<Any, Any>): Any? {
         val interceptedMethod = InterceptedMethod.of(context, conversionService)
         return try {
             if (interceptedMethod.resultType() == InterceptedMethod.ResultType.COMPLETION_STAGE) {
