@@ -44,10 +44,17 @@ public final class ContextHolder {
     private ContextHolder() {
     }
 
+    /**
+     * Internal hook to register the PythonPool once initialized.
+     * @param pool The Python pool
+     */
     public static void setPythonPool(PythonPool pool) {
         ContextHolder.pythonPool = pool;
     }
 
+    /**
+     * @return The configured PythonPool. Throws if not initialized.
+     */
     public static PythonPool getPythonPool() {
         PythonPool pool = pythonPool;
         if (pool == null) {
@@ -56,31 +63,86 @@ public final class ContextHolder {
         return pool;
     }
 
-    // Pooled convenience APIs used by generated code
+    /**
+     * Obtain a pooled Python class instance (per-context cached). Used by generated code.
+     * @param packageName The Python package (or null/python for top-level)
+     * @param simpleName The class simple name
+     * @return The pooled class instance (Value) from some context
+     */
+    @UsedByGeneratedCode
     public static Value getPooled(@Nullable String packageName, String simpleName) {
         return getPythonPool().getAnyClass(packageName, simpleName);
     }
 
+    /**
+     * Execute a function with a borrowed pooled class instance. Used by generated code.
+     * @param packageName The Python package
+     * @param simpleName The class name
+     * @param fn Function receiving the pooled Value
+     * @return Result returned from the function
+     */
+    @UsedByGeneratedCode
     public static <T> T withPooled(@Nullable String packageName, String simpleName, java.util.function.Function<Value, T> fn) {
         return getPythonPool().withClass(packageName, simpleName, fn);
     }
 
+    /**
+     * Obtain a pooled Python script/module object. Used by generated code.
+     * @param packageName The Python package
+     * @param scriptName The script/module name
+     * @return A pooled script Value
+     */
+    @UsedByGeneratedCode
     public static Value getPooledScript(String packageName, String scriptName) {
         return getPythonPool().getAnyScript(packageName, scriptName);
     }
 
+    /**
+     * Execute a function with a borrowed pooled script/module object. Used by generated code.
+     * @param packageName The package
+     * @param scriptName The script name
+     * @param fn Function receiving the script Value
+     * @return Result returned from the function
+     */
+    @UsedByGeneratedCode
     public static <T> T withPooledScript(String packageName, String scriptName, java.util.function.Function<Value, T> fn) {
         return getPythonPool().withScript(packageName, scriptName, fn);
     }
 
+    /**
+     * Broadcast an injected attribute into all pooled script instances. Used by generated code.
+     * @param packageName The package
+     * @param scriptName The script name
+     * @param attribute The attribute name
+     * @param value The value to inject
+     */
+    @UsedByGeneratedCode
     public static void injectedPooledScript(String packageName, String scriptName, String attribute, Value value) {
         getPythonPool().injectScriptAll(packageName, scriptName, attribute, value);
     }
 
+    /**
+     * Invoke a method on a pooled class instance. Used by generated code.
+     * @param packageName The package
+     * @param simpleName The class name
+     * @param methodName The method name
+     * @param args Arguments
+     * @return The polyglot result
+     */
+    @UsedByGeneratedCode
     public static Value invokePooled(String packageName, String simpleName, String methodName, Object... args) {
         return withPooled(packageName, simpleName, v -> v.getMember(methodName).execute(args));
     }
 
+    /**
+     * Invoke a method on a pooled script instance. Used by generated code.
+     * @param packageName The package
+     * @param scriptName The script name
+     * @param methodName The method name
+     * @param args Arguments
+     * @return The polyglot result
+     */
+    @UsedByGeneratedCode
     public static Value invokePooledScript(String packageName, String scriptName, String methodName, Object... args) {
         return withPooledScript(packageName, scriptName, v -> v.getMember(methodName).execute(args));
     }
@@ -94,6 +156,14 @@ public final class ContextHolder {
         return ctx;
     }
 
+    /**
+     * Create an instance that is abstract and fill out the abstract methods with stubs to be later populated.
+     *
+     * @param packageName The package name
+     * @param simpleName  The simple name
+     * @param args        The args
+     * @return The new instance
+     */
     @UsedByGeneratedCode
     public static Value newIntroduction(@Nullable String packageName, String simpleName, Object... args) {
         Value pythonClass = findClass(packageName, simpleName);
@@ -119,6 +189,14 @@ public final class ContextHolder {
         return instantiate(packageName, simpleName, args, pythonClass);
     }
 
+    /**
+     * Create a new instance for the given package name, simple name and args.
+     *
+     * @param packageName The package name
+     * @param simpleName  The simple name
+     * @param args        The args
+     * @return The new instance
+     */
     @UsedByGeneratedCode
     public static Value newInstance(@Nullable String packageName, String simpleName, Object... args) {
         Value pythonClass = findClass(packageName, simpleName);
@@ -134,6 +212,13 @@ public final class ContextHolder {
         }
     }
 
+    /**
+     * Create a new instance for the given simple name and args.
+     *
+     * @param simpleName The simple name
+     * @param args       The args
+     * @return The new instance
+     */
     public static Value newInstance(String simpleName, Object... args) {
         Value pythonClass = findClass(simpleName);
         return instantiate(null, simpleName, args, pythonClass);
@@ -153,6 +238,12 @@ public final class ContextHolder {
         }
     }
 
+    /**
+     * Find a Python class by fully qualified name. Used by generated code.
+     * @param simpleName The class name
+     * @return The class Value
+     */
+    @UsedByGeneratedCode
     public static @NotNull Value findClass(String simpleName) {
         Context ctx = getContext();
         Value v = ctx.getBindings(PYTHON).getMember(simpleName);
@@ -167,6 +258,13 @@ public final class ContextHolder {
         return v;
     }
 
+    /**
+     * Find a Python script/module Value. Used by generated code.
+     * @param packageName The package name (or python for top-level)
+     * @param scriptName The script/module name
+     * @return The module Value
+     */
+    @UsedByGeneratedCode
     public static @NotNull Value findScript(String packageName, String scriptName) {
         Context ctx = getContext();
         Value v = ctx.getBindings(PYTHON);

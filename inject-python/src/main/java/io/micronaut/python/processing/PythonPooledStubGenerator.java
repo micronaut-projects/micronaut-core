@@ -15,32 +15,30 @@ import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.processing.visitor.AbstractPythonClassElement;
-import io.micronaut.python.processing.visitor.PythonClassElement;
 import io.micronaut.python.processing.visitor.PythonScriptElement;
 import io.micronaut.sourcegen.model.ClassDef;
 import io.micronaut.sourcegen.model.ClassTypeDef;
 import io.micronaut.sourcegen.model.ExpressionDef;
-import io.micronaut.sourcegen.model.FieldDef;
 import io.micronaut.sourcegen.model.MethodDef;
 import io.micronaut.sourcegen.model.ParameterDef;
 import io.micronaut.sourcegen.model.StatementDef;
 import io.micronaut.sourcegen.model.TypeDef;
 import io.micronaut.sourcegen.model.VariableDef;
-import org.graalvm.polyglot.Value;
 
 import javax.lang.model.element.Modifier;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+
+import static io.micronaut.python.processing.PythonStubGenerator.AS_POLYGLOT_VALUE;
+import static io.micronaut.python.processing.PythonStubGenerator.CONTEXT_HOLDER;
+import static io.micronaut.python.processing.PythonStubGenerator.FROM_POLYGLOT_VALUE;
+import static io.micronaut.python.processing.PythonStubGenerator.POLYGLOT_VALUE;
+import static io.micronaut.python.processing.PythonStubGenerator.coerceParameterToPolyglotValue;
+import static io.micronaut.python.processing.PythonStubGenerator.erasedType;
+import static io.micronaut.python.processing.PythonStubGenerator.handleReturnType;
 
 final class PythonPooledStubGenerator {
-    static final TypeDef POLYGLOT_VALUE = TypeDef.of(Value.class);
-    static final ClassTypeDef RUNTIME_UTIL = ClassTypeDef.of("io.micronaut.context.python.GraalPyRuntimeUtil");
-    static final ClassTypeDef CONTEXT_HOLDER = ClassTypeDef.of("io.micronaut.context.python.ContextHolder");
-    static final String AS_POLYGLOT_VALUE = "asPolyglotValue";
-    static final String FROM_POLYGLOT_VALUE = "fromPolyglotValue";
 
     static ClassDef.ClassDefBuilder generatePooledClass(AbstractPythonClassElement element,
                                                         VisitorContext context,
@@ -192,7 +190,7 @@ final class PythonPooledStubGenerator {
             args.add(ExpressionDef.constant(pythonFunctionName));
             args.addAll(parameterExpressions);
             var invoked = CONTEXT_HOLDER.invokeStatic("invokePooled", POLYGLOT_VALUE, args);
-            return handleReturnType(methodElement.getReturnType(), invoked, allClasses);
+            return handleReturnType(allClasses, methodElement.getReturnType(), invoked).returning();
         })));
 
     }
@@ -225,7 +223,7 @@ final class PythonPooledStubGenerator {
             args.add(ExpressionDef.constant(pythonFunctionName));
             args.addAll(parameterExpressions);
             var invoked = CONTEXT_HOLDER.invokeStatic("invokePooledScript", POLYGLOT_VALUE, args);
-            return handleReturnType(methodElement.getReturnType(), invoked, allClasses);
+            return handleReturnType(allClasses, methodElement.getReturnType(), invoked).returning();
         })));
 
     }
@@ -245,7 +243,7 @@ final class PythonPooledStubGenerator {
         builder.addMethod(getterBuilder.build(((aThis, methodParameters) -> {
             var invoked = CONTEXT_HOLDER.invokeStatic("invokePooledScript", POLYGLOT_VALUE,
                 List.of(ExpressionDef.constant(pkg), ExpressionDef.constant(script), ExpressionDef.constant(beanProperty.getName())));
-            return handleReturnType(beanProperty.getType(), invoked, allClasses);
+            return handleReturnType(allClasses, beanProperty.getType(), invoked).returning();
         })));
     }
 
@@ -275,103 +273,5 @@ final class PythonPooledStubGenerator {
                 return StatementDef.multi(result, ExpressionDef.nullValue().returning());
             }
         })));
-    }
-
-    private static TypeDef erasedType(ClassElement t) {
-        return !t.getTypeArguments().isEmpty() ? ClassTypeDef.of(t.getName()) : TypeDef.of(t);
-    }
-
-    private static void coerceParameterToPolyglotValue(io.micronaut.inject.ast.TypedElement param,
-                                                       List<ExpressionDef> parameters,
-                                                       VariableDef.MethodParameter methodParam) {
-        ClassElement genericType = param.getGenericType();
-        if (genericType.isAssignable(Map.class) && genericType.getTypeArguments().get("V") instanceof PythonClassElement) {
-            parameters.add(RUNTIME_UTIL.invokeStatic("coerceMap", TypeDef.of(Map.class), methodParam));
-        } else if (genericType.isAssignable(List.class) && genericType.getTypeArguments().get("E") instanceof PythonClassElement) {
-            parameters.add(RUNTIME_UTIL.invokeStatic("coerceList", TypeDef.of(List.class), methodParam));
-        } else if (genericType instanceof PythonClassElement) {
-            if (param.hasAnnotation("jakarta.annotation.Nullable")) {
-                parameters.add(methodParam.isNull().doIfElse(ExpressionDef.nullValue(), methodParam.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE)));
-            } else {
-                parameters.add(methodParam.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE));
-            }
-        } else {
-            parameters.add(methodParam);
-        }
-    }
-
-    private static StatementDef handleReturnType(ClassElement returnType,
-                                                 ExpressionDef valueExpr,
-                                                 Map<String, ClassElement> allClasses) {
-        if (returnType.isVoid()) {
-            return valueExpr.returning();
-        } else if (returnType.isPrimitive()) {
-            return switch (returnType.getName()) {
-                case "int", "java.lang.Integer" -> valueExpr.invoke("asInt", TypeDef.Primitive.INT).returning();
-                case "boolean", "java.lang.Boolean" -> valueExpr.invoke("asBoolean", TypeDef.Primitive.BOOLEAN).returning();
-                case "double", "java.lang.Double" -> valueExpr.invoke("asDouble", TypeDef.Primitive.DOUBLE).returning();
-                case "float", "java.lang.Float" -> valueExpr.invoke("asFloat", TypeDef.Primitive.FLOAT).returning();
-                case "long", "java.lang.Long" -> valueExpr.invoke("asLong", TypeDef.Primitive.LONG).returning();
-                case "short", "java.lang.Short" -> valueExpr.invoke("asShort", TypeDef.Primitive.SHORT).returning();
-                case "byte", "java.lang.Byte" -> valueExpr.invoke("asByte", TypeDef.Primitive.BYTE).returning();
-                case "char", "java.lang.Character" -> valueExpr.invoke("asString", ClassTypeDef.STRING).invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0)).returning();
-                default -> valueExpr.invoke("asString", ClassTypeDef.STRING).returning();
-            };
-        } else {
-            String referenceTypeName = returnType.getName();
-            switch (referenceTypeName) {
-                case "java.lang.Integer":
-                    return valueExpr.invoke("asInt", TypeDef.Primitive.INT).returning();
-                case "java.lang.Boolean":
-                    return valueExpr.invoke("asBoolean", TypeDef.Primitive.BOOLEAN).returning();
-                case "java.lang.Double":
-                    return valueExpr.invoke("asDouble", TypeDef.Primitive.DOUBLE).returning();
-                case "java.lang.Float":
-                    return valueExpr.invoke("asFloat", TypeDef.Primitive.FLOAT).returning();
-                case "java.lang.Long":
-                    return valueExpr.invoke("asLong", TypeDef.Primitive.LONG).returning();
-                case "java.lang.Short":
-                    return valueExpr.invoke("asShort", TypeDef.Primitive.SHORT).returning();
-                case "java.lang.Byte":
-                    return valueExpr.invoke("asByte", TypeDef.Primitive.BYTE).returning();
-                case "java.lang.Character":
-                    return valueExpr.invoke("asString", ClassTypeDef.STRING).invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0)).returning();
-                case "java.lang.String":
-                    return valueExpr.invoke("asString", ClassTypeDef.STRING).returning();
-                default:
-                    if (returnType.isAssignable(List.class)) {
-                        ClassElement componentType = returnType.getFirstTypeArgument().orElse(null);
-                        ExpressionDef genericType = toClassExpression(componentType);
-                        return RUNTIME_UTIL.invokeStatic("convertList", ClassTypeDef.of(List.class), valueExpr, genericType).returning();
-                    } else if (returnType.isAssignable(Map.class)) {
-                        Map<String, ClassElement> typeArguments = returnType.getTypeArguments();
-                        ExpressionDef keyType = toClassExpression(typeArguments.get("K"));
-                        ExpressionDef valueType = toClassExpression(typeArguments.get("V"));
-                        return RUNTIME_UTIL.invokeStatic("convertMap", ClassTypeDef.of(Map.class), valueExpr, keyType, valueType).returning();
-                    } else if (returnType.isAssignable(Set.class)) {
-                        ClassElement componentType = returnType.getFirstTypeArgument().orElse(null);
-                        ExpressionDef genericType = toClassExpression(componentType);
-                        return RUNTIME_UTIL.invokeStatic("convertSet", ClassTypeDef.of(Set.class), valueExpr, genericType).returning();
-                    } else if (returnType.isAssignable(java.util.Optional.class)) {
-                        ClassElement componentType = returnType.getFirstTypeArgument().orElse(null);
-                        ExpressionDef genericType = toClassExpression(componentType);
-                        return RUNTIME_UTIL.invokeStatic("convertOptional", ClassTypeDef.of(java.util.Optional.class), valueExpr, genericType).returning();
-                    } else {
-                        if (allClasses.containsKey(returnType.getName())) {
-                            return ClassTypeDef.of(returnType).invokeStatic(FROM_POLYGLOT_VALUE, POLYGLOT_VALUE, valueExpr).returning();
-                        } else {
-                            return RUNTIME_UTIL.invokeStatic("convertValue", ClassTypeDef.OBJECT, valueExpr, ClassTypeDef.of(returnType.getRawClassElement().getName()).getStaticField("class", TypeDef.CLASS)).cast(TypeDef.of(returnType)).returning();
-                        }
-                    }
-            }
-        }
-    }
-
-    private static ExpressionDef toClassExpression(ClassElement componentType) {
-        if (componentType == null) {
-            return ClassTypeDef.of(Object.class).getStaticField("class", TypeDef.CLASS);
-        } else {
-            return ClassTypeDef.of(componentType).getStaticField("class", TypeDef.CLASS);
-        }
     }
 }
