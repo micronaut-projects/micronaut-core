@@ -17,7 +17,6 @@ package io.micronaut.annotation.processing;
 
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.core.annotation.Generated;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.util.CollectionUtils;
@@ -156,7 +155,6 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
      *
      * @return A set of patterns
      */
-    @NonNull
     private Set<String> getProcessedAnnotationTypePatterns() {
         if (processedTypes == null) {
 
@@ -215,8 +213,7 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
      * @param processingEnv The processing env
      * @return The context
      */
-    @NonNull
-    protected JavaVisitorContext newVisitorContext(@NonNull ProcessingEnvironment processingEnv) {
+    protected JavaVisitorContext newVisitorContext(ProcessingEnvironment processingEnv) {
         return new JavaVisitorContext(
             processingEnv,
             messager,
@@ -235,7 +232,7 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
      *
      * @return The visitor kind
      */
-    protected TypeElementVisitor.@NonNull VisitorKind getVisitorKind() {
+    protected TypeElementVisitor.VisitorKind getVisitorKind() {
         return getIncrementalProcessorType().equals(GRADLE_PROCESSING_ISOLATING) ? TypeElementVisitor.VisitorKind.ISOLATING : TypeElementVisitor.VisitorKind.AGGREGATING;
     }
 
@@ -332,7 +329,7 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
      * @param processingEnv The processing environment.
      * @return True if it is
      */
-    protected boolean isIncremental(@NonNull ProcessingEnvironment processingEnv) {
+    protected boolean isIncremental(ProcessingEnvironment processingEnv) {
         final Map<String, String> options = processingEnv.getOptions();
         final String v = options.get(MICRONAUT_PROCESSING_INCREMENTAL);
         if (v != null) {

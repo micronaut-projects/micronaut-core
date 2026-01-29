@@ -17,7 +17,6 @@ package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ArrayableClassElement;
@@ -51,10 +50,10 @@ final class JavaWildcardElement extends JavaClassElement implements WildcardElem
     private ElementAnnotationMetadata genericTypeAnnotationMetadata;
 
     JavaWildcardElement(ElementAnnotationMetadataFactory elementAnnotationMetadataFactory,
-                        @NonNull WildcardType wildcardType,
-                        @NonNull JavaClassElement mostUpper,
-                        @NonNull List<JavaClassElement> upperBounds,
-                        @NonNull List<JavaClassElement> lowerBounds,
+                        WildcardType wildcardType,
+                        JavaClassElement mostUpper,
+                        List<JavaClassElement> upperBounds,
+                        List<JavaClassElement> lowerBounds,
                         @Nullable String doc) {
         super(
             mostUpper.getNativeType(),
@@ -76,7 +75,6 @@ final class JavaWildcardElement extends JavaClassElement implements WildcardElem
         return Optional.of(upperBound);
     }
 
-    @NonNull
     @Override
     public MutableAnnotationMetadataDelegate<AnnotationMetadata> getGenericTypeAnnotationMetadata() {
         if (genericTypeAnnotationMetadata == null) {
@@ -90,19 +88,16 @@ final class JavaWildcardElement extends JavaClassElement implements WildcardElem
         return getGenericTypeAnnotationMetadata();
     }
 
-    @NonNull
     @Override
     public MutableAnnotationMetadataDelegate<AnnotationMetadata> getTypeAnnotationMetadata() {
         return typeAnnotationMetadata;
     }
 
-    @NonNull
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
         return new AnnotationMetadataHierarchy(true, super.getAnnotationMetadata(), getGenericTypeAnnotationMetadata());
     }
 
-    @NonNull
     @Override
     public Object getGenericNativeType() {
         return wildcardType;
@@ -113,13 +108,11 @@ final class JavaWildcardElement extends JavaClassElement implements WildcardElem
         return true;
     }
 
-    @NonNull
     @Override
     public List<? extends ClassElement> getUpperBounds() {
         return upperBounds;
     }
 
-    @NonNull
     @Override
     public List<? extends ClassElement> getLowerBounds() {
         return lowerBounds;
@@ -134,7 +127,7 @@ final class JavaWildcardElement extends JavaClassElement implements WildcardElem
     }
 
     @Override
-    public ClassElement foldBoundGenericTypes(@NonNull Function<ClassElement, ClassElement> fold) {
+    public ClassElement foldBoundGenericTypes(Function<ClassElement, ClassElement> fold) {
         List<JavaClassElement> upperBounds = this.upperBounds.stream()
             .map(ele -> toJavaClassElement(ele.foldBoundGenericTypes(fold)))
             .toList();

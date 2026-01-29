@@ -16,7 +16,6 @@
 package io.micronaut.discovery;
 
 import io.micronaut.context.env.Environment;
-import org.jspecify.annotations.NonNull;
 import jakarta.inject.Singleton;
 
 import java.util.Optional;
@@ -37,7 +36,6 @@ public class DefaultServiceInstanceIdGenerator implements ServiceInstanceIdGener
     protected DefaultServiceInstanceIdGenerator() {
     }
 
-    @NonNull
     @Override
     public String generateId(Environment environment, ServiceInstance serviceInstance) {
         Optional<String> cloudFoundryId = environment.getProperty("vcap.application.instance_id", String.class);

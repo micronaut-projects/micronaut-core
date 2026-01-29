@@ -16,7 +16,6 @@
 package io.micronaut.annotation.processing;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.processing.JavaModelUtils;
@@ -74,7 +73,7 @@ public class GenericUtils {
         return buildGenericTypeArgumentInfo(element, dt, Collections.emptyMap());
     }
 
-    private Map<String, Map<String, TypeMirror>> buildGenericTypeArgumentInfo(@NonNull Element element, @Nullable DeclaredType dt, Map<String, TypeMirror> boundTypes) {
+    private Map<String, Map<String, TypeMirror>> buildGenericTypeArgumentInfo(Element element, @Nullable DeclaredType dt, Map<String, TypeMirror> boundTypes) {
 
         var beanTypeArguments = new LinkedHashMap<String, Map<String, TypeMirror>>();
         if (dt != null) {

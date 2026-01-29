@@ -3221,7 +3221,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         return false;
     }
 
-    private static <T> @org.jspecify.annotations.NonNull List<T> nullSafe(@Nullable List<T> list) {
+    private static <T> List<T> nullSafe(@Nullable List<T> list) {
         if (list == null) {
             return Collections.emptyList();
         }

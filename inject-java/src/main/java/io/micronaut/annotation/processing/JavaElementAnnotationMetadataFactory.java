@@ -17,7 +17,6 @@ package io.micronaut.annotation.processing;
 
 import io.micronaut.annotation.processing.visitor.AbstractJavaElement;
 import io.micronaut.annotation.processing.visitor.JavaNativeElement;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
@@ -48,13 +47,11 @@ public final class JavaElementAnnotationMetadataFactory extends AbstractElementA
         super(isReadOnly, metadataBuilder);
     }
 
-    @NonNull
     @Override
     public ElementAnnotationMetadataFactory readOnly() {
         return new JavaElementAnnotationMetadataFactory(true, (JavaAnnotationMetadataBuilder) metadataBuilder);
     }
 
-    @NonNull
     @Override
     public ElementAnnotationMetadata build(io.micronaut.inject.ast.Element element) {
         AbstractJavaElement javaElement = (AbstractJavaElement) element;

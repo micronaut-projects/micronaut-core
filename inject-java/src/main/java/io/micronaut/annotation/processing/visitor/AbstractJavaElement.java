@@ -23,7 +23,6 @@ import com.github.javaparser.javadoc.description.JavadocSnippet;
 import io.micronaut.annotation.processing.PostponeToNextRoundException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
@@ -125,7 +124,6 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement {
             && !modifiers.contains(PRIVATE);
     }
 
-    @NonNull
     @Override
     public String getName() {
         var element = nativeElement.element();
@@ -203,7 +201,6 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement {
         return hasModifier(Modifier.PROTECTED);
     }
 
-    @NonNull
     @Override
     public JavaNativeElement getNativeType() {
         return nativeElement;
@@ -222,7 +219,6 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement {
      * @param declaredElementTypeArguments The type arguments of the declaring element (method, class)
      * @return The class element
      */
-    @NonNull
     protected final ClassElement newClassElement(@Nullable JavaNativeElement owner,
                                                  TypeMirror type,
                                                  Map<String, ClassElement> declaredElementTypeArguments) {
@@ -238,7 +234,6 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement {
      * @param doc The optional documentation
      * @return The class element
      */
-    @NonNull
     protected final ClassElement newClassElement(@Nullable JavaNativeElement owner,
                                                  TypeMirror type,
                                                  Map<String, ClassElement> declaredElementTypeArguments,
@@ -253,13 +248,11 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement {
      * @param declaredElementTypeArguments The type arguments of the declaring element (method, class)
      * @return The class element
      */
-    @NonNull
     protected final ClassElement newClassElement(TypeMirror type,
                                                  Map<String, ClassElement> declaredElementTypeArguments) {
         return newClassElement(null, type, declaredElementTypeArguments, new HashSet<>(), false, null);
     }
 
-    @NonNull
     private ClassElement newClassElement(@Nullable JavaNativeElement owner,
                                          TypeMirror type,
                                          Map<String, ClassElement> declaredTypeArguments,
@@ -269,7 +262,6 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement {
         return newClassElement(owner, type, declaredTypeArguments, visitedTypes, isTypeVariable, false, null, null, doc);
     }
 
-    @NonNull
     private ClassElement newClassElement(@Nullable JavaNativeElement owner,
                                          TypeMirror type,
                                          @Nullable

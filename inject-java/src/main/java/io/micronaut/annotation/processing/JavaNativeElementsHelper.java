@@ -16,7 +16,6 @@
 package io.micronaut.annotation.processing;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.utils.NativeElementsHelper;
 
 import javax.lang.model.element.Element;
@@ -59,7 +58,6 @@ public final class JavaNativeElementsHelper extends NativeElementsHelper<TypeEle
         return elementUtils.overrides(m1, m2, typeElement);
     }
 
-    @NonNull
     @Override
     protected String getMethodName(ExecutableElement element) {
         return element.getSimpleName().toString();
@@ -75,7 +73,6 @@ public final class JavaNativeElementsHelper extends NativeElementsHelper<TypeEle
         return (TypeElement) kind.asElement();
     }
 
-    @NonNull
     @Override
     protected Collection<TypeElement> getInterfaces(TypeElement classNode) {
         List<? extends TypeMirror> interfacesMirrors = classNode.getInterfaces();
@@ -89,7 +86,6 @@ public final class JavaNativeElementsHelper extends NativeElementsHelper<TypeEle
         return interfaces;
     }
 
-    @NonNull
     @Override
     protected List<ExecutableElement> getMethods(TypeElement classNode) {
         return ElementFilter.methodsIn(classNode.getEnclosedElements());

@@ -16,7 +16,6 @@
 package io.micronaut.core.async.subscriber;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import org.jspecify.annotations.NullUnmarked;
@@ -62,8 +61,7 @@ public final class LazySendingSubscriber<T> implements CoreSubscriber<T>, CorePu
      * @return A flow that will complete with the same stream
      * @param <T> The item type
      */
-    @NonNull
-    public static <T> ExecutionFlow<Publisher<T>> create(@NonNull Publisher<T> input) {
+    public static <T> ExecutionFlow<Publisher<T>> create(Publisher<T> input) {
         LazySendingSubscriber<T> subscriber = new LazySendingSubscriber<>();
         input.subscribe(subscriber);
         return subscriber.result;
