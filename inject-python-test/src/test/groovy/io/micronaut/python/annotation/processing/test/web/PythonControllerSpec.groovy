@@ -3,6 +3,7 @@ package io.micronaut.python.annotation.processing.test.web
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Replaces
 import io.micronaut.core.beans.BeanIntrospection
+import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.HttpClient
 import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementSpec
 import io.micronaut.runtime.server.EmbeddedServer
@@ -49,7 +50,7 @@ class HelloController:
         def context = buildContext('''
 from jakarta.inject import Singleton as S
 from micronaut.http.annotation import Controller, Get
-
+from micronaut.http import MediaType
 @S
 class MessageService:
     def say_hello(self, name : str) -> str:
@@ -60,7 +61,7 @@ class HelloController:
     def __init__(self, messageService: MessageService):
         self.messageService = messageService
 
-    @Get("/{name}")
+    @Get(value = "/{name}", produces = MediaType.TEXT_PLAIN)
     def say_hello(self, name : str) -> str:
         return self.messageService.say_hello(name)
 
@@ -69,8 +70,10 @@ class HelloController:
         def embeddedServer = context.getBean(EmbeddedServer)
         embeddedServer.start()
         def client = context.createBean(HttpClient, embeddedServer.URL)
+        def definition = context.getBeanDefinition(context.classLoader.loadClass('python.HelloController'))
 
         expect:
+        definition.getRequiredMethod("say_hello", String).stringValue(Get, "produces").get() == 'text/plain'
         client.toBlocking().retrieve("/hello/John") == "Hello John"
 
         cleanup:

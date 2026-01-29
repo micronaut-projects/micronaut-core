@@ -18,6 +18,7 @@ repositories {
             snapshotsOnly()
         }
     }
+    mavenLocal()
 }
 
 configurations.all {

@@ -15,17 +15,21 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.python.processing.util.GraalPyUtil;
+import org.jetbrains.annotations.Nullable;
 
 public final class PythonClassElement extends AbstractPythonClassElement {
     private Map<String, ClassElement> resolvedTypeArguments;
@@ -120,8 +124,26 @@ public final class PythonClassElement extends AbstractPythonClassElement {
     }
 
     @Override
+    public Collection<ClassElement> getInterfaces() {
+        List<TypeRef> bases = getNativeType().bases();
+        List<ClassElement> interfaces = new ArrayList<>();
+        for (TypeRef basis : bases) {
+            ClassElement baseElement = environment.classes().get(basis.name());
+            // python types can't be interfaces so skip if null and search java
+            if (baseElement == null) {
+                ClassElement javaInterface = toJavaType(basis).orElse(null);
+                if (javaInterface != null && javaInterface.isInterface()) {
+                    interfaces.add(javaInterface);
+                }
+            }
+        }
+        return interfaces;
+    }
+
+    @Override
     public Optional<ClassElement> getSuperType() {
         List<TypeRef> bases = getNativeType().bases();
+
         if (!bases.isEmpty()) {
             for (TypeRef base : bases) {
                 ClassElement baseElement = environment.classes().get(base.name());
@@ -141,8 +163,26 @@ public final class PythonClassElement extends AbstractPythonClassElement {
                     } else {
                         return Optional.of(baseElement);
                     }
+                } else  {
+                    // maybe a java type
+                    ClassElement javaSuper = toJavaType(base).orElse(null);
+                    if (javaSuper != null && !javaSuper.isInterface()) {
+                        return Optional.of(javaSuper);
+                    }
                 }
             }
+        }
+        return Optional.empty();
+    }
+
+    private Optional<ClassElement> toJavaType(TypeRef typeRef) {
+        ClassElement baseType = GraalPyUtil.resolvePythonTypeToJava(
+            typeRef,
+            environment.visitorContext(),
+            Map.of()
+        );
+        if (baseType != null && !baseType.getName().equals(Object.class.getName())) {
+            return Optional.of(baseType);
         }
         return Optional.empty();
     }

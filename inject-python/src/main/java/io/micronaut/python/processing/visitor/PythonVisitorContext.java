@@ -30,6 +30,7 @@ import io.micronaut.expressions.context.ExpressionCompilationContextFactory;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementFactory;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.GeneratedFile;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
@@ -191,6 +192,11 @@ public class PythonVisitorContext implements VisitorContext {
             return javaVisitorContext.visitGeneratedSourceFile(packageName, fileNameWithoutExtension, originatingElements);
         }
         return Optional.empty();
+    }
+
+    @Override
+    public Optional<ClassElement> getClassElement(String name, ElementAnnotationMetadataFactory annotationMetadataFactory) {
+        return getClassElement(name);
     }
 
     @Override

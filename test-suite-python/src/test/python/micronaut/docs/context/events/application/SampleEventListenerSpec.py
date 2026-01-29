@@ -13,7 +13,6 @@ from micronaut.docs.context.events.SampleEventEmitterBean import SampleEventEmit
 
 # tag::class[]
 @MicronautTest
-@Disabled("GR-71497 - generics can't be passed to types")
 class SampleEventListenerSpec:
     listener : Annotated[SampleEventListener, Inject]
     emitter : Annotated[SampleEventEmitterBean, Inject]

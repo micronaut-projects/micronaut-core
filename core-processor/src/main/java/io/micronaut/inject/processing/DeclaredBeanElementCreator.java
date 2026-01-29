@@ -29,8 +29,10 @@ import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NextMajorVersion;
+import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.writer.ProxyingBeanDefinitionVisitor;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -696,18 +698,19 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
             .map(p -> new AnnotationClassValue<>(getClassName(p.getGenericType())))
             .toArray(AnnotationClassValue[]::new);
 
-        targetMethod = targetMethod.withNewOwningType(classElement);
-
-        targetMethod.annotate(Adapter.class, builder -> {
-            builder.member(Adapter.InternalAttributes.ADAPTED_BEAN, new AnnotationClassValue<>(getClassName(classElement)));
-            builder.member(Adapter.InternalAttributes.ADAPTED_METHOD, sourceMethod.getName());
-            builder.member(Adapter.InternalAttributes.ADAPTED_ARGUMENT_TYPES, adaptedArgumentTypes);
-            String qualifier = classElement.stringValue(AnnotationUtil.NAMED).orElse(null);
-            if (StringUtils.isNotEmpty(qualifier)) {
-                builder.member(Adapter.InternalAttributes.ADAPTED_QUALIFIER, qualifier);
-            }
-        });
-
+        MutableAnnotationMetadata mutableAnnotationMetadata = MutableAnnotationMetadata.of(targetMethod.getMethodAnnotationMetadata());
+        mutableAnnotationMetadata.addAnnotationMetadata(MutableAnnotationMetadata.of(classElement.getAnnotationMetadata()));
+        AnnotationValueBuilder<Adapter> builder = AnnotationValue.builder(Adapter.class);
+        builder.member(Adapter.InternalAttributes.ADAPTED_BEAN, new AnnotationClassValue<>(getClassName(classElement)));
+        builder.member(Adapter.InternalAttributes.ADAPTED_METHOD, sourceMethod.getName());
+        builder.member(Adapter.InternalAttributes.ADAPTED_ARGUMENT_TYPES, adaptedArgumentTypes);
+        String qualifier = classElement.stringValue(AnnotationUtil.NAMED).orElse(null);
+        if (StringUtils.isNotEmpty(qualifier)) {
+            builder.member(Adapter.InternalAttributes.ADAPTED_QUALIFIER, qualifier);
+        }
+        AnnotationValue<Adapter> av = builder.build();
+        mutableAnnotationMetadata.addDeclaredAnnotation(av.getAnnotationName(), av.getValues());
+        targetMethod = targetMethod.withAnnotationMetadata(mutableAnnotationMetadata);
         aopProxyWriter.visitAroundMethod(interfaceToAdapt, targetMethod);
 
         beanDefinitionWriters.add(aopProxyWriter);

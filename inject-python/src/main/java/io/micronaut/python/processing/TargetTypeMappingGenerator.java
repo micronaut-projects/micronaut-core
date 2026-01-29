@@ -17,6 +17,7 @@ package io.micronaut.python.processing;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.visitor.TypeElementQuery;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
@@ -48,6 +49,9 @@ public final class TargetTypeMappingGenerator implements TypeElementVisitor<Obje
     public void visitClass(ClassElement element, VisitorContext context) {
         // Only generate for Java stubs created by PythonStubGenerator, which implement ValueCoercible
         if (!element.isAssignable("io.micronaut.context.python.ValueCoercible")) {
+            return;
+        }
+        if (element.getEnclosedElement(ElementQuery.ALL_METHODS.onlyStatic().named(FROM_POLYGLOT_VALUE).onlyAccessible(element)).isEmpty()) {
             return;
         }
         String mappingName = element.getName() + "TargetTypeMapping";

@@ -18,6 +18,7 @@ package io.micronaut.python.processing;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -38,6 +39,7 @@ import io.micronaut.core.annotation.Vetoed;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.TypedElement;
+import io.micronaut.inject.processing.BeanDefinitionCreatorFactory;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.python.processing.visitor.PythonVisitorContext;
 import io.micronaut.sourcegen.model.AbstractElementBuilder;
@@ -130,6 +132,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
                     String typeName = element.getName();
                     boolean isAopProxy = classElement.hasStereotype(InterceptorBinding.class);
+                    boolean isDeclaredBean = BeanDefinitionCreatorFactory.isDeclaredBeanInMetadata(classElement) || isAopProxy;
 
                     var builder = ClassDef.builder(typeName)
                         .addModifiers(Modifier.PUBLIC);
@@ -177,19 +180,23 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     // Track method names that have been added to avoid duplicates
                     Set<String> addedMethodNames = stubEntry.bridgedMethods();
 
-                    for (ClassElement anInterface : interfaces) {
-                        builder.addSuperinterface(TypeDef.of(anInterface));
-                        List<MethodElement> methods = anInterface.getMethods();
-                        Set<MethodElement> methodSet = new LinkedHashSet<>();
-                        for (MethodElement method : methods) {
-                            if (methodSet.contains(method)) {
-                                continue;
+                    if (isDeclaredBean) {
+
+                        for (ClassElement anInterface : interfaces) {
+                            TypeDef interfaceTypeDef = parameterizedTypeDef(anInterface);
+                            builder.addSuperinterface(interfaceTypeDef);
+                            List<MethodElement> methods = anInterface.getMethods();
+                            Set<MethodElement> methodSet = new LinkedHashSet<>();
+                            for (MethodElement method : methods) {
+                                if (methodSet.contains(method) || method.isDefault()) {
+                                    continue;
+                                }
+                                if (method.hasDeclaredStereotype(InterceptorBinding.class)) {
+                                    isAopProxy = true;
+                                }
+                                addBridgeMethod(method, builder, context, false, false, addedMethodNames);
+                                methodSet.add(method);
                             }
-                            if (method.hasDeclaredStereotype(InterceptorBinding.class)) {
-                                isAopProxy = true;
-                            }
-                            addBridgeMethod(method, builder, context, false, false, addedMethodNames);
-                            methodSet.add(method);
                         }
                     }
 
@@ -493,6 +500,22 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         }
     }
 
+    private static TypeDef parameterizedTypeDef(ClassElement anInterface) {
+        Map<String, ClassElement> typeArguments = anInterface.getTypeArguments();
+        TypeDef interfaceTypeDef = TypeDef.of(anInterface);
+        if (!typeArguments.isEmpty()) {
+            Map<String, TypeDef> resolved = new LinkedHashMap<>(typeArguments.size());
+            for (Map.Entry<String, ClassElement> entry : typeArguments.entrySet()) {
+                resolved.put(entry.getKey(), parameterizedTypeDef(entry.getValue()));
+            }
+            interfaceTypeDef = ClassTypeDef.of(anInterface,
+                resolved,
+                false
+            );
+        }
+        return interfaceTypeDef;
+    }
+
     private void visitScript(PythonScriptElement scriptElement, VisitorContext context) {
         try {
             if (classBuilders.containsKey(scriptElement.getName())) {
@@ -724,14 +747,13 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
         MethodDef.MethodDefBuilder methodBuilder = MethodDef.builder(pythonFunctionName)
             .addModifiers(Modifier.PUBLIC)
-            .returns(isJunit5Test ? TypeDef.Primitive.VOID : TypeDef.of(methodElement.getReturnType()));
+            .returns(isJunit5Test ? TypeDef.Primitive.VOID : TypeDef.of(methodElement.getGenericReturnType()));
 
         copyAnnotations(methodElement, methodBuilder, ANNOTATION_PACKAGES_TO_COPY, visitorContext);
         @NonNull ParameterElement[] parameters = methodElement.getParameters();
         for (@NonNull ParameterElement parameter : parameters) {
-            var parameterType = erasedType(parameter.getType());
             ParameterDef parameterDef = ParameterDef
-                .builder(parameter.getName(), parameterType).build();
+                .builder(parameter.getName(), TypeDef.of(parameter.getGenericType())).build();
             methodBuilder.addParameter(parameterDef);
         }
 
@@ -745,7 +767,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 }
 
                 // Get the return type to determine appropriate conversion method
-                var returnType = methodElement.getReturnType();
+                var returnType = methodElement.getGenericReturnType();
                 var invokedValue = aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE)
                     .invoke("getMember", POLYGLOT_VALUE, ExpressionDef.constant(pythonFunctionName))
                     .invoke("execute", POLYGLOT_VALUE, parameterExpressions);
