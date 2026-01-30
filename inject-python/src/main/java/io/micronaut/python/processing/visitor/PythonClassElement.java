@@ -25,6 +25,7 @@ import java.util.Optional;
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
@@ -74,6 +75,18 @@ public final class PythonClassElement extends AbstractPythonClassElement {
     @Override
     public String toString() {
         return "Python Class: " + getNativeType().name();
+    }
+
+    @Override
+    public Optional<MethodElement> getDefaultConstructor() {
+        Optional<MethodElement> primaryConstructor = getPrimaryConstructor();
+        if (primaryConstructor.isEmpty()) {
+            if (!hasDeclaredAnnotation("dataclass")) {
+                // python class with no explicit constructor return default
+                return Optional.of(new PythonConstructorElement(new FunctionDef(FunctionDef.CONSTRUCTOR_NAME), environment, this, this, environment.metadataFactory()));
+            }
+        }
+        return super.getDefaultConstructor();
     }
 
     @Override

@@ -155,17 +155,6 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
                     boolean isIntrospectedBean = element.hasStereotype(Introspected.class);
 
-                    if (isIntrospectedBean) {
-                        // add default constructor
-                        MethodDef.MethodDefBuilder defaultConstructor = MethodDef.constructor().addModifiers(Modifier.PUBLIC);
-                        defaultConstructor.addAnnotation(Creator.class);
-                        context.getClassElement("com.fasterxml.jackson.annotation.JsonCreator").ifPresent(t ->
-                            defaultConstructor.addAnnotation(t.getName())
-                        );
-
-                        builder.addMethod(defaultConstructor.build());
-                    }
-
                     List<PropertyElement> beanProperties = element.getBeanProperties();
                     Map<String, FieldDef> propertyFields = new LinkedHashMap<>();
                     if (isIntrospectedBean) {
@@ -365,6 +354,16 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             }))
                         );
                     } else {
+                        if (isIntrospectedBean && pythonConstructor != null && pythonConstructor.getParameters().length != 0) {
+                                // add default constructor
+                                MethodDef.MethodDefBuilder defaultConstructor = MethodDef.constructor().addModifiers(Modifier.PUBLIC);
+                                context.getClassElement("com.fasterxml.jackson.annotation.JsonCreator").ifPresent(t ->
+                                    defaultConstructor.addAnnotation(t.getName())
+                                );
+
+                                builder.addMethod(defaultConstructor.build());
+                        }
+
                         MethodDef.MethodDefBuilder constructor = MethodDef.constructor();
                         final boolean isAbstractIntroNoArg = element.isAbstract() && isAopProxy && element.hasStereotype(Introduction.class);
                         builder.addMethod(constructor.build(((aThis, methodParameters) -> {
