@@ -1279,7 +1279,8 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                         return interceptAndReturn(aThis, methodParameters, executableMethodInterceptor, INITIALIZE_INTERCEPTOR_METHOD);
                     })
                 );
-            } else {
+            } else if (!superBeanDefinition) {
+                //  for "super bean definition" we only add code to trigger "initialize"
                 classDefBuilder.addMethod(
                     buildInitializeMethod(buildMethodDefinition.postConstruct, MethodDef.override(METHOD_INITIALIZE))
                 );
