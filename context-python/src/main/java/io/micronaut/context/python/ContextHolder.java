@@ -306,7 +306,7 @@ public final class ContextHolder {
     }
 
     /**
-     * Returns true if the context should be reused
+     * Returns true if the context should be reused.
      * @return the reuse flag
      */
     public static boolean isReuseContext() {
