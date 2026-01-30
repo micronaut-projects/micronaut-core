@@ -15,6 +15,7 @@
  */
 package io.micronaut.expressions;
 
+import io.micronaut.context.bean.definition.builder.Builder;
 import io.micronaut.context.expressions.AbstractEvaluatedExpression;
 import io.micronaut.core.annotation.Generated;
 import io.micronaut.core.annotation.Internal;
@@ -26,12 +27,11 @@ import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
 import io.micronaut.expressions.parser.exception.ExpressionParsingException;
+import io.micronaut.inject.OutputObjectDef;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.VisitorContext;
-import io.micronaut.inject.writer.ByteCodeWriterUtils;
-import io.micronaut.inject.writer.ClassOutputWriter;
-import io.micronaut.inject.writer.ClassWriterOutputVisitor;
+import io.micronaut.inject.writer.OriginatingElements;
 import io.micronaut.sourcegen.model.ClassDef;
 import io.micronaut.sourcegen.model.ClassTypeDef;
 import io.micronaut.sourcegen.model.MethodDef;
@@ -39,8 +39,6 @@ import io.micronaut.sourcegen.model.StatementDef;
 import org.jspecify.annotations.NullUnmarked;
 
 import javax.lang.model.element.Modifier;
-import java.io.IOException;
-import java.io.OutputStream;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -54,7 +52,7 @@ import java.util.List;
  */
 @Internal
 @NullUnmarked
-public final class EvaluatedExpressionWriter implements ClassOutputWriter {
+public final class EvaluatedExpressionWriter implements Builder<OutputObjectDef> {
 
     private static final Method DO_EVALUATE_METHOD
         = ReflectionUtils.getRequiredMethod(AbstractEvaluatedExpression.class, "doEvaluate", ExpressionEvaluationContext.class);
@@ -62,8 +60,6 @@ public final class EvaluatedExpressionWriter implements ClassOutputWriter {
     private final ExpressionWithContext expressionMetadata;
     private final VisitorContext visitorContext;
     private final Element originatingElement;
-
-    private byte[] output;
 
     public EvaluatedExpressionWriter(ExpressionWithContext expressionMetadata,
                                      VisitorContext visitorContext,
@@ -73,24 +69,14 @@ public final class EvaluatedExpressionWriter implements ClassOutputWriter {
         this.originatingElement = originatingElement;
     }
 
-    /**
-     * Finish generating the expression class.
-     */
-    public void finish() {
-        String expressionClassName = expressionMetadata.expressionClassName();
-        ClassDef objectDef = generateClassDef(expressionClassName);
-        output = ByteCodeWriterUtils.writeByteCode(
-            objectDef,
-            visitorContext
-        );
-    }
-
     @Override
-    public void accept(ClassWriterOutputVisitor outputVisitor) throws IOException {
-        try (OutputStream outputStream = outputVisitor.visitClass(expressionMetadata.expressionClassName(), originatingElement)) {
-            outputStream.write(output);
-        }
-        output = null;
+    public OutputObjectDef build() {
+        String expressionClassName = expressionMetadata.expressionClassName();
+        return new OutputObjectDef(
+            generateClassDef(expressionClassName),
+            null,
+            OriginatingElements.of(originatingElement)
+        );
     }
 
     private ClassDef generateClassDef(String expressionClassName) {

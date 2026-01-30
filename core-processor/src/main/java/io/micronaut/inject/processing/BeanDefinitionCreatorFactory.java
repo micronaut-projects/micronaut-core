@@ -25,11 +25,12 @@ import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.inject.ElementBeanDefinitionBuilderFactory;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.visitor.VisitorContext;
 
-import java.util.Collections;
+import java.util.List;
 
 /**
  * Bean definition builder factory.
@@ -39,33 +40,39 @@ import java.util.Collections;
  */
 public abstract class BeanDefinitionCreatorFactory {
 
-    public static BeanDefinitionCreator produce(ClassElement classElement, VisitorContext visitorContext) {
+    public static <R> List<R> produce(ClassElement classElement,
+                                      ElementBeanDefinitionBuilderFactory<R> beanDefinitionBuilder,
+                                      VisitorContext visitorContext) {
+        return produceInternal(classElement, beanDefinitionBuilder, visitorContext);
+    }
+
+    private static <R> List<R> produceInternal(ClassElement classElement, ElementBeanDefinitionBuilderFactory<R> beanDefinitionBuilder, VisitorContext visitorContext) {
         boolean isAbstract = classElement.isAbstract();
         boolean isIntroduction = isIntroduction(classElement);
         if (ConfigurationReaderBeanElementCreator.isConfigurationProperties(classElement)) {
             if (classElement.isInterface()) {
-                return new IntroductionInterfaceBeanElementCreator(classElement, visitorContext);
+                return new IntroductionInterfaceBeanElementCreator<>(classElement, visitorContext, beanDefinitionBuilder).build();
             }
-            return new ConfigurationReaderBeanElementCreator(classElement, visitorContext);
+            return new ConfigurationReaderBeanElementCreator<>(classElement, visitorContext, beanDefinitionBuilder).build();
         }
         boolean aopProxyType = !isAbstract && isAopProxyType(classElement);
         if (!isAbstract && classElement.hasStereotype(Factory.class)) {
-            return new FactoryBeanElementCreator(classElement, visitorContext, aopProxyType);
+            return new FactoryBeanElementCreator<>(classElement, visitorContext, aopProxyType, beanDefinitionBuilder).build();
         }
         if (aopProxyType) {
             if (isIntroduction) {
-                return new AopIntroductionProxySupportedBeanElementCreator(classElement, visitorContext, true);
+                return new AopIntroductionProxySupportedBeanElementCreator<>(classElement, visitorContext, true, beanDefinitionBuilder).build();
             }
-            return new DeclaredBeanElementCreator(classElement, visitorContext, true);
+            return new DeclaredBeanElementCreator<>(classElement, visitorContext, true, beanDefinitionBuilder).build();
         }
         if (isIntroduction) {
             if (classElement.isInterface()) {
-                return new IntroductionInterfaceBeanElementCreator(classElement, visitorContext);
+                return new IntroductionInterfaceBeanElementCreator<>(classElement, visitorContext, beanDefinitionBuilder).build();
             }
-            return new AopIntroductionProxySupportedBeanElementCreator(classElement, visitorContext, false);
+            return new AopIntroductionProxySupportedBeanElementCreator<>(classElement, visitorContext, false, beanDefinitionBuilder).build();
         }
         if (classElement.isInterface()) {
-            return Collections::emptyList;
+            return List.of();
         }
         // NOTE: In Micronaut 3 abstract classes are allowed to be beans, but are not pickup to be beans just by having methods or fields with @Inject
         if (isDeclaredBean(classElement) || (!isAbstract && (containsInjectMethod(classElement) || containsInjectField(classElement)))) {
@@ -75,9 +82,9 @@ public abstract class BeanDefinitionCreatorFactory {
             if (classElement.isEnum()) {
                 throw new ProcessingException(classElement, "Enum types cannot be defined as beans");
             }
-            return new DeclaredBeanElementCreator(classElement, visitorContext, false);
+            return new DeclaredBeanElementCreator<>(classElement, visitorContext, false, beanDefinitionBuilder).build();
         }
-        return Collections::emptyList;
+        return List.of();
     }
 
     private static boolean isDeclaredBean(ClassElement classElement) {

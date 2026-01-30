@@ -15,31 +15,26 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
-import io.micronaut.aop.Around;
-import io.micronaut.aop.InterceptorKind;
-import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
-import io.micronaut.aop.writer.AopProxyWriter;
 import io.micronaut.ast.groovy.annotation.GroovyAnnotationMetadataBuilder;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.ArgumentUtils;
+import io.micronaut.inject.ElementBeanDefinitionBuilder;
+import io.micronaut.inject.ElementBeanDefinitionBuilderFactory;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
-import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.beans.BeanParameterElement;
+import io.micronaut.inject.utils.BeanInjectionUtils;
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
-import io.micronaut.inject.writer.BeanDefinitionVisitor;
-import io.micronaut.inject.writer.BeanDefinitionWriter;
+import org.jspecify.annotations.NonNull;
 
 import java.lang.annotation.Annotation;
-import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
@@ -95,16 +90,18 @@ class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
             }
 
             @Override
-            protected BeanDefinitionVisitor createBeanDefinitionWriter() {
-                final BeanDefinitionVisitor writer = super.createBeanDefinitionWriter();
+            protected ElementBeanDefinitionBuilder createBeanDefinitionBuilder(ElementBeanDefinitionBuilderFactory elementBeanDefinitionBuilderFactory) {
                 ClassElement newParent = parentType.withAnnotationMetadata(parentType.copyAnnotationMetadata()); // Just a copy
-                writer.visitBeanFactoryField(
-                    newParent,
-                    producerField.withAnnotationMetadata(
-                        new AnnotationMetadataHierarchy(newParent.getDeclaredMetadata(), producerField.getDeclaredMetadata())
+                return elementBeanDefinitionBuilderFactory.factoryField(
+                    BeanInjectionUtils.createFieldDefinition(
+                        newParent,
+                        producerField.withAnnotationMetadata(
+                            new AnnotationMetadataHierarchy(newParent.getDeclaredMetadata(), producerField.getDeclaredMetadata())
+                        ),
+                        !producerField.isPublic(),
+                        visitorContext
                     )
                 );
-                return writer;
             }
 
         };
@@ -140,19 +137,20 @@ class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
             }
 
             @Override
-            protected BeanDefinitionVisitor createBeanDefinitionWriter() {
-                final BeanDefinitionVisitor writer = super.createBeanDefinitionWriter();
+            protected ElementBeanDefinitionBuilder createBeanDefinitionBuilder(ElementBeanDefinitionBuilderFactory elementBeanDefinitionBuilderFactory) {
                 final GroovyElementFactory elementFactory = ((GroovyVisitorContext) visitorContext).getElementFactory();
                 ClassElement resolvedParent = resolveParent(parentType, elementFactory);
-                writer.visitBeanFactoryMethod(
-                    resolvedParent,
-                    producerMethod.withAnnotationMetadata(
-                        new AnnotationMetadataHierarchy(resolvedParent.getDeclaredMetadata(), producerMethod.getDeclaredMetadata())
-                    ),
-                    getParameters()
-                );
-                return writer;
+                AnnotationMetadataHierarchy annotationMetadata = new AnnotationMetadataHierarchy(resolvedParent.getDeclaredMetadata(), producerMethod.getDeclaredMetadata(), getAnnotationMetadata());
+                return elementBeanDefinitionBuilderFactory.factoryMethod(
+                    BeanInjectionUtils.createMethodDefinition(
+                        resolvedParent,
+                        producerMethod.withParameters(getParameters()).withAnnotationMetadata(annotationMetadata),
+                        annotationMetadata,
+                        !producerMethod.isPublic(),
+                        visitorContext
+                    ));
             }
+
         };
     }
 
@@ -202,29 +200,4 @@ class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
         return resolvedParent;
     }
 
-    @Override
-    protected @NonNull BeanDefinitionVisitor createAopWriter(BeanDefinitionWriter beanDefinitionWriter, AnnotationMetadata annotationMetadata) {
-        AnnotationValue<?>[] interceptorTypes =
-            InterceptedMethodUtil.resolveInterceptorBinding(annotationMetadata, InterceptorKind.AROUND);
-        return new AopProxyWriter(
-            getBeanType(),
-            beanDefinitionWriter,
-            annotationMetadata.getValues(Around.class, Boolean.class),
-            visitorContext,
-            interceptorTypes
-        );
-    }
-
-    @Override
-    protected @NonNull BiConsumer<TypedElement, MethodElement> createAroundMethodVisitor(BeanDefinitionVisitor aopWriter) {
-        var aopProxyWriter = (AopProxyWriter) aopWriter;
-        return (bean, method) -> {
-            AnnotationValue<?>[] newTypes =
-                InterceptedMethodUtil.resolveInterceptorBinding(method.getAnnotationMetadata(), InterceptorKind.AROUND);
-            aopProxyWriter.visitInterceptorBinding(newTypes);
-            aopProxyWriter.visitAroundMethod(
-                bean, method
-            );
-        };
-    }
 }

@@ -34,7 +34,7 @@ public interface InjectionPoint<T> extends AnnotationMetadataProvider {
     /**
      * @return The bean that declares this injection point
      */
- BeanDefinition<T> getDeclaringBean();
+    BeanDefinition<T> getDeclaringBean();
 
     /**
      * @return The qualifier of the bean that declares this injection point

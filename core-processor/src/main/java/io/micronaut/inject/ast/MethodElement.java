@@ -21,13 +21,13 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NextMajorVersion;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
@@ -35,7 +35,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -135,6 +134,40 @@ public interface MethodElement extends MemberElement {
      * @return The method parameters
      */
     ParameterElement[] getParameters();
+
+    /**
+     * Return the parameter with the given name or throw if not found.
+     *
+     * @param name The name of the parameter
+     * @return The method parameter with the name supplied
+     * @since 5.0
+     */
+    default ParameterElement getParameter(String name) {
+        for (ParameterElement parameter : getParameters()) {
+            if (parameter.getName().equals(name)) {
+                return parameter;
+            }
+        }
+        throw new IllegalStateException("Cannot find the parameter with the name: " + name);
+    }
+
+    /**
+     * Returns the index of the parameter with the supplied name.
+     *
+     * @param name The name of the parameter
+     * @return The parameter index or -1
+     * @since 5.0
+     */
+    default int findParameterIndex(String name) {
+        ParameterElement[] parameters = getParameters();
+        for (int i = 0; i < parameters.length; i++) {
+            ParameterElement parameter = parameters[i];
+            if (parameter.getName().equals(name)) {
+                return i;
+            }
+        }
+        return -1;
+    }
 
     /**
      * Takes this method element and transforms into a new method element with the given parameters appended to the existing parameters.
@@ -431,7 +464,7 @@ public interface MethodElement extends MemberElement {
 
             @Override
             public Object getNativeType() {
-                throw new UnsupportedOperationException("No native method type present");
+                throw new UnsupportedOperationException("No native method type present for: " + this);
             }
 
             @Override
@@ -503,13 +536,13 @@ public interface MethodElement extends MemberElement {
                     new AnnotationMetadataProvider() {
                         @Override
                         public AnnotationMetadata getAnnotationMetadata() {
-                            return Objects.requireNonNull(methodAnnotationMetadata);
+                            return getMethodAnnotationMetadata0();
                         }
                     },
                     new AnnotationMetadataProvider() {
                         @Override
                         public AnnotationMetadata getAnnotationMetadata() {
-                            return Objects.requireNonNull(annotationMetadata);
+                            return getAnnotationMetadata0();
                         }
                     },
                     metadataBuilder,
@@ -575,6 +608,10 @@ public interface MethodElement extends MemberElement {
 
             @Override
             public AnnotationMetadata getAnnotationMetadata() {
+                return getAnnotationMetadata0();
+            }
+
+            private AnnotationMetadata getAnnotationMetadata0() {
                 if (annotationMetadata == null) {
                     annotationMetadata = annotationMetadataProvider.getAnnotationMetadata().copyAnnotationMetadata();
                 }

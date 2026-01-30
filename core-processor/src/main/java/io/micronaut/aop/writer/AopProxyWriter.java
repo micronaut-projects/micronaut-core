@@ -19,10 +19,12 @@ import io.micronaut.aop.HotSwappableInterceptedProxy;
 import io.micronaut.aop.Intercepted;
 import io.micronaut.aop.InterceptedProxy;
 import io.micronaut.aop.Interceptor;
+import io.micronaut.aop.InterceptorKind;
 import io.micronaut.aop.InterceptorRegistry;
 import io.micronaut.aop.Introduced;
 import io.micronaut.aop.chain.InterceptorChain;
 import io.micronaut.aop.chain.MethodInterceptorChain;
+import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanDefinitionRegistry;
 import io.micronaut.context.BeanLocator;
@@ -39,22 +41,18 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.inject.OutputObjectDef;
 import io.micronaut.inject.ProxyBeanDefinition;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
-import io.micronaut.inject.ast.PrimitiveElement;
-import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.qualifiers.Qualified;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.ArgumentExpUtils;
 import io.micronaut.inject.writer.BeanDefinitionWriter;
-import io.micronaut.inject.writer.ByteCodeWriterUtils;
-import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import io.micronaut.inject.writer.ExecutableMethodsDefinitionWriter;
 import io.micronaut.inject.writer.MethodGenUtils;
-import io.micronaut.sourcegen.model.AnnotationDef;
 import io.micronaut.sourcegen.model.ClassDef;
 import io.micronaut.sourcegen.model.ClassTypeDef;
 import io.micronaut.sourcegen.model.ExpressionDef;
@@ -65,20 +63,17 @@ import io.micronaut.sourcegen.model.StatementDef;
 import io.micronaut.sourcegen.model.TypeDef;
 import io.micronaut.sourcegen.model.VariableDef;
 import org.jspecify.annotations.NullUnmarked;
+import org.jspecify.annotations.Nullable;
 
 import javax.lang.model.element.Modifier;
-import java.io.File;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.lang.annotation.Annotation;
-import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -90,7 +85,7 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import static io.micronaut.core.annotation.AnnotationUtil.ZERO_ANNOTATION_VALUES;
-import static io.micronaut.inject.ast.ParameterElement.ZERO_PARAMETER_ELEMENTS;
+import static io.micronaut.inject.writer.BeanDefinitionVisitor.PROXY_SUFFIX;
 
 /**
  * A class that generates AOP proxy classes at compile time.
@@ -186,6 +181,10 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         new IllegalStateException("new MethodInterceptorChain(..) constructor not found. Incompatible version of Micronaut?")
     );
     private static final String INTERCEPTORS_PARAMETER = "$interceptors";
+    private static final String BEAN_RESOLUTION_CONTEXT_PARAMETER = "$beanResolutionContext";
+    private static final String BEAN_CONTEXT_PARAMETER = "$beanContext";
+    private static final String QUALIFIER_PARAMETER = "$qualifier";
+    private static final String INTERCEPTOR_REGISTRY_PARAMETER = "$interceptorRegistry";
 
     private static final Method METHOD_PROCEED = ReflectionUtils.getRequiredInternalMethod(InterceptorChain.class, "proceed");
 
@@ -198,39 +197,19 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
     private static final String FIELD_PROXY_BEAN_DEFINITION = "$proxyBeanDefinition";
     private static final ClassTypeDef METHOD_INTERCEPTOR_CHAIN_TYPE = ClassTypeDef.of(MethodInterceptorChain.class);
 
-    private final Set<ClassElement> interfaceTypes;
     private final boolean hotswap;
     private final boolean lazy;
     private final boolean cacheLazyTarget;
 
-    private final List<MethodRef> proxiedMethods = new ArrayList<>();
-    private final Set<MethodRef> proxiedMethodsRefSet = new HashSet<>();
-    private final List<MethodRef> proxyTargetMethods = new ArrayList<>();
-    private int proxyMethodCount = 0;
-    private int interceptorsListArgumentIndex;
-    private int beanResolutionContextArgumentIndex = -1;
-    private int beanContextArgumentIndex = -1;
-    private int interceptorRegistryArgumentIndex = -1;
-    private int qualifierIndex;
-    private MethodElement newConstructor;
-    private MethodElement realConstructor;
-    private List<Map.Entry<ParameterElement, Integer>> superConstructorParametersBinding;
-    private ParameterElement qualifierParameter;
-    private ParameterElement interceptorsListParameter;
-
-    private ClassDef.ClassDefBuilder proxyBuilder;
-    private final FieldDef interceptorsField;
-    private final FieldDef proxyMethodsField;
-    private FieldDef targetField;
-
-    private byte[] output;
+    private final Map<MethodElement, MethodElement> overriddenMethods = new LinkedHashMap<>();
+    private final List<MethodElement> aroundMethods = new ArrayList<>();
 
     /**
      * <p>Constructs a new {@link AopProxyWriter} for the given parent {@link BeanDefinitionWriter} and starting interceptors types.</p>
      *
      * <p>Additional {@link Interceptor} types can be added downstream with {@link #visitInterceptorBinding(AnnotationValue[])} .</p>
      *
-     * @param targetType       The classElement
+     * @param targetType         The classElement
      * @param parent             The parent {@link BeanDefinitionWriter}
      * @param settings           optional setting
      * @param visitorContext     The visitor context
@@ -242,8 +221,9 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                           VisitorContext visitorContext,
                           AnnotationValue<?>... interceptorBinding) {
         super(
-            null,
-            ClassElement.of(parent.getBeanDefinitionName() + PROXY_SUFFIX, parent.isInterface(), parent.getAnnotationMetadata()),
+            createProxyConstructor(targetType, createProxyType(parent), visitorContext),
+//            null,
+            createProxyType(parent),
             targetType,
             parent,
             settings,
@@ -253,218 +233,129 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         this.hotswap = isProxyTarget && settings.get(Interceptor.HOTSWAP).orElse(false);
         this.lazy = isProxyTarget && settings.get(Interceptor.LAZY).orElse(false);
         this.cacheLazyTarget = lazy && settings.get(Interceptor.CACHEABLE_LAZY_TARGET).orElse(false);
-        this.interfaceTypes = Collections.emptySet();
-
-        proxyBuilder = ClassDef.builder(proxyType.getName()).synthetic();
-
-        interceptorsField = FieldDef.builder(FIELD_INTERCEPTORS, Interceptor[][].class)
-            .addModifiers(Modifier.PRIVATE, Modifier.FINAL)
-            .build();
-
-        proxyBuilder.addField(interceptorsField);
-
-        proxyMethodsField = FieldDef.builder(FIELD_PROXY_METHODS, ExecutableMethod[].class)
-            .addModifiers(Modifier.PRIVATE, Modifier.FINAL)
-            .build();
-
-        proxyBuilder.addField(proxyMethodsField);
-
-        if (cacheLazyTarget || hotswap) {
-            targetField = FieldDef.builder(FIELD_TARGET, TypeDef.OBJECT).addModifiers(Modifier.PRIVATE).build();
-            proxyBuilder.addField(targetField);
-        } else if (!lazy) {
-            targetField = FieldDef.builder(FIELD_TARGET, TypeDef.OBJECT).addModifiers(Modifier.PRIVATE, Modifier.FINAL).build();
-            proxyBuilder.addField(targetField);
-        }
     }
 
     /**
      * Constructs a new {@link AopProxyWriter} for the purposes of writing {@link io.micronaut.aop.Introduction} advise.
      *
-     * @param targetType       The source element
-     * @param interfaceTypes     The additional interfaces to implement
-     * @param visitorContext     The visitor context
-     * @param interceptorBinding The interceptor types
-     */
-    public AopProxyWriter(ClassElement targetType,
-                          ClassElement[] interfaceTypes,
-                          VisitorContext visitorContext,
-                          AnnotationValue<?>... interceptorBinding) {
-        this(targetType, true, interfaceTypes, visitorContext, interceptorBinding);
-    }
-
-    /**
-     * Constructs a new {@link AopProxyWriter} for the purposes of writing {@link io.micronaut.aop.Introduction} advise.
-     *
-     * @param targetType       The source element
+     * @param targetType         The source element
      * @param implementInterface Whether the interface should be implemented. If false the {@code interfaceTypes} argument should contain at least one entry
-     * @param interfaceTypes     The additional interfaces to implement
      * @param visitorContext     The visitor context
      * @param interceptorBinding The interceptor binding
      */
     public AopProxyWriter(ClassElement targetType,
                           boolean implementInterface,
-                          ClassElement[] interfaceTypes,
                           VisitorContext visitorContext,
                           AnnotationValue<?>... interceptorBinding) {
         super(
-            null,
-            ClassElement.of(targetType.getName() + PROXY_SUFFIX, targetType.isInterface(), targetType.getAnnotationMetadata()),
+            createProxyConstructor(targetType, createProxyType(targetType), visitorContext),
+//            null,
+            createProxyType(targetType),
             targetType,
             implementInterface,
-            interfaceTypes,
             visitorContext,
             interceptorBinding
         );
         this.hotswap = false;
         this.lazy = false;
         this.cacheLazyTarget = false;
-        this.interfaceTypes = interfaceTypes != null ? new LinkedHashSet<>(Arrays.asList(interfaceTypes)) : Collections.emptySet();
-
-        proxyBuilder = ClassDef.builder(proxyType.getName()).synthetic();
-
-        interceptorsField = FieldDef.builder(FIELD_INTERCEPTORS, Interceptor[][].class)
-            .addModifiers(Modifier.PRIVATE, Modifier.FINAL)
-            .build();
-
-        proxyBuilder.addField(interceptorsField);
-
-        proxyMethodsField = FieldDef.builder(FIELD_PROXY_METHODS, ExecutableMethod[].class)
-            .addModifiers(Modifier.PRIVATE, Modifier.FINAL)
-            .build();
-
-        proxyBuilder.addField(proxyMethodsField);
     }
 
-    @Override
-    protected BeanDefinitionWriter createAdviceProxyBeanDefinitionWriter(String suffix) {
-        return new BeanDefinitionWriter(
-            proxyType,
-            parentWriter,
-            visitorContext
-        );
+    private static ClassElement createProxyType(BeanDefinitionWriter parent) {
+        ClassElement target = parent.getBeanTypeElement();
+        return createProxyType(target, parent.getBeanDefinitionName() + PROXY_SUFFIX, parent.getAnnotationMetadata());
     }
 
-    @Override
-    protected BeanDefinitionWriter createIntroductionProxyBeanDefinitionWriter(String suffix) {
-        return new BeanDefinitionWriter(
-            proxyType,
-            this,
-            visitorContext
-        );
+    private static ClassElement createProxyType(ClassElement target) {
+        String proxyName = target.getName() + PROXY_SUFFIX;
+        return createProxyType(target, proxyName, target.getAnnotationMetadata());
     }
 
-    /**
-     * Find the interceptors list constructor parameter index.
-     *
-     * @param parameters The constructor parameters
-     * @return the index
-     */
-    public static int findInterceptorsListParameterIndex(List<ParameterElement> parameters) {
-        return parameters.indexOf(parameters.stream().filter(p -> p.getName().equals(INTERCEPTORS_PARAMETER)).findFirst().orElseThrow());
+    private static ClassElement createProxyType(ClassElement target, String proxyName, AnnotationMetadata annotationMetadata) {
+        if (target.isInterface()) {
+            return ClassElement.of(proxyName, false, annotationMetadata, Map.of(), null, List.of(target));
+        }
+        return ClassElement.of(proxyName, false, annotationMetadata, Map.of(), target, List.of());
     }
 
-    private void initConstructor(MethodElement constructor) {
+    private static MethodElement createProxyConstructor(ClassElement target, ClassElement proxyClass, VisitorContext visitorContext) {
+        MethodElement constructor = getConstructor(target);
+
         final ClassElement interceptorList = ClassElement.of(List.class, AnnotationMetadata.EMPTY_METADATA, Collections.singletonMap(
             "E", ClassElement.of(BeanRegistration.class, AnnotationMetadata.EMPTY_METADATA, Collections.singletonMap(
                 "T", ClassElement.of(Interceptor.class)
             ))
         ));
-        this.qualifierParameter = ParameterElement.of(Qualifier.class, "$qualifier");
-        this.interceptorsListParameter = ParameterElement.of(interceptorList, INTERCEPTORS_PARAMETER);
-        ParameterElement interceptorRegistryParameter = ParameterElement.of(ClassElement.of(InterceptorRegistry.class), "$interceptorRegistry");
-        ClassElement proxyClass = ClassElement.of(proxyType.getName());
-        superConstructorParametersBinding = new ArrayList<>();
+
+        ParameterElement interceptorsListParameter = ParameterElement.of(interceptorList, INTERCEPTORS_PARAMETER);
+
         ParameterElement[] constructorParameters = constructor.getParameters();
         List<ParameterElement> newConstructorParameters = new ArrayList<>(constructorParameters.length + 5);
-        newConstructorParameters.addAll(Arrays.asList(constructorParameters));
-        int superConstructorParameterIndex = 0;
-        for (ParameterElement newConstructorParameter : newConstructorParameters) {
-            superConstructorParametersBinding.add(Map.entry(newConstructorParameter, superConstructorParameterIndex++));
-        }
+        newConstructorParameters.addAll(List.of(constructorParameters));
 
-        ParameterElement beanResolutionContext = ParameterElement.of(BeanResolutionContext.class, "$beanResolutionContext");
-        newConstructorParameters.add(beanResolutionContext);
-        ParameterElement beanContext = ParameterElement.of(BeanContext.class, "$beanContext");
-        newConstructorParameters.add(beanContext);
+        ParameterElement qualifierParameter = ParameterElement.of(Qualifier.class, QUALIFIER_PARAMETER);
+        qualifierParameter.annotate(AnnotationUtil.NULLABLE);
+
+        newConstructorParameters.add(ParameterElement.of(BeanResolutionContext.class, BEAN_RESOLUTION_CONTEXT_PARAMETER));
+        newConstructorParameters.add(ParameterElement.of(BeanContext.class, BEAN_CONTEXT_PARAMETER));
         newConstructorParameters.add(qualifierParameter);
         newConstructorParameters.add(interceptorsListParameter);
-        newConstructorParameters.add(interceptorRegistryParameter);
-        superConstructorParameterIndex += 5; // Skip internal parameters
-        if (MethodGenUtils.hasKotlinDefaultsParameters(List.of(constructorParameters))) {
-            List<ParameterElement> realNewConstructorParameters = new ArrayList<>(newConstructorParameters);
-            int count = MethodGenUtils.calculateNumberOfKotlinDefaultsMasks(List.of(constructorParameters));
-            for (int j = 0; j < count; j++) {
-                ParameterElement mask = ParameterElement.of(PrimitiveElement.INT, "mask" + j);
-                realNewConstructorParameters.add(mask);
-                superConstructorParametersBinding.add(Map.entry(mask, superConstructorParameterIndex++));
-            }
-            ParameterElement marker = ParameterElement.of(ClassElement.of("kotlin.jvm.internal.DefaultConstructorMarker"), "marker");
-            realNewConstructorParameters.add(marker);
-            superConstructorParametersBinding.add(Map.entry(marker, superConstructorParameterIndex));
+        newConstructorParameters.add(ParameterElement.of(ClassElement.of(InterceptorRegistry.class), INTERCEPTOR_REGISTRY_PARAMETER));
 
-            this.realConstructor = MethodElement.of(
-                proxyClass,
-                constructor.getAnnotationMetadata(),
-                proxyClass,
-                proxyClass,
-                "<init>",
-                realNewConstructorParameters.toArray(ZERO_PARAMETER_ELEMENTS)
-            );
-        }
-        this.newConstructor = MethodElement.of(
+        return MethodElement.of(
             proxyClass,
             constructor.getAnnotationMetadata(),
             proxyClass,
             proxyClass,
             "<init>",
-            newConstructorParameters.toArray(ZERO_PARAMETER_ELEMENTS)
+            newConstructorParameters.toArray(ParameterElement.ZERO_PARAMETER_ELEMENTS)
         );
-        if (realConstructor == null) {
-            realConstructor = newConstructor;
-        }
-
-        this.beanResolutionContextArgumentIndex = newConstructorParameters.indexOf(beanResolutionContext);
-        this.beanContextArgumentIndex = newConstructorParameters.indexOf(beanContext);
-        this.qualifierIndex = newConstructorParameters.indexOf(qualifierParameter);
-        this.interceptorsListArgumentIndex = newConstructorParameters.indexOf(interceptorsListParameter);
-        this.interceptorRegistryArgumentIndex = newConstructorParameters.indexOf(interceptorRegistryParameter);
     }
 
     /**
      * Visit a method that is to be proxied.
      *
-     * @param beanType      The bean type.
      * @param methodElement The method element
      **/
     @Override
-    public void visitAroundMethod(TypedElement beanType,
-                                  MethodElement methodElement) {
+    public AopProxyWriter addAroundMethod(MethodElement methodElement) {
+        AnnotationMetadata methodAnnotationMetadata = methodElement.getMethodAnnotationMetadata();
+
+        if (InterceptedMethodUtil.hasAroundStereotype(methodAnnotationMetadata)) {
+            visitInterceptorBinding(
+                InterceptedMethodUtil.resolveInterceptorBinding(methodAnnotationMetadata, InterceptorKind.AROUND)
+            );
+        }
+        ExecutableMethodsDefinitionWriter methodsWriter = executableMethodsDefinitionWriter != null
+            ? executableMethodsDefinitionWriter
+            : proxyBeanDefinitionWriter.getExecutableMethodsWriter();
 
         MethodElement overriddenBy = findOverriddenBy(methodElement);
         if (overriddenBy != null) {
-            proxyBuilder.addMethod(copyRuntimeMethodAnnotations(MethodDef.override(methodElement), methodElement)
-                .build((aThis, methodParameters) -> aThis.invoke(overriddenBy, methodParameters).returning())
-            );
-            return;
+            overriddenMethods.put(methodElement, overriddenBy);
+        } else {
+            methodsWriter.addExecutableMethod(methodElement.getDeclaringType(), methodElement);
         }
+        aroundMethods.add(methodElement);
 
+        return this;
+    }
+
+    private void addInterceptedIfNeeded(ClassDef.ClassDefBuilder proxyBuilder,
+                                        MethodElement methodElement,
+                                        Set<MethodRef> uniqueInterceptedMethodsRefs,
+                                        List<MethodElement> methods) {
         String methodName = methodElement.getName();
         List<ParameterElement> argumentTypeList = Arrays.asList(methodElement.getSuspendParameters());
         ClassElement returnType = methodElement.isSuspend() ? ClassElement.of(Object.class) : methodElement.getReturnType();
         MethodRef methodKey = new MethodRef(methodName, argumentTypeList, returnType);
 
-        if (!proxiedMethodsRefSet.contains(methodKey)) {
-
-            ClassTypeDef interceptedProxyDef = null;
-            MethodDef interceptedProxyBridgeMethod = null;
-
+        if (!uniqueInterceptedMethodsRefs.contains(methodKey)) {
             if (!isProxyTarget) {
                 // if the target is not being proxied then we need to generate a bridge method and executable method that knows about it
 
                 if (!methodElement.isAbstract() || methodElement.isDefault()) {
-                    interceptedProxyDef = ClassTypeDef.of(proxyType.getName());
-                    interceptedProxyBridgeMethod = MethodDef.builder("$$access$$" + methodName)
+                    MethodDef interceptedProxyBridgeMethod = MethodDef.builder("$$access$$" + methodName)
                         .addModifiers(Modifier.PUBLIC)
                         .addParameters(argumentTypeList.stream().map(p -> ParameterDef.of(p.getName(), TypeDef.erasure(p.getType()))).toList())
                         .returns(TypeDef.erasure(returnType))
@@ -477,31 +368,36 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                     proxyBuilder.addMethod(
                         interceptedProxyBridgeMethod
                     );
+
+                    MethodElement proxyMethod = MethodElement.of(
+                        proxyType,
+                        AnnotationMetadata.EMPTY_METADATA,
+                        returnType,
+                        returnType,
+                        interceptedProxyBridgeMethod.getName(),
+                        methodElement.getSuspendParameters());
+
+                    ExecutableMethodsDefinitionWriter methodsWriter = executableMethodsDefinitionWriter != null
+                        ? executableMethodsDefinitionWriter
+                        : proxyBeanDefinitionWriter.getExecutableMethodsWriter();
+
+                    methodsWriter.setProxyType(ClassTypeDef.of(proxyType));
+                    methodsWriter.addBridgeMethod(methodElement, proxyMethod);
                 }
             }
 
-            BeanDefinitionWriter beanDefinitionWriter = parentWriter == null ? proxyBeanDefinitionWriter : parentWriter;
-            int methodIndex = beanDefinitionWriter.visitExecutableMethod(
-                beanType,
-                methodElement,
-                interceptedProxyDef,
-                interceptedProxyBridgeMethod
-            );
-            int index = proxyMethodCount++;
+            uniqueInterceptedMethodsRefs.add(methodKey);
 
-            methodKey.methodIndex = methodIndex;
-            proxiedMethods.add(methodKey);
-            proxiedMethodsRefSet.add(methodKey);
-            proxyTargetMethods.add(methodKey);
-
-            proxyBuilder.addMethod(
-                buildMethodOverride(methodElement, index)
-            );
+            methods.add(methodElement);
         }
     }
 
-    private MethodDef buildMethodOverride(MethodElement methodElement, int index) {
-        return copyRuntimeMethodAnnotations(MethodDef.override(methodElement), methodElement)
+    private MethodDef buildMethodIntercept(MethodElement methodElement,
+                                           int index,
+                                           @Nullable FieldDef targetField,
+                                           FieldDef interceptorsField,
+                                           FieldDef proxyMethodsField) {
+        return MethodDef.override(methodElement)
             .build((aThis, methodParameters) -> {
 
                 ExpressionDef targetArgument;
@@ -551,21 +447,38 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
             });
     }
 
-    private MethodDef.MethodDefBuilder copyRuntimeMethodAnnotations(MethodDef.MethodDefBuilder methodBuilder,
-                                                                    MethodElement methodElement) {
-        for (AnnotationValue<Annotation> annotationValue : methodElement.getMethodAnnotationMetadata().getDeclaredAnnotationValuesByType(Annotation.class)) {
-            if (annotationValue.getRetentionPolicy() == RetentionPolicy.RUNTIME) {
-                methodBuilder.addAnnotation(AnnotationDef.of(annotationValue, visitorContext));
-            }
-        }
-        return methodBuilder;
-    }
-
-    /**
-     * Finalizes the proxy. This method should be called before writing the proxy to disk with {@link #writeTo(File)}
-     */
     @Override
-    public void visitBeanDefinitionEnd() {
+    public List<OutputObjectDef> build() {
+
+        if (parentWriter != null && !isProxyTarget) {
+            processAlreadyVisitedMethods(parentWriter);
+        }
+
+        ClassDef.ClassDefBuilder proxyBuilder = ClassDef.builder(proxyType.getName()).synthetic();
+
+        FieldDef interceptorsField = FieldDef.builder(FIELD_INTERCEPTORS, Interceptor[][].class)
+            .addModifiers(Modifier.PRIVATE, Modifier.FINAL)
+            .build();
+
+        proxyBuilder.addField(interceptorsField);
+
+        FieldDef proxyMethodsField = FieldDef.builder(FIELD_PROXY_METHODS, ExecutableMethod[].class)
+            .addModifiers(Modifier.PRIVATE, Modifier.FINAL)
+            .build();
+
+        proxyBuilder.addField(proxyMethodsField);
+
+        FieldDef targetField;
+        if (cacheLazyTarget || hotswap) {
+            targetField = FieldDef.builder(FIELD_TARGET, TypeDef.OBJECT).addModifiers(Modifier.PRIVATE).build();
+            proxyBuilder.addField(targetField);
+        } else if (!lazy) {
+            targetField = FieldDef.builder(FIELD_TARGET, TypeDef.OBJECT).addModifiers(Modifier.PRIVATE, Modifier.FINAL).build();
+            proxyBuilder.addField(targetField);
+        } else {
+            targetField = null;
+        }
+
         ClassTypeDef classTargetType = ClassTypeDef.of(this.targetType.getName());
         if (!targetType.isInterface()) {
             proxyBuilder.superclass(classTargetType);
@@ -580,201 +493,219 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
 
         proxyBuilder.addAnnotation(Generated.class);
 
-        if (declaredConstructor == null) {
-            throw new IllegalStateException("The method visitBeanDefinitionConstructor(..) should be called at least once");
-        } else {
-            initConstructor(declaredConstructor);
+        List<MethodElement> interceptedMethods = new ArrayList<>();
+        final Set<MethodRef> uniqueInterceptedMethodsRefs = new LinkedHashSet<>();
+
+        for (MethodElement aroundMethod : aroundMethods) {
+            MethodElement overriddenByMethod = overriddenMethods.get(aroundMethod);
+            if (overriddenByMethod != null) {
+                proxyBuilder.addMethod(MethodDef.override(aroundMethod)
+                    .build((aThis, methodParameters) -> aThis.invoke(overriddenByMethod, methodParameters).returning())
+                );
+            } else {
+                addInterceptedIfNeeded(proxyBuilder, aroundMethod, uniqueInterceptedMethodsRefs, interceptedMethods);
+            }
         }
 
-        if (parentWriter != null && !isProxyTarget) {
-            processAlreadyVisitedMethods(parentWriter);
+        int index = 0;
+        for (MethodElement method : interceptedMethods) {
+            proxyBuilder.addMethod(
+                buildMethodIntercept(method, index++, targetField, interceptorsField, proxyMethodsField)
+            );
         }
 
-        interceptorsListParameter.annotate(AnnotationUtil.ANN_INTERCEPTOR_BINDING_QUALIFIER, builder -> {
-            final AnnotationValue<?>[] interceptorBinding = this.interceptorBinding.toArray(ZERO_ANNOTATION_VALUES);
-            builder.values(interceptorBinding);
+        constructor.getParameter(INTERCEPTORS_PARAMETER).annotate(AnnotationUtil.ANN_INTERCEPTOR_BINDING_QUALIFIER, builder -> {
+            builder.values(interceptorBinding.toArray(ZERO_ANNOTATION_VALUES));
         });
-        qualifierParameter.annotate(AnnotationUtil.NULLABLE);
-
-        proxyBeanDefinitionWriter.visitBeanDefinitionConstructor(
-            newConstructor,
-            constructorRequiresReflection,
-            visitorContext
-        );
 
         if (parentWriter != null) {
             proxyBeanDefinitionWriter.visitBeanDefinitionInterface(ProxyBeanDefinition.class);
             proxyBeanDefinitionWriter.generateProxyReference(parentWriter.getBeanDefinitionName(), parentWriter.getBeanTypeName());
         }
 
-        if (isProxyTarget) {
-            generateProxyTarget(classTargetType);
-        } else {
-            proxyBuilder.addSuperinterface(TypeDef.of(isIntroduction ? Introduced.class : Intercepted.class));
-            proxyBuilder.addMethod(MethodDef.constructor()
-                .addParameters(Arrays.stream(realConstructor.getParameters()).map(p -> TypeDef.erasure(p.getType())).toList())
-                .build((aThis, methodParameters) -> StatementDef.multi(
-                    invokeSuperConstructor(aThis, methodParameters),
-                    initializeProxyMethodsAndInterceptors(aThis, methodParameters)
-                )));
+        proxyBuilder.addSuperinterface(TypeDef.of(isIntroduction ? Introduced.class : Intercepted.class));
+
+        addConstructor(proxyBuilder, classTargetType, targetField, interceptorsField, proxyMethodsField, interceptedMethods);
+
+        List<OutputObjectDef> classes = new ArrayList<>();
+        classes.add(new OutputObjectDef(proxyBuilder.build(), null, originatingElements));
+        if (executableMethodsDefinitionWriter != null) {
+            classes.add(executableMethodsDefinitionWriter.build());
         }
+        classes.addAll(proxyBeanDefinitionWriter.build());
 
-        for (Runnable fieldInjectionPoint : deferredInjectionPoints) {
-            fieldInjectionPoint.run();
-        }
-
-        proxyBeanDefinitionWriter.visitBeanDefinitionEnd();
-
-        output = ByteCodeWriterUtils.writeByteCode(proxyBuilder.build(), visitorContext);
-        proxyBuilder = null;
+        return classes;
     }
 
-    private void generateProxyTarget(ClassTypeDef targetType) {
+    private void addConstructor(ClassDef.ClassDefBuilder proxyBuilder,
+                                ClassTypeDef targetType,
+                                @Nullable FieldDef targetField,
+                                FieldDef interceptorsField,
+                                FieldDef proxyMethodsField,
+                                List<MethodElement> interceptedMethods) {
+
         List<MethodDef.MethodBodyBuilder> bodyBuilders = new ArrayList<>();
 
-        FieldDef proxyBeanDefinitionField = FieldDef.builder(FIELD_PROXY_BEAN_DEFINITION, BeanDefinition.class)
-            .addModifiers(Modifier.PRIVATE, Modifier.FINAL)
-            .build();
-        proxyBuilder.addField(proxyBeanDefinitionField);
-        bodyBuilders.add((aThis, methodParameters) -> aThis.field(proxyBeanDefinitionField).assign(
-            methodParameters.get(beanContextArgumentIndex).invoke(
-                METHOD_GET_PROXY_BEAN_DEFINITION,
+        if (isProxyTarget) {
 
-                // 1nd argument: the type
-                pushTargetArgument(targetType),
-                // 2rd argument: the qualifier
-                methodParameters.get(qualifierIndex)
-            )
-        ));
+            int beanResolutionContextArgumentIndex = constructor.findParameterIndex(BEAN_RESOLUTION_CONTEXT_PARAMETER);
+            int beanContextArgumentIndex = constructor.findParameterIndex(BEAN_CONTEXT_PARAMETER);
+            int qualifierIndex = constructor.findParameterIndex(QUALIFIER_PARAMETER);
 
-        FieldDef beanQualifierField = FieldDef.builder(FIELD_BEAN_QUALIFIER, TypeDef.of(Qualifier.class))
-            .addModifiers(Modifier.PRIVATE)
-            .build();
-        proxyBuilder.addField(beanQualifierField);
-        proxyBuilder.addMethod(writeWithQualifierMethod(beanQualifierField));
-        bodyBuilders.add((aThis, methodParameters) ->
-            aThis.field(beanQualifierField).assign(methodParameters.get(qualifierIndex)));
 
-        MethodDef interceptedTargetMethod;
-        if (lazy) {
-            proxyBuilder.addSuperinterface(TypeDef.of(InterceptedProxy.class));
-
-            FieldDef beanResolutionContextField = FieldDef.builder(FIELD_BEAN_RESOLUTION_CONTEXT, BeanResolutionContext.class)
-                .addModifiers(Modifier.PRIVATE)
-                .build();
-
-            proxyBuilder.addField(beanResolutionContextField);
-
-            FieldDef beanLocatorField = FieldDef.builder(FIELD_BEAN_LOCATOR, BeanLocator.class)
+            FieldDef proxyBeanDefinitionField = FieldDef.builder(FIELD_PROXY_BEAN_DEFINITION, BeanDefinition.class)
                 .addModifiers(Modifier.PRIVATE, Modifier.FINAL)
                 .build();
+            proxyBuilder.addField(proxyBeanDefinitionField);
+            bodyBuilders.add((aThis, methodParameters) -> aThis.field(proxyBeanDefinitionField).assign(
+                methodParameters.get(beanContextArgumentIndex).invoke(
+                    METHOD_GET_PROXY_BEAN_DEFINITION,
 
-            proxyBuilder.addField(beanLocatorField);
-
-            if (cacheLazyTarget) {
-                interceptedTargetMethod = getCacheLazyTargetInterceptedTargetMethod(
-                    targetField,
-                    beanResolutionContextField,
-                    proxyBeanDefinitionField,
-                    beanQualifierField
-                );
-                proxyBuilder.addMethod(
-                    getHasCachedInterceptedTargetMethod(targetField)
-                );
-            } else {
-                interceptedTargetMethod = getLazyInterceptedTargetMethod(
-                    beanResolutionContextField,
-                    proxyBeanDefinitionField,
-                    beanQualifierField
-                );
-            }
-
-            bodyBuilders.add((aThis, methodParameters) -> StatementDef.multi(
-                aThis.field(beanLocatorField).assign(methodParameters.get(beanContextArgumentIndex)),
-                aThis.field(beanResolutionContextField).assign(
-                    methodParameters.get(beanResolutionContextArgumentIndex)
-                        .invoke(COPY_BEAN_CONTEXT_METHOD)
+                    // 1nd argument: the type
+                    pushTargetArgument(targetType),
+                    // 2rd argument: the qualifier
+                    methodParameters.get(qualifierIndex)
                 )
             ));
-        } else {
-            if (hotswap) {
-                proxyBuilder.addSuperinterface(TypeDef.parameterized(HotSwappableInterceptedProxy.class, targetType));
 
-                ClassTypeDef readWriteLockType = ClassTypeDef.of(ReentrantReadWriteLock.class);
-                FieldDef readWriteLockField = FieldDef.builder(FIELD_READ_WRITE_LOCK, readWriteLockType)
-                    .addModifiers(Modifier.PRIVATE, Modifier.FINAL)
-                    .initializer(readWriteLockType.instantiate())
+            FieldDef beanQualifierField = FieldDef.builder(FIELD_BEAN_QUALIFIER, TypeDef.of(Qualifier.class))
+                .addModifiers(Modifier.PRIVATE)
+                .build();
+            proxyBuilder.addField(beanQualifierField);
+            proxyBuilder.addMethod(writeWithQualifierMethod(beanQualifierField));
+            bodyBuilders.add((aThis, methodParameters) ->
+                aThis.field(beanQualifierField).assign(methodParameters.get(qualifierIndex)));
+
+            MethodDef interceptedTargetMethod;
+            if (lazy) {
+                proxyBuilder.addSuperinterface(TypeDef.of(InterceptedProxy.class));
+
+                FieldDef beanResolutionContextField = FieldDef.builder(FIELD_BEAN_RESOLUTION_CONTEXT, BeanResolutionContext.class)
+                    .addModifiers(Modifier.PRIVATE)
                     .build();
 
-                proxyBuilder.addField(readWriteLockField);
+                proxyBuilder.addField(beanResolutionContextField);
 
-                ClassTypeDef lockType = ClassTypeDef.of(Lock.class);
-                FieldDef readLockField = FieldDef.builder(FIELD_READ_LOCK, lockType)
+                FieldDef beanLocatorField = FieldDef.builder(FIELD_BEAN_LOCATOR, BeanLocator.class)
                     .addModifiers(Modifier.PRIVATE, Modifier.FINAL)
-                    .initializer(new VariableDef.This().field(readWriteLockField).invoke(GET_READ_LOCK_METHOD))
                     .build();
 
-                proxyBuilder.addField(readLockField);
+                proxyBuilder.addField(beanLocatorField);
 
-                FieldDef writeLockField = FieldDef.builder(FIELD_WRITE_LOCK, lockType)
-                    .addModifiers(Modifier.PRIVATE, Modifier.FINAL)
-                    .initializer(new VariableDef.This().field(readWriteLockField).invoke(GET_WRITE_LOCK_METHOD))
-                    .build();
+                if (cacheLazyTarget) {
+                    interceptedTargetMethod = getCacheLazyTargetInterceptedTargetMethod(
+                        targetField,
+                        beanResolutionContextField,
+                        proxyBeanDefinitionField,
+                        beanQualifierField
+                    );
+                    proxyBuilder.addMethod(
+                        getHasCachedInterceptedTargetMethod(targetField)
+                    );
+                } else {
+                    interceptedTargetMethod = getLazyInterceptedTargetMethod(
+                        beanResolutionContextField,
+                        proxyBeanDefinitionField,
+                        beanQualifierField
+                    );
+                }
 
-                proxyBuilder.addField(writeLockField);
-
-                proxyBuilder.addMethod(
-                    getSwapMethod(targetField, writeLockField)
-                );
-                interceptedTargetMethod = getHotSwapInterceptedTargetMethod(targetField, readLockField);
+                bodyBuilders.add((aThis, methodParameters) -> StatementDef.multi(
+                    aThis.field(beanLocatorField).assign(methodParameters.get(beanContextArgumentIndex)),
+                    aThis.field(beanResolutionContextField).assign(
+                        methodParameters.get(beanResolutionContextArgumentIndex)
+                            .invoke(COPY_BEAN_CONTEXT_METHOD)
+                    )
+                ));
             } else {
-                proxyBuilder.addSuperinterface(TypeDef.parameterized(InterceptedProxy.class, targetType));
-                interceptedTargetMethod = getSimpleInterceptedTargetMethod(targetField);
+                if (hotswap) {
+                    proxyBuilder.addSuperinterface(TypeDef.parameterized(HotSwappableInterceptedProxy.class, targetType));
+
+                    ClassTypeDef readWriteLockType = ClassTypeDef.of(ReentrantReadWriteLock.class);
+                    FieldDef readWriteLockField = FieldDef.builder(FIELD_READ_WRITE_LOCK, readWriteLockType)
+                        .addModifiers(Modifier.PRIVATE, Modifier.FINAL)
+                        .initializer(readWriteLockType.instantiate())
+                        .build();
+
+                    proxyBuilder.addField(readWriteLockField);
+
+                    ClassTypeDef lockType = ClassTypeDef.of(Lock.class);
+                    FieldDef readLockField = FieldDef.builder(FIELD_READ_LOCK, lockType)
+                        .addModifiers(Modifier.PRIVATE, Modifier.FINAL)
+                        .initializer(new VariableDef.This().field(readWriteLockField).invoke(GET_READ_LOCK_METHOD))
+                        .build();
+
+                    proxyBuilder.addField(readLockField);
+
+                    FieldDef writeLockField = FieldDef.builder(FIELD_WRITE_LOCK, lockType)
+                        .addModifiers(Modifier.PRIVATE, Modifier.FINAL)
+                        .initializer(new VariableDef.This().field(readWriteLockField).invoke(GET_WRITE_LOCK_METHOD))
+                        .build();
+
+                    proxyBuilder.addField(writeLockField);
+
+                    proxyBuilder.addMethod(
+                        getSwapMethod(targetField, writeLockField)
+                    );
+                    interceptedTargetMethod = getHotSwapInterceptedTargetMethod(targetField, readLockField);
+                } else {
+                    proxyBuilder.addSuperinterface(TypeDef.parameterized(InterceptedProxy.class, targetType));
+                    interceptedTargetMethod = getSimpleInterceptedTargetMethod(targetField);
+                }
+
+                // Non-lazy target
+                bodyBuilders.add((aThis, methodParameters) -> aThis.field(targetField).assign(
+                        methodParameters.get(beanResolutionContextArgumentIndex)
+                            .invoke(
+                                METHOD_GET_PROXY_TARGET_BEAN_WITH_BEAN_DEFINITION_AND_CONTEXT,
+                                // 1st argument: this.$proxyBeanDefinition
+                                aThis.field(proxyBeanDefinitionField),
+                                // 2nd argument: the type
+                                pushTargetArgument(targetType),
+                                // 3th argument: the qualifier
+                                methodParameters.get(qualifierIndex)
+                            ).cast(targetType)
+                    )
+                );
             }
 
-            // Non-lazy target
-            bodyBuilders.add((aThis, methodParameters) -> aThis.field(targetField).assign(
-                    methodParameters.get(beanResolutionContextArgumentIndex)
-                        .invoke(
-                            METHOD_GET_PROXY_TARGET_BEAN_WITH_BEAN_DEFINITION_AND_CONTEXT,
-                            // 1st argument: this.$proxyBeanDefinition
-                            aThis.field(proxyBeanDefinitionField),
-                            // 2nd argument: the type
-                            pushTargetArgument(targetType),
-                            // 3th argument: the qualifier
-                            methodParameters.get(qualifierIndex)
-                        ).cast(targetType)
-                )
-            );
+            proxyBuilder.addMethod(interceptedTargetMethod);
+
+            bodyBuilders.add((aThis, methodParameters) -> initializeProxyTargetMethodsAndInterceptors(aThis, methodParameters, proxyBeanDefinitionField, interceptorsField, proxyMethodsField, interceptedMethods));
+        } else {
+            bodyBuilders.add((aThis, methodParameters) -> initializeProxyMethodsAndInterceptors(aThis, methodParameters, interceptorsField, proxyMethodsField, interceptedMethods));
         }
 
-        proxyBuilder.addMethod(interceptedTargetMethod);
-
         proxyBuilder.addMethod(MethodDef.constructor()
-            .addParameters(Arrays.stream(realConstructor.getParameters()).map(p -> TypeDef.erasure(p.getType())).toList())
+            .addParameters(Arrays.stream(constructor.getParameters()).map(p -> TypeDef.erasure(p.getType())).toList())
             .build((aThis, methodParameters) -> {
                 List<StatementDef> constructorStatements = new ArrayList<>();
                 constructorStatements.add(
                     invokeSuperConstructor(aThis, methodParameters)
                 );
                 bodyBuilders.forEach(bodyBuilder -> constructorStatements.add(bodyBuilder.apply(aThis, methodParameters)));
-                constructorStatements.add(
-                    initializeProxyTargetMethodsAndInterceptors(aThis, methodParameters, proxyBeanDefinitionField)
-                );
                 return StatementDef.multi(constructorStatements);
             }));
     }
 
     private StatementDef initializeProxyMethodsAndInterceptors(VariableDef.This aThis,
-                                                               List<VariableDef.MethodParameter> parameters) {
-        if (proxiedMethods.isEmpty()) {
+                                                               List<VariableDef.MethodParameter> parameters,
+                                                               FieldDef interceptorsField,
+                                                               FieldDef proxyMethodsField,
+                                                               List<MethodElement> methods) {
+        if (methods.isEmpty()) {
             return StatementDef.multi();
         }
-        BeanDefinitionWriter beanDefinitionWriter = parentWriter == null ? proxyBeanDefinitionWriter : parentWriter;
-        ExecutableMethodsDefinitionWriter executableMethodsDefinitionWriter = beanDefinitionWriter.getExecutableMethodsWriter();
-        ClassTypeDef executableMethodsType = executableMethodsDefinitionWriter.getClassTypeDef();
+        ExecutableMethodsDefinitionWriter methodsWriter;
+        if (executableMethodsDefinitionWriter == null) {
+            methodsWriter = proxyBeanDefinitionWriter.getExecutableMethodsWriter();
+        } else {
+            methodsWriter = executableMethodsDefinitionWriter;
+        }
+
+        ClassTypeDef executableMethodsType = methodsWriter.getClassTypeDef();
         ExpressionDef.NewInstance executableMethodsInstance;
-        if (executableMethodsDefinitionWriter.isSupportsInterceptedProxy()) {
+        if (methodsWriter.isSupportsInterceptedProxy()) {
             executableMethodsInstance = executableMethodsType.instantiate(TypeDef.Primitive.BOOLEAN.constant(true));
         } else {
             executableMethodsInstance = executableMethodsType.instantiate();
@@ -783,31 +714,28 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         return executableMethodsInstance.newLocal("executableMethods", executableMethodsVar -> StatementDef.multi(
             aThis.field(proxyMethodsField).assign(
                 ClassTypeDef.of(ExecutableMethod.class).array().instantiate(
-                    proxyTargetMethods.stream().map(methodRef ->
+                    methods.stream().map(methodElement ->
                         executableMethodsVar.invoke(
                             ExecutableMethodsDefinitionWriter.GET_EXECUTABLE_AT_INDEX_METHOD,
 
-                            TypeDef.Primitive.INT.constant(methodRef.methodIndex)
+                            TypeDef.Primitive.INT.constant(methodsWriter.findIndexOfExecutableMethod(methodElement))
                         )).toList()
                 )
             ),
             aThis.field(interceptorsField).assign(
                 ClassTypeDef.of(Interceptor.class).array(2).instantiate(
-                    proxyTargetMethods.stream().map(methodRef -> {
-                            int methodIndex = methodRef.methodIndex;
-                            boolean introduction = isIntroduction && (
-                                executableMethodsDefinitionWriter.isAbstract(methodIndex) || (
-                                    executableMethodsDefinitionWriter.isInterface(methodIndex) && !executableMethodsDefinitionWriter.isDefault(methodIndex)));
+                    methods.stream().map(methodElement -> {
+                            boolean introduction = isIntroduction && (methodElement.isAbstract() || (methodElement.getDeclaringType().isInterface() && !methodElement.isDefault()));
 
                             return ClassTypeDef.of(InterceptorChain.class).invokeStatic(
                                 (introduction ? RESOLVE_INTRODUCTION_INTERCEPTORS_METHOD : RESOLVE_AROUND_INTERCEPTORS_METHOD),
 
                                 // First argument. The interceptor registry
-                                parameters.get(interceptorRegistryArgumentIndex),
+                                parameters.get(constructor.findParameterIndex(INTERCEPTOR_REGISTRY_PARAMETER)),
                                 // Second argument i.e. proxyMethods[0]
                                 aThis.field(proxyMethodsField).arrayElement(index.getAndIncrement()),
                                 // Third argument i.e. interceptors
-                                parameters.get(interceptorsListArgumentIndex)
+                                parameters.get(constructor.findParameterIndex(INTERCEPTORS_PARAMETER))
                             );
                         }
                     ).toList()
@@ -818,21 +746,21 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
 
     private StatementDef initializeProxyTargetMethodsAndInterceptors(VariableDef.This aThis,
                                                                      List<VariableDef.MethodParameter> parameters,
-                                                                     FieldDef proxyBeanDefinitionField) {
-        if (proxiedMethods.size() != proxyMethodCount) {
-            throw new IllegalStateException("Expected proxy methods count to match actual methods");
-        }
+                                                                     FieldDef proxyBeanDefinitionField,
+                                                                     FieldDef interceptorsField,
+                                                                     FieldDef proxyMethodsField,
+                                                                     List<MethodElement> methods) {
         AtomicInteger index = new AtomicInteger();
         return StatementDef.multi(
             aThis.field(proxyMethodsField).assign(
                 ClassTypeDef.of(ExecutableMethod.class).array().instantiate(
-                    proxyTargetMethods.stream().map(methodRef ->
+                    methods.stream().map(methodElement ->
                         aThis.field(proxyBeanDefinitionField).invoke(
                             METHOD_BEAN_DEFINITION_GET_REQUIRED_METHOD,
 
-                            ExpressionDef.constant(methodRef.name),
+                            ExpressionDef.constant(methodElement.getName()),
                             TypeDef.CLASS.array().instantiate(
-                                methodRef.genericArgumentTypes.stream().map(t -> ExpressionDef.constant(TypeDef.erasure(t))).toList()
+                                Arrays.stream(methodElement.getSuspendParameters()).map(p -> ExpressionDef.constant(TypeDef.erasure(p.getGenericType()))).toList()
                             )
                         )
                     ).toList()
@@ -840,16 +768,16 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
             ),
             aThis.field(interceptorsField).assign(
                 ClassTypeDef.of(Interceptor.class).array(2).instantiate(
-                    proxyTargetMethods.stream().map(methodRef ->
+                    methods.stream().map(methodElement ->
                         ClassTypeDef.of(InterceptorChain.class).invokeStatic(
                             (isIntroduction ? RESOLVE_INTRODUCTION_INTERCEPTORS_METHOD : RESOLVE_AROUND_INTERCEPTORS_METHOD),
 
                             // First argument. The interceptor registry
-                            parameters.get(interceptorRegistryArgumentIndex),
+                            parameters.get(constructor.findParameterIndex(INTERCEPTOR_REGISTRY_PARAMETER)),
                             // Second argument i.e. proxyMethods[0]
                             aThis.field(proxyMethodsField).arrayElement(index.getAndIncrement()),
                             // Third argument i.e. interceptors
-                            parameters.get(interceptorsListArgumentIndex)
+                            parameters.get(constructor.findParameterIndex(INTERCEPTORS_PARAMETER))
                         )
                     ).toList()
                 )
@@ -857,17 +785,27 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         );
     }
 
-    private ExpressionDef.InvokeInstanceMethod invokeSuperConstructor(VariableDef.This aThis, List<VariableDef.MethodParameter> methodParameters) {
+    private StatementDef invokeSuperConstructor(VariableDef.This aThis, List<VariableDef.MethodParameter> methodParameters) {
         if (targetType.isInterface()) {
             return aThis.superRef().invokeConstructor();
         }
+        MethodElement targetConstructor = getConstructor(targetType);
+
         List<ExpressionDef> values = new ArrayList<>();
-        List<TypeDef> arguments = new ArrayList<>();
-        for (Map.Entry<ParameterElement, Integer> e : superConstructorParametersBinding) {
-            values.add(methodParameters.get(e.getValue()));
-            arguments.add(TypeDef.erasure(e.getKey().getType()));
+        Iterator<VariableDef.MethodParameter> iterator = methodParameters.iterator();
+        for (ParameterElement ignored : targetConstructor.getParameters()) {
+            values.add(iterator.next());
         }
-        return aThis.superRef().invokeConstructor(arguments, values);
+        List<StatementDef> statements = new ArrayList<>();
+        statements.add(MethodGenUtils.invokeSuperConstructor(
+            aThis.superRef(),
+            targetConstructor,
+            true,
+            values,
+            values.stream().map(ExpressionDef::isNonNull).toList(),
+            statements
+        ));
+        return StatementDef.multi(statements);
     }
 
     private ExpressionDef.InvokeInstanceMethod pushResolveLazyProxyTargetBean(VariableDef.This aThis,
@@ -890,25 +828,11 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         return ArgumentExpUtils.buildArgumentWithGenerics(
             targetType,
             new AnnotationMetadataReference(
-                getBeanDefinitionName(),
-                getAnnotationMetadata()
+                proxyBeanDefinitionWriter.getBeanDefinitionName(),
+                proxyBeanDefinitionWriter.getAnnotationMetadata()
             ),
             parentWriter != null ? parentWriter.getTypeArguments() : proxyBeanDefinitionWriter.getTypeArguments()
         );
-    }
-
-    /**
-     * Write the class to output via a visitor that manages output destination.
-     *
-     * @param visitor the writer output visitor
-     * @throws IOException If an error occurs
-     */
-    @Override
-    public void accept(ClassWriterOutputVisitor visitor) throws IOException {
-        super.accept(visitor);
-        try (OutputStream out = visitor.visitClass(proxyType.getName(), getOriginatingElements())) {
-            out.write(output);
-        }
     }
 
     private MethodDef writeWithQualifierMethod(FieldDef beanQualifier) {
@@ -1036,18 +960,14 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
      * Method Reference class with names and a list of argument types. Used as the targets.
      */
     private static final class MethodRef {
-        int methodIndex;
         private final String name;
-        private final List<ClassElement> argumentTypes;
-        private final List<ClassElement> genericArgumentTypes;
         private final String returnType;
         private final List<String> rawTypes;
 
         public MethodRef(String name, List<ParameterElement> parameterElements, ClassElement returnType) {
             this.name = name;
-            this.argumentTypes = parameterElements.stream().map(ParameterElement::getType).toList();
-            this.genericArgumentTypes = parameterElements.stream().map(ParameterElement::getGenericType).toList();
-            this.rawTypes = this.argumentTypes.stream().map(AopProxyWriter::toTypeString).toList();
+            List<ClassElement> argumentTypes = parameterElements.stream().map(ParameterElement::getType).toList();
+            this.rawTypes = argumentTypes.stream().map(AopProxyWriter::toTypeString).toList();
             this.returnType = toTypeString(returnType);
         }
 

@@ -23,18 +23,19 @@ import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSAnnotation
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSFile
+import com.google.devtools.ksp.symbol.KSNode
 import com.google.devtools.ksp.symbol.Modifier
 import io.micronaut.core.annotation.Generated
 import io.micronaut.core.annotation.Vetoed
+import io.micronaut.inject.DefaultElementBeanDefinitionBuilderFactory
+import io.micronaut.inject.OutputObjectDef
 import io.micronaut.inject.processing.BeanDefinitionCreatorFactory
 import io.micronaut.inject.processing.ProcessingException
-import io.micronaut.inject.writer.BeanDefinitionVisitor
 import io.micronaut.inject.writer.BeanDefinitionWriter
-import io.micronaut.kotlin.processing.KotlinOutputVisitor
+import io.micronaut.inject.writer.ByteCodeWriterUtils
 import io.micronaut.kotlin.processing.visitor.KotlinClassElement
 import io.micronaut.kotlin.processing.visitor.KotlinNativeElement
 import io.micronaut.kotlin.processing.visitor.KotlinVisitorContext
-import java.io.IOException
 
 internal class BeanDefinitionProcessor(private val environment: SymbolProcessorEnvironment): SymbolProcessor {
 
@@ -60,6 +61,7 @@ internal class BeanDefinitionProcessor(private val environment: SymbolProcessorE
         } catch (e: ProcessingException) {
             handleProcessingException(environment, e)
         }
+        visitorContext.finish()
         return emptyList()
     }
 
@@ -89,18 +91,46 @@ internal class BeanDefinitionProcessor(private val environment: SymbolProcessorE
                     processClassDeclarations(innerClasses, visitorContext)
                 }
                 try {
-                    val outputVisitor = KotlinOutputVisitor(environment, visitorContext)
-                    val produce = BeanDefinitionCreatorFactory.produce(classElement, visitorContext)
-                    for (writer in produce.build()) {
-                        if (processed.add(writer.beanDefinitionName)) {
-                            writer.visitBeanDefinitionEnd()
-                            processBeanDefinitions(writer, outputVisitor)
+                    val beanDefinitionFactor = DefaultElementBeanDefinitionBuilderFactory(visitorContext)
+                    if (processed.add(classElement.name)) {
+                        val files = BeanDefinitionCreatorFactory.produce(classElement, beanDefinitionFactor, visitorContext)
+                        for (file in files) {
+                            write(file, visitorContext, environment)
                         }
                     }
                 } catch (e: ProcessingException) {
                     handleProcessingException(environment, e)
                 }
             }
+        }
+    }
+
+    private fun write(outputObjectDef: OutputObjectDef, visitorContext: KotlinVisitorContext, environment: SymbolProcessorEnvironment) {
+        try {
+            val objectDef = outputObjectDef.objectDef
+            val serviceClass = outputObjectDef.serviceClass
+            val originatingElements = outputObjectDef.originatingElements
+            if (serviceClass != null) {
+                visitorContext.visitServiceDescriptor(
+                    serviceClass,
+                    objectDef.getName(),
+                    originatingElements.getOriginatingElements()[0]
+                )
+            }
+            visitorContext.visitClass(objectDef.getName(), *originatingElements.getOriginatingElements())
+                .use { outputStream ->
+                    outputStream.write(ByteCodeWriterUtils.writeByteCode(objectDef, visitorContext))
+                }
+        } catch (e: Exception) {
+            // raise a compile error
+            val message = e.message
+            var kotlinElement: KSNode? = null
+            val astElement = outputObjectDef.originatingElements.getOriginatingElements()[0]
+            if (astElement.nativeType is KotlinNativeElement) {
+                val nativeElement: KotlinNativeElement = astElement.nativeType as KotlinNativeElement
+                kotlinElement = nativeElement.element
+            }
+            environment.logger.error("Unexpected error: " + (message ?: e.javaClass.getSimpleName()), kotlinElement)
         }
     }
 
@@ -131,21 +161,6 @@ internal class BeanDefinitionProcessor(private val environment: SymbolProcessorE
                     environment.logger.exception(e)
                 }
             }
-        }
-    }
-
-    private fun processBeanDefinitions(
-        beanDefinitionWriter: BeanDefinitionVisitor,
-        outputVisitor: KotlinOutputVisitor,
-    ) {
-        try {
-            if (beanDefinitionWriter.isEnabled) {
-                beanDefinitionWriter.accept(outputVisitor)
-            }
-        } catch (e: IOException) {
-            // raise a compile error
-            val message = e.message
-            error("Unexpected error ${e.javaClass.simpleName}:" + (message ?: e.javaClass.simpleName))
         }
     }
 

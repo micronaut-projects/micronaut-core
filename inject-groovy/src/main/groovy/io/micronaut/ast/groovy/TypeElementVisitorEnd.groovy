@@ -18,22 +18,23 @@ package io.micronaut.ast.groovy
 import groovy.transform.CompilationUnitAware
 import groovy.transform.CompileStatic
 import io.micronaut.ast.groovy.utils.AstMessageUtils
-import io.micronaut.ast.groovy.utils.InMemoryByteCodeGroovyClassLoader
-import io.micronaut.ast.groovy.utils.InMemoryClassWriterOutputVisitor
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.ast.groovy.visitor.LoadedVisitor
 import io.micronaut.core.order.OrderUtil
+import io.micronaut.inject.DefaultElementBeanDefinitionBuilderFactory
+import io.micronaut.inject.OutputObjectDef
+import io.micronaut.inject.visitor.VisitorContext
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder
 import io.micronaut.inject.writer.BeanDefinitionWriter
-import io.micronaut.inject.writer.ClassWriterOutputVisitor
-import io.micronaut.inject.writer.DirectoryClassWriterOutputVisitor
+import io.micronaut.inject.writer.ByteCodeWriterUtils
+import io.micronaut.inject.writer.OriginatingElements
+import io.micronaut.sourcegen.model.ObjectDef
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.CompilePhase
 import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.transform.ASTTransformation
 import org.codehaus.groovy.transform.GroovyASTTransformation
-
 /**
  * Finishes the type element visitors.
  *
@@ -50,19 +51,12 @@ class TypeElementVisitorEnd implements ASTTransformation, CompilationUnitAware {
     void visit(ASTNode[] nodes, SourceUnit source) {
         Map<String, LoadedVisitor> loadedVisitors = TypeElementVisitorTransform.loadedVisitors.get()
 
-        ClassWriterOutputVisitor classWriterOutputVisitor = null
-        if (source.classLoader instanceof InMemoryByteCodeGroovyClassLoader) {
-            classWriterOutputVisitor = new InMemoryClassWriterOutputVisitor(source.classLoader as InMemoryByteCodeGroovyClassLoader)
-        }
-
+        GroovyVisitorContext visitorContext = new GroovyVisitorContext(source, compilationUnit)
         if (loadedVisitors != null) {
             List<LoadedVisitor> values = new ArrayList<>(loadedVisitors.values())
             OrderUtil.reverseSort(values)
             for (loadedVisitor in values) {
                 try {
-                    GroovyVisitorContext visitorContext = classWriterOutputVisitor != null ?
-                            new GroovyVisitorContext(source, compilationUnit, classWriterOutputVisitor) :
-                            new GroovyVisitorContext(source, compilationUnit)
                     loadedVisitor.finish(visitorContext)
                 } catch (Throwable e) {
                     AstMessageUtils.error(
@@ -75,16 +69,16 @@ class TypeElementVisitorEnd implements ASTTransformation, CompilationUnitAware {
 
         final List<AbstractBeanDefinitionBuilder> beanDefinitionBuilders = TypeElementVisitorTransform.beanDefinitionBuilders.get()
         if (beanDefinitionBuilders) {
-            File classesDir = compilationUnit.configuration.targetDirectory
-            if (classWriterOutputVisitor == null) {
-                classWriterOutputVisitor = new DirectoryClassWriterOutputVisitor(classesDir)
-            }
+            DefaultElementBeanDefinitionBuilderFactory beanDefinitionBuilderFactory = new DefaultElementBeanDefinitionBuilderFactory(visitorContext)
             try {
-                AbstractBeanDefinitionBuilder.writeBeanDefinitionBuilders(
-                        classWriterOutputVisitor,
-                        beanDefinitionBuilders
+                List<OutputObjectDef> result = AbstractBeanDefinitionBuilder.build(
+                        beanDefinitionBuilders,
+                        beanDefinitionBuilderFactory
                 )
-            } catch (IOException e) {
+                for (OutputObjectDef outputObjectDef : result) {
+                    write(outputObjectDef, source, visitorContext)
+                }
+            } catch (Exception e) {
                 // raise a compile error
                 AstMessageUtils.error(
                         source,
@@ -93,13 +87,30 @@ class TypeElementVisitorEnd implements ASTTransformation, CompilationUnitAware {
             }
         }
 
-        if (classWriterOutputVisitor != null) {
-            classWriterOutputVisitor.finish()
-        }
+        visitorContext.finish()
 
         TypeElementVisitorTransform.loadedVisitors.remove()
         TypeElementVisitorTransform.beanDefinitionBuilders.remove()
         BeanDefinitionWriter.finish()
+    }
+
+    private static void write(OutputObjectDef outputObjectDef, SourceUnit source, VisitorContext visitorContext) {
+        try {
+            ObjectDef objectDef = outputObjectDef.objectDef();
+            Class<?> serviceClass = outputObjectDef.serviceClass();
+            OriginatingElements originatingElements = outputObjectDef.originatingElements();
+            if (serviceClass != null) {
+                visitorContext.visitServiceDescriptor(serviceClass, objectDef.getName(), originatingElements.getOriginatingElements()[0]);
+            }
+            try (OutputStream outputStream = visitorContext.visitClass(objectDef.getName(), originatingElements.getOriginatingElements())) {
+                outputStream.write(ByteCodeWriterUtils.writeByteCode(objectDef, visitorContext));
+            }
+        } catch (Exception e) {
+            AstMessageUtils.error(
+                    source,
+                    source.getAST(),
+                    "Error writing bean definitions: $e.message")
+        }
     }
 
     @Override

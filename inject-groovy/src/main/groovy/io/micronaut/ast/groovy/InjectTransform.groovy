@@ -18,30 +18,27 @@ package io.micronaut.ast.groovy
 import groovy.transform.CompilationUnitAware
 import groovy.transform.CompileStatic
 import io.micronaut.ast.groovy.utils.AstMessageUtils
-import io.micronaut.ast.groovy.utils.InMemoryByteCodeGroovyClassLoader
-import io.micronaut.ast.groovy.utils.InMemoryClassWriterOutputVisitor
 import io.micronaut.ast.groovy.visitor.GroovyNativeElement
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
-import io.micronaut.inject.processing.BeanDefinitionCreator
+import io.micronaut.inject.DefaultElementBeanDefinitionBuilderFactory
+import io.micronaut.inject.OutputObjectDef
 import io.micronaut.inject.processing.BeanDefinitionCreatorFactory
 import io.micronaut.inject.processing.ProcessingException
-import io.micronaut.inject.writer.BeanDefinitionVisitor
-import io.micronaut.inject.writer.ClassWriterOutputVisitor
-import io.micronaut.inject.writer.DirectoryClassWriterOutputVisitor
+import io.micronaut.inject.visitor.VisitorContext
+import io.micronaut.inject.writer.ByteCodeWriterUtils
+import io.micronaut.inject.writer.OriginatingElements
+import io.micronaut.sourcegen.model.ObjectDef
 import org.codehaus.groovy.ast.ASTNode
-import org.codehaus.groovy.ast.AnnotatedNode
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.InnerClassNode
 import org.codehaus.groovy.ast.ModuleNode
 import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.CompilePhase
 import org.codehaus.groovy.control.SourceUnit
-import org.codehaus.groovy.control.io.StringReaderSource
 import org.codehaus.groovy.transform.ASTTransformation
 import org.codehaus.groovy.transform.GroovyASTTransformation
 
 import java.lang.reflect.Modifier
-
 /**
  * An AST transformation that produces metadata for use by the injection container
  *
@@ -58,17 +55,6 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
     @Override
     void visit(ASTNode[] nodes, SourceUnit source) {
         ModuleNode moduleNode = source.getAST()
-        Map<AnnotatedNode, BeanDefinitionVisitor> beanDefinitionWriters = [:]
-        File classesDir = source.configuration.targetDirectory
-        boolean defineClassesInMemory = source.classLoader instanceof InMemoryByteCodeGroovyClassLoader
-        ClassWriterOutputVisitor outputVisitor
-        if (defineClassesInMemory) {
-            outputVisitor = new InMemoryClassWriterOutputVisitor(source.classLoader as InMemoryByteCodeGroovyClassLoader)
-
-        } else {
-            outputVisitor = new DirectoryClassWriterOutputVisitor(classesDir)
-        }
-
         List<ClassNode> classes = moduleNode.getClasses()
 
         def groovyVisitorContext = new GroovyVisitorContext(source, unit)
@@ -81,44 +67,42 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             }
             try {
                 def classElement = groovyVisitorContext.getElementFactory().newClassElement(classNode, elementAnnotationMetadataFactory)
-                BeanDefinitionCreator beanProcessor = BeanDefinitionCreatorFactory.produce(classElement, groovyVisitorContext);
-                beanProcessor.build().forEach(writer -> {
-                    if (writer.getBeanTypeName() == classNode.getName()) {
-                        beanDefinitionWriters.put(classNode, writer)
-                    } else {
-                        beanDefinitionWriters.put(new AnnotatedNode(), writer)
-                    }
-                })
+                DefaultElementBeanDefinitionBuilderFactory beanDefinitionBuilderFactory = new DefaultElementBeanDefinitionBuilderFactory(groovyVisitorContext)
+                List<OutputObjectDef> result = BeanDefinitionCreatorFactory.produce(classElement, beanDefinitionBuilderFactory, groovyVisitorContext);
+                for (OutputObjectDef outputObjectDef : result) {
+                    write(outputObjectDef, source, groovyVisitorContext)
+                }
             } catch (ProcessingException ex) {
                 groovyVisitorContext.fail(ex.getMessage(), (ex.getOriginatingElement() as GroovyNativeElement).annotatedNode())
             }
         }
 
-        for (entry in beanDefinitionWriters) {
-            BeanDefinitionVisitor beanDefWriter = entry.value
-            String beanTypeName = beanDefWriter.beanTypeName
-            AnnotatedNode beanClassNode = entry.key
-            try {
-                beanDefWriter.visitBeanDefinitionEnd()
-                if (classesDir != null) {
-                    beanDefWriter.accept(outputVisitor)
-                } else if (source.source instanceof StringReaderSource && defineClassesInMemory) {
-                    beanDefWriter.accept(outputVisitor)
-                }
-            } catch (Throwable e) {
-                AstMessageUtils.error(source, beanClassNode, "Error generating bean definition class for dependency injection of class [${beanTypeName}]: $e.message")
-                e.printStackTrace(System.err)
+        groovyVisitorContext.finish()
+    }
+
+    private static void write(OutputObjectDef outputObjectDef, SourceUnit source, VisitorContext visitorContext) {
+        try {
+            ObjectDef objectDef = outputObjectDef.objectDef();
+            Class<?> serviceClass = outputObjectDef.serviceClass();
+            OriginatingElements originatingElements = outputObjectDef.originatingElements();
+            if (serviceClass != null) {
+                visitorContext.visitServiceDescriptor(serviceClass, objectDef.getName(), originatingElements.getOriginatingElements()[0]);
             }
-        }
-        if (!beanDefinitionWriters.isEmpty()) {
-            try {
-                outputVisitor.finish()
-            } catch (Throwable e) {
-                AstMessageUtils.error(source, moduleNode, "Error generating META-INF/services files: $e.message")
-                if (e.message == null) {
-                    e.printStackTrace(System.err)
-                }
+            try (OutputStream outputStream = visitorContext.visitClass(objectDef.getName(), originatingElements.getOriginatingElements())) {
+                outputStream.write(ByteCodeWriterUtils.writeByteCode(objectDef, visitorContext));
             }
+        } catch (Throwable e) {
+            def element = outputObjectDef.originatingElements().originatingElements[0]
+            ASTNode type
+            if (element.nativeType instanceof ASTNode astNode) {
+               type = astNode
+            } else if (element.nativeType instanceof GroovyNativeElement groovyNativeElement) {
+               type = groovyNativeElement.annotatedNode()
+            } else {
+                type = null
+            }
+            AstMessageUtils.error(source, type, "Error generating bean definition class for dependency injection of class [${element.name}]: $e.message")
+            e.printStackTrace(System.err)
         }
     }
 

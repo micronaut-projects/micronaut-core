@@ -25,6 +25,7 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 
 import java.lang.annotation.Annotation;
+import java.lang.annotation.Repeatable;
 import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -840,6 +841,82 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
         }
     }
 
+    @Nullable
+    private static Map<String, String> inferRepeatableContainers(@Nullable Map<String, Map<CharSequence, Object>> annotations) {
+        if (CollectionUtils.isEmpty(annotations)) {
+            return null;
+        }
+        Map<String, String> inferred = null;
+        for (Map.Entry<String, Map<CharSequence, Object>> entry : annotations.entrySet()) {
+            Map<CharSequence, Object> values = entry.getValue();
+            if (CollectionUtils.isEmpty(values)) {
+                continue;
+            }
+            Object value = values.get(AnnotationMetadata.VALUE_MEMBER);
+            if (value == null) {
+                continue;
+            }
+            String repeatableAnnotation = resolveRepeatableAnnotationName(value);
+            if (repeatableAnnotation == null || repeatableAnnotation.equals(entry.getKey())) {
+                continue;
+            }
+            if (!isLikelyRepeatableContainer(repeatableAnnotation, entry.getKey())) {
+                continue;
+            }
+            if (inferred == null) {
+                inferred = new LinkedHashMap<>(2);
+            }
+            inferred.putIfAbsent(repeatableAnnotation, entry.getKey());
+        }
+        return inferred;
+    }
+
+    private static boolean isLikelyRepeatableContainer(String repeatableAnnotation, String containerAnnotation) {
+        var repeatableType = AnnotationMetadataSupport.getRegisteredAnnotationType(repeatableAnnotation);
+        if (repeatableType.isPresent()) {
+            Repeatable repeatable = repeatableType.get().getAnnotation(Repeatable.class);
+            return repeatable != null && repeatable.value().getName().equals(containerAnnotation);
+        }
+        return packageName(repeatableAnnotation).equals(packageName(containerAnnotation));
+    }
+
+    private static String packageName(String annotationName) {
+        int i = annotationName.lastIndexOf('.');
+        if (i == -1) {
+            return "";
+        }
+        return annotationName.substring(0, i);
+    }
+
+    @Nullable
+    private static String resolveRepeatableAnnotationName(Object value) {
+        if (value instanceof AnnotationValue<?> annotationValue) {
+            return annotationValue.getAnnotationName();
+        }
+        if (value instanceof AnnotationValue<?>[] annotationValues) {
+            return resolveRepeatableAnnotationName(Arrays.asList(annotationValues));
+        }
+        if (value instanceof Object[] values) {
+            return resolveRepeatableAnnotationName(Arrays.asList(values));
+        }
+        if (!(value instanceof Collection<?> values) || values.isEmpty()) {
+            return null;
+        }
+        String annotationName = null;
+        for (Object nested : values) {
+            if (!(nested instanceof AnnotationValue<?> annotationValue)) {
+                return null;
+            }
+            String nestedName = annotationValue.getAnnotationName();
+            if (annotationName == null) {
+                annotationName = nestedName;
+            } else if (!annotationName.equals(nestedName)) {
+                return null;
+            }
+        }
+        return annotationName;
+    }
+
     /**
      * Contributes defaults to the given target.
      *
@@ -903,16 +980,25 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
      */
     @Internal
     public static void contributeRepeatable(AnnotationMetadata target, AnnotationMetadata source) {
-        source = source.getTargetAnnotationMetadata();
+        source = source.getDeclaredMetadata();
         if (source instanceof AnnotationMetadataHierarchy hierarchy) {
             source = hierarchy.merge();
         }
-        if (target instanceof MutableAnnotationMetadata damTarget && source instanceof MutableAnnotationMetadata damSource) {
-            if (damSource.annotationRepeatableContainer != null && !damSource.annotationRepeatableContainer.isEmpty()) {
+        if (target instanceof MutableAnnotationMetadata damTarget) {
+            Map<String, String> repeatableContainer = null;
+            if (source instanceof MutableAnnotationMetadata mutableAnnotationMetadata) {
+                repeatableContainer = mutableAnnotationMetadata.annotationRepeatableContainer;
+                if (CollectionUtils.isEmpty(repeatableContainer)) {
+                    repeatableContainer = inferRepeatableContainers(mutableAnnotationMetadata.declaredAnnotations);
+                }
+            } else if (source instanceof DefaultAnnotationMetadata defaultAnnotationMetadata) {
+                repeatableContainer = inferRepeatableContainers(defaultAnnotationMetadata.declaredAnnotations);
+            }
+            if (repeatableContainer != null && !repeatableContainer.isEmpty()) {
                 if (damTarget.annotationRepeatableContainer == null) {
-                    damTarget.annotationRepeatableContainer = new HashMap<>(damSource.annotationRepeatableContainer);
+                    damTarget.annotationRepeatableContainer = new HashMap<>(repeatableContainer);
                 } else {
-                    damTarget.annotationRepeatableContainer.putAll(damSource.annotationRepeatableContainer);
+                    damTarget.annotationRepeatableContainer.putAll(repeatableContainer);
                 }
             }
         }

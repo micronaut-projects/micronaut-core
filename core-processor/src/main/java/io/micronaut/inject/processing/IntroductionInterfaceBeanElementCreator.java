@@ -17,12 +17,13 @@ package io.micronaut.inject.processing;
 
 import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.inject.ElementBeanDefinitionBuilderFactory;
+import io.micronaut.inject.ElementProxyBuilder;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.visitor.VisitorContext;
-import io.micronaut.inject.writer.BeanDefinitionVisitor;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -32,39 +33,20 @@ import java.util.List;
 /**
  * Introduction interface proxy builder.
  *
+ * @param <R> The builder result type
  * @author Denis Stepanov
  * @since 4.0.0
  */
 @Internal
-final class IntroductionInterfaceBeanElementCreator extends AbstractBeanElementCreator {
+final class IntroductionInterfaceBeanElementCreator<R> extends AbstractBeanElementCreator<R> {
 
-    IntroductionInterfaceBeanElementCreator(ClassElement classElement, VisitorContext visitorContext) {
-        super(classElement, visitorContext);
+    IntroductionInterfaceBeanElementCreator(ClassElement classElement, VisitorContext visitorContext, ElementBeanDefinitionBuilderFactory<R> beanDefinitionBuilderFactory) {
+        super(classElement, visitorContext, beanDefinitionBuilderFactory);
     }
 
     @Override
-    public void buildInternal() {
-        BeanDefinitionVisitor aopProxyWriter = createIntroductionAopProxyWriter(classElement, visitorContext);
-        aopProxyWriter.visitTypeArguments(classElement.getAllTypeArguments());
-
-        // Because we add validated interceptor in some cases, this needs to run before the constructor visit
-        if (classElement.hasAnnotation(ANN_REQUIRES_VALIDATION)) {
-            if (ConfigurationReaderBeanElementCreator.isConfigurationProperties(classElement)) {
-                // Configuration beans are validated at the startup and don't require validation advice
-                aopProxyWriter.setValidated(true);
-            } else {
-                for (MethodElement methodElement : classElement.getEnclosedElements(ElementQuery.ALL_METHODS.annotated(am -> am.hasAnnotation(ANN_REQUIRES_VALIDATION)))) {
-                    methodElement.annotate(AbstractBeanElementCreator.ANN_VALIDATED);
-                }
-            }
-        }
-
-        MethodElement constructorElement = classElement.getPrimaryConstructor().orElse(null);
-        if (constructorElement != null) {
-            aopProxyWriter.visitBeanDefinitionConstructor(constructorElement, constructorElement.isReflectionRequired(), visitorContext);
-        } else {
-            aopProxyWriter.visitDefaultConstructor(classElement, visitorContext);
-        }
+    public List<R> buildInternal() {
+        ElementProxyBuilder<R> proxyBuilder = beanDefinitionBuilderFactory.introductionProxy(classElement);
 
         // The introduction will include overridden methods* (find(List) <- find(Iterable)*) but ordinary class introduction doesn't
         // Because of the caching we need to process declared methods first
@@ -77,23 +59,19 @@ final class IntroductionInterfaceBeanElementCreator extends AbstractBeanElementC
         methods.removeIf(method -> !method.isAbstract() && !InterceptedMethodUtil.hasDeclaredAroundAdvice(method.getAnnotationMetadata()));
         Collections.reverse(methods); // reverse to process hierarchy starting from declared methods
         for (MethodElement methodElement : methods) {
-            visitIntrospectedMethod(aopProxyWriter, classElement, methodElement);
+            visitIntrospectedMethod(proxyBuilder, methodElement);
         }
         List<PropertyElement> beanProperties = classElement.getSyntheticBeanProperties();
         for (PropertyElement beanProperty : beanProperties) {
-            handlePropertyMethod(aopProxyWriter, methods, beanProperty.getReadMethod().orElse(null));
-            handlePropertyMethod(aopProxyWriter, methods, beanProperty.getWriteMethod().orElse(null));
+            handlePropertyMethod(proxyBuilder, methods, beanProperty.getReadMethod().orElse(null));
+            handlePropertyMethod(proxyBuilder, methods, beanProperty.getWriteMethod().orElse(null));
         }
-        beanDefinitionWriters.add(aopProxyWriter);
+        return proxyBuilder.build();
     }
 
-    private void handlePropertyMethod(BeanDefinitionVisitor aopProxyWriter, List<MethodElement> methods, @Nullable MethodElement method) {
+    private void handlePropertyMethod(ElementProxyBuilder<R> proxyBuilder, List<MethodElement> methods, @Nullable MethodElement method) {
         if (method != null && method.isAbstract() && !methods.contains(method)) {
-            visitIntrospectedMethod(
-                aopProxyWriter,
-                this.classElement,
-                method
-            );
+            visitIntrospectedMethod(proxyBuilder, method);
         }
     }
 

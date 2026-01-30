@@ -15,10 +15,10 @@
  */
 package io.micronaut.inject.writer;
 
+import io.micronaut.context.bean.definition.builder.Builder;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.BuildTimeInit;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.expressions.EvaluatedExpressionReference;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.expressions.EvaluatedExpressionWriter;
@@ -26,6 +26,7 @@ import io.micronaut.expressions.context.DefaultExpressionCompilationContextFacto
 import io.micronaut.expressions.context.ExpressionEvaluationContext;
 import io.micronaut.expressions.context.ExpressionWithContext;
 import io.micronaut.expressions.util.EvaluatedExpressionsUtils;
+import io.micronaut.inject.OutputObjectDef;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
@@ -35,8 +36,8 @@ import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.sourcegen.model.AnnotationDef;
 import io.micronaut.sourcegen.model.ClassDef;
+import org.jspecify.annotations.Nullable;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -47,16 +48,13 @@ import java.util.Set;
  * Internal utility class for writing annotation metadata with evaluated expressions.
  */
 @Internal
-public final class EvaluatedExpressionProcessor {
+public final class EvaluatedExpressionProcessor implements Builder<List<OutputObjectDef>> {
     private static final Set<String> WRITTEN_CLASSES = new HashSet<>();
 
     private final Collection<ExpressionWithContext> evaluatedExpressions = new ArrayList<>(2);
     private final DefaultExpressionCompilationContextFactory expressionCompilationContextFactory;
     private final VisitorContext visitorContext;
     private final Element originatingElement;
-
-    @Nullable
-    private List<EvaluatedExpressionWriter> writers;
 
     /**
      * Default constructor.
@@ -101,7 +99,7 @@ public final class EvaluatedExpressionProcessor {
 
     public void processEvaluatedExpressions(MethodElement methodElement) {
         Collection<EvaluatedExpressionReference> expressionReferences =
-            EvaluatedExpressionsUtils.findEvaluatedExpressionReferences(methodElement.getDeclaredMetadata());
+            EvaluatedExpressionsUtils.findEvaluatedExpressionReferences(methodElement.getMethodAnnotationMetadata());
 
         expressionReferences.stream()
             .map(expression -> {
@@ -126,9 +124,10 @@ public final class EvaluatedExpressionProcessor {
         return evaluatedExpressions;
     }
 
-    public void finish() {
+    @Override
+    public List<OutputObjectDef> build() {
         Collection<ExpressionWithContext> expressions = getEvaluatedExpressions();
-        writers = new ArrayList<>(expressions.size());
+        List<OutputObjectDef> classes = new ArrayList<>(expressions.size());
         for (ExpressionWithContext expression : expressions) {
             if (WRITTEN_CLASSES.add(expression.expressionClassName())) {
                 EvaluatedExpressionWriter writer = new EvaluatedExpressionWriter(
@@ -136,19 +135,10 @@ public final class EvaluatedExpressionProcessor {
                     visitorContext,
                     originatingElement
                 );
-                writer.finish();
-                writers.add(writer);
+                classes.add(writer.build());
             }
         }
-    }
-
-    public void writeEvaluatedExpressions(ClassWriterOutputVisitor visitor) throws IOException {
-        if (writers != null) {
-            for (EvaluatedExpressionWriter writer : writers) {
-                writer.accept(visitor);
-            }
-        }
-        writers = null;
+        return classes;
     }
 
     public boolean hasEvaluatedExpressions() {

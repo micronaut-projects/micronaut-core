@@ -16,28 +16,26 @@
 package io.micronaut.inject.processing;
 
 import io.micronaut.aop.Adapter;
-import io.micronaut.aop.InterceptorKind;
 import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
-import io.micronaut.aop.runtime.RuntimeProxy;
-import io.micronaut.aop.writer.AopProxyWriter;
-import io.micronaut.aop.writer.RuntimeProxyBeanDefinitionWriter;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Value;
+import io.micronaut.context.bean.definition.builder.Builder;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Indexed;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NextMajorVersion;
-import io.micronaut.inject.writer.ProxyingBeanDefinitionVisitor;
-import org.jspecify.annotations.NullUnmarked;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.inject.InjectionPoint;
+import io.micronaut.inject.ElementBeanDefinitionBuilder;
+import io.micronaut.inject.ElementBeanDefinitionBuilderFactory;
+import io.micronaut.inject.ElementProxyBuilder;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
+import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
@@ -47,13 +45,13 @@ import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.TypedElement;
+import io.micronaut.inject.validation.RequiresValidation;
 import io.micronaut.inject.visitor.VisitorContext;
-import io.micronaut.inject.writer.BeanDefinitionVisitor;
-import io.micronaut.inject.writer.BeanDefinitionWriter;
+import org.jspecify.annotations.NullUnmarked;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -64,22 +62,27 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * Ordinary declared bean.
  *
+ * @param <R> The builder result type
  * @author Denis Stepanov
  * @since 4.0.0
  */
 @NullUnmarked
 @Internal
-class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
+sealed class DeclaredBeanElementCreator<R> extends AbstractBeanElementCreator<R> permits AopIntroductionProxySupportedBeanElementCreator, ConfigurationReaderBeanElementCreator, FactoryBeanElementCreator {
+
+    private static final String ANN_VALIDATED = "io.micronaut.validation.Validated";
+    private static final String ANN_REQUIRES_VALIDATION = RequiresValidation.class.getName();
 
     private static final String MSG_ADAPTER_METHOD_PREFIX = "Cannot adapt method [";
     private static final String MSG_TARGET_METHOD_PREFIX = "] to target method [";
 
-    protected ProxyingBeanDefinitionVisitor aopProxyVisitor;
     protected final boolean isAopProxy;
+    protected final List<Builder<List<R>>> additionalBuilders = new ArrayList<>();
     private final AtomicInteger adaptedMethodIndex = new AtomicInteger(0);
+    private ElementProxyBuilder<R> aopProxyBuilder;
 
-    protected DeclaredBeanElementCreator(ClassElement classElement, VisitorContext visitorContext, boolean isAopProxy) {
-        super(classElement, visitorContext);
+    protected DeclaredBeanElementCreator(ClassElement classElement, VisitorContext visitorContext, boolean isAopProxy, ElementBeanDefinitionBuilderFactory<R> beanDefinitionBuilderFactory) {
+        super(classElement, visitorContext, beanDefinitionBuilderFactory);
         this.isAopProxy = isAopProxy;
 
         wantOfIncorrectUseOfExecutableMethodProcessor(classElement, visitorContext);
@@ -106,13 +109,21 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
     }
 
     @Override
-    public final void buildInternal() {
-        BeanDefinitionVisitor beanDefinitionVisitor = createBeanDefinitionVisitor();
+    public final List<R> buildInternal() {
+        ElementBeanDefinitionBuilder<R> beanDefinitionBuilder = createBeanDefinitionBuilder();
         if (isAopProxy) {
             // Always create AOP proxy
-            getAroundAopProxyVisitor(beanDefinitionVisitor, null);
+            getAopProxyBuilder(beanDefinitionBuilder, null);
         }
-        build(beanDefinitionVisitor);
+        build(beanDefinitionBuilder);
+        List<R> result = new ArrayList<>(beanDefinitionBuilder.build());
+        if (aopProxyBuilder != null) {
+            result.addAll(aopProxyBuilder.build());
+        }
+        for (Builder<List<R>> additionalBuilder : additionalBuilders) {
+            result.addAll(additionalBuilder.build());
+        }
+        return result;
     }
 
     /**
@@ -120,59 +131,23 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
      *
      * @return the visitor
      */
-    protected BeanDefinitionVisitor createBeanDefinitionVisitor() {
-        BeanDefinitionVisitor beanDefinitionWriter = new BeanDefinitionWriter(classElement, visitorContext);
-        beanDefinitionWriters.add(beanDefinitionWriter);
-        beanDefinitionWriter.visitTypeArguments(classElement.getAllTypeArguments());
-        visitAnnotationMetadata(beanDefinitionWriter, classElement.getAnnotationMetadata());
-        MethodElement constructorElement = classElement.getPrimaryConstructor().orElse(null);
-        if (constructorElement != null) {
-            applyConfigurationInjectionIfNecessary(beanDefinitionWriter, constructorElement);
-            ClassElement beanDef = ClassElement.of(beanDefinitionWriter.getBeanTypeName());
-            boolean requiresReflection = !constructorElement.isAccessible(beanDef);
-            beanDefinitionWriter.visitBeanDefinitionConstructor(constructorElement, requiresReflection, visitorContext);
-        } else {
-            beanDefinitionWriter.visitDefaultConstructor(AnnotationMetadata.EMPTY_METADATA, visitorContext);
-        }
-        return beanDefinitionWriter;
+    protected ElementBeanDefinitionBuilder<R> createBeanDefinitionBuilder() {
+        return beanDefinitionBuilderFactory.ofType(classElement);
     }
 
     /**
-     * Create an AOP proxy visitor.
+     * Create an AOP proxy bean definition builder.
      *
-     * @param visitor       the parent visitor
-     * @param methodElement the method that is originating the AOP proxy
-     * @return The AOP proxy visitor
+     * @param targetBeanDefinitionBuilder the builder of the current bean definition
+     * @param methodElement               the method that is originating the AOP proxy
+     * @return The AOP proxy bean definition builder
      */
-    protected ProxyingBeanDefinitionVisitor getAroundAopProxyVisitor(BeanDefinitionVisitor visitor, @Nullable MethodElement methodElement) {
-        if (aopProxyVisitor == null) {
-            if (classElement.isFinal()) {
-                throw new ProcessingException(classElement, "Cannot apply AOP advice to final class. Class must be made non-final to support proxying: " + classElement.getName());
-            }
-            aopProxyVisitor = createAroundAopProxyWriter(
-                classElement,
-                visitor,
-                isAopProxy || methodElement == null ? classElement.getAnnotationMetadata() : methodElement.getAnnotationMetadata(),
-                visitorContext,
-                false
-            );
-            beanDefinitionWriters.add(aopProxyVisitor);
-            MethodElement constructorElement = classElement.getPrimaryConstructor().orElse(null);
-            if (constructorElement != null) {
-                aopProxyVisitor.visitBeanDefinitionConstructor(
-                    constructorElement,
-                    constructorElement.isPrivate(),
-                    visitorContext
-                );
-            } else {
-                aopProxyVisitor.visitDefaultConstructor(
-                    AnnotationMetadata.EMPTY_METADATA,
-                    visitorContext
-                );
-            }
-            aopProxyVisitor.visitSuperBeanDefinition(visitor.getBeanDefinitionName());
+    protected ElementProxyBuilder<R> getAopProxyBuilder(ElementBeanDefinitionBuilder<R> targetBeanDefinitionBuilder, @Nullable MethodElement methodElement) {
+        if (aopProxyBuilder == null) {
+            AnnotationMetadata annotationMetadata = isAopProxy || methodElement == null ? classElement.getAnnotationMetadata() : methodElement.getAnnotationMetadata();
+            aopProxyBuilder = beanDefinitionBuilderFactory.aroundProxy(classElement, annotationMetadata, targetBeanDefinitionBuilder);
         }
-        return aopProxyVisitor;
+        return aopProxyBuilder;
     }
 
     /**
@@ -182,19 +157,19 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
         return false;
     }
 
-    private void build(BeanDefinitionVisitor visitor) {
+    protected void build(ElementBeanDefinitionBuilder<R> beanDefinitionBuilder) {
         Set<FieldElement> processedFields = new HashSet<>();
         ElementQuery<MemberElement> memberQuery = ElementQuery.ALL_FIELD_AND_METHODS.includeHiddenElements();
         if (processAsProperties()) {
             memberQuery = memberQuery.excludePropertyElements();
             for (PropertyElement propertyElement : classElement.getBeanProperties()) {
-                if (visitPropertyInternal(visitor, propertyElement)) {
+                if (visitPropertyInternal(beanDefinitionBuilder, propertyElement)) {
                     propertyElement.getField().ifPresent(processedFields::add);
                 }
             }
         } else {
             for (PropertyElement propertyElement : classElement.getSyntheticBeanProperties()) {
-                if (visitPropertyInternal(visitor, propertyElement)) {
+                if (visitPropertyInternal(beanDefinitionBuilder, propertyElement)) {
                     propertyElement.getField().ifPresent(processedFields::add);
                 }
             }
@@ -203,36 +178,36 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
         memberElements.removeAll(processedFields);
         for (MemberElement memberElement : memberElements) {
             if (memberElement instanceof FieldElement fieldElement) {
-                visitFieldInternal(visitor, fieldElement);
+                visitFieldInternal(beanDefinitionBuilder, fieldElement);
             } else if (memberElement instanceof MethodElement methodElement) {
-                visitMethodInternal(visitor, methodElement);
+                visitMethodInternal(beanDefinitionBuilder, methodElement);
             } else if (!(memberElement instanceof PropertyElement)) {
                 throw new IllegalStateException("Unknown element");
             }
         }
     }
 
-    private void visitFieldInternal(BeanDefinitionVisitor visitor, FieldElement fieldElement) {
-        boolean claimed = visitField(visitor, fieldElement);
+    private void visitFieldInternal(ElementBeanDefinitionBuilder<R> beanDefinitionBuilder, FieldElement fieldElement) {
+        boolean claimed = visitField(beanDefinitionBuilder, fieldElement);
         if (claimed) {
-            addOriginatingElementIfNecessary(visitor, fieldElement);
+            addOriginatingElementIfNecessary(beanDefinitionBuilder, fieldElement);
         }
     }
 
-    private void visitMethodInternal(BeanDefinitionVisitor visitor, MethodElement methodElement) {
+    private void visitMethodInternal(ElementBeanDefinitionBuilder<R> beanDefinitionBuilder, MethodElement methodElement) {
         makeInterceptedForValidationIfNeeded(methodElement);
-        boolean claimed = visitMethod(visitor, methodElement);
+        boolean claimed = visitMethod(beanDefinitionBuilder, methodElement);
         if (claimed) {
-            addOriginatingElementIfNecessary(visitor, methodElement);
+            addOriginatingElementIfNecessary(beanDefinitionBuilder, methodElement);
         }
     }
 
-    private boolean visitPropertyInternal(BeanDefinitionVisitor visitor, PropertyElement propertyElement) {
-        boolean claimed = visitProperty(visitor, propertyElement);
+    private boolean visitPropertyInternal(ElementBeanDefinitionBuilder<R> beanDefinitionBuilder, PropertyElement propertyElement) {
+        boolean claimed = visitProperty(beanDefinitionBuilder, propertyElement);
         if (claimed) {
-            propertyElement.getReadMethod().ifPresent(element -> addOriginatingElementIfNecessary(visitor, element));
-            propertyElement.getWriteMethod().ifPresent(element -> addOriginatingElementIfNecessary(visitor, element));
-            propertyElement.getField().ifPresent(element -> addOriginatingElementIfNecessary(visitor, element));
+            propertyElement.getReadMethod().ifPresent(element -> addOriginatingElementIfNecessary(beanDefinitionBuilder, element));
+            propertyElement.getWriteMethod().ifPresent(element -> addOriginatingElementIfNecessary(beanDefinitionBuilder, element));
+            propertyElement.getField().ifPresent(element -> addOriginatingElementIfNecessary(beanDefinitionBuilder, element));
         }
         return claimed;
     }
@@ -240,28 +215,45 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
     /**
      * Visit a property.
      *
-     * @param visitor         The visitor
-     * @param propertyElement The property
+     * @param beanDefinitionBuilder The bean definition builder
+     * @param propertyElement       The property
      * @return true if processed
      */
-    protected boolean visitProperty(BeanDefinitionVisitor visitor, PropertyElement propertyElement) {
+    protected boolean visitProperty(ElementBeanDefinitionBuilder<R> beanDefinitionBuilder, PropertyElement propertyElement) {
         boolean claimed = false;
         Optional<? extends MemberElement> writeMember = propertyElement.getWriteMember();
         if (writeMember.isPresent()) {
-            claimed |= visitPropertyWriteElement(visitor, propertyElement, writeMember.get());
+            claimed |= visitPropertyWriteElement(beanDefinitionBuilder, propertyElement, writeMember.get());
         }
         Optional<? extends MemberElement> readMember = propertyElement.getReadMember();
         if (readMember.isPresent()) {
-            boolean readElementClaimed = visitPropertyReadElement(visitor, propertyElement, readMember.get());
+            boolean readElementClaimed = visitPropertyReadElement(beanDefinitionBuilder, propertyElement, readMember.get());
             claimed |= readElementClaimed;
         }
         // Process property's field if no methods were processed
         Optional<FieldElement> field = propertyElement.getField();
         if (!claimed && field.isPresent()) {
             FieldElement writeElement = field.get();
-            claimed = visitField(visitor, writeElement);
+            claimed = visitField(beanDefinitionBuilder, writeElement);
         }
         return claimed;
+    }
+
+    /**
+     * Visit a property read element.
+     *
+     * @param beanDefinitionBuilder The bean definition builder
+     * @param propertyElement       The property
+     * @param readElement           The read element
+     * @return true if processed
+     */
+    protected boolean visitPropertyReadElement(ElementBeanDefinitionBuilder<R> beanDefinitionBuilder,
+                                               PropertyElement propertyElement,
+                                               MemberElement readElement) {
+        if (readElement instanceof MethodElement methodReadElement) {
+            return visitPropertyReadElement(beanDefinitionBuilder, propertyElement, methodReadElement);
+        }
+        return false;
     }
 
     /**
@@ -276,49 +268,32 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
     }
 
     /**
-     * Visit a property read element.
-     *
-     * @param visitor         The visitor
-     * @param propertyElement The property
-     * @param readElement     The read element
-     * @return true if processed
-     */
-    protected boolean visitPropertyReadElement(BeanDefinitionVisitor visitor,
-                                               PropertyElement propertyElement,
-                                               MemberElement readElement) {
-        if (readElement instanceof MethodElement methodReadElement) {
-            return visitPropertyReadElement(visitor, propertyElement, methodReadElement);
-        }
-        return false;
-    }
-
-    /**
      * Visit a property method read element.
      *
-     * @param visitor         The visitor
-     * @param propertyElement The property
-     * @param readElement     The read element
+     * @param beanDefinitionBuilder The bean definition builder
+     * @param propertyElement       The property
+     * @param readElement           The read element
      * @return true if processed
      */
-    protected boolean visitPropertyReadElement(BeanDefinitionVisitor visitor,
+    protected boolean visitPropertyReadElement(ElementBeanDefinitionBuilder<R> beanDefinitionBuilder,
                                                PropertyElement propertyElement,
                                                MethodElement readElement) {
-        return visitAopAndExecutableMethod(visitor, readElement);
+        return visitAopAndExecutableMethod(beanDefinitionBuilder, readElement);
     }
 
     /**
      * Visit a property write element.
      *
-     * @param visitor         The visitor
-     * @param propertyElement The property
-     * @param writeElement    The write element
+     * @param beanDefinitionBuilder The bean definition builder
+     * @param propertyElement       The property
+     * @param writeElement          The write element
      * @return true if processed
      */
-    protected boolean visitPropertyWriteElement(BeanDefinitionVisitor visitor,
+    protected boolean visitPropertyWriteElement(ElementBeanDefinitionBuilder<R> beanDefinitionBuilder,
                                                 PropertyElement propertyElement,
                                                 MemberElement writeElement) {
         if (writeElement instanceof MethodElement methodWriteElement) {
-            return visitPropertyWriteElement(visitor, propertyElement, methodWriteElement);
+            return visitPropertyWriteElement(beanDefinitionBuilder, propertyElement, methodWriteElement);
         }
         return false;
     }
@@ -326,68 +301,56 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
     /**
      * Visit a property write element.
      *
-     * @param visitor         The visitor
-     * @param propertyElement The property
-     * @param writeElement    The write element
+     * @param beanDefinitionBuilder The beanDefinitionBuilder
+     * @param propertyElement       The property
+     * @param writeElement          The write element
      * @return true if processed
      */
     @NextMajorVersion("Require @ReflectiveAccess for private methods in Micronaut 4")
-    protected boolean visitPropertyWriteElement(BeanDefinitionVisitor visitor,
+    protected boolean visitPropertyWriteElement(ElementBeanDefinitionBuilder<R> beanDefinitionBuilder,
                                                 PropertyElement propertyElement,
                                                 MethodElement writeElement) {
         makeInterceptedForValidationIfNeeded(writeElement);
-        if (visitInjectAndLifecycleMethod(visitor, writeElement)) {
+        if (visitInjectAndLifecycleMethod(beanDefinitionBuilder, writeElement)) {
             makeInterceptedForValidationIfNeeded(writeElement);
             return true;
         } else if (!writeElement.isStatic() && writeElement.getMethodAnnotationMetadata().hasStereotype(AnnotationUtil.QUALIFIER)) {
-            if (propertyElement.getReadMethod().isPresent() && writeElement.hasStereotype(ANN_REQUIRES_VALIDATION)) {
-                visitor.setValidated(true);
-            }
             staticMethodCheck(writeElement);
             // TODO: Require @ReflectiveAccess for private methods in Micronaut 4
-            visitMethodInjectionPoint(visitor, writeElement);
+            visitMethodInjectionPoint(beanDefinitionBuilder, writeElement);
             return true;
         }
-        return visitAopAndExecutableMethod(visitor, writeElement);
+        return visitAopAndExecutableMethod(beanDefinitionBuilder, writeElement);
     }
 
     /**
      * Visit a method.
      *
-     * @param visitor       The visitor
-     * @param methodElement The method
+     * @param beanDefinitionBuilder The bean definition builder
+     * @param methodElement         The method
      * @return true if processed
      */
-    protected boolean visitMethod(BeanDefinitionVisitor visitor, MethodElement methodElement) {
-        if (visitInjectAndLifecycleMethod(visitor, methodElement)) {
+    protected boolean visitMethod(ElementBeanDefinitionBuilder<R> beanDefinitionBuilder, MethodElement methodElement) {
+        if (visitInjectAndLifecycleMethod(beanDefinitionBuilder, methodElement)) {
             return true;
         }
-        return visitAopAndExecutableMethod(visitor, methodElement);
+        return visitAopAndExecutableMethod(beanDefinitionBuilder, methodElement);
     }
 
     @NextMajorVersion("Require @ReflectiveAccess for private methods in Micronaut 4")
-    private boolean visitInjectAndLifecycleMethod(BeanDefinitionVisitor visitor, MethodElement methodElement) {
+    private boolean visitInjectAndLifecycleMethod(ElementBeanDefinitionBuilder<R> beanDefinitionBuilder, MethodElement methodElement) {
         // All the cases above are using executable methods
         boolean claimed = false;
         if (methodElement.hasDeclaredAnnotation(AnnotationUtil.POST_CONSTRUCT)) {
             staticMethodCheck(methodElement);
             // TODO: Require @ReflectiveAccess for private methods in Micronaut 4
-            visitor.visitPostConstructMethod(
-                methodElement.getDeclaringType(),
-                methodElement,
-                methodElement.isReflectionRequired(classElement),
-                visitorContext);
+            beanDefinitionBuilder.addPostConstruct(methodElement, methodElement.isReflectionRequired(classElement), visitorContext);
             claimed = true;
         }
         if (methodElement.hasDeclaredAnnotation(AnnotationUtil.PRE_DESTROY)) {
             staticMethodCheck(methodElement);
             // TODO: Require @ReflectiveAccess for private methods in Micronaut 4
-            visitor.visitPreDestroyMethod(
-                methodElement.getDeclaringType(),
-                methodElement,
-                methodElement.isReflectionRequired(classElement),
-                visitorContext
-            );
+            beanDefinitionBuilder.addPreDestroy(methodElement, methodElement.isReflectionRequired(classElement), visitorContext);
             claimed = true;
         }
         if (claimed) {
@@ -396,7 +359,7 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
         if (!methodElement.isStatic() && isInjectPointMethod(methodElement)) {
             staticMethodCheck(methodElement);
             // TODO: Require @ReflectiveAccess for private methods in Micronaut 4
-            visitMethodInjectionPoint(visitor, methodElement);
+            visitMethodInjectionPoint(beanDefinitionBuilder, methodElement);
             return true;
         }
         return false;
@@ -404,51 +367,44 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
 
     /**
      * Visit a method injection point.
-     * @param visitor The visitor
-     * @param methodElement The method element
+     *
+     * @param beanDefinitionBuilder The bean definition builder
+     * @param methodElement         The method element
      */
-    protected void visitMethodInjectionPoint(BeanDefinitionVisitor visitor, MethodElement methodElement) {
-        applyConfigurationInjectionIfNecessary(visitor, methodElement);
-        visitor.visitMethodInjectionPoint(
-            methodElement.getDeclaringType(),
+    protected void visitMethodInjectionPoint(ElementBeanDefinitionBuilder<R> beanDefinitionBuilder, MethodElement methodElement) {
+        beanDefinitionBuilder.addMethodInjection(
             methodElement,
             methodElement.isReflectionRequired(classElement),
             visitorContext
         );
     }
 
-    private boolean visitAopAndExecutableMethod(BeanDefinitionVisitor visitor, MethodElement methodElement) {
+    private boolean visitAopAndExecutableMethod(ElementBeanDefinitionBuilder<R> beanDefinitionBuilder, MethodElement methodElement) {
         if (methodElement.isStatic() && isExplicitlyAnnotatedAsExecutable(methodElement)) {
             // Only allow static executable methods when it's explicitly annotated with Executable.class
             return false;
-        }
-        // This method requires pre-processing. See Executable#processOnStartup()
-        boolean preprocess = methodElement.isTrue(Executable.class, Executable.MEMBER_PROCESS_ON_STARTUP);
-        if (preprocess) {
-            visitor.setRequiresMethodProcessing(true);
         }
         if (methodElement.hasStereotype(Adapter.class)) {
             staticMethodCheck(methodElement);
             visitAdaptedMethod(methodElement);
             // Adapter is always an executable method but can also be intercepted so continue with visitors below
         }
-        if (visitAopMethod(visitor, methodElement)) {
+        if (visitAopMethod(beanDefinitionBuilder, methodElement)) {
             return true;
         }
-        return visitExecutableMethod(visitor, methodElement);
+        return visitExecutableMethod(beanDefinitionBuilder, methodElement);
     }
 
     /**
      * Visit an AOP method.
      *
-     * @param visitor       The visitor
-     * @param methodElement The method
+     * @param beanDefinitionBuilder The visitor
+     * @param methodElement         The method
      * @return true if processed
      */
-    protected boolean visitAopMethod(BeanDefinitionVisitor visitor, MethodElement methodElement) {
+    protected boolean visitAopMethod(ElementBeanDefinitionBuilder<R> beanDefinitionBuilder, MethodElement methodElement) {
         boolean aopDefinedOnClassAndPublicMethod = isAopProxy && (methodElement.isPublic() || methodElement.isPackagePrivate());
         AnnotationMetadata methodAnnotationMetadata = methodElement.getMethodAnnotationMetadata();
-
         if (aopDefinedOnClassAndPublicMethod ||
             !isAopProxy && InterceptedMethodUtil.hasAroundStereotype(methodAnnotationMetadata) ||
             InterceptedMethodUtil.hasDeclaredAroundAdvice(methodAnnotationMetadata) && !classElement.isAbstract()) {
@@ -464,29 +420,15 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
             } else if (methodElement.isStatic()) {
                 throw new ProcessingException(methodElement, "Method defines AOP advice but is declared static");
             }
-            ProxyingBeanDefinitionVisitor aopProxyVisitor = getAroundAopProxyVisitor(visitor, methodElement);
-            visitAroundMethod(aopProxyVisitor, classElement, methodElement);
+            ElementProxyBuilder<R> proxyBuilder = getAopProxyBuilder(beanDefinitionBuilder, methodElement);
+            visitAroundMethod(proxyBuilder, classElement, methodElement);
             return true;
         }
         return false;
     }
 
-    protected void visitAroundMethod(ProxyingBeanDefinitionVisitor aopProxyWriter, TypedElement beanType, MethodElement methodElement) {
-        aopProxyWriter.visitInterceptorBinding(
-            InterceptedMethodUtil.resolveInterceptorBinding(methodElement.getAnnotationMetadata(), InterceptorKind.AROUND)
-        );
-        aopProxyWriter.visitAroundMethod(beanType, methodElement);
-    }
-
-    /**
-     * Apply configuration injection for the constructor.
-     *
-     * @param visitor     The visitor
-     * @param constructor The constructor
-     */
-    protected void applyConfigurationInjectionIfNecessary(BeanDefinitionVisitor visitor,
-                                                          MethodElement constructor) {
-        // default to do nothing
+    protected void visitAroundMethod(ElementProxyBuilder<R> proxyBuilder, TypedElement beanType, MethodElement methodElement) {
+        proxyBuilder.addAroundMethod(methodElement);
     }
 
     /**
@@ -521,52 +463,41 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
     /**
      * Visit a field.
      *
-     * @param visitor      The visitor
-     * @param fieldElement The field
+     * @param beanDefinitionBuilder The bean definition builder
+     * @param fieldElement          The field
      * @return true if processed
      */
-    protected boolean visitField(BeanDefinitionVisitor visitor, FieldElement fieldElement) {
+    protected boolean visitField(ElementBeanDefinitionBuilder<R> beanDefinitionBuilder, FieldElement fieldElement) {
         if (fieldElement.isStatic() || fieldElement.isFinal()) {
             return false;
         }
         AnnotationMetadata fieldAnnotationMetadata = fieldElement.getAnnotationMetadata();
-        boolean isRequired = InjectionPoint.isInjectionRequired(fieldElement);
         if (fieldAnnotationMetadata.hasStereotype(Value.class) || fieldAnnotationMetadata.hasStereotype(Property.class)) {
-            visitor.visitFieldValue(
-                fieldElement.getDeclaringType(),
-                fieldElement,
-                fieldElement.isReflectionRequired(classElement),
-                !isRequired
-            );
+            beanDefinitionBuilder.addFieldPropertyInjection(fieldElement, fieldElement, fieldElement.isReflectionRequired(classElement), visitorContext);
             return true;
         }
         if (fieldAnnotationMetadata.hasStereotype(AnnotationUtil.INJECT)
             || fieldAnnotationMetadata.hasDeclaredStereotype(AnnotationUtil.QUALIFIER)) {
-            visitor.visitFieldInjectionPoint(
-                fieldElement.getDeclaringType(),
-                fieldElement,
-                fieldElement.isReflectionRequired(classElement),
-                visitorContext
-            );
+            beanDefinitionBuilder.addFieldInjection(fieldElement, fieldElement.isReflectionRequired(classElement), visitorContext);
             return true;
         }
         return false;
     }
 
-    private void addOriginatingElementIfNecessary(BeanDefinitionVisitor writer, MemberElement memberElement) {
+    private void addOriginatingElementIfNecessary(ElementBeanDefinitionBuilder<R> beanDefinitionBuilder, MemberElement memberElement) {
         if (!memberElement.isSynthetic() && !isDeclaredInThisClass(memberElement)) {
-            writer.addOriginatingElement(memberElement.getDeclaringType());
+            beanDefinitionBuilder.addOriginatingElement(memberElement.getDeclaringType());
         }
     }
 
     /**
      * Visit an executable method.
      *
-     * @param visitor       The visitor
-     * @param methodElement The method
+     * @param beanDefinitionBuilder The bean definition builder
+     * @param methodElement         The method
      * @return true if processed
      */
-    protected boolean visitExecutableMethod(BeanDefinitionVisitor visitor, MethodElement methodElement) {
+    protected boolean visitExecutableMethod(ElementBeanDefinitionBuilder<R> beanDefinitionBuilder, MethodElement methodElement) {
         if (!methodElement.hasStereotype(Executable.class)) {
             return false;
         }
@@ -592,7 +523,7 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
         // only include own accessible methods or the ones annotated with @ReflectiveAccess
         if (methodElement.isAccessible()
             || !methodElement.isPrivate() && methodElement.getClass().getSimpleName().contains("Groovy")) {
-            visitor.visitExecutableMethod(classElement, methodElement, visitorContext);
+            beanDefinitionBuilder.addExecutableMethod(methodElement, methodElement.isReflectionRequired(classElement));
         }
         return true;
     }
@@ -615,30 +546,6 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
             throw new ProcessingException(sourceMethod, "Class to adapt [" + interfaceToAdapt.getName() + "] is not an interface");
         }
 
-        String suffix = '$' + interfaceToAdapt.getSimpleName() + '$' + sourceMethod.getSimpleName() + adaptedMethodIndex.incrementAndGet();
-        String adapterClassName = classElement.getName() + suffix;
-
-        ProxyingBeanDefinitionVisitor aopProxyWriter;
-        if (sourceMethod.hasStereotype(RuntimeProxy.class)) {
-            aopProxyWriter = new RuntimeProxyBeanDefinitionWriter(
-                suffix,
-                ClassElement.of(interfaceToAdapt.getName(), true, new AnnotationMetadataHierarchy(classElement.getAnnotationMetadata(), methodAnnotationMetadata)),
-                false,
-                new ClassElement[]{interfaceToAdapt},
-                visitorContext
-            );
-        } else {
-            aopProxyWriter = new AopProxyWriter(
-                ClassElement.of(adapterClassName, true, new AnnotationMetadataHierarchy(classElement.getAnnotationMetadata(), methodAnnotationMetadata)),
-                false,
-                new ClassElement[]{interfaceToAdapt},
-                visitorContext
-            );
-        }
-        aopProxyWriter.addOriginatingElement(sourceMethod);
-
-        aopProxyWriter.visitDefaultConstructor(methodAnnotationMetadata, visitorContext);
-
         List<MethodElement> methods = interfaceToAdapt.getEnclosedElements(ElementQuery.ALL_METHODS.onlyAbstract());
         if (methods.isEmpty()) {
             throw new ProcessingException(sourceMethod, "Interface to adapt [" + interfaceToAdapt.getName() + "] is not a SAM type. No methods found.");
@@ -647,7 +554,7 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
             throw new ProcessingException(sourceMethod, "Interface to adapt [" + interfaceToAdapt.getName() + "] is not a SAM type. More than one abstract method declared.");
         }
 
-        MethodElement targetMethod = methods.iterator().next();
+        MethodElement targetMethod = methods.getFirst();
 
         ParameterElement[] sourceParams = sourceMethod.getParameters();
         ParameterElement[] targetParams = targetMethod.getParameters();
@@ -688,17 +595,16 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
             }
         }
 
-        if (!genericTypes.isEmpty()) {
-            aopProxyWriter.visitTypeArguments(Collections.singletonMap(interfaceToAdapt.getName(), genericTypes));
-        }
+        String suffix = '$' + interfaceToAdapt.getSimpleName() + '$' + sourceMethod.getSimpleName() + adaptedMethodIndex.incrementAndGet();
+        String adapterProxyClassName = classElement.getName() + suffix;
+
+        interfaceToAdapt = interfaceToAdapt.withTypeArguments(genericTypes);
 
         AnnotationClassValue<?>[] adaptedArgumentTypes = Arrays.stream(sourceParams)
             .map(p -> new AnnotationClassValue<>(getClassName(p.getGenericType())))
             .toArray(AnnotationClassValue[]::new);
 
-        targetMethod = targetMethod.withNewOwningType(classElement);
-
-        targetMethod.annotate(Adapter.class, builder -> {
+        interfaceToAdapt.annotate(Adapter.class, builder -> {
             builder.member(Adapter.InternalAttributes.ADAPTED_BEAN, new AnnotationClassValue<>(getClassName(classElement)));
             builder.member(Adapter.InternalAttributes.ADAPTED_METHOD, sourceMethod.getName());
             builder.member(Adapter.InternalAttributes.ADAPTED_ARGUMENT_TYPES, adaptedArgumentTypes);
@@ -708,9 +614,22 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
             }
         });
 
-        aopProxyWriter.visitAroundMethod(interfaceToAdapt, targetMethod);
+        ClassElement finalInterfaceToAdapt1 = interfaceToAdapt;
+        interfaceToAdapt.annotate(Indexed.class, builder -> builder.member(AnnotationMetadata.VALUE_MEMBER, new AnnotationClassValue<>(finalInterfaceToAdapt1.getName())));
 
-        beanDefinitionWriters.add(aopProxyWriter);
+        MutableAnnotationMetadata proxyAnnotationMetadata = MutableAnnotationMetadata.of(
+            new AnnotationMetadataHierarchy(classElement, interfaceToAdapt)
+        );
+
+        // TODO: The best would be to add a requires for the adapted bean instead of copying all the annotations
+        ElementProxyBuilder<R> aopProxyWriter = beanDefinitionBuilderFactory.introductionProxy(
+            adapterProxyClassName,
+            proxyAnnotationMetadata,
+            interfaceToAdapt
+        );
+        additionalBuilders.add(aopProxyWriter);
+
+        aopProxyWriter.implementInterface(interfaceToAdapt);
     }
 
     private static String getClassName(ClassElement element) {

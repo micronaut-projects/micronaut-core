@@ -16,12 +16,16 @@
 package io.micronaut.inject.writer;
 
 import io.micronaut.context.AbstractExecutableMethodsDefinition;
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.context.bean.definition.builder.Builder;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Generated;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.inject.ExecutableMethodsDefinition;
+import io.micronaut.inject.OutputObjectDef;
 import io.micronaut.inject.annotation.AnnotationMetadataGenUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
@@ -29,7 +33,6 @@ import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.TypedElement;
-import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.sourcegen.model.ClassDef;
 import io.micronaut.sourcegen.model.ClassTypeDef;
 import io.micronaut.sourcegen.model.ExpressionDef;
@@ -38,10 +41,9 @@ import io.micronaut.sourcegen.model.MethodDef;
 import io.micronaut.sourcegen.model.StatementDef;
 import io.micronaut.sourcegen.model.TypeDef;
 import org.jspecify.annotations.NullUnmarked;
+import org.jspecify.annotations.Nullable;
 
 import javax.lang.model.element.Modifier;
-import java.io.IOException;
-import java.io.OutputStream;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -55,8 +57,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.function.Function;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 /**
  * Writes out a {@link io.micronaut.inject.ExecutableMethodsDefinition} class.
@@ -66,10 +66,12 @@ import java.util.stream.IntStream;
  */
 @NullUnmarked
 @Internal
-public class ExecutableMethodsDefinitionWriter implements ClassOutputWriter {
+public class ExecutableMethodsDefinitionWriter implements Builder<OutputObjectDef> {
     public static final String CLASS_SUFFIX = "$Exec";
 
     public static final Method GET_EXECUTABLE_AT_INDEX_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractExecutableMethodsDefinition.class, "getExecutableMethodByIndex", int.class);
+
+    public static final Method REQUIRES_METHOD_PROCESSING_METHOD = ReflectionUtils.getRequiredInternalMethod(ExecutableMethodsDefinition.class, "requiresMethodProcessing");
 
     private static final Constructor<?> METHOD_REFERENCE_CONSTRUCTOR = ReflectionUtils.getRequiredInternalConstructor(
         AbstractExecutableMethodsDefinition.MethodReference.class,
@@ -97,8 +99,6 @@ public class ExecutableMethodsDefinitionWriter implements ClassOutputWriter {
     private final ClassTypeDef thisType;
     private final String beanDefinitionReferenceClassName;
 
-    private final List<String> addedMethods = new ArrayList<>();
-
     private final DispatchWriter methodDispatchWriter;
 
     private final Set<String> methodNames = new HashSet<>();
@@ -106,23 +106,40 @@ public class ExecutableMethodsDefinitionWriter implements ClassOutputWriter {
     private final EvaluatedExpressionProcessor evaluatedExpressionProcessor;
 
     private final OriginatingElements originatingElements;
-    private final VisitorContext visitorContext;
-
-    private byte[] output;
+    private boolean requiresMethodProcessing;
+    @Nullable
+    private ClassTypeDef proxyType;
 
     public ExecutableMethodsDefinitionWriter(EvaluatedExpressionProcessor evaluatedExpressionProcessor,
                                              AnnotationMetadata annotationMetadataWithDefaults,
                                              String beanDefinitionClassName,
                                              String beanDefinitionReferenceClassName,
-                                             OriginatingElements originatingElements, VisitorContext visitorContext) {
+                                             OriginatingElements originatingElements) {
         this.originatingElements = originatingElements;
         this.annotationMetadataWithDefaults = annotationMetadataWithDefaults;
         this.evaluatedExpressionProcessor = evaluatedExpressionProcessor;
         this.className = beanDefinitionClassName + CLASS_SUFFIX;
-        this.visitorContext = visitorContext;
         this.thisType = ClassTypeDef.of(className);
         this.beanDefinitionReferenceClassName = beanDefinitionReferenceClassName;
         this.methodDispatchWriter = new DispatchWriter(className);
+    }
+
+    /**
+     * By default, when the {@link io.micronaut.context.BeanContext} is started, the
+     * {@link io.micronaut.context.processor.ExecutableMethodProcessor} instances unless this method returns true.
+     *
+     * @return Whether the bean definition requires method processing
+     * @see io.micronaut.context.annotation.Executable#processOnStartup()
+     */
+    public boolean requiresMethodProcessing() {
+        return requiresMethodProcessing;
+    }
+
+    /**
+     * @param proxyType The proxy type
+     */
+    public void setProxyType(@Nullable ClassTypeDef proxyType) {
+        this.proxyType = proxyType;
     }
 
     /**
@@ -139,10 +156,6 @@ public class ExecutableMethodsDefinitionWriter implements ClassOutputWriter {
         return ClassTypeDef.of(className);
     }
 
-    private MethodElement getMethodElement(int index) {
-        return methodDispatchWriter.getDispatchTargets().get(index).getMethodElement();
-    }
-
     /**
      * Does method support intercepted proxy.
      *
@@ -153,93 +166,44 @@ public class ExecutableMethodsDefinitionWriter implements ClassOutputWriter {
     }
 
     /**
-     * Is the method abstract.
+     * Adds the given method to the executable methods definition.
      *
-     * @param index The method index
-     * @return Is the method abstract
+     * @param declaringType The declaring type
+     * @param methodElement The method element
      */
-    public boolean isAbstract(int index) {
-        MethodElement methodElement = getMethodElement(index);
-        return (isInterface(index) && !methodElement.isDefault()) || methodElement.isAbstract();
-    }
+    public void addExecutableMethod(TypedElement declaringType, MethodElement methodElement) {
+        boolean preprocess = methodElement.isTrue(Executable.class, Executable.MEMBER_PROCESS_ON_STARTUP);
+        if (preprocess) {
+            requiresMethodProcessing = true;
+        }
 
-    /**
-     * Is the method in an interface.
-     *
-     * @param index The method index
-     * @return Is the method in an interface
-     */
-    public boolean isInterface(int index) {
-        return getMethodElement(index).getDeclaringType().isInterface();
-    }
-
-    /**
-     * Is the method a default method.
-     *
-     * @param index The method index
-     * @return Is the method a default method
-     */
-    public boolean isDefault(int index) {
-        return getMethodElement(index).isDefault();
-    }
-
-    /**
-     * Is the method suspend.
-     *
-     * @param index The method index
-     * @return Is the method suspend
-     */
-    public boolean isSuspend(int index) {
-        return getMethodElement(index).isSuspend();
-    }
-
-    /**
-     * Visit a method that is to be made executable allow invocation of said method without reflection.
-     *
-     * @param declaringType                    The declaring type of the method. Either a Class or a string representing the
-     *                                         name of the type
-     * @param methodElement                    The method element
-     * @param interceptedProxyType             The intercepted proxy type
-     * @param interceptedProxyBridgeMethod     The intercepted proxy bridge method
-     * @return The method index
-     */
-    public int visitExecutableMethod(TypedElement declaringType,
-                                     MethodElement methodElement,
-                                     ClassTypeDef interceptedProxyType,
-                                     MethodDef interceptedProxyBridgeMethod) {
         evaluatedExpressionProcessor.processEvaluatedExpressions(methodElement);
 
-        String methodKey = methodElement.getName() +
-            "(" +
-            Arrays.stream(methodElement.getSuspendParameters())
-                .map(p -> toTypeString(p.getType()))
-                .collect(Collectors.joining(",")) +
-            ")";
+        methodDispatchWriter.addOrGetMethod(declaringType, methodElement);
 
-        int index = addedMethods.indexOf(methodKey);
-        if (index > -1) {
-            return index;
-        }
-        addedMethods.add(methodKey);
-        if (interceptedProxyType == null) {
-            return methodDispatchWriter.addMethod(declaringType, methodElement);
-        } else {
-            return methodDispatchWriter.addInterceptedMethod(declaringType, methodElement, interceptedProxyType, interceptedProxyBridgeMethod);
-        }
+        MutableAnnotationMetadata.contributeDefaults(
+            annotationMetadataWithDefaults,
+            methodElement
+        );
     }
 
-    @Override
-    public void accept(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
-        try (OutputStream outputStream = classWriterOutputVisitor.visitClass(className, originatingElements.getOriginatingElements())) {
-            outputStream.write(output);
+    public final void addBridgeMethod(MethodElement methodElement, MethodElement proxyMethod) {
+        methodDispatchWriter.addOrGetInterceptedMethod(methodElement.getDeclaringType(), methodElement, proxyMethod);
+    }
+
+    public final int findIndexOfExecutableMethod(MethodElement methodElement) {
+        int index = methodDispatchWriter.findMethodIndex(methodElement);
+        if (index == -1) {
+            throw new IllegalStateException("Cannot find the method: " + methodElement);
         }
-        output = null;
+        return index;
     }
 
     /**
      * Invoke to build the class model.
      */
-    public final void visitDefinitionEnd() {
+    @Override
+    public final OutputObjectDef build() {
         Map<String, MethodDef> loadTypeMethods = new LinkedHashMap<>();
 
         ClassTypeDef thisType = ClassTypeDef.of(className);
@@ -283,6 +247,8 @@ public class ExecutableMethodsDefinitionWriter implements ClassOutputWriter {
         );
 
         if (methodDispatchWriter.isHasInterceptedMethod()) {
+            ClassTypeDef proxy = Objects.requireNonNull(proxyType, "Proxy type is required");
+
             FieldDef interceptable = FieldDef.builder(FIELD_INTERCEPTABLE, TypeDef.Primitive.BOOLEAN)
                 .addModifiers(Modifier.PRIVATE, Modifier.FINAL)
                 .build();
@@ -308,6 +274,8 @@ public class ExecutableMethodsDefinitionWriter implements ClassOutputWriter {
                         )
                     )
             );
+
+            classDefBuilder.addMethod(methodDispatchWriter.buildDispatchMethod(proxy, interceptable));
         } else {
             classDefBuilder.addMethod(
                 MethodDef.constructor()
@@ -316,23 +284,27 @@ public class ExecutableMethodsDefinitionWriter implements ClassOutputWriter {
                         .invokeConstructor(SUPER_CONSTRUCTOR, createMethodsArrayExp)
                     )
             );
+            MethodDef dispatchMethod = methodDispatchWriter.buildDispatchMethod();
+            if (dispatchMethod != null) {
+                classDefBuilder.addMethod(dispatchMethod);
+            }
         }
 
-        MethodDef dispatchMethod = methodDispatchWriter.buildDispatchMethod();
-        if (dispatchMethod != null) {
-            classDefBuilder.addMethod(dispatchMethod);
-        }
         MethodDef getTargetMethodByIndex = methodDispatchWriter.buildGetTargetMethodByIndex();
         if (getTargetMethodByIndex != null) {
             classDefBuilder.addMethod(getTargetMethodByIndex);
         }
+        classDefBuilder.addMethod(
+            MethodDef.override(REQUIRES_METHOD_PROCESSING_METHOD).build((aThis, methodParameters) ->
+                ExpressionDef.constant(requiresMethodProcessing).returning())
+        );
 
         if (methodDispatchWriter.getDispatchTargets().size() > MIN_METHODS_TO_GENERATE_GET_METHOD) {
             classDefBuilder.addMethod(buildGetMethod());
         }
         loadTypeMethods.values().forEach(classDefBuilder::addMethod);
 
-        output = ByteCodeWriterUtils.writeByteCode(classDefBuilder.build(), visitorContext);
+        return new OutputObjectDef(classDefBuilder.build(), null, originatingElements);
     }
 
     private MethodDef buildGetMethod() {
@@ -401,7 +373,7 @@ public class ExecutableMethodsDefinitionWriter implements ClassOutputWriter {
             // 1: declaringType
             ExpressionDef.constant(ClassTypeDef.of(declaringType)),
             // 2: annotationMetadata
-            annotationMetadata(annotationMetadataWithDefaults, annotationMetadata, loadClassValueExpressionFn),
+            annotationMetadata(annotationMetadata, loadClassValueExpressionFn),
             // 3: methodName
             ExpressionDef.constant(methodElement.getName()),
             // 4: return argument
@@ -421,43 +393,21 @@ public class ExecutableMethodsDefinitionWriter implements ClassOutputWriter {
         );
     }
 
-    private ExpressionDef annotationMetadata(AnnotationMetadata annotationMetadataWithDefaults,
-                                             AnnotationMetadata annotationMetadata,
+    private ExpressionDef annotationMetadata(AnnotationMetadata annotationMetadata,
                                              Function<String, ExpressionDef> loadClassValueExpressionFn) {
 
         if (annotationMetadata == AnnotationMetadata.EMPTY_METADATA || annotationMetadata.isEmpty()) {
             return ExpressionDef.nullValue();
         }
-        if (annotationMetadata instanceof AnnotationMetadataReference annotationMetadataReference) {
-            return AnnotationMetadataGenUtils.annotationMetadataReference(annotationMetadataReference);
-        }
-        if (annotationMetadata instanceof AnnotationMetadataHierarchy annotationMetadataHierarchy) {
-            MutableAnnotationMetadata.contributeDefaults(
-                annotationMetadataWithDefaults,
-                annotationMetadataHierarchy
-            );
-            return AnnotationMetadataGenUtils.instantiateNewMetadataHierarchy(annotationMetadataHierarchy, loadClassValueExpressionFn);
-        }
-        if (annotationMetadata instanceof MutableAnnotationMetadata mutableAnnotationMetadata) {
-            MutableAnnotationMetadata.contributeDefaults(
-                annotationMetadataWithDefaults,
-                annotationMetadata
-            );
-            return AnnotationMetadataGenUtils.instantiateNewMetadata(mutableAnnotationMetadata, loadClassValueExpressionFn);
-        }
-        throw new IllegalStateException("Unknown metadata: " + annotationMetadata);
-    }
-
-    /**
-     * @param p The class element
-     * @return The string representation
-     */
-    private static String toTypeString(ClassElement p) {
-        String name = p.getName();
-        if (p.isArray()) {
-            return name + IntStream.range(0, p.getArrayDimensions()).mapToObj(ignore -> "[]").collect(Collectors.joining());
-        }
-        return name;
+        return switch (annotationMetadata) {
+            case AnnotationMetadataReference annotationMetadataReference ->
+                AnnotationMetadataGenUtils.annotationMetadataReference(annotationMetadataReference);
+            case AnnotationMetadataHierarchy annotationMetadataHierarchy ->
+                AnnotationMetadataGenUtils.instantiateNewMetadataHierarchy(annotationMetadataHierarchy, loadClassValueExpressionFn);
+            case MutableAnnotationMetadata mutableAnnotationMetadata ->
+                AnnotationMetadataGenUtils.instantiateNewMetadata(mutableAnnotationMetadata, loadClassValueExpressionFn);
+            default -> throw new IllegalStateException("Unknown metadata: " + annotationMetadata);
+        };
     }
 
     /**

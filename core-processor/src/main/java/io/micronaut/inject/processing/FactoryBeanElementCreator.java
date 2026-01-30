@@ -25,6 +25,9 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.inject.ElementBeanDefinitionBuilder;
+import io.micronaut.inject.ElementBeanDefinitionBuilderFactory;
+import io.micronaut.inject.ElementProxyBuilder;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
@@ -36,53 +39,47 @@ import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.configuration.ConfigurationUtils;
 import io.micronaut.inject.visitor.VisitorContext;
-import io.micronaut.inject.writer.BeanDefinitionVisitor;
-import io.micronaut.inject.writer.BeanDefinitionWriter;
-import io.micronaut.inject.writer.OriginatingElements;
-import io.micronaut.inject.writer.ProxyingBeanDefinitionVisitor;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Factory bean builder.
  *
+ * @param <R> The builder result type
  * @author Denis Stepanov
  * @since 4.0.0
  */
 @Internal
-final class FactoryBeanElementCreator extends DeclaredBeanElementCreator {
+final class FactoryBeanElementCreator<R> extends DeclaredBeanElementCreator<R> {
 
-    private final AtomicInteger factoryMethodIndex = new AtomicInteger();
-
-    FactoryBeanElementCreator(ClassElement classElement, VisitorContext visitorContext, boolean isAopProxy) {
-        super(classElement, visitorContext, isAopProxy);
+    FactoryBeanElementCreator(ClassElement classElement, VisitorContext visitorContext, boolean isAopProxy, ElementBeanDefinitionBuilderFactory<R> beanDefinitionBuilder) {
+        super(classElement, visitorContext, isAopProxy, beanDefinitionBuilder);
     }
 
     @Override
-    protected boolean visitMethod(BeanDefinitionVisitor visitor, MethodElement methodElement) {
+    protected boolean visitMethod(ElementBeanDefinitionBuilder<R> beanDefinitionBuilder, MethodElement methodElement) {
         if (methodElement.hasDeclaredStereotype(Bean.class.getName(), AnnotationUtil.SCOPE)) {
-            visitBeanFactoryElement(visitor, methodElement.getGenericReturnType(), methodElement);
+            visitBeanFactoryElement(beanDefinitionBuilder, methodElement.getGenericReturnType(), methodElement);
             return true;
         }
-        return super.visitMethod(visitor, methodElement);
+        return super.visitMethod(beanDefinitionBuilder, methodElement);
     }
 
     @Override
-    protected boolean visitField(BeanDefinitionVisitor visitor, FieldElement fieldElement) {
+    protected boolean visitField(ElementBeanDefinitionBuilder<R> beanDefinitionBuilder, FieldElement fieldElement) {
         if (fieldElement.hasDeclaredStereotype(Bean.class.getName())) {
             if (!fieldElement.isAccessible(classElement)) {
                 throw new ProcessingException(fieldElement, "Beans produced from fields cannot be private");
             }
-            visitBeanFactoryElement(visitor, fieldElement.getType(), fieldElement);
+            visitBeanFactoryElement(beanDefinitionBuilder, fieldElement.getType(), fieldElement);
             return true;
         }
-        return super.visitField(visitor, fieldElement);
+        return super.visitField(beanDefinitionBuilder, fieldElement);
     }
 
     @Override
-    protected boolean visitPropertyReadElement(BeanDefinitionVisitor visitor, PropertyElement propertyElement, MemberElement readElement) {
+    protected boolean visitPropertyReadElement(ElementBeanDefinitionBuilder<R> beanDefinitionBuilder, PropertyElement propertyElement, MemberElement readElement) {
         if (readElement.hasDeclaredStereotype(Bean.class.getName())) {
             ClassElement beanType;
             if (readElement instanceof MethodElement methodElement) {
@@ -92,22 +89,22 @@ final class FactoryBeanElementCreator extends DeclaredBeanElementCreator {
             } else {
                 throw new IllegalStateException();
             }
-            visitBeanFactoryElement(visitor, beanType, readElement);
+            visitBeanFactoryElement(beanDefinitionBuilder, beanType, readElement);
             return true;
         }
-        return super.visitPropertyReadElement(visitor, propertyElement, readElement);
+        return super.visitPropertyReadElement(beanDefinitionBuilder, propertyElement, readElement);
     }
 
     @Override
-    protected boolean visitPropertyWriteElement(BeanDefinitionVisitor visitor, PropertyElement propertyElement, MemberElement writeElement) {
+    protected boolean visitPropertyWriteElement(ElementBeanDefinitionBuilder<R> beanDefinitionBuilder, PropertyElement propertyElement, MemberElement writeElement) {
         if (writeElement.hasDeclaredStereotype(Bean.class.getName())) {
             // Ignore bean producer accessor
             return true;
         }
-        return super.visitPropertyWriteElement(visitor, propertyElement, writeElement);
+        return super.visitPropertyWriteElement(beanDefinitionBuilder, propertyElement, writeElement);
     }
 
-    void visitBeanFactoryElement(BeanDefinitionVisitor visitor, ClassElement producedType, MemberElement producingElement) {
+    void visitBeanFactoryElement(ElementBeanDefinitionBuilder<R> beanDefinitionBuilder, ClassElement producedType, MemberElement producingElement) {
         if (producedType.isPrimitive()) {
             buildProducedBeanDefinition(producedType, producedType, producingElement, producingElement.getAnnotationMetadata());
         } else {
@@ -120,10 +117,10 @@ final class FactoryBeanElementCreator extends DeclaredBeanElementCreator {
             buildProducedBeanDefinition(newProducedType, producedType, producingElement, newProducedType.getAnnotationMetadata());
 
             if (producingElement instanceof MethodElement methodElement) {
-                if (isAopProxy && visitAopMethod(visitor, methodElement)) {
+                if (isAopProxy && visitAopMethod(beanDefinitionBuilder, methodElement)) {
                     return;
                 }
-                visitExecutableMethod(visitor, methodElement);
+                visitExecutableMethod(beanDefinitionBuilder, methodElement);
             }
         }
     }
@@ -170,34 +167,23 @@ final class FactoryBeanElementCreator extends DeclaredBeanElementCreator {
             producingElement.annotate(ConfigurationReader.class, builder -> builder.member(ConfigurationReader.PREFIX, ConfigurationUtils.getRequiredTypePath(producedType)));
         }
 
-        BeanDefinitionWriter producedBeanDefinitionWriter = new BeanDefinitionWriter(
-                producingElement,
-                OriginatingElements.of(producingElement),
-                visitorContext,
-                factoryMethodIndex.getAndIncrement()
-        );
-
-        beanDefinitionWriters.add(producedBeanDefinitionWriter);
-
-        visitAnnotationMetadata(producedBeanDefinitionWriter, producedAnnotationMetadata);
-        producedBeanDefinitionWriter.visitTypeArguments(producedType.getAllTypeArguments());
-
+        ElementBeanDefinitionBuilder<R> beanDefinitionBuilder;
         if (producingElement instanceof PropertyElement propertyElement) {
             MethodElement readMethod = propertyElement.getReadMethod().orElse(null);
             if (readMethod != null) {
-                producedBeanDefinitionWriter.visitBeanFactoryMethod(classElement, readMethod);
+                beanDefinitionBuilder = beanDefinitionBuilderFactory.factoryMethod(readMethod);
             } else {
                 FieldElement fieldElement = propertyElement.getField().orElse(null);
                 if (fieldElement != null && fieldElement.isAccessible()) {
-                    producedBeanDefinitionWriter.visitBeanFactoryField(classElement, fieldElement);
+                    beanDefinitionBuilder = beanDefinitionBuilderFactory.factoryField(fieldElement);
                 } else {
                     throw new ProcessingException(producingElement, "A property element that defines the @Bean annotation must have an accessible getter or field");
                 }
             }
         } else if (producingElement instanceof MethodElement methodElement) {
-            producedBeanDefinitionWriter.visitBeanFactoryMethod(classElement, methodElement);
+            beanDefinitionBuilder = beanDefinitionBuilderFactory.factoryMethod(methodElement);
         } else {
-            producedBeanDefinitionWriter.visitBeanFactoryField(classElement, (FieldElement) producingElement);
+            beanDefinitionBuilder = beanDefinitionBuilderFactory.factoryField((FieldElement) producingElement);
         }
 
         if (InterceptedMethodUtil.hasAroundStereotype(producedAnnotationMetadata) && !producedType.isAssignable("io.micronaut.aop.Interceptor")) {
@@ -229,33 +215,25 @@ final class FactoryBeanElementCreator extends DeclaredBeanElementCreator {
                             "Proxying types with constructor arguments can lead to unexpected behaviour. See the javadoc for for Around.ProxyTargetConstructorMode for more information and possible solutions: " + producingElement.getName());
                 }
             }
-
-            ProxyingBeanDefinitionVisitor aopProxyWriter = createAroundAopProxyWriter(producedType, producedBeanDefinitionWriter, producedAnnotationMetadata, visitorContext, true);
-            if (constructorElement != null) {
-                aopProxyWriter.visitBeanDefinitionConstructor(constructorElement, constructorElement.isReflectionRequired(), visitorContext);
-            } else {
-                aopProxyWriter.visitDefaultConstructor(AnnotationMetadata.EMPTY_METADATA, visitorContext);
-            }
-            aopProxyWriter.visitSuperBeanDefinitionFactory(producedBeanDefinitionWriter.getBeanDefinitionName());
-            aopProxyWriter.visitTypeArguments(producedType.getAllTypeArguments());
-            beanDefinitionWriters.add(aopProxyWriter);
+            ElementProxyBuilder<R> proxyBuilder = beanDefinitionBuilderFactory.aroundProxy(producedType, producedAnnotationMetadata, beanDefinitionBuilder);
+            additionalBuilders.add(proxyBuilder);
 
             List<MethodElement> methodElements = producedType.getEnclosedElements(ElementQuery.ALL_METHODS)
                 .stream()
                 .filter(m -> m.isPublic() && !m.isFinal() && !m.isStatic()).toList();
             methodElements
-                .forEach(methodElement -> visitAroundMethod(aopProxyWriter, methodElement.getDeclaringType(), methodElement));
+                .forEach(methodElement -> visitAroundMethod(proxyBuilder, methodElement.getDeclaringType(), methodElement));
             List<PropertyElement> syntheticBeanProperties = producedType.getSyntheticBeanProperties();
             for (PropertyElement syntheticBeanProperty : syntheticBeanProperties) {
                 syntheticBeanProperty.getReadMethod().ifPresent(m -> {
                         if (!m.isFinal()) {
-                            visitAroundMethod(aopProxyWriter, m.getDeclaringType(), m);
+                            visitAroundMethod(proxyBuilder, m.getDeclaringType(), m);
                         }
                     }
                 );
                 syntheticBeanProperty.getWriteMethod().ifPresent(m -> {
                         if (!m.isFinal()) {
-                            visitAroundMethod(aopProxyWriter, m.getDeclaringType(), m);
+                            visitAroundMethod(proxyBuilder, m.getDeclaringType(), m);
                         }
                     }
                 );
@@ -269,7 +247,8 @@ final class FactoryBeanElementCreator extends DeclaredBeanElementCreator {
                 throw new ProcessingException(producingElement, "Using '@Executable' is not allowed on primitive type beans");
             }
             producedType.getEnclosedElements(ElementQuery.ALL_METHODS)
-                .forEach(methodElement -> producedBeanDefinitionWriter.visitExecutableMethod(methodElement.getDeclaringType(), methodElement, visitorContext));
+                .forEach(methodElement -> beanDefinitionBuilder.addExecutableMethod(
+                    methodElement, methodElement.isReflectionRequired(producingElement.getDeclaringType())));
         }
 
         if (producedAnnotationMetadata.isPresent(Bean.class, "preDestroy")) {
@@ -288,13 +267,15 @@ final class FactoryBeanElementCreator extends DeclaredBeanElementCreator {
                         .filter((e) -> !e.hasParameters()));
                     if (destroyMethod.isPresent()) {
                         MethodElement destroyMethodElement = destroyMethod.get();
-                        producedBeanDefinitionWriter.visitPreDestroyMethod(producedType, destroyMethodElement, false, visitorContext);
+                        beanDefinitionBuilder.addPreDestroy(destroyMethodElement, false, visitorContext);
                     } else {
                         throw new ProcessingException(producingElement, "@Bean method defines a preDestroy method that does not exist or is not public: " + destroyMethodName);
                     }
                 }
             });
         }
+
+        additionalBuilders.add(beanDefinitionBuilder);
     }
 
     private void allowProxyConstruction(MethodElement constructor) {

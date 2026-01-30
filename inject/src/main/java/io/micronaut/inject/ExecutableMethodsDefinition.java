@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject;
 
+import io.micronaut.context.annotation.Executable;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.core.util.CollectionUtils;
@@ -56,6 +57,24 @@ public interface ExecutableMethodsDefinition<T> {
      * @return The {@link ExecutableMethod} instances for this definition
      */
     List<ExecutableMethod<T, ?>> getExecutableMethods();
+
+    /**
+     * By default, when the {@link io.micronaut.context.BeanContext} is started, the
+     * {@link BeanDefinition#getExecutableMethods()} are not processed by registered
+     * {@link io.micronaut.context.processor.ExecutableMethodProcessor} instances unless this method returns true.
+     *
+     * @return Whether the bean definition requires method processing
+     * @see io.micronaut.context.annotation.Executable#processOnStartup()
+     * @since 5.0
+     */
+    default boolean requiresMethodProcessing() {
+        for (ExecutableMethod<T, ?> executableMethod : getExecutableMethods()) {
+            if (executableMethod.isTrue(Executable.class, Executable.MEMBER_PROCESS_ON_STARTUP)) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     /**
      * Retrieves an {@link ExecutableMethod} from the collection of executable methods by the specified index.

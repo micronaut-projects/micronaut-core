@@ -23,17 +23,16 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.BeanType;
 import jakarta.inject.Named;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.util.Collection;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
 
@@ -80,18 +79,27 @@ public class Qualifiers {
      * @param <T>      The type
      * @return The resolved qualifier
      */
+    public static @Nullable <T> Qualifier<T> forArgument(Argument<?> argument) {
+        return of(argument.getAnnotationMetadata());
+    }
+
+    /**
+     * Build a qualifier for the given annotation metadata.
+     *
+     * @param annotationMetadata The annotation metadata
+     * @param <T>                The type
+     * @return The resolved qualifier
+     */
     @SuppressWarnings("unchecked")
-    public static @Nullable
-    <T> Qualifier<T> forArgument(Argument<?> argument) {
-        AnnotationMetadata annotationMetadata = Objects.requireNonNull(argument, "Argument cannot be null").getAnnotationMetadata();
-        boolean hasMetadata = annotationMetadata != AnnotationMetadata.EMPTY_METADATA;
+    public static @Nullable <T> Qualifier<T> of(AnnotationMetadata annotationMetadata) {
+        boolean hasMetadata = !annotationMetadata.isEmpty();
 
         List<String> qualifierTypes = hasMetadata ? AnnotationUtil.findQualifierAnnotationsNames(annotationMetadata) : null;
         if (CollectionUtils.isNotEmpty(qualifierTypes)) {
             if (qualifierTypes.size() == 1) {
                 return Qualifiers.byAnnotation(
-                        annotationMetadata,
-                        qualifierTypes.iterator().next()
+                    annotationMetadata,
+                    qualifierTypes.getFirst()
                 );
             } else {
                 Qualifier[] qualifiers = new Qualifier[qualifierTypes.size()];
@@ -102,7 +110,6 @@ public class Qualifiers {
                 return Qualifiers.byQualifiers(qualifiers);
             }
         }
-
         return null;
     }
 

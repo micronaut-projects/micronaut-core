@@ -32,6 +32,11 @@ tasks.withType(Test).configureEach {
     jvmArgs "--enable-preview"
 }
 
+java {
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
+}
+
 tasks.withType(JavaCompile).configureEach {
     options.fork = true
     options.compilerArgs.add("-Amicronaut.processing.group=$project.group")

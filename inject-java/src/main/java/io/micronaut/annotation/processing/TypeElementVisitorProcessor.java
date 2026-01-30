@@ -21,12 +21,13 @@ import io.micronaut.annotation.processing.visitor.JavaNativeElement;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.visitor.VisitorUtils;
 import io.micronaut.core.annotation.NextMajorVersion;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.version.VersionUtils;
+import io.micronaut.inject.DefaultElementBeanDefinitionBuilderFactory;
+import io.micronaut.inject.OutputObjectDef;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
@@ -41,6 +42,10 @@ import io.micronaut.inject.visitor.TypeElementQuery;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
+import io.micronaut.inject.writer.ByteCodeWriterUtils;
+import io.micronaut.inject.writer.OriginatingElements;
+import io.micronaut.sourcegen.model.ObjectDef;
+import org.jspecify.annotations.Nullable;
 
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
@@ -48,7 +53,7 @@ import javax.annotation.processing.SupportedOptions;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.TypeMirror;
-import java.io.IOException;
+import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.ArrayList;
@@ -337,9 +342,12 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
         final List<AbstractBeanDefinitionBuilder> beanDefinitionBuilders = javaVisitorContext.getBeanElementBuilders();
         if (CollectionUtils.isNotEmpty(beanDefinitionBuilders)) {
+            DefaultElementBeanDefinitionBuilderFactory beanDefinitionBuilderFactory = new DefaultElementBeanDefinitionBuilderFactory(javaVisitorContext);
             try {
-                AbstractBeanDefinitionBuilder.writeBeanDefinitionBuilders(classWriterOutputVisitor, beanDefinitionBuilders);
-            } catch (IOException e) {
+                for (OutputObjectDef outputObjectDef : AbstractBeanDefinitionBuilder.build(beanDefinitionBuilders, beanDefinitionBuilderFactory)) {
+                    write(outputObjectDef, javaVisitorContext);
+                }
+            } catch (Exception e) {
                 // raise a compile error
                 String message = e.getMessage();
                 error("Unexpected error: %s", message != null ? message : e.getClass().getSimpleName());
@@ -350,6 +358,29 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             javaVisitorContext.finish();
         }
         return false;
+    }
+
+    private void write(OutputObjectDef outputObjectDef, VisitorContext visitorContext) {
+        try {
+            ObjectDef objectDef = outputObjectDef.objectDef();
+            Class<?> serviceClass = outputObjectDef.serviceClass();
+            OriginatingElements originatingElements = outputObjectDef.originatingElements();
+            if (serviceClass != null) {
+                classWriterOutputVisitor.visitServiceDescriptor(serviceClass, objectDef.getName(), originatingElements.getOriginatingElements()[0]);
+            }
+            try (OutputStream outputStream = classWriterOutputVisitor.visitClass(objectDef.getName(), originatingElements.getOriginatingElements())) {
+                outputStream.write(ByteCodeWriterUtils.writeByteCode(objectDef, visitorContext));
+            }
+        } catch (Exception e) {
+            // raise a compile error
+            String message = e.getMessage();
+            Element javaElement = null;
+            io.micronaut.inject.ast.Element astElement = outputObjectDef.originatingElements().getOriginatingElements()[0];
+            if (astElement.getNativeType() instanceof JavaNativeElement javaNativeElement) {
+                javaElement = javaNativeElement.element();
+            }
+            error(javaElement, "Unexpected error: %s", message != null ? message : e.getClass().getSimpleName());
+        }
     }
 
     private <T extends Throwable> void postponeElement(JavaClassElement javaClassElement, Element originalElement, T e) throws T {

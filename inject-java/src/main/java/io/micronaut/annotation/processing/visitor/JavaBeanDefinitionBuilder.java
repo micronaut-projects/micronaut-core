@@ -16,31 +16,26 @@
 package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.annotation.processing.JavaAnnotationMetadataBuilder;
-import io.micronaut.aop.Around;
-import io.micronaut.aop.InterceptorKind;
-import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
-import io.micronaut.aop.writer.AopProxyWriter;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.ArgumentUtils;
+import io.micronaut.inject.ElementBeanDefinitionBuilder;
+import io.micronaut.inject.ElementBeanDefinitionBuilderFactory;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
-import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.beans.BeanParameterElement;
+import io.micronaut.inject.utils.BeanInjectionUtils;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
-import io.micronaut.inject.writer.BeanDefinitionVisitor;
-import io.micronaut.inject.writer.BeanDefinitionWriter;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
-import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
@@ -57,10 +52,10 @@ class JavaBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
     /**
      * Default constructor.
      *
-     * @param originatingElement The originating element
-     * @param beanType The bean type
-     * @param elementAnnotationMetadataFactory The element annotation metadata factory
-     * @param visitorContext the visitor context
+     * @param originatingElement                  The originating element
+     * @param beanType                            The bean type
+     * @param elementAnnotationMetadataFactory    The element annotation metadata factory
+     * @param visitorContext                      the visitor context
      */
     JavaBeanDefinitionBuilder(Element originatingElement,
                               ClassElement beanType,
@@ -97,43 +92,13 @@ class JavaBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
             }
 
             @Override
-            protected BeanDefinitionVisitor createBeanDefinitionWriter() {
-                final BeanDefinitionVisitor writer = super.createBeanDefinitionWriter();
+            protected ElementBeanDefinitionBuilder createBeanDefinitionBuilder(ElementBeanDefinitionBuilderFactory beanDefinitionBuilderFactory) {
                 ClassElement newParent = parentType.withAnnotationMetadata(parentType.copyAnnotationMetadata()); // Just a copy
-                writer.visitBeanFactoryField(
-                    newParent,
-                    producerField.withAnnotationMetadata(
-                        new AnnotationMetadataHierarchy(newParent.getDeclaredMetadata(), producerField.getDeclaredMetadata())
-                    )
+                return beanDefinitionBuilderFactory.factoryField(
+                    BeanInjectionUtils.createFieldDefinition(newParent, producerField, !producerField.isPublic(), visitorContext)
                 );
-                return writer;
             }
-        };
-    }
 
-    @Override
-    protected BeanDefinitionVisitor createAopWriter(BeanDefinitionWriter beanDefinitionWriter, AnnotationMetadata annotationMetadata) {
-        AnnotationValue<?>[] interceptorTypes =
-            InterceptedMethodUtil.resolveInterceptorBinding(annotationMetadata, InterceptorKind.AROUND);
-        return new AopProxyWriter(
-            getBeanType(),
-            beanDefinitionWriter,
-            annotationMetadata.getValues(Around.class, Boolean.class),
-            visitorContext,
-            interceptorTypes
-        );
-    }
-
-    @Override
-    protected BiConsumer<TypedElement, MethodElement> createAroundMethodVisitor(BeanDefinitionVisitor aopWriter) {
-        AopProxyWriter aopProxyWriter = (AopProxyWriter) aopWriter;
-        return (bean, method) -> {
-            AnnotationValue<?>[] newTypes =
-                InterceptedMethodUtil.resolveInterceptorBinding(method.getAnnotationMetadata(), InterceptorKind.AROUND);
-            aopProxyWriter.visitInterceptorBinding(newTypes);
-            aopProxyWriter.visitAroundMethod(
-                bean, method
-            );
         };
     }
 
@@ -167,17 +132,17 @@ class JavaBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
             }
 
             @Override
-            protected BeanDefinitionVisitor createBeanDefinitionWriter() {
-                final BeanDefinitionVisitor writer = super.createBeanDefinitionWriter();
+            protected ElementBeanDefinitionBuilder createBeanDefinitionBuilder(ElementBeanDefinitionBuilderFactory beanDefinitionBuilderFactory) {
                 ClassElement newParent = parentType.withAnnotationMetadata(parentType.copyAnnotationMetadata()); // Just a copy
-                writer.visitBeanFactoryMethod(
-                    newParent,
-                    producerMethod.withAnnotationMetadata(
-                        new AnnotationMetadataHierarchy(newParent.getDeclaredMetadata(), producerMethod.getDeclaredMetadata())
-                    ),
-                    getParameters()
-                );
-                return writer;
+                AnnotationMetadataHierarchy annotationMetadata = new AnnotationMetadataHierarchy(newParent.getDeclaredMetadata(), producerMethod.getDeclaredMetadata(), getAnnotationMetadata());
+                return beanDefinitionBuilderFactory.factoryMethod(
+                    BeanInjectionUtils.createMethodDefinition(
+                        newParent,
+                        producerMethod.withParameters(getParameters()).withAnnotationMetadata(annotationMetadata),
+                        annotationMetadata,
+                        !producerMethod.isPublic(),
+                        visitorContext
+                    ));
             }
 
         };

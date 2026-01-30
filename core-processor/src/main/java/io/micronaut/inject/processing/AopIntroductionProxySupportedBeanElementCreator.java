@@ -15,84 +15,90 @@
  */
 package io.micronaut.inject.processing;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.context.bean.definition.builder.Builder;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.inject.ElementBeanDefinitionBuilder;
+import io.micronaut.inject.ElementBeanDefinitionBuilderFactory;
+import io.micronaut.inject.ElementProxyBuilder;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.visitor.VisitorContext;
-import io.micronaut.inject.writer.BeanDefinitionVisitor;
-import io.micronaut.inject.writer.ProxyingBeanDefinitionVisitor;
+import org.jspecify.annotations.Nullable;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Ordinary bean with AOP introduction.
  *
+ * @param <R> The builder result type
  * @author Denis Stepanov
  * @since 4.0.0
  */
 @Internal
-final class AopIntroductionProxySupportedBeanElementCreator extends DeclaredBeanElementCreator {
+final class AopIntroductionProxySupportedBeanElementCreator<R> extends DeclaredBeanElementCreator<R> {
 
-    AopIntroductionProxySupportedBeanElementCreator(ClassElement classElement, VisitorContext visitorContext, boolean isAopProxy) {
-        super(classElement, visitorContext, isAopProxy);
-    }
+    private final ElementProxyBuilder<R> introductionProxyBuilder;
 
-    @Override
-    protected BeanDefinitionVisitor createBeanDefinitionVisitor() {
+    AopIntroductionProxySupportedBeanElementCreator(ClassElement classElement,
+                                                    VisitorContext visitorContext,
+                                                    boolean isAopProxy,
+                                                    ElementBeanDefinitionBuilderFactory<R> beanDefinitionBuilder) {
+        super(classElement, visitorContext, isAopProxy, beanDefinitionBuilder);
         if (classElement.isFinal()) {
             throw new ProcessingException(classElement, "Cannot apply AOP advice to final class. Class must be made non-final to support proxying: " + classElement.getName());
         }
-        aopProxyVisitor = createIntroductionAopProxyWriter(classElement, visitorContext);
-        aopProxyVisitor.visitTypeArguments(classElement.getAllTypeArguments());
-        visitAnnotationMetadata(aopProxyVisitor, classElement.getAnnotationMetadata());
-        beanDefinitionWriters.add(aopProxyVisitor);
-        MethodElement constructorElement = classElement.getPrimaryConstructor().orElse(null);
-        if (constructorElement != null) {
-            aopProxyVisitor.visitBeanDefinitionConstructor(
-                constructorElement,
-                constructorElement.isPrivate(),
-                visitorContext
-            );
-        } else {
-            aopProxyVisitor.visitDefaultConstructor(
-                AnnotationMetadata.EMPTY_METADATA,
-                visitorContext
-            );
+        introductionProxyBuilder = beanDefinitionBuilderFactory.introductionProxy(classElement);
+    }
+
+    @Override
+    public List<R> build() {
+        ElementBeanDefinitionBuilder<R> beanDefinitionBuilder = createBeanDefinitionBuilder();
+        build(beanDefinitionBuilder);
+        List<R> result = new ArrayList<>(introductionProxyBuilder.build());
+        for (Builder<List<R>> additionalBuilder : additionalBuilders) {
+            result.addAll(additionalBuilder.build());
         }
-        return aopProxyVisitor;
+        return result;
     }
 
     @Override
-    protected ProxyingBeanDefinitionVisitor getAroundAopProxyVisitor(BeanDefinitionVisitor visitor, MethodElement methodElement) {
-        return aopProxyVisitor;
+    protected ElementBeanDefinitionBuilder<R> createBeanDefinitionBuilder() {
+        return introductionProxyBuilder.beanDefinitionBuilder();
     }
 
     @Override
-    protected boolean visitPropertyReadElement(BeanDefinitionVisitor visitor, PropertyElement propertyElement, MethodElement readElement) {
-        if (intercept(visitor, readElement)) {
+    protected ElementProxyBuilder<R> getAopProxyBuilder(ElementBeanDefinitionBuilder<R> beanDefinitionBuilder, @Nullable MethodElement methodElement) {
+        return introductionProxyBuilder;
+    }
+
+    @Override
+    protected boolean visitPropertyReadElement(ElementBeanDefinitionBuilder<R> beanDefinitionBuilder, PropertyElement propertyElement, MethodElement readElement) {
+        if (intercept(readElement)) {
             return true;
         }
-        return super.visitPropertyReadElement(visitor, propertyElement, readElement);
+        return super.visitPropertyReadElement(beanDefinitionBuilder, propertyElement, readElement);
     }
 
     @Override
-    protected boolean visitPropertyWriteElement(BeanDefinitionVisitor visitor, PropertyElement propertyElement, MethodElement writeElement) {
-        if (intercept(visitor, writeElement)) {
+    protected boolean visitPropertyWriteElement(ElementBeanDefinitionBuilder<R> beanDefinitionBuilder, PropertyElement propertyElement, MethodElement writeElement) {
+        if (intercept(writeElement)) {
             return true;
         }
-        return super.visitPropertyWriteElement(visitor, propertyElement, writeElement);
+        return super.visitPropertyWriteElement(beanDefinitionBuilder, propertyElement, writeElement);
     }
 
     @Override
-    protected boolean visitMethod(BeanDefinitionVisitor visitor, MethodElement methodElement) {
-        if (intercept(visitor, methodElement)) {
+    protected boolean visitMethod(ElementBeanDefinitionBuilder<R> beanDefinitionBuilder, MethodElement methodElement) {
+        if (intercept(methodElement)) {
             return true;
         }
-        return super.visitMethod(visitor, methodElement);
+        return super.visitMethod(beanDefinitionBuilder, methodElement);
     }
 
-    private boolean intercept(BeanDefinitionVisitor visitor, MethodElement methodElement) {
-        return !methodElement.isFinal() && visitIntrospectedMethod(visitor, classElement, methodElement);
+    private boolean intercept(MethodElement methodElement) {
+        return !methodElement.isFinal() && visitIntrospectedMethod(introductionProxyBuilder, methodElement);
     }
 
 }

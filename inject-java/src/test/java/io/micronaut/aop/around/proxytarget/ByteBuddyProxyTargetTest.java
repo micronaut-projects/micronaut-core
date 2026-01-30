@@ -16,11 +16,11 @@ class ByteBuddyProxyTargetTest {
     @Test
     void test() {
         try (ApplicationContext context = ApplicationContext.run(Map.of("spec.name", "RuntimeProxyTest"))) {
-            ButeBuddyProxyTargetProxyingClass<String> proxyingClass = context.getBean(ButeBuddyProxyTargetProxyingClass.class);
-            ButeBuddyProxyTargetProxyingClass<String> target = null;
+            ByteBuddyProxyTargetProxyingClass<String> proxyingClass = context.getBean(ByteBuddyProxyTargetProxyingClass.class);
+            ByteBuddyProxyTargetProxyingClass<String> target = null;
             if (proxyingClass instanceof InterceptedProxy<?> interceptedProxy) {
                 assertEquals(true, interceptedProxy.hasCachedInterceptedTarget());
-                target = (ButeBuddyProxyTargetProxyingClass<String>) interceptedProxy.interceptedTarget();
+                target = (ByteBuddyProxyTargetProxyingClass<String>) interceptedProxy.interceptedTarget();
             }
             // Assert @PostConstruct init() was invoked exactly once
             assertEquals(1, target.lifeCycleCount, "PostConstruct init() should increment lifeCycleCount once");
