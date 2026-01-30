@@ -13,4 +13,5 @@
     </root>
     <logger name="io.micronaut.context" level="warn"/>
     <logger name="io.micronaut.web.router" level="trace"/>
+<!--    <logger name="io.micronaut.http" level="trace" />-->
 </configuration>

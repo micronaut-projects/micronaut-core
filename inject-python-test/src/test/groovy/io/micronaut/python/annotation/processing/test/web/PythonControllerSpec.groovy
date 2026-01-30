@@ -3,8 +3,11 @@ package io.micronaut.python.annotation.processing.test.web
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Replaces
 import io.micronaut.core.beans.BeanIntrospection
+import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.HttpClient
+import io.micronaut.json.JsonMapper
 import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementSpec
 import io.micronaut.runtime.server.EmbeddedServer
 import jakarta.inject.Singleton
@@ -153,6 +156,114 @@ class HelloController:
 
         expect:
         client.toBlocking().retrieve("/hello/John") == "{\"message\":\"Hello John\"}"
+
+        cleanup:
+        client.close()
+        context?.close()
+    }
+
+    void "test python controller generic JSON response"() {
+        given:
+        def context = buildContext('''
+from jakarta.inject import Singleton as S
+from micronaut.http.annotation import Controller, Get
+from micronaut.core.annotation import Introspected
+from micronaut.http import HttpResponse
+from dataclasses import dataclass
+
+@Introspected
+@dataclass
+class Message:
+    message: str = "Who are you?"
+
+@S
+class MessageService:
+    def say_hello(self, name : str) -> Message:
+        text = f"Hello {name}"
+        return Message(text)
+
+@Controller("/hello")
+class HelloController:
+    def __init__(self, messageService: MessageService):
+        self.messageService = messageService
+
+    @Get("/{name}")
+    def say_hello(self, name : str) -> HttpResponse[Message]:
+        response = HttpResponse.ok(self.messageService.say_hello(name))
+        response.header("Foo", "Bar")
+        return response
+
+
+''', true)
+
+        def embeddedServer = context.getBean(EmbeddedServer)
+        embeddedServer.start()
+        def client = context.createBean(HttpClient, embeddedServer.URL)
+
+
+        def response = client.toBlocking().exchange("/hello/John", String)
+        expect:
+        response.header("Foo") == "Bar"
+        response.body() == "{\"message\":\"Hello John\"}"
+
+        cleanup:
+        client.close()
+        context?.close()
+    }
+
+    void "test python controller generic JSON exchange"() {
+        given:
+        def context = buildContext('''
+from jakarta.inject import Singleton as S
+from micronaut.http.annotation import Controller, Post, Body
+from micronaut.core.annotation import Introspected
+from micronaut.http import HttpResponse, HttpRequest
+from dataclasses import dataclass
+from typing import Annotated
+
+@Introspected
+@dataclass
+class Message:
+    message: str = "Who are you?"
+
+@Introspected
+@dataclass
+class Person:
+    name: str = None
+
+@S
+class MessageService:
+    def say_hello(self, name : str) -> Message:
+        text = f"Hello {name}"
+        return Message(text)
+
+@Controller("/hello")
+class HelloController:
+    def __init__(self, messageService: MessageService):
+        self.messageService = messageService
+
+    @Post("/")
+    def say_hello(self, request : HttpRequest[Person]) -> HttpResponse[Message]:
+        response = HttpResponse.ok(self.messageService.say_hello(request.getBody().get().getName()))
+        response.header("Foo", "Bar")
+        return response
+
+
+''', true)
+
+        def embeddedServer = context.getBean(EmbeddedServer)
+        embeddedServer.start()
+        def client = context.createBean(HttpClient, embeddedServer.URL)
+
+        def personClass = context.classLoader.loadClass('python.Person')
+        def person = personClass.newInstance("John")
+        def jsonMapper = context.getBean(JsonMapper)
+        person = jsonMapper.readValue(jsonMapper.writeValueAsString(person), personClass)
+
+        def response = client.toBlocking().exchange(HttpRequest.POST("/hello", person), String)
+        expect:
+        response.header("Foo") == "Bar"
+        response.body() == "{\"message\":\"Hello John\"}"
 
         cleanup:
         client.close()

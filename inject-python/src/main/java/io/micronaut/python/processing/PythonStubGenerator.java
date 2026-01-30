@@ -35,6 +35,7 @@ import io.micronaut.aop.Introduction;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Creator;
 import io.micronaut.core.annotation.Vetoed;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.inject.ast.Element;
@@ -153,6 +154,17 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     }
 
                     boolean isIntrospectedBean = element.hasStereotype(Introspected.class);
+
+                    if (isIntrospectedBean) {
+                        // add default constructor
+                        MethodDef.MethodDefBuilder defaultConstructor = MethodDef.constructor().addModifiers(Modifier.PUBLIC);
+                        defaultConstructor.addAnnotation(Creator.class);
+                        context.getClassElement("com.fasterxml.jackson.annotation.JsonCreator").ifPresent(t ->
+                            defaultConstructor.addAnnotation(t.getName())
+                        );
+
+                        builder.addMethod(defaultConstructor.build());
+                    }
 
                     List<PropertyElement> beanProperties = element.getBeanProperties();
                     Map<String, FieldDef> propertyFields = new LinkedHashMap<>();

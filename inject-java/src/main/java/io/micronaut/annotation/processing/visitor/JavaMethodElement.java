@@ -283,13 +283,9 @@ public class JavaMethodElement extends AbstractJavaMemberElement implements Meth
 
     @Override
     public @NonNull MethodElement withNewOwningType(@NonNull ClassElement owningType) {
-        ClassElement copy = owningType;
-        return new JavaMethodElement(this.owningType, getNativeType(), elementAnnotationMetadataFactory, visitorContext) {
-            @Override
-            public ClassElement getOwningType() {
-                return copy;
-            }
-        };
+        JavaMethodElement javaMethodElement = new JavaMethodElement((JavaClassElement) owningType, getNativeType(), elementAnnotationMetadataFactory, visitorContext);
+        copyValues(javaMethodElement);
+        return javaMethodElement;
     }
 
     @Override
