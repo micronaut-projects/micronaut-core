@@ -1260,32 +1260,29 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
 
         if (buildMethodDefinition.postConstruct != null) {
             //  for "super bean definition" we only add code to trigger "initialize"
-            if (!superBeanDefinition) {
-                classDefBuilder.addSuperinterface(TypeDef.of(InitializingBeanDefinition.class));
+            classDefBuilder.addSuperinterface(TypeDef.of(InitializingBeanDefinition.class));
+            if (buildMethodDefinition.postConstruct.intercepted) {
+                // Create a new method that will be invoked by the intercepted chain
+                MethodDef targetInitializeMethod = buildInitializeMethod(buildMethodDefinition.postConstruct, MethodDef.builder("initialize$intercepted")
+                    .addModifiers(Modifier.PUBLIC)
+                    .addParameters(BeanResolutionContext.class, BeanContext.class, Object.class)
+                    .returns(Object.class));
 
-                if (buildMethodDefinition.postConstruct.intercepted) {
-                    // Create a new method that will be invoked by the intercepted chain
-                    MethodDef targetInitializeMethod = buildInitializeMethod(buildMethodDefinition.postConstruct, MethodDef.builder("initialize$intercepted")
-                        .addModifiers(Modifier.PUBLIC)
-                        .addParameters(BeanResolutionContext.class, BeanContext.class, Object.class)
-                        .returns(Object.class));
+                classDefBuilder.addMethod(
+                    targetInitializeMethod
+                );
 
-                    classDefBuilder.addMethod(
-                        targetInitializeMethod
-                    );
-
-                    // Original initialize method is invoking the interceptor chain
-                    classDefBuilder.addMethod(
-                        MethodDef.override(METHOD_INITIALIZE).build((aThis, methodParameters) -> {
-                            ClassTypeDef executableMethodInterceptor = createExecutableMethodInterceptor(targetInitializeMethod, "InitializeInterceptor");
-                            return interceptAndReturn(aThis, methodParameters, executableMethodInterceptor, INITIALIZE_INTERCEPTOR_METHOD);
-                        })
-                    );
-                } else {
-                    classDefBuilder.addMethod(
-                        buildInitializeMethod(buildMethodDefinition.postConstruct, MethodDef.override(METHOD_INITIALIZE))
-                    );
-                }
+                // Original initialize method is invoking the interceptor chain
+                classDefBuilder.addMethod(
+                    MethodDef.override(METHOD_INITIALIZE).build((aThis, methodParameters) -> {
+                        ClassTypeDef executableMethodInterceptor = createExecutableMethodInterceptor(targetInitializeMethod, "InitializeInterceptor");
+                        return interceptAndReturn(aThis, methodParameters, executableMethodInterceptor, INITIALIZE_INTERCEPTOR_METHOD);
+                    })
+                );
+            } else {
+                classDefBuilder.addMethod(
+                    buildInitializeMethod(buildMethodDefinition.postConstruct, MethodDef.override(METHOD_INITIALIZE))
+                );
             }
         }
 
