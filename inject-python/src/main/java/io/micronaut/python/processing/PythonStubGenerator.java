@@ -253,15 +253,39 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         builder.addMethod(MethodDef.builder(AS_POLYGLOT_VALUE)
                             .addModifiers(Modifier.PUBLIC)
                             .returns(POLYGLOT_VALUE).build(((aThis, methodParameters) -> {
-                                    List<ExpressionDef> args = new ArrayList<>();
-                                    args.add(ExpressionDef.constant(element.getPackageName()));
-                                    args.add(ExpressionDef.constant(element.getSimpleName()));
-                                    for (PropertyElement beanProperty : beanProperties) {
-                                        FieldDef field = propertyFields.get(beanProperty.getName());
-                                        ExpressionDef fieldRef = aThis.field(field);
-                                        args.add(coerceTypedElementToPolyglotValue(beanProperty, fieldRef));
+                                    var primaryCtor = element.getPrimaryConstructor().orElse(null);
+                                    if (primaryCtor == null) {
+                                        // No explicit constructor: instantiate with no args and set members via map
+                                        List<ExpressionDef> mapEntries = new ArrayList<>();
+                                        for (PropertyElement beanProperty : beanProperties) {
+                                            FieldDef field = propertyFields.get(beanProperty.getName());
+                                            ExpressionDef fieldRef = aThis.field(field);
+                                            mapEntries.add(ExpressionDef.constant(beanProperty.getName()));
+                                            mapEntries.add(coerceTypedElementToPolyglotValue(beanProperty, fieldRef));
+                                        }
+                                        ExpressionDef propsMap = ClassTypeDef.of(AnnotationUtil.class)
+                                            .invokeStatic("mapOf", TypeDef.of(Map.class), mapEntries);
+                                        return CONTEXT_HOLDER.invokeStatic(
+                                            "newInstance",
+                                            POLYGLOT_VALUE,
+                                            List.of(
+                                                ExpressionDef.constant(element.getPackageName()),
+                                                ExpressionDef.constant(element.getSimpleName()),
+                                                propsMap
+                                            )
+                                        ).returning();
+                                    } else {
+                                        // Constructor present: use positional args
+                                        List<ExpressionDef> args = new ArrayList<>();
+                                        args.add(ExpressionDef.constant(element.getPackageName()));
+                                        args.add(ExpressionDef.constant(element.getSimpleName()));
+                                        for (PropertyElement beanProperty : beanProperties) {
+                                            FieldDef field = propertyFields.get(beanProperty.getName());
+                                            ExpressionDef fieldRef = aThis.field(field);
+                                            args.add(coerceTypedElementToPolyglotValue(beanProperty, fieldRef));
+                                        }
+                                        return CONTEXT_HOLDER.invokeStatic(isAbstractIntro ? "newIntroduction" : "newInstance", POLYGLOT_VALUE, args).returning();
                                     }
-                                    return CONTEXT_HOLDER.invokeStatic(isAbstractIntro ? "newIntroduction" : "newInstance", POLYGLOT_VALUE, args).returning();
                                 })
                             ));
                     } else {

@@ -108,6 +108,28 @@ public final class ContextHolder {
         return instantiate(packageName, simpleName, args, pythonClass);
     }
 
+    /**
+     * Create a new instance and set properties via member assignment when no constructor exists.
+     * This overload accepts a map of property values and will instantiate the Python class with
+     * no positional arguments, then populate attributes using Graal Polyglot putMember.
+     *
+     * @param packageName The package name (nullable)
+     * @param simpleName  The simple class name
+     * @param props       Map of property names to values
+     * @return The new instance with members populated.
+     */
+    @UsedByGeneratedCode
+    public static Value newInstance(@Nullable String packageName, String simpleName, java.util.Map<String, Object> props) {
+        Value pythonClass = findClass(packageName, simpleName);
+        Value instance = instantiate(packageName, simpleName, new Object[0], pythonClass);
+        if (props != null && !props.isEmpty()) {
+            for (java.util.Map.Entry<String, Object> e : props.entrySet()) {
+                instance.putMember(e.getKey(), e.getValue());
+            }
+        }
+        return instance;
+    }
+
     private static Value instantiate(String packageName, String simpleName, Object[] args, Value pythonClass) {
         if (pythonClass.canInstantiate()) {
             return pythonClass.newInstance(args);
@@ -172,7 +194,7 @@ public final class ContextHolder {
                 if ("Unnamed".equals(scriptName)) {
                     return v;
                 } else {
-                    Value member = ctx.eval(PYTHON, "import " + scriptName )
+                    Value member = ctx.eval(PYTHON, "import " + scriptName)
                         .getMember(scriptName);
                     if (member == null) {
                         throw new InstantiationException("Cannot find Python module: " + packageName);
@@ -180,7 +202,7 @@ public final class ContextHolder {
                     return member;
                 }
             } else {
-                Value member = ctx.eval(PYTHON, "from " + packageName + " import " + scriptName )
+                Value member = ctx.eval(PYTHON, "from " + packageName + " import " + scriptName)
                     .getMember(scriptName);
                 if (member == null) {
                     throw new InstantiationException("Cannot find Python module: " + packageName);
