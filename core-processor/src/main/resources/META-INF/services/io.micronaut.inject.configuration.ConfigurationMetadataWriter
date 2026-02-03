@@ -1,1 +1,2 @@
 io.micronaut.inject.configuration.JsonConfigurationMetadataWriter
+io.micronaut.inject.configuration.JsonSchemaConfigurationMetadataWriter
