@@ -87,6 +87,7 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
     private static final String STRING = "string";
     private static final String DURATION = "duration";
     private static final String ATTR_ADDITIONAL_PROPERTIES = "additionalProperties";
+    private static final String BOOLEAN = "boolean";
 
     @Override
     public void write(ConfigurationMetadataBuilder metadataBuilder, ClassWriterOutputVisitor outputVisitor) throws IOException {
@@ -551,7 +552,7 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
 
     private void writeSimpleTypeName(Writer out, String fqcn) throws IOException {
         String type = switch (fqcn) {
-            case "boolean", "java.lang.Boolean" -> "boolean";
+            case BOOLEAN, "java.lang.Boolean" -> BOOLEAN;
             case "byte", "short", "int", "long", "java.lang.Byte", "java.lang.Short",
                  "java.lang.Integer", "java.lang.Long", "java.math.BigInteger" -> "integer";
             case "float", "double", "java.lang.Float", "java.lang.Double", "java.math.BigDecimal" ->
@@ -565,7 +566,7 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
     private @Nullable Object coerceDefault(String value, String typeName) {
         try {
             return switch (typeName) {
-                case "boolean", "java.lang.Boolean" -> Boolean.parseBoolean(value);
+                case BOOLEAN, "java.lang.Boolean" -> Boolean.parseBoolean(value);
                 case "byte", "short", "int", "long", "java.lang.Byte", "java.lang.Short",
                      "java.lang.Integer", "java.lang.Long", "java.math.BigInteger" ->
                     Long.parseLong(value);
