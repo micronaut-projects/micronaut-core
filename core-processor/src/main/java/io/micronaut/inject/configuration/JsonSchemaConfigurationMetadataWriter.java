@@ -15,9 +15,11 @@
  */
 package io.micronaut.inject.configuration;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.PropertyElement;
@@ -42,7 +44,6 @@ import java.util.OptionalInt;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.function.BiFunction;
-import java.util.function.Function;
 
 /**
  * A {@link ConfigurationMetadataWriter} that writes per-class JSON Schema (Draft 2020-12)
@@ -51,6 +52,41 @@ import java.util.function.Function;
 public final class JsonSchemaConfigurationMetadataWriter implements ConfigurationMetadataWriter {
 
     private static final String SCHEMAS_DIR = "micronaut-configuration-schemas";
+    private static final String ATTR_MIN = "minimum";
+    private static final String ATTR_MAX = "maximum";
+    private static final String ATTR_CONST = "const";
+    private static final String ATTR_FORMAT = "format";
+    private static final String ATTR_PATTERN = "pattern";
+    private static final String ATTR_TYPE = "type";
+    private static final String ATTR_ENUM = "enum";
+    private static final String ATTR_PROPERTIES = "properties";
+    private static final String JV_NOT_NULL = "jakarta.validation.constraints.NotNull";
+    private static final String JV_NOT_BLANK = "jakarta.validation.constraints.NotBlank";
+    private static final String JV_ASSERT_TRUE = "jakarta.validation.constraints.AssertTrue";
+    private static final String JV_ASSERT_FALSE = "jakarta.validation.constraints.AssertFalse";
+    private static final String JV_EMAIL = "jakarta.validation.constraints.Email";
+    private static final String JV_PATTERN = "jakarta.validation.constraints.Pattern";
+    private static final String JV_SIZE = "jakarta.validation.constraints.Size";
+    private static final String JV_NOT_EMPTY = "jakarta.validation.constraints.NotEmpty";
+    private static final String ATTR_MIN_PROPERTIES = "minProperties";
+    private static final String ATTR_MAX_PROPERTIES = "maxProperties";
+    private static final String JV_MIN = "jakarta.validation.constraints.Min";
+    private static final String JV_MAX = "jakarta.validation.constraints.Max";
+    private static final String JV_DIGITS = "jakarta.validation.constraints.Digits";
+    private static final String JV_NEGATIVE = "jakarta.validation.constraints.Negative";
+    private static final String JV_NEGATIVE_OR_ZERO = "jakarta.validation.constraints.NegativeOrZero";
+    private static final String ATTR_EXCLUSIVE_MINIMUM = "exclusiveMinimum";
+    private static final String ATTR_EXCLUSIVE_MAXIMUM = "exclusiveMaximum";
+    private static final String JV_POSITIVE = "jakarta.validation.constraints.Positive";
+    private static final String JV_POSITIVE_OR_ZERO = "jakarta.validation.constraints.PositiveOrZero";
+    private static final String OBJECT = "object";
+    private static final String DEFAULT = "default";
+    private static final String ARRAY = "array";
+    private static final String ATTR_MIN_ITEMS = "minItems";
+    private static final String URL_JSON_SCHEMA = "https://json-schema.org/draft/2020-12/schema";
+    private static final String STRING = "string";
+    private static final String DURATION = "duration";
+    private static final String ATTR_ADDITIONAL_PROPERTIES = "additionalProperties";
 
     @Override
     public void write(ConfigurationMetadataBuilder metadataBuilder, ClassWriterOutputVisitor outputVisitor) throws IOException {
@@ -106,7 +142,7 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
         // JSON begin
         out.write('{');
         attr(out, "$schema");
-        str(out, "https://json-schema.org/draft/2020-12/schema");
+        str(out, URL_JSON_SCHEMA);
         comma(out);
         attr(out, "$id");
         str(out, "urn:micronaut:config:" + cm.getType());
@@ -125,7 +161,7 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
         attr(out, "prefix");
         str(out, basePrefix);
         comma(out);
-        attr(out, "type");
+        attr(out, ATTR_TYPE);
         str(out, cm.getType());
         comma(out);
         boolean isEach = isEachMap || isEachList;
@@ -142,10 +178,10 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
         // Root schema shape
         if (isEachMap) {
             // type: object; minProperties:1; additionalProperties: $ref $defs.Entry
-            attr(out, "type");
-            str(out, "object");
+            attr(out, ATTR_TYPE);
+            str(out, OBJECT);
             comma(out);
-            attr(out, "minProperties");
+            attr(out, ATTR_MIN_PROPERTIES);
             out.write("1");
             comma(out);
             emitAdditionalPropertiesRef(out);
@@ -153,10 +189,10 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
             emitEntryDefs(cm, basePrefix, allProps, vc, out, true, vc != null ? vc.getClassElement(cm.getType()).orElse(null) : null);
         } else if (isEachList) {
             // type: array; minItems:1; items: $ref $defs.Entry
-            attr(out, "type");
-            str(out, "array");
+            attr(out, ATTR_TYPE);
+            str(out, ARRAY);
             comma(out);
-            attr(out, "minItems");
+            attr(out, ATTR_MIN_ITEMS);
             out.write("1");
             comma(out);
             attr(out, "items");
@@ -164,11 +200,11 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
             emitEntryDefs(cm, basePrefix, allProps, vc, out, false, vc != null ? vc.getClassElement(cm.getType()).orElse(null) : null);
         } else {
             // Plain configuration object
-            attr(out, "type");
-            str(out, "object");
+            attr(out, ATTR_TYPE);
+            str(out, OBJECT);
             comma(out);
             // properties: object
-            attr(out, "properties");
+            attr(out, ATTR_PROPERTIES);
             ClassElement classElement = vc != null ? vc.getClassElement(cm.getType()).orElse(null) : null;
             Set<String> required = writePropertiesObject(out, cm, basePrefix, allProps, vc, /*containerMode*/ null, classElement);
             emitRequired(out, required);
@@ -205,10 +241,10 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
         out.write('{');
         attr(out, "Entry");
         out.write('{');
-        attr(out, "type");
-        str(out, "object");
+        attr(out, ATTR_TYPE);
+        str(out, OBJECT);
         comma(out);
-        attr(out, "properties");
+        attr(out, ATTR_PROPERTIES);
         Set<String> required = writePropertiesObject(out, cm, basePrefix, allProps, vc, mapMode ? ContainerMode.MAP : ContainerMode.LIST, classElement);
         emitRequired(out, required);
         out.write('}');
@@ -312,7 +348,7 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
                 Object coerced = coerceDefault(pm.getDefaultValue(), pm.getType());
                 if (coerced != null) {
                     out.write(',');
-                    attr(out, "default");
+                    attr(out, DEFAULT);
                     writeJsonValue(out, coerced);
                     wroteDefault = true;
                 } else {
@@ -342,7 +378,7 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
                                 Object aDefault = coerceDefault(defaultValue, pm.getType());
                                 if (aDefault != null) {
                                     out.write(',');
-                                    attr(out, "default");
+                                    attr(out, DEFAULT);
                                     writeJsonValue(out, aDefault);
                                 }
                             } else {
@@ -352,7 +388,7 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
                                     Object constantValue = constantField.getConstantValue();
                                     if (constantValue != null) {
                                         out.write(',');
-                                        attr(out, "default");
+                                        attr(out, DEFAULT);
                                         writeJsonValue(out, constantValue);
                                     }
                                 }
@@ -374,10 +410,10 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
         } else if (node instanceof Map) {
             Map<String, Object> m = (Map<String, Object>) node;
             out.write('{');
-            attr(out, "type");
-            str(out, "object");
+            attr(out, ATTR_TYPE);
+            str(out, OBJECT);
             out.write(',');
-            attr(out, "properties");
+            attr(out, ATTR_PROPERTIES);
             emitProperties(out, vc, classElement, m, requiredOut);
             out.write('}');
         } else {
@@ -410,10 +446,10 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
             // Collection/Array
             if (t.isArray() || t.isIterable()) {
                 out.write('"');
-                out.write("type");
+                out.write(ATTR_TYPE);
                 out.write('"');
                 out.write(':');
-                str(out, "array");
+                str(out, ARRAY);
                 out.write(',');
                 attr(out, "items");
                 if (t.isArray()) {
@@ -435,12 +471,12 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
             // Map
             if (t.isAssignable(Map.class)) {
                 out.write('"');
-                out.write("type");
+                out.write(ATTR_TYPE);
                 out.write('"');
                 out.write(':');
-                str(out, "object");
+                str(out, OBJECT);
                 out.write(',');
-                attr(out, "additionalProperties");
+                attr(out, ATTR_ADDITIONAL_PROPERTIES);
                 ClassElement v = t.getTypeArguments().get("V");
                 if (v == null) {
                     v = t;
@@ -471,10 +507,10 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
     private void writeSimpleTypeSchema(Writer out, ClassElement t) throws IOException {
         // Enum
         if (t.isEnum()) {
-            attr(out, "type");
-            str(out, "string");
+            attr(out, ATTR_TYPE);
+            str(out, STRING);
             out.write(',');
-            attr(out, "enum");
+            attr(out, ATTR_ENUM);
             out.write('[');
             List<String> values;
             if (t instanceof io.micronaut.inject.ast.EnumElement ee) {
@@ -494,19 +530,19 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
         // URI/URL
         String n = t.getName();
         if ("java.net.URI".equals(n) || "java.net.URL".equals(n)) {
-            attr(out, "type");
-            str(out, "string");
+            attr(out, ATTR_TYPE);
+            str(out, STRING);
             out.write(',');
-            attr(out, "format");
+            attr(out, ATTR_FORMAT);
             str(out, "uri");
             return;
         }
         if ("java.time.Duration".equals(n)) {
-            attr(out, "type");
-            str(out, "string");
+            attr(out, ATTR_TYPE);
+            str(out, STRING);
             out.write(',');
-            attr(out, "format");
-            str(out, "duration");
+            attr(out, ATTR_FORMAT);
+            str(out, DURATION);
             return;
         }
         // Basic primitives/wrappers/strings
@@ -520,9 +556,9 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
                  "java.lang.Integer", "java.lang.Long", "java.math.BigInteger" -> "integer";
             case "float", "double", "java.lang.Float", "java.lang.Double", "java.math.BigDecimal" ->
                 "number";
-            default -> "string";
+            default -> STRING;
         };
-        attr(out, "type");
+        attr(out, ATTR_TYPE);
         str(out, type);
     }
 
@@ -549,7 +585,7 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
                 return;
             }
             case Boolean b -> {
-                out.write(b ? "true" : "false");
+                out.write(b ? StringUtils.TRUE : StringUtils.FALSE);
                 return;
             }
             case Number number -> {
@@ -565,7 +601,7 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
     }
 
     private void emitAdditionalPropertiesRef(Writer out) throws IOException {
-        attr(out, "additionalProperties");
+        attr(out, ATTR_ADDITIONAL_PROPERTIES);
         refEntry(out);
     }
 
@@ -598,10 +634,6 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
                                             PropertyElement pe,
                                             @Nullable String currentKey,
                                             Set<String> requiredOut) throws IOException {
-        Function<String, Boolean> has = ann -> {
-            List<AnnotationValue<Annotation>> values = pe.getDeclaredAnnotationValuesByName(ann);
-            return !values.isEmpty();
-        };
         BiFunction<String, String, @Nullable String> sval = (ann, member) ->
             pe.stringValue(ann, member).orElseGet(() -> {
                 List<AnnotationValue<Annotation>> values = pe.getDeclaredAnnotationValuesByName(ann);
@@ -612,88 +644,46 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
             }
         );
 
-        BiFunction<String, String, @Nullable Integer> ival = (ann, member) -> {
-            OptionalInt opt = pe.intValue(ann, member);
-            if (opt.isPresent()) {
-                return opt.getAsInt();
-            } else {
-                List<AnnotationValue<Annotation>> values = pe.getDeclaredAnnotationValuesByName(ann);
-                if (!values.isEmpty()) {
-                    OptionalInt optionalInt = values.getFirst().intValue(member);
-                    if (optionalInt.isPresent()) {
-                        return optionalInt.getAsInt();
-                    }
-                }
-                return null;
-            }
-        };
-
-        java.util.function.BiFunction<String, String, @Nullable Long> lval = (ann, member) -> {
-            OptionalLong opt = pe.longValue(ann, member);
-            if (opt.isPresent()) {
-                return opt.getAsLong();
-            } else {
-                List<AnnotationValue<Annotation>> values = pe.getDeclaredAnnotationValuesByName(ann);
-                if (!values.isEmpty()) {
-                    OptionalLong optionalInt = values.getFirst().longValue(member);
-                    if (optionalInt.isPresent()) {
-                        return optionalInt.getAsLong();
-                    }
-                }
-                return null;
-            }
-        };
-
-        java.util.function.BiFunction<String, String, @Nullable Boolean> bval = (ann, member) ->
-            pe.booleanValue(ann, member).orElseGet(() -> {
-                    List<AnnotationValue<Annotation>> values = pe.getDeclaredAnnotationValuesByName(ann);
-                    if (!values.isEmpty()) {
-                        return values.getFirst().booleanValue(member).orElse(null);
-                    }
-                    return null;
-                }
-            );
-
         // Collect NotNull -> required
-        if ((has.apply("jakarta.validation.constraints.NotNull") || has.apply("jakarta.validation.constraints.NotBlank")) && currentKey != null) {
+        if ((hasValidationAnnotation(pe, JV_NOT_NULL) || hasValidationAnnotation(pe, JV_NOT_BLANK)) && currentKey != null) {
             requiredOut.add(currentKey);
         }
         // Null -> const null? skip (rare); users should use @Nullable to allow nulls
         // AssertTrue/False -> const
-        if (has.apply("jakarta.validation.constraints.AssertTrue")) {
+        if (hasValidationAnnotation(pe, JV_ASSERT_TRUE)) {
             comma(out);
-            attr(out, "const");
-            out.write("true");
+            attr(out, ATTR_CONST);
+            out.write(StringUtils.TRUE);
         }
-        if (has.apply("jakarta.validation.constraints.AssertFalse")) {
+        if (hasValidationAnnotation(pe, JV_ASSERT_FALSE)) {
             comma(out);
-            attr(out, "const");
-            out.write("false");
+            attr(out, ATTR_CONST);
+            out.write(StringUtils.FALSE);
         }
         // Email
-        if (has.apply("jakarta.validation.constraints.Email")) {
+        if (hasValidationAnnotation(pe, JV_EMAIL)) {
             comma(out);
-            attr(out, "format");
+            attr(out, ATTR_FORMAT);
             str(out, "email");
         }
         // Pattern
-        String pattern = sval.apply("jakarta.validation.constraints.Pattern", "regexp");
+        String pattern = sval.apply(JV_PATTERN, "regexp");
         if (pattern != null && !pattern.isEmpty()) {
             comma(out);
-            attr(out, "pattern");
+            attr(out, ATTR_PATTERN);
             str(out, pattern);
         }
         // Size
-        Integer sizeMinBox = ival.apply("jakarta.validation.constraints.Size", "min");
-        Integer sizeMaxBox = ival.apply("jakarta.validation.constraints.Size", "max");
+        Integer sizeMinBox = intValue(pe, JV_SIZE, "min");
+        Integer sizeMaxBox = intValue(pe, JV_SIZE, "max");
         int sizeMin = sizeMinBox == null ? -1 : sizeMinBox;
         int sizeMax = sizeMaxBox == null ? -1 : sizeMaxBox;
         ClassElement t = pe.getType();
-        boolean isString = "java.lang.String".equals(t.getName());
+        boolean isString = String.class.getName().equals(t.getName());
         boolean isArray = t.isArray() || t.isIterable();
         boolean isMap = t.isAssignable(java.util.Map.class);
         if (isString) {
-            if (has.apply("jakarta.validation.constraints.NotBlank") || has.apply("jakarta.validation.constraints.NotEmpty")) {
+            if (hasValidationAnnotation(pe, JV_NOT_BLANK) || hasValidationAnnotation(pe, JV_NOT_EMPTY)) {
                 sizeMin = Math.max(sizeMin, 1);
             }
             if (sizeMin >= 0) {
@@ -707,12 +697,12 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
                 out.write(Integer.toString(sizeMax));
             }
         } else if (isArray) {
-            if (has.apply("jakarta.validation.constraints.NotEmpty")) {
+            if (hasValidationAnnotation(pe, JV_NOT_EMPTY)) {
                 sizeMin = Math.max(sizeMin, 1);
             }
             if (sizeMin >= 0) {
                 comma(out);
-                attr(out, "minItems");
+                attr(out, ATTR_MIN_ITEMS);
                 out.write(Integer.toString(sizeMin));
             }
             if (sizeMax >= 0) {
@@ -721,80 +711,80 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
                 out.write(Integer.toString(sizeMax));
             }
         } else if (isMap) {
-            if (has.apply("jakarta.validation.constraints.NotEmpty")) {
+            if (hasValidationAnnotation(pe, JV_NOT_EMPTY)) {
                 sizeMin = Math.max(sizeMin, 1);
             }
             if (sizeMin >= 0) {
                 comma(out);
-                attr(out, "minProperties");
+                attr(out, ATTR_MIN_PROPERTIES);
                 out.write(Integer.toString(sizeMin));
             }
             if (sizeMax >= 0) {
                 comma(out);
-                attr(out, "maxProperties");
+                attr(out, ATTR_MAX_PROPERTIES);
                 out.write(Integer.toString(sizeMax));
             }
         }
         // Min/Max
-        Long min = lval.apply("jakarta.validation.constraints.Min", "value");
-        Long max = lval.apply("jakarta.validation.constraints.Max", "value");
+        Long min = longValue(pe, JV_MIN, AnnotationMetadata.VALUE_MEMBER);
+        Long max = longValue(pe, JV_MAX, AnnotationMetadata.VALUE_MEMBER);
         if (min != null) {
             comma(out);
-            attr(out, "minimum");
+            attr(out, ATTR_MIN);
             out.write(Long.toString(min));
         }
         if (max != null) {
             comma(out);
-            attr(out, "maximum");
+            attr(out, ATTR_MAX);
             out.write(Long.toString(max));
         }
         // DecimalMin/DecimalMax
-        String dmin = sval.apply("jakarta.validation.constraints.DecimalMin", "value");
-        Boolean dminInc = bval.apply("jakarta.validation.constraints.DecimalMin", "inclusive");
+        String dmin = sval.apply("jakarta.validation.constraints.DecimalMin", AnnotationMetadata.VALUE_MEMBER);
+        Boolean dminInc = booleanValue(pe, "jakarta.validation.constraints.DecimalMin", "inclusive");
         if (dmin != null) {
             comma(out);
             if (dminInc == null || dminInc) {
-                attr(out, "minimum");
+                attr(out, ATTR_MIN);
             } else {
-                attr(out, "exclusiveMinimum");
+                attr(out, ATTR_EXCLUSIVE_MINIMUM);
             }
             out.write(dmin);
         }
-        String dmax = sval.apply("jakarta.validation.constraints.DecimalMax", "value");
-        Boolean dmaxInc = bval.apply("jakarta.validation.constraints.DecimalMax", "inclusive");
+        String dmax = sval.apply("jakarta.validation.constraints.DecimalMax", AnnotationMetadata.VALUE_MEMBER);
+        Boolean dmaxInc = booleanValue(pe, "jakarta.validation.constraints.DecimalMax", "inclusive");
         if (dmax != null) {
             comma(out);
             if (dmaxInc == null || dmaxInc) {
-                attr(out, "maximum");
+                attr(out, ATTR_MAX);
             } else {
-                attr(out, "exclusiveMaximum");
+                attr(out, ATTR_EXCLUSIVE_MAXIMUM);
             }
             out.write(dmax);
         }
         // Positive / Negative variants
-        if (has.apply("jakarta.validation.constraints.Positive")) {
+        if (hasValidationAnnotation(pe, JV_POSITIVE)) {
             comma(out);
-            attr(out, "exclusiveMinimum");
+            attr(out, ATTR_EXCLUSIVE_MINIMUM);
             out.write("0");
         }
-        if (has.apply("jakarta.validation.constraints.PositiveOrZero")) {
+        if (hasValidationAnnotation(pe, JV_POSITIVE_OR_ZERO)) {
             comma(out);
-            attr(out, "minimum");
+            attr(out, ATTR_MIN);
             out.write("0");
         }
-        if (has.apply("jakarta.validation.constraints.Negative")) {
+        if (hasValidationAnnotation(pe, JV_NEGATIVE)) {
             comma(out);
-            attr(out, "exclusiveMaximum");
+            attr(out, ATTR_EXCLUSIVE_MAXIMUM);
             out.write("0");
         }
-        if (has.apply("jakarta.validation.constraints.NegativeOrZero")) {
+        if (hasValidationAnnotation(pe, JV_NEGATIVE_OR_ZERO)) {
             comma(out);
-            attr(out, "maximum");
+            attr(out, ATTR_MAX);
             out.write("0");
         }
         // Digits -> regex
-        Integer intDigits = ival.apply("jakarta.validation.constraints.Digits", "integer");
-        Integer fracDigits = ival.apply("jakarta.validation.constraints.Digits", "fraction");
+        Integer intDigits = intValue(pe, JV_DIGITS, "integer");
+        Integer fracDigits = intValue(pe, JV_DIGITS, "fraction");
         if (intDigits != null || fracDigits != null) {
             StringBuilder re = new StringBuilder("^");
             int id = intDigits != null ? intDigits : 0;
@@ -809,9 +799,60 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
             }
             re.append("$");
             comma(out);
-            attr(out, "pattern");
+            attr(out, ATTR_PATTERN);
             str(out, re.toString());
         }
+    }
+
+    @Nullable
+    private static Boolean booleanValue(PropertyElement pe, String ann, String member) {
+        return pe.booleanValue(ann, member).orElseGet(() -> {
+                List<AnnotationValue<Annotation>> values = pe.getDeclaredAnnotationValuesByName(ann);
+                if (!values.isEmpty()) {
+                    return values.getFirst().booleanValue(member).orElse(null);
+                }
+                return null;
+            }
+        );
+    }
+
+    @Nullable
+    private static Long longValue(PropertyElement pe, String ann, String member) {
+        OptionalLong opt = pe.longValue(ann, member);
+        if (opt.isPresent()) {
+            return opt.getAsLong();
+        } else {
+            List<AnnotationValue<Annotation>> values = pe.getDeclaredAnnotationValuesByName(ann);
+            if (!values.isEmpty()) {
+                OptionalLong optionalInt = values.getFirst().longValue(member);
+                if (optionalInt.isPresent()) {
+                    return optionalInt.getAsLong();
+                }
+            }
+            return null;
+        }
+    }
+
+    @Nullable
+    private static Integer intValue(PropertyElement pe, String ann, String member) {
+        OptionalInt opt = pe.intValue(ann, member);
+        if (opt.isPresent()) {
+            return opt.getAsInt();
+        } else {
+            List<AnnotationValue<Annotation>> values = pe.getDeclaredAnnotationValuesByName(ann);
+            if (!values.isEmpty()) {
+                OptionalInt optionalInt = values.getFirst().intValue(member);
+                if (optionalInt.isPresent()) {
+                    return optionalInt.getAsInt();
+                }
+            }
+            return null;
+        }
+    }
+
+    private static boolean hasValidationAnnotation(PropertyElement pe, String ann) {
+        List<AnnotationValue<Annotation>> values = pe.getDeclaredAnnotationValuesByName(ann);
+        return !values.isEmpty();
     }
 
     // JSON writing helpers
