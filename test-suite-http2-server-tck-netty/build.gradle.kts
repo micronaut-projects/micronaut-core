@@ -40,7 +40,7 @@ graalvmNative {
     binaries {
         all {
             buildArgs.add("-H:+ReportExceptionStackTraces")
-            if ("21" == org.apache.tools.ant.util.JavaEnvUtils.getJavaVersion()) {
+            if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_21)) {
                 buildArgs.add("--initialize-at-build-time=org.junit.platform.suite.engine.IsSuiteClass")
                 buildArgs.add("--initialize-at-build-time=org.junit.platform.suite.engine.IsPotentialTestContainer")
                 buildArgs.add("-H:+SharedArenaSupport")
