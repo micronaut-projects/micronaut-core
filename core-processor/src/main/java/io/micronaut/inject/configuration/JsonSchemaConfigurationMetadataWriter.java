@@ -30,6 +30,7 @@ import org.jspecify.annotations.Nullable;
 import java.io.IOException;
 import java.io.Writer;
 import java.lang.annotation.Annotation;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -40,6 +41,8 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
 import java.util.Set;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 
 /**
  * A {@link ConfigurationMetadataWriter} that writes per-class JSON Schema (Draft 2020-12)
@@ -86,7 +89,7 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
 
     private void writeSchemaFor(ConfigurationMetadata cm,
                                 List<PropertyMetadata> allProps,
-                                @org.jspecify.annotations.Nullable VisitorContext vc,
+                                @Nullable VisitorContext vc,
                                 Writer out) throws IOException {
         // Determine prefix and whether this is EachProperty
         String fullPrefix = cm.getName(); // may contain .* or [*]
@@ -189,10 +192,10 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
     private void emitEntryDefs(ConfigurationMetadata cm,
                                String basePrefix,
                                List<PropertyMetadata> allProps,
-                               @org.jspecify.annotations.Nullable VisitorContext vc,
+                               @Nullable VisitorContext vc,
                                Writer out,
                                boolean mapMode,
-                               @org.jspecify.annotations.Nullable ClassElement classElement) throws IOException {
+                               @Nullable ClassElement classElement) throws IOException {
         comma(out);
         attr(out, "$defs");
         out.write('{');
@@ -229,9 +232,9 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
                                               ConfigurationMetadata cm,
                                               String basePrefix,
                                               List<PropertyMetadata> allProps,
-                                              @org.jspecify.annotations.Nullable VisitorContext vc,
-                                              @org.jspecify.annotations.Nullable ContainerMode containerMode,
-                                              @org.jspecify.annotations.Nullable ClassElement classElement) throws IOException {
+                                              @Nullable VisitorContext vc,
+                                              @Nullable ContainerMode containerMode,
+                                              @Nullable ClassElement classElement) throws IOException {
         // Build nested property tree from matching properties
         Map<String, Object> tree = new LinkedHashMap<>();
         Set<String> required = new java.util.LinkedHashSet<>();
@@ -285,7 +288,7 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
             Map.Entry<String, Object> e = it.next();
             String key = e.getKey();
             attr(out, key);
-            writeSchemaNode(out, e.getValue(), cm, vc, classElement, key, required);
+            writeSchemaNode(out, e.getValue(), vc, classElement, key, required);
             if (it.hasNext()) {
                 out.write(',');
             }
@@ -295,7 +298,7 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
     }
 
     @SuppressWarnings("unchecked")
-    private void writeSchemaNode(Writer out, Object node, ConfigurationMetadata cm, @org.jspecify.annotations.Nullable VisitorContext vc, @org.jspecify.annotations.Nullable ClassElement classElement, @org.jspecify.annotations.Nullable String currentKey, Set<String> requiredOut) throws IOException {
+    private void writeSchemaNode(Writer out, Object node, @Nullable VisitorContext vc, @Nullable ClassElement classElement, @Nullable String currentKey, Set<String> requiredOut) throws IOException {
         if (node instanceof PropertyMetadata pm) {
             // Leaf property schema
             out.write('{');
@@ -333,11 +336,8 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
             attr(out, "x-micronaut-path");
             str(out, pm.getPath());
             if (vc != null) {
-                ClassElement ceLocal = vc.getClassElement(pm.getDeclaringType()).orElse(null);
-                if (ceLocal != null) {
-                    PropertyElement pe = ceLocal.getBeanProperties().stream()
-                        .filter(p -> p.getName().equals(pm.getName()) || (currentKey != null && p.getName().equals(currentKey)))
-                        .findFirst().orElse(null);
+                if (classElement != null) {
+                    PropertyElement pe = findProperty(classElement, currentKey, pm);
                     if (pe != null) {
                         applyValidationConstraints(out, pe, pm, currentKey, requiredOut, vc);
                         if (!wroteDefault) {
@@ -351,7 +351,7 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
                                 }
                             } else {
                                 String constantName = "DEFAULT_" + NameUtils.environmentName(pm.getName());
-                                FieldElement constantField = ceLocal.getEnclosedElement(ElementQuery.ALL_FIELDS.named(constantName).onlyStatic()).orElse(null);
+                                FieldElement constantField = classElement.getEnclosedElement(ElementQuery.ALL_FIELDS.named(constantName).onlyStatic()).orElse(null);
                                 if (constantField != null) {
                                     Object constantValue = constantField.getConstantValue();
                                     if (constantValue != null) {
@@ -388,7 +388,7 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
                 Map.Entry<String, Object> e = it.next();
                 String key = e.getKey();
                 attr(out, key);
-                writeSchemaNode(out, e.getValue(), cm, vc, classElement, key, requiredOut);
+                writeSchemaNode(out, e.getValue(), vc, classElement, key, requiredOut);
                 if (it.hasNext()) {
                     out.write(',');
                 }
@@ -401,13 +401,20 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
         }
     }
 
-    private void writeTypeForProperty(Writer out, PropertyMetadata pm, @org.jspecify.annotations.Nullable VisitorContext vc) throws IOException {
+    @Nullable
+    private static PropertyElement findProperty(ClassElement classElement, @Nullable String currentKey, PropertyMetadata pm) {
+        return classElement.getBeanProperties()
+            .stream().filter(p -> p.getName().equals(currentKey) || p.getName().equals(pm.getName()))
+            .findFirst().orElse(null);
+    }
+
+    private void writeTypeForProperty(Writer out, PropertyMetadata pm, @Nullable VisitorContext vc) throws IOException {
         String fqcn = pm.getType();
         // Try to refine via VisitorContext (generics, enums)
         ClassElement ce = (vc != null) ? vc.getClassElement(pm.getDeclaringType()).orElse(null) : null;
         PropertyElement pe = null;
         if (ce != null) {
-            pe = ce.getBeanProperties().stream().filter(p -> p.getName().equals(pm.getName())).findFirst().orElse(null);
+            pe = findProperty(ce, null, pm);
         }
         if (pe != null) {
             // Optional
@@ -464,7 +471,7 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
         writeSimpleTypeName(out, fqcn);
     }
 
-    private void writeChildTypeSchema(Writer out, ClassElement t, @org.jspecify.annotations.Nullable VisitorContext vc) throws IOException {
+    private void writeChildTypeSchema(Writer out, ClassElement t, @Nullable VisitorContext vc) throws IOException {
         out.write('{');
         writeSimpleTypeSchema(out, t, vc);
         out.write('}');
@@ -476,7 +483,7 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
         out.write('}');
     }
 
-    private void writeSimpleTypeSchema(Writer out, ClassElement t, @org.jspecify.annotations.Nullable VisitorContext vc) throws IOException {
+    private void writeSimpleTypeSchema(Writer out, ClassElement t, @Nullable VisitorContext vc) throws IOException {
         // Enum
         if (t.isEnum()) {
             attr(out, "type");
@@ -534,7 +541,7 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
         str(out, type);
     }
 
-    private @org.jspecify.annotations.Nullable Object coerceDefault(String value, String typeName) {
+    private @Nullable Object coerceDefault(String value, String typeName) {
         try {
             return switch (typeName) {
                 case "boolean", "java.lang.Boolean" -> Boolean.parseBoolean(value);
@@ -579,9 +586,9 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
 
     private static List<String> splitOnDot(String rel) {
         if (rel.indexOf('.') < 0) {
-            return java.util.List.of(rel);
+            return List.of(rel);
         }
-        java.util.List<String> parts = new java.util.ArrayList<>();
+        List<String> parts = new ArrayList<>();
         int start = 0;
         for (int i = 0; i < rel.length(); i++) {
             if (rel.charAt(i) == '.') {
@@ -605,14 +612,14 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
     private void applyValidationConstraints(Writer out,
                                             PropertyElement pe,
                                             PropertyMetadata pm,
-                                            @org.jspecify.annotations.Nullable String currentKey,
+                                            @Nullable String currentKey,
                                             Set<String> requiredOut,
                                             VisitorContext context) throws IOException {
-        java.util.function.Function<String, Boolean> has = ann -> {
+        Function<String, Boolean> has = ann -> {
             List<AnnotationValue<Annotation>> values = pe.getDeclaredAnnotationValuesByName(ann);
             return !values.isEmpty();
         };
-        java.util.function.BiFunction<String, String, @Nullable String> sval = (ann, member) ->
+        BiFunction<String, String, @Nullable String> sval = (ann, member) ->
             pe.stringValue(ann, member).orElseGet(() -> {
                 List<AnnotationValue<Annotation>> values = pe.getDeclaredAnnotationValuesByName(ann);
                 if (!values.isEmpty()) {
@@ -622,7 +629,7 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
             }
         );
 
-        java.util.function.BiFunction<String, String, @Nullable Integer> ival = (ann, member) -> {
+        BiFunction<String, String, @Nullable Integer> ival = (ann, member) -> {
             OptionalInt opt = pe.intValue(ann, member);
             if (opt.isPresent()) {
                 return opt.getAsInt();
