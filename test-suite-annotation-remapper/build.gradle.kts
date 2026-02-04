@@ -36,7 +36,7 @@ graalvmNative {
                 buildArgs.add("--initialize-at-build-time=org.junit.platform.commons.logging.LoggerFactory\$DelegatingLogger")
                 buildArgs.add("--initialize-at-build-time=org.junit.platform.suite.engine.IsSuiteClass")
                 buildArgs.add("--initialize-at-build-time=org.junit.platform.suite.engine.IsPotentialTestContainer")
-                buildArgs.add("--strict-image-heap")
+                buildArgs.add("-H:+SharedArenaSupport")
             }
             resources.autodetect()
         }
