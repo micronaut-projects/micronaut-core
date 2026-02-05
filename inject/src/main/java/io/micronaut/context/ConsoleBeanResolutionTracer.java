@@ -55,6 +55,10 @@ abstract sealed class ConsoleBeanResolutionTracer
 
     @Override
     public void traceInitialConfiguration(Environment environment, Collection<BeanDefinitionReference<?>> beanReferences, Collection<DisabledBean<?>> disabledBeans) {
+        if (environment == null) {
+            return;
+        }
+
         Collection<PropertySource> propertySources = environment.getPropertySources();
         Set<String> activeNames = environment.getActiveNames();
         StringWriter sw = new StringWriter();
