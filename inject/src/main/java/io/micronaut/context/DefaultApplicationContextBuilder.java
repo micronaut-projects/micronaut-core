@@ -16,6 +16,7 @@
 package io.micronaut.context;
 
 import io.micronaut.context.env.CommandLinePropertySource;
+import io.micronaut.context.env.ConfigurationLoadStrategy;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.env.PropertySourcesLocator;
@@ -26,6 +27,7 @@ import io.micronaut.core.cli.CommandLine;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.order.OrderUtil;
+import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanConfiguration;
 import io.micronaut.inject.QualifiedBeanType;
@@ -41,6 +43,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
@@ -85,6 +88,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private Boolean bootstrapEnvironment = null;
     private boolean enableDefaultPropertySources = true;
     private BeanResolutionTraceConfiguration traceConfiguration = new BeanResolutionTraceConfiguration();
+    private ConfigurationLoadStrategy configurationLoadStrategy = ConfigurationLoadStrategy.defaultStrategy();
     private BeanDefinitionsProvider beanDefinitionsProvider = new DefaultBeanDefinitionsProvider();
     private boolean eagerBeansEnabled = true;
     private boolean eventsEnabled = true;
@@ -122,6 +126,11 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
         return this.traceConfiguration;
     }
 
+    @Override
+    public ConfigurationLoadStrategy getConfigurationLoadingStrategy() {
+        return configurationLoadStrategy;
+    }
+
     private ClassLoader resolveClassLoader() {
         final ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
         if (contextClassLoader != null) {
@@ -143,6 +152,15 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     @Override
     public ApplicationContextBuilder enableDefaultPropertySources(boolean areEnabled) {
         this.enableDefaultPropertySources = areEnabled;
+        return this;
+    }
+
+    @Override
+    public ApplicationContextBuilder configurationLoadingStrategy(Consumer<ConfigurationLoadStrategy.Builder> builderConsumer) {
+        ArgumentUtils.requireNonNull("builderConsumer", builderConsumer);
+        ConfigurationLoadStrategy.Builder builder = ConfigurationLoadStrategy.builder();
+        builderConsumer.accept(builder);
+        this.configurationLoadStrategy = builder.build();
         return this;
     }
 

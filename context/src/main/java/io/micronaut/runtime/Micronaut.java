@@ -23,6 +23,7 @@ import io.micronaut.context.banner.Banner;
 import io.micronaut.context.banner.MicronautBanner;
 import io.micronaut.context.banner.ResourceBanner;
 import io.micronaut.context.env.Environment;
+import io.micronaut.context.env.ConfigurationLoadStrategy;
 import io.micronaut.context.env.PropertySource;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -37,6 +38,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 import static io.micronaut.core.reflect.ReflectionUtils.EMPTY_CLASS_ARRAY;
@@ -278,6 +280,11 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     @Override
     public Micronaut environments(String @Nullable ... environments) {
         return (Micronaut) super.environments(environments);
+    }
+
+    @Override
+    public Micronaut configurationLoadingStrategy(Consumer<ConfigurationLoadStrategy.Builder> builderConsumer) {
+        return (Micronaut) super.configurationLoadingStrategy(builderConsumer);
     }
 
     @Override

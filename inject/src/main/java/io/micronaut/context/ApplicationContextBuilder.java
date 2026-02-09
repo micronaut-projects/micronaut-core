@@ -16,6 +16,7 @@
 package io.micronaut.context;
 
 import io.micronaut.context.annotation.ConfigurationReader;
+import io.micronaut.context.env.ConfigurationLoadStrategy;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.env.PropertySourcesLocator;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
@@ -28,6 +29,7 @@ import java.lang.annotation.Annotation;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Consumer;
 
 /**
  * An interface for building an application context.
@@ -106,6 +108,17 @@ public interface ApplicationContextBuilder {
      * @since 3.7.0
      */
     default ApplicationContextBuilder enableDefaultPropertySources(boolean areEnabled) {
+        return this;
+    }
+
+    /**
+     * Configure how Micronaut loads configuration resources when duplicates exist on the classpath.
+     *
+     * @param builderConsumer The strategy builder customizer
+     * @return This builder
+     * @since 5.0.0
+     */
+    default ApplicationContextBuilder configurationLoadingStrategy(Consumer<ConfigurationLoadStrategy.Builder> builderConsumer) {
         return this;
     }
 
