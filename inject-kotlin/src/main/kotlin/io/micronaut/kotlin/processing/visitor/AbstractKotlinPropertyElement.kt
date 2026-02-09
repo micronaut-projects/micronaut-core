@@ -93,6 +93,10 @@ internal abstract class AbstractKotlinPropertyElement<T : KotlinNativeElement>(
             val overriddenDeclaration = overriddenNativeType.closestClassDeclaration()
 
             if (declaration != null && overriddenDeclaration != null) {
+                if (overriddenDeclaration.classKind != ClassKind.INTERFACE) {
+                    return false
+                }
+
                 val isInHierarchy = declaration.getAllSuperTypes().any { it.declaration == overriddenDeclaration }
 
                 if (isInHierarchy) {
