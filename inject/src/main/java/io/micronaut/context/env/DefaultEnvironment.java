@@ -59,6 +59,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -575,35 +576,81 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
             return Optional.empty();
         }
 
-        for (String ext : propertySourceLoader.getExtensions()) {
+        // Precompute resources for all supported extensions so we can detect
+        // conflicts across extensions for the same logical base name.
+        String[] extensions = propertySourceLoader.getExtensions().toArray(new String[0]);
+        Map<String, List<URL>> extensionResources = new LinkedHashMap<>(extensions.length);
+        int extensionsWithResources = 0;
+        for (String ext : extensions) {
             String fileExt = fileName + "." + ext;
             List<URL> urls = resourceLoader.getResources(fileExt).toList();
+            extensionResources.put(ext, urls);
+            if (!urls.isEmpty()) {
+                extensionsWithResources++;
+            }
+        }
 
+        // If multiple extensions provide resources for the same base name,
+        // treat this as a duplicate configuration across extensions and let
+        // the existing strategy decide how to react. This keeps the existing
+        // precedence (first non-empty extension wins) but no longer ignores
+        // cross-extension conflicts silently.
+        if (extensionsWithResources > 1) {
+            List<URL> allUrls = new ArrayList<>();
+            for (List<URL> urls : extensionResources.values()) {
+                allUrls.addAll(urls);
+            }
+            if (!allUrls.isEmpty()) {
+                handleDuplicateResources(fileName, allUrls, strategy);
+            }
+        }
+
+        for (String ext : extensions) {
+            String fileExt = fileName + "." + ext;
+            List<URL> urls = Objects.requireNonNullElse(extensionResources.get(ext), Collections.emptyList());
+            
+            // Short-circuit when duplicates are neither warned about nor merged/failed
+            boolean needsAllResources = strategy.type() == ConfigurationLoadStrategyType.MERGE_ALL
+                || strategy.type() == ConfigurationLoadStrategyType.FAIL_ON_DUPLICATE
+                || (strategy.type() == ConfigurationLoadStrategyType.FIRST_MATCH && strategy.warnOnDuplicates());
+            
             Map<String, Object> merged = Collections.emptyMap();
-            if (strategy.type() == ConfigurationLoadStrategyType.MERGE_ALL && urls.size() > 1) {
-                List<URL> orderedUrls = urls;
-                if (!strategy.mergeOrder().isEmpty()) {
-                    orderedUrls = orderByArtifactPatterns(urls, strategy.mergeOrder());
-                }
+            if (needsAllResources) {
+                if (strategy.type() == ConfigurationLoadStrategyType.MERGE_ALL && urls.size() > 1) {
+                    List<URL> orderedUrls = urls;
+                    if (!strategy.mergeOrder().isEmpty()) {
+                        orderedUrls = orderByArtifactPatterns(urls, strategy.mergeOrder());
+                    }
 
-                if (LOG.isInfoEnabled()) {
-                    LOG.info("Merging configuration resources '{}' in order: {}", fileExt, orderedUrls);
-                }
+                    if (LOG.isInfoEnabled()) {
+                        LOG.info("Merging configuration resources '{}' in order: {}", fileExt, orderedUrls);
+                    }
 
-                Map<String, Object> mergedMap = new LinkedHashMap<>(64);
-                for (URL url : orderedUrls) {
-                    try (InputStream input = url.openStream()) {
-                        mergedMap.putAll(propertySourceLoader.read(fileName, input));
-                    } catch (IOException e) {
-                        throw new ConfigurationException("I/O exception occurred reading [" + fileExt + "] from [" + url + "]: " + e.getMessage(), e);
+                    Map<String, Object> mergedMap = new LinkedHashMap<>(64);
+                    for (URL url : orderedUrls) {
+                        try (InputStream input = url.openStream()) {
+                            mergedMap.putAll(propertySourceLoader.read(fileName, input));
+                        } catch (IOException e) {
+                            throw new ConfigurationException("I/O exception occurred reading [" + fileExt + "] from [" + url + "]: " + e.getMessage(), e);
+                        }
+                    }
+                    merged = mergedMap;
+                } else {
+                    if (urls.size() > 1) {
+                        handleDuplicateResources(fileExt, urls, strategy);
+                    }
+
+                    Optional<InputStream> config = propertySourceLoader.readInput(resourceLoader, fileExt);
+                    if (config.isPresent()) {
+                        try (InputStream input = config.get()) {
+                            merged = propertySourceLoader.read(fileName, input);
+                        } catch (IOException e) {
+                            throw new ConfigurationException("I/O exception occurred reading [" + fileExt + "]: " + e.getMessage(), e);
+                        }
                     }
                 }
-                merged = mergedMap;
             } else {
-                if (urls.size() > 1) {
-                    handleDuplicateResources(fileExt, urls, strategy);
-                }
-
+                // FIRST_MATCH with warnOnDuplicates=false: use first resource without enumerating all
                 Optional<InputStream> config = propertySourceLoader.readInput(resourceLoader, fileExt);
                 if (config.isPresent()) {
                     try (InputStream input = config.get()) {

@@ -57,7 +57,8 @@ public record ConfigurationLoadStrategy(
         }
         if (mergeOrder == null) {
             mergeOrder = List.of();
-        } else if (!(mergeOrder instanceof ArrayList)) {
+        } else {
+            // Always create a defensive copy to prevent external mutation
             mergeOrder = new ArrayList<>(mergeOrder);
         }
 
