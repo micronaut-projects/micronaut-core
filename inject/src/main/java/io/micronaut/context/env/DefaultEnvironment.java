@@ -575,8 +575,38 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
             return Optional.empty();
         }
 
-        for (String ext : propertySourceLoader.getExtensions()) {
+        // Precompute resources for all supported extensions so we can detect
+        // conflicts across extensions for the same logical base name.
+        String[] extensions = propertySourceLoader.getExtensions().toArray(new String[0]);
+        Map<String, List<URL>> extensionResources = new LinkedHashMap<>(extensions.length);
+        int extensionsWithResources = 0;
+        for (String ext : extensions) {
             String fileExt = fileName + "." + ext;
+            List<URL> urls = resourceLoader.getResources(fileExt).toList();
+            extensionResources.put(ext, urls);
+            if (!urls.isEmpty()) {
+                extensionsWithResources++;
+            }
+        }
+
+        // If multiple extensions provide resources for the same base name,
+        // treat this as a duplicate configuration across extensions and let
+        // the existing strategy decide how to react. This keeps the existing
+        // precedence (first non-empty extension wins) but no longer ignores
+        // cross-extension conflicts silently.
+        if (extensionsWithResources > 1) {
+            List<URL> allUrls = new ArrayList<>();
+            for (List<URL> urls : extensionResources.values()) {
+                allUrls.addAll(urls);
+            }
+            if (!allUrls.isEmpty()) {
+                handleDuplicateResources(fileName, allUrls, strategy);
+            }
+        }
+
+        for (String ext : extensions) {
+            String fileExt = fileName + "." + ext;
+            List<URL> urls = extensionResources.getOrDefault(ext, Collections.emptyList());
             
             // Short-circuit when duplicates are neither warned about nor merged/failed
             boolean needsAllResources = strategy.type() == ConfigurationLoadStrategyType.MERGE_ALL
@@ -585,8 +615,6 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
             
             Map<String, Object> merged = Collections.emptyMap();
             if (needsAllResources) {
-                List<URL> urls = resourceLoader.getResources(fileExt).toList();
-                
                 if (strategy.type() == ConfigurationLoadStrategyType.MERGE_ALL && urls.size() > 1) {
                     List<URL> orderedUrls = urls;
                     if (!strategy.mergeOrder().isEmpty()) {
