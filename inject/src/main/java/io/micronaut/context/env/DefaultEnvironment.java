@@ -583,7 +583,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         int extensionsWithResources = 0;
         for (String ext : extensions) {
             String fileExt = fileName + "." + ext;
-            List<URL> urls = resourceLoader.getResources(fileExt).toList();
+            List<URL> urls = listUniqueResources(resourceLoader, fileExt);
             extensionResources.put(ext, urls);
             if (!urls.isEmpty()) {
                 extensionsWithResources++;
@@ -749,6 +749,18 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
             return withoutEntry.substring(slashIndex + 1);
         }
         return withoutEntry;
+    }
+
+    private static List<URL> listUniqueResources(ResourceLoader resourceLoader, String resourceName) {
+        Stream<URL> stream = resourceLoader.getResources(resourceName);
+        if (stream == null) {
+            return List.of();
+        }
+        try (stream) {
+            LinkedHashMap<String, URL> unique = new LinkedHashMap<>();
+            stream.forEach(url -> unique.putIfAbsent(url.toExternalForm(), url));
+            return List.copyOf(unique.values());
+        }
     }
 
     /**
