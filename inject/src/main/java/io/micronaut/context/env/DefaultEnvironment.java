@@ -577,33 +577,51 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
 
         for (String ext : propertySourceLoader.getExtensions()) {
             String fileExt = fileName + "." + ext;
-            List<URL> urls = resourceLoader.getResources(fileExt).toList();
-
+            
+            // Short-circuit when duplicates are neither warned about nor merged/failed
+            boolean needsAllResources = strategy.type() == ConfigurationLoadStrategyType.MERGE_ALL
+                || strategy.type() == ConfigurationLoadStrategyType.FAIL_ON_DUPLICATE
+                || (strategy.type() == ConfigurationLoadStrategyType.FIRST_MATCH && strategy.warnOnDuplicates());
+            
             Map<String, Object> merged = Collections.emptyMap();
-            if (strategy.type() == ConfigurationLoadStrategyType.MERGE_ALL && urls.size() > 1) {
-                List<URL> orderedUrls = urls;
-                if (!strategy.mergeOrder().isEmpty()) {
-                    orderedUrls = orderByArtifactPatterns(urls, strategy.mergeOrder());
-                }
+            if (needsAllResources) {
+                List<URL> urls = resourceLoader.getResources(fileExt).toList();
+                
+                if (strategy.type() == ConfigurationLoadStrategyType.MERGE_ALL && urls.size() > 1) {
+                    List<URL> orderedUrls = urls;
+                    if (!strategy.mergeOrder().isEmpty()) {
+                        orderedUrls = orderByArtifactPatterns(urls, strategy.mergeOrder());
+                    }
 
-                if (LOG.isInfoEnabled()) {
-                    LOG.info("Merging configuration resources '{}' in order: {}", fileExt, orderedUrls);
-                }
+                    if (LOG.isInfoEnabled()) {
+                        LOG.info("Merging configuration resources '{}' in order: {}", fileExt, orderedUrls);
+                    }
 
-                Map<String, Object> mergedMap = new LinkedHashMap<>(64);
-                for (URL url : orderedUrls) {
-                    try (InputStream input = url.openStream()) {
-                        mergedMap.putAll(propertySourceLoader.read(fileName, input));
-                    } catch (IOException e) {
-                        throw new ConfigurationException("I/O exception occurred reading [" + fileExt + "] from [" + url + "]: " + e.getMessage(), e);
+                    Map<String, Object> mergedMap = new LinkedHashMap<>(64);
+                    for (URL url : orderedUrls) {
+                        try (InputStream input = url.openStream()) {
+                            mergedMap.putAll(propertySourceLoader.read(fileName, input));
+                        } catch (IOException e) {
+                            throw new ConfigurationException("I/O exception occurred reading [" + fileExt + "] from [" + url + "]: " + e.getMessage(), e);
+                        }
+                    }
+                    merged = mergedMap;
+                } else {
+                    if (urls.size() > 1) {
+                        handleDuplicateResources(fileExt, urls, strategy);
+                    }
+
+                    Optional<InputStream> config = propertySourceLoader.readInput(resourceLoader, fileExt);
+                    if (config.isPresent()) {
+                        try (InputStream input = config.get()) {
+                            merged = propertySourceLoader.read(fileName, input);
+                        } catch (IOException e) {
+                            throw new ConfigurationException("I/O exception occurred reading [" + fileExt + "]: " + e.getMessage(), e);
+                        }
                     }
                 }
-                merged = mergedMap;
             } else {
-                if (urls.size() > 1) {
-                    handleDuplicateResources(fileExt, urls, strategy);
-                }
-
+                // FIRST_MATCH with warnOnDuplicates=false: use first resource without enumerating all
                 Optional<InputStream> config = propertySourceLoader.readInput(resourceLoader, fileExt);
                 if (config.isPresent()) {
                     try (InputStream input = config.get()) {
