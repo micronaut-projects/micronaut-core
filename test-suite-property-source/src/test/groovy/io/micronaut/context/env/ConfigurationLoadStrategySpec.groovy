@@ -7,8 +7,11 @@ import spock.lang.Specification
 import java.net.URL
 import java.net.URLClassLoader
 import java.nio.charset.StandardCharsets
+import java.nio.file.FileVisitResult
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.SimpleFileVisitor
+import java.nio.file.attribute.BasicFileAttributes
 import java.util.jar.JarEntry
 import java.util.jar.JarOutputStream
 
@@ -16,7 +19,7 @@ class ConfigurationLoadStrategySpec extends Specification {
 
     void "default strategy fails on duplicate configuration resources"() {
         given:
-        def jars = duplicateJars(
+        def result = duplicateJars(
                 "app-1.0.jar",
                 "lib-1.0.jar",
                 "application.properties",
@@ -25,7 +28,7 @@ class ConfigurationLoadStrategySpec extends Specification {
         )
 
         when:
-        try (URLClassLoader cl = new URLClassLoader(jars*.toUri()*.toURL() as URL[], getClass().classLoader)) {
+        try (URLClassLoader cl = new URLClassLoader(result.jars*.toUri()*.toURL() as URL[], getClass().classLoader)) {
             ApplicationContext.builder(cl).start()
         }
 
@@ -34,11 +37,14 @@ class ConfigurationLoadStrategySpec extends Specification {
         e.message.contains("Duplicate configuration resource 'application.properties'")
         e.message.contains("app-1.0.jar")
         e.message.contains("lib-1.0.jar")
+
+        cleanup:
+        deleteDirectory(result.dir)
     }
 
     void "FIRST_MATCH uses first match and can disable warning"() {
         given:
-        def jars = duplicateJars(
+        def result = duplicateJars(
                 "app-1.0.jar",
                 "lib-1.0.jar",
                 "application.properties",
@@ -48,7 +54,7 @@ class ConfigurationLoadStrategySpec extends Specification {
 
         when:
         String value
-        try (URLClassLoader cl = new URLClassLoader(jars*.toUri()*.toURL() as URL[], getClass().classLoader);
+        try (URLClassLoader cl = new URLClassLoader(result.jars*.toUri()*.toURL() as URL[], getClass().classLoader);
              ApplicationContext ctx = ApplicationContext.builder(cl)
                      .configurationLoadingStrategy { b ->
                          b.type(ConfigurationLoadStrategyType.FIRST_MATCH)
@@ -61,11 +67,14 @@ class ConfigurationLoadStrategySpec extends Specification {
 
         then:
         value == "app"
+
+        cleanup:
+        deleteDirectory(result.dir)
     }
 
     void "MERGE_ALL merges duplicates in classpath order"() {
         given:
-        def jars = duplicateJars(
+        def result = duplicateJars(
                 "app-1.0.jar",
                 "lib-1.0.jar",
                 "application.properties",
@@ -75,7 +84,7 @@ class ConfigurationLoadStrategySpec extends Specification {
 
         when:
         Map<String, Object> props
-        try (URLClassLoader cl = new URLClassLoader(jars*.toUri()*.toURL() as URL[], getClass().classLoader);
+        try (URLClassLoader cl = new URLClassLoader(result.jars*.toUri()*.toURL() as URL[], getClass().classLoader);
              ApplicationContext ctx = ApplicationContext.builder(cl)
                      .configurationLoadingStrategy { b ->
                          b.type(ConfigurationLoadStrategyType.MERGE_ALL)
@@ -92,11 +101,14 @@ class ConfigurationLoadStrategySpec extends Specification {
         props.foo == "lib"
         props.appOnly == "yes"
         props.libOnly == "yes"
+
+        cleanup:
+        deleteDirectory(result.dir)
     }
 
     void "MERGE_ALL mergeOrder can reorder by jar name"() {
         given:
-        def jars = duplicateJars(
+        def result = duplicateJars(
                 "app-1.0.jar",
                 "lib-1.0.jar",
                 "application.properties",
@@ -106,7 +118,7 @@ class ConfigurationLoadStrategySpec extends Specification {
 
         when:
         String value
-        try (URLClassLoader cl = new URLClassLoader(jars*.toUri()*.toURL() as URL[], getClass().classLoader);
+        try (URLClassLoader cl = new URLClassLoader(result.jars*.toUri()*.toURL() as URL[], getClass().classLoader);
              ApplicationContext ctx = ApplicationContext.builder(cl)
                      .configurationLoadingStrategy { b ->
                          b.type(ConfigurationLoadStrategyType.MERGE_ALL)
@@ -119,11 +131,14 @@ class ConfigurationLoadStrategySpec extends Specification {
 
         then:
         value == "app"
+
+        cleanup:
+        deleteDirectory(result.dir)
     }
 
     void "mergeOrder is rejected when strategy type is not MERGE_ALL"() {
         given:
-        def jars = duplicateJars(
+        def result = duplicateJars(
                 "app-1.0.jar",
                 "lib-1.0.jar",
                 "application.properties",
@@ -132,7 +147,7 @@ class ConfigurationLoadStrategySpec extends Specification {
         )
 
         when:
-        try (URLClassLoader cl = new URLClassLoader(jars*.toUri()*.toURL() as URL[], getClass().classLoader)) {
+        try (URLClassLoader cl = new URLClassLoader(result.jars*.toUri()*.toURL() as URL[], getClass().classLoader)) {
             ApplicationContext.builder(cl)
                     .configurationLoadingStrategy { b ->
                         b.mergeOrder("app-.*\\.jar")
@@ -141,6 +156,9 @@ class ConfigurationLoadStrategySpec extends Specification {
 
         then:
         thrown(ConfigurationException)
+
+        cleanup:
+        deleteDirectory(result.dir)
     }
 
     void "duplicates are detected for environment-specific resources too"() {
@@ -163,9 +181,12 @@ class ConfigurationLoadStrategySpec extends Specification {
         then:
         def e = thrown(ConfigurationException)
         e.message.contains("application-test.properties")
+
+        cleanup:
+        deleteDirectory(dir)
     }
 
-    private static List<Path> duplicateJars(String jar1Name,
+    private static Map<String, Object> duplicateJars(String jar1Name,
                                            String jar2Name,
                                            String resourceName,
                                            String jar1Content,
@@ -173,7 +194,7 @@ class ConfigurationLoadStrategySpec extends Specification {
         Path dir = Files.createTempDirectory("mn-config-strategy")
         Path jar1 = createJar(dir.resolve(jar1Name), [(resourceName): jar1Content])
         Path jar2 = createJar(dir.resolve(jar2Name), [(resourceName): jar2Content])
-        return [jar1, jar2]
+        return [dir: dir, jars: [jar1, jar2]]
     }
 
     private static Path createJar(Path jarPath, Map<String, String> entries) {
@@ -192,5 +213,23 @@ class ConfigurationLoadStrategySpec extends Specification {
             }
         }
         return jarPath
+    }
+
+    private static void deleteDirectory(Path directory) {
+        if (directory != null && Files.exists(directory)) {
+            Files.walkFileTree(directory, new SimpleFileVisitor<Path>() {
+                @Override
+                FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                    Files.delete(file)
+                    return FileVisitResult.CONTINUE
+                }
+
+                @Override
+                FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+                    Files.delete(dir)
+                    return FileVisitResult.CONTINUE
+                }
+            })
+        }
     }
 }
