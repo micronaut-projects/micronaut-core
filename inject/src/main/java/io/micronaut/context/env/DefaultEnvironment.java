@@ -59,6 +59,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -606,7 +607,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
 
         for (String ext : extensions) {
             String fileExt = fileName + "." + ext;
-            List<URL> urls = extensionResources.getOrDefault(ext, Collections.emptyList());
+            List<URL> urls = Objects.requireNonNullElse(extensionResources.get(ext), Collections.emptyList());
             
             // Short-circuit when duplicates are neither warned about nor merged/failed
             boolean needsAllResources = strategy.type() == ConfigurationLoadStrategyType.MERGE_ALL

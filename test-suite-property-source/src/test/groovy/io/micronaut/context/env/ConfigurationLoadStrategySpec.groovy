@@ -186,6 +186,15 @@ class ConfigurationLoadStrategySpec extends Specification {
         deleteDirectory(dir)
     }
 
+    /**
+     * Helper method to create duplicate JAR files for testing.
+     * @param jar1Name Name of the first JAR file
+     * @param jar2Name Name of the second JAR file
+     * @param resourceName Name of the resource to include in both JARs
+     * @param jar1Content Content of the resource in the first JAR
+     * @param jar2Content Content of the resource in the second JAR
+     * @return A map containing 'dir' (Path to temp directory) and 'jars' (List of Path to JAR files)
+     */
     private static Map<String, Object> duplicateJars(String jar1Name,
                                            String jar2Name,
                                            String resourceName,
