@@ -84,7 +84,7 @@ public final class PartData implements Closeable {
     }
 
     /**
-     * The field metadata (name, file name, etc.)
+     * The field metadata (name, file name, etc.).
      *
      * @return The field metadata
      */
@@ -93,7 +93,7 @@ public final class PartData implements Closeable {
     }
 
     /**
-     * The field bytes
+     * The field bytes.
      *
      * @return The field bytes
      */

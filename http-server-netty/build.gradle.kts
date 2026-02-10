@@ -32,8 +32,7 @@ dependencies {
     compileOnly(projects.micronautWebsocket)
     compileOnly(libs.managed.kotlin.stdlib)
     compileOnly(libs.managed.netty.transport.native.unix.common)
-    implementation(libs.managed.netty.contrib.multipart.vintage) // todo: depend on core only
-    testImplementation(libs.managed.netty.contrib.multipart.vintage)
+    implementation(libs.managed.netty.contrib.multipart.core)
     compileOnly(projects.micronautHttpNettyHttp3)
     compileOnly(libs.brotli4j)
 
@@ -125,7 +124,6 @@ dependencies {
     }
     testImplementation(libs.junit.jupiter.api)
     testImplementation(libs.micronaut.test.netty.leak)
-    testRuntimeOnly(libs.managed.netty.contrib.multipart.vintage)
 }
 
 tasks.withType<Test>().configureEach {

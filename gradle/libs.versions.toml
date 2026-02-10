@@ -168,7 +168,7 @@ managed-netty-transport-native-iouring = { module = "io.netty:netty-transport-na
 managed-netty-transport-native-unix-common = { module = "io.netty:netty-transport-native-unix-common", version.ref = "managed-netty" }
 managed-netty-pkitesting = { module = "io.netty:netty-pkitesting", version.ref = "managed-netty" }
 managed-netty-tcnative-boringssl-static = { module = "io.netty:netty-tcnative-boringssl-static", version.ref = "managed-netty-tcnative" }
-managed-netty-contrib-multipart-vintage = { module = "io.netty.contrib:netty-codec-multipart-vintage", version.ref = "managed-netty-contrib-multipart" }
+managed-netty-contrib-multipart-core = { module = "io.netty.contrib:netty-codec-multipart-core", version.ref = "managed-netty-contrib-multipart" }
 
 managed-reactive-streams = { module = "org.reactivestreams:reactive-streams", version.ref = "managed-reactive-streams" }
 
