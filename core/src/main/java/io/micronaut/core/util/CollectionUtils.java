@@ -451,8 +451,7 @@ public class CollectionUtils {
      * @return The last element of a collection or null
      */
     public static @Nullable <T> T last(Collection<T> collection) {
-        if (collection instanceof List) {
-            List<T> list = (List<T>) collection;
+        if (collection instanceof List<T> list) {
             final int s = list.size();
             if (s > 0) {
                 return list.get(s - 1);

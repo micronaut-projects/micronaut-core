@@ -126,7 +126,7 @@ public final class InterceptorBindingQualifier<T> extends FilteringQualifier<T> 
                     interceptorBinding.getAnnotation(META_BINDING_VALUES).orElse(null);
                 boolean matched = true;
                 for (AnnotationValue<?> binding : bindingList) {
-                    matched = matched && (!binding.isPresent(META_BINDING_VALUES) || binding.equals(otherBinding));
+                    matched = matched && (!binding.isPresent(META_BINDING_VALUES) || otherBinding != null && binding.equals(otherBinding));
                 }
                 return matched;
             }
@@ -144,7 +144,7 @@ public final class InterceptorBindingQualifier<T> extends FilteringQualifier<T> 
                     final AnnotationValue<Annotation> otherBinding =
                         annotation.getAnnotation(META_BINDING_VALUES).orElse(null);
                     for (AnnotationValue<?> binding : bindingList) {
-                        matched = (!binding.isPresent(META_BINDING_VALUES) || binding.equals(otherBinding));
+                        matched = (!binding.isPresent(META_BINDING_VALUES) || otherBinding != null && binding.equals(otherBinding));
                         if (matched) {
                             break;
                         }

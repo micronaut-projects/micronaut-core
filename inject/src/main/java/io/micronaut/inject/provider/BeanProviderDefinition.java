@@ -37,7 +37,7 @@ import java.util.stream.Stream;
 @Internal
 public final class BeanProviderDefinition extends AbstractProviderDefinition<BeanProvider<Object>> {
     @Override
-    public boolean isEnabled(BeanContext context, BeanResolutionContext resolutionContext) {
+    public boolean isEnabled(BeanContext context, @Nullable BeanResolutionContext resolutionContext) {
         return true;
     }
 
@@ -61,10 +61,12 @@ public final class BeanProviderDefinition extends AbstractProviderDefinition<Bea
             boolean singleton) {
         return new BeanProvider<>() {
 
+            @Nullable
             private final Qualifier<Object> finalQualifier =
                     qualifier instanceof AnyQualifier ? null : qualifier;
 
-            private Qualifier<Object> qualify(Qualifier<Object> qualifier) {
+            @Nullable
+            private Qualifier<Object> qualify(@Nullable Qualifier<Object> qualifier) {
                 if (finalQualifier == null) {
                     return qualifier;
                 } else if (qualifier == null) {
@@ -81,7 +83,7 @@ public final class BeanProviderDefinition extends AbstractProviderDefinition<Bea
             }
 
             @Override
-            public Optional<Object> find(Qualifier<Object> qualifier) {
+            public Optional<Object> find(@Nullable Qualifier<Object> qualifier) {
                 return resolutionContext.copy().findBean(argument, qualify(qualifier));
             }
 
@@ -91,7 +93,7 @@ public final class BeanProviderDefinition extends AbstractProviderDefinition<Bea
             }
 
             @Override
-            public Object get(Qualifier<Object> qualifier) {
+            public Object get(@Nullable Qualifier<Object> qualifier) {
                 return resolutionContext.copy().getBean(argument, qualify(qualifier));
             }
 

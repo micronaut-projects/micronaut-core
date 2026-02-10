@@ -25,6 +25,7 @@ import io.micronaut.core.reflect.exception.InstantiationException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.CollectionUtils;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -184,7 +185,7 @@ public class InstantiationUtils {
      * @param <T>  The generic type
      * @return The instantiated instance or {@link Optional#empty()}
      */
-    public static <T> Optional<T> tryInstantiate(Constructor<T> type, Object... args) {
+    public static <T> Optional<T> tryInstantiate(Constructor<T> type, @Nullable Object... args) {
         try {
             return Optional.of(type.newInstance(args));
         } catch (Throwable e) {

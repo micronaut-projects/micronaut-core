@@ -17,7 +17,6 @@ package io.micronaut.http.client.jdk;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
@@ -49,16 +48,19 @@ public class HttpResponseAdapter<O> extends BaseHttpResponseAdapter<byte[], O> {
 
     private static final Logger LOG = LoggerFactory.getLogger(HttpResponseAdapter.class);
 
-    @NonNull
+    @Nullable
     private final Argument<O> bodyType;
 
+    @Nullable
     private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
+    @Nullable
     private final MessageBodyHandlerRegistry messageBodyHandlerRegistry;
 
     public HttpResponseAdapter(java.net.http.HttpResponse<byte[]> httpResponse,
                                @Nullable Argument<O> bodyType,
                                ConversionService conversionService,
-                               MediaTypeCodecRegistry mediaTypeCodecRegistry,
+                               @Nullable MediaTypeCodecRegistry mediaTypeCodecRegistry,
+                               @Nullable
                                MessageBodyHandlerRegistry messageBodyHandlerRegistry) {
         super(httpResponse, conversionService);
         this.bodyType = bodyType;
@@ -72,7 +74,10 @@ public class HttpResponseAdapter<O> extends BaseHttpResponseAdapter<byte[], O> {
     }
 
     @Override
-    public <T> Optional<T> getBody(Argument<T> type) {
+    public <T> Optional<T> getBody(@Nullable Argument<T> type) {
+        if (type == null) {
+            type = (Argument<T>) Argument.OBJECT_ARGUMENT;
+        }
         final boolean isOptional = type.getType() == Optional.class;
         final Argument<Object> theArgument = (Argument<Object>) (isOptional ? type.getFirstTypeVariable().orElse(type) : type);
         Optional<?> optional = convertBytes(getContentType().orElse(null), httpResponse.body(), theArgument);
@@ -116,7 +121,7 @@ public class HttpResponseAdapter<O> extends BaseHttpResponseAdapter<byte[], O> {
                         getHeaders(),
                         ByteArrayBufferFactory.INSTANCE.wrap(bytes)
                     );
-                    return Optional.of(value);
+                    return Optional.ofNullable(value);
                 } catch (CodecException e) {
                     logCodecError(contentType, type, e);
                 }
@@ -126,7 +131,7 @@ public class HttpResponseAdapter<O> extends BaseHttpResponseAdapter<byte[], O> {
        return conversionService.convert(bytes, ConversionContext.of(type));
     }
 
-    private <T> void logCodecError(MediaType contentType, Argument<T> type, CodecException e) {
+    private <T> void logCodecError(@Nullable MediaType contentType, Argument<T> type, CodecException e) {
         if (LOG.isDebugEnabled()) {
             var message = e.getMessage();
             LOG.debug("Error decoding body for type [{}] from '{}'. Attempting fallback.", type, contentType);

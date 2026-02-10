@@ -19,6 +19,8 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
+import org.jspecify.annotations.Nullable;
+
 import java.lang.reflect.Method;
 
 /**
@@ -50,7 +52,7 @@ public interface ExecutionHandle<T, R> extends AnnotationMetadataDelegate {
     /**
      * @return The required argument types.
      */
-    Argument[] getArguments();
+    Argument<?>[] getArguments();
 
     /**
      * Invokes the method.
@@ -58,7 +60,8 @@ public interface ExecutionHandle<T, R> extends AnnotationMetadataDelegate {
      * @param arguments The arguments
      * @return The result
      */
-    R invoke(Object... arguments);
+    @Nullable
+    R invoke(@Nullable Object... arguments);
 
     /**
      * Creates an {@link ExecutionHandle} for the give bean and method.
@@ -92,7 +95,7 @@ public interface ExecutionHandle<T, R> extends AnnotationMetadataDelegate {
             }
 
             @Override
-            public Argument[] getArguments() {
+            public Argument<?>[] getArguments() {
                 return method.getArguments();
             }
 
@@ -102,12 +105,13 @@ public interface ExecutionHandle<T, R> extends AnnotationMetadataDelegate {
             }
 
             @Override
-            public ReturnType getReturnType() {
+            public ReturnType<R2> getReturnType() {
                 return method.getReturnType();
             }
 
             @Override
-            public R2 invoke(Object... arguments) {
+            @Nullable
+            public R2 invoke(@Nullable  Object... arguments) {
                 return method.invoke(bean, arguments);
             }
 

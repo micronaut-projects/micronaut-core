@@ -23,6 +23,7 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.json.JsonConfiguration;
+import org.jspecify.annotations.Nullable;
 import tools.jackson.core.StreamReadFeature;
 import tools.jackson.core.StreamWriteFeature;
 import tools.jackson.core.json.JsonFactory;
@@ -75,8 +76,11 @@ public class JacksonConfiguration implements JsonConfiguration {
     public static final String PROPERTY_MODULE_SCAN = "jackson.module-scan";
 
     private boolean moduleScan = true;
+    @Nullable
     private String dateFormat;
+    @Nullable
     private Locale locale;
+    @Nullable
     private TimeZone timeZone;
     private int arraySizeThreshold = DEFAULT_ARRAYSIZETHRESHOLD;
     private Map<SerializationFeature, Boolean> serializationFeatures = Collections.emptyMap();
@@ -91,7 +95,9 @@ public class JacksonConfiguration implements JsonConfiguration {
     private Map<DateTimeFeature, Boolean> dateTimeFeatures = Collections.emptyMap();
     private Map<JsonNodeFeature, Boolean> jsonNodeFeatures = Collections.emptyMap();
     private JsonInclude.Include serializationInclusion = JsonInclude.Include.NON_EMPTY;
+    @Nullable
     private DefaultTyping defaultTyping = null;
+    @Nullable
     private PropertyNamingStrategy propertyNamingStrategy = null;
     private boolean alwaysSerializeErrorsAsList = true;
     private boolean trimStrings = false;
@@ -124,6 +130,7 @@ public class JacksonConfiguration implements JsonConfiguration {
     /**
      * @return The global defaultTyping using for Polymorphic handling
      */
+    @Nullable
     public DefaultTyping getDefaultTyping() {
         return defaultTyping;
     }
@@ -131,6 +138,7 @@ public class JacksonConfiguration implements JsonConfiguration {
     /**
      * @return The default locale to use
      */
+    @Nullable
     public Locale getLocale() {
         return locale;
     }
@@ -138,6 +146,7 @@ public class JacksonConfiguration implements JsonConfiguration {
     /**
      * @return The default time zone to use
      */
+    @Nullable
     public TimeZone getTimeZone() {
         return timeZone;
     }
@@ -145,6 +154,7 @@ public class JacksonConfiguration implements JsonConfiguration {
     /**
      * @return The date format to use for dates
      */
+    @Nullable
     public String getDateFormat() {
         return dateFormat;
     }
@@ -160,6 +170,7 @@ public class JacksonConfiguration implements JsonConfiguration {
     /**
      * @return The property naming strategy
      */
+    @Nullable
     public PropertyNamingStrategy getPropertyNamingStrategy() {
         return propertyNamingStrategy;
     }
@@ -430,7 +441,7 @@ public class JacksonConfiguration implements JsonConfiguration {
      *
      * @param serializationInclusion The serialization inclusion mode
      */
-    public void setSerializationInclusion(JsonInclude.Include serializationInclusion) {
+    public void setSerializationInclusion(JsonInclude. @Nullable Include serializationInclusion) {
         if (serializationInclusion != null) {
             this.serializationInclusion = serializationInclusion;
         }

@@ -19,7 +19,6 @@ import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.ArrayUtils;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
@@ -51,7 +50,6 @@ public class DefaultCompositeConfigurationClient implements ConfigurationClient 
         this.configurationClients = configurationClients;
     }
 
-    @NonNull
     @Override
     public String getDescription() {
         return toString();

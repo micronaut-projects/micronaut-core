@@ -17,6 +17,7 @@ package io.micronaut.inject.processing;
 
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.StringUtils;
+import org.jspecify.annotations.Nullable;
 
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
@@ -37,6 +38,7 @@ import java.util.Optional;
 public class JavaModelUtils {
 
     public static final Map<String, String> NAME_TO_TYPE_MAP = new HashMap<>();
+    @Nullable
     private static final ElementKind RECORD_KIND = ReflectionUtils.findDeclaredField(ElementKind.class, "RECORD").flatMap(field -> {
         try {
             return Optional.of((ElementKind) field.get(ElementKind.class));
@@ -44,6 +46,7 @@ public class JavaModelUtils {
             return Optional.empty();
         }
     }).orElse(null);
+    @Nullable
     private static final ElementKind RECORD_COMPONENT_KIND = ReflectionUtils.findDeclaredField(ElementKind.class, "RECORD_COMPONENT").flatMap(field -> {
         try {
             return Optional.of((ElementKind) field.get(ElementKind.class));
@@ -92,7 +95,7 @@ public class JavaModelUtils {
      * @param expected The expected kind
      * @return The kind if it is resolvable and matches the expected kind
      */
-    public static Optional<ElementKind> resolveKind(Element element, ElementKind expected) {
+    public static Optional<ElementKind> resolveKind(Element element, @Nullable ElementKind expected) {
         final Optional<ElementKind> elementKind = resolveKind(element);
         if (elementKind.isPresent() && elementKind.get() == expected) {
             return elementKind;

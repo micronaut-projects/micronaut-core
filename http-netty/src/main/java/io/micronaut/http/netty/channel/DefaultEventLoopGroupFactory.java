@@ -160,7 +160,7 @@ public class DefaultEventLoopGroupFactory implements EventLoopGroupFactory {
     }
 
     @Override
-    public Channel channelInstance(NettyChannelType type, EventLoopGroupConfiguration configuration, Channel parent, int fd) {
+    public Channel channelInstance(NettyChannelType type, @Nullable EventLoopGroupConfiguration configuration, @Nullable Channel parent, int fd) {
         return getFactory(configuration).channelInstance(type, configuration, parent, fd);
     }
 
@@ -172,7 +172,7 @@ public class DefaultEventLoopGroupFactory implements EventLoopGroupFactory {
                 .findFirst()
                 .orElseThrow(() -> new NoSuchElementException("No matching transport was found. Configured transports are " + configuration.getTransport() + ", available transports are " + factories.keySet()));
         } else {
-            return factories.get(NioEventLoopGroupFactory.NAME);
+            return Objects.requireNonNull(factories.get(NioEventLoopGroupFactory.NAME));
         }
     }
 

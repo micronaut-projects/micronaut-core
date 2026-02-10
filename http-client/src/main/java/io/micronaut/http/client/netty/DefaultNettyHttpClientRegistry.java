@@ -139,6 +139,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     private final JsonMapper jsonMapper;
     private final Collection<ChannelPipelineListener> pipelineListeners = new CopyOnWriteArrayList<>();
     private final CompositeNettyClientCustomizer clientCustomizer = new CompositeNettyClientCustomizer();
+    @Nullable
     private final ExecutorService blockingExecutor;
 
     /**
@@ -353,7 +354,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
 
             final List<String> filterAnnotations = clientKey.filterAnnotations;
             final String path = clientKey.path;
-            if (clientBean != null && path == null && configurationClass == null && filterAnnotations.isEmpty()) {
+            if (clientBean != null && path == null && configurationClass == null && (filterAnnotations == null || filterAnnotations.isEmpty())) {
                 return clientBean;
             }
 
@@ -401,7 +402,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             final JsonFeatures jsonFeatures = clientKey.jsonFeatures;
             if (jsonFeatures != null) {
                 List<MediaTypeCodec> codecs = new ArrayList<>(2);
-                MediaTypeCodecRegistry codecRegistry = builder.codecRegistry;
+                MediaTypeCodecRegistry codecRegistry = Objects.requireNonNull(builder.codecRegistry);
                 for (MediaTypeCodec codec : codecRegistry.getCodecs()) {
                     if (codec instanceof MapperMediaTypeCodec typeCodec) {
                         codecs.add(typeCodec.cloneWithFeatures(jsonFeatures));
@@ -409,12 +410,12 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                         codecs.add(codec);
                     }
                 }
-                if (!codecRegistry.findCodec(MediaType.APPLICATION_JSON_TYPE).isPresent()) {
+                if (codecRegistry.findCodec(MediaType.APPLICATION_JSON_TYPE).isEmpty()) {
                     codecs.add(createNewJsonCodec(this.beanContext, jsonFeatures));
                 }
                 builder.codecRegistry(MediaTypeCodecRegistry.of(codecs));
                 builder.handlerRegistry(new MessageBodyHandlerRegistry() {
-                    final MessageBodyHandlerRegistry delegate = builder.handlerRegistry;
+                    final MessageBodyHandlerRegistry delegate = Objects.requireNonNull(builder.handlerRegistry);
 
                     @SuppressWarnings("unchecked")
                     private <T> T customize(T handler) {
@@ -425,7 +426,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                     }
 
                     @Override
-                    public <T> Optional<MessageBodyReader<T>> findReader(Argument<T> type, List<MediaType> mediaType) {
+                    public <T> Optional<MessageBodyReader<T>> findReader(Argument<T> type, @Nullable List<MediaType> mediaType) {
                         return delegate.findReader(type, mediaType).map(this::customize);
                     }
 
@@ -441,6 +442,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
 
     private DefaultHttpClientBuilder clientBuilder(
             HttpClientConfiguration configuration,
+            @Nullable
             String clientId,
             BeanContext beanContext,
             AnnotationMetadata annotationMetadata) {
@@ -564,19 +566,31 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
      */
     @Internal
     private static final class ClientKey {
+        @Nullable
         final HttpVersionSelection httpVersion;
+        @Nullable
         final String clientId;
+        @Nullable
         final List<String> filterAnnotations;
+        @Nullable
         final String path;
+        @Nullable
         final Class<?> configurationClass;
+        @Nullable
         final JsonFeatures jsonFeatures;
 
         ClientKey(
-            HttpVersionSelection httpVersion,
+                @Nullable
+                HttpVersionSelection httpVersion,
+                @Nullable
                 String clientId,
+                @Nullable
                 List<String> filterAnnotations,
+                @Nullable
                 String path,
+                @Nullable
                 Class<?> configurationClass,
+                @Nullable
                 JsonFeatures jsonFeatures) {
             this.httpVersion = httpVersion;
             this.clientId = clientId;

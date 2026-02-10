@@ -15,12 +15,13 @@
  */
 package io.micronaut.http.server.exceptions;
 
-import org.jspecify.annotations.NonNull;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
+
+import java.util.Objects;
 
 /**
  * An abstract class to handle exceptions via an HTTP Response and the {@link ErrorResponseProcessor} API.
@@ -46,10 +47,9 @@ public abstract class ErrorResponseProcessorExceptionHandler<T extends Throwable
     public HttpResponse<?> handle(HttpRequest request, T exception) {
         return responseProcessor.processResponse(ErrorContext.builder(request)
                 .cause(exception)
-                .errorMessage(exception.getMessage())
+                .errorMessage(Objects.requireNonNullElse(exception.getMessage(), "Unknown error"))
                 .build(), createResponse(exception));
     }
 
-    @NonNull
     protected abstract MutableHttpResponse<?> createResponse(T exception);
 }

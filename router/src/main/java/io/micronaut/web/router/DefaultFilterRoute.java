@@ -24,6 +24,7 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.filter.FilterPatternStyle;
 import io.micronaut.http.filter.GenericHttpFilter;
+import org.jspecify.annotations.Nullable;
 
 import java.net.URI;
 import java.util.ArrayList;
@@ -47,12 +48,12 @@ final class DefaultFilterRoute implements FilterRoute {
     private final List<String> patterns = new ArrayList<>(1);
     private final Supplier<GenericHttpFilter> filterSupplier;
     private final AnnotationMetadataResolver annotationMetadataResolver;
-    private Set<HttpMethod> httpMethods;
-    private FilterPatternStyle patternStyle;
-    private volatile GenericHttpFilter filter;
-    private AnnotationMetadata annotationMetadata;
+    private @Nullable Set<HttpMethod> httpMethods;
+    private @Nullable FilterPatternStyle patternStyle;
+    private volatile @Nullable GenericHttpFilter filter;
+    private @Nullable AnnotationMetadata annotationMetadata;
     private final boolean isPreMatching;
-    private String matchingAnnotation;
+    private @Nullable String matchingAnnotation;
 
     DefaultFilterRoute(Supplier<GenericHttpFilter> filter, AnnotationMetadataResolver annotationMetadataResolver, boolean isPreMatching) {
         Objects.requireNonNull(filter, "HttpFilter argument is required");
@@ -120,6 +121,7 @@ final class DefaultFilterRoute implements FilterRoute {
     }
 
     @Override
+    @Nullable
     public String findMatchingAnnotation() {
         if (matchingAnnotation == null) {
             matchingAnnotation = FilterRoute.super.findMatchingAnnotation();
@@ -159,7 +161,7 @@ final class DefaultFilterRoute implements FilterRoute {
 
     @Override
     public Set<HttpMethod> getFilterMethods() {
-        return httpMethods;
+        return httpMethods != null ? httpMethods : java.util.Collections.emptySet();
     }
 
     @Override

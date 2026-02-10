@@ -22,6 +22,7 @@ import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
 import io.micronaut.runtime.ApplicationConfiguration;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -97,6 +98,7 @@ public final class ContextlessMessageBodyHandlerRegistry extends AbstractMessage
     }
 
     @Override
+    @Nullable
     protected <T> MessageBodyReader<T> findReaderImpl(Argument<T> type, List<MediaType> mediaTypes) {
         for (TypedMessageBodyReader<?> messageBodyReader : typedMessageBodyReaders) {
             TypedMessageBodyReader<T> reader = (TypedMessageBodyReader<T>) messageBodyReader;
@@ -117,6 +119,7 @@ public final class ContextlessMessageBodyHandlerRegistry extends AbstractMessage
     }
 
     @Override
+    @Nullable
     protected <T> MessageBodyWriter<T> findWriterImpl(Argument<T> type, List<MediaType> mediaTypes) {
         for (TypedMessageBodyWriter<?> messageBodyReader : typedMessageBodyWriters) {
             TypedMessageBodyWriter<T> writer = (TypedMessageBodyWriter<T>) messageBodyReader;

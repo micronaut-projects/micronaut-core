@@ -107,6 +107,7 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
     }
 
     @Override
+    @Nullable
     public R invoke(T instance, @Nullable Object... arguments) {
         return new MethodInterceptorChain<>(interceptors, instance, executionHandle, originalParameters).proceed();
     }
@@ -194,6 +195,7 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
      */
     @Internal
     @UsedByGeneratedCode
+    @Nullable
     public static <T1> T1 initialize(
         BeanResolutionContext resolutionContext,
         BeanContext beanContext,
@@ -224,6 +226,7 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
      */
     @Internal
     @UsedByGeneratedCode
+    @Nullable
     public static <T1> T1 dispose(
         BeanResolutionContext resolutionContext,
         BeanContext beanContext,
@@ -241,6 +244,7 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
+    @Nullable
     private static <T1> T1 doIntercept(
         BeanResolutionContext resolutionContext,
         BeanContext beanContext,

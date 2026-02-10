@@ -42,6 +42,7 @@ import java.lang.annotation.Annotation;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -97,6 +98,7 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
     }
 
     @Override
+    @Nullable
     public R invoke(B instance, @Nullable Object... arguments) {
         return proceed();
     }
@@ -244,6 +246,7 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
         Interceptor[] introductionInterceptors = resolveInterceptorsInternal(method, Introduction.class, interceptors, beanContext != null ? beanContext.getClassLoader() : InterceptorChain.class.getClassLoader());
         if (introductionInterceptors.length == 0) {
             if (method.hasStereotype(Adapter.class)) {
+                Objects.requireNonNull(beanContext);
                 introductionInterceptors = new Interceptor[] {new AdapterIntroduction(beanContext, method)};
             } else {
                 throw new IllegalStateException("At least one @Introduction method interceptor required, but missing. Check if your @Introduction stereotype annotation is marked with @Retention(RUNTIME) and @Type(..) with the interceptor type. Otherwise do not load @Introduction beans if their interceptor definitions are missing!");
@@ -272,7 +275,7 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
         );
     }
 
-    private static void instrumentAnnotationMetadata(BeanContext beanContext, ExecutableMethod<?, ?> method) {
+    private static void instrumentAnnotationMetadata(@Nullable BeanContext beanContext, ExecutableMethod<?, ?> method) {
         if (beanContext instanceof ApplicationContext context && method instanceof EnvironmentConfigurable m) {
             if (m.hasPropertyExpressions()) {
                 m.configure(context.getEnvironment());

@@ -243,7 +243,7 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
      * @param arguments The arguments
      * @return The class array
      */
-    static Class<?>[] toClassArray(@Nullable Argument<?>... arguments) {
+    static Class<?>[] toClassArray(Argument<?> @Nullable ... arguments) {
         if (ArrayUtils.isEmpty(arguments)) {
             return ReflectionUtils.EMPTY_CLASS_ARRAY;
         }
@@ -261,8 +261,7 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
      * @param arguments The arguments
      * @return The String representation
      */
-    static
-    String toString(@Nullable Argument<?>... arguments) {
+    static String toString(Argument<?> @Nullable ... arguments) {
         if (ArrayUtils.isNotEmpty(arguments)) {
             StringBuilder baseString = new StringBuilder();
             for (int i = 0; i < arguments.length; i++) {
@@ -290,7 +289,7 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
     @UsedByGeneratedCode
     static <T> Argument<T> of(Class<T> type,
                               @Nullable String name,
-                              @Nullable Argument<?>... typeParameters) {
+                              Argument<?> @Nullable ... typeParameters) {
         return new DefaultArgument<>(type, name, AnnotationMetadata.EMPTY_METADATA, typeParameters);
     }
 
@@ -306,11 +305,10 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
      * @since 3.0.0
      */
     @UsedByGeneratedCode
-    static <T> Argument<T> ofTypeVariable(
- Class<T> type,
-            @Nullable String name,
-            @Nullable AnnotationMetadata annotationMetadata,
-            @Nullable Argument<?>... typeParameters) {
+    static <T> Argument<T> ofTypeVariable(Class<T> type,
+                                          @Nullable String name,
+                                          @Nullable AnnotationMetadata annotationMetadata,
+                                          @Nullable Argument<?>... typeParameters) {
         return new DefaultGenericPlaceholder<>(type, name, annotationMetadata, typeParameters);
     }
 
@@ -389,7 +387,7 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
      */
     @UsedByGeneratedCode
     static <T> Argument<T> of(
- Class<T> type,
+            Class<T> type,
             @Nullable String name,
             @Nullable AnnotationMetadata annotationMetadata,
             @Nullable Argument<?>... typeParameters) {

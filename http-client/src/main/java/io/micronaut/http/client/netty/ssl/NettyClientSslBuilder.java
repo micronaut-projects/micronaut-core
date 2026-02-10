@@ -38,6 +38,7 @@ import io.netty.handler.ssl.SslProvider;
 import io.netty.handler.ssl.SupportedCipherSuiteFilter;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -158,6 +159,7 @@ public class NettyClientSslBuilder extends SslBuilder<SslContext> implements Cli
     }
 
     @Override
+    @Nullable
     protected KeyManagerFactory getKeyManagerFactory(SslConfiguration ssl) {
         try {
             Optional<KeyStore> ks = this.getKeyStore(ssl);
@@ -172,6 +174,7 @@ public class NettyClientSslBuilder extends SslBuilder<SslContext> implements Cli
     }
 
     @Override
+    @Nullable
     protected TrustManagerFactory getTrustManagerFactory(SslConfiguration ssl) {
         try {
             Optional<KeyStore> trustStore = getTrustStore(ssl);

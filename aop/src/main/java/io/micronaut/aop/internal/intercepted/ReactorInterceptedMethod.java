@@ -23,6 +23,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.ReturnType;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -48,7 +49,7 @@ final class ReactorInterceptedMethod extends PublisherInterceptedMethod {
     }
 
     @Override
-    protected Publisher<?> convertToPublisher(Object result) {
+    protected Publisher<?> convertToPublisher(@Nullable Object result) {
         return captureContext(super.convertToPublisher(result));
     }
 

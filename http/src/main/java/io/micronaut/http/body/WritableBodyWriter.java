@@ -30,6 +30,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.runtime.ApplicationConfiguration;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
@@ -86,17 +87,17 @@ public final class WritableBodyWriter implements TypedMessageBodyHandler<Writabl
     }
 
     @Override
-    public Publisher<? extends Writable> readChunked(Argument<Writable> type, MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
+    public Publisher<? extends Writable> readChunked(Argument<Writable> type, @Nullable MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
         return Flux.from(input).map(this::read0);
     }
 
     @Override
-    public Writable read(Argument<Writable> type, MediaType mediaType, Headers httpHeaders, ByteBuffer<?> byteBuffer) throws CodecException {
+    public Writable read(Argument<Writable> type, @Nullable MediaType mediaType, Headers httpHeaders, ByteBuffer<?> byteBuffer) throws CodecException {
         return read0(byteBuffer);
     }
 
     @Override
-    public Writable read(Argument<Writable> type, MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
+    public Writable read(Argument<Writable> type, @Nullable MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
         String s;
         try {
             s = new String(inputStream.readAllBytes(), applicationConfiguration.getDefaultCharset());

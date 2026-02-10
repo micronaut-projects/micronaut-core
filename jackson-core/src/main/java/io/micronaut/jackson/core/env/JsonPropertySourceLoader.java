@@ -15,6 +15,7 @@
  */
 package io.micronaut.jackson.core.env;
 
+import org.jspecify.annotations.Nullable;
 import tools.jackson.core.json.JsonFactory;
 import tools.jackson.core.JsonParser;
 import io.micronaut.context.env.AbstractPropertySourceLoader;
@@ -28,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -69,7 +71,7 @@ public class JsonPropertySourceLoader extends AbstractPropertySourceLoader {
      */
     @SuppressWarnings("unchecked")
     protected Map<String, Object> readJsonAsMap(InputStream input) throws IOException {
-        return (Map<String, Object>) unwrap(readJsonAsObject(input));
+        return (Map<String, Object>) Objects.requireNonNull(unwrap(readJsonAsObject(input)));
     }
 
     private JsonNode readJsonAsObject(InputStream input) throws IOException {
@@ -78,6 +80,7 @@ public class JsonPropertySourceLoader extends AbstractPropertySourceLoader {
         }
     }
 
+    @Nullable
     private Object unwrap(JsonNode value) {
         if (value.isNumber()) {
             return value.getNumberValue();

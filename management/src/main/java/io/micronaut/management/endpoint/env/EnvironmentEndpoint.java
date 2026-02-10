@@ -56,6 +56,7 @@ public class EnvironmentEndpoint {
         EnvironmentEndpoint.PACKAGES_KEY, EnvironmentEndpoint.PROPERTY_SOURCES_KEY);
     private static final String MASK_VALUE = "*****";
     private final Environment environment;
+    @Nullable
     private final EnvironmentEndpointFilter environmentFilter;
     private List<String> activeKeys = DEFAULT_ACTIVE_SECTIONS;
 
@@ -132,6 +133,7 @@ public class EnvironmentEndpoint {
      * @return a map with all the properties defined in the property source if it exists; null otherwise.
      */
     @Read
+    @Nullable
     public Map<String, Object> getProperties(@Selector String propertySourceName) {
         EnvironmentFilterSpecification filter = createFilterSpecification();
 

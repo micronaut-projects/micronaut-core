@@ -111,15 +111,15 @@ public interface HttpFilterResolver<T extends AnnotationMetadataProvider> {
             @Nullable AnnotationMetadata annotationMetadata,
             @Nullable Set<HttpMethod> methods,
             FilterPatternStyle patternStyle, String... patterns) {
-            return new DefaultFilterEntry(
-                GenericHttpFilter.createLegacyFilter(
-                    Objects.requireNonNull(filter, "Filter cannot be null"),
-                    new FilterOrder.Dynamic(OrderUtil.getOrder(annotationMetadata))),
-                annotationMetadata != null ? annotationMetadata : AnnotationMetadata.EMPTY_METADATA,
-                methods,
-                patternStyle,
-                patterns
-            );
+             return new DefaultFilterEntry(
+                 GenericHttpFilter.createLegacyFilter(
+                     Objects.requireNonNull(filter, "Filter cannot be null"),
+                     new FilterOrder.Dynamic(OrderUtil.getOrder(annotationMetadata != null ? annotationMetadata : AnnotationMetadata.EMPTY_METADATA))),
+                 annotationMetadata != null ? annotationMetadata : AnnotationMetadata.EMPTY_METADATA,
+                 java.util.Objects.requireNonNullElse(methods, java.util.Collections.emptySet()),
+                 patternStyle,
+                 patterns
+             );
         }
     }
 }

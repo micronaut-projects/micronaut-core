@@ -46,6 +46,7 @@ class DefaultMethodInjectionPoint<B, T> implements MethodInjectionPoint<B, T>, E
     private final String methodName;
     private final Class<?>[] argTypes;
     private final Argument<?>[] arguments;
+    @Nullable
     private Environment environment;
 
     /**

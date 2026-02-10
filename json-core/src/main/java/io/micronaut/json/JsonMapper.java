@@ -65,6 +65,7 @@ public interface JsonMapper {
      * @return The deserialized value.
      * @throws IOException IOException
      */
+    @Nullable
     <T> T readValueFromTree(JsonNode tree, Argument<T> type) throws IOException;
 
     /**
@@ -76,6 +77,7 @@ public interface JsonMapper {
      * @return The deserialized value.
      * @throws IOException IOException
      */
+    @Nullable
     default <T> T readValueFromTree(JsonNode tree, Class<T> type) throws IOException {
         return readValueFromTree(tree, Argument.of(type));
     }
@@ -89,6 +91,7 @@ public interface JsonMapper {
      * @return The deserialized object.
      * @throws IOException IOException
      */
+    @Nullable
     <T> T readValue(InputStream inputStream, Argument<T> type) throws IOException;
 
     /**
@@ -114,7 +117,8 @@ public interface JsonMapper {
      * @return The deserialized object.
      * @throws IOException IOException
      */
-    <T> T readValue(byte [] byteArray, Argument<T> type) throws IOException;
+    @Nullable
+    <T> T readValue(byte[] byteArray, Argument<T> type) throws IOException;
 
     /**
      * Parse and map json from the given byte buffer.
@@ -126,6 +130,7 @@ public interface JsonMapper {
      * @throws IOException IOException
      * @deprecated Prefer {@link #readValue(ReadBuffer, Argument)}
      */
+    @Nullable
     @Deprecated(since = "5.0.0")
     default <T> T readValue(ByteBuffer<?> byteBuffer, Argument<T> type) throws IOException {
         return readValue(byteBuffer.toByteArray(), type);
@@ -141,6 +146,7 @@ public interface JsonMapper {
      * @throws IOException IOException
      * @since 5.0.0
      */
+    @Nullable
     default <T> T readValue(ReadBuffer readBuffer, Argument<T> type) throws IOException {
         return readValue(readBuffer.toArray(), type);
     }
@@ -154,6 +160,7 @@ public interface JsonMapper {
      * @return The deserialized object.
      * @throws IOException IOException
      */
+    @Nullable
     default <T> T readValue(String string, Argument<T> type) throws IOException {
         return readValue(string.getBytes(StandardCharsets.UTF_8), type);
     }
@@ -267,8 +274,7 @@ public interface JsonMapper {
      * @throws IOException If an unrecoverable error occurs
      * @since 4.0.0
      */
-    default String writeValueAsString(Object object) throws IOException {
-        Objects.requireNonNull(object, "Object cannot be null");
+    default String writeValueAsString(@Nullable Object object) throws IOException {
         return new String(writeValueAsBytes(object), StandardCharsets.UTF_8);
     }
 

@@ -26,6 +26,7 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.sourcegen.model.ExpressionDef;
 import io.micronaut.sourcegen.model.TypeDef;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Expression AST node used for context method parameter access.
@@ -41,6 +42,7 @@ final class ContextMethodParameterAccess extends ExpressionNode {
 
     private final ParameterElement parameterElement;
 
+    @Nullable
     private Integer parameterIndex;
 
     public ContextMethodParameterAccess(ParameterElement parameterElement) {

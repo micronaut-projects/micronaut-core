@@ -94,7 +94,7 @@ interface EnvironmentAnnotationMetadata extends AnnotationMetadata {
      * @param valueMapper The value mapper
      * @return The class value
      */
-    Optional<Class> classValue(Class<? extends Annotation> annotation, String member, Function<Object, Object> valueMapper);
+    Optional<Class> classValue(Class<? extends Annotation> annotation, String member, @Nullable Function<Object, Object> valueMapper);
 
     /**
      * Retrieve the class value and optionally map its value.
@@ -123,7 +123,7 @@ interface EnvironmentAnnotationMetadata extends AnnotationMetadata {
     * @param valueMapper The value mapper
     * @return The boolean value
     */
-    Optional<Boolean> booleanValue(Class<? extends Annotation> annotation, String member, Function<Object, Object> valueMapper);
+    Optional<Boolean> booleanValue(Class<? extends Annotation> annotation, String member, @Nullable Function<Object, Object> valueMapper);
 
     /**
      * Retrieve the boolean value and optionally map its value.
@@ -169,7 +169,7 @@ interface EnvironmentAnnotationMetadata extends AnnotationMetadata {
      * @param valueMapper The value mapper
      * @return The int value
      */
-    Optional<String> stringValue(Class<? extends Annotation> annotation, String member, Function<Object, Object> valueMapper);
+    Optional<String> stringValue(Class<? extends Annotation> annotation, String member, @Nullable Function<Object, Object> valueMapper);
 
     /**
      * Retrieve the string value and optionally map its value.
@@ -178,7 +178,7 @@ interface EnvironmentAnnotationMetadata extends AnnotationMetadata {
      * @param valueMapper The value mapper
      * @return The int value
      */
-    String [] stringValues(Class<? extends Annotation> annotation, String member, Function<Object, Object> valueMapper);
+    String [] stringValues(Class<? extends Annotation> annotation, String member, @Nullable Function<Object, Object> valueMapper);
 
     /**
      * Retrieve the string value and optionally map its value.
@@ -187,7 +187,7 @@ interface EnvironmentAnnotationMetadata extends AnnotationMetadata {
      * @param valueMapper The value mapper
      * @return The int value
      */
-    String [] stringValues(String annotation, String member, Function<Object, Object> valueMapper);
+    String [] stringValues(String annotation, String member, @Nullable Function<Object, Object> valueMapper);
 
     /**
      * Retrieve the string value and optionally map its value.
@@ -205,7 +205,7 @@ interface EnvironmentAnnotationMetadata extends AnnotationMetadata {
      * @param valueMapper The value mapper
      * @return The boolean value
      */
-    boolean isTrue(Class<? extends Annotation> annotation, String member, Function<Object, Object> valueMapper);
+    boolean isTrue(Class<? extends Annotation> annotation, String member, @Nullable Function<Object, Object> valueMapper);
 
     /**
      * Retrieve the boolean value and optionally map its value.
@@ -234,7 +234,7 @@ interface EnvironmentAnnotationMetadata extends AnnotationMetadata {
      * @return The double value
      */
     @Internal
-    OptionalDouble doubleValue(String annotation, String member, Function<Object, Object> valueMapper);
+    OptionalDouble doubleValue(String annotation, String member, @Nullable Function<Object, Object> valueMapper);
 
     /**
      * Resolves the given value performing type conversion as necessary.

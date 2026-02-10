@@ -34,6 +34,7 @@ import io.micronaut.json.JsonMapper;
 import io.micronaut.json.JsonSyntaxException;
 import io.micronaut.json.tree.JsonNode;
 import jakarta.inject.Inject;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -52,6 +53,7 @@ import java.util.Optional;
 @Prototype
 public final class JsonConverterRegistrar implements TypeConverterRegistrar {
     private final BeanProvider<JsonMapper> objectCodecProvider;
+    @Nullable
     private JsonMapper objectCodec;
     private final ConversionService conversionService;
     private final BeanProvider<BeanPropertyBinder> beanPropertyBinder;

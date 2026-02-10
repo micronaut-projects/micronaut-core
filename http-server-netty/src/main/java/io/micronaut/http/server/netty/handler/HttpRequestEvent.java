@@ -22,6 +22,7 @@ import io.netty.handler.codec.http.HttpResponse;
 import jdk.jfr.Enabled;
 import jdk.jfr.Event;
 import jdk.jfr.StackTrace;
+import org.jspecify.annotations.Nullable;
 
 /**
  * JFR event that tracks HTTP request lifetime.
@@ -33,8 +34,11 @@ import jdk.jfr.StackTrace;
 @StackTrace(false)
 @Enabled(false)
 abstract sealed class HttpRequestEvent extends Event permits Http1RequestEvent, Http2RequestEvent {
+    @Nullable
     String channelId;
+    @Nullable
     String method;
+    @Nullable
     String uri;
     int status;
 

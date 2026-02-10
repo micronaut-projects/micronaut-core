@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.RequestBinderRegistry;
+import org.jspecify.annotations.Nullable;
 
 import java.io.Closeable;
 import java.util.Collection;
@@ -104,6 +105,7 @@ public interface RouteMatch<R> extends Callable<R>, AnnotationMetadataProvider, 
      *
      * @return The result
      */
+    @Nullable
     R execute();
 
     /**
@@ -112,6 +114,7 @@ public interface RouteMatch<R> extends Callable<R>, AnnotationMetadataProvider, 
      * @return The result
      * @throws Exception When an exception occurs
      */
+    @Nullable
     @Override
     default R call() throws Exception {
         return execute();

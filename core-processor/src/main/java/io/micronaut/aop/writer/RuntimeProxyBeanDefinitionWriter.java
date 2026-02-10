@@ -32,6 +32,7 @@ import io.micronaut.inject.writer.BeanDefinitionWriter;
 import io.micronaut.sourcegen.model.ClassTypeDef;
 import io.micronaut.sourcegen.model.ExpressionDef;
 import io.micronaut.sourcegen.model.TypeDef;
+import org.jspecify.annotations.NullUnmarked;
 
 import java.lang.reflect.Method;
 
@@ -41,6 +42,7 @@ import java.lang.reflect.Method;
  * @author Denis Stepanov
  * @since 5.0
  */
+@NullUnmarked
 @Internal
 public class RuntimeProxyBeanDefinitionWriter extends ProxyingBeanDefinitionWriter {
 

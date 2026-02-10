@@ -16,6 +16,8 @@
 package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import org.jspecify.annotations.Nullable;
+
 /**
  * Stores data about an element that references a field.
  *
@@ -44,6 +46,7 @@ public interface FieldElement extends TypedElement, MemberElement {
      *
      * @since 4.5.0
      */
+    @Nullable
     default Object getConstantValue() {
         return null;
     }

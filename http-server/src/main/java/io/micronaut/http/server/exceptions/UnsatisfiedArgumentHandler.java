@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.server.exceptions;
 
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.bind.exceptions.UnsatisfiedArgumentException;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.server.exceptions.response.Error;
@@ -43,7 +42,6 @@ public class UnsatisfiedArgumentHandler extends ErrorExceptionHandler<Unsatisfie
     }
 
     @Override
-    @NonNull
     protected Error error(UnsatisfiedArgumentException exception) {
         return new Error() {
             @Override

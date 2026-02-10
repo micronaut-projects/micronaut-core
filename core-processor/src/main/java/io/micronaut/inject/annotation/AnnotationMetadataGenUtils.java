@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.AnnotationDefaultValuesProvider;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.NullUnmarked;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.expressions.EvaluatedExpressionReference;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -54,6 +55,7 @@ import java.util.function.Function;
  * @author Graeme Rocher
  * @since 1.0
  */
+@NullUnmarked
 @Internal
 public final class AnnotationMetadataGenUtils {
 

@@ -15,6 +15,7 @@
  */
 package io.micronaut.http;
 import io.micronaut.http.cookie.Cookies;
+import org.jspecify.annotations.Nullable;
 
 import javax.net.ssl.SSLSession;
 import java.net.InetSocketAddress;
@@ -67,7 +68,7 @@ public class HttpRequestWrapper<B> extends HttpMessageWrapper<B> implements Http
     }
 
     @Override
-    public HttpRequest<B> setAttribute(CharSequence name, Object value) {
+    public HttpRequest<B> setAttribute(CharSequence name, @Nullable Object value) {
         return getDelegate().setAttribute(name, value);
     }
 
@@ -127,7 +128,7 @@ public class HttpRequestWrapper<B> extends HttpMessageWrapper<B> implements Http
     }
 
     @Override
-    public String getServerName() {
+    public @Nullable String getServerName() {
         return getDelegate().getServerName();
     }
 

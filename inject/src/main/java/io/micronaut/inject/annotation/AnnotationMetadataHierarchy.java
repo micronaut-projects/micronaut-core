@@ -434,7 +434,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     }
 
     @Override
-    public <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByStereotype(String stereotype) {
+    public <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByStereotype(@Nullable String stereotype) {
         Set<AnnotationValue<T>> list = new LinkedHashSet<>();
         for (AnnotationMetadata am : hierarchy) {
             list.addAll(am.getAnnotationValuesByStereotype(stereotype));
@@ -675,7 +675,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     }
 
     @Override
-    public Optional<Class> classValue(Class<? extends Annotation> annotation, String member, Function<Object, Object> valueMapper) {
+    public Optional<Class> classValue(Class<? extends Annotation> annotation, String member, @Nullable Function<Object, Object> valueMapper) {
         for (AnnotationMetadata annotationMetadata : hierarchy) {
             final Optional<Class> o;
             if (annotationMetadata instanceof EnvironmentAnnotationMetadata environmentAnnotationMetadata) {
@@ -723,7 +723,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     }
 
     @Override
-    public Optional<Boolean> booleanValue(Class<? extends Annotation> annotation, String member, Function<Object, Object> valueMapper) {
+    public Optional<Boolean> booleanValue(Class<? extends Annotation> annotation, String member, @Nullable Function<Object, Object> valueMapper) {
         for (AnnotationMetadata annotationMetadata : hierarchy) {
             final Optional<Boolean> o;
             if (annotationMetadata instanceof EnvironmentAnnotationMetadata environmentAnnotationMetadata) {
@@ -852,7 +852,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     }
 
     @Override
-    public Optional<String> stringValue(Class<? extends Annotation> annotation, String member, Function<Object, Object> valueMapper) {
+    public Optional<String> stringValue(Class<? extends Annotation> annotation, String member, @Nullable Function<Object, Object> valueMapper) {
         for (AnnotationMetadata annotationMetadata : hierarchy) {
             final Optional<String> o;
             if (annotationMetadata instanceof EnvironmentAnnotationMetadata environmentAnnotationMetadata) {
@@ -868,7 +868,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     }
 
     @Override
-    public String[] stringValues(Class<? extends Annotation> annotation, String member, Function<Object, Object> valueMapper) {
+    public String[] stringValues(Class<? extends Annotation> annotation, String member, @Nullable Function<Object, Object> valueMapper) {
         List<String> strings = new ArrayList<>();
         for (AnnotationMetadata am : hierarchy) {
             if (am instanceof EnvironmentAnnotationMetadata environmentAnnotationMetadata) {
@@ -881,7 +881,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     }
 
     @Override
-    public String[] stringValues(String annotation, String member, Function<Object, Object> valueMapper) {
+    public String[] stringValues(String annotation, String member, @Nullable Function<Object, Object> valueMapper) {
         List<String> strings = new ArrayList<>();
         for (AnnotationMetadata am : hierarchy) {
             if (am instanceof EnvironmentAnnotationMetadata environmentAnnotationMetadata) {
@@ -910,7 +910,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     }
 
     @Override
-    public boolean isTrue(Class<? extends Annotation> annotation, String member, Function<Object, Object> valueMapper) {
+    public boolean isTrue(Class<? extends Annotation> annotation, String member, @Nullable Function<Object, Object> valueMapper) {
         return booleanValue(annotation, member, valueMapper).orElse(false);
     }
 
@@ -936,7 +936,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     }
 
     @Override
-    public OptionalDouble doubleValue(String annotation, String member, Function<Object, Object> valueMapper) {
+    public OptionalDouble doubleValue(String annotation, String member, @Nullable Function<Object, Object> valueMapper) {
         for (AnnotationMetadata annotationMetadata : hierarchy) {
             final OptionalDouble o;
             if (annotationMetadata instanceof EnvironmentAnnotationMetadata environmentAnnotationMetadata) {

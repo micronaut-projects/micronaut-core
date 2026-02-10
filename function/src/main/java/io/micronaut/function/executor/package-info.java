@@ -20,7 +20,6 @@
  * @since 1.0
  */
 @NullMarked
-
 package io.micronaut.function.executor;
 
 import org.jspecify.annotations.NullMarked;

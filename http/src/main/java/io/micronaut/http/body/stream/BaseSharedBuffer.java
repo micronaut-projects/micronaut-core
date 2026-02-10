@@ -57,7 +57,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      * Any stream error.
      */
     @Nullable
-    private Throwable error;
+    private @Nullable Throwable error;
     /**
      * Number of reserved subscriber spots. A new subscription MUST be preceded by a
      * reservation, and every reservation MUST have a subscription.
@@ -67,12 +67,12 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      * Active subscribers.
      */
     @Nullable
-    private List<BufferConsumer> subscribers;
+    private @Nullable List<BufferConsumer> subscribers;
     /**
      * Active subscribers that need the fully buffered body.
      */
     @Nullable
-    private List<DelayedExecutionFlow<ReadBuffer>> fullSubscribers;
+    private @Nullable List<DelayedExecutionFlow<ReadBuffer>> fullSubscribers;
     /**
      * This flag is only used in tests, to verify that the BufferConsumer methods arent called
      * in a reentrant fashion.
@@ -397,6 +397,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      * Implementation of {@link BufferConsumer#complete()}.<br>
      * Not thread safe, caller must handle concurrency.
      */
+    @Override
     public void complete() {
         if (expectedLength > lengthSoFar) {
             throw new IncorrectContentLengthException("Received fewer bytes than specified by Content-Length");
@@ -424,6 +425,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      *
      * @param e The error
      */
+    @Override
     public void error(Throwable e) {
         if (error != null) {
             if (error != e) {

@@ -24,6 +24,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.util.HttpUtil;
+import org.jspecify.annotations.Nullable;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -78,7 +79,7 @@ public interface HttpMessage<B> extends MutableAttributeHolder {
     }
 
     @Override
-    default HttpMessage<B> setAttribute(CharSequence name, Object value) {
+    default HttpMessage<B> setAttribute(CharSequence name, @Nullable Object value) {
         return (HttpMessage<B>) MutableAttributeHolder.super.setAttribute(name, value);
     }
 

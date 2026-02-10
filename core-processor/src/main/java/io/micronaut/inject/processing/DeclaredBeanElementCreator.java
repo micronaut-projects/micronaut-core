@@ -32,6 +32,7 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.inject.writer.ProxyingBeanDefinitionVisitor;
+import org.jspecify.annotations.NullUnmarked;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
@@ -66,6 +67,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * @author Denis Stepanov
  * @since 4.0.0
  */
+@NullUnmarked
 @Internal
 class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
 

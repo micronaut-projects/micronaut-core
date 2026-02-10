@@ -21,6 +21,9 @@ import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.sourcegen.model.ExpressionDef;
 import io.micronaut.sourcegen.model.TypeDef;
+import org.jspecify.annotations.Nullable;
+
+import java.util.Objects;
 
 import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.isNumeric;
 
@@ -41,6 +44,7 @@ public final class RelationalOperator extends ExpressionNode {
     private final ExpressionNode rightOperand;
     private final ExpressionDef.ComparisonOperation.OpType type;
 
+    @Nullable
     private ExpressionNode comparisonOperation;
 
     public RelationalOperator(ExpressionNode leftOperand,
@@ -69,6 +73,6 @@ public final class RelationalOperator extends ExpressionNode {
 
     @Override
     public ExpressionDef generateExpression(ExpressionCompilationContext ctx) {
-        return comparisonOperation.compile(ctx);
+        return Objects.requireNonNull(comparisonOperation).compile(ctx);
     }
 }

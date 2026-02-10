@@ -186,7 +186,7 @@ public interface PropertyResolver extends ValueResolver<String> {
      * @param <T>          The concrete type
      * @return An optional containing the property value if it exists
      */
-    default @Nullable <T> T getProperty(String name, Class<T> requiredType, @Nullable T defaultValue) {
+    default <T> T getProperty(String name, Class<T> requiredType, T defaultValue) {
         return getProperty(name, requiredType).orElse(defaultValue);
     }
 

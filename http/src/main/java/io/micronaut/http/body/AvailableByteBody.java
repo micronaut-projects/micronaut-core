@@ -43,6 +43,7 @@ public sealed interface AvailableByteBody extends ByteBody permits CloseableAvai
      * @see ByteBody#split()
      * @return A body with the same content as this one
      */
+    @Override
     CloseableAvailableByteBody split();
 
     /**

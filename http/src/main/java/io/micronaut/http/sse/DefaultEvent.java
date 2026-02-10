@@ -18,6 +18,7 @@ package io.micronaut.http.sse;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Duration;
 
@@ -33,10 +34,10 @@ import java.time.Duration;
 class DefaultEvent<T> implements Event<T> {
 
     private final T data;
-    private String id;
-    private String name;
-    private String comment;
-    private Duration retry;
+    private @Nullable String id;
+    private @Nullable String name;
+    private @Nullable String comment;
+    private @Nullable Duration retry;
 
     /**
      * @param data The event
@@ -51,45 +52,45 @@ class DefaultEvent<T> implements Event<T> {
     }
 
     @Override
-    public String getId() {
+    public @Nullable String getId() {
         return id;
     }
 
     @Override
-    public String getName() {
+    public @Nullable String getName() {
         return name;
     }
 
     @Override
-    public String getComment() {
+    public @Nullable String getComment() {
         return comment;
     }
 
     @Override
-    public Duration getRetry() {
+    public @Nullable Duration getRetry() {
         return retry;
     }
 
     @Override
-    public Event<T> retry(Duration duration) {
+    public Event<T> retry(@Nullable Duration duration) {
         this.retry = duration;
         return this;
     }
 
     @Override
-    public Event<T> id(String id) {
+    public Event<T> id(@Nullable String id) {
         this.id = id;
         return this;
     }
 
     @Override
-    public Event<T> name(String name) {
+    public Event<T> name(@Nullable String name) {
         this.name = name;
         return this;
     }
 
     @Override
-    public Event<T> comment(String comment) {
+    public Event<T> comment(@Nullable String comment) {
         this.comment = comment;
         return this;
     }

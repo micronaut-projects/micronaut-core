@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.client;
 
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
@@ -38,7 +37,7 @@ public interface ProxyHttpClient {
      * @param request The request
      * @return A publisher that emits the response.
      */
-    Publisher<MutableHttpResponse<?>> proxy(@NonNull HttpRequest<?> request);
+    Publisher<MutableHttpResponse<?>> proxy(HttpRequest<?> request);
 
     /**
      * Proxy the given request and emit the response. This method expects the full absolute URL to be included in the request.
@@ -49,7 +48,7 @@ public interface ProxyHttpClient {
      * @return A publisher that emits the response.
      * @since 3.5.0
      */
-    default Publisher<MutableHttpResponse<?>> proxy(@NonNull HttpRequest<?> request, @NonNull ProxyRequestOptions options) {
+    default Publisher<MutableHttpResponse<?>> proxy(HttpRequest<?> request, ProxyRequestOptions options) {
         if (options.equals(ProxyRequestOptions.getDefault())) {
             return proxy(request);
         } else {
@@ -80,7 +79,7 @@ public interface ProxyHttpClient {
      * @return The client
      * @since 2.2.0
      */
-    static ProxyHttpClient create(@Nullable URL url, @NonNull HttpClientConfiguration configuration) {
+    static ProxyHttpClient create(@Nullable URL url, HttpClientConfiguration configuration) {
         return ProxyHttpClientFactoryResolver.getFactory().createProxyClient(url, configuration);
     }
 }

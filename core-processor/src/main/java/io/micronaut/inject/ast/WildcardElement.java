@@ -16,7 +16,10 @@
 package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.Experimental;
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Represents a wildcard, for example {@code List<?>}. For compatibility, this wildcard acts like its first upper bound when used as a
@@ -56,6 +59,7 @@ public interface WildcardElement extends GenericElement {
      * @param <T> The class element type
      * @return the most upper type
      */
+    @Nullable
     static <T extends ClassElement> T findUpperType(List<T> bounds1, List<T> bounds2) {
         T upper = null;
         for (T lowerBound : bounds2) {
@@ -69,5 +73,16 @@ public interface WildcardElement extends GenericElement {
             }
         }
         return upper;
+    }
+
+    /**
+     * Find the most upper type.
+     * @param bounds1 The bounds 1
+     * @param bounds2 The bounds 2
+     * @param <T> The class element type
+     * @return the most upper type
+     */
+    static <T extends ClassElement> T findUpperTypeRequired(List<T> bounds1, List<T> bounds2) {
+        return Objects.requireNonNull(findUpperType(bounds1, bounds2), "No upper bound found");
     }
 }

@@ -33,7 +33,7 @@ public interface CookieFactory {
         .load(CookieFactory.class)
         .firstOr("io.micronaut.http.cookie.HttpCookieFactory", CookieFactory.class.getClassLoader())
         .map(ServiceDefinition::load)
-        .orElse(null);
+        .orElseGet(() -> (name, value) -> new CookieHttpCookieAdapter(new java.net.HttpCookie(name, value)));
 
     /**
      * Create a new cookie.

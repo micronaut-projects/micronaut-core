@@ -16,6 +16,7 @@
 package io.micronaut.http.filter;
 
 import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.NullUnmarked;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.order.OrderUtil;
@@ -27,6 +28,7 @@ import io.micronaut.http.HttpResponse;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.Objects;
 import java.util.function.BiFunction;
 
 /**
@@ -75,7 +77,9 @@ public class FilterRunner {
      * @since 4.6
      */
     public FilterRunner(List<GenericHttpFilter> filters) {
-        this(null, filters, null);
+        this(null, filters, (httpRequest, propagatedContext) -> {
+            throw new IllegalStateException("No response provider defined!");
+        });
     }
 
     /**
@@ -162,8 +166,8 @@ public class FilterRunner {
      * @param propagatedContext The propagated context
      * @return A flow that will be passed on to the next filter, or null if exception is not remapped
      */
-    @Nullable
     @SuppressWarnings("java:S1452")
+    @NullUnmarked // Fix
     protected ExecutionFlow<HttpResponse<?>> processFailure(HttpRequest<?> request, Throwable failure, PropagatedContext propagatedContext) {
         return null;
     }
@@ -234,7 +238,7 @@ public class FilterRunner {
                 f.filterIterator = iterator;
             }
         } else {
-            iterator = filterFilters(filters, request).listIterator();
+            iterator = filters == null ? List.<InternalHttpFilter>of().listIterator() : filterFilters(filters, request).listIterator();
         }
         if (!iterator.hasNext()) {
             return provideResponse(request, propagatedContext);
@@ -318,7 +322,7 @@ public class FilterRunner {
                 // Imperative flow: Unwrap the context and continue the loop
                 if (context != flowContext) {
                     // Response modified by the filter
-                    flow = processResponse(flowContext.request(), flowContext.response(), flowContext.propagatedContext()).map(flowContext::withResponse);
+                    flow = processResponse(flowContext.request(), Objects.requireNonNull(flowContext.response()), flowContext.propagatedContext()).map(flowContext::withResponse);
                     exception = null;
                     flowContext = flow.tryCompleteValue();
                     if (flowContext != null) {
@@ -336,7 +340,7 @@ public class FilterRunner {
                 .flatMap(newContext -> {
                     if (finalContext != newContext) {
                         // Response modified by the filter
-                        return processResponse(newContext.request(), newContext.response(), newContext.propagatedContext()).map(newContext::withResponse);
+                        return processResponse(newContext.request(), Objects.requireNonNull(newContext.response()), newContext.propagatedContext()).map(newContext::withResponse);
                     }
                     return ExecutionFlow.just(newContext);
                 })
@@ -390,7 +394,7 @@ public class FilterRunner {
      */
     final class RouteMatchResolverHttpFilter implements InternalHttpFilter {
 
-        private ListIterator<InternalHttpFilter> filterIterator;
+        private ListIterator<InternalHttpFilter> filterIterator = List.<InternalHttpFilter>of().listIterator();
 
         @Override
         public boolean isFiltersRequest() {

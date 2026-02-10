@@ -16,6 +16,7 @@
 package io.micronaut.discovery.cloud.digitalocean;
 
 import io.micronaut.discovery.cloud.NetworkInterface;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A {@link NetworkInterface} implementation for Digital Ocean.
@@ -27,6 +28,7 @@ public class DigitalOceanNetworkInterface extends NetworkInterface {
 
     private int cidr;
 
+    @Nullable
     private String ipv6Gateway;
 
     @Override
@@ -86,6 +88,7 @@ public class DigitalOceanNetworkInterface extends NetworkInterface {
     /**
      * @return the IPV6 gateway
      */
+    @Nullable
     public String getIpv6Gateway() {
         return ipv6Gateway;
     }
@@ -93,7 +96,7 @@ public class DigitalOceanNetworkInterface extends NetworkInterface {
     /**
      * @param ipv6Gateway the IPV6 gateway
      */
-    public void setIpv6Gateway(String ipv6Gateway) {
+    public void setIpv6Gateway(@Nullable String ipv6Gateway) {
         this.ipv6Gateway = ipv6Gateway;
     }
 

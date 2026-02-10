@@ -17,7 +17,6 @@ package io.micronaut.http.client;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.client.annotation.Client;
@@ -75,7 +74,7 @@ public final class HttpVersionSelection {
     private final boolean http2CipherSuites;
     private final boolean http3;
 
-    private HttpVersionSelection(PlaintextMode plaintextMode, boolean alpn, @NonNull String @NonNull [] alpnSupportedProtocols, boolean http2CipherSuites) {
+    private HttpVersionSelection(PlaintextMode plaintextMode, boolean alpn, String[] alpnSupportedProtocols, boolean http2CipherSuites) {
         this.plaintextMode = plaintextMode;
         this.alpn = alpn;
         this.alpnSupportedProtocols = alpnSupportedProtocols;
@@ -93,17 +92,12 @@ public final class HttpVersionSelection {
      * @param httpVersion The HTTP version as configured for Micronaut HTTP client 3.x
      * @return The version selection
      */
-    @NonNull
-    public static HttpVersionSelection forLegacyVersion(@NonNull HttpVersion httpVersion) {
-        switch (httpVersion) {
-            case HTTP_1_0:
-            case HTTP_1_1:
-                return LEGACY_1;
-            case HTTP_2_0:
-                return LEGACY_2;
-            default:
-                throw new IllegalArgumentException("HTTP version " + httpVersion + " not supported here");
-        }
+    public static HttpVersionSelection forLegacyVersion(HttpVersion httpVersion) {
+        return switch (httpVersion) {
+            case HTTP_1_0, HTTP_1_1 -> LEGACY_1;
+            case HTTP_2_0 -> LEGACY_2;
+            default -> throw new IllegalArgumentException("HTTP version " + httpVersion + " not supported here");
+        };
     }
 
     /**
@@ -112,7 +106,6 @@ public final class HttpVersionSelection {
      *
      * @return The version selection for WebSocket
      */
-    @NonNull
     public static HttpVersionSelection forWebsocket() {
         return WEBSOCKET_1;
     }

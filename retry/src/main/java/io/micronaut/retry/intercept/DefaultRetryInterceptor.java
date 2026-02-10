@@ -40,6 +40,7 @@ import reactor.core.publisher.Flux;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -65,6 +66,7 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
     private static final int DEFAULT_CIRCUIT_BREAKER_TIMEOUT_IN_MILLIS = 20;
 
     private final ConversionService conversionService;
+    @Nullable
     private final ApplicationEventPublisher eventPublisher;
     private final ScheduledExecutorService executorService;
     private final Map<ExecutableMethod, CircuitBreakerRetry> circuitContexts = new ConcurrentHashMap<>();
@@ -77,6 +79,7 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
      * @param executorService The executor service to use for completable futures
      */
     public DefaultRetryInterceptor(ConversionService conversionService,
+                                   @Nullable
                                    ApplicationEventPublisher eventPublisher,
                                    @Named(TaskExecutors.SCHEDULED) ExecutorService executorService) {
         this.conversionService = conversionService;
@@ -138,6 +141,7 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
                 case COMPLETION_STAGE -> {
                     CompletableFuture<Object> newFuture = new CompletableFuture<>();
                     Supplier<CompletionStage<?>> retrySupplier = () -> interceptedMethod.interceptResultAsCompletionStage(this);
+                    Objects.requireNonNull(result);
                     ((CompletionStage<?>) result).whenComplete(retryCompletable(context, retryState, newFuture, retrySupplier));
                     return interceptedMethod.handleResult(newFuture);
                 }
@@ -217,6 +221,7 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
         };
     }
 
+    @Nullable
     private Object retrySync(MethodInvocationContext<Object, Object> context, MutableRetryState retryState, InterceptedMethod interceptedMethod) {
         boolean firstCall = true;
         while (true) {
@@ -227,7 +232,7 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
                 }
                 return interceptedMethod.interceptResult(this);
             } catch (Throwable e) {
-                if (!retryState.getCapturedException().isAssignableFrom(e.getClass())) {
+                if (retryState.getCapturedException() != null && !retryState.getCapturedException().isAssignableFrom(e.getClass())) {
                     throw e;
                 }
 

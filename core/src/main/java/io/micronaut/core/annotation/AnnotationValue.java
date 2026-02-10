@@ -117,7 +117,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      */
     @UsedByGeneratedCode
     @Internal
-    public AnnotationValue(String annotationName, Map<CharSequence, Object> values, Map<CharSequence, Object> defaultValues) {
+    public AnnotationValue(String annotationName, Map<CharSequence, Object> values, @Nullable Map<CharSequence, Object> defaultValues) {
         this(annotationName, values, defaultValues, RetentionPolicy.RUNTIME, null);
     }
 
@@ -232,9 +232,9 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     @Internal
     @UsedByGeneratedCode
     public AnnotationValue(AnnotationValue<A> target,
-                           Map<CharSequence, Object> defaultValues,
+                           @Nullable Map<CharSequence, Object> defaultValues,
                            ConvertibleValues<Object> convertibleValues,
-                           Function<Object, Object> valueMapper) {
+                           @Nullable Function<Object, Object> valueMapper) {
         this.annotationName = target.annotationName;
         this.defaultValues = defaultValues;
         this.values = target.values;

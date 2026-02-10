@@ -17,6 +17,8 @@ package io.micronaut.inject;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
+import org.jspecify.annotations.Nullable;
+
 import java.util.function.Predicate;
 
 /**
@@ -42,6 +44,7 @@ public interface BeanConfiguration extends AnnotationMetadataProvider, BeanConte
      *
      * @return The version or null
      */
+    @Nullable
     String getVersion();
 
     /**

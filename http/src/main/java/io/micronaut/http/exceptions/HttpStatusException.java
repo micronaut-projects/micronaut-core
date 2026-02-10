@@ -16,6 +16,7 @@
 package io.micronaut.http.exceptions;
 
 import io.micronaut.http.HttpStatus;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Optional;
 
@@ -28,7 +29,7 @@ import java.util.Optional;
 public class HttpStatusException extends HttpException {
 
     private HttpStatus status;
-    private Object body;
+    private @Nullable Object body;
 
     /**
      * @param status  The {@link io.micronaut.http.HttpStatus}

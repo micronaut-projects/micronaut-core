@@ -173,12 +173,14 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
      */
     @Internal
     @SuppressWarnings("VisibilityModifier")
-    public ArgumentBinder.BindingResult<ConvertibleValues<?>> convertibleBody;
+    public ArgumentBinder. @Nullable BindingResult<ConvertibleValues<?>> convertibleBody;
 
     private final NettyHttpHeaders headers;
     private final ChannelHandlerContext channelHandlerContext;
     private final HttpServerConfiguration serverConfiguration;
+    @Nullable
     private MutableConvertibleValues<Object> attributes;
+    @Nullable
     private NettyCookies nettyCookies;
     private final CloseableByteBody body;
     private Object legacyBody;
@@ -220,7 +222,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         return new NettyByteBodyFactory(channelHandlerContext.channel());
     }
 
-    public void setLegacyBody(Object legacyBody) {
+    public void setLegacyBody(@Nullable Object legacyBody) {
         this.legacyBody = legacyBody;
     }
 
@@ -329,7 +331,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     }
 
     @Override
-    public HttpRequest<T> setAttribute(CharSequence name, Object value) {
+    public HttpRequest<T> setAttribute(CharSequence name, @Nullable Object value) {
         // This is the copy from the super method to avoid the type pollution
         if (StringUtils.isNotEmpty(name)) {
             if (value == null) {
@@ -352,7 +354,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     public Optional<T> getBody() {
         io.micronaut.http.server.multipart.FormRouteCompleter frc = FormFactory.getCompleterOrNull(this);
         if (frc != null) {
-            return Optional.of((T) frc.mapForGetBody(serverConfiguration.getDefaultCharset()));
+            return Optional.ofNullable((T) frc.mapForGetBody(serverConfiguration.getDefaultCharset()));
         } else {
             return Optional.ofNullable((T) legacyBody);
         }
@@ -579,7 +581,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     }
 
     @Override
-    protected Charset initCharset(Charset characterEncoding) {
+    protected Charset initCharset(@Nullable Charset characterEncoding) {
         return characterEncoding == null ? serverConfiguration.getDefaultCharset() : characterEncoding;
     }
 
@@ -658,6 +660,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     }
 
     @Override
+    @Nullable
     public ByteBuffer<?> contents() {
         if (byteBody() instanceof AvailableByteArrayBody immediate) {
             return toByteBuffer(immediate);
@@ -758,6 +761,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
      */
     private final class NettyMutableHttpRequest implements MutableHttpRequest<T>, NettyHttpRequestBuilder {
 
+        @Nullable
         private URI uri;
         @Nullable
         private MutableHttpParameters httpParameters;
@@ -791,7 +795,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         }
 
         @Override
-        public <T1> MutableHttpRequest<T1> body(T1 body) {
+        public <T1> MutableHttpRequest<T1> body(@Nullable T1 body) {
             this.body = body;
             return (MutableHttpRequest<T1>) this;
         }
@@ -916,6 +920,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         }
 
         @Override
+        @Nullable
         public ByteBody byteBodyDirect() {
             // if the body has been changed we can't return the byteBody directly
             return body != null ? null : NettyHttpRequest.this.byteBodyDirect();
@@ -924,6 +929,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
 
     private abstract static class BodyConvertor<T> {
 
+        @Nullable
         private BodyConvertor<T> nextConvertor;
 
         public abstract Optional<T> convert(ArgumentConversionContext<T> conversionContext, T value);

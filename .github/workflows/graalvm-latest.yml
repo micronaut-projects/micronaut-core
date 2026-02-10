@@ -29,7 +29,7 @@ jobs:
         uses: micronaut-projects/github-actions/graalvm/build-matrix@master
         id: build-matrix
         with:
-          java-version: '21'
+          java-version: '25'
   build:
     needs: build_matrix
     if: github.repository != 'micronaut-projects/micronaut-project-template'
@@ -37,7 +37,7 @@ jobs:
     strategy:
       max-parallel: 6
       matrix:
-        java: ['21']
+        java: ['25']
         native_test_task: ${{ fromJson(needs.build_matrix.outputs.matrix).native_test_task }}
     env:
       DEVELOCITY_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
@@ -55,7 +55,7 @@ jobs:
         id: pre-build
         with:
           distribution: 'graalvm'
-          gradle-java: '21'
+          gradle-java: '25'
           java: ${{ matrix.java }}
           nativeTestTask: ${{ matrix.native_test_task }}
       - name: Build Steps

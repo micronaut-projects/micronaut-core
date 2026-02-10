@@ -28,6 +28,7 @@ import reactor.util.function.Tuples;
 
 import java.security.KeyStore;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -47,6 +48,7 @@ public abstract class SslContextAutoLoader {
 
     @Nullable
     private SslContextHolder current;
+    @Nullable
     private Disposable refreshSslDisposable;
     private long generation;
 
@@ -192,7 +194,7 @@ public abstract class SslContextAutoLoader {
             nextDisposable = Flux.from(keyProvider.getKeyStore())
                 .subscribe(ks -> refreshSsl(ks, null, gen));
         } else {
-            CertificateProvider trustProvider = certificateProviders().get(Qualifiers.byName(trustName));
+            CertificateProvider trustProvider = certificateProviders().get(Qualifiers.byName(Objects.requireNonNull(trustName)));
             nextDisposable = Flux.from(trustProvider.getTrustStore())
                 .subscribe(ts -> refreshSsl(null, ts, gen));
         }

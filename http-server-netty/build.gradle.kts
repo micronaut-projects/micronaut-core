@@ -2,14 +2,12 @@ plugins {
     id("io.micronaut.build.internal.convention-library")
 }
 
-import org . apache . tools . ant . taskdefs . condition . Os
-
-        micronautBuild {
-            core {
-                usesMicronautTestJunit()
-                usesMicronautTestSpock()
-            }
-        }
+micronautBuild {
+    core {
+        usesMicronautTestJunit()
+        usesMicronautTestSpock()
+    }
+}
 
 tasks {
     test {
@@ -94,7 +92,7 @@ dependencies {
     }
     testImplementation(libs.managed.netty.transport.native.kqueue) {
         artifact {
-            classifier = if (Os.isArch("aarch64")) {
+            classifier = if (org.apache.tools.ant.taskdefs.condition.Os.isArch("aarch64")) {
                 "osx-aarch_64"
             } else {
                 "osx-x86_64"
@@ -103,8 +101,8 @@ dependencies {
     }
     testImplementation(libs.managed.netty.tcnative.boringssl.static) {
         artifact {
-            if (Os.isFamily("mac")) {
-                classifier = if (Os.isArch("aarch64")) {
+            if (org.apache.tools.ant.taskdefs.condition.Os.isFamily("mac")) {
+                classifier = if (org.apache.tools.ant.taskdefs.condition.Os.isArch("aarch64")) {
                     "osx-aarch_64"
                 } else {
                     "osx-x86_64"

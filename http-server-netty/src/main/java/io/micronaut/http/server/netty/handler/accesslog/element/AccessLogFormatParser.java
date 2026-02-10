@@ -19,6 +19,7 @@ import io.micronaut.core.order.OrderUtil;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.EmptyHttpHeaders;
 import io.netty.handler.codec.http.HttpHeaders;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -107,7 +108,7 @@ public class AccessLogFormatParser {
      *
      * @param spec The log format. When null the Common Log Format is used.
      */
-    public AccessLogFormatParser(String spec) {
+    public AccessLogFormatParser(@Nullable String spec) {
         parse(spec);
     }
 
@@ -138,7 +139,7 @@ public class AccessLogFormatParser {
         return l.stream().map(elt -> map.computeIfAbsent(elt, IndexedLogElement::copyIndexedLogElement)).collect(Collectors.toList());
     }
 
-    private void parse(String spec) {
+    private void parse(@Nullable String spec) {
         if (spec == null || spec.isEmpty() || "common".equals(spec)) {
             spec = COMMON_LOG_FORMAT;
         } else if ("combined".equals(spec)) {
@@ -245,13 +246,13 @@ public class AccessLogFormatParser {
     }
 
     private void checkConstantElement(List<LogElement> logElements, StringBuilder token) {
-        if (token.length() != 0) {
+        if (!token.isEmpty()) {
             logElements.add(new ConstantElement(token.toString()));
             token.setLength(0);
         }
     }
 
-    private LogElement fromToken(String pattern, String param) {
+    private LogElement fromToken(String pattern, @Nullable String param) {
         for (LogElementBuilder builder: LOG_ELEMENT_BUILDERS) {
             LogElement logElement = builder.build(pattern, param);
             if (logElement != null) {
@@ -291,7 +292,7 @@ public class AccessLogFormatParser {
         }
 
         @Override
-        public String onRequestHeaders(ConnectionMetadata metadata, String method, HttpHeaders headers, String uri, String protocol) {
+        public @Nullable String onRequestHeaders(ConnectionMetadata metadata, String method, HttpHeaders headers, String uri, String protocol) {
             return delegate.onRequestHeaders(metadata, method, headers, uri, protocol);
         }
 

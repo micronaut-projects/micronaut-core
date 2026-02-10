@@ -17,6 +17,7 @@ package io.micronaut.core.io.file;
 
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.util.SupplierUtil;
+import org.jspecify.annotations.Nullable;
 
 import java.io.File;
 import java.io.IOException;
@@ -152,7 +153,7 @@ public class DefaultFileSystemResourceLoader implements FileSystemResourceLoader
 
     private static final class BaseDir {
         final boolean exists;
-        final @org.jspecify.annotations.Nullable Path dir;
+        final @Nullable Path dir;
 
         BaseDir() {
             exists = true;

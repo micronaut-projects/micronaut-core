@@ -179,7 +179,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     }
 
     @Override
-    default HttpRequest<B> setAttribute(CharSequence name, Object value) {
+    default HttpRequest<B> setAttribute(CharSequence name, @Nullable Object value) {
         return (HttpRequest<B>) HttpMessage.super.setAttribute(name, value);
     }
 
@@ -389,7 +389,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      * @return The {@link MutableHttpRequest} instance
      * @see HttpRequestFactory
      */
-    static <T> MutableHttpRequest<T> DELETE(URI uri, T body) {
+    static <T> MutableHttpRequest<T> DELETE(URI uri, @Nullable T body) {
         return DELETE(uri.toString(), body);
     }
 
@@ -402,7 +402,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      * @return The {@link MutableHttpRequest} instance
      * @see HttpRequestFactory
      */
-    static <T> MutableHttpRequest<T> DELETE(String uri, T body) {
+    static <T> MutableHttpRequest<T> DELETE(String uri, @Nullable T body) {
         Objects.requireNonNull(uri, "Argument [uri] is required");
         return HttpRequestFactory.INSTANCE.delete(uri, body);
     }
@@ -416,7 +416,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      * @see HttpRequestFactory
      */
     static <T> MutableHttpRequest<T> DELETE(String uri) {
-        return DELETE(uri, null);
+        return DELETE(uri, (T) null);
     }
 
     /**
@@ -428,7 +428,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      * @see HttpRequestFactory
      */
     static <T> MutableHttpRequest<T> DELETE(URI uri) {
-        return DELETE(uri.toString(), null);
+        return DELETE(uri.toString(), (T) null);
     }
 
     /**

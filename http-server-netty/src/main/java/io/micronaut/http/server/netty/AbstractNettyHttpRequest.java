@@ -33,6 +33,7 @@ import io.netty.handler.codec.http.HttpConstants;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.util.DefaultAttributeMap;
+import org.jspecify.annotations.Nullable;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -54,9 +55,13 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
     protected final String unvalidatedUrl;
     protected final String httpMethodName;
 
+    @Nullable
     private volatile URI uri;
+    @Nullable
     private volatile NettyHttpParameters httpParameters;
+    @Nullable
     private volatile Charset charset;
+    @Nullable
     private volatile String path;
 
     /**

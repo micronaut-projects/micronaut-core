@@ -17,6 +17,7 @@ package io.micronaut.json.tree;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.CollectionUtils;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Map;
 
@@ -55,11 +56,13 @@ public class JsonObject extends JsonContainer {
     }
 
     @Override
+    @Nullable
     public JsonNode get(String fieldName) {
         return values.get(fieldName);
     }
 
     @Override
+    @Nullable
     public JsonNode get(int index) {
         return null;
     }

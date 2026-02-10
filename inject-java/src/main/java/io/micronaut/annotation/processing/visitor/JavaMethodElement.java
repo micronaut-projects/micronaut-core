@@ -49,6 +49,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -65,12 +66,18 @@ public class JavaMethodElement extends AbstractJavaMemberElement implements Meth
 
     protected final JavaClassElement owningType;
     protected final ExecutableElement executableElement;
+    @Nullable
     private JavaClassElement resolvedDeclaringClass;
-    private ParameterElement[] parameters;
+    private ParameterElement @Nullable [] parameters;
+    @Nullable
     private ParameterElement continuationParameter;
+    @Nullable
     private ClassElement genericReturnType;
+    @Nullable
     private ClassElement returnType;
+    @Nullable
     private Map<String, ClassElement> typeArguments;
+    @Nullable
     private Map<String, ClassElement> declaredTypeArguments;
     private final MethodElementAnnotationsHelper helper;
 
@@ -100,20 +107,18 @@ public class JavaMethodElement extends AbstractJavaMemberElement implements Meth
         return helper.getMethodAnnotationMetadata(presetAnnotationMetadata);
     }
 
-    @NonNull
     @Override
     public ElementAnnotationMetadata getMethodAnnotationMetadata() {
         return helper.getMethodAnnotationMetadata(presetAnnotationMetadata);
     }
 
-    @NonNull
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
         return helper.getAnnotationMetadata(presetAnnotationMetadata);
     }
 
     @Override
-    public JavaNativeElement.@NonNull Method getNativeType() {
+    public JavaNativeElement.Method getNativeType() {
         return (JavaNativeElement.Method) super.getNativeType();
     }
 
@@ -134,7 +139,7 @@ public class JavaMethodElement extends AbstractJavaMemberElement implements Meth
     }
 
     @Override
-    public @NonNull MethodElement withParameters(ParameterElement... parameters) {
+    public MethodElement withParameters(ParameterElement... parameters) {
         JavaMethodElement methodElement = (JavaMethodElement) makeCopy();
         methodElement.parameters = parameters;
         return methodElement;
@@ -153,7 +158,7 @@ public class JavaMethodElement extends AbstractJavaMemberElement implements Meth
     }
 
     @Override
-    public ClassElement @NonNull [] getThrownTypes() {
+    public ClassElement[] getThrownTypes() {
         final List<? extends TypeMirror> thrownTypes = executableElement.getThrownTypes();
         if (!thrownTypes.isEmpty()) {
             return thrownTypes.stream()
@@ -175,7 +180,7 @@ public class JavaMethodElement extends AbstractJavaMemberElement implements Meth
     }
 
     @Override
-    public boolean overrides(@NonNull MethodElement overridden) {
+    public boolean overrides(MethodElement overridden) {
         if (equals(overridden) || isStatic() || overridden.isStatic() || isPrivate() || overridden.isPrivate()) {
             return false;
         }
@@ -205,7 +210,7 @@ public class JavaMethodElement extends AbstractJavaMemberElement implements Meth
     }
 
     @Override
-    public boolean hides(@NonNull MethodElement hiddenMethod) {
+    public boolean hides(MethodElement hiddenMethod) {
         if (isStatic() && getDeclaringType().isInterface()) {
             return false;
         }
@@ -215,7 +220,6 @@ public class JavaMethodElement extends AbstractJavaMemberElement implements Meth
         return MethodElement.super.hides(hiddenMethod);
     }
 
-    @NonNull
     @Override
     public ClassElement getGenericReturnType() {
         if (genericReturnType == null) {
@@ -225,7 +229,6 @@ public class JavaMethodElement extends AbstractJavaMemberElement implements Meth
     }
 
     @Override
-    @NonNull
     public ClassElement getReturnType() {
         if (returnType == null) {
             returnType = returnType(Collections.emptyMap());
@@ -241,7 +244,7 @@ public class JavaMethodElement extends AbstractJavaMemberElement implements Meth
     }
 
     @Override
-    public @NonNull Map<String, ClassElement> getTypeArguments() {
+    public Map<String, ClassElement> getTypeArguments() {
         if (typeArguments == null) {
             typeArguments = MethodElement.super.getTypeArguments();
         }
@@ -249,7 +252,7 @@ public class JavaMethodElement extends AbstractJavaMemberElement implements Meth
     }
 
     @Override
-    public @NonNull Map<String, ClassElement> getDeclaredTypeArguments() {
+    public Map<String, ClassElement> getDeclaredTypeArguments() {
         if (declaredTypeArguments == null) {
             declaredTypeArguments = resolveTypeArguments(executableElement, getDeclaringType().getTypeArguments());
         }
@@ -281,7 +284,7 @@ public class JavaMethodElement extends AbstractJavaMemberElement implements Meth
     }
 
     @Override
-    public @NonNull MethodElement withNewOwningType(@NonNull ClassElement owningType) {
+    public MethodElement withNewOwningType(ClassElement owningType) {
         JavaMethodElement javaMethodElement = new JavaMethodElement((JavaClassElement) owningType, getNativeType(), elementAnnotationMetadataFactory, visitorContext);
         copyValues(javaMethodElement);
         return javaMethodElement;
@@ -291,7 +294,7 @@ public class JavaMethodElement extends AbstractJavaMemberElement implements Meth
     public ParameterElement[] getSuspendParameters() {
         ParameterElement[] parameters = getParameters();
         if (isSuspend()) {
-            return ArrayUtils.concat(parameters, continuationParameter);
+            return ArrayUtils.concat(parameters, Objects.requireNonNull(continuationParameter));
         } else {
             return parameters;
         }
@@ -304,8 +307,7 @@ public class JavaMethodElement extends AbstractJavaMemberElement implements Meth
      * @param variableElement The variable element
      * @return The parameter element
      */
-    @NonNull
-    JavaParameterElement newParameterElement(@NonNull JavaMethodElement methodElement, @NonNull VariableElement variableElement) {
+    JavaParameterElement newParameterElement(JavaMethodElement methodElement, VariableElement variableElement) {
         return new JavaParameterElement(owningType, methodElement, new JavaNativeElement.Variable(variableElement), elementAnnotationMetadataFactory, visitorContext);
     }
 
@@ -335,9 +337,9 @@ public class JavaMethodElement extends AbstractJavaMemberElement implements Meth
 
     private ClassElement returnType(Map<String, ClassElement> genericInfo) {
         VariableElement varElement = CollectionUtils.last(executableElement.getParameters());
-        if (isSuspend(varElement)) {
+        if (varElement != null && isSuspend(varElement)) {
             DeclaredType dType = (DeclaredType) varElement.asType();
-            TypeMirror tm = dType.getTypeArguments().iterator().next();
+            TypeMirror tm = dType.getTypeArguments().getFirst();
             if (tm.getKind() == TypeKind.WILDCARD) {
                 tm = ((WildcardType) tm).getSuperBound();
             }
@@ -345,10 +347,11 @@ public class JavaMethodElement extends AbstractJavaMemberElement implements Meth
             if ((tm instanceof DeclaredType dt) && sameType("kotlin.Unit", dt)) {
                 return PrimitiveElement.VOID;
             } else {
-                return newClassElement(tm, genericInfo);
+                return newClassElement(Objects.requireNonNull(tm), genericInfo);
             }
         }
         final TypeMirror returnType = executableElement.getReturnType();
+
         String docComment = visitorContext.getElements().getDocComment(executableElement);
         ClassElement returnClassElement = newClassElement(getNativeType(), returnType, genericInfo, findReturnDoc(docComment));
         if (canBeMarkedWithNonNull(returnClassElement)) {
@@ -380,7 +383,7 @@ public class JavaMethodElement extends AbstractJavaMemberElement implements Meth
         return (elt instanceof TypeElement te) && type.equals(te.getQualifiedName().toString());
     }
 
-    private boolean isSuspend(VariableElement ve) {
+    private boolean isSuspend(@Nullable VariableElement ve) {
         if (ve != null && ve.asType() instanceof DeclaredType dt) {
             return sameType("kotlin.coroutines.Continuation", dt);
         }

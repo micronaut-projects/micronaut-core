@@ -108,8 +108,8 @@ public abstract class AbstractProviderDefinition<T> implements InstantiatableBea
     }
 
     @Override
-    public boolean isCandidateBean(Argument<?> beanType) {
-        return beanType.isAssignableFrom(getBeanType());
+    public boolean isCandidateBean(@Nullable Argument<?> beanType) {
+        return beanType != null && beanType.isAssignableFrom(getBeanType());
     }
 
     @Override

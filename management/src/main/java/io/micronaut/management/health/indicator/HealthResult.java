@@ -15,6 +15,7 @@
  */
 package io.micronaut.management.health.indicator;
 
+import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.annotation.JsonDeserialize;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.ReflectiveAccess;
@@ -25,6 +26,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * <p>Used to represent the output of a {@link HealthIndicator}.</p>
@@ -50,6 +52,7 @@ public interface HealthResult {
     /**
      * @return Any data to be returned
      */
+    @Nullable
     Object getDetails();
 
     /**
@@ -80,6 +83,7 @@ public interface HealthResult {
         private static final Logger LOG = LoggerFactory.getLogger(HealthResult.class);
         private final String name;
         private HealthStatus status;
+        @Nullable
         private Object details;
 
         /**
@@ -95,7 +99,7 @@ public interface HealthResult {
          * @param name The name of the health result
          */
         Builder(String name) {
-            this.name = name;
+            this(name, HealthStatus.UNKNOWN);
         }
 
         /**
@@ -104,8 +108,8 @@ public interface HealthResult {
          * @param status The status, null allowed
          * @return The builder
          */
-        public Builder status(HealthStatus status) {
-            this.status = status;
+        public Builder status(@Nullable HealthStatus status) {
+            this.status = Objects.requireNonNullElse(status, HealthStatus.UNKNOWN);
             return this;
         }
 
@@ -131,7 +135,7 @@ public interface HealthResult {
          * @param details The details, null allowed
          * @return The builder
          */
-        public Builder details(Object details) {
+        public Builder details(@Nullable Object details) {
             this.details = details;
             return this;
         }
@@ -144,7 +148,7 @@ public interface HealthResult {
         public HealthResult build() {
             return new DefaultHealthResult(
                 name,
-                status != null ? status : HealthStatus.UNKNOWN,
+                status,
                 details
             );
         }

@@ -100,7 +100,6 @@ public class Publishers {
         COMPLETABLE_TYPES = completableTypes;
     }
 
-    @NonNull
     private static List<String> getSingleTypeNames() {
         return List.of(
             "io.micronaut.core.async.publisher.CompletableFuturePublisher",
@@ -114,7 +113,6 @@ public class Publishers {
         );
     }
 
-    @NonNull
     private static List<String> getCompletableTypeNames() {
         return List.of(
             "io.reactivex.Completable",
@@ -123,7 +121,6 @@ public class Publishers {
         );
     }
 
-    @NonNull
     private static List<String> getNonSpecificReactiveTypeNames() {
         return List.of(
             "io.reactivex.Observable",
@@ -134,7 +131,6 @@ public class Publishers {
         );
     }
 
-    @NonNull
     public static List<String> getReactiveTypeNames() {
         return Stream.of(
             getNonSpecificReactiveTypeNames(),
@@ -466,7 +462,7 @@ public class Publishers {
      * @param object The object
      * @return True if it is
      */
-    public static boolean isConvertibleToPublisher(Object object) {
+    public static boolean isConvertibleToPublisher(@Nullable Object object) {
         if (object == null ||
             // check some common types for performance
             object instanceof String || object instanceof byte[]) {
@@ -531,8 +527,7 @@ public class Publishers {
      * @return The Resulting in publisher
      * @since 4.6.0
      */
-    @NonNull
-    public static <T> Publisher<T> convertToPublisher(@NonNull ConversionService conversionService, @NonNull Object object) {
+    public static <T> Publisher<T> convertToPublisher(ConversionService conversionService, @Nullable Object object) {
         Objects.requireNonNull(object, "Argument [object] cannot be null");
         if (object instanceof Publisher<?> publisher) {
             return (Publisher<T>) publisher;
@@ -655,15 +650,13 @@ public class Publishers {
          * @param result The next value.
          * @return The mapped value.
          */
-        @NonNull
-        R map(@NonNull T result);
+        R map(T result);
 
         /**
          * Supplies an empty value if there is no next value.
          *
          * @return The result.
          */
-        @NonNull
         R supplyEmpty();
 
     }

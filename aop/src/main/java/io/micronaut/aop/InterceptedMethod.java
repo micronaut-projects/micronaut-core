@@ -20,8 +20,10 @@ import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 
+import java.util.Objects;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
 
@@ -76,6 +78,7 @@ public interface InterceptedMethod {
      *
      * @return The intercepted result
      */
+    @Nullable
     Object interceptResult();
 
     /**
@@ -84,6 +87,7 @@ public interface InterceptedMethod {
      * @param from The interceptor to start from
      * @return The intercepted result
      */
+    @Nullable
     Object interceptResult(Interceptor<?, ?> from);
 
     /**
@@ -95,7 +99,7 @@ public interface InterceptedMethod {
         if (resultType() != ResultType.COMPLETION_STAGE) {
             throw new ConfigurationException("Cannot return `CompletionStage` result from '" + resultType() + "' interceptor");
         }
-        return (CompletionStage<?>) interceptResult();
+        return (CompletionStage<?>) Objects.requireNonNull(interceptResult(), "CompletionStage result cannot be null");
     }
 
     /**
@@ -107,7 +111,7 @@ public interface InterceptedMethod {
         if (resultType() != ResultType.PUBLISHER) {
             throw new ConfigurationException("Cannot return `Publisher` result from '" + resultType() + "' interceptor");
         }
-        return (Publisher<?>) interceptResult();
+        return (Publisher<?>) Objects.requireNonNull(interceptResult(), "Publisher result cannot be null");
     }
 
     /**
@@ -133,7 +137,7 @@ public interface InterceptedMethod {
         if (resultType() != ResultType.COMPLETION_STAGE) {
             throw new ConfigurationException("Cannot return `CompletionStage` result from '" + resultType() + "' interceptor");
         }
-        return (CompletionStage<?>) interceptResult(from);
+        return (CompletionStage<?>) Objects.requireNonNull(interceptResult(from), "CompletionStage result cannot be null");
     }
 
     /**
@@ -146,7 +150,7 @@ public interface InterceptedMethod {
         if (resultType() != ResultType.PUBLISHER) {
             throw new ConfigurationException("Cannot return `Publisher` result from '" + resultType() + "' interceptor");
         }
-        return (Publisher<?>) interceptResult(from);
+        return (Publisher<?>) Objects.requireNonNull(interceptResult(from), "Publisher result cannot be null");
     }
 
     /**
@@ -155,7 +159,8 @@ public interface InterceptedMethod {
      * @param result The result of the invocation
      * @return The result of the invocation being returned from the interceptor
      */
-    Object handleResult(Object result);
+    @Nullable
+    Object handleResult(@Nullable Object result);
 
     /**
      * Handle the exception that should be thrown out of the invocation.
@@ -165,6 +170,7 @@ public interface InterceptedMethod {
      * @return The result of the invocation being returned from the interceptor
      * @throws E The exception
      */
+    @Nullable
     <E extends Throwable> Object handleException(Exception exception) throws E;
 
     /**

@@ -45,11 +45,11 @@ public final class PublisherAsBlocking implements Subscriber<ReadBuffer>, Closea
     /**
      * Pending object, this field is used to transfer from {@link #onNext} to {@link #take}.
      */
-    private ReadBuffer swap;
+    private @Nullable ReadBuffer swap;
     /**
      * The upstream subscription.
      */
-    private Subscription subscription;
+    private @Nullable Subscription subscription;
     /**
      * Set by {@link #onComplete} and {@link #onError}.
      */
@@ -61,7 +61,7 @@ public final class PublisherAsBlocking implements Subscriber<ReadBuffer>, Closea
     /**
      * Failure from {@link #onError}.
      */
-    private Throwable failure;
+    private @Nullable Throwable failure;
 
     /**
      * The failure from {@link #onError(Throwable)}. When {@link #take()} returns {@code null}, this

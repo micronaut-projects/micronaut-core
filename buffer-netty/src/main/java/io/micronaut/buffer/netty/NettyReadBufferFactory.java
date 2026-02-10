@@ -198,6 +198,7 @@ public final class NettyReadBufferFactory extends ReadBufferFactory {
     @Override
     public ReadBufferFactory. BufferingOutputStream outputStreamBuffer() {
         return new ReadBufferFactory.BufferingOutputStream() {
+            @Nullable
             ByteBufOutputStream out = new ByteBufOutputStream(allocator.buffer());
 
             @Override

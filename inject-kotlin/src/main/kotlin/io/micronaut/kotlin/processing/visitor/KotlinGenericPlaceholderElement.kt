@@ -54,7 +54,7 @@ internal class KotlinGenericPlaceholderElement(
         visitorContext: KotlinVisitorContext
     ) : this(
         genericNativeType,
-        selectClassElementRepresentingThisPlaceholder(resolved, bounds),
+        selectClassElementRepresentingThisPlaceholder(resolved, bounds)!!,
         resolved,
         bounds,
         declaringElement,

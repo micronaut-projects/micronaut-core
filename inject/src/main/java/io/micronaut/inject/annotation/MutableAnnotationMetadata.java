@@ -562,7 +562,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     @SuppressWarnings("java:S2259") // false positive
     private void addAnnotation(String annotation,
                                Map<CharSequence, Object> values,
-                               Map<String, Map<CharSequence, Object>> declaredAnnotations,
+                               @Nullable Map<String, Map<CharSequence, Object>> declaredAnnotations,
                                Map<String, Map<CharSequence, Object>> allAnnotations,
                                boolean isDeclared,
                                RetentionPolicy retentionPolicy) {
@@ -962,7 +962,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
         removeAnnotationsIf(predicate, this.allAnnotations);
     }
 
-    private <A extends Annotation> void removeAnnotationsIf(Predicate<AnnotationValue<A>> predicate, Map<String, Map<CharSequence, Object>> annotations) {
+    private <A extends Annotation> void removeAnnotationsIf(Predicate<AnnotationValue<A>> predicate, @Nullable Map<String, Map<CharSequence, Object>> annotations) {
         if (annotations == null) {
             return;
         }
@@ -1067,6 +1067,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     }
 
     @Override
+    @Nullable
     protected String findRepeatableAnnotationContainerInternal(String annotation) {
         if (annotationRepeatableContainer != null) {
             String repeatedName = annotationRepeatableContainer.get(annotation);

@@ -160,7 +160,7 @@ final class TextStreamBodyWriter<T> implements MessageBodyWriter<T> {
      * @param attribute The attribute
      * @param value     The value
      */
-    private static void writeAttribute(Output eventData, byte[] attribute, String value) {
+    private static void writeAttribute(Output eventData, byte[] attribute, @Nullable String value) {
         if (value != null) {
             eventData.write(attribute)
                 .write(value, StandardCharsets.UTF_8)
@@ -184,6 +184,7 @@ final class TextStreamBodyWriter<T> implements MessageBodyWriter<T> {
 
         ByteBufferOutput(ByteBufferFactory<?, ?> bufferFactory) {
             this.bufferFactory = bufferFactory;
+            buffer = bufferFactory.buffer(0);
         }
 
         @Override

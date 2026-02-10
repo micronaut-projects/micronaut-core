@@ -144,6 +144,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledExecutorService;
@@ -181,12 +182,15 @@ public class ConnectionManager {
     private final ThreadFactory threadFactory;
     private final ChannelFactory<? extends Channel> socketChannelFactory;
     private final ChannelFactory<? extends Channel> udpChannelFactory;
+    @Nullable
     private Bootstrap bootstrap;
+    @Nullable
     private Bootstrap udpBootstrap;
     private final HttpClientConfiguration configuration;
-    private SslContextAutoLoader sslContextWrapper;
-    private SslContextAutoLoader sslContextWrapperWs;
+    private final SslContextAutoLoader sslContextWrapper;
+    private final SslContextAutoLoader sslContextWrapperWs;
     private volatile boolean wsContextLoaded;
+    @Nullable
     private final String informationalServiceId;
 
     /**
@@ -297,7 +301,7 @@ public class ConnectionManager {
      * @return The configured allocator
      */
     public final ByteBufAllocator alloc() {
-        return (ByteBufAllocator) bootstrap.config().options().getOrDefault(ChannelOption.ALLOCATOR, ByteBufAllocator.DEFAULT);
+        return (ByteBufAllocator) Objects.requireNonNull(bootstrap).config().options().getOrDefault(ChannelOption.ALLOCATOR, ByteBufAllocator.DEFAULT);
     }
 
     /**
@@ -361,16 +365,17 @@ public class ConnectionManager {
     }
 
     private void initBootstrap() {
-        this.bootstrap = new Bootstrap()
+        Bootstrap newBootstrap = new Bootstrap()
             .channelFactory(socketChannelFactory)
             .option(ChannelOption.SO_KEEPALIVE, true);
+        this.bootstrap = newBootstrap;
         if (httpVersion.isHttp3()) {
             this.udpBootstrap = new Bootstrap()
                 .channelFactory(udpChannelFactory);
         }
 
         Optional<Duration> connectTimeout = configuration.getConnectTimeout();
-        connectTimeout.ifPresent(duration -> bootstrap.option(
+        connectTimeout.ifPresent(duration -> newBootstrap.option(
             ChannelOption.CONNECT_TIMEOUT_MILLIS,
             (int) duration.toMillis()
         ));
@@ -379,11 +384,11 @@ public class ConnectionManager {
             Object v = entry.getValue();
             if (v != null) {
                 String channelOption = entry.getKey();
-                bootstrap.option(ChannelOption.valueOf(NameUtils.underscoreSeparate(channelOption).toUpperCase(Locale.ENGLISH)), v);
+                newBootstrap.option(ChannelOption.valueOf(NameUtils.underscoreSeparate(channelOption).toUpperCase(Locale.ENGLISH)), v);
             }
         }
 
-        bootstrap.resolver(resolverGroup);
+        newBootstrap.resolver(resolverGroup);
     }
 
     static AddressResolverGroup<? extends SocketAddress> getResolver(HttpClientConfiguration.DnsResolutionMode mode) {
@@ -454,7 +459,7 @@ public class ConnectionManager {
     ChannelFuture doConnect(DefaultHttpClient.RequestKey requestKey, CustomizerAwareInitializer channelInitializer, EventLoopGroup eventLoop) {
         String host = requestKey.getHost();
         int port = requestKey.getPort();
-        Bootstrap localBootstrap = bootstrap.clone();
+        Bootstrap localBootstrap = Objects.requireNonNull(bootstrap).clone();
         Proxy proxy = configuration.resolveProxy(requestKey.isSecure(), host, port);
         if (proxy.type() != Proxy.Type.DIRECT) {
             localBootstrap.resolver(NoopAddressResolverGroup.INSTANCE);
@@ -478,7 +483,7 @@ public class ConnectionManager {
             SslContextHolder holder = sslContextWrapper.takeRetained();
             sslCtx = holder == null ? null : holder.sslContext();
             //Allow https requests to be sent if SSL is disabled but a proxy is present
-            if (sslCtx == null && !configuration.getProxyAddress().isPresent()) {
+            if (sslCtx == null && configuration.getProxyAddress().isEmpty()) {
                 throw decorate(new HttpClientException("Cannot send HTTPS request. SSL is disabled"));
             }
         } else {
@@ -581,7 +586,7 @@ public class ConnectionManager {
                         ch.pipeline().addLast(WebSocketClientCompressionHandler.INSTANCE);
                     }
                     ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_WEBSOCKET_CLIENT, handler);
-                    bootstrappedCustomizer.specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION).onInitialPipelineBuilt();
+                    Objects.requireNonNull(bootstrappedCustomizer).specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION).onInitialPipelineBuilt();
                     if (initial.tryEmitEmpty().isSuccess()) {
                         return;
                     }
@@ -655,7 +660,7 @@ public class ConnectionManager {
     private Http2FrameCodec makeFrameCodec() {
         Http2Settings defaultSettings = Http2Settings.defaultSettings();
 
-        defaultSettings.maxHeaderListSize(configuration.getHttp2Configuration().getMaxHeaderListSize());
+        defaultSettings.maxHeaderListSize(Objects.requireNonNull(configuration.getHttp2Configuration()).getMaxHeaderListSize());
 
         Http2FrameCodecBuilder builder = Http2FrameCodecBuilder.forClient()
             .initialSettings(defaultSettings);
@@ -882,6 +887,7 @@ public class ConnectionManager {
     }
 
     abstract static class CustomizerAwareInitializer extends ChannelInitializer<Channel> {
+        @Nullable
         NettyClientCustomizer bootstrappedCustomizer;
     }
 
@@ -892,12 +898,12 @@ public class ConnectionManager {
     private final class AdaptiveAlpnChannelInitializer extends CustomizerAwareInitializer {
         private final PoolHolder pool;
 
-        private final Supplier<SslContext> sslContext;
+        private final Supplier<@Nullable SslContext> sslContext;
         private final String host;
         private final int port;
 
         AdaptiveAlpnChannelInitializer(PoolHolder pool,
-                                       Supplier<SslContext> sslContext,
+                                       Supplier<@Nullable SslContext> sslContext,
                                        String host,
                                        int port) {
             this.pool = pool;
@@ -911,17 +917,19 @@ public class ConnectionManager {
          */
         @Override
         protected void initChannel(Channel ch) {
-            NettyClientCustomizer channelCustomizer = bootstrappedCustomizer.specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION);
+            NettyClientCustomizer channelCustomizer = Objects.requireNonNull(bootstrappedCustomizer).specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION);
 
             insertPcapLoggingHandlerLazy(ch, "outer");
 
             configureProxy(ch.pipeline(), true, host, port);
 
             SslContext sslContext = this.sslContext.get();
-            try {
-                ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_SSL, configureSslHandler(sslContext.newHandler(ch.alloc(), host, port)));
-            } finally {
-                ReferenceCountUtil.release(sslContext);
+            if (sslContext != null) {
+                try {
+                    ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_SSL, configureSslHandler(sslContext.newHandler(ch.alloc(), host, port)));
+                } finally {
+                    ReferenceCountUtil.release(sslContext);
+                }
             }
 
             insertPcapLoggingHandlerLazy(ch, "tls-unwrapped");
@@ -985,7 +993,7 @@ public class ConnectionManager {
 
         @Override
         protected void initChannel(Channel ch) throws Exception {
-            NettyClientCustomizer connectionCustomizer = bootstrappedCustomizer.specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION);
+            NettyClientCustomizer connectionCustomizer = Objects.requireNonNull(bootstrappedCustomizer).specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION);
 
             insertPcapLoggingHandlerLazy(ch, "outer");
 
@@ -1034,6 +1042,7 @@ public class ConnectionManager {
         private final String host;
         private final int port;
 
+        @Nullable
         private NettyClientCustomizer bootstrappedCustomizer;
 
         Http3ChannelInitializer(PoolHolder pool, String host, int port) {
@@ -1064,11 +1073,11 @@ public class ConnectionManager {
         }
 
         private void initChannel(Channel ch) {
-            NettyClientCustomizer channelCustomizer = bootstrappedCustomizer.specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION);
+            NettyClientCustomizer channelCustomizer = Objects.requireNonNull(bootstrappedCustomizer).specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION);
 
             insertPcapLoggingHandlerLazy(ch, "outer");
 
-            QuicSslContext quicSslContext = sslContextWrapper.takeRetained().quicSslContext();
+            QuicSslContext quicSslContext = Objects.requireNonNull(sslContextWrapper.takeRetained()).quicSslContext();
             try {
                 ch.pipeline()
                     .addLast(Http3.newQuicClientCodecBuilder()
@@ -1275,7 +1284,7 @@ public class ConnectionManager {
             if (requestKey.isSecure()) {
                 if (httpVersion.isHttp3()) {
                     Http3ChannelInitializer channelInitializer = new Http3ChannelInitializer(this, requestKey.getHost(), requestKey.getPort());
-                    Bootstrap localBootstrap = udpBootstrap.clone()
+                    Bootstrap localBootstrap = Objects.requireNonNull(udpBootstrap).clone()
                         .handler(channelInitializer)
                         .localAddress(0)
                         .group(eventLoop);
@@ -1301,7 +1310,7 @@ public class ConnectionManager {
                                 @Override
                                 public void channelActive0(ChannelHandlerContext ctx) throws Exception {
                                     ctx.pipeline().remove(this);
-                                    NettyClientCustomizer channelCustomizer = bootstrappedCustomizer.specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION);
+                                    NettyClientCustomizer channelCustomizer = Objects.requireNonNull(bootstrappedCustomizer).specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION);
                                     new Http1ConnectionHolder(ch, channelCustomizer).init(true);
                                 }
                             });
@@ -1331,6 +1340,7 @@ public class ConnectionManager {
             ScheduledFuture<?> ttlFuture;
             volatile boolean windDownConnection = false;
 
+            @Nullable
             private ReadTimeoutHandler readTimeoutHandler;
 
             ConnectionHolder(Channel channel, NettyClientCustomizer connectionCustomizer) {

@@ -24,6 +24,7 @@ import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.graceful.GracefulShutdownCapable;
 import io.micronaut.scheduling.LoomSupport;
 import jakarta.inject.Inject;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -46,6 +47,7 @@ public class ExecutorFactory implements GracefulShutdownCapable {
 
     private final BeanLocator beanLocator;
     private final ThreadFactory threadFactory;
+    @Nullable
     private List<GracefulShutdownCapable> gracefulShutdownCapable;
 
     /**

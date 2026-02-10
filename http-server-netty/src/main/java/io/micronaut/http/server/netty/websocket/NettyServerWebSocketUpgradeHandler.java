@@ -70,6 +70,7 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -97,9 +98,11 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
     private final NettyEmbeddedServices nettyEmbeddedServices;
     private final ConversionService conversionService;
     private final NettyHttpServerConfiguration serverConfiguration;
+    @Nullable
     private WebSocketServerHandshaker handshaker;
     private boolean cancelUpgrade = false;
 
+    @Nullable
     private RoutingInBoundHandler next;
 
     /**
@@ -152,18 +155,18 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                 }
             });
         } else {
-            next.accept(ctx, request, body, outboundAccess);
+            Objects.requireNonNull(next).accept(ctx, request, body, outboundAccess);
         }
     }
 
     @Override
     public void handleUnboundError(Throwable cause) {
-        next.handleUnboundError(cause);
+        Objects.requireNonNull(next).handleUnboundError(cause);
     }
 
     @Override
-    public void responseWritten(Object attachment) {
-        next.responseWritten(attachment);
+    public void responseWritten(@Nullable Object attachment) {
+        Objects.requireNonNull(next).responseWritten(attachment);
     }
 
     private void writeResponse(ChannelHandlerContext ctx,
@@ -194,7 +197,7 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                 NettyServerWebSocketHandler webSocketHandler = new NettyServerWebSocketHandler(
                     nettyEmbeddedServices,
                     webSocketSessionRepository,
-                    handshaker,
+                    Objects.requireNonNull(handshaker),
                     webSocketBean,
                     msg,
                     routeMatch,
@@ -219,7 +222,7 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                 ctx.writeAndFlush(new CloseWebSocketFrame(CloseReason.INTERNAL_ERROR.getCode(), CloseReason.INTERNAL_ERROR.getReason()));
             }
         } else {
-            next.writeResponse(outboundAccess, msg, actualResponse, null);
+            Objects.requireNonNull(next).writeResponse(outboundAccess, msg, actualResponse, null);
         }
     }
 

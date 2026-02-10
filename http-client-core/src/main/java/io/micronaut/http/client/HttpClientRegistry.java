@@ -17,7 +17,6 @@ package io.micronaut.http.client;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.inject.InjectionPoint;
@@ -37,8 +36,7 @@ public interface HttpClientRegistry<T extends HttpClient> {
      * @param annotationMetadata The annotation metadata.
      * @return The client
      */
-    @NonNull
-    T getClient(@NonNull AnnotationMetadata annotationMetadata);
+    T getClient(AnnotationMetadata annotationMetadata);
 
     /**
      * Return the client for the client ID and path.
@@ -50,8 +48,7 @@ public interface HttpClientRegistry<T extends HttpClient> {
      * @deprecated Use {@link #getClient(HttpVersionSelection, String, String)} instead
      */
     @Deprecated
-    @NonNull
-    default T getClient(HttpVersion httpVersion, @NonNull String clientId, @Nullable String path) {
+    default T getClient(HttpVersion httpVersion, String clientId, @Nullable String path) {
         return getClient(HttpVersionSelection.forLegacyVersion(httpVersion), clientId, path);
     }
 
@@ -64,8 +61,7 @@ public interface HttpClientRegistry<T extends HttpClient> {
      * @return The client
      * @since 4.0.0
      */
-    @NonNull
-    T getClient(@NonNull HttpVersionSelection httpVersion, @NonNull String clientId, @Nullable String path);
+    T getClient(HttpVersionSelection httpVersion, String clientId, @Nullable String path);
 
     /**
      * Resolves a {@link HttpClient} for the given injection point.
@@ -76,11 +72,10 @@ public interface HttpClientRegistry<T extends HttpClient> {
      * @param beanContext    The bean context to use
      * @return The HTTP Client
      */
-    @NonNull
     T resolveClient(@Nullable InjectionPoint<?> injectionPoint,
                     @Nullable LoadBalancer loadBalancer,
                     @Nullable HttpClientConfiguration configuration,
-                    @NonNull BeanContext beanContext);
+                    BeanContext beanContext);
 
     /**
      * Dispose of the client defined by the given metadata.

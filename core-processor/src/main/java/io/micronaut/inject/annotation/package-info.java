@@ -16,7 +16,4 @@
 /**
  * The package info.
  */
-@NullMarked
 package io.micronaut.inject.annotation;
-
-import org.jspecify.annotations.NullMarked;

@@ -19,6 +19,7 @@ import io.micronaut.core.beans.BeanMap;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.core.util.StringUtils;
+import org.jspecify.annotations.NullUnmarked;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -46,6 +47,7 @@ import static io.micronaut.core.util.ArrayUtils.EMPTY_OBJECT_ARRAY;
  * @author Graeme Rocher
  * @since 1.0
  */
+@NullUnmarked
 public class UriTemplate implements Comparable<UriTemplate> {
 
     private static final String STRING_PATTERN_SCHEME = "([^:/?#]+):";

@@ -50,7 +50,7 @@ public class RouteVersionFilter implements VersionRouteMatchFilter {
     private static final Logger LOG = LoggerFactory.getLogger(RouteVersionFilter.class);
 
     private final List<RequestVersionResolver> resolvingStrategies;
-    private final DefaultVersionProvider defaultVersionProvider;
+    private final @Nullable DefaultVersionProvider defaultVersionProvider;
 
     @Nullable
     private final RoutesVersioningConfiguration routesVersioningConfiguration;

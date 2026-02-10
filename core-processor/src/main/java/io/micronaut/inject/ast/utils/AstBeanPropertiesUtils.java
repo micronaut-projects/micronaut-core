@@ -28,6 +28,7 @@ import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.PropertyElementQuery;
+import org.jspecify.annotations.NullUnmarked;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -46,6 +47,7 @@ import java.util.function.Supplier;
  * @author Denis Stepanov
  * @since 4.0.0
  */
+@NullUnmarked
 @Internal
 public final class AstBeanPropertiesUtils {
 

@@ -89,6 +89,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -329,6 +330,7 @@ public final class AnnotationMetadataSupport {
      * @return The repeatable annotation container.
      */
     @Internal
+    @Nullable
     public static String getRepeatableAnnotation(String annotation) {
         return REPEATABLE_ANNOTATIONS_CONTAINERS.get(annotation);
     }
@@ -511,6 +513,7 @@ public final class AnnotationMetadataSupport {
     private static class AnnotationProxyHandler<A extends Annotation> implements InvocationHandler, AnnotationValueProvider<A> {
         private final int hashCode;
         private final Class<A> annotationClass;
+        @Nullable
         private final AnnotationValue<A> annotationValue;
 
         AnnotationProxyHandler(int hashCode, Class<A> annotationClass, @Nullable AnnotationValue<A> annotationValue) {
@@ -549,6 +552,7 @@ public final class AnnotationMetadataSupport {
             }
         }
 
+        @Nullable
         private AnnotationValue<?> getAnnotationValues(Annotation other) {
             if (other instanceof AnnotationProxyHandler<?> handler) {
                 return handler.annotationValue;
@@ -557,18 +561,18 @@ public final class AnnotationMetadataSupport {
         }
 
         @Override
-        public Object invoke(Object proxy, Method method, Object[] args) {
+        public Object invoke(Object proxy, Method method, @Nullable Object @Nullable [] args) {
             String name = method.getName();
             if ((args == null || args.length == 0) && "hashCode".equals(name)) {
                 return hashCode;
             } else if ((args != null && args.length == 1) && "equals".equals(name)) {
                 return equals(args[0]);
             } else if ("toString".equals(name)) {
-                return annotationValue.toString();
+                return Objects.requireNonNull(annotationValue).toString();
             } else if ("annotationType".equals(name)) {
                 return annotationClass;
             } else if (method.getReturnType() == AnnotationValue.class) {
-                return annotationValue;
+                return Objects.requireNonNull(annotationValue);
             } else if (annotationValue != null && annotationValue.contains(name)) {
                 return annotationValue.getRequiredValue(name, method.getReturnType());
             }

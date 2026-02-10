@@ -24,6 +24,7 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.visitor.VisitorContext;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collection;
 import java.util.Optional;
@@ -59,7 +60,7 @@ public final class DefaultExpressionCompilationContextFactory implements Express
     }
 
     @Override
-    public ExpressionEvaluationContext buildContext(EvaluatedExpressionReference expression, ClassElement thisElement) {
+    public ExpressionEvaluationContext buildContext(EvaluatedExpressionReference expression, @Nullable ClassElement thisElement) {
         return buildForExpression(expression, thisElement);
     }
 
@@ -70,7 +71,7 @@ public final class DefaultExpressionCompilationContextFactory implements Express
         return this;
     }
 
-    private ExtensibleExpressionEvaluationContext buildForExpression(EvaluatedExpressionReference expression, ClassElement thisElement) {
+    private ExtensibleExpressionEvaluationContext buildForExpression(EvaluatedExpressionReference expression, @Nullable ClassElement thisElement) {
         String annotationName = expression.annotationName();
         String memberName = expression.annotationMember();
 

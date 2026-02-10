@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -104,7 +105,7 @@ public final class ConfigurationUtils {
         return prefix;
     }
 
-    private static String computeIterablePrefix(AnnotationMetadata annotationMetadata, String prefix) {
+    private static String computeIterablePrefix(AnnotationMetadata annotationMetadata, @Nullable String prefix) {
         if (prefix == null) {
             prefix = StringUtils.EMPTY_STRING;
         }
@@ -179,6 +180,7 @@ public final class ConfigurationUtils {
         return path;
     }
 
+    @Nullable
     private static ClassElement resolveSuperInterface(ClassElement declaringType) {
         return declaringType.getInterfaces().stream()
                 .filter(tm -> tm.hasStereotype(ConfigurationReader.class))

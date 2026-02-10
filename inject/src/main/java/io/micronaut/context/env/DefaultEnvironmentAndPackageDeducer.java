@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 
 import java.io.BufferedReader;
@@ -36,6 +37,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -87,9 +89,11 @@ final class DefaultEnvironmentAndPackageDeducer implements EnvironmentNamesDeduc
 
     private final Logger log;
     private final ApplicationContextConfiguration configuration;
+    @Nullable
     private final Boolean deduceEnvironments;
-
+    @Nullable
     private LinkedHashSet<String> environments;
+    @Nullable
     private String packageName;
 
     public DefaultEnvironmentAndPackageDeducer(Logger log, ApplicationContextConfiguration configuration) {
@@ -101,7 +105,7 @@ final class DefaultEnvironmentAndPackageDeducer implements EnvironmentNamesDeduc
     @Override
     public Set<String> deduceEnvironmentNames() {
         deduce();
-        return environments;
+        return Objects.requireNonNull(environments);
     }
 
     @Override
@@ -125,7 +129,7 @@ final class DefaultEnvironmentAndPackageDeducer implements EnvironmentNamesDeduc
             List<String> specifiedNames = CollectionUtils.concat(envEnvironments, configurationEnvironments);
             environments = new LinkedHashSet<>(specifiedNames);
 
-            deduceEnvironmentsAndPackage();
+            deduceEnvironmentsAndPackage(environments);
 
             if (environments.isEmpty() && specifiedNames.isEmpty()) {
                 specifiedNames = configuration.getDefaultEnvironments();
@@ -135,7 +139,7 @@ final class DefaultEnvironmentAndPackageDeducer implements EnvironmentNamesDeduc
         }
     }
 
-    private void deduceEnvironmentsAndPackage() {
+    private void deduceEnvironmentsAndPackage(Set<String> environments) {
         if (environments.contains(Environment.FUNCTION)) {
             performFunctionDeduction(environments);
         } else {
@@ -317,7 +321,6 @@ final class DefaultEnvironmentAndPackageDeducer implements EnvironmentNamesDeduc
     private static ComputePlatform determineCloudProvider() {
         String computePlatform = CachedEnvironment.getProperty(CLOUD_PLATFORM_PROPERTY);
         if (computePlatform != null) {
-
             try {
                 return ComputePlatform.valueOf(computePlatform);
             } catch (IllegalArgumentException e) {
@@ -325,7 +328,7 @@ final class DefaultEnvironmentAndPackageDeducer implements EnvironmentNamesDeduc
             }
 
         }
-        boolean isWindows = CachedEnvironment.getProperty("os.name")
+        boolean isWindows = Objects.requireNonNullElse(CachedEnvironment.getProperty("os.name"), "unknown")
             .toLowerCase().startsWith("windows");
 
         if (isWindows ? isEC2Windows() : isEC2Linux()) {
@@ -372,7 +375,7 @@ final class DefaultEnvironmentAndPackageDeducer implements EnvironmentNamesDeduc
             ProcessBuilder builder = new ProcessBuilder();
             builder.command("cmd.exe", "/c", cmd);
             builder.redirectErrorStream(true);
-            builder.directory(new File(CachedEnvironment.getProperty("user.home")));
+            builder.directory(new File(Objects.requireNonNull(CachedEnvironment.getProperty("user.home"), "Cannot find user.home")));
             Process process = builder.start();
             return Optional.of(process);
         } catch (IOException ignore) {
@@ -402,7 +405,7 @@ final class DefaultEnvironmentAndPackageDeducer implements EnvironmentNamesDeduc
 
     private static boolean isOracleCloudWindows() {
         Optional<Process> optionalProcess = runWindowsCmd(ORACLE_CLOUD_WINDOWS_ASSET_TAG_CMD);
-        if (!optionalProcess.isPresent()) {
+        if (optionalProcess.isEmpty()) {
             return false;
         }
         Process process = optionalProcess.get();
@@ -445,7 +448,7 @@ final class DefaultEnvironmentAndPackageDeducer implements EnvironmentNamesDeduc
 
     private static boolean isEC2Windows() {
         Optional<Process> optionalProcess = runWindowsCmd(EC2_WINDOWS_HYPERVISOR_CMD);
-        if (!optionalProcess.isPresent()) {
+        if (optionalProcess.isEmpty()) {
             return false;
         }
         Process process = optionalProcess.get();

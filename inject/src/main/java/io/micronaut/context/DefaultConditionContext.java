@@ -40,7 +40,7 @@ final class DefaultConditionContext<B extends AnnotationMetadataProvider> implem
 
     private final B component;
     private final List<Failure> failures = new ArrayList<>(0);
-    private final BeanResolutionContext originalResolutionContext;
+    private final @Nullable BeanResolutionContext originalResolutionContext;
     private final BeanResolutionContext resolutionContext;
 
     /**
@@ -67,7 +67,7 @@ final class DefaultConditionContext<B extends AnnotationMetadataProvider> implem
     }
 
     @Override
-    public BeanResolutionContext getBeanResolutionContext() {
+    public @Nullable BeanResolutionContext getBeanResolutionContext() {
         return originalResolutionContext;
     }
 
@@ -149,7 +149,7 @@ final class DefaultConditionContext<B extends AnnotationMetadataProvider> implem
     }
 
     @Override
-    public <T> Optional<T> findBean(Argument<T> beanType, Qualifier<T> qualifier) {
+    public <T> Optional<T> findBean(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         return resolutionContext.findBean(beanType, qualifier);
     }
 

@@ -21,12 +21,14 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.PropertyCatalog;
 import io.micronaut.core.value.PropertyResolver;
 import io.micronaut.inject.BeanDefinition;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Consumer;
 
 /**
@@ -52,6 +54,7 @@ final class DefaultConfigurationPath implements ConfigurationPath {
     }
 
     @Override
+    @Nullable
     public ConfigurationPath parent() {
         int i = list.size();
         if (i > 1) {
@@ -89,6 +92,7 @@ final class DefaultConfigurationPath implements ConfigurationPath {
     }
 
     @Override
+    @Nullable
     public String primary() {
         ConfigurationSegment segment = peekLast();
         if (segment != null) {
@@ -108,6 +112,7 @@ final class DefaultConfigurationPath implements ConfigurationPath {
     }
 
     @Override
+    @Nullable
     public Class<?> configurationType() {
         ConfigurationSegment segment = peekLast();
         if (segment != null) {
@@ -117,6 +122,7 @@ final class DefaultConfigurationPath implements ConfigurationPath {
     }
 
     @Override
+    @Nullable
     public String name() {
         ConfigurationSegment segment = peekLast();
         if (segment != null) {
@@ -143,6 +149,7 @@ final class DefaultConfigurationPath implements ConfigurationPath {
     }
 
     @Override
+    @Nullable
     public String simpleName() {
         ConfigurationSegment segment = peekLast();
         if (segment != null) {
@@ -242,6 +249,7 @@ final class DefaultConfigurationPath implements ConfigurationPath {
     }
 
     @Override
+    @Nullable
     public ConfigurationSegment peekLast() {
         return list.peekLast();
     }
@@ -327,7 +335,7 @@ final class DefaultConfigurationPath implements ConfigurationPath {
         ConfigurationSegment.ConfigurationKind kind = configurationSegment.kind();
         switch (kind) {
             case NAME ->
-                pushConfigurationSegment(configurationSegment.name());
+                pushConfigurationSegment(Objects.requireNonNull(configurationSegment.name(), "Name cannot be null"));
             case INDEX ->
                 pushConfigurationSegment(configurationSegment.index());
             case ROOT ->
@@ -455,12 +463,16 @@ final class DefaultConfigurationPath implements ConfigurationPath {
     }
 
     record DefaultConfigurationSegment(
+        @Nullable
         Class<?> type,
         String prefix,
         String path,
         ConfigurationKind kind,
+        @Nullable
         String name,
+        @Nullable
         String simpleName,
+        @Nullable
         String primary,
         int index) implements ConfigurationSegment {
 

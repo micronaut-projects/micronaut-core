@@ -108,7 +108,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param annotation The stereotype
      * @return This builder
      */
-    public AnnotationValueBuilder<T> stereotype(AnnotationValue<?> annotation) {
+    public AnnotationValueBuilder<T> stereotype(@Nullable AnnotationValue<?> annotation) {
         if (annotation != null) {
             if (stereotypes == null) {
                 stereotypes = new ArrayList<>(10);
@@ -191,7 +191,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param defaultValues The default values
      * @return This builder
      */
-    public AnnotationValueBuilder<T> defaultValues(Map<? extends CharSequence, Object> defaultValues) {
+    public AnnotationValueBuilder<T> defaultValues(@Nullable Map<? extends CharSequence, Object> defaultValues) {
         if (defaultValues != null) {
             if (this.defaultValues == null) {
                 this.defaultValues = new LinkedHashMap<>(defaultValues);

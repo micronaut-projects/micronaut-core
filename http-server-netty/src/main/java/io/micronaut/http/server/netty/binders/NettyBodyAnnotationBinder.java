@@ -54,6 +54,7 @@ import io.netty.buffer.ByteBuf;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import reactor.core.publisher.Flux;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -119,6 +120,7 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
 
         return new PendingRequestBindingResult<>() {
             @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
+            @Nullable
             Optional<T> result;
 
             {
@@ -142,7 +144,7 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
 
             @Override
             public Optional<T> getValue() {
-                return result;
+                return result == null ? Optional.empty() : result;
             }
 
             @Override
@@ -221,7 +223,8 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
         return sub.list;
     }
 
-    private T read(ArgumentConversionContext<T> context, MessageBodyReader<T> reader, HttpHeaders headers, MediaType mediaType, ByteBuffer<?> byteBuffer) {
+    @Nullable
+    private T read(ArgumentConversionContext<T> context, MessageBodyReader<T> reader, HttpHeaders headers, @Nullable MediaType mediaType, ByteBuffer<?> byteBuffer) {
         boolean success = false;
         try {
             T result = reader.read(context.getArgument(), mediaType, headers, byteBuffer);

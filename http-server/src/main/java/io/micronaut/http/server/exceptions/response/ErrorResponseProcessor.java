@@ -16,7 +16,6 @@
 package io.micronaut.http.server.exceptions.response;
 
 import io.micronaut.context.annotation.DefaultImplementation;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.http.MutableHttpResponse;
 
 /**
@@ -42,7 +41,6 @@ public interface ErrorResponseProcessor<T> {
      *                     mutate
      * @return An error response
      */
-    @NonNull
-    MutableHttpResponse<T> processResponse(@NonNull ErrorContext errorContext, @NonNull MutableHttpResponse<?> baseResponse);
+    MutableHttpResponse<T> processResponse(ErrorContext errorContext, MutableHttpResponse<?> baseResponse);
 
 }

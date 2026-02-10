@@ -26,6 +26,7 @@ import io.micronaut.http.exceptions.HttpException;
  * @since 1.0
  */
 public class HttpClientException extends HttpException {
+    @Nullable
     private String serviceId;
     private boolean serviceIdLocked;
 
@@ -40,7 +41,7 @@ public class HttpClientException extends HttpException {
      * @param message The message
      * @param cause   The throwable
      */
-    public HttpClientException(String message, Throwable cause) {
+    public HttpClientException(String message, @Nullable Throwable cause) {
         super(message, cause);
     }
 
@@ -49,7 +50,7 @@ public class HttpClientException extends HttpException {
      * @param cause   The throwable
      * @param shared Shared instance
      */
-    public HttpClientException(String message, Throwable cause, boolean shared) {
+    public HttpClientException(String message, @Nullable Throwable cause, boolean shared) {
         super(message, cause, false, true);
         if (!shared) {
             throw new IllegalArgumentException("shared must be true");
@@ -83,6 +84,7 @@ public class HttpClientException extends HttpException {
         serviceIdLocked = true;
     }
 
+    @Nullable
     @Override
     public String getMessage() {
         if (serviceId != null) {

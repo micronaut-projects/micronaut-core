@@ -33,6 +33,7 @@ import io.micronaut.inject.ast.PackageElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.WildcardElement;
+import org.jspecify.annotations.NullUnmarked;
 
 import java.lang.annotation.Annotation;
 import java.util.function.Consumer;
@@ -46,6 +47,7 @@ import java.util.function.Predicate;
  * @author Denis Stepanov
  * @since 4.0.0
  */
+@NullUnmarked
 public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements ElementAnnotationMetadataFactory {
 
     protected final boolean isReadOnly;

@@ -38,9 +38,10 @@ import java.util.Map;
  */
 public abstract class AbstractInitializableBeanDefinitionAndReference<T> extends AbstractInitializableBeanDefinition<T> implements BeanDefinitionReference<T> {
 
+    @Nullable
     private final Throwable failedInitialization;
-    private final Condition[] preLoadConditions;
-    private final Condition[] postLoadConditions;
+    private final Condition @Nullable[] preLoadConditions;
+    private final Condition @Nullable [] postLoadConditions;
 
     protected AbstractInitializableBeanDefinitionAndReference(Class<T> beanType,
                                                               @Nullable MethodOrFieldReference constructor,
@@ -50,7 +51,7 @@ public abstract class AbstractInitializableBeanDefinitionAndReference<T> extends
                                                               AnnotationReference @Nullable [] annotationInjection,
                                                               @Nullable ExecutableMethodsDefinition<T> executableMethodsDefinition,
                                                               Map<String, Argument<?> @Nullable []> typeArgumentsMap,
- PrecalculatedInfo precalculatedInfo) {
+                                                              PrecalculatedInfo precalculatedInfo) {
         this(beanType, constructor, annotationMetadata, methodInjection, fieldInjection, annotationInjection, executableMethodsDefinition, typeArgumentsMap, precalculatedInfo, null, null, null);
     }
 
@@ -62,7 +63,7 @@ public abstract class AbstractInitializableBeanDefinitionAndReference<T> extends
                                                               AnnotationReference @Nullable [] annotationInjection,
                                                               @Nullable ExecutableMethodsDefinition<T> executableMethodsDefinition,
                                                               Map<String, Argument<?> @Nullable []> typeArgumentsMap,
- PrecalculatedInfo precalculatedInfo,
+                                                              PrecalculatedInfo precalculatedInfo,
                                                               Condition @Nullable [] preLoadConditions,
                                                               Condition @Nullable [] postLoadConditions,
                                                               @Nullable Throwable failedInitialization) {
@@ -80,7 +81,7 @@ public abstract class AbstractInitializableBeanDefinitionAndReference<T> extends
      * @param preCheck          if it's a pre-load / post-load
      * @return true if enabled
      */
-    public final boolean isEnabled(BeanContext context, BeanResolutionContext resolutionContext, boolean preCheck) {
+    public final boolean isEnabled(BeanContext context, @Nullable BeanResolutionContext resolutionContext, boolean preCheck) {
         if (preLoadConditions != null && postLoadConditions != null) {
             DefaultConditionContext<AbstractBeanContextConditional> conditionContext = new DefaultConditionContext<>(
                 context,

@@ -31,11 +31,11 @@ public final class ContextPathUtils {
     }
 
     public static URI prepend(URI requestURI, @Nullable ServerContextPathProvider serverContextPathProvider) throws URISyntaxException {
-        return prepend(requestURI, serverContextPathProvider.getContextPath());
+        return prepend(requestURI, serverContextPathProvider == null ? null : serverContextPathProvider.getContextPath());
     }
 
     public static URI prepend(URI requestURI, @Nullable ClientContextPathProvider clientContextPathProvider) throws URISyntaxException {
-        return prepend(requestURI, clientContextPathProvider.getContextPath().orElse(null));
+        return prepend(requestURI, clientContextPathProvider == null ? null : clientContextPathProvider.getContextPath().orElse(null));
     }
 
     public static URI prepend(URI requestURI, @Nullable String contextPath) throws URISyntaxException {

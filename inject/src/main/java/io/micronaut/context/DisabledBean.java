@@ -36,7 +36,7 @@ public record DisabledBean<T>(
     implements BeanDefinition<T>, BeanDefinitionReference<T> {
 
     @Override
-    public boolean isEnabled(BeanContext context, BeanResolutionContext resolutionContext) {
+    public boolean isEnabled(BeanContext context, @Nullable BeanResolutionContext resolutionContext) {
         return true;
     }
 
@@ -51,7 +51,7 @@ public record DisabledBean<T>(
     }
 
     @Override
-    public Qualifier<T> getDeclaredQualifier() {
+    public @Nullable Qualifier<T> getDeclaredQualifier() {
         return qualifier;
     }
 

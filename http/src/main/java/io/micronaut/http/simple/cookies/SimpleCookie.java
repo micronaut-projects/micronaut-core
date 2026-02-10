@@ -17,6 +17,7 @@ package io.micronaut.http.simple.cookies;
 import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.SameSite;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Optional;
 
@@ -30,12 +31,12 @@ public class SimpleCookie implements Cookie {
 
     private final String name;
     private String value;
-    private String domain;
-    private String path;
+    private @Nullable String domain;
+    private @Nullable String path;
     private boolean httpOnly;
     private boolean secure;
     private long maxAge;
-    private SameSite sameSite;
+    private @Nullable SameSite sameSite;
 
     /**
      * Constructor.
@@ -59,12 +60,12 @@ public class SimpleCookie implements Cookie {
     }
 
     @Override
-    public String getDomain() {
+    public @Nullable String getDomain() {
         return domain;
     }
 
     @Override
-    public String getPath() {
+    public @Nullable String getPath() {
         return path;
     }
 
@@ -89,7 +90,7 @@ public class SimpleCookie implements Cookie {
     }
 
     @Override
-    public Cookie sameSite(SameSite sameSite) {
+    public Cookie sameSite(@Nullable SameSite sameSite) {
         this.sameSite = sameSite;
         return this;
     }
@@ -107,13 +108,13 @@ public class SimpleCookie implements Cookie {
     }
 
     @Override
-    public Cookie domain(String domain) {
+    public Cookie domain(@Nullable String domain) {
         this.domain = domain;
         return this;
     }
 
     @Override
-    public Cookie path(String path) {
+    public Cookie path(@Nullable String path) {
         this.path = path;
         return this;
     }

@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty.handler.accesslog.element;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.http.HttpHeaders;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.EnumSet;
@@ -65,7 +66,8 @@ public interface LogElement {
      * @deprecated Does not work for unix or embedded channels. Please implement and use {@link #onRequestHeaders(ConnectionMetadata, String, HttpHeaders, String, String)} instead.
      */
     @Deprecated
-    default String onRequestHeaders(SocketChannel channel, String method, HttpHeaders headers, String uri, String protocol) {
+    @Nullable
+    default String onRequestHeaders(@Nullable SocketChannel channel, String method, HttpHeaders headers, String uri, String protocol) {
         return ConstantElement.UNKNOWN_VALUE;
     }
 
@@ -80,7 +82,7 @@ public interface LogElement {
      * @param protocol The request protocol.
      * @return The processed value.
      */
-    default String onRequestHeaders(ConnectionMetadata metadata, String method, HttpHeaders headers, String uri, String protocol) {
+    default @Nullable String onRequestHeaders(ConnectionMetadata metadata, String method, HttpHeaders headers, String uri, String protocol) {
         SocketChannel ch = metadata instanceof ConnectionMetadataImpl.SocketChannelMetadata m ? m.ch() : null;
         return onRequestHeaders(ch, method, headers, uri, protocol);
     }

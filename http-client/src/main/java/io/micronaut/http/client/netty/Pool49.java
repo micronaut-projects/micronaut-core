@@ -16,6 +16,7 @@
 package io.micronaut.http.client.netty;
 
 import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.NullUnmarked;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
@@ -49,6 +50,7 @@ import java.util.function.Function;
 /**
  * This class handles the concurrent aspects of pooling for {@link ConnectionManager}.
  */
+@NullUnmarked
 @Internal
 final class Pool49 implements Pool {
     private final Listener listener;

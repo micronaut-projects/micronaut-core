@@ -117,12 +117,14 @@ public class SpareTire extends Tire {
 
     public boolean packagePrivateMethod2Injected;
 
+    @SuppressWarnings("MissingOverride")
     @Inject void injectPackagePrivateMethod2() {
         packagePrivateMethod2Injected = true;
     }
 
     public boolean packagePrivateMethod3Injected;
 
+    @SuppressWarnings("MissingOverride")
     void injectPackagePrivateMethod3() {
         packagePrivateMethod3Injected = true;
     }

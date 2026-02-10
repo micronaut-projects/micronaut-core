@@ -46,7 +46,7 @@ public final class InputStreamByteBody extends InternalByteBody implements Close
     // originally from micronaut-servlet
 
     private final Context context;
-    private ExtendedInputStream stream;
+    private @Nullable ExtendedInputStream stream;
 
     private InputStreamByteBody(Context context, ExtendedInputStream stream) {
         this.context = context;

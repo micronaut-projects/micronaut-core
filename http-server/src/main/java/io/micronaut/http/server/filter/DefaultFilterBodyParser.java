@@ -17,7 +17,6 @@ package io.micronaut.http.server.filter;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.form.FormUrlEncodedDecoder;
@@ -48,7 +47,7 @@ import java.util.concurrent.CompletionException;
 @Experimental
 final class DefaultFilterBodyParser implements FilterBodyParser {
     private static final Logger LOG = LoggerFactory.getLogger(DefaultFilterBodyParser.class);
-    private static final @NonNull Argument<Map<String, Object>> MAP_STRING_OBJECT_ARGUMENT = Argument.mapOf(String.class, Object.class);
+    private static final Argument<Map<String, Object>> MAP_STRING_OBJECT_ARGUMENT = Argument.mapOf(String.class, Object.class);
     private final JsonMapper jsonMapper;
     private final FormUrlEncodedDecoder formUrlEncodedDecoder;
 
@@ -63,9 +62,8 @@ final class DefaultFilterBodyParser implements FilterBodyParser {
     }
 
     @Override
-    @NonNull
     @SingleResult
-    public CompletableFuture<Map<String, Object>> parseBody(@NonNull HttpRequest<?> request) {
+    public CompletableFuture<Map<String, Object>> parseBody(HttpRequest<?> request) {
         Optional<MediaType> mediaTypeOptional = request.getContentType();
         if (mediaTypeOptional.isEmpty()) {
             if (LOG.isDebugEnabled()) {
@@ -91,7 +89,7 @@ final class DefaultFilterBodyParser implements FilterBodyParser {
         return CompletableFuture.completedFuture(Collections.emptyMap());
     }
 
-    private CompletableFuture<Map<String, Object>> parseJson(@NonNull ServerHttpRequest<?> request) {
+    private CompletableFuture<Map<String, Object>> parseJson(ServerHttpRequest<?> request) {
         try (CloseableByteBody closeableByteBody = request.byteBody().split(ByteBody.SplitBackpressureMode.FASTEST)) {
             return closeableByteBody.buffer()
                 .thenApply(bb -> {
@@ -104,7 +102,7 @@ final class DefaultFilterBodyParser implements FilterBodyParser {
         }
     }
 
-    private CompletableFuture<Map<String, Object>> parseFormUrlEncoded(@NonNull ServerHttpRequest<?> request) {
+    private CompletableFuture<Map<String, Object>> parseFormUrlEncoded(ServerHttpRequest<?> request) {
         try (CloseableByteBody closeableByteBody = request.byteBody().split(ByteBody.SplitBackpressureMode.FASTEST)) {
             return closeableByteBody.buffer()
                     .thenApply(bb -> bb.toString(request.getCharacterEncoding()))

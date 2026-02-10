@@ -77,7 +77,7 @@ sealed class DefaultArgumentValue<V> implements ArgumentValue<V> permits Default
     }
 
     @Override
-    public @org.jspecify.annotations.Nullable <T extends Annotation> T synthesize(Class<T> annotationClass) {
+    public @Nullable <T extends Annotation> T synthesize(Class<T> annotationClass) {
         return argument.synthesize(annotationClass);
     }
 

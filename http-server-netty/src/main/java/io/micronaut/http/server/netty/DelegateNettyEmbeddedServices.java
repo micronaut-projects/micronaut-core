@@ -34,6 +34,7 @@ import io.micronaut.web.router.resource.StaticResourceResolver;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelOutboundHandler;
 import io.netty.channel.EventLoopGroup;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.Optional;
@@ -83,6 +84,7 @@ interface DelegateNettyEmbeddedServices extends NettyEmbeddedServices {
     }
 
     @Override
+    @Nullable
     default ServerSslBuilder getServerSslBuilder() {
         return getDelegate().getServerSslBuilder();
     }
@@ -113,7 +115,7 @@ interface DelegateNettyEmbeddedServices extends NettyEmbeddedServices {
     }
 
     @Override
-    default EventLoopGroup createEventLoopGroup(int numThreads, ExecutorService executorService, Integer ioRatio) {
+    default EventLoopGroup createEventLoopGroup(int numThreads, ExecutorService executorService, @Nullable Integer ioRatio) {
         return getDelegate().createEventLoopGroup(numThreads, executorService, ioRatio);
     }
 
@@ -123,12 +125,12 @@ interface DelegateNettyEmbeddedServices extends NettyEmbeddedServices {
     }
 
     @Override
-    default Channel getChannelInstance(NettyChannelType type, EventLoopGroupConfiguration workerConfig, Channel parent, int fd) {
+    default Channel getChannelInstance(NettyChannelType type, @Nullable EventLoopGroupConfiguration workerConfig, @Nullable Channel parent, int fd) {
         return getDelegate().getChannelInstance(type, workerConfig, parent, fd);
     }
 
     @Override
-    default Channel getChannelInstance(NettyChannelType type, EventLoopGroupConfiguration workerConfig) {
+    default Channel getChannelInstance(NettyChannelType type, @Nullable EventLoopGroupConfiguration workerConfig) {
         return getDelegate().getChannelInstance(type, workerConfig);
     }
 

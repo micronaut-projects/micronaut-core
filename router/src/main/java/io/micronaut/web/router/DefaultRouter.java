@@ -244,7 +244,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     }
 
     @Override
-    public <T, R> UriRouteMatch<T, R> findClosest(HttpRequest<?> request) throws DuplicateRouteException {
+    public @Nullable <T, R> UriRouteMatch<T, R> findClosest(HttpRequest<?> request) throws DuplicateRouteException {
         List<UriRouteInfo<Object, Object>> routes = findInternal(request);
         if (routes.isEmpty()) {
             return null;

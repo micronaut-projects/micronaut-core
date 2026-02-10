@@ -34,6 +34,7 @@ import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.inject.UnsafeExecutionHandle;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -56,12 +57,12 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
     protected final ConversionService conversionService;
     protected final MethodBasedRouteInfo<T, R> routeInfo;
     protected final MethodExecutionHandle<T, R> methodExecutionHandle;
-    protected final UnsafeExecutionHandle<T, R> unsafeMethodExecutionHandle;
+    protected final @Nullable UnsafeExecutionHandle<T, R> unsafeMethodExecutionHandle;
     protected final ExecutableMethod<T, R> executableMethod;
 
     private final Argument<?>[] arguments;
     private final String[] argumentNames;
-    private final Object[] argumentValues;
+    private final @Nullable Object[] argumentValues;
     private final PostponedRequestArgumentBinder<Object>[] postponedArgumentBinders;
     private final PendingRequestBindingResult<?>[] pendingRequestBindingResults;
     private final boolean[] fulfilledArguments;
@@ -83,23 +84,16 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
         this.arguments = executableMethod.getArguments();
         this.argumentNames = routeInfo.getArgumentNames();
         int length = arguments.length;
-        if (length == 0) {
-            fulfilled = true;
-            this.argumentValues = null;
-            this.fulfilledArguments = null;
-            this.postponedArgumentBinders = null;
-            this.pendingRequestBindingResults = null;
-        } else {
-            this.argumentValues = new Object[length];
-            this.fulfilledArguments = new boolean[length];
-            this.postponedArgumentBinders = new PostponedRequestArgumentBinder[length];
-            this.pendingRequestBindingResults = new PendingRequestBindingResult[length];
-        }
+        this.argumentValues = new Object[length];
+        this.fulfilledArguments = new boolean[length];
+        this.postponedArgumentBinders = new PostponedRequestArgumentBinder[length];
+        this.pendingRequestBindingResults = new PendingRequestBindingResult[length];
         if (methodExecutionHandle instanceof UnsafeExecutionHandle<?, ?>) {
             unsafeMethodExecutionHandle = (UnsafeExecutionHandle<T, R>) methodExecutionHandle;
         } else {
             unsafeMethodExecutionHandle = null;
         }
+        this.fulfilled = length == 0;
     }
 
     @Override
@@ -191,7 +185,8 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
     }
 
     @Override
-    public R invoke(Object... arguments) {
+    @Nullable
+    public R invoke(@Nullable Object... arguments) {
         Argument<?>[] targetArguments = getArguments();
         if (targetArguments.length == 0) {
             return methodExecutionHandle.invoke();
@@ -221,6 +216,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
     }
 
     @Override
+    @Nullable
     public R execute() {
         Argument<?>[] targetArguments = getArguments();
         if (targetArguments.length == 0) {
@@ -438,7 +434,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
         return true;
     }
 
-    private void setValue(int index, Argument<?> argument, Object value) {
+    private void setValue(int index, Argument<?> argument, @Nullable Object value) {
         if (value != null) {
             argumentValues[index] = convertValue(conversionService, argument, value);
         }
@@ -457,7 +453,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
         fulfilled = true;
     }
 
-    private Object convertValue(ConversionService conversionService, Argument<?> argument, Object value) {
+    private @Nullable Object convertValue(ConversionService conversionService, Argument<?> argument, Object value) {
         if (value instanceof ConversionError conversionError) {
             throw new ConversionErrorException(argument, conversionError);
         }
@@ -478,7 +474,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
         }
     }
 
-    private Object resolveValueOrError(Argument<?> argument, ConversionContext conversionContext, Optional<?> result) {
+    private @Nullable Object resolveValueOrError(Argument<?> argument, ConversionContext conversionContext, Optional<?> result) {
         if (result.isEmpty()) {
             Optional<ConversionError> lastError = conversionContext.getLastError();
             if (lastError.isEmpty() && argument.isDeclaredNullable()) {

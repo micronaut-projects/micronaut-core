@@ -39,6 +39,7 @@ import java.io.File;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Paths;
+import java.util.Objects;
 import java.util.Optional;
 
 @Internal
@@ -52,6 +53,7 @@ final class NettyRequestLifecycle extends RequestLifecycle {
      * Should only be used where netty-specific stuff is needed, such as reading the body or
      * writing the response.
      */
+    @Nullable
     private NettyHttpRequest<?> nettyRequest;
 
     NettyRequestLifecycle(RoutingInBoundHandler rib, OutboundAccess outboundAccess) {
@@ -128,7 +130,7 @@ final class NettyRequestLifecycle extends RequestLifecycle {
     @Override
     protected ExecutionFlow<RouteMatch<?>> fulfillArguments(RouteMatch<?> routeMatch, HttpRequest<?> request) {
         // handle decoding failure
-        DecoderResult decoderResult = nettyRequest.getNativeRequest().decoderResult();
+        DecoderResult decoderResult = Objects.requireNonNull(nettyRequest).getNativeRequest().decoderResult();
         if (decoderResult.isFailure()) {
             return ExecutionFlow.error(decoderResult.cause());
         }

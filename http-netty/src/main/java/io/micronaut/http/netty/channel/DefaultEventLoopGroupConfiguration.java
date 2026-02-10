@@ -37,10 +37,13 @@ public class DefaultEventLoopGroupConfiguration implements EventLoopGroupConfigu
 
     private final int numThreads;
     private final double threadCoreRatio;
+    @Nullable
     private final Integer ioRatio;
     private final boolean preferNativeTransport;
+    @Nullable
     private final List<String> transport;
     private final String name;
+    @Nullable
     private final String executor;
     private final Duration shutdownQuietPeriod;
     private final Duration shutdownTimeout;

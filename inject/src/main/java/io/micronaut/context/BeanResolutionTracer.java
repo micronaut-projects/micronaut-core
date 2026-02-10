@@ -83,6 +83,7 @@ sealed interface BeanResolutionTracer permits ConsoleBeanResolutionTracer {
     default <T> void traceBeanDisabled(
         BeanResolutionContext resolutionContext,
         Argument<T> beanType,
+        @Nullable
         Qualifier<T> qualifier,
         String disabledBeanMessage) {
         // no-op
@@ -103,6 +104,7 @@ sealed interface BeanResolutionTracer permits ConsoleBeanResolutionTracer {
         BeanResolutionContext resolutionContext,
         Argument<T> argument,
         String property,
+        @Nullable
         T value
     ) {
         // no-op

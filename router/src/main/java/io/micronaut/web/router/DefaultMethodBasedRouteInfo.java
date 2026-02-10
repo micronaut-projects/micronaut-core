@@ -56,9 +56,10 @@ sealed class DefaultMethodBasedRouteInfo<T, R> extends DefaultRouteInfo<R> imple
     private final boolean isVoid;
     private final Optional<Argument<?>> optionalBodyArgument;
     private final Optional<Argument<?>> optionalFullBodyArgument;
+    @Nullable
     private final MessageBodyReader<?> messageBodyReader;
 
-    private RequestArgumentBinder<Object>[] argumentBinders;
+    private RequestArgumentBinder<Object> @Nullable [] argumentBinders;
     private final boolean needsBody;
 
     public DefaultMethodBasedRouteInfo(MethodExecutionHandle<T, R> targetMethod,
@@ -117,6 +118,7 @@ sealed class DefaultMethodBasedRouteInfo<T, R> extends DefaultRouteInfo<R> imple
     }
 
     @Override
+    @Nullable
     public final MessageBodyReader<?> getMessageBodyReader() {
         return messageBodyReader;
     }

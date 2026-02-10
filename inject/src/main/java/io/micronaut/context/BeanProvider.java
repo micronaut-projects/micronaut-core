@@ -14,11 +14,13 @@
  * limitations under the License.
  */
 package io.micronaut.context;
-import org.jspecify.annotations.Nullable;
+
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
-
 import jakarta.inject.Provider;
+import org.jetbrains.annotations.Contract;
+import org.jspecify.annotations.Nullable;
+
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.Objects;
@@ -186,6 +188,7 @@ public interface BeanProvider<T> extends Iterable<T> {
      * @return The bean if present or else the supplied alternative
      * @since 3.0.2
      */
+    @Contract("!null -> !null")
     default @Nullable T orElse(@Nullable T alternative) {
         if (isPresent()) {
             return get();

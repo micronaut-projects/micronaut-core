@@ -26,6 +26,7 @@ import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.TypeElementQuery;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.HashSet;
@@ -38,6 +39,7 @@ import java.util.Set;
  * @since 4.1.0
  */
 public final class MapperVisitor implements TypeElementVisitor<Object, Mapper> {
+    @Nullable
     private ClassElement lastClassElement;
 
     @Override

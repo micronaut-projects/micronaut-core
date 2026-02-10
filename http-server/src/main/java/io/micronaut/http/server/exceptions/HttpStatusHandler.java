@@ -24,6 +24,7 @@ import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
 import jakarta.inject.Singleton;
 
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -57,7 +58,7 @@ public class HttpStatusHandler extends ErrorResponseProcessorExceptionHandler<Ht
         } else {
             return responseProcessor.processResponse(ErrorContext.builder(request)
                     .cause(exception)
-                    .errorMessage(exception.getMessage())
+                    .errorMessage(Objects.requireNonNull(exception.getMessage()))
                     .build(), response);
         }
     }

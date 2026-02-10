@@ -16,7 +16,6 @@
 package io.micronaut.http.client;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.http.ByteBodyHttpResponse;
@@ -52,9 +51,8 @@ public interface RawHttpClient extends Closeable {
      * @return A mono that will contain the response to this request. This response will
      * <i>usually</i> be a {@link ByteBodyHttpResponse}, unless a filter replaced it.
      */
-    @NonNull
     @SingleResult
-    Publisher<? extends HttpResponse<?>> exchange(@NonNull HttpRequest<?> request, @Nullable CloseableByteBody requestBody, @Nullable Thread blockedThread);
+    Publisher<? extends HttpResponse<?>> exchange(HttpRequest<?> request, @Nullable CloseableByteBody requestBody, @Nullable Thread blockedThread);
 
     /**
      * Create a new {@link RawHttpClient}.
@@ -78,7 +76,7 @@ public interface RawHttpClient extends Closeable {
      * @param configuration the client configuration
      * @return The client
      */
-    static RawHttpClient create(@Nullable URI url, @NonNull HttpClientConfiguration configuration) {
+    static RawHttpClient create(@Nullable URI url, HttpClientConfiguration configuration) {
         return RawHttpClientFactoryResolver.getFactory().createRawClient(url, configuration);
     }
 }

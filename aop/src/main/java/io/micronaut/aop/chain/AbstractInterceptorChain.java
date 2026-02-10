@@ -160,7 +160,7 @@ abstract class AbstractInterceptorChain<B, R> implements InvocationContext<B, R>
             }
 
             @Override
-            public void setValue(Object value) {
+            public void setValue(@Nullable Object value) {
                 originalParameters[finalIndex] = value;
             }
         };

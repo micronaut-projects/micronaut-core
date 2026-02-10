@@ -79,11 +79,15 @@ public final class JacksonDatabindMapper implements JsonMapper {
     private final ObjectMapper objectMapper;
     private final JsonStreamConfig config;
     private final JsonNodeTreeCodec treeCodec;
+    @Nullable
     private final ObjectReader specializedReader;
+    @Nullable
     private final ObjectWriter specializedWriter;
     private final boolean allowViews;
 
+    @Nullable
     private TypeCache<ObjectReader> cachedReader;
+    @Nullable
     private TypeCache<ObjectWriter> cachedWriter;
 
     @Internal
@@ -188,6 +192,7 @@ public final class JacksonDatabindMapper implements JsonMapper {
     }
 
     @Override
+    @Nullable
     public <T> T readValueFromTree(JsonNode tree, Argument<T> type) throws IOException {
         return createReader(type).readValue(treeAsTokens(tree));
     }
@@ -200,13 +205,14 @@ public final class JacksonDatabindMapper implements JsonMapper {
     }
 
     @Override
-    public <T> JsonNode writeValueToTree(Argument<T> type, T value) throws IOException {
+    public <T> JsonNode writeValueToTree(Argument<T> type, @Nullable T value) throws IOException {
         TreeGenerator treeGenerator = treeCodec.createTreeGenerator();
         createWriter(type).writeValue(treeGenerator, value);
         return treeGenerator.getCompletedValue();
     }
 
     @Override
+    @Nullable
     public <T> T readValue(InputStream inputStream, Argument<T> type) throws IOException {
         try {
             return createReader(type).readValue(inputStream);
@@ -216,6 +222,7 @@ public final class JacksonDatabindMapper implements JsonMapper {
     }
 
     @Override
+    @Nullable
     public <T> T readValue(byte[] byteArray, Argument<T> type) throws IOException {
         try {
             return createReader(type).readValue(byteArray);
@@ -225,6 +232,7 @@ public final class JacksonDatabindMapper implements JsonMapper {
     }
 
     @Override
+    @Nullable
     public <T> T readValue(ByteBuffer<?> byteBuffer, Argument<T> type) throws IOException {
         try (JsonParser parser = JacksonCoreParserFactory.createJsonParser((JsonFactory) objectMapper.tokenStreamFactory(), objectMapper._deserializationContext(), byteBuffer)) {
             return createReader(type).readValue(parser);
@@ -234,6 +242,7 @@ public final class JacksonDatabindMapper implements JsonMapper {
     }
 
     @Override
+    @Nullable
     public <T> T readValue(ReadBuffer readBuffer, Argument<T> type) throws IOException {
         try {
             ObjectReader reader = createReader(type);
@@ -259,7 +268,7 @@ public final class JacksonDatabindMapper implements JsonMapper {
     }
 
     @Override
-    public <T> void writeValue(OutputStream outputStream, Argument<T> type, T object) throws IOException {
+    public <T> void writeValue(OutputStream outputStream, Argument<T> type, @Nullable T object) throws IOException {
         createWriter(type).writeValue(outputStream, object);
     }
 
@@ -272,7 +281,7 @@ public final class JacksonDatabindMapper implements JsonMapper {
     }
 
     @Override
-    public <T> byte[] writeValueAsBytes(Argument<T> type, T object) throws IOException {
+    public <T> byte[] writeValueAsBytes(Argument<T> type, @Nullable T object) throws IOException {
         return createWriter(type).writeValueAsBytes(object);
     }
 

@@ -16,7 +16,6 @@
 package io.micronaut.http.server.util.locale;
 
 import io.micronaut.context.annotation.Primary;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.http.HttpRequest;
 import jakarta.inject.Singleton;
 
@@ -48,8 +47,7 @@ public class CompositeHttpLocaleResolver extends HttpAbstractLocaleResolver {
     }
 
     @Override
-    @NonNull
-    public Optional<Locale> resolve(@NonNull HttpRequest<?> request) {
+    public Optional<Locale> resolve(HttpRequest<?> request) {
         return Arrays.stream(localeResolvers)
                 .map(resolver -> resolver.resolve(request))
                 .filter(Optional::isPresent)

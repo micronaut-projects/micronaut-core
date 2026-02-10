@@ -17,7 +17,6 @@ package io.micronaut.http.client;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.InjectionPoint;
 
@@ -39,11 +38,10 @@ public interface StreamingHttpClientRegistry<S extends StreamingHttpClient> {
      * @param beanContext    The bean context to use
      * @return The Streaming HTTP Client
      */
-    @NonNull
     S resolveStreamingHttpClient(@Nullable InjectionPoint<?> injectionPoint,
                                  @Nullable LoadBalancer loadBalancer,
                                  @Nullable HttpClientConfiguration configuration,
-                                 @NonNull BeanContext beanContext);
+                                 BeanContext beanContext);
 
     /**
      * Return the client for the given annotation metadata.
@@ -51,8 +49,7 @@ public interface StreamingHttpClientRegistry<S extends StreamingHttpClient> {
      * @param annotationMetadata The annotation metadata.
      * @return The client
      */
-    @NonNull
-    S getStreamingHttpClient(@NonNull AnnotationMetadata annotationMetadata);
+    S getStreamingHttpClient(AnnotationMetadata annotationMetadata);
 
     /**
      * @return Return the default Streaming HTTP client.

@@ -41,7 +41,7 @@ import jakarta.inject.Singleton;
 @Singleton
 public class AnnotatedFilterRouteBuilder extends DefaultRouteBuilder implements BeanDefinitionProcessor<Filter> {
 
-    private final ServerContextPathProvider contextPathProvider;
+    private final @Nullable ServerContextPathProvider contextPathProvider;
 
     /**
      * Constructor.

@@ -111,7 +111,8 @@ final class AnnotationMetadataQualifier<T> extends FilteringQualifier<T> {
         if (qualifierAnn == null) {
             return candidate.getAnnotationMetadata().hasAnnotation(annotationName);
         }
-        return qualifierAnn.equals(resolveBindingAnnotationValue(candidate.getAnnotationMetadata()));
+        AnnotationValue<Annotation> val = resolveBindingAnnotationValue(candidate.getAnnotationMetadata());
+        return val != null && qualifierAnn.equals(val);
     }
 
     @Nullable

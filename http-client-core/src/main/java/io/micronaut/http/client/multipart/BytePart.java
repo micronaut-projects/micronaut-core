@@ -16,6 +16,7 @@
 package io.micronaut.http.client.multipart;
 
 import io.micronaut.http.MediaType;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A class representing a byte[] data {@link Part} in {@link MultipartBody} to build a Netty multipart request.
@@ -41,7 +42,7 @@ class BytePart extends AbstractFilePart<byte[]> {
      * @param contentType The type of the content, example - "application/json", "text/plain" etc
      * @param data        The contents of the file as a byte[]
      */
-    BytePart(String name, String filename, MediaType contentType, byte[] data) {
+    BytePart(String name, String filename, @Nullable MediaType contentType, byte[] data) {
         super(name, filename, contentType);
         this.data = data;
     }

@@ -44,6 +44,7 @@ public final class GracefulShutdownConfiguration implements Toggleable {
      * @return {@code true} to enable graceful shutdown
      */
     @Bindable(defaultValue = StringUtils.FALSE)
+    @Override
     public boolean isEnabled() {
         return enabled;
     }

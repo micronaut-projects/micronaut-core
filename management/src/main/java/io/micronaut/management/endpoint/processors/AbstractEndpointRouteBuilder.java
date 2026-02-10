@@ -129,7 +129,7 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
                 BeanDefinition<?> beanDefinition = opt.get();
                 if (beanDefinition.hasStereotype(Endpoint.class)) {
                     String id = beanDefinition.stringValue(Endpoint.class).orElse(null);
-                    final EndpointConfiguration endpointConfiguration = beanContext.getProvider(EndpointConfiguration.class, Qualifiers.byName(id))
+                    final EndpointConfiguration endpointConfiguration = id == null ? null : beanContext.getProvider(EndpointConfiguration.class, Qualifiers.byName(id))
                         .orElse(null);
                     if (endpointConfiguration != null && StringUtils.isNotEmpty(endpointConfiguration.getPath())) {
                         return Optional.of(endpointConfiguration.getPath());

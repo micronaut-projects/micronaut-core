@@ -85,6 +85,7 @@ public interface RetryState {
     /**
      * @return The captured exception type (default to {@link RuntimeException}
      */
+    @Nullable
     Class<? extends Throwable> getCapturedException();
 
     /**

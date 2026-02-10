@@ -19,6 +19,8 @@
 
 package io.micronaut.scheduling.cron;
 
+import org.jspecify.annotations.NullUnmarked;
+
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.LocalDate;
@@ -140,6 +142,7 @@ import java.util.regex.Pattern;
  * the constraints of each field are met. Overlap of intervals are not allowed. That is: for
  * Day-of-week field &quot;FRI-MON&quot; is invalid, but &quot;FRI-SUN,MON&quot; is valid
  */
+@NullUnmarked
 public final class CronExpression {
 
     /**
@@ -249,7 +252,7 @@ public final class CronExpression {
      * @return The next time within given barrier
      */
     public ZonedDateTime nextTimeAfter(ZonedDateTime afterTime, ZonedDateTime dateTimeBarrier) {
-        ZonedDateTime nextTime = ZonedDateTime.from(afterTime).withNano(0).plusSeconds(1).withNano(0);
+        ZonedDateTime nextTime = afterTime.withNano(0).plusSeconds(1).withNano(0);
 
         while (true) { // day of week
             while (true) { // month
@@ -438,7 +441,7 @@ public final class CronExpression {
                 fieldType.to));
             } else if (part.from != null && part.to != null && part.from > part.to) {
                 throw new IllegalArgumentException(
-                
+
                 "Invalid interval [%s-%s].  Rolling periods are not supported (ex. 5-1, only 1-5) since this won't give a deterministic result. Must be %s<=_<=%s".formatted(
                 part.from, part.to, fieldType.from, fieldType.to));
             }

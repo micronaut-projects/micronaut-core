@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.BeanProperties;
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.NullUnmarked;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
@@ -46,6 +47,7 @@ import static io.micronaut.inject.configuration.ConfigurationUtils.getRequiredTy
  * @author Denis Stepanov
  * @since 1.0
  */
+@NullUnmarked
 public class ConfigurationMetadataBuilder {
 
     /**

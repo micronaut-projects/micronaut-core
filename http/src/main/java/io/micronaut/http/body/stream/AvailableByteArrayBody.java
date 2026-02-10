@@ -25,6 +25,7 @@ import io.micronaut.core.io.buffer.ReadBufferFactory;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.http.body.CloseableAvailableByteBody;
 import io.micronaut.http.body.InternalByteBody;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 
 import java.util.Objects;
@@ -37,7 +38,7 @@ import java.util.Objects;
  */
 @Experimental
 public final class AvailableByteArrayBody extends InternalByteBody implements CloseableAvailableByteBody {
-    private ReadBuffer readBuffer;
+    private @Nullable ReadBuffer readBuffer;
 
     private AvailableByteArrayBody(ReadBuffer readBuffer) {
         this.readBuffer = Objects.requireNonNull(readBuffer, "readBuffer");

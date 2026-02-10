@@ -51,22 +51,22 @@ public class NettyHttpClientFactory implements
         RawHttpClientFactory {
 
     @Override
-    public HttpClient createClient(URL url) {
+    public HttpClient createClient(@Nullable URL url) {
         return createNettyClient(url);
     }
 
     @Override
-    public HttpClient createClient(URL url, HttpClientConfiguration configuration) {
+    public HttpClient createClient(@Nullable URL url, HttpClientConfiguration configuration) {
         return createNettyClient(url, configuration);
     }
 
     @Override
-    public ProxyHttpClient createProxyClient(URL url) {
+    public ProxyHttpClient createProxyClient(@Nullable URL url) {
         return createNettyClient(url);
     }
 
     @Override
-    public ProxyHttpClient createProxyClient(URL url, HttpClientConfiguration configuration) {
+    public ProxyHttpClient createProxyClient(@Nullable URL url, HttpClientConfiguration configuration) {
         return createNettyClient(url, configuration);
     }
 
@@ -81,22 +81,22 @@ public class NettyHttpClientFactory implements
     }
 
     @Override
-    public StreamingHttpClient createStreamingClient(URL url) {
+    public StreamingHttpClient createStreamingClient(@Nullable URL url) {
         return createNettyClient(url);
     }
 
     @Override
-    public StreamingHttpClient createStreamingClient(URL url, HttpClientConfiguration configuration) {
+    public StreamingHttpClient createStreamingClient(@Nullable URL url, HttpClientConfiguration configuration) {
         return createNettyClient(url, configuration);
     }
 
     @Override
-    public WebSocketClient createWebSocketClient(URI uri) {
+    public WebSocketClient createWebSocketClient(@Nullable URI uri) {
         return createNettyClient(uri);
     }
 
     @Override
-    public WebSocketClient createWebSocketClient(URI uri, HttpClientConfiguration configuration) {
+    public WebSocketClient createWebSocketClient(@Nullable URI uri, HttpClientConfiguration configuration) {
         return createNettyClient(uri, configuration);
     }
 
@@ -110,7 +110,7 @@ public class NettyHttpClientFactory implements
         return createNettyClient(url, configuration);
     }
 
-    private DefaultHttpClient createNettyClient(URL url) {
+    private DefaultHttpClient createNettyClient(@Nullable URL url) {
         try {
             return createNettyClient(url != null ? url.toURI() : null);
         } catch (URISyntaxException e) {
@@ -118,7 +118,7 @@ public class NettyHttpClientFactory implements
         }
     }
 
-    private DefaultHttpClient createNettyClient(URL url, HttpClientConfiguration configuration) {
+    private DefaultHttpClient createNettyClient(@Nullable URL url, HttpClientConfiguration configuration) {
         try {
             return createNettyClient(url != null ? url.toURI() : null, configuration);
         } catch (URISyntaxException e) {
@@ -126,11 +126,11 @@ public class NettyHttpClientFactory implements
         }
     }
 
-    private DefaultHttpClient createNettyClient(URI uri) {
+    private DefaultHttpClient createNettyClient(@Nullable URI uri) {
         return DefaultHttpClient.builder().uri(uri).build();
     }
 
-    private DefaultHttpClient createNettyClient(URI uri, HttpClientConfiguration configuration) {
+    private DefaultHttpClient createNettyClient(@Nullable URI uri, HttpClientConfiguration configuration) {
         return DefaultHttpClient.builder().uri(uri).configuration(configuration).build();
     }
 }

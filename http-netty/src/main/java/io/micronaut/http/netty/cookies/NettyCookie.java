@@ -141,13 +141,13 @@ public class NettyCookie implements Cookie {
     }
 
     @Override
-    public Cookie domain(String domain) {
+    public Cookie domain(@Nullable String domain) {
         nettyCookie.setDomain(domain);
         return this;
     }
 
     @Override
-    public Cookie path(String path) {
+    public Cookie path(@Nullable String path) {
         nettyCookie.setPath(path);
         return this;
     }

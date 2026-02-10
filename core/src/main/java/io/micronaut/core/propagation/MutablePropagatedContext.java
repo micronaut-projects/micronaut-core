@@ -61,8 +61,7 @@ public interface MutablePropagatedContext {
      * @param newElement The context element to be replaced with
      * @return the current mutable propagated context.
      */
-    MutablePropagatedContext replace(PropagatedContextElement oldElement,
- PropagatedContextElement newElement);
+    MutablePropagatedContext replace(PropagatedContextElement oldElement, PropagatedContextElement newElement);
 
     /**
      * The mutated context.

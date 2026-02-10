@@ -19,6 +19,7 @@ import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.context.env.SystemPropertiesPropertySource;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.ResourceLoader;
+import org.jspecify.annotations.Nullable;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
@@ -81,6 +82,7 @@ public class EnvJsonPropertySourceLoader extends JsonPropertySourceLoader {
      * @return The JSON stored in the environment variables
      * {@code SPRING_APPLICATION_JSON} or {@code MICRONAUT_APPLICATION_JSON}.
      */
+    @Nullable
     protected String getEnvValue() {
         String v = CachedEnvironment.getenv(SPRING_APPLICATION_JSON);
         if (v == null) {

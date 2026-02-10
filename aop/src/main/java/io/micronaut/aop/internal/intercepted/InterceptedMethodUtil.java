@@ -111,7 +111,7 @@ public final class InterceptedMethodUtil {
      * @return True if it does
      */
     public static boolean hasAroundStereotype(@Nullable AnnotationMetadata annotationMetadata) {
-        return hasInterceptorBinding(annotationMetadata,
+        return hasInterceptorBinding(annotationMetadata == null ? AnnotationMetadata.EMPTY_METADATA : annotationMetadata,
             false,
             Around.class,
             InterceptorKind.AROUND);
@@ -124,7 +124,7 @@ public final class InterceptedMethodUtil {
      * @return True if it does
      */
     public static boolean hasIntroductionStereotype(@Nullable AnnotationMetadata annotationMetadata) {
-        return hasInterceptorBinding(annotationMetadata,
+        return hasInterceptorBinding(annotationMetadata == null ? AnnotationMetadata.EMPTY_METADATA : annotationMetadata,
             false,
             Introduction.class,
             InterceptorKind.INTRODUCTION);
@@ -137,7 +137,7 @@ public final class InterceptedMethodUtil {
      * @return True if it does
      */
     public static boolean hasDeclaredAroundAdvice(@Nullable AnnotationMetadata annotationMetadata) {
-        return hasInterceptorBinding(annotationMetadata,
+        return hasInterceptorBinding(annotationMetadata == null ? AnnotationMetadata.EMPTY_METADATA : annotationMetadata,
             true,
             Around.class,
             InterceptorKind.AROUND);

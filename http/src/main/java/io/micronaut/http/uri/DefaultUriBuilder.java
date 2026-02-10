@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -58,14 +59,14 @@ class DefaultUriBuilder implements UriBuilder {
         "^(" + STRING_PATTERN_SCHEME + ")?" + "(//(" + STRING_PATTERN_USER_INFO + "@)?" + STRING_PATTERN_HOST + "(:" + STRING_PATTERN_PORT +
             ")?" + ")?" + STRING_PATTERN_PATH + "(\\?" + STRING_PATTERN_QUERY + ")?" + "(#" + STRING_PATTERN_REMAINING + ")?");
 
-    private String authority;
+    private @Nullable String authority;
     private final MutableConvertibleMultiValues<String> queryParams;
-    private String scheme;
-    private String userInfo;
-    private String host;
+    private @Nullable String scheme;
+    private @Nullable String userInfo;
+    private @Nullable String host;
     private int port = -1;
     private StringBuilder path = new StringBuilder();
-    private String fragment;
+    private @Nullable String fragment;
 
     /**
      * Constructor to create from a URI.
@@ -286,7 +287,7 @@ class DefaultUriBuilder implements UriBuilder {
         return build().toString();
     }
 
-    private String reconstructAsString(Map<String, ? super Object> values) {
+    private String reconstructAsString(@Nullable Map<String, ? super Object> values) {
         var builder = new StringBuilder();
         String scheme = this.scheme;
         String host = this.host;
@@ -304,7 +305,7 @@ class DefaultUriBuilder implements UriBuilder {
         if (hasUserInfo || hasHost || hasPort) {
             builder.append("//");
             if (hasUserInfo) {
-                String userInfo = this.userInfo;
+                String userInfo = Objects.requireNonNull(this.userInfo);
                 if (userInfo.contains(":")) {
                     final String[] sa = userInfo.split(":");
                     userInfo = expandOrEncode(sa[0], values) + ":" + expandOrEncode(sa[1], values);
@@ -316,7 +317,7 @@ class DefaultUriBuilder implements UriBuilder {
             }
 
             if (hasHost) {
-                host = expandOrEncode(host, values);
+                host = expandOrEncode(Objects.requireNonNull(host), values);
                 builder.append(host);
             }
 
@@ -361,11 +362,12 @@ class DefaultUriBuilder implements UriBuilder {
         return builder.toString();
     }
 
-    private boolean isTemplate(String value, Map<String, ? super Object> values) {
+    private boolean isTemplate(String value, @Nullable Map<String, ? super Object> values) {
         return values != null && value.indexOf('{') > -1;
     }
 
-    private String buildQueryParams(Map<String, ? super Object> values) {
+    @Nullable
+    private String buildQueryParams(@Nullable Map<String, ? super Object> values) {
         if (!queryParams.isEmpty()) {
             var builder = new StringBuilder();
             final Iterator<Map.Entry<String, List<String>>> nameIterator = queryParams.iterator();
@@ -392,7 +394,7 @@ class DefaultUriBuilder implements UriBuilder {
         return null;
     }
 
-    private String expandOrEncode(String value, Map<String, ? super Object> values) {
+    private String expandOrEncode(String value, @Nullable Map<String, ? super Object> values) {
         if (isTemplate(value, values)) {
             value = UriTemplate.of(value).expand(values);
         } else {

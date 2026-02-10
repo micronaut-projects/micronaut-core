@@ -63,6 +63,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -336,7 +337,7 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
                                                              @Nullable String message) {
         if (message == null) {
             StringBuilder stringBuilder = new StringBuilder();
-            String ls = CachedEnvironment.getProperty("line.separator");
+            String ls = Objects.requireNonNullElse(CachedEnvironment.getProperty("line.separator"), System.lineSeparator());
             appendBeanMissingMessage("", stringBuilder, ls, resolutionContext, beanType, qualifier);
             message = stringBuilder.toString();
         }
@@ -400,7 +401,7 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
     }
 
     @Nullable
-    private <T> BeanDefinition<T> findAnyBeanDefinition(BeanResolutionContext resolutionContext, Argument<T> beanType) {
+    private <T> BeanDefinition<T> findAnyBeanDefinition(@Nullable BeanResolutionContext resolutionContext, Argument<T> beanType) {
         Collection<BeanDefinition<T>> existing = super.findBeanCandidates(resolutionContext, beanType, false, definition -> !definition.isAbstract());
         BeanDefinition<T> definition = null;
         if (existing.size() == 1) {
@@ -410,8 +411,9 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
     }
 
     private List<BeanDefinition<?>> calculateEachPropertyChain(
-        BeanResolutionContext resolutionContext,
-        BeanDefinition<?> definition) {
+         @Nullable BeanResolutionContext resolutionContext,
+         BeanDefinition<?> definition) {
+
         List<BeanDefinition<?>> chain = new ArrayList<>();
         while (definition != null) {
             chain.add(definition);
@@ -457,7 +459,7 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
             .append("]");
     }
 
-    private <T> String calculatePrefix(BeanResolutionContext resolutionContext, Qualifier<T> qualifier, BeanDefinition<?> definition) {
+    private <T> String calculatePrefix(@Nullable BeanResolutionContext resolutionContext, @Nullable Qualifier<T> qualifier, BeanDefinition<?> definition) {
         List<BeanDefinition<?>> chain = calculateEachPropertyChain(resolutionContext, definition);
         String prefix;
         if (chain.size() > 1) {
@@ -664,9 +666,10 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
     }
 
     private <T> void createAndAddDelegate(BeanResolutionContext resolutionContext, BeanDefinition<T> candidate, Set<BeanDefinition<T>> transformedCandidates, ConfigurationPath path) {
+        Qualifier<T> q = (Qualifier<T>) Objects.requireNonNullElse(path.beanQualifier(), PrimaryQualifier.INSTANCE);
         BeanDefinitionDelegate<T> delegate = BeanDefinitionDelegate.create(
             candidate,
-            path.beanQualifier(),
+            q,
             path
         );
         if (delegate.isEnabled(this, resolutionContext)) {
@@ -675,7 +678,7 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
     }
 
     @Override
-    protected <T> BeanDefinition<T> findConcreteCandidate(Class<T> beanType, Qualifier<T> qualifier, Collection<BeanDefinition<T>> candidates) {
+    protected <T> BeanDefinition<T> findConcreteCandidate(Class<T> beanType, @Nullable Qualifier<T> qualifier, Collection<BeanDefinition<T>> candidates) {
         if (!(qualifier instanceof Named)) {
             return super.findConcreteCandidate(beanType, qualifier, candidates);
         }
@@ -743,7 +746,7 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
 
         private final ApplicationContextConfiguration bootstrapConfiguration;
         private final ApplicationContext parentContext;
-        private ApplicationContext bootstrapContext;
+        private @Nullable ApplicationContext bootstrapContext;
 
         private BootstrapPropertySourcesLocator(ApplicationContextConfiguration bootstrapConfiguration, ApplicationContext parentContext) {
             this.bootstrapConfiguration = bootstrapConfiguration;
@@ -816,6 +819,7 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
         }
 
         @Override
+        @Nullable
         public Object get(String key) {
             return delegate.get(key);
         }

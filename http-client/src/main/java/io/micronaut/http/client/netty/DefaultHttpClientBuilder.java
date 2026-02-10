@@ -65,20 +65,29 @@ public final class DefaultHttpClientBuilder {
     LoadBalancer loadBalancer = null;
     @Nullable
     HttpVersionSelection explicitHttpVersion = null;
+    @Nullable
     HttpClientConfiguration configuration;
     @Nullable
     String contextPath = null;
     AnnotationMetadataResolver annotationMetadataResolver = AnnotationMetadataResolver.DEFAULT;
+    @Nullable
     HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver;
+    @Nullable
     List<HttpFilterResolver.FilterEntry> clientFilterEntries = null;
     @Nullable
     ThreadFactory threadFactory;
+    @Nullable
     ClientSslBuilder nettyClientSslBuilder;
+    @Nullable
     NettyClientSslFactory sslFactory;
+    @Nullable
     BeanProvider<CertificateProvider> certificateProviders;
+    @Nullable
     MediaTypeCodecRegistry codecRegistry;
+    @Nullable
     MessageBodyHandlerRegistry handlerRegistry;
     WebSocketBeanRegistry webSocketBeanRegistry = WebSocketBeanRegistry.EMPTY;
+    @Nullable
     RequestBinderRegistry requestBinderRegistry;
     @Nullable
     EventLoopGroup eventLoopGroup = null;

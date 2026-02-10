@@ -18,6 +18,7 @@ package io.micronaut.module.info.runtime;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.module.info.MavenCoordinates;
 import io.micronaut.module.info.MicronautModuleInfo;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.List;
@@ -32,11 +33,12 @@ import java.util.Set;
 @Experimental
 public final class MicronautRuntimeModule {
     private final MicronautModuleInfo info;
+    @Nullable
     private final MicronautRuntimeModule parent;
     private final List<MicronautRuntimeModule> children;
 
     public MicronautRuntimeModule(MicronautModuleInfo info,
-                                  MicronautRuntimeModule parent,
+                                  @Nullable MicronautRuntimeModule parent,
                                   List<MicronautRuntimeModule> children) {
         this.info = info;
         this.parent = parent;

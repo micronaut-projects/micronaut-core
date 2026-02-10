@@ -18,6 +18,7 @@ package io.micronaut.context;
 import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,9 +51,9 @@ public enum BeanResolutionTraceMode {
     private static final String CLASSES_SYS_PROP = "micronaut.inject.trace";
     private static final String CLASSES_ENV_VAR = "MICRONAUT_INJECT_TRACE";
 
-    private final BeanResolutionTracer resolutionTracer;
+    private final @Nullable BeanResolutionTracer resolutionTracer;
 
-    BeanResolutionTraceMode(BeanResolutionTracer resolutionTracer) {
+    BeanResolutionTraceMode(@Nullable BeanResolutionTracer resolutionTracer) {
         this.resolutionTracer = resolutionTracer;
     }
 

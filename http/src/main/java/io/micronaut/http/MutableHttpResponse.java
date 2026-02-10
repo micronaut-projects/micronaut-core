@@ -73,7 +73,7 @@ public interface MutableHttpResponse<B> extends HttpResponse<B>, MutableHttpMess
      * @param message The message
      * @return This response object
      */
-    default MutableHttpResponse<B> status(HttpStatus status, CharSequence message) {
+    default MutableHttpResponse<B> status(HttpStatus status, @Nullable CharSequence message) {
         if (message == null) {
             message = status.getReason();
         }
@@ -178,7 +178,7 @@ public interface MutableHttpResponse<B> extends HttpResponse<B>, MutableHttpMess
      * @param message The message
      * @return This response object
      */
-    MutableHttpResponse<B> status(int status, CharSequence message);
+    MutableHttpResponse<B> status(int status, @Nullable CharSequence message);
 
     /**
      * Sets the response status.

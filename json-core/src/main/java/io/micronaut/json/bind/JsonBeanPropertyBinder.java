@@ -29,6 +29,7 @@ import io.micronaut.json.JsonConfiguration;
 import io.micronaut.json.JsonMapper;
 import io.micronaut.json.tree.JsonNode;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -36,6 +37,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
@@ -70,7 +72,7 @@ final class JsonBeanPropertyBinder implements BeanPropertyBinder {
         try {
             JsonNode objectNode = buildSourceObjectNode(source.entrySet());
             Object result = jsonMapper.readValueFromTree(objectNode, context.getArgument());
-            return () -> Optional.of(result);
+            return () -> Optional.ofNullable(result);
         } catch (Exception e) {
             context.reject(e);
             return new BindingResult<>() {
@@ -96,7 +98,7 @@ final class JsonBeanPropertyBinder implements BeanPropertyBinder {
     public <T2> T2 bind(Class<T2> type, Set<? extends Map.Entry<? extends CharSequence, Object>> source) throws ConversionErrorException {
         try {
             JsonNode objectNode = buildSourceObjectNode(source);
-            return jsonMapper.readValueFromTree(objectNode, type);
+            return Objects.requireNonNull(jsonMapper.readValueFromTree(objectNode, type));
         } catch (Exception e) {
             throw newConversionError(null, e);
         }
@@ -129,7 +131,7 @@ final class JsonBeanPropertyBinder implements BeanPropertyBinder {
      * @param e The exception object
      * @return The new conversion error
      */
-    private ConversionErrorException newConversionError(Object object, Exception e) {
+    private ConversionErrorException newConversionError(@Nullable Object object, Exception e) {
         for (JsonBeanPropertyBinderExceptionHandler exceptionHandler : exceptionHandlers) {
             Optional<ConversionErrorException> handled = exceptionHandler.toConversionError(object, e);
             if (handled.isPresent()) {

@@ -73,11 +73,12 @@ public class HealthResultFilter {
         Object body = response.body();
         if (body instanceof HealthResult healthResult) {
             HealthStatus status = healthResult.getStatus();
-
-            HttpStatus httpStatus = healthEndpoint
-                .getStatusConfiguration()
-                .getHttpMapping()
-                .get(status.getName());
+            HttpStatus httpStatus = null;
+            HealthEndpoint.StatusConfiguration statusConfiguration = healthEndpoint
+                .getStatusConfiguration();
+            if (statusConfiguration != null) {
+                httpStatus = statusConfiguration.getHttpMapping().get(status.getName());
+            }
             if (httpStatus != null) {
                 response.status(httpStatus);
             } else {

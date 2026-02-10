@@ -66,7 +66,7 @@ public final class DefaultErrorRouteInfo<T, R> extends DefaultRequestMatcher<T, 
     }
 
     @Override
-    public Class<?> originatingType() {
+    public @Nullable Class<?> originatingType() {
         return originatingType;
     }
 
@@ -76,7 +76,7 @@ public final class DefaultErrorRouteInfo<T, R> extends DefaultRequestMatcher<T, 
     }
 
     @Override
-    public Optional<RouteMatch<R>> match(Class<?> originatingClass, Throwable exception) {
+    public Optional<RouteMatch<R>> match(@Nullable Class<?> originatingClass, Throwable exception) {
         if (originatingClass == originatingType && exceptionType.isInstance(exception)) {
             return Optional.of(new ErrorRouteMatch<>(exception, this, conversionService));
         }
@@ -92,7 +92,7 @@ public final class DefaultErrorRouteInfo<T, R> extends DefaultRequestMatcher<T, 
     }
 
     @Override
-    public HttpStatus findStatus(HttpStatus defaultStatus) {
+    public HttpStatus findStatus(@Nullable HttpStatus defaultStatus) {
         return super.findStatus(defaultStatus == null ? HttpStatus.INTERNAL_SERVER_ERROR : defaultStatus);
     }
 

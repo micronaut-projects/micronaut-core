@@ -105,7 +105,7 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
         boolean hasDependents = CollectionUtils.isNotEmpty(dependents);
         if (beanDefinition instanceof DisposableBeanDefinition || bean instanceof LifeCycle || hasDependents) {
             return hasDependents ?
-                new BeanDisposingRegistration<>(beanContext, identifier, beanDefinition, bean, dependents) :
+                new BeanDisposingRegistration<>(beanContext, identifier, beanDefinition, bean, Objects.requireNonNull(dependents)) :
                 new BeanDisposingRegistration<>(beanContext, identifier, beanDefinition, bean);
         }
         return new BeanRegistration<>(identifier, beanDefinition, bean);
@@ -181,7 +181,7 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
     }
 
     @Override
-    public boolean isEnabled(BeanContext context, BeanResolutionContext resolutionContext) {
+    public boolean isEnabled(BeanContext context, @Nullable BeanResolutionContext resolutionContext) {
         return definition().isEnabled(context, resolutionContext);
     }
 

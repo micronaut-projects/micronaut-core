@@ -104,7 +104,7 @@ public class MixinVisitorProcessor extends AbstractInjectAnnotationProcessor {
                     if (originatingElement == null) {
                         originatingElement = mixin.getNativeType();
                     }
-                    error(originatingElement.element(), e.getMessage());
+                    error(originatingElement.element(), Objects.requireNonNullElse(e.getMessage(), "Error"));
                 } catch (PostponeToNextRoundException e) {
                     postponedTypes.put(mixin.getCanonicalName(), e.getNativeErrorElement());
                 } catch (ElementPostponedToNextRoundException e) {

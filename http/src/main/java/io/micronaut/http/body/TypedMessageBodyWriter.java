@@ -18,6 +18,7 @@ package io.micronaut.http.body;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A body writer {@link MessageBodyWriter} with a type argument.
@@ -35,7 +36,7 @@ public interface TypedMessageBodyWriter<T> extends MessageBodyWriter<T> {
     Argument<T> getType();
 
     @Override
-    default boolean isWriteable(Argument<T> type, MediaType mediaType) {
+    default boolean isWriteable(Argument<T> type, @Nullable MediaType mediaType) {
         return getType().isAssignableFrom(type);
     }
 }

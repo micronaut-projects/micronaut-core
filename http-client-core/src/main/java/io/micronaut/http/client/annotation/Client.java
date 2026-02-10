@@ -18,7 +18,6 @@ package io.micronaut.http.client.annotation;
 import io.micronaut.aop.Introduction;
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
@@ -77,7 +76,6 @@ public @interface Client {
      * @see Produces
      */
     @Experimental
-    @NonNull
     DefinitionType definitionType() default DefinitionType.CLIENT;
 
     /**
@@ -117,7 +115,7 @@ public @interface Client {
      * @return The plaintext connection mode.
      * @since 4.0.0
      */
-    HttpVersionSelection.@NonNull PlaintextMode plaintextMode() default HttpVersionSelection.PlaintextMode.HTTP_1;
+    HttpVersionSelection.PlaintextMode plaintextMode() default HttpVersionSelection.PlaintextMode.HTTP_1;
 
     /**
      * The protocols to support for TLS ALPN. If HTTP 2 is included, this will also restrict the
@@ -128,7 +126,7 @@ public @interface Client {
      * @return The supported ALPN protocols.
      * @since 4.0.0
      */
-    String @NonNull [] alpnModes() default {
+    String[] alpnModes() default {
         HttpVersionSelection.ALPN_HTTP_2,
         HttpVersionSelection.ALPN_HTTP_1
     };

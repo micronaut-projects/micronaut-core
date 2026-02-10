@@ -18,12 +18,11 @@ package io.micronaut.context;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.env.PropertySourcesLocator;
-import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.BeanConfiguration;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.util.Map;
@@ -38,7 +37,6 @@ import java.util.Set;
  * @see ApplicationContextConfigurer
  * @see ApplicationContext#builder()
  */
-@NullMarked
 public interface ApplicationContextBuilder {
 
     /**
@@ -136,7 +134,7 @@ public interface ApplicationContextBuilder {
      * @param beans The beans
      * @return This builder
      */
-    ApplicationContextBuilder singletons(@Nullable Object... beans);
+    ApplicationContextBuilder singletons(Object @Nullable ... beans);
 
     /**
      * Register additional runtime bean definitions prior to startup.
@@ -199,7 +197,7 @@ public interface ApplicationContextBuilder {
      * @param environments The environments
      * @return This builder
      */
-    ApplicationContextBuilder environments(@Nullable String... environments);
+    ApplicationContextBuilder environments(String @Nullable ... environments);
 
     /**
      * The environments to use if no other environments are specified.
@@ -207,7 +205,7 @@ public interface ApplicationContextBuilder {
      * @param environments The environments
      * @return This builder
      */
-    ApplicationContextBuilder defaultEnvironments(@Nullable String... environments);
+    ApplicationContextBuilder defaultEnvironments(String @Nullable ... environments);
 
     /**
      * The packages to include for package scanning.
@@ -215,7 +213,7 @@ public interface ApplicationContextBuilder {
      * @param packages The packages
      * @return This builder
      */
-    ApplicationContextBuilder packages(@Nullable String... packages);
+    ApplicationContextBuilder packages(String @Nullable ... packages);
 
     /**
      * Properties to override from the environment.
@@ -231,7 +229,7 @@ public interface ApplicationContextBuilder {
      * @param propertySources The property sources to include
      * @return This builder
      */
-    ApplicationContextBuilder propertySources(@Nullable PropertySource... propertySources);
+    ApplicationContextBuilder propertySources(PropertySource @Nullable ... propertySources);
 
     /**
      * Set whether environment variables should contribute to configuration.
@@ -247,7 +245,7 @@ public interface ApplicationContextBuilder {
      * @param environmentVariables The environment variables
      * @return This builder
      */
-    ApplicationContextBuilder environmentVariableIncludes(@Nullable String... environmentVariables);
+    ApplicationContextBuilder environmentVariableIncludes(String @Nullable ... environmentVariables);
 
     /**
      * Which environment variables should not contribute to configuration.
@@ -255,7 +253,7 @@ public interface ApplicationContextBuilder {
      * @param environmentVariables The environment variables
      * @return This builder
      */
-    ApplicationContextBuilder environmentVariableExcludes(@Nullable String... environmentVariables);
+    ApplicationContextBuilder environmentVariableExcludes(String @Nullable ... environmentVariables);
 
     /**
      * The main class used by this application.
@@ -286,7 +284,7 @@ public interface ApplicationContextBuilder {
      * @param configurations The configurations to include
      * @return This application
      */
-    ApplicationContextBuilder include(@Nullable String... configurations);
+    ApplicationContextBuilder include(String @Nullable ... configurations);
 
     /**
      * Allow customizing the configurations that will be loaded.
@@ -294,7 +292,7 @@ public interface ApplicationContextBuilder {
      * @param configurations The configurations to exclude
      * @return This application
      */
-    ApplicationContextBuilder exclude(@Nullable String... configurations);
+    ApplicationContextBuilder exclude(String @Nullable ... configurations);
 
     /**
      * Whether the banner is enabled or not.
@@ -319,7 +317,7 @@ public interface ApplicationContextBuilder {
      * @param args The arguments
      * @return This application
      */
-    default ApplicationContextBuilder args(@Nullable String... args) {
+    default ApplicationContextBuilder args(String @Nullable ... args) {
         return this;
     }
 

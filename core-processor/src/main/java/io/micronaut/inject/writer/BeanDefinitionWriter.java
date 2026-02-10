@@ -153,6 +153,7 @@ import io.micronaut.sourcegen.model.StatementDef;
 import io.micronaut.sourcegen.model.TypeDef;
 import io.micronaut.sourcegen.model.VariableDef;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.NullUnmarked;
 import org.jspecify.annotations.Nullable;
 
 import javax.lang.model.element.Modifier;
@@ -213,6 +214,7 @@ import static io.micronaut.inject.visitor.BeanElementVisitor.VISITORS;
  * @see BeanDefinition
  * @since 1.0
  */
+@NullUnmarked
 @Internal
 public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefinitionVisitor, BeanElement, Toggleable {
     @NextMajorVersion("Inline as true")
@@ -1258,9 +1260,8 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
 
         if (buildMethodDefinition.postConstruct != null) {
             //  for "super bean definition" we only add code to trigger "initialize"
-            if (!superBeanDefinition || buildMethodDefinition.postConstruct.intercepted) {
-                classDefBuilder.addSuperinterface(TypeDef.of(InitializingBeanDefinition.class));
-
+            classDefBuilder.addSuperinterface(TypeDef.of(InitializingBeanDefinition.class));
+            if (buildMethodDefinition.postConstruct.intercepted) {
                 // Create a new method that will be invoked by the intercepted chain
                 MethodDef targetInitializeMethod = buildInitializeMethod(buildMethodDefinition.postConstruct, MethodDef.builder("initialize$intercepted")
                     .addModifiers(Modifier.PUBLIC)
@@ -1277,6 +1278,11 @@ public final class BeanDefinitionWriter implements ClassOutputWriter, BeanDefini
                         ClassTypeDef executableMethodInterceptor = createExecutableMethodInterceptor(targetInitializeMethod, "InitializeInterceptor");
                         return interceptAndReturn(aThis, methodParameters, executableMethodInterceptor, INITIALIZE_INTERCEPTOR_METHOD);
                     })
+                );
+            } else if (!superBeanDefinition) {
+                //  for "super bean definition" we only add code to trigger "initialize"
+                classDefBuilder.addMethod(
+                    buildInitializeMethod(buildMethodDefinition.postConstruct, MethodDef.override(METHOD_INITIALIZE))
                 );
             }
         }

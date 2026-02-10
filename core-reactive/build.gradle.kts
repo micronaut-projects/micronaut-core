@@ -10,6 +10,7 @@ dependencies {
 
     compileOnly(libs.managed.reactor)
     compileOnly(libs.managed.kotlinx.coroutines.core)
+    compileOnly(libs.managed.jspecify)
 
     testImplementation(libs.managed.reactor)
 }

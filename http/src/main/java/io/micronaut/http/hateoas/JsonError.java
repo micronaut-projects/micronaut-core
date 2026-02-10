@@ -42,8 +42,8 @@ public class JsonError extends AbstractResource<JsonError> {
     public static final Argument<JsonError> TYPE = Argument.of(JsonError.class);
 
     private String message;
-    private String logref;
-    private String path;
+    private @Nullable String logref;
+    private @Nullable String path;
 
     /**
      * @param message The message
@@ -57,6 +57,7 @@ public class JsonError extends AbstractResource<JsonError> {
      */
     @Internal
     JsonError() {
+        this.message = "";
     }
 
     /**

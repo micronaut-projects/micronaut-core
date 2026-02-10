@@ -146,6 +146,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         this.requestHandler = requestHandler;
     }
 
+    private ChannelHandlerContext requiredCtx() {
+        return Objects.requireNonNull(ctx, "ctx");
+    }
+
     public void setCompressionStrategy(HttpCompressionStrategy compressionStrategy) {
         if (compressionStrategy.isEnabled()) {
             this.compressor = new Compressor(compressionStrategy);
@@ -209,7 +213,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         // has no response yet. If there is, apply backpressure.
         if (!readCalled && outboundQueue.size() <= 1 && inboundHandler.needMore()) {
             readCalled = true;
-            ctx.read();
+            requiredCtx().read();
         }
     }
 
@@ -287,24 +291,24 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     private ChannelFuture write(Object message, boolean flush, boolean close, boolean needsPromise) {
         assert ctx != null;
         if (close) {
-            return ctx.writeAndFlush(message)
+            return requiredCtx().writeAndFlush(message)
                 .addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE)
                 .addListener(ChannelFutureListener.CLOSE);
         } else {
             ChannelPromise promise = needsPromise ?
-                ctx.newPromise().addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE) :
-                ctx.voidPromise();
+                requiredCtx().newPromise().addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE) :
+                requiredCtx().voidPromise();
             if (flush) {
                 // delay flush until readComplete if possible
                 if (reading) {
-                    ctx.write(message, promise);
+                    requiredCtx().write(message, promise);
                     flushPending = true;
                     return promise;
                 } else {
-                    return ctx.writeAndFlush(message, promise);
+                    return requiredCtx().writeAndFlush(message, promise);
                 }
             } else {
-                return ctx.write(message, promise);
+                return requiredCtx().write(message, promise);
             }
         }
     }
@@ -320,7 +324,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
         writing = true;
         try {
-            while (ctx.channel().isWritable()) {
+            while (requiredCtx().channel().isWritable()) {
                 // if we have no outboundHandler, check whether the first queued response is ready
                 if (outboundHandler == null) {
                     OutboundAccessImpl next = outboundQueue.peek();
@@ -353,13 +357,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     @Override
     public CompletionStage<?> shutdownGracefully() {
         assert ctx != null;
-        if (ctx.executor().inEventLoop()) {
+        if (requiredCtx().executor().inEventLoop()) {
             shutdownGracefully0();
         } else {
-            ctx.executor().execute(this::shutdownGracefully0);
+            requiredCtx().executor().execute(this::shutdownGracefully0);
         }
 
-        return NettyHttpServer.toCompletionStage(ctx.channel().closeFuture());
+        return NettyHttpServer.toCompletionStage(requiredCtx().channel().closeFuture());
     }
 
     private void shutdownGracefully0() {
@@ -371,7 +375,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          */
         shuttingDown = true;
         if (inboundHandler == baseInboundHandler && outboundHandler == null && outboundQueue.isEmpty()) {
-            ctx.close();
+            requiredCtx().close();
         } else {
             OutboundAccessImpl lastResponse = outboundQueue.peekLast();
             if (lastResponse != null) {
@@ -382,7 +386,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
     private NettyByteBodyFactory byteBodyFactory() {
         assert ctx != null;
-        return new NettyByteBodyFactory(ctx.channel());
+        return new NettyByteBodyFactory(requiredCtx().channel());
     }
 
     /**
@@ -437,18 +441,18 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                     decompressionChannel = null;
                 } else if (HttpHeaderValues.GZIP.contentEqualsIgnoreCase(contentEncoding) ||
                     HttpHeaderValues.X_GZIP.contentEqualsIgnoreCase(contentEncoding)) {
-                    decompressionChannel = new EmbeddedChannel(ctx.channel().id(), ctx.channel().metadata().hasDisconnect(),
-                        ctx.channel().config(), ZlibCodecFactory.newZlibDecoder(ZlibWrapper.GZIP));
+                    decompressionChannel = new EmbeddedChannel(requiredCtx().channel().id(), requiredCtx().channel().metadata().hasDisconnect(),
+                        requiredCtx().channel().config(), ZlibCodecFactory.newZlibDecoder(ZlibWrapper.GZIP));
                 } else if (HttpHeaderValues.DEFLATE.contentEqualsIgnoreCase(contentEncoding) ||
                     HttpHeaderValues.X_DEFLATE.contentEqualsIgnoreCase(contentEncoding)) {
-                    decompressionChannel = new EmbeddedChannel(ctx.channel().id(), ctx.channel().metadata().hasDisconnect(),
-                        ctx.channel().config(), ZlibCodecFactory.newZlibDecoder(ZlibWrapper.ZLIB_OR_NONE));
+                    decompressionChannel = new EmbeddedChannel(requiredCtx().channel().id(), requiredCtx().channel().metadata().hasDisconnect(),
+                        requiredCtx().channel().config(), ZlibCodecFactory.newZlibDecoder(ZlibWrapper.ZLIB_OR_NONE));
                 } else if (Brotli.isAvailable() && HttpHeaderValues.BR.contentEqualsIgnoreCase(contentEncoding)) {
-                    decompressionChannel = new EmbeddedChannel(ctx.channel().id(), ctx.channel().metadata().hasDisconnect(),
-                        ctx.channel().config(), new BrotliDecoder());
+                    decompressionChannel = new EmbeddedChannel(requiredCtx().channel().id(), requiredCtx().channel().metadata().hasDisconnect(),
+                        requiredCtx().channel().config(), new BrotliDecoder());
                 } else if (HttpHeaderValues.SNAPPY.contentEqualsIgnoreCase(contentEncoding)) {
-                    decompressionChannel = new EmbeddedChannel(ctx.channel().id(), ctx.channel().metadata().hasDisconnect(),
-                        ctx.channel().config(), new SnappyFrameDecoder());
+                    decompressionChannel = new EmbeddedChannel(requiredCtx().channel().id(), requiredCtx().channel().metadata().hasDisconnect(),
+                        requiredCtx().channel().config(), new SnappyFrameDecoder());
                 } else {
                     decompressionChannel = null;
                 }
@@ -464,7 +468,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             // getClass for performance
             boolean full = request.getClass() != DefaultHttpRequest.class && request instanceof FullHttpRequest;
             if (full && decompressionChannel == null) {
-                requestHandler.accept(ctx, request, byteBodyFactory().createChecked(bodySizeLimits, ((FullHttpRequest) request).content()), outboundAccess);
+                requestHandler.accept(requiredCtx(), request, byteBodyFactory().createChecked(bodySizeLimits, ((FullHttpRequest) request).content()), outboundAccess);
             } else if (!hasBody(request)) {
                 inboundHandler = droppingInboundHandler;
                 if (full) {
@@ -473,7 +477,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 if (decompressionChannel != null) {
                     decompressionChannel.finish();
                 }
-                requestHandler.accept(ctx, request, NettyByteBodyFactory.empty(), outboundAccess);
+                requestHandler.accept(requiredCtx(), request, NettyByteBodyFactory.empty(), outboundAccess);
             } else {
                 optimisticBufferingInboundHandler.init(request, outboundAccess);
                 if (decompressionChannel == null) {
@@ -550,7 +554,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 } else if (buffer.size() == 1) {
                     fullBody = buffer.getFirst().content();
                 } else {
-                    CompositeByteBuf composite = ctx.alloc().compositeBuffer();
+                    CompositeByteBuf composite = requiredCtx().alloc().compositeBuffer();
                     for (HttpContent c : buffer) {
                         composite.addComponent(true, c.content());
                     }
@@ -564,7 +568,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 assert ctx != null;
                 assert request != null;
                 assert outboundAccess != null;
-                requestHandler.accept(ctx, request, byteBodyFactory().createChecked(bodySizeLimits, fullBody), outboundAccess);
+                requestHandler.accept(requiredCtx(), Objects.requireNonNull(request), byteBodyFactory().createChecked(bodySizeLimits, fullBody), Objects.requireNonNull(outboundAccess));
 
                 inboundHandler = baseInboundHandler;
             }
@@ -590,7 +594,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
             assert outboundAccess != null;
             assert request != null;
-            StreamingInboundHandler streamingInboundHandler = new StreamingInboundHandler(outboundAccess, HttpUtil.is100ContinueExpected(request));
+            StreamingInboundHandler streamingInboundHandler = new StreamingInboundHandler(Objects.requireNonNull(outboundAccess), HttpUtil.is100ContinueExpected(request));
             streamingInboundHandler.dest.setExpectedLengthFrom(request.headers());
             for (HttpContent content : buffer) {
                 streamingInboundHandler.read(content);
@@ -664,7 +668,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         @Override
         public void start() {
             assert ctx != null;
-            EventLoop eventLoop = ctx.channel().eventLoop();
+            EventLoop eventLoop = requiredCtx().channel().eventLoop();
             if (!eventLoop.inEventLoop()) {
                 eventLoop.execute(this::start);
                 return;
@@ -679,7 +683,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         @Override
         public void onBytesConsumed(long bytesConsumed) {
             assert ctx != null;
-            EventLoop eventLoop = ctx.channel().eventLoop();
+            EventLoop eventLoop = requiredCtx().channel().eventLoop();
             if (!eventLoop.inEventLoop()) {
                 eventLoop.execute(() -> onBytesConsumed(bytesConsumed));
                 return;
@@ -696,7 +700,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         public void allowDiscard() {
-            EventLoop eventLoop = ctx.channel().eventLoop();
+            EventLoop eventLoop = requiredCtx().channel().eventLoop();
             if (!eventLoop.inEventLoop()) {
                 eventLoop.execute(this::allowDiscard);
                 return;
@@ -716,7 +720,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         public void disregardBackpressure() {
-            EventLoop eventLoop = ctx.channel().eventLoop();
+            EventLoop eventLoop = requiredCtx().channel().eventLoop();
             if (!eventLoop.inEventLoop()) {
                 eventLoop.execute(this::disregardBackpressure);
                 return;
@@ -931,7 +935,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 throw new IllegalStateException("Only one response per request");
             }
 
-            EventLoop eventLoop = ctx.channel().eventLoop();
+            EventLoop eventLoop = requiredCtx().channel().eventLoop();
             if (!eventLoop.inEventLoop()) {
                 eventLoop.execute(() -> write(handler));
                 return;
@@ -1015,7 +1019,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 return;
             }
             assert ctx != null;
-            Compressor.Session compressionSession = compressor.prepare(ctx, request, response, contentLength);
+            Compressor.Session compressionSession = compressor.prepare(requiredCtx(), request, response, contentLength);
             if (compressionSession != null) {
                 // if content-length and transfer-encoding are unset, we will close anyway.
                 // if this is a full response, there's special handling below in OutboundHandler
@@ -1034,7 +1038,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          */
         final OutboundAccessImpl outboundAccess;
 
-        Compressor.@Nullable Session compressionSession;
+        Compressor. @Nullable Session compressionSession;
 
         private OutboundHandler(OutboundAccessImpl outboundAccess) {
             this.outboundAccess = outboundAccess;
@@ -1049,7 +1053,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 writePotentialEnd(content, flush, shouldCloseAfterContent(last));
             } else {
                 // slow path
-                writeCompressing0(content, flush, last);
+                writeCompressing0(compressionSession, content, flush, last);
             }
         }
 
@@ -1059,11 +1063,12 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             ChannelFuture future = write(content, flush, close, record);
             if (record) {
                 future.addListener((ChannelFutureListener) f -> {
-                    outboundAccess.jfrEvent.end();
-                    if (outboundAccess.jfrEvent.shouldCommit()) {
-                        outboundAccess.jfrEvent.populateChannel(ctx.channel());
-                        outboundAccess.jfrEvent.populateRequest(outboundAccess.request);
-                        outboundAccess.jfrEvent.commit();
+                    Http1RequestEvent jfrEvent = Objects.requireNonNull(outboundAccess.jfrEvent);
+                    jfrEvent.end();
+                    if (jfrEvent.shouldCommit()) {
+                        jfrEvent.populateChannel(requiredCtx().channel());
+                        jfrEvent.populateRequest(outboundAccess.request);
+                        jfrEvent.commit();
                     }
                 });
             }
@@ -1191,18 +1196,17 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      * Handler that writes a {@link StreamedHttpResponse}.
      */
     private final class StreamingOutboundHandler extends OutboundHandler implements BufferConsumer {
-        private final EventLoopFlow flow = new EventLoopFlow(ctx.channel().eventLoop());
+        private final EventLoopFlow flow = new EventLoopFlow(requiredCtx().channel().eventLoop());
         private final OutboundAccessImpl outboundAccess;
         @Nullable
         private HttpResponse initialMessage;
-        private BufferConsumer.@Nullable Upstream upstream;
+        private BufferConsumer. @Nullable Upstream upstream;
         private boolean earlyComplete = false;
         private boolean writtenLast = false;
         private long incompleteWrittenBytes = 0;
 
         StreamingOutboundHandler(OutboundAccessImpl outboundAccess, HttpResponse initialMessage) {
             super(outboundAccess);
-            assert initialMessage != null;
             if (initialMessage instanceof FullHttpResponse) {
                 throw new IllegalArgumentException("Cannot have a full response as the initial message of a streaming response");
             }
@@ -1216,7 +1220,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             if (initialMessage != null) {
                 write(initialMessage, false, false, false);
                 initialMessage = null;
-                upstream.start();
+                Objects.requireNonNull(upstream).start();
             }
             if (earlyComplete) {
                 // onComplete has been called before the first writeSome. Trigger onComplete
@@ -1226,7 +1230,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 long written = incompleteWrittenBytes;
                 if (written > 0) {
                     incompleteWrittenBytes = 0;
-                    upstream.onBytesConsumed(written);
+                    Objects.requireNonNull(upstream).onBytesConsumed(written);
                 }
             }
         }
@@ -1251,7 +1255,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 int n = buf.readable();
                 writeCompressing(new DefaultHttpContent(NettyReadBufferFactory.toByteBuf(buf)), true, false);
                 incompleteWrittenBytes += n;
-                if (ctx.channel().isWritable()) {
+                if (requiredCtx().channel().isWritable()) {
                     writeSome();
                 }
             } else {
@@ -1272,7 +1276,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 if (LOG.isWarnEnabled()) {
                     LOG.warn("Reactive response received an error after some data has already been written. This error cannot be forwarded to the client.", t);
                 }
-                ctx.close();
+                requiredCtx().close();
 
                 requestHandler.responseWritten(outboundAccess.attachment);
             }
@@ -1322,4 +1326,5 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             outboundHandler = null;
         }
     }
+
 }

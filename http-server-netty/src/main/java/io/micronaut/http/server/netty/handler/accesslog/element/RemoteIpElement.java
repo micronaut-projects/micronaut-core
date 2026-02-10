@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.handler.accesslog.element;
 import io.micronaut.http.HttpHeaders;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Locale;
 import java.util.Set;
@@ -83,6 +84,7 @@ final class RemoteIpElement implements LogElement {
         }
     }
 
+    @Nullable
     private static String processForwarded(String forwarded) {
         final int firstComma = forwarded.indexOf(',');
         final String firstForward = (firstComma >= 0 ? forwarded.substring(0, firstComma) : forwarded)

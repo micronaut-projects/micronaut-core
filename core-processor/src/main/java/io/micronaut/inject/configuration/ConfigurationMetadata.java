@@ -16,6 +16,7 @@
 package io.micronaut.inject.configuration;
 
 import io.micronaut.core.io.Writable;
+import org.jspecify.annotations.NullUnmarked;
 
 import java.io.IOException;
 import java.io.Writer;
@@ -26,6 +27,7 @@ import java.util.Set;
  *
  * @author Graeme Rocher
  */
+@NullUnmarked
 public class ConfigurationMetadata implements Writable {
 
     String type;

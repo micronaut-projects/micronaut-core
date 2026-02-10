@@ -57,7 +57,7 @@ final class RawHttpRequestWrapper<B> extends MutableHttpRequestWrapper<B> implem
     }
 
     @Override
-    public <T> MutableHttpRequest<T> body(T body) {
+    public <T> MutableHttpRequest<T> body(@Nullable T body) {
         throw new UnsupportedOperationException("Changing the body of raw requests is currently not supported");
     }
 

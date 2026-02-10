@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.server.exceptions.response;
 
-import org.jspecify.annotations.NonNull;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
@@ -43,8 +42,7 @@ public class HateoasErrorResponseProcessor implements ErrorResponseProcessor<Jso
     }
 
     @Override
-    @NonNull
-    public MutableHttpResponse<JsonError> processResponse(@NonNull ErrorContext errorContext, @NonNull MutableHttpResponse<?> response) {
+    public MutableHttpResponse<JsonError> processResponse(ErrorContext errorContext, MutableHttpResponse<?> response) {
         if (errorContext.getRequest().getMethod() == HttpMethod.HEAD) {
             return (MutableHttpResponse<JsonError>) response;
         }

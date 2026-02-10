@@ -32,6 +32,7 @@ import io.micronaut.inject.InjectionPoint;
 import io.micronaut.inject.InstantiatableBeanDefinition;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.qualifiers.Qualifiers;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,8 +62,10 @@ public final class ApplicationEventPublisherFactory<T>
 
     private static final Argument<Object> TYPE_VARIABLE = Argument.ofTypeVariable(Object.class, "T");
     private final AnnotationMetadata annotationMetadata;
+    @Nullable
     private ApplicationEventPublisher applicationObjectEventPublisher;
     private final Map<Argument, Supplier<ApplicationEventPublisher>> publishers = new ConcurrentHashMap<>();
+    @Nullable
     private Supplier<Executor> executorSupplier;
 
     public ApplicationEventPublisherFactory() {
@@ -107,8 +110,8 @@ public final class ApplicationEventPublisherFactory<T>
     }
 
     @Override
-    public boolean isCandidateBean(Argument<?> beanType) {
-        return beanType.isAssignableFrom(ApplicationEventPublisher.class);
+    public boolean isCandidateBean(@Nullable Argument<?> beanType) {
+        return beanType != null && beanType.isAssignableFrom(ApplicationEventPublisher.class);
     }
 
     @Override
@@ -127,7 +130,7 @@ public final class ApplicationEventPublisherFactory<T>
     }
 
     @Override
-    public boolean isEnabled(BeanContext context, BeanResolutionContext resolutionContext) {
+    public boolean isEnabled(BeanContext context, @Nullable BeanResolutionContext resolutionContext) {
         return true;
     }
 
@@ -181,11 +184,11 @@ public final class ApplicationEventPublisherFactory<T>
         }
         if (eventType.getType().equals(Object.class)) {
             if (applicationObjectEventPublisher == null) {
-                applicationObjectEventPublisher = createObjectEventPublisher(context);
+                applicationObjectEventPublisher = createObjectEventPublisher(context, executorSupplier);
             }
             return applicationObjectEventPublisher;
         }
-        return getTypedEventPublisher(eventType, context);
+        return getTypedEventPublisher(eventType, context, executorSupplier);
     }
 
     @Override
@@ -214,25 +217,25 @@ public final class ApplicationEventPublisherFactory<T>
         return getClass().hashCode();
     }
 
-    private ApplicationEventPublisher<Object> createObjectEventPublisher(BeanContext beanContext) {
+    private ApplicationEventPublisher<Object> createObjectEventPublisher(BeanContext beanContext, Supplier<Executor> executorSupplier) {
         return new ApplicationEventPublisher<>() {
             @Override
             public void publishEvent(Object event) {
-                getTypedEventPublisher(Argument.of(event.getClass()), beanContext).publishEvent(event);
+                getTypedEventPublisher(Argument.of(event.getClass()), beanContext, executorSupplier).publishEvent(event);
             }
 
             @Override
             public Future<Void> publishEventAsync(Object event) {
-                return getTypedEventPublisher(Argument.of(event.getClass()), beanContext).publishEventAsync(event);
+                return getTypedEventPublisher(Argument.of(event.getClass()), beanContext, executorSupplier).publishEventAsync(event);
             }
         };
     }
 
-    private ApplicationEventPublisher getTypedEventPublisher(Argument eventType, BeanContext beanContext) {
-        return publishers.computeIfAbsent(eventType, argument -> SupplierUtil.memoized(() -> createEventPublisher(argument, beanContext))).get();
+    private ApplicationEventPublisher getTypedEventPublisher(Argument eventType, BeanContext beanContext, Supplier<Executor> executorSupplier) {
+        return publishers.computeIfAbsent(eventType, argument -> SupplierUtil.memoized(() -> createEventPublisher(argument, beanContext, executorSupplier))).get();
     }
 
-    private ApplicationEventPublisher<Object> createEventPublisher(Argument<?> eventType, BeanContext beanContext) {
+    private ApplicationEventPublisher<Object> createEventPublisher(Argument<?> eventType, BeanContext beanContext, Supplier<Executor> executor) {
         return new ApplicationEventPublisher<>() {
 
             private final Supplier<ApplicationEventListener[]> lazyListeners = SupplierUtil.memoized(() -> beanContext.getBeansOfType(ApplicationEventListener.class, Qualifiers.byTypeArguments(eventType.getType()))
@@ -255,7 +258,7 @@ public final class ApplicationEventPublisherFactory<T>
                 Objects.requireNonNull(event, "Event cannot be null");
                 CompletableFuture<Void> future = new CompletableFuture<>();
                 ApplicationEventListener[] eventListeners = lazyListeners.get();
-                executorSupplier.get().execute(() -> {
+                executor.get().execute(() -> {
                     try {
                         notifyEventListeners(event, eventListeners);
                         future.complete(null);
@@ -273,8 +276,8 @@ public final class ApplicationEventPublisherFactory<T>
         };
     }
 
-    private void notifyEventListeners(Object event, ApplicationEventListener [] eventListeners) {
-        if (eventListeners.length == 0) {
+    private void notifyEventListeners(Object event, ApplicationEventListener @Nullable [] eventListeners) {
+        if (eventListeners == null || eventListeners.length == 0) {
             return;
         }
         if (EventLogger.LOG.isTraceEnabled()) {

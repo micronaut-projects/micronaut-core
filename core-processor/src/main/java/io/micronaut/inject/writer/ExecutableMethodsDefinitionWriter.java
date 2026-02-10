@@ -37,6 +37,7 @@ import io.micronaut.sourcegen.model.FieldDef;
 import io.micronaut.sourcegen.model.MethodDef;
 import io.micronaut.sourcegen.model.StatementDef;
 import io.micronaut.sourcegen.model.TypeDef;
+import org.jspecify.annotations.NullUnmarked;
 
 import javax.lang.model.element.Modifier;
 import java.io.IOException;
@@ -63,6 +64,7 @@ import java.util.stream.IntStream;
  * @author Denis Stepanov
  * @since 3.0
  */
+@NullUnmarked
 @Internal
 public class ExecutableMethodsDefinitionWriter implements ClassOutputWriter {
     public static final String CLASS_SUFFIX = "$Exec";

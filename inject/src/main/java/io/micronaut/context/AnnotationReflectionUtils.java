@@ -398,6 +398,7 @@ public final class AnnotationReflectionUtils {
         }
 
         @Override
+        @Nullable
         public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
             return null;
         }
@@ -430,6 +431,7 @@ public final class AnnotationReflectionUtils {
         }
 
         @Override
+        @Nullable
         public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
             return annotationSources.stream()
                 .map(s -> s.getAnnotation(annotationClass))

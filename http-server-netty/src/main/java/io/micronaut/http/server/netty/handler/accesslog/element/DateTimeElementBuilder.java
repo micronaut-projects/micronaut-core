@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.server.netty.handler.accesslog.element;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * Builder for DateTimeElement.
  *
@@ -24,7 +26,8 @@ package io.micronaut.http.server.netty.handler.accesslog.element;
 public final class DateTimeElementBuilder implements LogElementBuilder {
 
     @Override
-    public LogElement build(String token, String param) {
+    @Nullable
+    public LogElement build(String token, @Nullable String param) {
         if (DateTimeElement.DATE_TIME.equals(token)) {
             return new DateTimeElement(param);
         }

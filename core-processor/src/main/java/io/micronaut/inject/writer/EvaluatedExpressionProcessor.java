@@ -55,6 +55,7 @@ public final class EvaluatedExpressionProcessor {
     private final VisitorContext visitorContext;
     private final Element originatingElement;
 
+    @Nullable
     private List<EvaluatedExpressionWriter> writers;
 
     /**
@@ -142,8 +143,10 @@ public final class EvaluatedExpressionProcessor {
     }
 
     public void writeEvaluatedExpressions(ClassWriterOutputVisitor visitor) throws IOException {
-        for (EvaluatedExpressionWriter writer : writers) {
-            writer.accept(visitor);
+        if (writers != null) {
+            for (EvaluatedExpressionWriter writer : writers) {
+                writer.accept(visitor);
+            }
         }
         writers = null;
     }

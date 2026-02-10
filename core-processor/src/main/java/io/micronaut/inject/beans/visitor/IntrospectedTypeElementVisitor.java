@@ -39,6 +39,7 @@ import io.micronaut.inject.visitor.TypeElementQuery;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.ClassGenerationException;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.lang.annotation.Annotation;
@@ -48,6 +49,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -215,7 +217,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                 builderClass
             );
         } else if (element.hasDeclaredAnnotation(ANN_LOMBOK_BUILDER)) {
-            AnnotationValue<Annotation> lombokBuilder = element.getAnnotation(ANN_LOMBOK_BUILDER);
+            AnnotationValue<Annotation> lombokBuilder = Objects.requireNonNull(element.getDeclaredAnnotation(ANN_LOMBOK_BUILDER));
             String lombokBuilderAccessType = lombokBuilder.stringValue("access").orElse("");
             if ("PRIVATE".equals(lombokBuilderAccessType)) {
                 return;
@@ -246,7 +248,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
         }
     }
 
-    private void processBuilderDefinition(ClassElement element, VisitorContext context, AnnotationValue<Introspected> introspected, int index, String targetPackage, String builderMethod, String creatorMethod, String[] writePrefixes, AnnotationClassValue<?> builderClass) {
+    private void processBuilderDefinition(ClassElement element, VisitorContext context, AnnotationValue<Introspected> introspected, int index, String targetPackage, @Nullable String builderMethod, @Nullable String creatorMethod, String[] writePrefixes, @Nullable AnnotationClassValue<?> builderClass) {
         if (builderMethod != null) {
             MethodElement methodElement = element
                 .getEnclosedElement(ElementQuery.ALL_METHODS.onlyStatic()
@@ -356,12 +358,12 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     private void handleBuilder(
         ClassElement classToBuild,
         VisitorContext context,
-        String creatorMethod,
+        @Nullable String creatorMethod,
         String[] writePrefixes,
-        MethodElement primaryConstructor,
-        MethodElement defaultConstructor,
+        @Nullable MethodElement primaryConstructor,
+        @Nullable MethodElement defaultConstructor,
         ClassElement builderType,
-        AnnotationMetadata builderMetadata,
+        @Nullable AnnotationMetadata builderMetadata,
         int index, String targetPackage) {
         if (builderMetadata == null) {
             builderMetadata = AnnotationMetadata.EMPTY_METADATA;

@@ -25,6 +25,7 @@ import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.NullUnmarked;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
@@ -76,6 +77,7 @@ import static io.micronaut.inject.ast.beans.BeanParameterElement.ZERO_BEAN_PARAM
  * @author graemerocher
  * @since 3.0.0
  */
+@NullUnmarked
 @Internal
 public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilder {
     private static final Map<String, AtomicInteger> BEAN_COUNTER = new HashMap<>(15);

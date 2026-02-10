@@ -17,6 +17,7 @@ package io.micronaut.json.codec;
 
 import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Experimental;
+import org.jspecify.annotations.NullUnmarked;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
@@ -50,6 +51,7 @@ import java.util.List;
  */
 @Deprecated(since = "4.7")
 @Experimental
+@NullUnmarked
 public abstract class MapperMediaTypeCodec implements MediaTypeCodec {
     public static final String REGULAR_JSON_MEDIA_TYPE_CODEC_NAME = "json";
 

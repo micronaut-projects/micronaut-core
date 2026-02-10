@@ -19,6 +19,7 @@ import io.micronaut.context.condition.Condition;
 import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.NullUnmarked;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
@@ -32,6 +33,7 @@ import java.util.function.Consumer;
  * @since 4.0.0
  */
 @Internal
+@NullUnmarked
 public final class LoomSupport {
     private static final boolean SUPPORTED;
     private static Throwable failure;

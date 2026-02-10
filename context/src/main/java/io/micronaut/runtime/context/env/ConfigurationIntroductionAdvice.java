@@ -28,13 +28,13 @@ import io.micronaut.context.annotation.Prototype;
 import io.micronaut.context.env.ConfigurationPath;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.value.PropertyNotFoundException;
 import io.micronaut.inject.BeanDefinition;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.Optional;
@@ -59,6 +59,7 @@ public class ConfigurationIntroductionAdvice implements MethodInterceptor<Object
     private final ConversionService conversionService;
     private final BeanContext beanContext;
     private final ConfigurationPath configurationPath;
+    @Nullable
     private final BeanDefinition<?> beanDefinition;
 
     /**
@@ -92,6 +93,7 @@ public class ConfigurationIntroductionAdvice implements MethodInterceptor<Object
         }
     }
 
+    @Nullable
     private Object resolveProperty(MethodInvocationContext<Object, Object> context, ReturnType<Object> rt, Argument<Object> argument) {
         String property = context.stringValue(Property.class, MEMBER_NAME).orElse(null);
         if (property == null) {
@@ -123,6 +125,7 @@ public class ConfigurationIntroductionAdvice implements MethodInterceptor<Object
         }
     }
 
+    @Nullable
     private Object resolveBean(MethodInvocationContext<Object, Object> context, Class<Object> returnType, Argument<Object> argument) {
         final Qualifier<Object> qualifier = configurationPath.beanQualifier();
         if (Iterable.class.isAssignableFrom(returnType)) {

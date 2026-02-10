@@ -38,10 +38,12 @@ import static io.micronaut.core.annotation.AnnotationUtil.ZERO_ANNOTATIONS;
 @Internal
 abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
 
+    @Nullable
     private volatile Map<String, Annotation> annotationMap;
+    @Nullable
     private volatile Map<String, Annotation> declaredAnnotationMap;
-    private volatile Annotation[] allAnnotationArray;
-    private volatile Annotation[] declaredAnnotationArray;
+    private volatile Annotation @Nullable [] allAnnotationArray;
+    private volatile Annotation @Nullable [] declaredAnnotationArray;
 
     /**
      * Constructs a default metadata.
@@ -60,7 +62,7 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
                 }
             }
         }
-        return annotationMap;
+        return Objects.requireNonNull(annotationMap);
     }
 
     private Map<String, Annotation> getDeclaredAnnotationMap() {
@@ -74,7 +76,7 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
                 }
             }
         }
-        return declaredAnnotationMap;
+        return Objects.requireNonNull(declaredAnnotationMap);
     }
 
     @SuppressWarnings("unchecked")

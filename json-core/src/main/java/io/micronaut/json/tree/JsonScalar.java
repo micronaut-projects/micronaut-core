@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 package io.micronaut.json.tree;
+import org.jspecify.annotations.Nullable;
+
 import java.util.Map;
 
 /**
@@ -44,11 +46,13 @@ abstract class JsonScalar extends JsonNode {
     }
 
     @Override
+    @Nullable
     public JsonNode get(String fieldName) {
         return null;
     }
 
     @Override
+    @Nullable
     public JsonNode get(int index) {
         return null;
     }

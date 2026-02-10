@@ -35,6 +35,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -502,13 +503,13 @@ public interface MethodElement extends MemberElement {
                     new AnnotationMetadataProvider() {
                         @Override
                         public AnnotationMetadata getAnnotationMetadata() {
-                            return methodAnnotationMetadata;
+                            return Objects.requireNonNull(methodAnnotationMetadata);
                         }
                     },
                     new AnnotationMetadataProvider() {
                         @Override
                         public AnnotationMetadata getAnnotationMetadata() {
-                            return annotationMetadata;
+                            return Objects.requireNonNull(annotationMetadata);
                         }
                     },
                     metadataBuilder,
@@ -531,6 +532,7 @@ public interface MethodElement extends MemberElement {
                     }
 
                     @SuppressWarnings("java:S1192")
+                    @Override
                     public <T extends Annotation> AnnotationMetadata annotate(String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
                         AnnotationValueBuilder<T> builder = AnnotationValue.builder(annotationType, metadataBuilder.getRetentionPolicy(annotationType));
                         //noinspection ConstantConditions

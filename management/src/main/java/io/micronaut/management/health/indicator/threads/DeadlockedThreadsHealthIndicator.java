@@ -25,6 +25,7 @@ import io.micronaut.management.health.indicator.AbstractHealthIndicator;
 import io.micronaut.management.health.indicator.HealthIndicator;
 import io.micronaut.management.health.indicator.annotation.Liveness;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.management.ManagementFactory;
 import java.lang.management.MonitorInfo;
@@ -64,6 +65,7 @@ class DeadlockedThreadsHealthIndicator extends AbstractHealthIndicator {
     private static final String KEY_STACK_TRACE = "stackTrace";
 
     @Override
+    @Nullable
     protected Object getHealthInformation() {
             ThreadMXBean threadMXBean = ManagementFactory.getThreadMXBean();
             long[] deadlockedThreads = null;

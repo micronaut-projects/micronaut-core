@@ -22,6 +22,7 @@ import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.io.ResourceResolver;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 
 import java.io.InputStream;
@@ -40,12 +41,16 @@ public final class ResourceCertificateProvider implements CertificateProvider {
     private final KeyStore ks;
 
     ResourceCertificateProvider(
- Config config,
- ResourceResolver resourceLoader
+        Config config,
+        ResourceResolver resourceLoader
     ) throws Exception {
         name = config.name;
         byte[] bytes;
-        try (InputStream stream = resourceLoader.getResourceAsStream(config.getResource()).orElseThrow(() -> new ConfigurationException("Resource unavailable: " + config.getResource()))) {
+        String res = config.getResource();
+        if (res == null) {
+            throw new ConfigurationException("Missing resource for certificate provider");
+        }
+        try (InputStream stream = resourceLoader.getResourceAsStream(res).orElseThrow(() -> new ConfigurationException("Resource unavailable: " + res))) {
             bytes = stream.readAllBytes();
         }
         ks = FileCertificateProvider.load(config, bytes, null);
@@ -67,6 +72,7 @@ public final class ResourceCertificateProvider implements CertificateProvider {
     @EachProperty(CONFIG_PREFIX + ".resource")
     @BootstrapContextCompatible
     public static final class Config extends AbstractCertificateFileConfig {
+        @Nullable
         private String resource;
 
         public Config(@Parameter String name) {
@@ -79,7 +85,7 @@ public final class ResourceCertificateProvider implements CertificateProvider {
          * properties in {@link AbstractCertificateFileConfig} (e.g. {@code format}, {@code password}).
          * @return the resource location of the certificate material
          */
-        public String getResource() {
+        public @Nullable String getResource() {
             return resource;
         }
 

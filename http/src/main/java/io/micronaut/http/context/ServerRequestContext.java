@@ -50,9 +50,22 @@ public final class ServerRequestContext {
      * @param runnable The runnable
      */
     public static void with(@Nullable HttpRequest<?> request, Runnable runnable) {
-        try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(request)).propagate()) {
+        try (PropagatedContext.Scope ignore = propagatedContextWithRequest(request).propagate()) {
             runnable.run();
         }
+    }
+
+    private static PropagatedContext propagatedContextWithRequest(@Nullable HttpRequest<?> request) {
+        PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
+        if (request == null) {
+            Optional<ServerHttpRequestContext> serverHttpRequestContext = propagatedContext.find(ServerHttpRequestContext.class);
+            if (serverHttpRequestContext.isPresent()) {
+                propagatedContext = propagatedContext.minus(serverHttpRequestContext.get());
+            }
+        } else {
+            propagatedContext = propagatedContext.plus(new ServerHttpRequestContext(request));
+        }
+        return propagatedContext;
     }
 
     /**
@@ -75,7 +88,7 @@ public final class ServerRequestContext {
      * @return The return value of the callable
      */
     public static <T> T with(@Nullable HttpRequest<?> request, Supplier<T> supplier) {
-        try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(request)).propagate()) {
+        try (PropagatedContext.Scope ignore = propagatedContextWithRequest(request).propagate()) {
             return supplier.get();
         }
     }
@@ -90,7 +103,7 @@ public final class ServerRequestContext {
      * @throws Exception If the callable throws an exception
      */
     public static <T> T with(@Nullable HttpRequest<?> request, Callable<T> callable) throws Exception {
-        try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(request)).propagate()) {
+        try (PropagatedContext.Scope ignore = propagatedContextWithRequest(request).propagate()) {
             return callable.call();
         }
     }

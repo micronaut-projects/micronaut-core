@@ -287,7 +287,7 @@ public interface RouteInfo<R> extends AnnotationMetadataProvider {
      * @return The status
      * @since 2.5.2
      */
-    HttpStatus findStatus(HttpStatus defaultStatus);
+    HttpStatus findStatus(@Nullable HttpStatus defaultStatus);
 
     /**
      * Checks if route is for web socket.
