@@ -16,7 +16,6 @@
 package io.micronaut.http.server.multipart;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
@@ -53,6 +52,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -91,7 +91,7 @@ public final class FormFactory {
      * @return The completer
      */
     @Nullable
-    public static FormRouteCompleter getCompleterOrNull(@NonNull HttpRequest<?> request) {
+    public static FormRouteCompleter getCompleterOrNull(HttpRequest<?> request) {
         return request.getAttribute(COMPLETER, FormRouteCompleter.class).orElse(null);
     }
 
@@ -101,8 +101,7 @@ public final class FormFactory {
      * @param request The request
      * @return The completer
      */
-    @NonNull
-    public FormRouteCompleter getOrCreateCompleter(@NonNull HttpRequest<?> request) {
+    public FormRouteCompleter getOrCreateCompleter(HttpRequest<?> request) {
         if (!(request instanceof FormCapableHttpRequest<?> fchr)) {
             throw new IllegalStateException("Request class " + request + " does not support form binding");
         }
@@ -126,7 +125,7 @@ public final class FormFactory {
      * @param formField The field
      * @return A flow that completes when the full field has been buffered
      */
-    public ExecutionFlow<? extends CompletedPart> completePart(@NonNull FormCapableHttpRequest<?> request, @NonNull RawFormField formField) {
+    public ExecutionFlow<? extends CompletedPart> completePart(FormCapableHttpRequest<?> request, RawFormField formField) {
         if (formField.metadata().fileName() == null) {
             return completeAttribute(request, formField);
         } else {
@@ -141,8 +140,7 @@ public final class FormFactory {
      * @param formField The field
      * @return A flow that completes when the full field has been buffered
      */
-    @NonNull
-    public ExecutionFlow<CompletedAttribute> completeAttribute(@NonNull FormCapableHttpRequest<?> request, @NonNull RawFormField formField) {
+    public ExecutionFlow<CompletedAttribute> completeAttribute(FormCapableHttpRequest<?> request, RawFormField formField) {
         return InternalByteBody.bufferFlow(formField.byteBody()).map(av -> {
             CompletedAttribute attr = CompletedAttribute.create(formField.metadata(), av.toReadBuffer());
             request.addDisposalResource(attr::close);
@@ -158,8 +156,7 @@ public final class FormFactory {
      * @param formField The form field to stream
      * @return The flow with the uploaded file
      */
-    @NonNull
-    public ExecutionFlow<CompletedFileUpload> completeFileUpload(@NonNull FormCapableHttpRequest<?> request, @NonNull RawFormField formField) {
+    public ExecutionFlow<CompletedFileUpload> completeFileUpload(FormCapableHttpRequest<?> request, RawFormField formField) {
         if (formField.metadata().fileName() == null) {
             formField.close();
             return ExecutionFlow.error(new HttpStatusException(HttpStatus.BAD_REQUEST, "Field [" + formField.metadata().name() + "] was expected to be a file upload, but is missing a file name"));
@@ -176,8 +173,7 @@ public final class FormFactory {
      * @param formField The field
      * @return The streaming upload
      */
-    @NonNull
-    public StreamingFileUpload streamFileUpload(@NonNull RawFormField formField) {
+    public StreamingFileUpload streamFileUpload(RawFormField formField) {
         return new StreamingFileUpload(formField, diskWriteExecutor);
     }
 
@@ -239,10 +235,14 @@ public final class FormFactory {
         private final DelayedExecutionFlow<CompletedFileUpload> result = DelayedExecutionFlow.create();
         private boolean completed;
 
+        @Nullable
         private Subscription subscription;
         private long total = 0;
+        @Nullable
         private List<ReadBuffer> memory = new ArrayList<>();
+        @Nullable
         private CompletableFuture<PathAndStream> file;
+        @Nullable
         private CompletableFuture<PathAndStream> latestPieceWritten;
 
         /**
@@ -256,7 +256,7 @@ public final class FormFactory {
          *     <li>When the request lifecyle ends, this becomes {@link #CLOSED_SENTINEL}.</li>
          * </ol>
          */
-        private final AtomicReference<Object> closeResource = new AtomicReference<>();
+        private final AtomicReference<@org.jspecify.annotations.Nullable Object> closeResource = new AtomicReference<>();
 
         ToDiskSubscriber(FormFieldMetadata metadata, ReadBufferFactory bufferFactory) {
             this.metadata = metadata;
@@ -269,7 +269,7 @@ public final class FormFactory {
             s.request(1);
         }
 
-        private RuntimeException concurrentClose(@Nullable Closeable cl) {
+        private RuntimeException concurrentClose(@org.jspecify.annotations.Nullable Closeable cl) {
             RuntimeException e = new IllegalStateException("Request terminated with upload in progress");
             if (cl != null) {
                 try {
@@ -294,7 +294,7 @@ public final class FormFactory {
             if (file == null) {
                 // do we need to transfer to disk?
                 if (mc.isDisk() || (mc.isMixed() && total > mc.getThreshold())) {
-                    List<ReadBuffer> memory = this.memory;
+                    List<ReadBuffer> memory = Objects.requireNonNull(this.memory);
                     this.memory = null;
                     // transfer asynchronously
                     file = CompletableFuture.supplyAsync(() -> {
@@ -307,8 +307,8 @@ public final class FormFactory {
                     latestPieceWritten = file;
                 } else {
                     // no transfer, just save to memory
-                    memory.add(buffer);
-                    subscription.request(1);
+                    Objects.requireNonNull(memory).add(buffer);
+                    Objects.requireNonNull(subscription).request(1);
                     return;
                 }
             }
@@ -317,17 +317,17 @@ public final class FormFactory {
                 if (t != null) {
                     // transfer failed, discard this piece also
                     buffer.close();
-                    subscription.cancel();
+                    Objects.requireNonNull(subscription).cancel();
                     result.tryCompleteExceptionally(t);
                     return;
                 }
                 try {
                     buffer.transferTo(p.out);
                     // transfer complete, request the next piece
-                    subscription.request(1);
+                    Objects.requireNonNull(subscription).request(1);
                 } catch (IOException e) {
                     // transfer of this piece failed
-                    subscription.cancel();
+                    Objects.requireNonNull(subscription).cancel();
                     result.tryCompleteExceptionally(e);
                     try {
                         p.close();
@@ -337,7 +337,7 @@ public final class FormFactory {
                     throw new CompletionException(e);
                 } catch (Throwable e) {
                     // transfer of this piece failed
-                    subscription.cancel();
+                    Objects.requireNonNull(subscription).cancel();
                     result.tryCompleteExceptionally(e);
                     try {
                         p.close();
@@ -370,9 +370,11 @@ public final class FormFactory {
                     }
                 }, diskWriteExecutor);
             } else {
-                // close memory buffers
-                for (ReadBuffer readBuffer : memory) {
-                    readBuffer.close();
+                if (memory != null) {
+                    // close memory buffers
+                    for (ReadBuffer readBuffer : memory) {
+                        readBuffer.close();
+                    }
                 }
             }
             result.tryCompleteExceptionally(t);
@@ -386,7 +388,7 @@ public final class FormFactory {
             assert (file == null) == (latestPieceWritten == null);
             if (latestPieceWritten == null) {
                 // all in-memory
-                CompletedFileUpload cfu = CompletedFileUpload.ofMemory(metadata, bufferFactory.compose(memory));
+                CompletedFileUpload cfu = CompletedFileUpload.ofMemory(metadata, bufferFactory.compose(Objects.requireNonNull(memory)));
                 if (closeResource.compareAndSet(null, cfu)) {
                     result.complete(cfu);
                 } else {

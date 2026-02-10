@@ -137,7 +137,7 @@ public final class FormDemuxer implements BufferConsumer {
 
         if (e instanceof TooManyFormFieldsException) {
             e = new ContentLengthExceededException("Number of form fields exceeds configured limit");
-        } else if (e instanceof FormDecoderException && e.getMessage().equals("Undecoded data limit exceeded")) { // todo: specific exception in next codec-multipart release
+        } else if (e instanceof FormDecoderException && "Undecoded data limit exceeded".equals(e.getMessage())) { // todo: specific exception in next codec-multipart release
             e = new ContentLengthExceededException("Length of buffered form field exceeds configured limit");
         }
 

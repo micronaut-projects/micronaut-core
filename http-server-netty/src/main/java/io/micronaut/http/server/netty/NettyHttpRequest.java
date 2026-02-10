@@ -183,7 +183,9 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     @Nullable
     private NettyCookies nettyCookies;
     private final CloseableByteBody body;
+    @Nullable
     private Object legacyBody;
+    @Nullable
     private List<Runnable> disposalResources;
 
     private final BodyConvertor bodyConvertor = newBodyConvertor();
@@ -739,7 +741,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     }
 
     @Override
-    public synchronized void addDisposalResource(@NonNull Runnable dispose) {
+    public synchronized void addDisposalResource(Runnable dispose) {
         if (disposalResources == null) {
             disposalResources = new ArrayList<>(1);
         }
@@ -753,7 +755,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         static final FormTypeUrlEncoded INSTANCE = new FormTypeUrlEncoded();
     }
 
-    private static record FormTypeMultipart(String boundary) implements FormType {
+    private record FormTypeMultipart(String boundary) implements FormType {
     }
 
     /**

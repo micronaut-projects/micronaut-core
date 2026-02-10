@@ -587,13 +587,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         private void devolveToStreaming() {
-            HttpRequest request = this.request;
-            OutboundAccessImpl outboundAccess = this.outboundAccess;
+            HttpRequest request = Objects.requireNonNull(this.request);
+            OutboundAccessImpl outboundAccess = Objects.requireNonNull(this.outboundAccess);
             this.request = null;
             this.outboundAccess = null;
 
-            assert outboundAccess != null;
-            assert request != null;
             StreamingInboundHandler streamingInboundHandler = new StreamingInboundHandler(Objects.requireNonNull(outboundAccess), HttpUtil.is100ContinueExpected(request));
             streamingInboundHandler.dest.setExpectedLengthFrom(request.headers());
             for (HttpContent content : buffer) {
@@ -606,8 +604,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             } else {
                 ((DecompressingInboundHandler) inboundHandler).delegate = streamingInboundHandler;
             }
-            assert ctx != null;
-            requestHandler.accept(ctx, request, new StreamingNettyByteBody(streamingInboundHandler.dest), outboundAccess);
+            requestHandler.accept(Objects.requireNonNull(ctx), request, new StreamingNettyByteBody(streamingInboundHandler.dest), outboundAccess);
         }
 
         @Override
@@ -1053,7 +1050,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 writePotentialEnd(content, flush, shouldCloseAfterContent(last));
             } else {
                 // slow path
-                writeCompressing0(compressionSession, content, flush, last);
+                writeCompressing0(content, flush, last);
             }
         }
 
@@ -1075,8 +1072,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         private void writeCompressing0(HttpContent content, boolean flush, boolean last) {
-            Compressor.Session compressionSession = this.compressionSession;
-            assert compressionSession != null;
+            Compressor.Session compressionSession = Objects.requireNonNull(this.compressionSession);
             compressionSession.push(content.content());
             if (last) {
                 compressionSession.finish();
@@ -1321,8 +1317,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             // - while cancel() may trigger onComplete/onError, `removed` is true at this point, so
             //   they won't call responseWritten in turn
             requestHandler.responseWritten(outboundAccess.attachment);
-            assert upstream != null;
-            upstream.allowDiscard();
+            Objects.requireNonNull(upstream).allowDiscard();
             outboundHandler = null;
         }
     }

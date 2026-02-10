@@ -96,7 +96,7 @@ class LeakTrackerFactoryHolder {
 }
 
 @SuppressWarnings({"ReturnValueIgnored", "ResultOfMethodCallIgnored"})
-class NettyLeakTrackerFactory<T> implements LeakTracker.Factory<T> {
+final class NettyLeakTrackerFactory<T> implements LeakTracker.Factory<T> {
     private final Class<T> trackedClass;
     @Nullable
     private volatile ResourceLeakDetector<T> detector;

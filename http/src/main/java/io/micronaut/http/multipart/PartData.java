@@ -19,7 +19,6 @@ import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.MediaType;
 
 import java.io.Closeable;
-import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.Optional;
@@ -27,12 +26,21 @@ import java.util.Optional;
 /**
  * Represents a chunk of data belonging to a part of a multipart request.
  *
- * @param fieldMetadata The field metadata (name, file name, etc.)
- * @param readBuffer The buffered part data
  * @author James Kleeh
  * @since 1.0
  */
-public record PartData(FormFieldMetadata fieldMetadata, ReadBuffer readBuffer) implements Closeable {
+public final class PartData implements Closeable {
+    private final FormFieldMetadata fieldMetadata;
+    private final ReadBuffer readBuffer;
+
+    /**
+     * @param fieldMetadata The field metadata (name, file name, etc.)
+     * @param readBuffer    The buffered part data
+     */
+    public PartData(FormFieldMetadata fieldMetadata, ReadBuffer readBuffer) {
+        this.fieldMetadata = fieldMetadata;
+        this.readBuffer = readBuffer;
+    }
 
     /**
      * Gets the content of this chunk as an {@code InputStream}.
@@ -74,4 +82,30 @@ public record PartData(FormFieldMetadata fieldMetadata, ReadBuffer readBuffer) i
     public void close() {
         readBuffer.close();
     }
+
+    /**
+     * The field metadata (name, file name, etc.)
+     *
+     * @return The field metadata
+     */
+    public FormFieldMetadata fieldMetadata() {
+        return fieldMetadata;
+    }
+
+    /**
+     * The field bytes
+     *
+     * @return The field bytes
+     */
+    public ReadBuffer readBuffer() {
+        return readBuffer;
+    }
+
+    @Override
+    public String toString() {
+        return "PartData[" +
+            "fieldMetadata=" + fieldMetadata + ", " +
+            "readBuffer=" + readBuffer + ']';
+    }
+
 }

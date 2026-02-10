@@ -22,12 +22,12 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.optim.StaticOptimizations;
 import io.micronaut.core.reflect.ClassUtils;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 
 import java.io.Closeable;
@@ -582,10 +582,10 @@ public class Publishers {
      * @return The publisher to consume the buffered elements
      * @since 5.0.0
      */
-    @NonNull
     public static <E> Publisher<E> bufferNow(@NonNull Publisher<E> source) {
         Sinks.Many<E> sink = Sinks.many().unicast().onBackpressureBuffer();
         var subscriber = new Subscriber<E>() {
+            @Nullable
             volatile Subscription subscription;
 
             void cancel() {

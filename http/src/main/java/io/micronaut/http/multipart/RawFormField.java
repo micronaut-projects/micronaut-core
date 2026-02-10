@@ -22,14 +22,47 @@ import java.io.Closeable;
 /**
  * A raw, streamed form field. Note that processing of other form fields may be stalled until you
  * consume the {@link #byteBody}!
- *
- * @param metadata The field metadata provided by the user
- * @param byteBody The field bytes
  */
-public record RawFormField(FormFieldMetadata metadata,
-                           CloseableByteBody byteBody) implements Closeable {
+public final class RawFormField implements Closeable {
+    private final FormFieldMetadata metadata;
+    private final CloseableByteBody byteBody;
+
+    /**
+     * @param metadata The field metadata provided by the user
+     * @param byteBody The field bytes
+     */
+    public RawFormField(FormFieldMetadata metadata, CloseableByteBody byteBody) {
+        this.metadata = metadata;
+        this.byteBody = byteBody;
+    }
+
     @Override
     public void close() {
         byteBody.close();
+    }
+
+    /**
+     * The field metadata provided by the user.
+     *
+     * @return The field metadata
+     */
+    public FormFieldMetadata metadata() {
+        return metadata;
+    }
+
+    /**
+     * The field bytes.
+     *
+     * @return The field bytes
+     */
+    public CloseableByteBody byteBody() {
+        return byteBody;
+    }
+
+    @Override
+    public String toString() {
+        return "RawFormField[" +
+            "metadata=" + metadata + ", " +
+            "byteBody=" + byteBody + ']';
     }
 }

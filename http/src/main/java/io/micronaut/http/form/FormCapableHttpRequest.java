@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.form;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.LifecycleHttpRequest;
 import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.multipart.RawFormField;
@@ -26,6 +27,7 @@ import org.reactivestreams.Publisher;
  *
  * @param <B> The body type
  */
+@Experimental
 public interface FormCapableHttpRequest<B> extends ServerHttpRequest<B>, LifecycleHttpRequest<B> {
     /**
      * Get the raw form field publisher. Can only be subscribed to once.

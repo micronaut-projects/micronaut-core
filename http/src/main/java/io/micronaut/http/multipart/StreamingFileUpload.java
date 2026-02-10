@@ -32,6 +32,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.concurrent.Executor;
 import java.util.concurrent.locks.StampedLock;
@@ -189,21 +190,19 @@ public final class StreamingFileUpload implements Closeable {
                         outputStream = supplier.get();
                         success = true;
                     } catch (Exception e) {
-                        subscription.cancel();
+                        s.cancel();
                         sink.tryEmitError(e);
                     } finally {
                         outputLock.unlockWrite(stamp);
                     }
                     if (success) {
-                        subscription.request(1);
+                        s.request(1);
                     }
                 });
             }
 
             @Override
             public void onNext(ReadBuffer readBuffer) {
-                assert subscription != null;
-                assert outputStream != null;
                 // if there is an onComplete immediately after onNext, this lock delays it until
                 // the onNext execute is done.
                 long stamp = outputLock.tryWriteLock();
@@ -213,21 +212,21 @@ public final class StreamingFileUpload implements Closeable {
                 ioExecutor.execute(() -> {
                     boolean success = false;
                     try (readBuffer) {
-                        readBuffer.transferTo(outputStream);
+                        readBuffer.transferTo(Objects.requireNonNull(outputStream));
                         success = true;
                     } catch (Exception e) {
                         try {
-                            outputStream.close();
+                            Objects.requireNonNull(outputStream).close();
                         } catch (IOException ex) {
                             e.addSuppressed(ex);
                         }
-                        subscription.cancel();
+                        Objects.requireNonNull(subscription).cancel();
                         sink.tryEmitError(e);
                     } finally {
                         outputLock.unlock(stamp);
                     }
                     if (success) {
-                        subscription.request(1);
+                        Objects.requireNonNull(subscription).request(1);
                     }
                 });
             }
@@ -237,8 +236,7 @@ public final class StreamingFileUpload implements Closeable {
                 ioExecutor.execute(() -> {
                     long stamp = outputLock.writeLock();
                     try {
-                        assert outputStream != null;
-                        outputStream.close();
+                        Objects.requireNonNull(outputStream).close();
                     } catch (IOException ex) {
                         t.addSuppressed(ex);
                     } finally {
@@ -253,8 +251,7 @@ public final class StreamingFileUpload implements Closeable {
                 ioExecutor.execute(() -> {
                     long stamp = outputLock.writeLock();
                     try {
-                        assert outputStream != null;
-                        outputStream.close();
+                        Objects.requireNonNull(outputStream).close();
                         sink.tryEmitEmpty();
                     } catch (IOException ex) {
                         sink.tryEmitError(ex);

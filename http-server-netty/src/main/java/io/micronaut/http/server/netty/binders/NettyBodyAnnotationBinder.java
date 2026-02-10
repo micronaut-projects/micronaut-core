@@ -51,10 +51,10 @@ import io.micronaut.http.server.netty.converters.NettyConverters;
 import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteInfo;
 import io.netty.buffer.ByteBuf;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import reactor.core.publisher.Flux;
-import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -190,6 +190,7 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
         var sub = new Subscriber<T>() {
             final List<T> list = new ArrayList<>();
             boolean complete = false;
+            @Nullable
             Throwable error = null;
 
             @Override

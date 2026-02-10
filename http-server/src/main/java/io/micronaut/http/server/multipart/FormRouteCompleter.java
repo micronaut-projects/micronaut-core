@@ -16,7 +16,6 @@
 package io.micronaut.http.server.multipart;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.bind.exceptions.UnsatisfiedArgumentException;
 import io.micronaut.core.execution.ExecutionFlow;
@@ -35,7 +34,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.charset.Charset;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -56,15 +60,20 @@ public final class FormRouteCompleter {
     private final AtomicInteger cancelledDownstreamCount = new AtomicInteger();
     private int downstreamCount = 0;
     private boolean started = false;
+    @Nullable
     private Subscription upstream;
 
+    @Nullable
     private Throwable globalError;
     private boolean globalComplete;
 
     private final Map<String, Unicast> fieldUnicasts = new HashMap<>();
 
+    @Nullable
     private Map<String, List<CloseableByteBody>> bufferedForGetBody = new LinkedHashMap<>();
+    @Nullable
     private Map<String, Object> stringsForGetBody;
+    @Nullable
     private Throwable exceptionForGetBody;
 
     private volatile boolean deadlockDetection = true;
@@ -80,8 +89,7 @@ public final class FormRouteCompleter {
      * @param metadata The subscription metadata, used for detecting and reporting deadlocks
      * @return The publisher
      */
-    @NonNull
-    public Publisher<@NonNull RawFormField> subscribeField(@NonNull String name, @NonNull SubscriptionMetadata metadata) {
+    public Publisher<RawFormField> subscribeField(String name, SubscriptionMetadata metadata) {
         if (started) {
             throw new IllegalStateException("FormRouteCompleter already started");
         }
@@ -141,7 +149,7 @@ public final class FormRouteCompleter {
         if (exceptionForGetBody != null) {
             return sneakyThrow(exceptionForGetBody);
         } else {
-            return stringsForGetBody;
+            return Objects.requireNonNull(stringsForGetBody);
         }
     }
 
@@ -157,8 +165,7 @@ public final class FormRouteCompleter {
      * @return The transformed bodies
      * @throws IllegalStateException If any of the input bodies is not yet fully available
      */
-    @NonNull
-    public static Map<String, Object> mapForGetBody(@NonNull Map<String, ? extends Iterable<CloseableByteBody>> byteBodies, @NonNull Charset charset) {
+    public static Map<String, Object> mapForGetBody(Map<String, ? extends Iterable<CloseableByteBody>> byteBodies, Charset charset) {
         Map<String, Object> map = new LinkedHashMap<>();
         Throwable error = null;
         for (Map.Entry<String, ? extends Iterable<CloseableByteBody>> entry : byteBodies.entrySet()) {
@@ -229,7 +236,7 @@ public final class FormRouteCompleter {
             Unicast unicast = fieldUnicasts.get(rawFormField.metadata().name());
             if (unicast == null) {
                 rawFormField.close();
-                upstream.request(1);
+                Objects.requireNonNull(upstream).request(1);
             } else {
                 unicast.emit(rawFormField);
             }
@@ -251,12 +258,15 @@ public final class FormRouteCompleter {
     private final class Unicast implements Publisher<RawFormField>, Subscription {
         final SubscriptionMetadata metadata;
 
+        @Nullable
         private Subscriber<? super RawFormField> subscriber;
+        @Nullable
         private volatile RawFormField queued = null;
         private final AtomicLong demand = new AtomicLong(0);
         private final AtomicReference<State> state = new AtomicReference<>(State.CLEAN);
         private boolean endForwarded;
         private volatile boolean cancelled;
+        @Nullable
         private Throwable ownError;
 
         Unicast(SubscriptionMetadata metadata) {
@@ -362,7 +372,7 @@ public final class FormRouteCompleter {
         private void work() {
             Subscriber<? super RawFormField> s = subscriber;
             while (queued != null) {
-                Exception deadlock = predictDeadlock(queued);
+                Exception deadlock = predictDeadlock(Objects.requireNonNull(queued));
                 if (deadlock != null) {
                     // we detected a deadlock. cancel this subscription and forward the error
                     cancelled = true;
@@ -374,9 +384,9 @@ public final class FormRouteCompleter {
                     break;
                 }
                 if (cancelled) {
-                    queued.close();
+                    Objects.requireNonNull(queued).close();
                     queued = null;
-                    upstream.request(1);
+                    Objects.requireNonNull(upstream).request(1);
                     break;
                 }
                 if (s == null) {
@@ -387,7 +397,7 @@ public final class FormRouteCompleter {
                 demand.decrementAndGet();
                 s.onNext(queued);
                 queued = null;
-                upstream.request(1);
+                Objects.requireNonNull(upstream).request(1);
             }
             if (!endForwarded && queued == null && (globalComplete || globalError != null || ownError != null) && s != null) {
                 endForwarded = true;
@@ -406,7 +416,7 @@ public final class FormRouteCompleter {
             if (!cancelled) {
                 cancelled = true;
                 if (cancelledDownstreamCount.incrementAndGet() == downstreamCount) {
-                    upstream.cancel();
+                    Objects.requireNonNull(upstream).cancel();
                 }
             }
             demand.set(Long.MAX_VALUE);

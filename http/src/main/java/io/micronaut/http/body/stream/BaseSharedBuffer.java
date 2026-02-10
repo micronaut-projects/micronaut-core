@@ -57,7 +57,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      * Any stream error.
      */
     @Nullable
-    private @Nullable Throwable error;
+    private Throwable error;
     /**
      * Number of reserved subscriber spots. A new subscription MUST be preceded by a
      * reservation, and every reservation MUST have a subscription.
@@ -67,12 +67,12 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      * Active subscribers.
      */
     @Nullable
-    private @Nullable List<BufferConsumer> subscribers;
+    private List<BufferConsumer> subscribers;
     /**
      * Active subscribers that need the fully buffered body.
      */
     @Nullable
-    private @Nullable List<DelayedExecutionFlow<ReadBuffer>> fullSubscribers;
+    private List<DelayedExecutionFlow<ReadBuffer>> fullSubscribers;
     /**
      * This flag is only used in tests, to verify that the BufferConsumer methods arent called
      * in a reentrant fashion.
