@@ -23,6 +23,7 @@ import org.jspecify.annotations.Nullable;
 import java.net.URL;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 /**
@@ -78,10 +79,7 @@ public interface ClassPathResourceLoader extends ResourceLoader {
      * @since 5.0.0
      */
     static List<URL> listUniqueResources(ResourceLoader resourceLoader, String name) {
-        @Nullable Stream<URL> stream = resourceLoader.getResources(name);
-        if (stream == null) {
-            return List.of();
-        }
+        Stream<URL> stream = Optional.ofNullable(resourceLoader.getResources(name)).orElseGet(Stream::empty);
         try (stream) {
             LinkedHashMap<String, URL> unique = new LinkedHashMap<>();
             stream.forEach(url -> unique.putIfAbsent(url.toExternalForm(), url));

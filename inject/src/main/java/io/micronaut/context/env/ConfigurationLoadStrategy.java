@@ -80,7 +80,7 @@ public record ConfigurationLoadStrategy(
         private List<String> mergeOrder = List.of();
 
         public Builder type(@Nullable ConfigurationLoadStrategyType type) {
-            this.type = Objects.requireNonNullElse(type, ConfigurationLoadStrategyType.FAIL_ON_DUPLICATE);
+            this.type = type == null ? ConfigurationLoadStrategyType.FAIL_ON_DUPLICATE : type;
             return this;
         }
 
@@ -90,7 +90,7 @@ public record ConfigurationLoadStrategy(
         }
 
         public Builder mergeOrder(@Nullable List<String> mergeOrder) {
-            this.mergeOrder = Objects.requireNonNullElse(mergeOrder, List.of());
+            this.mergeOrder = mergeOrder == null ? List.of() : mergeOrder;
             return this;
         }
 
