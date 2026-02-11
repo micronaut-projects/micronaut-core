@@ -22,6 +22,9 @@ import io.micronaut.core.io.scan.ClassPathResourceLoader
 import spock.lang.Specification
 
 import java.nio.charset.StandardCharsets
+import java.nio.file.Files
+import java.util.jar.JarEntry
+import java.util.jar.JarOutputStream
 import java.util.stream.Stream
 
 class DefaultEnvironmentLoadPropertySourceFromAbstractLoaderSpec extends Specification {
@@ -139,6 +142,147 @@ class DefaultEnvironmentLoadPropertySourceFromAbstractLoaderSpec extends Specifi
         env?.close()
     }
 
+    void "loadPropertySourceFromAbstractLoader MERGE_ALL merges duplicate resources"() {
+        given:
+        def jar1 = createJarWithEntry("lib-1.jar", "application.yml", "foo: one\nbar: one\n")
+        def jar2 = createJarWithEntry("app-1.jar", "application.yml", "foo: two\nbaz: two\n")
+        def loader = new InMemoryClassPathResourceLoader(
+                resources: [:],
+                resourcesByName: ["application.yml": [
+                        jarUrl(jar1, "application.yml"),
+                        jarUrl(jar2, "application.yml")
+                ]],
+                returnNullResourceStream: false
+        )
+        def configuration = new DefaultApplicationContextBuilder() {
+            @Override
+            ClassPathResourceLoader getResourceLoader() {
+                return loader
+            }
+        }.configurationLoadingStrategy(ConfigurationLoadStrategy.builder()
+                .type(ConfigurationLoadStrategyType.MERGE_ALL))
+
+        when:
+        def env = new DefaultEnvironment(configuration).start()
+
+        then:
+        env.getProperty("foo", String).orElse(null) == "two"
+        env.getProperty("bar", String).orElse(null) == "one"
+        env.getProperty("baz", String).orElse(null) == "two"
+
+        cleanup:
+        env?.close()
+    }
+
+    void "loadPropertySourceFromAbstractLoader MERGE_ALL mergeOrder affects merge order"() {
+        given:
+        def jarLib = createJarWithEntry("lib-1.jar", "application.yml", "foo: lib\n")
+        def jarApp = createJarWithEntry("app-1.jar", "application.yml", "foo: app\n")
+        def loader = new InMemoryClassPathResourceLoader(
+                resources: [:],
+                // Intentionally reversed so mergeOrder has an effect
+                resourcesByName: ["application.yml": [
+                        jarUrl(jarApp, "application.yml"),
+                        jarUrl(jarLib, "application.yml")
+                ]],
+                returnNullResourceStream: false
+        )
+        def configuration = new DefaultApplicationContextBuilder() {
+            @Override
+            ClassPathResourceLoader getResourceLoader() {
+                return loader
+            }
+        }.configurationLoadingStrategy(ConfigurationLoadStrategy.builder()
+                .type(ConfigurationLoadStrategyType.MERGE_ALL)
+                .mergeOrder("lib-.*\\.jar", "app-.*\\.jar"))
+
+        when:
+        def env = new DefaultEnvironment(configuration).start()
+
+        then:
+        env.getProperty("foo", String).orElse(null) == "app"
+
+        cleanup:
+        env?.close()
+    }
+
+    void "loadPropertySourceFromAbstractLoader MERGE_ALL rejects invalid mergeOrder patterns"() {
+        given:
+        def jar1 = createJarWithEntry("lib-1.jar", "application.yml", "foo: one\n")
+        def jar2 = createJarWithEntry("app-1.jar", "application.yml", "foo: two\n")
+        def loader = new InMemoryClassPathResourceLoader(
+                resources: [:],
+                resourcesByName: ["application.yml": [
+                        jarUrl(jar1, "application.yml"),
+                        jarUrl(jar2, "application.yml")
+                ]],
+                returnNullResourceStream: false
+        )
+        def configuration = new DefaultApplicationContextBuilder() {
+            @Override
+            ClassPathResourceLoader getResourceLoader() {
+                return loader
+            }
+        }.configurationLoadingStrategy(ConfigurationLoadStrategy.builder()
+                .type(ConfigurationLoadStrategyType.MERGE_ALL)
+                .mergeOrder("["))
+
+        when:
+        new DefaultEnvironment(configuration).start()
+
+        then:
+        def e = thrown(ConfigurationException)
+        e.message.contains("Invalid mergeOrder regex pattern")
+    }
+
+    void "loadPropertySourceFromAbstractLoader FAIL_ON_DUPLICATE fails for duplicates within the same extension"() {
+        given:
+        def jar1 = createJarWithEntry("a.jar", "application.yml", "foo: one\n")
+        def jar2 = createJarWithEntry("b.jar", "application.yml", "foo: two\n")
+        def loader = new InMemoryClassPathResourceLoader(
+                resources: [:],
+                resourcesByName: ["application.yml": [
+                        jarUrl(jar1, "application.yml"),
+                        jarUrl(jar2, "application.yml")
+                ]],
+                returnNullResourceStream: false
+        )
+        def configuration = new DefaultApplicationContextBuilder() {
+            @Override
+            ClassPathResourceLoader getResourceLoader() {
+                return loader
+            }
+        }.configurationLoadingStrategy(ConfigurationLoadStrategy.builder()
+                .type(ConfigurationLoadStrategyType.FAIL_ON_DUPLICATE))
+
+        when:
+        new DefaultEnvironment(configuration).start()
+
+        then:
+        def e = thrown(ConfigurationException)
+        e.message.contains("Duplicate configuration resource 'application.yml'")
+    }
+
+    private static File createJarWithEntry(String fileName, String entryName, String content) {
+        File jar = Files.createTempFile(fileName.replace('.jar', ''), ".jar").toFile()
+        jar.deleteOnExit()
+        JarOutputStream jos = new JarOutputStream(new FileOutputStream(jar))
+        try {
+            JarEntry entry = new JarEntry(entryName)
+            jos.putNextEntry(entry)
+            jos.write(content.getBytes(StandardCharsets.UTF_8))
+            jos.closeEntry()
+        } finally {
+            jos.close()
+        }
+        return jar
+    }
+
+    private static URL jarUrl(File jar, String entryName) {
+        URL fileUrl = jar.toURI().toURL()
+        return new URL("jar:" + fileUrl.toExternalForm() + "!/" + entryName)
+    }
+
     private static final class InMemoryClassPathResourceLoader implements ClassPathResourceLoader {
         Map<String, String> resources = [:]
         Map<String, List<URL>> resourcesByName = [:]
@@ -148,7 +292,15 @@ class DefaultEnvironmentLoadPropertySourceFromAbstractLoaderSpec extends Specifi
         Optional<InputStream> getResourceAsStream(String path) {
             String content = resources.get(path)
             if (content == null) {
-                return Optional.empty()
+                List<URL> urls = resourcesByName.get(path)
+                if (urls == null || urls.isEmpty()) {
+                    return Optional.empty()
+                }
+                try {
+                    return Optional.of(urls.get(0).openStream())
+                } catch (IOException e) {
+                    return Optional.empty()
+                }
             }
             return Optional.of(new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8)))
         }
