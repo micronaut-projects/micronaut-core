@@ -27,7 +27,6 @@ import io.micronaut.core.cli.CommandLine;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.order.OrderUtil;
-import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanConfiguration;
 import io.micronaut.inject.QualifiedBeanType;
@@ -41,9 +40,9 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
@@ -156,10 +155,8 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     }
 
     @Override
-    public ApplicationContextBuilder configurationLoadingStrategy(Consumer<ConfigurationLoadStrategy.Builder> builderConsumer) {
-        ArgumentUtils.requireNonNull("builderConsumer", builderConsumer);
-        ConfigurationLoadStrategy.Builder builder = ConfigurationLoadStrategy.builder();
-        builderConsumer.accept(builder);
+    public ApplicationContextBuilder configurationLoadingStrategy(ConfigurationLoadStrategy.Builder builder) {
+        Objects.requireNonNull(builder, "builder");
         this.configurationLoadStrategy = builder.build();
         return this;
     }

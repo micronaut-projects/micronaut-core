@@ -29,7 +29,6 @@ import java.lang.annotation.Annotation;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.function.Consumer;
 
 /**
  * An interface for building an application context.
@@ -114,11 +113,11 @@ public interface ApplicationContextBuilder {
     /**
      * Configure how Micronaut loads configuration resources when duplicates exist on the classpath.
      *
-     * @param builderConsumer The strategy builder customizer
+     * @param builder The strategy builder
      * @return This builder
      * @since 5.0.0
      */
-    default ApplicationContextBuilder configurationLoadingStrategy(Consumer<ConfigurationLoadStrategy.Builder> builderConsumer) {
+    default ApplicationContextBuilder configurationLoadingStrategy(ConfigurationLoadStrategy.Builder builder) {
         return this;
     }
 

@@ -20,6 +20,11 @@ import io.micronaut.core.io.ResourceLoader;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
+import java.net.URL;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.stream.Stream;
+
 /**
  * Abstraction to load resources from the classpath.
  *
@@ -62,5 +67,25 @@ public interface ClassPathResourceLoader extends ResourceLoader {
             classLoader = ClassLoader.getSystemClassLoader();
         }
         return new DefaultClassPathResourceLoader(classLoader);
+    }
+
+    /**
+     * List resources for the given name, handling duplicate URLs and implementations that may return {@code null}.
+     *
+     * @param resourceLoader The resource loader
+     * @param name The resource name
+     * @return An immutable list of unique URLs in encounter order
+     * @since 5.0.0
+     */
+    static List<URL> listUniqueResources(ResourceLoader resourceLoader, String name) {
+        @Nullable Stream<URL> stream = resourceLoader.getResources(name);
+        if (stream == null) {
+            return List.of();
+        }
+        try (stream) {
+            LinkedHashMap<String, URL> unique = new LinkedHashMap<>();
+            stream.forEach(url -> unique.putIfAbsent(url.toExternalForm(), url));
+            return List.copyOf(unique.values());
+        }
     }
 }

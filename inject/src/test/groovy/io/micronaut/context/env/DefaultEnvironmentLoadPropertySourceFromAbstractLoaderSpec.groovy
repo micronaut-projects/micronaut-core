@@ -125,10 +125,9 @@ class DefaultEnvironmentLoadPropertySourceFromAbstractLoaderSpec extends Specifi
             ClassPathResourceLoader getResourceLoader() {
                 return loader
             }
-        }.configurationLoadingStrategy { b ->
-            b.type(ConfigurationLoadStrategyType.FIRST_MATCH)
-            b.warnOnDuplicates(false)
-        }
+        }.configurationLoadingStrategy(ConfigurationLoadStrategy.builder()
+            .type(ConfigurationLoadStrategyType.FIRST_MATCH)
+            .warnOnDuplicates(false))
 
         when:
         def env = new DefaultEnvironment(configuration).start()

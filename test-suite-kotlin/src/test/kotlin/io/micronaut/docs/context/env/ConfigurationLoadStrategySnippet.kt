@@ -16,6 +16,7 @@
 package io.micronaut.docs.context.env
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.ConfigurationLoadStrategy
 import io.micronaut.context.env.ConfigurationLoadStrategyType
 import io.micronaut.runtime.Micronaut
 
@@ -24,10 +25,11 @@ internal class ConfigurationLoadStrategySnippet {
     fun firstMatch(args: Array<String>) {
         // tag::firstMatch[]
         Micronaut.build(*args)
-            .configurationLoadingStrategy { s ->
-                s.type(ConfigurationLoadStrategyType.FIRST_MATCH)
-                s.warnOnDuplicates(true)
-            }
+            .configurationLoadingStrategy(
+                ConfigurationLoadStrategy.builder()
+                    .type(ConfigurationLoadStrategyType.FIRST_MATCH)
+                    .warnOnDuplicates(true)
+            )
             .start()
         // end::firstMatch[]
     }
@@ -35,9 +37,10 @@ internal class ConfigurationLoadStrategySnippet {
     fun mergeAll() {
         // tag::mergeAll[]
         val ctx = ApplicationContext.builder()
-            .configurationLoadingStrategy { s ->
-                s.type(ConfigurationLoadStrategyType.MERGE_ALL)
-            }
+            .configurationLoadingStrategy(
+                ConfigurationLoadStrategy.builder()
+                    .type(ConfigurationLoadStrategyType.MERGE_ALL)
+            )
             .start()
         // end::mergeAll[]
 
@@ -47,10 +50,11 @@ internal class ConfigurationLoadStrategySnippet {
     fun mergeOrder() {
         // tag::mergeOrder[]
         val ctx = ApplicationContext.builder()
-            .configurationLoadingStrategy { s ->
-                s.type(ConfigurationLoadStrategyType.MERGE_ALL)
-                s.mergeOrder("lib-.*\\.jar", "app-.*\\.jar")
-            }
+            .configurationLoadingStrategy(
+                ConfigurationLoadStrategy.builder()
+                    .type(ConfigurationLoadStrategyType.MERGE_ALL)
+                    .mergeOrder("lib-.*\\.jar", "app-.*\\.jar")
+            )
             .start()
         // end::mergeOrder[]
 
@@ -60,9 +64,10 @@ internal class ConfigurationLoadStrategySnippet {
     fun restoreFirstMatch() {
         // tag::restoreFirstMatch[]
         val ctx = ApplicationContext.builder()
-            .configurationLoadingStrategy { s ->
-                s.type(ConfigurationLoadStrategyType.FIRST_MATCH)
-            }
+            .configurationLoadingStrategy(
+                ConfigurationLoadStrategy.builder()
+                    .type(ConfigurationLoadStrategyType.FIRST_MATCH)
+            )
             .start()
         // end::restoreFirstMatch[]
 

@@ -16,6 +16,7 @@
 package io.micronaut.docs.context.env;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.env.ConfigurationLoadStrategy;
 import io.micronaut.context.env.ConfigurationLoadStrategyType;
 import io.micronaut.runtime.Micronaut;
 
@@ -27,10 +28,9 @@ final class ConfigurationLoadStrategySnippet {
     void firstMatch(String[] args) {
         // tag::firstMatch[]
         Micronaut.build(args)
-            .configurationLoadingStrategy(s -> s
+            .configurationLoadingStrategy(ConfigurationLoadStrategy.builder()
                 .type(ConfigurationLoadStrategyType.FIRST_MATCH)
-                .warnOnDuplicates(true)
-            )
+                .warnOnDuplicates(true))
             .start();
         // end::firstMatch[]
     }
@@ -38,9 +38,8 @@ final class ConfigurationLoadStrategySnippet {
     void mergeAll() {
         // tag::mergeAll[]
         ApplicationContext ctx = ApplicationContext.builder()
-            .configurationLoadingStrategy(s -> s
-                .type(ConfigurationLoadStrategyType.MERGE_ALL)
-            )
+            .configurationLoadingStrategy(ConfigurationLoadStrategy.builder()
+                .type(ConfigurationLoadStrategyType.MERGE_ALL))
             .start();
         // end::mergeAll[]
 
@@ -50,10 +49,9 @@ final class ConfigurationLoadStrategySnippet {
     void mergeOrder() {
         // tag::mergeOrder[]
         ApplicationContext ctx = ApplicationContext.builder()
-            .configurationLoadingStrategy(s -> s
+            .configurationLoadingStrategy(ConfigurationLoadStrategy.builder()
                 .type(ConfigurationLoadStrategyType.MERGE_ALL)
-                .mergeOrder("lib-.*\\.jar", "app-.*\\.jar")
-            )
+                .mergeOrder("lib-.*\\.jar", "app-.*\\.jar"))
             .start();
         // end::mergeOrder[]
 
@@ -63,9 +61,8 @@ final class ConfigurationLoadStrategySnippet {
     void restoreFirstMatch() {
         // tag::restoreFirstMatch[]
         ApplicationContext ctx = ApplicationContext.builder()
-            .configurationLoadingStrategy(s -> s
-                .type(ConfigurationLoadStrategyType.FIRST_MATCH)
-            )
+            .configurationLoadingStrategy(ConfigurationLoadStrategy.builder()
+                .type(ConfigurationLoadStrategyType.FIRST_MATCH))
             .start();
         // end::restoreFirstMatch[]
 

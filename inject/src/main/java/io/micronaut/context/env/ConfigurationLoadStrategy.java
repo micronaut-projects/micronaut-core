@@ -17,6 +17,7 @@ package io.micronaut.context.env;
 
 import io.micronaut.context.exceptions.ConfigurationException;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -78,7 +79,7 @@ public record ConfigurationLoadStrategy(
         private boolean warnOnDuplicates = true;
         private List<String> mergeOrder = List.of();
 
-        public Builder type(ConfigurationLoadStrategyType type) {
+        public Builder type(@Nullable ConfigurationLoadStrategyType type) {
             this.type = Objects.requireNonNullElse(type, ConfigurationLoadStrategyType.FAIL_ON_DUPLICATE);
             return this;
         }
@@ -88,12 +89,12 @@ public record ConfigurationLoadStrategy(
             return this;
         }
 
-        public Builder mergeOrder(List<String> mergeOrder) {
+        public Builder mergeOrder(@Nullable List<String> mergeOrder) {
             this.mergeOrder = Objects.requireNonNullElse(mergeOrder, List.of());
             return this;
         }
 
-        public Builder mergeOrder(String... mergeOrder) {
+        public Builder mergeOrder(@Nullable String... mergeOrder) {
             if (mergeOrder == null || mergeOrder.length == 0) {
                 this.mergeOrder = List.of();
             } else {

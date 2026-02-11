@@ -56,10 +56,9 @@ class ConfigurationLoadStrategySpec extends Specification {
         String value
         try (URLClassLoader cl = new URLClassLoader(result.jars*.toUri()*.toURL() as URL[], getClass().classLoader);
              ApplicationContext ctx = ApplicationContext.builder(cl)
-                     .configurationLoadingStrategy { b ->
-                         b.type(ConfigurationLoadStrategyType.FIRST_MATCH)
-                         b.warnOnDuplicates(false)
-                     }
+                     .configurationLoadingStrategy(ConfigurationLoadStrategy.builder()
+                         .type(ConfigurationLoadStrategyType.FIRST_MATCH)
+                         .warnOnDuplicates(false))
                      .start()) {
 
             value = ctx.environment.getProperty("foo", String).orElse(null)
@@ -86,9 +85,8 @@ class ConfigurationLoadStrategySpec extends Specification {
         Map<String, Object> props
         try (URLClassLoader cl = new URLClassLoader(result.jars*.toUri()*.toURL() as URL[], getClass().classLoader);
              ApplicationContext ctx = ApplicationContext.builder(cl)
-                     .configurationLoadingStrategy { b ->
-                         b.type(ConfigurationLoadStrategyType.MERGE_ALL)
-                     }
+                     .configurationLoadingStrategy(ConfigurationLoadStrategy.builder()
+                         .type(ConfigurationLoadStrategyType.MERGE_ALL))
                      .start()) {
             props = [
                     foo: ctx.environment.getProperty("foo", String).orElse(null),
@@ -120,10 +118,9 @@ class ConfigurationLoadStrategySpec extends Specification {
         String value
         try (URLClassLoader cl = new URLClassLoader(result.jars*.toUri()*.toURL() as URL[], getClass().classLoader);
              ApplicationContext ctx = ApplicationContext.builder(cl)
-                     .configurationLoadingStrategy { b ->
-                         b.type(ConfigurationLoadStrategyType.MERGE_ALL)
-                         b.mergeOrder("lib-.*\\.jar", "app-.*\\.jar")
-                     }
+                     .configurationLoadingStrategy(ConfigurationLoadStrategy.builder()
+                         .type(ConfigurationLoadStrategyType.MERGE_ALL)
+                         .mergeOrder("lib-.*\\.jar", "app-.*\\.jar"))
                      .start()) {
 
             value = ctx.environment.getProperty("foo", String).orElse(null)
@@ -149,9 +146,8 @@ class ConfigurationLoadStrategySpec extends Specification {
         when:
         try (URLClassLoader cl = new URLClassLoader(result.jars*.toUri()*.toURL() as URL[], getClass().classLoader)) {
             ApplicationContext.builder(cl)
-                    .configurationLoadingStrategy { b ->
-                        b.mergeOrder("app-.*\\.jar")
-                    }
+                    .configurationLoadingStrategy(ConfigurationLoadStrategy.builder()
+                        .mergeOrder("app-.*\\.jar"))
         }
 
         then:

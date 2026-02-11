@@ -38,7 +38,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
 import java.util.function.Function;
 
 import static io.micronaut.core.reflect.ReflectionUtils.EMPTY_CLASS_ARRAY;
@@ -283,8 +282,8 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     }
 
     @Override
-    public Micronaut configurationLoadingStrategy(Consumer<ConfigurationLoadStrategy.Builder> builderConsumer) {
-        return (Micronaut) super.configurationLoadingStrategy(builderConsumer);
+    public Micronaut configurationLoadingStrategy(ConfigurationLoadStrategy.Builder builder) {
+        return (Micronaut) super.configurationLoadingStrategy(builder);
     }
 
     @Override

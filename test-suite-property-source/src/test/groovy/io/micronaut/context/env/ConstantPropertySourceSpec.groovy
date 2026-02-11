@@ -20,10 +20,9 @@ class ConstantPropertySourceSpec extends Specification {
         when:
         def configuration = Micronaut.build()
                 .environments(name)
-                .configurationLoadingStrategy { b ->
-                    b.type(ConfigurationLoadStrategyType.FIRST_MATCH)
-                    b.warnOnDuplicates(false)
-                }
+                .configurationLoadingStrategy(ConfigurationLoadStrategy.builder()
+                        .type(ConfigurationLoadStrategyType.FIRST_MATCH)
+                        .warnOnDuplicates(false))
         def env = new DefaultEnvironment(configuration)
         env.start()
 
