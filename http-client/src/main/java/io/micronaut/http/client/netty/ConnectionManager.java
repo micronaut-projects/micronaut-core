@@ -660,9 +660,9 @@ public class ConnectionManager {
     private Http2FrameCodec makeFrameCodec() {
         Http2Settings defaultSettings = Http2Settings.defaultSettings();
 
-        if (configuration.getHttp2Configuration() != null){
+        if (configuration.getHttp2Configuration() != null) {
             defaultSettings.maxHeaderListSize(configuration.getHttp2Configuration().getMaxHeaderListSize());
-        }       
+        }
 
         Http2FrameCodecBuilder builder = Http2FrameCodecBuilder.forClient()
             .initialSettings(defaultSettings);
