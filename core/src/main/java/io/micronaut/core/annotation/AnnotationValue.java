@@ -1516,12 +1516,15 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @return The string[] or null
      */
     @Internal
-    public static String @Nullable[] resolveStringValues(@Nullable Object value, @Nullable Function<Object, Object> valueMapper) {
+    public static String @Nullable[] resolveStringValues(@Nullable Object value, @Nullable Function<Object, @Nullable Object> valueMapper) {
         if (value == null) {
             return null;
         }
         if (valueMapper != null) {
             value = valueMapper.apply(value);
+            if (value == null) {
+                return null;
+            }
         }
         if (value instanceof String s) {
             return new String[]{s};
