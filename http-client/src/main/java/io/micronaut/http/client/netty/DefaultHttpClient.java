@@ -1275,12 +1275,7 @@ public class DefaultHttpClient implements
                 return resolveURI(request, false);
             } else {
                 URI redirectedURI = parentRequest.getUri().resolve(requestURI).normalize();
-                UriBuilder uriBuilder = UriBuilder.of(redirectedURI)
-                        .scheme(redirectedURI.getScheme())
-                        .userInfo(redirectedURI.getUserInfo())
-                        .host(redirectedURI.getHost())
-                        .port(redirectedURI.getPort());
-                return ExecutionFlow.just(uriBuilder.build());
+                return ExecutionFlow.just(redirectedURI);
             }
         }
     }
