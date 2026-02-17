@@ -1274,12 +1274,12 @@ public class DefaultHttpClient implements
             if (parentRequest == null || parentRequest.getUri().getHost() == null) {
                 return resolveURI(request, false);
             } else {
-                URI parentURI = parentRequest.getUri();
-                UriBuilder uriBuilder = UriBuilder.of(requestURI)
-                        .scheme(parentURI.getScheme())
-                        .userInfo(parentURI.getUserInfo())
-                        .host(parentURI.getHost())
-                        .port(parentURI.getPort());
+                URI redirectedURI = parentRequest.getUri().resolve(requestURI).normalize();
+                UriBuilder uriBuilder = UriBuilder.of(redirectedURI)
+                        .scheme(redirectedURI.getScheme())
+                        .userInfo(redirectedURI.getUserInfo())
+                        .host(redirectedURI.getHost())
+                        .port(redirectedURI.getPort());
                 return ExecutionFlow.just(uriBuilder.build());
             }
         }
