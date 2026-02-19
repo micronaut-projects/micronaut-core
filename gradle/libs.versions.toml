@@ -84,7 +84,7 @@ managed-kotlin = "2.3.0"
 managed-kotlin-coroutines = "1.10.2"
 managed-methvin-directory-watcher = "0.19.1"
 managed-netty = "4.2.9.Final"
-managed-netty-tcnative = "2.0.74.Final"
+managed-netty-tcnative = "2.0.75.Final"
 managed-netty-contrib-multipart = "1.0.0.Alpha1"
 managed-reactive-streams = "1.0.4"
 # This should be kept aligned with https://github.com/micronaut-projects/micronaut-reactor/blob/master/gradle.properties from the BOM
