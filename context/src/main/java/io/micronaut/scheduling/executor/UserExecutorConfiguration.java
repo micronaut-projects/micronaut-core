@@ -56,7 +56,7 @@ public class UserExecutorConfiguration implements ExecutorConfiguration {
      *
      * @param name The name
      */
-    private UserExecutorConfiguration(@Parameter String name) {
+    private UserExecutorConfiguration(@Nullable @Parameter String name) {
         this(name, null, null, null, null, false, null);
     }
 
@@ -203,7 +203,6 @@ public class UserExecutorConfiguration implements ExecutorConfiguration {
      * @param type The type
      * @return The configuration
      */
-    @SuppressWarnings("NullAway")
     public static UserExecutorConfiguration of(ExecutorType type) {
         ArgumentUtils.check("type", type).notNull();
         UserExecutorConfiguration configuration = new UserExecutorConfiguration(null);
