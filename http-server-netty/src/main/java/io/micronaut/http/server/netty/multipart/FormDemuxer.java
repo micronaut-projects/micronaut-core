@@ -40,10 +40,10 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.EventLoop;
 import io.netty.contrib.multipart.ContentDisposition;
-import io.netty.contrib.multipart.FormDecoderException;
 import io.netty.contrib.multipart.ParsedHeaderValue;
 import io.netty.contrib.multipart.PostBodyDecoder;
 import io.netty.contrib.multipart.TooManyFormFieldsException;
+import io.netty.contrib.multipart.UndecodedDataLimitExceededException;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -137,7 +137,7 @@ public final class FormDemuxer implements BufferConsumer {
 
         if (e instanceof TooManyFormFieldsException) {
             e = new ContentLengthExceededException("Number of form fields exceeds configured limit");
-        } else if (e instanceof FormDecoderException && "Undecoded data limit exceeded".equals(e.getMessage())) { // todo: specific exception in next codec-multipart release
+        } else if (e instanceof UndecodedDataLimitExceededException) {
             e = new ContentLengthExceededException("Length of buffered form field exceeds configured limit");
         }
 
@@ -450,11 +450,7 @@ public final class FormDemuxer implements BufferConsumer {
         @Override
         void accept(PostBodyDecoder.Event event) {
             if (event == PostBodyDecoder.Event.CONTENT) {
-                ByteBuf dc = decoder.decodedContent();
-                // TODO: https://github.com/netty-contrib/codec-multipart/commit/026ea6db77434466824ee9b858aa35f1a5254f27
-                ByteBuf copy = dc.copy();
-                dc.release();
-                add(copy);
+                add(decoder.decodedContent());
             } else if (event == PostBodyDecoder.Event.FIELD_COMPLETE) {
                 baseSharedBuffer.complete();
                 if (fieldsPublisherCancelled) {

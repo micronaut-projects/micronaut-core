@@ -18,9 +18,17 @@ Note that if there are multiple form fields of the same name, only the first one
 
 A api:io.micronaut.http.multipart.CompletedFileUpload[] is similar to a `byte[]` parameter, except that the upload can be buffered to disk instead of memory. This allows you to receive even large files without consuming a lot of memory. This behavior needs to be configured, though.
 
-// TODO: example with `mixed` config properties
+[configuration]
+----
+micronaut:
+  server:
+    multipart:
+      mixed: true
+      # Default threshold to transfer data to disk is 10MB
+      threshold: 10MB
+----
 
-The controller is called once the entire file has been uploaded.
+If you don't configure this value, the file will be kept in memory. The controller is called once the entire file has been uploaded.
 
 NOTE: The uploaded file is automatically deleted when the controller terminates, so if you want to keep it around, you need to move or copy it elsewhere beforehand. You can also call `CompletedFileUpload.moveResource()` to get a new `CompletedFileUpload` instance that sticks around after the controller lifetime.
 
