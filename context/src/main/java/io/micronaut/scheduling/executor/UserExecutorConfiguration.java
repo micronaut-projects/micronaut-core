@@ -39,6 +39,7 @@ public class UserExecutorConfiguration implements ExecutorConfiguration {
      */
     public static final int AVAILABLE_PROCESSORS = Runtime.getRuntime().availableProcessors();
 
+    @Nullable
     protected String name;
     // needs to be protected to allow for nThreads to be set in config
     @SuppressWarnings("WeakerAccess")
@@ -71,7 +72,7 @@ public class UserExecutorConfiguration implements ExecutorConfiguration {
      * @param threadFactoryClass the thread factory class
      */
     @ConfigurationInject
-    protected UserExecutorConfiguration(@Parameter String name,
+    protected UserExecutorConfiguration(@Nullable @Parameter String name,
                                         @Nullable Integer nThreads,
                                         @Nullable ExecutorType type,
                                         @Nullable Integer parallelism,
@@ -88,6 +89,7 @@ public class UserExecutorConfiguration implements ExecutorConfiguration {
     }
 
     @Override
+    @Nullable
     public String getName() {
         return name;
     }
@@ -201,9 +203,10 @@ public class UserExecutorConfiguration implements ExecutorConfiguration {
      * @param type The type
      * @return The configuration
      */
+    @SuppressWarnings("NullAway")
     public static UserExecutorConfiguration of(ExecutorType type) {
         ArgumentUtils.check("type", type).notNull();
-        UserExecutorConfiguration configuration = new UserExecutorConfiguration("default");
+        UserExecutorConfiguration configuration = new UserExecutorConfiguration(null);
         configuration.type = type;
         return configuration;
     }
