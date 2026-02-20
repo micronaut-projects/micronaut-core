@@ -656,7 +656,13 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
             if (isReferenceEnabled(ref, context, resolutionContext)) {
                 return ref;
             } else {
-                this.reference = null;
+                // Only permanently disable if the context is running.
+                // Before startup, property sources may not yet be processed
+                // into the environment resolver, so condition evaluation
+                // results are unreliable and should not be cached.
+                if (context.isRunning()) {
+                    this.reference = null;
+                }
                 return null;
             }
         }
@@ -686,8 +692,10 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
             }
             BeanDefinitionReference<T> ref = getReferenceIfEnabled(context, resolutionContext);
             if (ref == null) {
-                // shortcut for future calls
-                this.definition = DEFINITION_DISABLED_SENTINEL;
+                if (context.isRunning()) {
+                    // shortcut for future calls
+                    this.definition = DEFINITION_DISABLED_SENTINEL;
+                }
                 return null;
             }
             if (beanType != null && !(beanType.getType().equals(Object.class) || ref.isCandidateBean(beanType))) {

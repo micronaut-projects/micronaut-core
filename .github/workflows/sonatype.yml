@@ -3,7 +3,7 @@
 # https://github.com/micronaut-projects/micronaut-project-template/tree/master/.github/workflows
 #
 # and edit them there. Note that it will be sync'ed to all the Micronaut repos
-name: Java CI
+name: Sonatype Vuln Scan
 on:
   push:
     branches:
@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        java: ['25']
+        java: ['21']
     env:
       DEVELOCITY_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
       DEVELOCITY_CACHE_USERNAME: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME }}
@@ -33,7 +33,7 @@ jobs:
       OSS_INDEX_USERNAME: ${{ secrets.OSS_INDEX_USERNAME }}
       OSS_INDEX_PASSWORD: ${{ secrets.OSS_INDEX_PASSWORD }}
     steps:
-       # https://github.com/actions/virtual-environments/issues/709
+      # https://github.com/actions/virtual-environments/issues/709
       - name: Remove system JDKs
         run: |
           sudo rm -rf /usr/lib/jvm/*
@@ -41,13 +41,13 @@ jobs:
           export PATH=$(echo "$PATH" | tr ':' '\n' | grep -v '/usr/lib/jvm' | paste -sd:)
       - name: "🗑 Free disk space"
         run: |
-         sudo rm -rf "/usr/local/share/boost"
-         sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-         sudo rm -rf "/opt/ghc"
-         sudo rm -rf "/usr/share/dotnet"
-         sudo rm -rf "/usr/local/lib/android"
-         sudo apt-get clean
-         df -h
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          sudo rm -rf "/opt/ghc"
+          sudo rm -rf "/usr/share/dotnet"
+          sudo rm -rf "/usr/local/lib/android"
+          sudo apt-get clean
+          df -h
 
       - name: "📥 Checkout repository"
         uses: actions/checkout@v6
@@ -68,54 +68,11 @@ jobs:
         run: |
           [ -f ./setup.sh ] && ./setup.sh || [ ! -f ./setup.sh ]
 
-      - name: "🛠 Build with Gradle"
-        id: gradle
+      - name: "🚔 Sonatype Scan"
+        if: env.OSS_INDEX_PASSWORD != '' && matrix.java == '21'
+        id: sonatypescan
         run: |
-          ./gradlew check jacocoReport --no-daemon --continue
-
-      - name: "🔎 Run static analysis"
-        if: env.SONAR_TOKEN != '' && matrix.java == '25'
-        run: |
-          ./gradlew sonar --no-parallel --continue
-
-      - name: "📊 Publish Test Report"
-        if: always()
-        uses: mikepenz/action-junit-report@v6
-        with:
-          check_name: Java CI / Test Report (${{ matrix.java }})
-          report_paths: '**/build/test-results/test/TEST-*.xml'
-          check_retries: 'true'
-
-      - name: "📜 Upload binary compatibility check results"
-        if: matrix.java == '25'
-        uses: actions/upload-artifact@v6
-        with:
-          name: binary-compatibility-reports
-          path: "**/build/reports/binary-compatibility-*.html"
-
-      - name: "📦 Publish to Sonatype Snapshots"
-        if: success() && github.event_name == 'push' && matrix.java == '25'
-        env:
-          SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
-          SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
-        run: ./gradlew publishToSonatype docs --no-daemon
-
-      - name: "❓ Determine docs target repository"
-        uses: haya14busa/action-cond@v1
-        id: docs_target
-        with:
-          cond: ${{ github.repository == 'micronaut-projects/micronaut-core' }}
-          if_true: "micronaut-projects/micronaut-docs"
-          if_false: ${{ github.repository }}
-
-      - name: "📑 Publish to Github Pages"
-        if: success() && github.event_name == 'push' && matrix.java == '25'
-        uses: micronaut-projects/github-pages-deploy-action@master
-        env:
-          TARGET_REPOSITORY: ${{ steps.docs_target.outputs.value }}
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          BRANCH: gh-pages
-          FOLDER: build/docs
+          ./gradlew ossIndexAudit --no-parallel --info
 
       - name: "❓ Optional cleanup step"
         run: |
