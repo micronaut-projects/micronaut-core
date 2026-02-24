@@ -15,7 +15,7 @@
  */
 package io.micronaut.jackson;
 
-import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Experimental;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.core.Version;
 import tools.jackson.databind.AnnotationIntrospector;
@@ -39,13 +39,13 @@ import java.util.Optional;
 import java.util.stream.Stream;
 
 /**
- * Support for Jackson 2.x databind annotations.
+ * Support for Jackson 2.x databind annotations. Used by micronaut-oracle-cloud.
  *
  * @since 5.0.0
  * @author Jonas Konrad
  */
-@Internal
-final class Jackson2AnnotationSupport {
+@Experimental
+public final class Jackson2AnnotationSupport {
     private static final boolean JACKSON2_AVAILABLE;
 
     static {
@@ -59,7 +59,12 @@ final class Jackson2AnnotationSupport {
         JACKSON2_AVAILABLE = available;
     }
 
-    static void installJackson2Introspector(MapperBuilder<?, ?> builder) {
+    /**
+     * Adapt an object mapper builder to support some jackson-databind 2.x annotations.
+     *
+     * @param builder The builder
+     */
+    public static void installJackson2Introspector(MapperBuilder<?, ?> builder) {
         if (!JACKSON2_AVAILABLE) {
             return;
         }
