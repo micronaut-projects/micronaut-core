@@ -71,6 +71,7 @@ zacsweers-kotlin-compile-testing = "0.12.1"
 errorprone-gradle-plugin = "4.3.0"
 nullaway = "0.12.15"
 error_prone_core = "2.45.0"
+jackson2 = "2.21.1"
 
 #
 # Versions which start with managed- are managed by Micronaut in the sense
@@ -246,6 +247,8 @@ junit4 = { module = "junit:junit", version.ref = "junit4" }
 
 jazzer-junit = { module = "com.code-intelligence:jazzer-junit", version.ref = "jazzer" }
 jazzer-api = { module = "com.code-intelligence:jazzer-api", version.ref = "jazzer" }
+
+jackson2-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson2" }
 
 jetbrains-annotations = { module = "org.jetbrains:annotations", version.ref = "jetbrains-annotations" }
 
