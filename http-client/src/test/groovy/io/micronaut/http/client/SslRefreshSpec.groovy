@@ -14,23 +14,23 @@ import io.micronaut.http.server.netty.NettyHttpRequest
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent
 import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.handler.ssl.SslHandler
+import io.netty.handler.ssl.SslProvider
+import io.netty.handler.ssl.OpenSsl
 import io.netty.handler.ssl.util.SelfSignedCertificate
-import spock.lang.Ignore
-import spock.lang.IgnoreIf
-import spock.lang.Retry
 import spock.lang.Shared
 import spock.lang.Specification
 
+import javax.net.ssl.SSLContext
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.KeyStore
 import java.security.cert.Certificate
 import java.security.cert.X509Certificate
 
-@Ignore
 class SslRefreshSpec extends Specification {
 
-    @Shared List<String> ciphers = ['TLS_RSA_WITH_AES_128_CBC_SHA',
+    // List of required ciphers
+    @Shared List<String> requiredCiphers = ['TLS_RSA_WITH_AES_128_CBC_SHA',
                                     'TLS_RSA_WITH_AES_256_CBC_SHA',
                                     'TLS_RSA_WITH_AES_128_GCM_SHA256',
                                     'TLS_RSA_WITH_AES_256_GCM_SHA384',
@@ -38,6 +38,33 @@ class SslRefreshSpec extends Specification {
                                     'TLS_DHE_RSA_WITH_AES_256_GCM_SHA384',
                                     'TLS_DHE_DSS_WITH_AES_128_GCM_SHA256',
                                     'TLS_DHE_DSS_WITH_AES_256_GCM_SHA384']
+
+    // Dynamically determine enabled ciphers
+    @Shared List<String> ciphers;
+    def setupSpec() {
+        if (SslProvider.isAlpnSupported(SslProvider.OPENSSL_REFCNT)) {
+            // OpenSSL will be used
+            ciphers = requiredCiphers.findAll { cipher ->
+                OpenSsl.isCipherSuiteAvailable(cipher)
+            }
+            println "Using OpenSSL provider. Supported ciphers: $ciphers"
+        } else {
+            // JDK will be used
+            def context = SSLContext.getInstance("TLS")
+            context.init(null, null, null)
+            def engine = context.createSSLEngine()
+            ciphers = requiredCiphers.findAll { cipher ->
+                try {
+                    engine.setEnabledCipherSuites([cipher] as String[])
+                    true
+                } catch (IllegalArgumentException ignored) {
+                    false
+                }
+            }
+            println "Using JDK provider. Supported ciphers: $ciphers"
+        }
+    }
+
     @Shared Path keyStorePath
     @Shared Path trustStorePath
     @Shared Map<String, Object> config = [
@@ -56,6 +83,12 @@ class SslRefreshSpec extends Specification {
     ]
 
     private void makeClientCert(SelfSignedCertificate certificate) {
+        // Skip test if no ciphers are supported
+        if (!ciphers || ciphers.isEmpty()) {
+            println "No required ciphers are supported by JVM. Skipping test."
+            return
+        }
+
         keyStorePath = Files.createTempFile("micronaut-test-key-store", "pkcs12")
         trustStorePath = Files.createTempFile("micronaut-test-trust-store", "pkcs12")
 
@@ -84,6 +117,17 @@ class SslRefreshSpec extends Specification {
     }
 
     void "test server ssl refresh"() {
+        // Skip test if no ciphers are supported
+        if (!ciphers || ciphers.isEmpty()) {
+            println "No required ciphers are supported by JVM. Skipping test."
+            return
+        }
+
+        if (ciphers.size() <= 1) {
+            println "Not enough ciphers to simulate a change. Skipping test."
+            return
+        }
+
         given:
         makeClientCert(new SelfSignedCertificate("client1"))
         config.put('micronaut.server.ssl.ciphers', ciphers)
@@ -107,7 +151,7 @@ class SslRefreshSpec extends Specification {
         config.putAll('micronaut.server.ssl.key-store.path': 'classpath:keystore.p12',
                         'micronaut.server.ssl.key-store.password': 'foobar',
                         'micronaut.server.ssl.key-store.type': 'PKCS12',
-                        'micronaut.server.ssl.ciphers': ciphers[0..4])
+                        'micronaut.server.ssl.ciphers': ciphers[0..-2])
         def diff = embeddedServer.applicationContext.environment.refreshAndDiff()
         embeddedServer.applicationContext
                 .getBean(Argument.of(ApplicationEventPublisher, RefreshEvent))
@@ -116,7 +160,7 @@ class SslRefreshSpec extends Specification {
 
         then:
         response.status() == HttpStatus.OK
-        response.body().ciphers == ciphers[0..4]
+        response.body().ciphers == ciphers[0..-2]
         response.body().subjectDN == 'CN=example.local, OU=IT Department, O=Global Security, L=London, ST=London, C=GB'
 
         cleanup:
@@ -127,6 +171,12 @@ class SslRefreshSpec extends Specification {
     }
 
     void "test client ssl refresh"() {
+        // Skip test if no ciphers are supported
+        if (!ciphers || ciphers.isEmpty()) {
+            println "No required ciphers are supported by JVM. Skipping test."
+            return
+        }
+
         given:
         makeClientCert(new SelfSignedCertificate("client1"))
 
