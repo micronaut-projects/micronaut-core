@@ -630,11 +630,8 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
             for (List<URL> urls : extensionResources.values()) {
                 allUrls.addAll(urls);
             }
-            if (!allUrls.isEmpty()) {
-                if (strategy.type() == ResourceLoadStrategyType.FAIL_ON_DUPLICATE) {
-                    throw new ConfigurationException(buildDuplicateConfigurationMessage(fileName, allUrls));
-                }
-                handleDuplicateResources(fileName, allUrls, strategy);
+            if (!allUrls.isEmpty() && strategy.type() == ResourceLoadStrategyType.FAIL_ON_DUPLICATE) {
+                throw new ConfigurationException(buildDuplicateConfigurationMessage(fileName, allUrls));
             }
         }
 
@@ -642,9 +639,6 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
             String fileExt = fileName + "." + ext;
             List<URL> urls = Objects.requireNonNullElse(extensionResources.get(ext), Collections.emptyList());
             Map<String, Object> merged = Collections.emptyMap();
-            if (!urls.isEmpty() && urls.size() > 1) {
-                handleDuplicateResources(fileExt, urls, strategy);
-            }
 
             if (urls.isEmpty()) {
                 Optional<InputStream> config = propertySourceLoader.readInput(resourceLoader, fileExt);
@@ -691,16 +685,6 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         }
 
         return Optional.empty();
-    }
-
-    private void handleDuplicateResources(String resourceName,
-                                          List<URL> urls,
-                                          ResourceLoadStrategy strategy) {
-        if (strategy.type() == ResourceLoadStrategyType.FIRST_MATCH && strategy.warnOnDuplicates() && LOG.isWarnEnabled()) {
-            URL chosen = urls.getFirst();
-            List<URL> duplicates = urls.subList(1, urls.size());
-            LOG.warn("Duplicate configuration resource '{}' found on the classpath. Using: {}. Duplicates: {}", resourceName, chosen, duplicates);
-        }
     }
 
     private static String buildDuplicateConfigurationMessage(String resourceName, List<URL> urls) {

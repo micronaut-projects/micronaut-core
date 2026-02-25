@@ -24,7 +24,18 @@ import org.jspecify.annotations.NullMarked;
  */
 @NullMarked
 public enum ResourceLoadStrategyType {
+    /**
+     * Uses the first matching resource.
+     */
     FIRST_MATCH,
+
+    /**
+     * Fails fast if duplicate resources are detected.
+     */
     FAIL_ON_DUPLICATE,
+
+    /**
+     * Signals that all matching resources should be merged by the caller.
+     */
     MERGE_ALL
 }

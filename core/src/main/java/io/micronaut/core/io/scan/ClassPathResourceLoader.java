@@ -41,6 +41,18 @@ import java.util.stream.Stream;
 public interface ClassPathResourceLoader extends ResourceLoader {
 
     /**
+     * Hook to handle duplicate resources for {@link ResourceLoadStrategyType#FIRST_MATCH}.
+     * Default implementation is a no-op.
+     *
+     * @param resourceName The resource name
+     * @param chosen       The chosen resource URL
+     * @param duplicates   The duplicate resource URLs
+     * @since 5.0.0
+     */
+    default void handleResourceDuplicates(String resourceName, URL chosen, List<URL> duplicates) {
+    }
+
+    /**
      * Returns the underlying classloader used by this {@link ClassPathResourceLoader}.
      *
      * @return The underlying classloader used by this {@link ClassPathResourceLoader}
@@ -118,6 +130,12 @@ public interface ClassPathResourceLoader extends ResourceLoader {
         }
         if (type == ResourceLoadStrategyType.MERGE_ALL) {
             throw new ResourceConflictException(name, urls);
+        }
+
+        if (strategy.warnOnDuplicates() && resourceLoader instanceof ClassPathResourceLoader) {
+            URL chosen = urls.getFirst();
+            List<URL> duplicates = urls.subList(1, urls.size());
+            ((ClassPathResourceLoader) resourceLoader).handleResourceDuplicates(name, chosen, duplicates);
         }
         return urls;
     }
