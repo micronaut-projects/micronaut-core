@@ -33,7 +33,7 @@ import java.util.concurrent.CompletableFuture;
  * @since 4.5.0
  */
 @Internal
-public abstract class InternalByteBody implements ByteBody {
+public abstract non-sealed class InternalByteBody implements ByteBody {
     private static final String TRACK_OPERATIONS_PROPERTY = ByteBody.class.getName() + ".trackOperations";
     private static final boolean TRACK_OPERATIONS = Boolean.getBoolean(TRACK_OPERATIONS_PROPERTY);
 

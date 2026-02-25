@@ -22,7 +22,6 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.io.socket.SocketUtils;
 import io.micronaut.core.util.CollectionUtils;
@@ -79,16 +78,15 @@ import io.netty.channel.nio.NioIoHandler;
 import io.netty.channel.socket.DatagramChannel;
 import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.unix.DomainSocketAddress;
-import io.netty.handler.codec.http.multipart.DiskFileUpload;
 import io.netty.handler.codec.quic.QuicSslContext;
 import io.netty.handler.ssl.SslContext;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 import io.netty.util.concurrent.GlobalEventExecutor;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
 import java.net.BindException;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
@@ -174,8 +172,6 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         this.isDefault = isDefault;
         this.serverConfiguration = serverConfiguration;
         this.nettyEmbeddedServices = nettyEmbeddedServices;
-        Optional<File> location = this.serverConfiguration.getMultipart().getLocation();
-        location.ifPresent(dir -> DiskFileUpload.baseDirectory = dir.getAbsolutePath());
         this.applicationContext = nettyEmbeddedServices.getApplicationContext();
         this.environment = applicationContext.getEnvironment();
 
@@ -769,7 +765,6 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             if (isDefault && applicationContext.isRunning() && !stopServerOnly) {
                 applicationContext.stop();
             }
-            serverConfiguration.getMultipart().getLocation().ifPresent(dir -> DiskFileUpload.baseDirectory = null);
             List<Listener> activeListeners = this.activeListeners;
             if (activeListeners != null) {
                 for (Listener listener : activeListeners) {

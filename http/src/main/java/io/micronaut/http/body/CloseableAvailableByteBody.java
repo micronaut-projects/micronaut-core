@@ -24,7 +24,7 @@ import io.micronaut.core.annotation.Experimental;
  * @since 4.5.0
  */
 @Experimental
-public interface CloseableAvailableByteBody extends AvailableByteBody, CloseableByteBody {
+public non-sealed interface CloseableAvailableByteBody extends AvailableByteBody, CloseableByteBody {
     /**
      * {@inheritDoc}
      *

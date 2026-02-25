@@ -24,11 +24,9 @@ import io.micronaut.http.MediaType.TEXT_PLAIN
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.multipart.StreamingFileUpload
-import org.reactivestreams.Publisher
 import reactor.core.publisher.Mono
 import java.io.ByteArrayOutputStream
 import java.io.File
-import java.io.OutputStream
 
 @Controller("/upload")
 class UploadController {
@@ -42,14 +40,9 @@ class UploadController {
         val uploadPublisher = file.transferTo(tempFile) // <3>
 
         return Mono.from(uploadPublisher)  // <4>
-            .map { success ->
-                if (success) {
-                    HttpResponse.ok("Uploaded")
-                } else {
-                    HttpResponse.status<String>(CONFLICT)
-                        .body("Upload Failed")
-                }
-            }
+            .thenReturn<HttpResponse<String>>(HttpResponse.ok("Uploaded"))
+            .onErrorReturn(HttpResponse.status<String>(CONFLICT)
+                .body("Upload Failed"))
     }
     // end::file[]
 
@@ -61,14 +54,9 @@ class UploadController {
         val uploadPublisher = file.transferTo(outputStream) // <4>
 
         return Mono.from(uploadPublisher) // <5>
-            .map { success: Boolean ->
-                return@map if (success) {
-                    HttpResponse.ok("Uploaded")
-                } else {
-                    HttpResponse.status<String>(CONFLICT)
-                        .body("Upload Failed")
-                }
-            }
+            .thenReturn<HttpResponse<String>>(HttpResponse.ok("Uploaded"))
+            .onErrorReturn(HttpResponse.status<String>(CONFLICT)
+                .body("Upload Failed"))
     }
     // end::outputStream[]
 

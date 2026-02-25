@@ -16,10 +16,10 @@
 package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.body.stream.BaseSharedBuffer;
 import io.micronaut.http.body.stream.BufferConsumer;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -44,6 +44,7 @@ public class AbstractBodyAdapter implements BufferConsumer.Upstream, Subscriber<
     private final Publisher<ReadBuffer> source;
     @Nullable
     private final Runnable onDiscard;
+    private boolean started;
     private volatile boolean cancelled;
 
     public AbstractBodyAdapter(Publisher<ReadBuffer> source, @Nullable Runnable onDiscard) {
@@ -57,6 +58,10 @@ public class AbstractBodyAdapter implements BufferConsumer.Upstream, Subscriber<
 
     @Override
     public final void start() {
+        if (started) {
+            throw new IllegalStateException("Already started");
+        }
+        started = true;
         source.subscribe(this);
     }
 

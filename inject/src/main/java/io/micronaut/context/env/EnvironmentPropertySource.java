@@ -18,8 +18,10 @@ package io.micronaut.context.env;
 import org.jspecify.annotations.Nullable;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * Loads properties from environment variables via {@link System#getenv()}.
@@ -28,6 +30,10 @@ import java.util.Map;
  * @since 1.0
  */
 public class EnvironmentPropertySource extends MapPropertySource {
+    /**
+     * Converts list elements defined as _0 or _0_ into names that the resolver can understand; i.e., [0].
+     */
+    private static final Pattern LIST_CONVERTER_REGEX = Pattern.compile("_([0-9]{1,2})(?:_|$)");
 
     /**
      * The position of the loader.
@@ -76,21 +82,22 @@ public class EnvironmentPropertySource extends MapPropertySource {
         return getEnv(CachedEnvironment.getenv(), includes, excludes);
     }
 
-    static Map<String, String> getEnv(Map<String, String> env, @Nullable List<String> includes, @Nullable List<String> excludes) {
-        if (includes != null || excludes != null) {
-            Map<String, String> result = new HashMap<>();
-            for (Map.Entry<String, String> entry : env.entrySet()) {
-                String envVar = entry.getKey();
-                if (excludes != null && excludes.contains(envVar)) {
-                    continue;
-                }
-                if (includes != null && !includes.contains(envVar)) {
-                    continue;
-                }
-                result.put(envVar, entry.getValue());
+    static Map getEnv(Map<String, String> env, @Nullable List<String> includes, @Nullable List<String> excludes) {
+        Map<String, String> result = new LinkedHashMap<>();
+        for (Map.Entry<String, String> entry : env.entrySet()) {
+            String envVar = entry.getKey();
+            if (excludes != null && excludes.contains(envVar)) {
+                continue;
             }
-            return result;
+            if (includes != null && !includes.contains(envVar)) {
+                continue;
+            }
+
+            String convertedEnvVar = LIST_CONVERTER_REGEX.matcher(envVar).replaceAll("[$1]");
+
+            result.put(convertedEnvVar, entry.getValue());
         }
-        return env;
+
+        return result;
     }
 }

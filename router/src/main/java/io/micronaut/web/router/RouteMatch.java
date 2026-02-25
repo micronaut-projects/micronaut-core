@@ -16,11 +16,13 @@
 package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import org.jspecify.annotations.Nullable;
 
+import java.io.Closeable;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
@@ -34,7 +36,7 @@ import java.util.concurrent.Callable;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface RouteMatch<R> extends Callable<R>, AnnotationMetadataProvider {
+public interface RouteMatch<R> extends Callable<R>, AnnotationMetadataProvider, Closeable {
 
     /**
      * @return The route info
@@ -126,4 +128,14 @@ public interface RouteMatch<R> extends Callable<R>, AnnotationMetadataProvider {
      */
     boolean isSatisfied(String name);
 
+    /**
+     * Close this route match, releasing any associated resources, in particular unused argument
+     * binding results.
+     *
+     * @since 5.0.0
+     */
+    @Override
+    @Experimental
+    default void close() {
+    }
 }

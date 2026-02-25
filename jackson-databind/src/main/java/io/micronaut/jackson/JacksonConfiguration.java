@@ -101,6 +101,7 @@ public class JacksonConfiguration implements JsonConfiguration {
     private PropertyNamingStrategy propertyNamingStrategy = null;
     private boolean alwaysSerializeErrorsAsList = true;
     private boolean trimStrings = false;
+    private boolean jackson2DatabindAnnotationSupport = true;
 
     /**
      * Whether Jackson modules should be scanned for.
@@ -483,6 +484,28 @@ public class JacksonConfiguration implements JsonConfiguration {
      */
     public void setTrimStrings(boolean trimStrings) {
         this.trimStrings = trimStrings;
+    }
+
+    /**
+     * Enable support for some jackson-databind 2.x annotations (in the
+     * com.fasterxml.jackson.databind.annotation package). Only works if the annotations are on the
+     * classpath at runtime.
+     *
+     * @return Whether to enable jackson-databind 2.x annotation support
+     */
+    public boolean isJackson2DatabindAnnotationSupport() {
+        return jackson2DatabindAnnotationSupport;
+    }
+
+    /**
+     * Enable support for some jackson-databind 2.x annotations (in the
+     * com.fasterxml.jackson.databind.annotation package). Only works if the annotations are on the
+     * classpath at runtime.
+     *
+     * @param jackson2DatabindAnnotationSupport Whether to enable jackson-databind 2.x annotation support
+     */
+    public void setJackson2DatabindAnnotationSupport(boolean jackson2DatabindAnnotationSupport) {
+        this.jackson2DatabindAnnotationSupport = jackson2DatabindAnnotationSupport;
     }
 
     /**

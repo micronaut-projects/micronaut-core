@@ -64,6 +64,8 @@ public interface BufferConsumer {
          * Signal that we want to start consuming bytes. This is an optional hint to the upstream,
          * the upstream may ignore it and send bytes immediately. This is used for CONTINUE
          * support.
+         * <p>
+         * Must be called exactly once.
          */
         default void start() {
         }

@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 package io.micronaut.buffer.netty;
+
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.io.buffer.ReadBufferFactory;
 import io.micronaut.core.util.functional.ThrowingConsumer;
@@ -30,8 +31,10 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
+import java.nio.channels.ScatteringByteChannel;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.Iterator;
 
 /**
  * Netty-based {@link ReadBufferFactory}. Also has additional utilities for dealing with netty
@@ -59,7 +62,7 @@ public final class NettyReadBufferFactory extends ReadBufferFactory {
 
     @Override
     public ReadBuffer createEmpty() {
-        return new NettyReadBuffer(Unpooled.EMPTY_BUFFER);
+        return adapt(Unpooled.EMPTY_BUFFER);
     }
 
     @Override
@@ -86,6 +89,27 @@ public final class NettyReadBufferFactory extends ReadBufferFactory {
             if (free) {
                 buffer.release();
             }
+        }
+    }
+
+    @Override
+    public @Nullable ReadBuffer copyOf(ScatteringByteChannel channel, int n) throws IOException {
+        ByteBuf bb = allocator.buffer(n);
+        int actual;
+        try {
+            actual = bb.writeBytes(channel, n);
+        } catch (Throwable e) {
+            bb.release();
+            throw e;
+        }
+        if (actual < 0) {
+            bb.release();
+            return null;
+        } else if (actual > 0) {
+            return adapt(bb);
+        } else {
+            bb.release();
+            return createEmpty();
         }
     }
 
@@ -221,6 +245,16 @@ public final class NettyReadBufferFactory extends ReadBufferFactory {
 
     @Override
     public ReadBuffer compose(Iterable<ReadBuffer> buffers) {
+        // shortcuts for buffers.size == 0 or 1
+        Iterator<ReadBuffer> itr = buffers.iterator();
+        if (!itr.hasNext()) {
+            return createEmpty();
+        } else {
+            ReadBuffer first = itr.next();
+            if (!itr.hasNext()) {
+                return first;
+            }
+        }
         CompositeByteBuf composite = allocator.compositeBuffer();
         try {
             for (ReadBuffer buffer : buffers) {

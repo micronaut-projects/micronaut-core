@@ -70,6 +70,10 @@ public final class StreamingNettyByteBody extends BaseStreamingByteBody<Streamin
         this.forceDelaySubscribe = forceDelaySubscribe;
     }
 
+    boolean isCompatible(EventLoop eventLoop) {
+        return sharedBuffer.eventLoop == eventLoop;
+    }
+
     @Override
     public BufferConsumer.Upstream primary(@Nullable BufferConsumer primary) {
         touch();
@@ -240,7 +244,9 @@ public final class StreamingNettyByteBody extends BaseStreamingByteBody<Streamin
 
         @Override
         public void add(ReadBuffer rb) {
-            assert eventLoop.inEventLoop();
+            if (!eventLoop.inEventLoop()) {
+                throw new IllegalStateException("Must only be called on event loop");
+            }
             adding = true;
             try {
                 super.add(rb);

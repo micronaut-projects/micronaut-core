@@ -21,11 +21,17 @@ import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.optim.StaticOptimizations;
 import io.micronaut.core.reflect.ClassUtils;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import reactor.core.publisher.Sinks;
 
+import java.io.Closeable;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -52,6 +58,7 @@ public class Publishers {
     private static final List<Class<?>> REACTIVE_TYPES;
     private static final List<Class<?>> SINGLE_TYPES;
     private static final List<Class<?>> COMPLETABLE_TYPES;
+    private static final Logger LOG = LoggerFactory.getLogger(Publishers.class);
 
     static {
         List<Class<?>> reactiveTypes;
@@ -564,6 +571,68 @@ public class Publishers {
 
     private static <T> IllegalArgumentException unconvertibleError(Object object, Class<T> publisherType) {
         return new IllegalArgumentException("Cannot convert reactive type [" + object.getClass() + "] to type [" + publisherType + "]. Ensure that you have the necessary Reactive module on your classpath. For example for Reactor you should have 'micronaut-reactor'.");
+    }
+
+    /**
+     * Eagerly subscribe to the given publisher, buffering elements until read from the returned
+     * publisher.
+     *
+     * @param source The source to read from
+     * @param <E> The element type
+     * @return The publisher to consume the buffered elements
+     * @since 5.0.0
+     */
+    public static <E> Publisher<E> bufferNow(@NonNull Publisher<E> source) {
+        Sinks.Many<E> sink = Sinks.many().unicast().onBackpressureBuffer();
+        var subscriber = new Subscriber<E>() {
+            @Nullable
+            volatile Subscription subscription;
+
+            void cancel() {
+                // best effort...
+                Subscription subscription = this.subscription;
+                if (subscription != null) {
+                    subscription.cancel();
+                }
+            }
+
+            @Override
+            public void onSubscribe(Subscription s) {
+                this.subscription = s;
+                s.request(Long.MAX_VALUE);
+            }
+
+            @Override
+            public void onNext(E e) {
+                if (sink.tryEmitNext(e).isFailure()) {
+                    discard(e);
+                }
+            }
+
+            void discard(Object e) {
+                if (e instanceof Closeable cl) {
+                    try {
+                        cl.close();
+                    } catch (IOException ex) {
+                        LOG.debug("Failed to close discarded item", ex);
+                    }
+                }
+            }
+
+            @Override
+            public void onError(Throwable t) {
+                sink.tryEmitError(t);
+            }
+
+            @Override
+            public void onComplete() {
+                sink.tryEmitComplete();
+            }
+        };
+        source.subscribe(subscriber);
+        return sink.asFlux()
+            .doOnCancel(subscriber::cancel)
+            .doOnDiscard(Object.class, subscriber::discard);
     }
 
     /**

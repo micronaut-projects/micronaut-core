@@ -538,7 +538,7 @@ class HttpPostSpec extends Specification {
                 consumes = MediaType.MULTIPART_FORM_DATA,
                 produces = MediaType.TEXT_PLAIN)
         String multipartCharset(CompletedFileUpload file) {
-            return file.fileUpload.getCharset()
+            return file.contentType.orElseThrow().charset.orElseThrow().toString()
         }
 
         @Post(uri = "/booleans")

@@ -20,6 +20,7 @@ import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
+import io.netty.util.IllegalReferenceCountException;
 import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
@@ -36,11 +37,32 @@ import java.util.function.Function;
  */
 @Internal
 final class NettyReadBuffer extends ReadBuffer {
+    /**
+     * If this is set, we copy the ByteBuf on ReadBuffer creation. This ensures it has its own
+     * reference count, so incorrectly releasing the original buffer will not leave this ReadBuffer
+     * in an invalid state. In practice this should not be necessary, but it can help with
+     * debugging.
+     */
+    private static final boolean STRICT_REFCNT = Boolean.getBoolean("io.micronaut.buffer.netty.NettyReadBuffer.STRICT_REFCNT");
+
     @Nullable
     ByteBuf buf;
 
     NettyReadBuffer(ByteBuf buf) {
-        this.buf = buf;
+        checkAccessible(buf);
+        if (STRICT_REFCNT) {
+            ByteBuf copy = buf.copy();
+            buf.release();
+            this.buf = copy;
+        } else {
+            this.buf = buf;
+        }
+    }
+
+    private static void checkAccessible(ByteBuf buf) {
+        if (buf.refCnt() <= 0) {
+            throw new IllegalReferenceCountException(buf.refCnt());
+        }
     }
 
     private ByteBuf getBuf() {
@@ -48,6 +70,7 @@ final class NettyReadBuffer extends ReadBuffer {
         if (buf == null) {
             throw new IllegalStateException("Already released");
         }
+        checkAccessible(buf);
         return buf;
     }
 

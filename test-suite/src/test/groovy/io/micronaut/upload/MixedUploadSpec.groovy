@@ -371,6 +371,7 @@ class MixedUploadSpec extends AbstractMicronautSpec {
 
     void "test the file is not corrupted with transferTo"() {
         given:
+        File file = new File(uploadDir, "bar-stream.json")
         Path toUpload = Files.createTempFile("random", "bytes")
         OutputStream outputStream = Files.newOutputStream(toUpload)
         int size = 1024 * 1024 * 10
@@ -398,12 +399,14 @@ class MixedUploadSpec extends AbstractMicronautSpec {
                         .accept(MediaType.TEXT_PLAIN_TYPE), String
         ))
         HttpResponse<String> response = flowable.blockFirst()
-        File file = new File(uploadDir, "bar-stream.json")
-        file.deleteOnExit()
 
         then:
         response.code() == HttpStatus.OK.code
         calculateMd5(file.toPath()) == originalmd5
+
+        cleanup:
+        Files.deleteIfExists(toUpload)
+        Files.deleteIfExists(file.toPath())
     }
 
     void "test reading a CompletedFileUpload input stream and closing it multiple times"() {

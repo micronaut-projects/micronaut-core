@@ -23,10 +23,7 @@ import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
-import io.micronaut.http.annotation.Body;
-import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
-import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.server.RequestLifecycle;
 import io.micronaut.http.server.netty.handler.OutboundAccess;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
@@ -35,7 +32,6 @@ import io.micronaut.http.server.types.files.SystemFile;
 import io.micronaut.web.router.RouteMatch;
 import io.netty.handler.codec.DecoderResult;
 import io.netty.handler.codec.TooLongFrameException;
-import io.netty.handler.codec.http.DefaultHttpContent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -138,29 +134,7 @@ final class NettyRequestLifecycle extends RequestLifecycle {
         if (decoderResult.isFailure()) {
             return ExecutionFlow.error(decoderResult.cause());
         }
-        return super.fulfillArguments(routeMatch, request).flatMap(this::waitForBody);
-    }
-
-    /**
-     * If necessary (e.g. when there's a {@link Body} parameter), wait for the body to come in.
-     * This method also sometimes fulfills more controller parameters with form data.
-     */
-    private ExecutionFlow<RouteMatch<?>> waitForBody(RouteMatch<?> routeMatch) {
-        // if there is a binder that needs form content, actually process the body now. We need to
-        // do this after all binders are done because all createClaimant calls must be done before
-        // the FormRouteCompleter can process data.
-        if (Objects.requireNonNull(nettyRequest).hasFormRouteCompleter()) {
-            FormDataHttpContentProcessor processor = new FormDataHttpContentProcessor(nettyRequest, rib.serverConfiguration);
-            ByteBody rootBody = nettyRequest.byteBody();
-            FormRouteCompleter formRouteCompleter = nettyRequest.formRouteCompleter();
-            try {
-                HttpContentProcessorAsReactiveProcessor.asPublisher(processor, NettyByteBodyFactory.toByteBufs(rootBody).map(DefaultHttpContent::new)).subscribe(formRouteCompleter);
-                nettyRequest.addRouteWaitsFor(formRouteCompleter.getExecute());
-            } catch (Throwable e) {
-                return ExecutionFlow.error(e);
-            }
-        }
-        return nettyRequest.getRouteWaitsFor().map(v -> routeMatch);
+        return super.fulfillArguments(routeMatch, request);
     }
 
     void handleException(NettyHttpRequest<?> nettyRequest, Throwable cause) {

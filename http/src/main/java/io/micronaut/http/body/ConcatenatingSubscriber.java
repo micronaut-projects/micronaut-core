@@ -16,13 +16,14 @@
 package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.Nullable;
+import io.micronaut.core.io.buffer.LeakTracker;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.io.buffer.ReadBufferFactory;
 import io.micronaut.http.body.stream.BaseSharedBuffer;
 import io.micronaut.http.body.stream.BaseStreamingByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
 import reactor.core.CoreSubscriber;
@@ -187,6 +188,9 @@ public class ConcatenatingSubscriber implements BufferConsumer.Upstream, CoreSub
     public final void start() {
         Subscription initialDemand;
         synchronized (this) {
+            if (start) {
+                throw new IllegalStateException("Already started");
+            }
             initialDemand = subscription;
             start = true;
         }
@@ -326,7 +330,7 @@ public class ConcatenatingSubscriber implements BufferConsumer.Upstream, CoreSub
         /**
          * {@link #jsonSeparators(ReadBufferFactory)} using {@link ReadBufferFactory#getJdkFactory()}.
          */
-        public static final Separators JDK_JSON = jsonSeparators(ReadBufferFactory.getJdkFactory());
+        public static final Separators JDK_JSON = LeakTracker.Factory.staticInitializer(() -> jsonSeparators(ReadBufferFactory.getJdkFactory()));
 
         /**
          * Create the appropriate separators for JSON using the given buffer factory.

@@ -2,7 +2,6 @@ package io.micronaut.http.server.netty
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
-import org.jspecify.annotations.NonNull
 import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
@@ -13,7 +12,6 @@ import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.client.multipart.MultipartBody
 import io.micronaut.http.multipart.CompletedFileUpload
-import io.micronaut.http.multipart.FileUpload
 import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.bootstrap.Bootstrap
 import io.netty.buffer.Unpooled
@@ -51,6 +49,7 @@ import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler
 import io.netty.handler.ssl.SslContextBuilder
 import io.netty.handler.ssl.SupportedCipherSuiteFilter
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory
+import org.jspecify.annotations.NonNull
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import spock.lang.Ignore
@@ -522,11 +521,11 @@ class MaxRequestSizeSpec extends Specification {
                          CompletedFileUpload c,
                          CompletedFileUpload d,
                          CompletedFileUpload e) {
-            a.discard()
-            b.discard()
-            c.discard()
-            d.discard()
-            e.discard()
+            a.close()
+            b.close()
+            c.close()
+            d.close()
+            e.close()
             "OK"
         }
 
@@ -534,7 +533,6 @@ class MaxRequestSizeSpec extends Specification {
         @SingleResult
         Publisher<String> multipart(@Body io.micronaut.http.server.multipart.MultipartBody body) {
             return Flux.from(body).map {
-                if (it instanceof FileUpload) it.discard()
                 return it
             }.collectList().map({ list -> "OK" })
         }

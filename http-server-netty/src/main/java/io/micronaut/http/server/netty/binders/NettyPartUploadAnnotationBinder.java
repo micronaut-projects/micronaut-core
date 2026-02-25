@@ -14,18 +14,24 @@
  * limitations under the License.
  */
 package io.micronaut.http.server.netty.binders;
+
+import io.micronaut.context.BeanProvider;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.type.Argument;
+import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.annotation.Part;
 import io.micronaut.http.bind.binders.AnnotatedRequestArgumentBinder;
 import io.micronaut.http.bind.binders.PendingRequestBindingResult;
 import io.micronaut.http.bind.binders.RequestArgumentBinder;
-import io.micronaut.http.server.netty.NettyHttpRequest;
-import io.micronaut.http.server.netty.converters.NettyConverters;
+import io.micronaut.http.form.FormCapableHttpRequest;
+import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
+import io.micronaut.http.server.multipart.FormFactory;
+import io.micronaut.http.server.multipart.FormRouteCompleter;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
@@ -44,18 +50,21 @@ final class NettyPartUploadAnnotationBinder<T> implements AnnotatedRequestArgume
     private final ConversionService conversionService;
     private final NettyCompletedFileUploadBinder completedFileUploadBinder;
     private final NettyPublisherPartUploadBinder publisherPartUploadBinder;
+    private final BeanProvider<FormFactory> formFactory;
 
     NettyPartUploadAnnotationBinder(ConversionService conversionService,
-                                           NettyCompletedFileUploadBinder completedFileUploadBinder,
-                                           NettyPublisherPartUploadBinder publisherPartUploadBinder) {
+                                    NettyCompletedFileUploadBinder completedFileUploadBinder,
+                                    NettyPublisherPartUploadBinder publisherPartUploadBinder,
+                                    BeanProvider<FormFactory> formFactory) {
         this.conversionService = conversionService;
         this.completedFileUploadBinder = completedFileUploadBinder;
         this.publisherPartUploadBinder = publisherPartUploadBinder;
+        this.formFactory = formFactory;
     }
 
     @Override
     public BindingResult<T> bind(ArgumentConversionContext<T> context, HttpRequest<?> request) {
-        if (!(request instanceof NettyHttpRequest<?> nettyRequest) || !nettyRequest.isFormOrMultipartData()) {
+        if (!(request instanceof FormCapableHttpRequest<?> nettyRequest) || !nettyRequest.hasFormBody()) {
             return BindingResult.unsatisfied();
         }
         if (completedFileUploadBinder.matches(context.getArgument().getType())) {
@@ -68,16 +77,32 @@ final class NettyPartUploadAnnotationBinder<T> implements AnnotatedRequestArgume
         Argument<T> argument = context.getArgument();
         String inputName = argument.getAnnotationMetadata().stringValue(Bindable.NAME).orElse(argument.getName());
 
-        return bindPart(conversionService, context, nettyRequest, inputName, false);
+        return bindPart(conversionService, context, formFactory.get(), nettyRequest, inputName, false);
     }
 
-    static <T> BindingResult<T> bindPart(ConversionService conversionService, ArgumentConversionContext<T> context, NettyHttpRequest<?> nettyRequest, String inputName, boolean skipClaimed) {
-        if (skipClaimed && nettyRequest.formRouteCompleter().isClaimed(inputName)) {
+    static <T> BindingResult<T> bindPart(ConversionService conversionService, ArgumentConversionContext<T> context, FormFactory formFactory, FormCapableHttpRequest<?> nettyRequest, String inputName, boolean skipClaimed) {
+        FormRouteCompleter completer = formFactory.getOrCreateCompleter(nettyRequest);
+        if (skipClaimed && completer.isClaimed(inputName)) {
             return BindingResult.unsatisfied();
         }
-        CompletableFuture<Optional<T>> completableFuture = Mono.from(nettyRequest.formRouteCompleter().claimFieldsComplete(inputName))
-            .map(d -> NettyConverters.refCountAwareConvert(conversionService, d, context))
+        CompletableFuture<Optional<T>> completableFuture = Mono.from(completer.subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.WAITS_FOR_FULL, context.getArgument())))
+            .flatMap(rff -> Mono.from(ReactiveExecutionFlow.toPublisher(formFactory.completePart(nettyRequest, rff))))
+            .map(d -> {
+                boolean skipClose = false;
+                try {
+                    Optional<T> converted = conversionService.convert(d, context);
+                    if (converted.isPresent() && converted.get() == d) {
+                        skipClose = true;
+                    }
+                    return converted;
+                } finally {
+                    if (!skipClose) {
+                        d.closeAsync(formFactory.getDiskWriteExecutor());
+                    }
+                }
+            })
             .toFuture();
+        BasicHttpAttributes.addRouteWaitsFor(nettyRequest, CompletableFutureExecutionFlow.just(completableFuture));
 
         return new PendingRequestBindingResult<>() {
 

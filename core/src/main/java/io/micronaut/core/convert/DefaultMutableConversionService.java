@@ -27,6 +27,7 @@ import io.micronaut.core.convert.format.ReadableBytesTypeConverter;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.convert.value.ConvertibleValuesMap;
 import io.micronaut.core.io.IOUtils;
+import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.reflect.ClassUtils;
@@ -199,7 +200,6 @@ public class DefaultMutableConversionService implements MutableConversionService
         }
 
         @Override
-        @Nullable
         public <T> T convertRequired(@Nullable Object value, Class<T> type) {
             return DefaultMutableConversionService.this.convertRequired(value, type);
         }
@@ -451,16 +451,16 @@ public class DefaultMutableConversionService implements MutableConversionService
         addInternalConverter(AnnotationClassValue.class, Object.class, (object, targetType, context) -> {
             if (targetType.equals(Class.class)) {
                 return object.getType();
+            } else if (CharSequence.class.isAssignableFrom(targetType)) {
+                return Optional.of(object.getName());
+            } else if (targetType.isArray() && CharSequence.class.isAssignableFrom(targetType.getComponentType())) {
+                return Optional.of(new String[] {object.getName()});
             } else {
-                if (CharSequence.class.isAssignableFrom(targetType)) {
-                    return Optional.of(object.getName());
-                } else {
-                    Optional i = object.getInstance();
-                    if (i.isPresent() && targetType.isInstance(i.get())) {
-                        return i;
-                    }
-                    return Optional.empty();
+                Optional i = object.getInstance();
+                if (i.isPresent() && targetType.isInstance(i.get())) {
+                    return i;
                 }
+                return Optional.empty();
             }
         });
         addInternalConverter(AnnotationClassValue[].class, Class.class, (object, targetType, context) -> {
@@ -1175,6 +1175,11 @@ public class DefaultMutableConversionService implements MutableConversionService
         addInternalConverter(CharSequence.class, Proxy.Type.class, new CharSequenceToEnumConverter<>());
         // Boolean -> String
         addInternalConverter(Boolean.class, String.class, Object::toString);
+
+        // ReadBuffer
+        addInternalConverter(ReadBuffer.class, byte[].class, (object, targetType, context) -> Optional.of(object.toArray()));
+        addInternalConverter(ReadBuffer.class, String.class, (object, targetType, context) -> Optional.of(object.toString(context.getCharset())));
+        addInternalConverter(ReadBuffer.class, InputStream.class, (object, targetType, context) -> Optional.of(object.toInputStream()));
 
         Collection<TypeConverterRegistrar> registrars = new ArrayList<>();
         SoftServiceLoader.load(TypeConverterRegistrar.class)

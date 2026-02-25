@@ -26,6 +26,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.ScatteringByteChannel;
 import java.nio.charset.Charset;
 
 /**
@@ -81,6 +82,26 @@ public class ReadBufferFactory {
      */
     public ReadBuffer copyOf(InputStream stream) throws IOException {
         return adapt(stream.readAllBytes());
+    }
+
+    /**
+     * Read some bytes from a {@link ScatteringByteChannel}. This is a blocking operation.
+     *
+     * @param channel The channel to read from
+     * @param n The maximum number of bytes to read
+     * @return The bytes read, or {@code null} if we hit EOF
+     */
+    public @Nullable ReadBuffer copyOf(ScatteringByteChannel channel, int n) throws IOException {
+        ByteBuffer buffer = ByteBuffer.allocate(n);
+        int read = channel.read(buffer);
+        if (read < 0) {
+            return null;
+        } else if (read > 0) {
+            buffer.flip();
+            return adapt(buffer);
+        } else {
+            return createEmpty();
+        }
     }
 
     /**
@@ -217,8 +238,15 @@ public class ReadBufferFactory {
     public ReadBuffer compose(Iterable<ReadBuffer> buffers) {
         try {
             int capacity = 0;
+            int n = 0;
             for (ReadBuffer buffer : buffers) {
                 capacity = Math.addExact(capacity, buffer.readable());
+                n++;
+            }
+            if (n == 0) {
+                return createEmpty();
+            } else if (n == 1) {
+                return buffers.iterator().next();
             }
             try (BufferingOutputStream bos = outputStreamBuffer(capacity)) {
                 for (ReadBuffer buffer : buffers) {

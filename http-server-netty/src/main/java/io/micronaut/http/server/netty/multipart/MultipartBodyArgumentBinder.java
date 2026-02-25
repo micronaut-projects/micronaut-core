@@ -21,23 +21,14 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
+import io.micronaut.http.form.FormCapableHttpRequest;
 import io.micronaut.http.multipart.CompletedPart;
-import io.micronaut.http.netty.body.NettyByteBodyFactory;
+import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
+import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.http.server.multipart.MultipartBody;
-import io.micronaut.http.server.netty.FormDataHttpContentProcessor;
-import io.micronaut.http.server.netty.HttpContentProcessorAsReactiveProcessor;
-import io.micronaut.http.server.netty.NettyHttpRequest;
-import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
-import io.netty.handler.codec.http.DefaultHttpContent;
-import io.netty.handler.codec.http.multipart.Attribute;
-import io.netty.handler.codec.http.multipart.FileUpload;
-import io.netty.handler.codec.http.multipart.HttpData;
-import io.netty.util.ReferenceCounted;
 import reactor.core.publisher.Flux;
 
-import java.util.HashSet;
 import java.util.Optional;
-import java.util.Set;
 
 /**
  * A {@link io.micronaut.http.annotation.Body} argument binder for a {@link MultipartBody} argument.
@@ -47,15 +38,15 @@ import java.util.Set;
  */
 @Internal
 public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinder<MultipartBody> {
-    private final BeanProvider<NettyHttpServerConfiguration> httpServerConfiguration;
+    private final BeanProvider<FormFactory> formFactory;
 
     /**
      * Default constructor.
      *
-     * @param httpServerConfiguration The server configuration
+     * @param formFactory Form utilities
      */
-    public MultipartBodyArgumentBinder(BeanProvider<NettyHttpServerConfiguration> httpServerConfiguration) {
-        this.httpServerConfiguration = httpServerConfiguration;
+    public MultipartBodyArgumentBinder(BeanProvider<FormFactory> formFactory) {
+        this.formFactory = formFactory;
     }
 
     @Override
@@ -65,30 +56,12 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
 
     @Override
     public BindingResult<MultipartBody> bind(ArgumentConversionContext<MultipartBody> context, HttpRequest<?> source) {
-        if (source instanceof NettyHttpRequest<?> nhr) {
-            FormDataHttpContentProcessor processor = new FormDataHttpContentProcessor(nhr, httpServerConfiguration.get());
-            Flux<HttpData> multiObjectBody;
-            try {
-                multiObjectBody = HttpContentProcessorAsReactiveProcessor.asPublisher(processor, NettyByteBodyFactory.toByteBufs(nhr.byteBody()).map(DefaultHttpContent::new));
-            } catch (Throwable e) {
-                return () -> Optional.of(Flux.<CompletedPart>error(e)::subscribe);
-            }
-            Set<ReferenceCounted> partial = new HashSet<>();
-            Flux<CompletedPart> completed = multiObjectBody.mapNotNull(message -> {
-                if (message.isCompleted() && message.length() != 0) {
-                    partial.remove(message);
-                    if (message instanceof FileUpload fu) {
-                        return new NettyCompletedFileUpload(fu, true);
-                    } else {
-                        return new NettyCompletedAttribute((Attribute) message, true);
-                    }
-                } else {
-                    partial.add(message);
-                    return null;
-                }
-            }).doOnTerminate(() -> partial.forEach(ReferenceCounted::release));
-            return () -> Optional.of(completed::subscribe);
+        if (!(source instanceof FormCapableHttpRequest<?> fchr) || !fchr.hasFormBody()) {
+            return BindingResult.empty();
         }
-        return BindingResult.empty();
+        Flux<? extends CompletedPart> parts = Flux.from(fchr.getRawFormFields())
+            .flatMap(raw -> ReactiveExecutionFlow.toPublisher(formFactory.get().completePart(fchr, raw)))
+            .doOnDiscard(CompletedPart.class, p -> p.closeAsync(formFactory.get().getDiskWriteExecutor()));
+        return () -> Optional.of(parts::subscribe);
     }
 }

@@ -16,10 +16,10 @@
 package io.micronaut.core.reflect;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.optim.StaticOptimizations;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.helpers.NOPLogger;
@@ -353,7 +353,8 @@ public class ClassUtils {
             if (!type.getComponentType().isPrimitive()) {
                 hierarchy.add(Object[].class);
             }
-        } else {
+        }
+        if (!type.isPrimitive()) {
             hierarchy.add(Object.class);
         }
 
