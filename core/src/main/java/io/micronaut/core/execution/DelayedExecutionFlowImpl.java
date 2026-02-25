@@ -23,6 +23,7 @@ import org.slf4j.LoggerFactory;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -201,10 +202,15 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
 
     @Override
     public void cancel() {
+        cancel(null);
+    }
+
+    @Override
+    public void cancel(@Nullable Consumer<T> discard) {
         if (cancelled) {
             return;
         }
-        next(new Cancel());
+        next(new Cancel(discard));
         cancelled = true;
         Runnable hook = this.onCancel;
         if (hook != null) {
@@ -449,10 +455,20 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
 
     private static final class Cancel<E> extends Step<E, E> {
         private static final ExecutionFlow ERR = ExecutionFlow.error(new AssertionError("Should never be hit, no further steps are allowed after cancel"));
+        @Nullable
+        private final Consumer<E> discard;
+
+        public Cancel(@Nullable Consumer<E> discard) {
+            this.discard = discard;
+        }
 
         @Override
         ExecutionFlow<E> apply(ExecutionFlow<E> input) {
-            input.cancel();
+            if (discard == null) {
+                input.cancel();
+            } else {
+                input.cancel(discard);
+            }
             return ERR;
         }
     }

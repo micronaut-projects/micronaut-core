@@ -17,7 +17,6 @@ package io.micronaut.http.server.netty.handler;
 
 import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.util.NativeImageUtils;
 import io.micronaut.http.body.AvailableByteBody;
@@ -67,6 +66,7 @@ import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
@@ -203,6 +203,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      * Call {@code ctx.read()} if necessary.
      */
     private void refreshNeedMore() {
+        assert ctx != null;
         // if readCalled is true, ctx.read() is already called and we haven't seen the associated readComplete yet.
 
         // needMore is false if there is downstream backpressure.
@@ -217,7 +218,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     }
 
     @Override
-    public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
+    public void handlerAdded(ChannelHandlerContext ctx) {
         this.ctx = ctx;
         // we take control of reading now.
         ctx.channel().config().setAutoRead(false);
@@ -225,7 +226,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     }
 
     @Override
-    public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
+    public void handlerRemoved(ChannelHandlerContext ctx) {
         removed = true;
         if (outboundHandler != null) {
             outboundHandler.discardOutbound();
@@ -247,7 +248,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     }
 
     @Override
-    public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
+    public void channelReadComplete(ChannelHandlerContext ctx) {
         inboundHandler.readComplete();
         reading = false;
         // only unset readCalled now. This ensures no read call is done before channelReadComplete
@@ -260,12 +261,12 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     }
 
     @Override
-    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
         inboundHandler.handleUpstreamError(cause);
     }
 
     @Override
-    public void channelWritabilityChanged(ChannelHandlerContext ctx) throws Exception {
+    public void channelWritabilityChanged(ChannelHandlerContext ctx) {
         writeSome();
     }
 
@@ -288,6 +289,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      * @param close   {@code true} iff the channel should be closed after this message
      */
     private ChannelFuture write(Object message, boolean flush, boolean close, boolean needsPromise) {
+        assert ctx != null;
         if (close) {
             return requiredCtx().writeAndFlush(message)
                 .addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE)
@@ -315,6 +317,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      * Write some data if possible.
      */
     private void writeSome() {
+        assert ctx != null;
         if (writing) {
             // already inside writeSome
             return;
@@ -350,8 +353,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         return OptionalLong.of(1);
     }
 
+    @SuppressWarnings("resource")
     @Override
     public CompletionStage<?> shutdownGracefully() {
+        assert ctx != null;
         if (requiredCtx().executor().inEventLoop()) {
             shutdownGracefully0();
         } else {
@@ -362,6 +367,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     }
 
     private void shutdownGracefully0() {
+        assert ctx != null;
         /*
          * - if there is no in-flight request, close immediately.
          * - if there is one or more request where the response headers have not been sent yet, send `connection: close` for the last of them
@@ -379,6 +385,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     }
 
     private NettyByteBodyFactory byteBodyFactory() {
+        assert ctx != null;
         return new NettyByteBodyFactory(requiredCtx().channel());
     }
 
@@ -421,6 +428,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     private final class MessageInboundHandler extends InboundHandler {
         @Override
         void read(Object message) {
+            assert ctx != null;
             HttpRequest request = (HttpRequest) message;
             OutboundAccessImpl outboundAccess = new OutboundAccessImpl(request);
             outboundQueue.add(outboundAccess);
@@ -500,8 +508,6 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                     } else {
                         contentEncoding = transferEncoding.trim();
                     }
-                } else {
-                    contentEncoding = null;
                 }
             }
             return contentEncoding;
@@ -559,6 +565,9 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 this.request = null;
                 OutboundAccess outboundAccess = this.outboundAccess;
                 this.outboundAccess = null;
+                assert ctx != null;
+                assert request != null;
+                assert outboundAccess != null;
                 requestHandler.accept(requiredCtx(), Objects.requireNonNull(request), byteBodyFactory().createChecked(bodySizeLimits, fullBody), Objects.requireNonNull(outboundAccess));
 
                 inboundHandler = baseInboundHandler;
@@ -578,12 +587,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         private void devolveToStreaming() {
-            HttpRequest request = this.request;
-            OutboundAccessImpl outboundAccess = this.outboundAccess;
+            HttpRequest request = Objects.requireNonNull(this.request);
+            OutboundAccessImpl outboundAccess = Objects.requireNonNull(this.outboundAccess);
             this.request = null;
             this.outboundAccess = null;
 
             StreamingInboundHandler streamingInboundHandler = new StreamingInboundHandler(Objects.requireNonNull(outboundAccess), HttpUtil.is100ContinueExpected(request));
+            streamingInboundHandler.dest.setExpectedLengthFrom(request.headers());
             for (HttpContent content : buffer) {
                 streamingInboundHandler.read(content);
             }
@@ -594,8 +604,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             } else {
                 ((DecompressingInboundHandler) inboundHandler).delegate = streamingInboundHandler;
             }
-            streamingInboundHandler.dest.setExpectedLengthFrom(Objects.requireNonNull(request).headers());
-            requestHandler.accept(requiredCtx(), request, new StreamingNettyByteBody(streamingInboundHandler.dest), outboundAccess);
+            requestHandler.accept(Objects.requireNonNull(ctx), request, new StreamingNettyByteBody(streamingInboundHandler.dest), outboundAccess);
         }
 
         @Override
@@ -655,6 +664,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         public void start() {
+            assert ctx != null;
             EventLoop eventLoop = requiredCtx().channel().eventLoop();
             if (!eventLoop.inEventLoop()) {
                 eventLoop.execute(this::start);
@@ -669,6 +679,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         public void onBytesConsumed(long bytesConsumed) {
+            assert ctx != null;
             EventLoop eventLoop = requiredCtx().channel().eventLoop();
             if (!eventLoop.inEventLoop()) {
                 eventLoop.execute(() -> onBytesConsumed(bytesConsumed));
@@ -1004,6 +1015,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             if (compressor == null) {
                 return;
             }
+            assert ctx != null;
             Compressor.Session compressionSession = compressor.prepare(requiredCtx(), request, response, contentLength);
             if (compressionSession != null) {
                 // if content-length and transfer-encoding are unset, we will close anyway.
@@ -1038,11 +1050,12 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 writePotentialEnd(content, flush, shouldCloseAfterContent(last));
             } else {
                 // slow path
-                writeCompressing0(compressionSession, content, flush, last);
+                writeCompressing0(content, flush, last);
             }
         }
 
         void writePotentialEnd(Object content, boolean flush, boolean close) {
+            assert ctx != null;
             boolean record = outboundAccess.jfrEvent != null && content instanceof LastHttpContent;
             ChannelFuture future = write(content, flush, close, record);
             if (record) {
@@ -1058,7 +1071,8 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             }
         }
 
-        private void writeCompressing0(Compressor.Session compressionSession, HttpContent content, boolean flush, boolean last) {
+        private void writeCompressing0(HttpContent content, boolean flush, boolean last) {
+            Compressor.Session compressionSession = Objects.requireNonNull(this.compressionSession);
             compressionSession.push(content.content());
             if (last) {
                 compressionSession.finish();
@@ -1198,6 +1212,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         void writeSome() {
+            assert upstream != null;
             if (initialMessage != null) {
                 write(initialMessage, false, false, false);
                 initialMessage = null;
@@ -1252,6 +1267,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         private void error0(Throwable t) {
+            assert ctx != null;
             if (!removed) {
                 if (LOG.isWarnEnabled()) {
                     LOG.warn("Reactive response received an error after some data has already been written. This error cannot be forwarded to the client.", t);

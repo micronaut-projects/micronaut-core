@@ -49,7 +49,7 @@ import java.util.concurrent.CompletableFuture;
  * @since 4.5.0
  */
 @Experimental
-public interface ByteBody {
+public sealed interface ByteBody permits AvailableByteBody, CloseableByteBody, InternalByteBody {
     /**
      * Equivalent to {@code split(SplitBackpressureMode.SLOWEST)}.
      *

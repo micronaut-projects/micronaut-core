@@ -111,6 +111,7 @@ class FileUploadSpec extends Specification {
         @Post(value = '/complete-file-upload', consumes = MediaType.MULTIPART_FORM_DATA)
         String completeFileUpload(CompletedFileUpload data) {
             def bytes = data.inputStream.bytes
+            data.close()
             return "Uploaded ${bytes.length} bytes"
         }
 
@@ -125,7 +126,7 @@ class FileUploadSpec extends Specification {
             return Flux.from(files)
                     .collectList()
                     .map { l ->
-                        l.forEach { it.discard() }
+                        l.forEach { it.close() }
                         "Files: " + l.size()
                     }
         }

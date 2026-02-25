@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.binders;
 
+import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
@@ -25,6 +26,7 @@ import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.propagation.PropagatedContext;
+import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
@@ -33,29 +35,29 @@ import io.micronaut.http.bind.binders.PendingRequestBindingResult;
 import io.micronaut.http.body.AvailableByteBody;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.CloseableAvailableByteBody;
+import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.context.ServerHttpRequestContext;
+import io.micronaut.http.form.FormCapableHttpRequest;
+import io.micronaut.http.multipart.RawFormField;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
-import io.micronaut.http.server.netty.FormDataHttpContentProcessor;
-import io.micronaut.http.server.netty.FormRouteCompleter;
-import io.micronaut.http.server.netty.MicronautHttpData;
+import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.converters.NettyConverters;
 import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteInfo;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
-import io.netty.buffer.ByteBufHolder;
-import io.netty.buffer.CompositeByteBuf;
-import io.netty.handler.codec.http.DefaultLastHttpContent;
-import io.netty.handler.codec.http.multipart.InterfaceHttpData;
 import org.jspecify.annotations.Nullable;
+import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
+import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -64,20 +66,23 @@ import java.util.Optional;
 final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> {
     final NettyHttpServerConfiguration httpServerConfiguration;
     final MessageBodyHandlerRegistry bodyHandlerRegistry;
+    final BeanProvider<FormFactory> formFactory;
 
     NettyBodyAnnotationBinder(ConversionService conversionService,
                               NettyHttpServerConfiguration httpServerConfiguration,
-                                     MessageBodyHandlerRegistry bodyHandlerRegistry) {
+                              MessageBodyHandlerRegistry bodyHandlerRegistry,
+                              BeanProvider<FormFactory> formFactory) {
         super(conversionService);
         this.httpServerConfiguration = httpServerConfiguration;
         this.bodyHandlerRegistry = bodyHandlerRegistry;
+        this.formFactory = formFactory;
     }
 
     @Override
     protected BindingResult<T> bindBodyPart(ArgumentConversionContext<T> context, HttpRequest<?> source, String bodyComponent) {
-        if (source instanceof NettyHttpRequest<?> nhr && nhr.isFormOrMultipartData()) {
+        if (source instanceof FormCapableHttpRequest<?> nhr && nhr.hasFormBody()) {
             // skipClaimed=true because for unmatched binding, both this binder and PartUploadAnnotationBinder can be called on the same parameter
-            return NettyPartUploadAnnotationBinder.bindPart(conversionService, context, nhr, bodyComponent, true);
+            return NettyPartUploadAnnotationBinder.bindPart(conversionService, context, formFactory.get(), nhr, bodyComponent, true);
         } else {
             return super.bindBodyPart(context, source, bodyComponent);
         }
@@ -121,7 +126,7 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
             {
                 // NettyRequestLifecycle will "subscribe" to the execution flow added to routeWaitsFor,
                 // so we can't subscribe directly ourselves. Instead, use the side effect of a map.
-                nhr.addRouteWaitsFor(buffered.flatMap(imm -> {
+                BasicHttpAttributes.addRouteWaitsFor(nhr, buffered.flatMap(imm -> {
                     try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(nhr)).propagate()) {
                         result = transform(nhr, context, imm);
                         return ExecutionFlow.just(null);
@@ -159,44 +164,13 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
         if (mediaType != null && (reader == null || !reader.isReadable(context.getArgument(), mediaType))) {
             reader = bodyHandlerRegistry.findReader(context.getArgument(), List.of(mediaType)).orElse(null);
         }
-        if (reader == null && nhr.isFormOrMultipartData()) {
-            FormDataHttpContentProcessor processor = new FormDataHttpContentProcessor(nhr, httpServerConfiguration);
-            ByteBuf buf = NettyByteBodyFactory.toByteBuf(imm);
-            List<InterfaceHttpData> data = new ArrayList<>();
-            if (buf.isReadable()) {
-                processor.add(new DefaultLastHttpContent(buf), data);
-            } else {
-                buf.release();
+        if (reader == null && nhr.hasFormBody()) {
+            Map<String, List<CloseableByteBody>> bodies = new LinkedHashMap<>();
+            for (RawFormField rff : toListNow(nhr.getRawFormFields(imm))) {
+                bodies.computeIfAbsent(rff.metadata().name(), k -> new ArrayList<>(1)).add(rff.byteBody());
             }
-            processor.complete(data);
-            boolean allFormData = true;
-            for (Object object : data) {
-                if (!(object instanceof MicronautHttpData<?>)) {
-                    allFormData = false;
-                    break;
-                }
-            }
-            Object intermediate;
-            if (allFormData) {
-                @SuppressWarnings({"unchecked", "rawtypes"})
-                List<? extends MicronautHttpData<?>> formData = (List) data;
-                Map<String, Object> map = FormRouteCompleter.toMap(httpServerConfiguration.getDefaultCharset(), formData);
-                for (MicronautHttpData<?> datum : formData) {
-                    datum.release();
-                }
-                intermediate = map;
-            } else if (data.size() == 1) {
-                intermediate = data.getFirst();
-                if (intermediate instanceof ByteBufHolder bbh) {
-                    intermediate = bbh.content();
-                }
-            } else {
-                intermediate = coerceToComposite(data, nhr.getChannelHandlerContext().alloc());
-            }
-            Optional<T> converted =
-                intermediate instanceof io.netty.util.ReferenceCounted rc ?
-                    NettyConverters.refCountAwareConvert(conversionService, rc, context) :
-                    conversionService.convert(intermediate, context);
+            Object intermediate = io.micronaut.http.server.multipart.FormRouteCompleter.mapForGetBody(bodies, nhr.getCharacterEncoding());
+            Optional<T> converted = conversionService.convert(intermediate, context);
             nhr.setLegacyBody(converted.orElse(null));
             return converted;
         }
@@ -212,12 +186,42 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
         return converted;
     }
 
-    private static CompositeByteBuf coerceToComposite(List<?> objects, ByteBufAllocator alloc) {
-        CompositeByteBuf composite = alloc.compositeBuffer();
-        for (Object object : objects) {
-            composite.addComponent(true, (ByteBuf) object);
+    private static <T> List<T> toListNow(Flux<T> flux) {
+        var sub = new Subscriber<T>() {
+            final List<T> list = new ArrayList<>();
+            boolean complete = false;
+            @Nullable
+            Throwable error = null;
+
+            @Override
+            public void onSubscribe(Subscription s) {
+                s.request(Long.MAX_VALUE);
+            }
+
+            @Override
+            public void onNext(T t) {
+                list.add(t);
+            }
+
+            @Override
+            public void onError(Throwable t) {
+                error = t;
+                complete = true;
+            }
+
+            @Override
+            public void onComplete() {
+                complete = true;
+            }
+        };
+        flux.subscribe(sub);
+        if (!sub.complete) {
+            throw new IllegalStateException("Flux did not finish immediately");
         }
-        return composite;
+        if (sub.error != null) {
+            throw new IllegalStateException("Failed to load form fields", sub.error);
+        }
+        return sub.list;
     }
 
     @Nullable

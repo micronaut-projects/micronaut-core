@@ -23,6 +23,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -149,4 +150,10 @@ final class ImperativeExecutionFlowImpl implements ImperativeExecutionFlow<Objec
         return CompletableFuture.completedFuture(value);
     }
 
+    @Override
+    public void cancel(Consumer<Object> discard) {
+        if (value != null) {
+            discard.accept(value);
+        }
+    }
 }

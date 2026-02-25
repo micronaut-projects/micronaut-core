@@ -18,7 +18,6 @@ package io.micronaut.http.body;
 import io.micronaut.core.annotation.Blocking;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.io.buffer.ReadBuffer;
@@ -31,6 +30,8 @@ import io.micronaut.http.body.stream.BaseSharedBuffer;
 import io.micronaut.http.body.stream.BaseStreamingByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 
 import java.io.IOException;
@@ -203,6 +204,31 @@ public class ByteBodyFactory {
     @Internal
     protected AbstractBodyAdapter createBodyAdapter(Publisher<ReadBuffer> publisher, @Nullable Runnable onDiscard) {
         return new AbstractBodyAdapter(publisher, onDiscard);
+    }
+
+    /**
+     * Create a new {@link ByteBody} that wraps the given buffer, but also check the buffer size
+     * against the given size limits. If the buffer is too large, this will return a streaming body
+     * with an error. If that is not the case, this will return a normal available body.
+     *
+     * @param bodySizeLimits The size limits
+     * @param buf            The buffer
+     * @return The body that wraps the buffer
+     */
+    @NonNull
+    public final CloseableByteBody createChecked(@NonNull BodySizeLimits bodySizeLimits, @NonNull ReadBuffer buf) {
+        // AvailableNettyByteBody does not support exceptions, so if we hit one of the configured
+        // limits, we return a StreamingNettyByteBody instead.
+        int readable = buf.readable();
+        if (readable > bodySizeLimits.maxBodySize() || readable > bodySizeLimits.maxBufferSize()) {
+            BufferConsumer.Upstream upstream = bytesConsumed -> {
+            };
+            StreamingBody streamingBody = createStreamingBody(bodySizeLimits, upstream);
+            streamingBody.sharedBuffer.add(buf); // this will trigger the exception for exceeded body or buffer size
+            return streamingBody.rootBody;
+        } else {
+            return adapt(buf);
+        }
     }
 
     /**

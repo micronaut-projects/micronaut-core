@@ -23,7 +23,6 @@ import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
@@ -31,6 +30,7 @@ import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.netty.channel.ChannelOption;
+import io.netty.contrib.multipart.DecoderQuirk;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.ssl.ApplicationProtocolNames;
 import jakarta.inject.Inject;
@@ -183,7 +183,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      *
      * @since 4.6.0
      */
-    public static final int DEFAULT_FORM_MAX_BUFFERED_BYTES = 1024;
+    public static final int DEFAULT_FORM_MAX_BUFFERED_BYTES = 4 * 1024 * 1024;
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServerConfiguration.class);
 
@@ -227,10 +227,12 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private int jsonBufferMaxComponents = DEFAULT_JSON_BUFFER_MAX_COMPONENTS;
     private boolean legacyMultiplexHandlers = false;
     private int formMaxFields = DEFAULT_FORM_MAX_FIELDS;
-    private int formMaxBufferedBytes = DEFAULT_FORM_MAX_BUFFERED_BYTES;
+    private long fieldMaxBufferedBytes = Long.MAX_VALUE;
+    private long fieldMaxBytes = Long.MAX_VALUE;
+    private long formMaxBufferedBytes = DEFAULT_FORM_MAX_BUFFERED_BYTES;
+    private long formMaxBytes = Long.MAX_VALUE;
     private boolean requestDecompressionEnabled = true;
-    @NextMajorVersion("Move to DecoderQuirk enum once it becomes mandatory")
-    private Set<String> formDecoderQuirks = Collections.emptySet();
+    private Set<DecoderQuirk> formDecoderQuirks = Collections.emptySet();
 
     /**
      * Default empty constructor.
@@ -864,25 +866,95 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     }
 
     /**
-     * The maximum number of bytes the form / multipart decoders are allowed to buffer internally.
-     * This sets a limit on form field size.
+     * The maximum number of bytes that are allowed to be buffered per form value. If there are
+     * multiple fields, this limit is counted separately for each.
+     *
+     * @return The maximum number of bytes
+     * @since 5.0.0
+     */
+    @ReadableBytes
+    public long getFieldMaxBufferedBytes() {
+        return fieldMaxBufferedBytes;
+    }
+
+    /**
+     * The maximum number of bytes that are allowed to be buffered per form value. If there are
+     * multiple fields, this limit is counted separately for each.
+     *
+     * @param fieldMaxBufferedBytes The maximum number of bytes
+     * @since 5.0.0
+     */
+    public void setFieldMaxBufferedBytes(@ReadableBytes long fieldMaxBufferedBytes) {
+        this.fieldMaxBufferedBytes = fieldMaxBufferedBytes;
+    }
+
+    /**
+     * The maximum number of bytes per form <i>value</i>. If there are multiple fields, this limit
+     * is counted separately for each.
+     *
+     * @return The maximum number of bytes
+     * @since 5.0.0
+     */
+    @ReadableBytes
+    public long getFieldMaxBytes() {
+        return fieldMaxBytes;
+    }
+
+    /**
+     * The maximum number of bytes per form <i>value</i>. If there are multiple fields, this limit
+     * is counted separately for each.
+     *
+     * @param fieldMaxBytes The maximum number of bytes
+     * @since 5.0.0
+     */
+    public void setFieldMaxBytes(@ReadableBytes long fieldMaxBytes) {
+        this.fieldMaxBytes = fieldMaxBytes;
+    }
+
+    /**
+     * The maximum number of bytes the entire form is allowed to buffer internally. If multiple
+     * fields are buffered, this limit is shared.
      *
      * @return The maximum number of buffered bytes
      * @since 4.6.0
      */
-    public int getFormMaxBufferedBytes() {
+    @ReadableBytes
+    public long getFormMaxBufferedBytes() {
         return formMaxBufferedBytes;
     }
 
     /**
-     * The maximum number of bytes the form / multipart decoders are allowed to buffer internally.
-     * This sets a limit on form field size.
+     * The maximum number of bytes the entire form is allowed to buffer internally. If multiple
+     * fields are buffered, this limit is shared.
      *
      * @param formMaxBufferedBytes The maximum number of buffered bytes
      * @since 4.6.0
      */
-    public void setFormMaxBufferedBytes(int formMaxBufferedBytes) {
+    public void setFormMaxBufferedBytes(@ReadableBytes long formMaxBufferedBytes) {
         this.formMaxBufferedBytes = formMaxBufferedBytes;
+    }
+
+    /**
+     * The maximum number of bytes of all form <i>values</i>. If there are multiple fields, this
+     * limit is shared.
+     *
+     * @return The maximum number of bytes
+     * @since 5.0.0
+     */
+    @ReadableBytes
+    public long getFormMaxBytes() {
+        return formMaxBytes;
+    }
+
+    /**
+     * The maximum number of bytes of all form <i>values</i>. If there are multiple fields, this
+     * limit is shared.
+     *
+     * @param formMaxBytes The maximum number of bytes
+     * @since 5.0.0
+     */
+    public void setFormMaxBytes(@ReadableBytes long formMaxBytes) {
+        this.formMaxBytes = formMaxBytes;
     }
 
     /**
@@ -893,7 +965,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * @return The decoder quirks
      */
     @Experimental
-    public Set<String> getFormDecoderQuirks() {
+    public Set<DecoderQuirk> getFormDecoderQuirks() {
         return formDecoderQuirks;
     }
 
@@ -905,7 +977,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * @param formDecoderQuirks The decoder quirks
      */
     @Experimental
-    public void setFormDecoderQuirks(Set<String> formDecoderQuirks) {
+    public void setFormDecoderQuirks(Set<DecoderQuirk> formDecoderQuirks) {
         this.formDecoderQuirks = formDecoderQuirks;
     }
 

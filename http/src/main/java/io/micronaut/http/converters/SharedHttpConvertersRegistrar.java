@@ -19,8 +19,10 @@ import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.TypeConverterRegistrar;
+import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.HttpVersion;
+import io.micronaut.http.multipart.CompletedAttribute;
 
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
@@ -105,5 +107,15 @@ public class SharedHttpConvertersRegistrar implements TypeConverterRegistrar {
                     }
                 }
         );
+        conversionService.addConverter(CompletedAttribute.class, Object.class, (object, targetType, context) -> {
+            try (ReadBuffer rb = object.toReadBuffer()) {
+                Optional<Object> first = conversionService.convert(rb, targetType, context);
+                if (first.isPresent()) {
+                    return first;
+                }
+                // try to go via string
+                return conversionService.convert(rb.toString(context.getCharset()), targetType, context);
+            }
+        });
     }
 }

@@ -20,7 +20,12 @@ import org.jspecify.annotations.Nullable;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Consumer;
 
 /**
@@ -30,6 +35,7 @@ import java.util.function.Consumer;
  */
 @Experimental
 public final class HttpResponseAssertion {
+    @Nullable
     private final HttpStatus httpStatus;
     private final Map<String, String> headers;
     private final List<BodyAssertion<?, ?>> bodyAssertions;
@@ -37,7 +43,7 @@ public final class HttpResponseAssertion {
     @Nullable
     private final Consumer<HttpResponse<?>> responseConsumer;
 
-    private HttpResponseAssertion(HttpStatus httpStatus,
+    private HttpResponseAssertion(@Nullable HttpStatus httpStatus,
                                   Map<String, String> headers,
                                   List<BodyAssertion<?, ?>> bodyAssertions,
                                   @Nullable Consumer<HttpResponse<?>> responseConsumer) {
@@ -55,6 +61,7 @@ public final class HttpResponseAssertion {
      *
      * @return Expected HTTP Response Status
      */
+    @Nullable
     public HttpStatus getHttpStatus() {
         return httpStatus;
     }

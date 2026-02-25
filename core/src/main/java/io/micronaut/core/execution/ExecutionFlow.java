@@ -27,6 +27,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -264,6 +265,17 @@ public interface ExecutionFlow<T> {
      * @since 4.8.0
      */
     default void cancel() {
+    }
+
+    /**
+     * Like {@link #cancel()}, but you can also provide a lambda to discard the content if it's
+     * already available.
+     *
+     * @param discard A function that will discard the content if necessary
+     * @since 5.0.0
+     */
+    default void cancel(Consumer<T> discard) {
+        cancel();
     }
 }
 

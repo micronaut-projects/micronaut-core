@@ -68,12 +68,6 @@ jobs:
         run: |
           [ -f ./setup.sh ] && ./setup.sh || [ ! -f ./setup.sh ]
 
-      - name: "🚔 Sonatype Scan"
-        if: env.OSS_INDEX_PASSWORD != '' && matrix.java == '25'
-        id: sonatypescan
-        run: |
-          ./gradlew ossIndexAudit --no-parallel --info
-
       - name: "🛠 Build with Gradle"
         id: gradle
         run: |

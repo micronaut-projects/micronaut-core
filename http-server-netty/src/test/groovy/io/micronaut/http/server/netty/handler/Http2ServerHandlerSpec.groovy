@@ -1,6 +1,5 @@
 package io.micronaut.http.server.netty.handler
 
-import io.micronaut.core.annotation.NonNull
 import io.micronaut.http.body.CloseableByteBody
 import io.micronaut.http.body.InternalByteBody
 import io.micronaut.http.body.stream.InputStreamByteBody
@@ -42,6 +41,7 @@ import io.netty.handler.codec.http2.Http2SettingsAckFrame
 import io.netty.handler.codec.http2.Http2SettingsFrame
 import io.netty.handler.codec.http2.Http2StreamFrame
 import io.netty.util.AsciiString
+import org.jspecify.annotations.NonNull
 import org.junit.jupiter.api.Assertions
 import org.reactivestreams.Publisher
 import org.reactivestreams.Subscriber

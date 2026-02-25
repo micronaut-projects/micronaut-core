@@ -272,6 +272,10 @@ public class ObjectMapperFactory {
             jacksonConfiguration.getSerializationFeatures().forEach(builder::configure);
         }
 
+        if (jacksonConfiguration == null || jacksonConfiguration.isJackson2DatabindAnnotationSupport()) {
+            Jackson2AnnotationSupport.installJackson2Introspector(builder);
+        }
+
         return builder;
     }
 }
