@@ -1,6 +1,8 @@
 package io.micronaut.context.env
 
 import io.micronaut.core.optim.StaticOptimizations
+import io.micronaut.core.io.ResourceLoadStrategy
+import io.micronaut.core.io.ResourceLoadStrategyType
 import io.micronaut.runtime.Micronaut
 import spock.lang.Specification
 
@@ -20,8 +22,8 @@ class ConstantPropertySourceSpec extends Specification {
         when:
         def configuration = Micronaut.build()
                 .environments(name)
-                .configurationLoadingStrategy(ConfigurationLoadStrategy.builder()
-                        .type(ConfigurationLoadStrategyType.FIRST_MATCH)
+                .configurationLoadingStrategy(ResourceLoadStrategy.builder()
+                        .type(ResourceLoadStrategyType.FIRST_MATCH)
                         .warnOnDuplicates(false))
         def env = new DefaultEnvironment(configuration)
         env.start()

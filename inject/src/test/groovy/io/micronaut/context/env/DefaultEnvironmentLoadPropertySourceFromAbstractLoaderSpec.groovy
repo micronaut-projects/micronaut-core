@@ -18,6 +18,8 @@ package io.micronaut.context.env
 import io.micronaut.context.DefaultApplicationContextBuilder
 import io.micronaut.context.exceptions.ConfigurationException
 import io.micronaut.core.io.ResourceLoader
+import io.micronaut.core.io.ResourceLoadStrategy
+import io.micronaut.core.io.ResourceLoadStrategyType
 import io.micronaut.core.io.scan.ClassPathResourceLoader
 import spock.lang.Specification
 
@@ -128,8 +130,8 @@ class DefaultEnvironmentLoadPropertySourceFromAbstractLoaderSpec extends Specifi
             ClassPathResourceLoader getResourceLoader() {
                 return loader
             }
-        }.configurationLoadingStrategy(ConfigurationLoadStrategy.builder()
-            .type(ConfigurationLoadStrategyType.FIRST_MATCH)
+        }.configurationLoadingStrategy(ResourceLoadStrategy.builder()
+            .type(ResourceLoadStrategyType.FIRST_MATCH)
             .warnOnDuplicates(false))
 
         when:
@@ -159,8 +161,8 @@ class DefaultEnvironmentLoadPropertySourceFromAbstractLoaderSpec extends Specifi
             ClassPathResourceLoader getResourceLoader() {
                 return loader
             }
-        }.configurationLoadingStrategy(ConfigurationLoadStrategy.builder()
-                .type(ConfigurationLoadStrategyType.MERGE_ALL))
+        }.configurationLoadingStrategy(ResourceLoadStrategy.builder()
+                .type(ResourceLoadStrategyType.MERGE_ALL))
 
         when:
         def env = new DefaultEnvironment(configuration).start()
@@ -192,8 +194,8 @@ class DefaultEnvironmentLoadPropertySourceFromAbstractLoaderSpec extends Specifi
             ClassPathResourceLoader getResourceLoader() {
                 return loader
             }
-        }.configurationLoadingStrategy(ConfigurationLoadStrategy.builder()
-                .type(ConfigurationLoadStrategyType.MERGE_ALL)
+        }.configurationLoadingStrategy(ResourceLoadStrategy.builder()
+                .type(ResourceLoadStrategyType.MERGE_ALL)
                 .mergeOrder("lib-.*\\.jar", "app-.*\\.jar"))
 
         when:
@@ -223,8 +225,8 @@ class DefaultEnvironmentLoadPropertySourceFromAbstractLoaderSpec extends Specifi
             ClassPathResourceLoader getResourceLoader() {
                 return loader
             }
-        }.configurationLoadingStrategy(ConfigurationLoadStrategy.builder()
-                .type(ConfigurationLoadStrategyType.MERGE_ALL)
+        }.configurationLoadingStrategy(ResourceLoadStrategy.builder()
+                .type(ResourceLoadStrategyType.MERGE_ALL)
                 .mergeOrder("["))
 
         when:
@@ -252,8 +254,8 @@ class DefaultEnvironmentLoadPropertySourceFromAbstractLoaderSpec extends Specifi
             ClassPathResourceLoader getResourceLoader() {
                 return loader
             }
-        }.configurationLoadingStrategy(ConfigurationLoadStrategy.builder()
-                .type(ConfigurationLoadStrategyType.FAIL_ON_DUPLICATE))
+        }.configurationLoadingStrategy(ResourceLoadStrategy.builder()
+                .type(ResourceLoadStrategyType.FAIL_ON_DUPLICATE))
 
         when:
         new DefaultEnvironment(configuration).start()

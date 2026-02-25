@@ -17,7 +17,7 @@ package io.micronaut.context;
 
 import io.micronaut.context.env.EnvironmentNamesDeducer;
 import io.micronaut.context.env.EnvironmentPackagesDeducer;
-import io.micronaut.context.env.ConfigurationLoadStrategy;
+import io.micronaut.core.io.ResourceLoadStrategy;
 import io.micronaut.context.env.PropertySourcesLocator;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -214,8 +214,8 @@ public interface ApplicationContextConfiguration extends BeanContextConfiguratio
      * @return The configuration loading strategy
      * @since 5.0.0
      */
-    default ConfigurationLoadStrategy getConfigurationLoadingStrategy() {
-        return ConfigurationLoadStrategy.defaultStrategy();
+    default ResourceLoadStrategy getConfigurationLoadingStrategy() {
+        return ResourceLoadStrategy.defaultStrategy();
     }
 
 }

@@ -16,7 +16,7 @@
 package io.micronaut.context;
 
 import io.micronaut.context.env.CommandLinePropertySource;
-import io.micronaut.context.env.ConfigurationLoadStrategy;
+import io.micronaut.core.io.ResourceLoadStrategy;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.env.PropertySourcesLocator;
@@ -87,7 +87,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private Boolean bootstrapEnvironment = null;
     private boolean enableDefaultPropertySources = true;
     private BeanResolutionTraceConfiguration traceConfiguration = new BeanResolutionTraceConfiguration();
-    private ConfigurationLoadStrategy configurationLoadStrategy = ConfigurationLoadStrategy.defaultStrategy();
+    private ResourceLoadStrategy configurationLoadStrategy = ResourceLoadStrategy.defaultStrategy();
     private BeanDefinitionsProvider beanDefinitionsProvider = new DefaultBeanDefinitionsProvider();
     private boolean eagerBeansEnabled = true;
     private boolean eventsEnabled = true;
@@ -126,7 +126,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     }
 
     @Override
-    public ConfigurationLoadStrategy getConfigurationLoadingStrategy() {
+    public ResourceLoadStrategy getConfigurationLoadingStrategy() {
         return configurationLoadStrategy;
     }
 
@@ -155,7 +155,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     }
 
     @Override
-    public ApplicationContextBuilder configurationLoadingStrategy(ConfigurationLoadStrategy.Builder builder) {
+    public ApplicationContextBuilder configurationLoadingStrategy(ResourceLoadStrategy.Builder builder) {
         Objects.requireNonNull(builder, "builder");
         this.configurationLoadStrategy = builder.build();
         return this;

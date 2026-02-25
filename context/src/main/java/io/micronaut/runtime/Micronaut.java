@@ -23,7 +23,7 @@ import io.micronaut.context.banner.Banner;
 import io.micronaut.context.banner.MicronautBanner;
 import io.micronaut.context.banner.ResourceBanner;
 import io.micronaut.context.env.Environment;
-import io.micronaut.context.env.ConfigurationLoadStrategy;
+import io.micronaut.core.io.ResourceLoadStrategy;
 import io.micronaut.context.env.PropertySource;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -282,7 +282,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     }
 
     @Override
-    public Micronaut configurationLoadingStrategy(ConfigurationLoadStrategy.Builder builder) {
+    public Micronaut configurationLoadingStrategy(ResourceLoadStrategy.Builder builder) {
         return (Micronaut) super.configurationLoadingStrategy(builder);
     }
 

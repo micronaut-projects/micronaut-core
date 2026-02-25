@@ -16,8 +16,8 @@
 package io.micronaut.runtime;
 
 import io.micronaut.context.ApplicationContext;
-import io.micronaut.context.env.ConfigurationLoadStrategy;
-import io.micronaut.context.env.ConfigurationLoadStrategyType;
+import io.micronaut.core.io.ResourceLoadStrategy;
+import io.micronaut.core.io.ResourceLoadStrategyType;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -27,8 +27,8 @@ class MicronautConfigurationLoadingStrategyTest {
     @Test
     void configurationLoadingStrategyIsFluent() {
         Micronaut micronaut = Micronaut.build(new String[0])
-            .configurationLoadingStrategy(ConfigurationLoadStrategy.builder()
-                .type(ConfigurationLoadStrategyType.FIRST_MATCH)
+            .configurationLoadingStrategy(ResourceLoadStrategy.builder()
+                .type(ResourceLoadStrategyType.FIRST_MATCH)
                 .warnOnDuplicates(false));
 
         try (ApplicationContext ctx = micronaut.start()) {

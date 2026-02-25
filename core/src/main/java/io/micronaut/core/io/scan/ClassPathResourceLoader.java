@@ -15,6 +15,10 @@
  */
 package io.micronaut.core.io.scan;
 
+import io.micronaut.core.io.ResourceConflictException;
+import io.micronaut.core.io.ResourceDuplicateException;
+import io.micronaut.core.io.ResourceLoadStrategy;
+import io.micronaut.core.io.ResourceLoadStrategyType;
 import io.micronaut.core.io.ResourceLoader;
 
 import org.jspecify.annotations.NullMarked;
@@ -37,6 +41,8 @@ import java.util.stream.Stream;
 public interface ClassPathResourceLoader extends ResourceLoader {
 
     /**
+     * Returns the underlying classloader used by this {@link ClassPathResourceLoader}.
+     *
      * @return The underlying classloader used by this {@link ClassPathResourceLoader}
      */
     ClassLoader getClassLoader();
@@ -85,5 +91,34 @@ public interface ClassPathResourceLoader extends ResourceLoader {
             stream.forEach(url -> unique.putIfAbsent(url.toExternalForm(), url));
             return List.copyOf(unique.values());
         }
+    }
+
+    /**
+     * Resolve resources for the given name, applying the configured strategy.
+     *
+     * @param resourceLoader The resource loader
+     * @param name           The resource name
+     * @param strategy       The strategy
+     * @return An immutable list of unique URLs in encounter order
+     * @throws ResourceDuplicateException If multiple resources are found and the configured strategy is
+     *                                   {@link ResourceLoadStrategyType#FAIL_ON_DUPLICATE}
+     * @throws ResourceConflictException  If multiple resources are found and the configured strategy is
+     *                                   {@link ResourceLoadStrategyType#MERGE_ALL}
+     * @since 5.0.0
+     */
+    static List<URL> resolveResources(ResourceLoader resourceLoader, String name, ResourceLoadStrategy strategy) {
+        List<URL> urls = listUniqueResources(resourceLoader, name);
+        if (urls.size() <= 1) {
+            return urls;
+        }
+
+        ResourceLoadStrategyType type = strategy.type();
+        if (type == ResourceLoadStrategyType.FAIL_ON_DUPLICATE) {
+            throw new ResourceDuplicateException(name, urls);
+        }
+        if (type == ResourceLoadStrategyType.MERGE_ALL) {
+            throw new ResourceConflictException(name, urls);
+        }
+        return urls;
     }
 }

@@ -2,6 +2,8 @@ package io.micronaut.context.env
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.ConfigurationException
+import io.micronaut.core.io.ResourceLoadStrategy
+import io.micronaut.core.io.ResourceLoadStrategyType
 import spock.lang.Specification
 
 import java.net.URL
@@ -55,11 +57,11 @@ class ConfigurationLoadStrategySpec extends Specification {
         when:
         String value
         try (URLClassLoader cl = new URLClassLoader(result.jars*.toUri()*.toURL() as URL[], getClass().classLoader)
-             ApplicationContext ctx = ApplicationContext.builder(cl)
-                      .configurationLoadingStrategy(ConfigurationLoadStrategy.builder()
-                          .type(ConfigurationLoadStrategyType.FIRST_MATCH)
-                          .warnOnDuplicates(false))
-                      .start()) {
+              ApplicationContext ctx = ApplicationContext.builder(cl)
+                     .configurationLoadingStrategy(ResourceLoadStrategy.builder()
+                         .type(ResourceLoadStrategyType.FIRST_MATCH)
+                         .warnOnDuplicates(false))
+                     .start()) {
 
             value = ctx.environment.getProperty("foo", String).orElse(null)
         }
@@ -84,10 +86,10 @@ class ConfigurationLoadStrategySpec extends Specification {
         when:
         Map<String, Object> props
         try (URLClassLoader cl = new URLClassLoader(result.jars*.toUri()*.toURL() as URL[], getClass().classLoader)
-             ApplicationContext ctx = ApplicationContext.builder(cl)
-                      .configurationLoadingStrategy(ConfigurationLoadStrategy.builder()
-                          .type(ConfigurationLoadStrategyType.MERGE_ALL))
-                      .start()) {
+              ApplicationContext ctx = ApplicationContext.builder(cl)
+                     .configurationLoadingStrategy(ResourceLoadStrategy.builder()
+                         .type(ResourceLoadStrategyType.MERGE_ALL))
+                     .start()) {
             props = [
                     foo: ctx.environment.getProperty("foo", String).orElse(null),
                     appOnly: ctx.environment.getProperty("appOnly", String).orElse(null),
@@ -117,10 +119,10 @@ class ConfigurationLoadStrategySpec extends Specification {
         when:
         String value
         try (URLClassLoader cl = new URLClassLoader(result.jars*.toUri()*.toURL() as URL[], getClass().classLoader)
-             ApplicationContext ctx = ApplicationContext.builder(cl)
-                      .configurationLoadingStrategy(ConfigurationLoadStrategy.builder()
-                          .type(ConfigurationLoadStrategyType.MERGE_ALL)
-                          .mergeOrder("lib-.*\\.jar", "app-.*\\.jar"))
+              ApplicationContext ctx = ApplicationContext.builder(cl)
+                     .configurationLoadingStrategy(ResourceLoadStrategy.builder()
+                         .type(ResourceLoadStrategyType.MERGE_ALL)
+                         .mergeOrder("lib-.*\\.jar", "app-.*\\.jar"))
                      .start()) {
 
             value = ctx.environment.getProperty("foo", String).orElse(null)
@@ -146,12 +148,12 @@ class ConfigurationLoadStrategySpec extends Specification {
         when:
         try (URLClassLoader cl = new URLClassLoader(result.jars*.toUri()*.toURL() as URL[], getClass().classLoader)) {
             ApplicationContext.builder(cl)
-                    .configurationLoadingStrategy(ConfigurationLoadStrategy.builder()
+                    .configurationLoadingStrategy(ResourceLoadStrategy.builder()
                         .mergeOrder("app-.*\\.jar"))
         }
 
         then:
-        thrown(ConfigurationException)
+        thrown(IllegalArgumentException)
 
         cleanup:
         deleteDirectory(result.dir)

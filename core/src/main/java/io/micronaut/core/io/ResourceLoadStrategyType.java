@@ -13,30 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.context.env;
+package io.micronaut.core.io;
 
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Defines how Micronaut should behave when the same configuration resource (for example
- * {@code application.yml} or {@code application.properties}) is found more than once on the classpath.
+ * Resource loading strategy.
  *
  * @since 5.0.0
  */
 @NullMarked
-public enum ConfigurationLoadStrategyType {
-    /**
-     * The first matching resource is used. Duplicates may be logged as a warning.
-     */
+public enum ResourceLoadStrategyType {
     FIRST_MATCH,
-
-    /**
-     * All matching resources are read and merged in the configured order.
-     */
-    MERGE_ALL,
-
-    /**
-     * Fail fast if duplicate configuration resources are detected.
-     */
-    FAIL_ON_DUPLICATE
+    FAIL_ON_DUPLICATE,
+    MERGE_ALL
 }

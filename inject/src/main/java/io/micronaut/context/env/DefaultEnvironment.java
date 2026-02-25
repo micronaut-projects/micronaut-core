@@ -22,6 +22,10 @@ import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.DefaultMutableConversionService;
 import io.micronaut.core.convert.MutableConversionService;
+import io.micronaut.core.io.ResourceConflictException;
+import io.micronaut.core.io.ResourceDuplicateException;
+import io.micronaut.core.io.ResourceLoadStrategy;
+import io.micronaut.core.io.ResourceLoadStrategyType;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.core.io.file.DefaultFileSystemResourceLoader;
@@ -529,7 +533,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     }
 
     private void loadPropertySourceFromLoader(String name, PropertySourceLoader propertySourceLoader, List<PropertySource> propertySources, ResourceLoader resourceLoader) {
-        ConfigurationLoadStrategy strategy = configuration.getConfigurationLoadingStrategy();
+        ResourceLoadStrategy strategy = configuration.getConfigurationLoadingStrategy();
 
         Optional<PropertySource> defaultPropertySource = loadPropertySourceFromLoader(name, propertySourceLoader, resourceLoader, strategy);
         defaultPropertySource.ifPresent(propertySources::add);
@@ -545,9 +549,9 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     }
 
     private Optional<PropertySource> loadPropertySourceFromLoader(String name,
-                                                                  PropertySourceLoader propertySourceLoader,
-                                                                  ResourceLoader resourceLoader,
-                                                                  ConfigurationLoadStrategy strategy) {
+                                                                   PropertySourceLoader propertySourceLoader,
+                                                                   ResourceLoader resourceLoader,
+                                                                   ResourceLoadStrategy strategy) {
         if (propertySourceLoader instanceof AbstractPropertySourceLoader abstractPropertySourceLoader) {
             return loadPropertySourceFromAbstractLoader(name, abstractPropertySourceLoader, resourceLoader, abstractPropertySourceLoader.getOrder(), strategy);
         }
@@ -555,10 +559,10 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     }
 
     private Optional<PropertySource> loadPropertySourceFromLoader(String name,
-                                                                  PropertySourceLoader propertySourceLoader,
-                                                                  ResourceLoader resourceLoader,
-                                                                  ActiveEnvironment activeEnvironment,
-                                                                  ConfigurationLoadStrategy strategy) {
+                                                                   PropertySourceLoader propertySourceLoader,
+                                                                   ResourceLoader resourceLoader,
+                                                                   ActiveEnvironment activeEnvironment,
+                                                                   ResourceLoadStrategy strategy) {
         if (propertySourceLoader instanceof AbstractPropertySourceLoader abstractPropertySourceLoader) {
             String envName = name + "-" + activeEnvironment.getName();
             int order = abstractPropertySourceLoader.getOrder() + 1 + activeEnvironment.getPriority();
@@ -571,36 +575,65 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
                                                                           AbstractPropertySourceLoader propertySourceLoader,
                                                                           ResourceLoader resourceLoader,
                                                                           int order,
-                                                                          ConfigurationLoadStrategy strategy) {
+                                                                          ResourceLoadStrategy strategy) {
         if (!propertySourceLoader.isEnabled()) {
             return Optional.empty();
         }
 
-        // Precompute resources for all supported extensions so we can detect
-        // conflicts across extensions for the same logical base name.
+        final boolean needsAllResources = strategy.type() == ResourceLoadStrategyType.MERGE_ALL
+            || strategy.type() == ResourceLoadStrategyType.FAIL_ON_DUPLICATE
+            || (strategy.type() == ResourceLoadStrategyType.FIRST_MATCH && strategy.warnOnDuplicates());
+
         String[] extensions = propertySourceLoader.getExtensions().toArray(new String[0]);
+        if (!needsAllResources) {
+            // FIRST_MATCH with warnOnDuplicates=false: use first resource without enumerating all
+            for (String ext : extensions) {
+                String fileExt = fileName + "." + ext;
+                Optional<InputStream> config = propertySourceLoader.readInput(resourceLoader, fileExt);
+                if (config.isPresent()) {
+                    try (InputStream input = config.get()) {
+                        Map<String, Object> merged = propertySourceLoader.read(fileName, input);
+                        if (!merged.isEmpty()) {
+                            return Optional.of(propertySourceLoader.createPropertySource(fileName, merged, order, PropertySource.Origin.of(fileExt)));
+                        }
+                    } catch (IOException e) {
+                        throw new ConfigurationException("I/O exception occurred reading [" + fileExt + "]: " + e.getMessage(), e);
+                    }
+                }
+            }
+            return Optional.empty();
+        }
+
         Map<String, List<URL>> extensionResources = new LinkedHashMap<>(extensions.length);
+        Set<String> mergeExtensions = new HashSet<>();
         int extensionsWithResources = 0;
+
         for (String ext : extensions) {
             String fileExt = fileName + "." + ext;
-            List<URL> urls = ClassPathResourceLoader.listUniqueResources(resourceLoader, fileExt);
+            List<URL> urls;
+            try {
+                urls = ClassPathResourceLoader.resolveResources(resourceLoader, fileExt, strategy);
+            } catch (ResourceDuplicateException e) {
+                throw new ConfigurationException(buildDuplicateConfigurationMessage(e.getResourceName(), e.getResources()));
+            } catch (ResourceConflictException e) {
+                urls = e.getResources();
+                mergeExtensions.add(ext);
+            }
             extensionResources.put(ext, urls);
             if (!urls.isEmpty()) {
                 extensionsWithResources++;
             }
         }
 
-        // If multiple extensions provide resources for the same base name,
-        // treat this as a duplicate configuration across extensions and let
-        // the existing strategy decide how to react. This keeps the existing
-        // precedence (first non-empty extension wins) but no longer ignores
-        // cross-extension conflicts silently.
-        if (extensionsWithResources > 1) {
+        if (extensionsWithResources > 1 && strategy.type() != ResourceLoadStrategyType.MERGE_ALL) {
             List<URL> allUrls = new ArrayList<>();
             for (List<URL> urls : extensionResources.values()) {
                 allUrls.addAll(urls);
             }
             if (!allUrls.isEmpty()) {
+                if (strategy.type() == ResourceLoadStrategyType.FAIL_ON_DUPLICATE) {
+                    throw new ConfigurationException(buildDuplicateConfigurationMessage(fileName, allUrls));
+                }
                 handleDuplicateResources(fileName, allUrls, strategy);
             }
         }
@@ -608,49 +641,40 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         for (String ext : extensions) {
             String fileExt = fileName + "." + ext;
             List<URL> urls = Objects.requireNonNullElse(extensionResources.get(ext), Collections.emptyList());
-            
-            // Short-circuit when duplicates are neither warned about nor merged/failed
-            boolean needsAllResources = strategy.type() == ConfigurationLoadStrategyType.MERGE_ALL
-                || strategy.type() == ConfigurationLoadStrategyType.FAIL_ON_DUPLICATE
-                || (strategy.type() == ConfigurationLoadStrategyType.FIRST_MATCH && strategy.warnOnDuplicates());
-            
             Map<String, Object> merged = Collections.emptyMap();
-            if (needsAllResources) {
-                if (strategy.type() == ConfigurationLoadStrategyType.MERGE_ALL && urls.size() > 1) {
-                    List<URL> orderedUrls = urls;
-                    if (!strategy.mergeOrder().isEmpty()) {
-                        orderedUrls = orderByArtifactPatterns(urls, strategy.mergeOrder());
-                    }
+            if (!urls.isEmpty() && urls.size() > 1) {
+                handleDuplicateResources(fileExt, urls, strategy);
+            }
 
-                    if (LOG.isInfoEnabled()) {
-                        LOG.info("Merging configuration resources '{}' in order: {}", fileExt, orderedUrls);
-                    }
-
-                    Map<String, Object> mergedMap = new LinkedHashMap<>(64);
-                    for (URL url : orderedUrls) {
-                        try (InputStream input = url.openStream()) {
-                            mergedMap.putAll(propertySourceLoader.read(fileName, input));
-                        } catch (IOException e) {
-                            throw new ConfigurationException("I/O exception occurred reading [" + fileExt + "] from [" + url + "]: " + e.getMessage(), e);
-                        }
-                    }
-                    merged = mergedMap;
-                } else {
-                    if (urls.size() > 1) {
-                        handleDuplicateResources(fileExt, urls, strategy);
-                    }
-
-                    Optional<InputStream> config = propertySourceLoader.readInput(resourceLoader, fileExt);
-                    if (config.isPresent()) {
-                        try (InputStream input = config.get()) {
-                            merged = propertySourceLoader.read(fileName, input);
-                        } catch (IOException e) {
-                            throw new ConfigurationException("I/O exception occurred reading [" + fileExt + "]: " + e.getMessage(), e);
-                        }
+            if (urls.isEmpty()) {
+                Optional<InputStream> config = propertySourceLoader.readInput(resourceLoader, fileExt);
+                if (config.isPresent()) {
+                    try (InputStream input = config.get()) {
+                        merged = propertySourceLoader.read(fileName, input);
+                    } catch (IOException e) {
+                        throw new ConfigurationException("I/O exception occurred reading [" + fileExt + "]: " + e.getMessage(), e);
                     }
                 }
+            } else if (mergeExtensions.contains(ext) && urls.size() > 1) {
+                List<URL> orderedUrls = urls;
+                if (!strategy.mergeOrder().isEmpty()) {
+                    orderedUrls = orderByArtifactPatterns(urls, strategy.mergeOrder());
+                }
+
+                if (LOG.isInfoEnabled()) {
+                    LOG.info("Merging configuration resources '{}' in order: {}", fileExt, orderedUrls);
+                }
+
+                Map<String, Object> mergedMap = new LinkedHashMap<>(64);
+                for (URL url : orderedUrls) {
+                    try (InputStream input = url.openStream()) {
+                        mergedMap.putAll(propertySourceLoader.read(fileName, input));
+                    } catch (IOException e) {
+                        throw new ConfigurationException("I/O exception occurred reading [" + fileExt + "] from [" + url + "]: " + e.getMessage(), e);
+                    }
+                }
+                merged = mergedMap;
             } else {
-                // FIRST_MATCH with warnOnDuplicates=false: use first resource without enumerating all
                 Optional<InputStream> config = propertySourceLoader.readInput(resourceLoader, fileExt);
                 if (config.isPresent()) {
                     try (InputStream input = config.get()) {
@@ -662,9 +686,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
             }
 
             if (!merged.isEmpty()) {
-                return Optional.of(
-                    propertySourceLoader.createPropertySource(fileName, merged, order, PropertySource.Origin.of(fileExt))
-                );
+                return Optional.of(propertySourceLoader.createPropertySource(fileName, merged, order, PropertySource.Origin.of(fileExt)));
             }
         }
 
@@ -673,12 +695,8 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
 
     private void handleDuplicateResources(String resourceName,
                                           List<URL> urls,
-                                          ConfigurationLoadStrategy strategy) {
-        ConfigurationLoadStrategyType type = strategy.type();
-        if (type == ConfigurationLoadStrategyType.FAIL_ON_DUPLICATE) {
-            throw new ConfigurationException(buildDuplicateConfigurationMessage(resourceName, urls));
-        }
-        if (type == ConfigurationLoadStrategyType.FIRST_MATCH && strategy.warnOnDuplicates() && LOG.isWarnEnabled()) {
+                                          ResourceLoadStrategy strategy) {
+        if (strategy.type() == ResourceLoadStrategyType.FIRST_MATCH && strategy.warnOnDuplicates() && LOG.isWarnEnabled()) {
             URL chosen = urls.getFirst();
             List<URL> duplicates = urls.subList(1, urls.size());
             LOG.warn("Duplicate configuration resource '{}' found on the classpath. Using: {}. Duplicates: {}", resourceName, chosen, duplicates);

@@ -16,8 +16,8 @@
 package io.micronaut.docs.context.env
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.env.ConfigurationLoadStrategy
-import io.micronaut.context.env.ConfigurationLoadStrategyType
+import io.micronaut.core.io.ResourceLoadStrategy
+import io.micronaut.core.io.ResourceLoadStrategyType
 import io.micronaut.runtime.Micronaut
 
 internal class ConfigurationLoadStrategySnippet {
@@ -26,8 +26,8 @@ internal class ConfigurationLoadStrategySnippet {
         // tag::firstMatch[]
         Micronaut.build(*args)
             .configurationLoadingStrategy(
-                ConfigurationLoadStrategy.builder()
-                    .type(ConfigurationLoadStrategyType.FIRST_MATCH)
+                ResourceLoadStrategy.builder()
+                    .type(ResourceLoadStrategyType.FIRST_MATCH)
                     .warnOnDuplicates(true)
             )
             .start()
@@ -38,8 +38,8 @@ internal class ConfigurationLoadStrategySnippet {
         // tag::mergeAll[]
         val ctx = ApplicationContext.builder()
             .configurationLoadingStrategy(
-                ConfigurationLoadStrategy.builder()
-                    .type(ConfigurationLoadStrategyType.MERGE_ALL)
+                ResourceLoadStrategy.builder()
+                    .type(ResourceLoadStrategyType.MERGE_ALL)
             )
             .start()
         // end::mergeAll[]
@@ -51,8 +51,8 @@ internal class ConfigurationLoadStrategySnippet {
         // tag::mergeOrder[]
         val ctx = ApplicationContext.builder()
             .configurationLoadingStrategy(
-                ConfigurationLoadStrategy.builder()
-                    .type(ConfigurationLoadStrategyType.MERGE_ALL)
+                ResourceLoadStrategy.builder()
+                    .type(ResourceLoadStrategyType.MERGE_ALL)
                     .mergeOrder("lib-.*\\.jar", "app-.*\\.jar")
             )
             .start()
@@ -65,8 +65,8 @@ internal class ConfigurationLoadStrategySnippet {
         // tag::restoreFirstMatch[]
         val ctx = ApplicationContext.builder()
             .configurationLoadingStrategy(
-                ConfigurationLoadStrategy.builder()
-                    .type(ConfigurationLoadStrategyType.FIRST_MATCH)
+                ResourceLoadStrategy.builder()
+                    .type(ResourceLoadStrategyType.FIRST_MATCH)
             )
             .start()
         // end::restoreFirstMatch[]

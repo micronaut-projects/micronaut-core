@@ -16,7 +16,7 @@
 package io.micronaut.context;
 
 import io.micronaut.context.annotation.ConfigurationReader;
-import io.micronaut.context.env.ConfigurationLoadStrategy;
+import io.micronaut.core.io.ResourceLoadStrategy;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.env.PropertySourcesLocator;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
@@ -117,7 +117,7 @@ public interface ApplicationContextBuilder {
      * @return This builder
      * @since 5.0.0
      */
-    default ApplicationContextBuilder configurationLoadingStrategy(ConfigurationLoadStrategy.Builder builder) {
+    default ApplicationContextBuilder configurationLoadingStrategy(ResourceLoadStrategy.Builder builder) {
         return this;
     }
 
