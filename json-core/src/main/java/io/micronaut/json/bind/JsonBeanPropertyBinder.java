@@ -265,7 +265,7 @@ final class JsonBeanPropertyBinder implements BeanPropertyBinder {
 
     private void expandArrayToThreshold(int arrayIndex, ArrayBuilder arrayNode) {
         if (arrayIndex < arraySizeThreshhold) {
-            while (arrayNode.values.size() != arrayIndex + 1) {
+            while (arrayNode.values.size() < arrayIndex + 1) {
                 arrayNode.values.add(FixedValue.NULL);
             }
         }

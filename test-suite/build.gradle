@@ -87,6 +87,7 @@ dependencies {
 
     testFixturesApi libs.managed.spock
     testFixturesApi libs.managed.groovy
+    testImplementation(libs.junit.jupiter.params)
 }
 
 //tasks.withType(Test).configureEach {
