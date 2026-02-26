@@ -65,7 +65,7 @@ jobs:
           check_retries: 'true'
 
       - name: "📜 Upload binary compatibility check results"
-        if: always()
+        if: matrix.java == '17'
         uses: actions/upload-artifact@v4
         with:
           name: binary-compatibility-reports
