@@ -21,8 +21,8 @@ import spock.lang.Specification
 class ClientProxySpec extends Specification {
 
     static final int PROXY_PORT = 3128
-    static final String URL = "https://micronaut.io/"
-    static final String HTML_FRAGMENT = 'Home - Micronaut Framework'
+    static final String URL = "https://www.commonhaus.org"
+    static final String HTML_FRAGMENT = 'Commonhaus Foundation'
 
     @AutoCleanup
     GenericContainer proxyContainer =
