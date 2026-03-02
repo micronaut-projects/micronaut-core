@@ -316,7 +316,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
 
     @Override
     public Collection<String> getPropertyEntries(String name) {
-        return getPropertyEntries(name, PropertyCatalog.NORMALIZED);
+        return getPropertyEntries(name, PropertyCatalog.GENERATED);
     }
 
     @Override
