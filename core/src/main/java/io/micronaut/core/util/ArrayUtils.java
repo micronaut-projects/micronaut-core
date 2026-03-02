@@ -95,7 +95,6 @@ public final class ArrayUtils {
      * @param <T> The array type
      * @return The concatenated array
      */
-    @SafeVarargs
     public static <T> T[] concat(T[] a, T... b) {
         int bLen = b.length;
 
