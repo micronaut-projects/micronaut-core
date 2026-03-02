@@ -102,7 +102,7 @@ class PropertySourcePropertyResolverSpec extends Specification {
 
         expect:
         generatedEntries.contains('default')
-        resolver.getPropertyEntries("micronaut.object-storage.oracle-cloud") == generatedEntries
+        resolver.getPropertyEntries("micronaut.object-storage.oracle-cloud").isEmpty()
     }
 
     @Unroll

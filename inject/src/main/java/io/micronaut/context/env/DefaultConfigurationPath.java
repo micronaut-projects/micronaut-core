@@ -208,6 +208,19 @@ final class DefaultConfigurationPath implements ConfigurationPath {
         switch (kind) {
             case MAP -> {
                 Collection<String> entries = propertyResolver.getPropertyEntries(thisPath.prefix(), thisPath.propertyCatalog());
+                if (entries.isEmpty() && thisPath.propertyCatalog() == PropertyCatalog.NORMALIZED) {
+                    Collection<String> generatedEntries = propertyResolver.getPropertyEntries(thisPath.prefix(), PropertyCatalog.GENERATED);
+                    if (!generatedEntries.isEmpty()) {
+                        Collection<String> filteredEntries = new LinkedList<>();
+                        String prefix = thisPath.prefix();
+                        for (String key : generatedEntries) {
+                            if (!propertyResolver.getPropertyEntries(prefix + '.' + key, PropertyCatalog.GENERATED).isEmpty()) {
+                                filteredEntries.add(key);
+                            }
+                        }
+                        entries = filteredEntries;
+                    }
+                }
                 for (String key : entries) {
                     ConfigurationPath newPath = thisPath.copy();
                     newPath.pushConfigurationSegment(key);
