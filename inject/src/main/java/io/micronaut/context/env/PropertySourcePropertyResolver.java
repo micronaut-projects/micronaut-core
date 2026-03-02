@@ -316,6 +316,10 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
 
     @Override
     public Collection<String> getPropertyEntries(String name) {
+        Collection<String> normalizedEntries = getPropertyEntries(name, PropertyCatalog.NORMALIZED);
+        if (!normalizedEntries.isEmpty()) {
+            return normalizedEntries;
+        }
         return getPropertyEntries(name, PropertyCatalog.GENERATED);
     }
 
