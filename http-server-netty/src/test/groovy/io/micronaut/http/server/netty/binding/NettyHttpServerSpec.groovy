@@ -220,6 +220,7 @@ class NettyHttpServerSpec extends Specification {
 
         cleanup:
         httpsClient.stop()
+        httpClient.stop()
         embeddedServer.applicationContext.stop()
     }
 
