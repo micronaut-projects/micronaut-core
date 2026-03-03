@@ -24,7 +24,8 @@ class Person:
 
         expect:
         assertGeneratedSourceContains(pythonCode, """
-  Person(String name, int age, Address address) {
+  @JsonCreator
+  Person(@JsonProperty("name") String name, @JsonProperty("age") int age, @JsonProperty("address") Address address) {
     this(ContextHolder.newInstance("python", "Person", name, age, address.asPolyglotValue()));
   }
 
@@ -33,7 +34,11 @@ class Person:
   }
 
   public static Person fromPolyglotValue(Value arg1) {
-    return new python.Person(arg1);
+    if (arg1.isNull()) {
+      return null;
+    } else {
+      return new python.Person(arg1);
+    }
   }
 
   public void setName(String arg1) {

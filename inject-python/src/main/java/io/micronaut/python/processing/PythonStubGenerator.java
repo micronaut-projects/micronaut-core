@@ -86,6 +86,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     public static final String GENERATOR_NAME = "python";
     private static final Set<String> ANNOTATION_PACKAGES_TO_COPY = Set.of("org.junit.jupiter.api", "io.micronaut.test.extensions.junit5.annotation");
     public static final String JUNIT_TEST = "org.junit.jupiter.api.Test";
+    public static final String ANN_JSON_PROPERTY = "com.fasterxml.jackson.annotation.JsonProperty";
+    public static final String ANN_JSON_CREATOR = "com.fasterxml.jackson.annotation.JsonCreator";
 
     private final Map<String, StubEntry> classBuilders = new LinkedHashMap<>();
     private Map<String, ClassElement> allClasses = Map.of();
@@ -282,7 +284,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                         for (PropertyElement beanProperty : beanProperties) {
                                             FieldDef field = propertyFields.get(beanProperty.getName());
                                             ExpressionDef fieldRef = aThis.field(field);
-                                            args.add(coerceTypedElementToPolyglotValue(beanProperty, fieldRef));
+                                            args.add(coerceTypedElementToPolyglotValue(beanProperty, fieldRef).cast(TypeDef.OBJECT));
                                         }
                                         return CONTEXT_HOLDER.invokeStatic(isAbstractIntro ? "newIntroduction" : "newInstance", POLYGLOT_VALUE, args).returning();
                                     }
@@ -324,17 +326,28 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     // Check if there's a primary constructor with parameters for dependency injection
                     var pythonConstructor = element.getPrimaryConstructor().orElse(null);
 
+                    Optional<ClassElement> jsonCreatorClassElement = context.getClassElement(ANN_JSON_CREATOR);
+                    Optional<ClassElement> jsonPropertyElement = context.getClassElement(ANN_JSON_PROPERTY);
                     if (pythonConstructor != null && pythonConstructor.getParameters().length > 0) {
                         MethodDef.MethodDefBuilder constructor = MethodDef.constructor();
                         @NonNull ParameterElement[] parameters = pythonConstructor.getParameters();
                         for (@NonNull ParameterElement parameter : parameters) {
                             ClassElement t = parameter.getType();
                             var parameterType = erasedType(t);
-                            ParameterDef parameterDef = ParameterDef
-                                .builder(parameter.getName(), parameterType).build();
+                            ParameterDef.ParameterDefBuilder pb = ParameterDef
+                                .builder(parameter.getName(), parameterType);
+                            if (jsonPropertyElement.isPresent() && isIntrospectedBean && !parameter.hasDeclaredAnnotation(ANN_JSON_PROPERTY)) {
+                                pb.addAnnotation(AnnotationDef.builder(ClassTypeDef.of(jsonPropertyElement.get())).addMember(AnnotationMetadata.VALUE_MEMBER, parameter.getName()).build());
+                            }
+                            ParameterDef parameterDef = pb.build();
                             constructor.addParameter(parameterDef);
                         }
 
+                        if (isIntrospectedBean) {
+                            jsonCreatorClassElement.ifPresent(t ->
+                                constructor.addAnnotation(t.getName())
+                            );
+                        }
                         final boolean isAbstractIntroCtor = element.isAbstract() && isAopProxy && element.hasStereotype(Introduction.class);
                         builder.addMethod(
                             constructor.build(((aThis, methodParameters) -> {
@@ -347,6 +360,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                         @NonNull ParameterElement parameter = parameters[i];
                                         VariableDef.MethodParameter methodParameter = methodParameters.get(i);
                                         coerceParameterToPolyglotValue(parameter, arguments, methodParameter);
+                                        int lastArgIndex = arguments.size() - 1;
+                                        arguments.set(lastArgIndex, arguments.get(lastArgIndex).cast(TypeDef.OBJECT));
                                     }
                                     ExpressionDef pythonInstance = CONTEXT_HOLDER.invokeStatic(
                                         isAbstractIntroCtor ? "newIntroduction" : "newInstance",
@@ -363,6 +378,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                         @NonNull ParameterElement parameter = parameters[i];
                                         VariableDef.MethodParameter methodParameter = methodParameters.get(i);
                                         coerceParameterToPolyglotValue(parameter, arguments, methodParameter);
+                                        int lastArgIndex = arguments.size() - 1;
+                                        arguments.set(lastArgIndex, arguments.get(lastArgIndex).cast(TypeDef.OBJECT));
                                     }
                                     ExpressionDef pythonInstance = CONTEXT_HOLDER.invokeStatic(
                                         isAbstractIntroCtor ? "newIntroduction" : "newInstance",
@@ -381,7 +398,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         if (isIntrospectedBean && pythonConstructor != null && pythonConstructor.getParameters().length != 0) {
                                 // add default constructor
                                 MethodDef.MethodDefBuilder defaultConstructor = MethodDef.constructor().addModifiers(Modifier.PUBLIC);
-                                context.getClassElement("com.fasterxml.jackson.annotation.JsonCreator").ifPresent(t ->
+                                jsonCreatorClassElement.ifPresent(t ->
                                     defaultConstructor.addAnnotation(t.getName())
                                 );
 

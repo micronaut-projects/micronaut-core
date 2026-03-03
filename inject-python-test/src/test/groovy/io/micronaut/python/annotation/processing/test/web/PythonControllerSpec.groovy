@@ -258,7 +258,9 @@ class HelloController:
         def personClass = context.classLoader.loadClass('python.Person')
         def person = personClass.newInstance("John")
         def jsonMapper = context.getBean(JsonMapper)
-        person = jsonMapper.readValue(jsonMapper.writeValueAsString(person), personClass)
+
+        def json = jsonMapper.writeValueAsString(person)
+        person = jsonMapper.readValue(json, personClass)
 
         def response = client.toBlocking().exchange(HttpRequest.POST("/hello", person), String)
         expect:

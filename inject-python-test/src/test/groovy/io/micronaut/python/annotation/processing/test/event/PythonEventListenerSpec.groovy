@@ -2,37 +2,53 @@ package io.micronaut.python.annotation.processing.test.event
 
 import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementSpec
 import org.graalvm.polyglot.Value
+import spock.lang.PendingFeature
 
 class PythonEventListenerSpec extends AbstractPythonTypeElementSpec {
 
+    @PendingFeature(reason = "GraalPy has a bug that doesn't allow constructors for types that implement a java interface")
     void "test python event listener via interface with java event"() {
         given:
         def context = buildContext('''
 from dataclasses import dataclass
 from jakarta.inject import Singleton, Inject
 from micronaut.context.event import ApplicationEventListener, StartupEvent
+from micronaut.context.annotation import Executable
 
 @dataclass
 class SampleEvent:
     message : str = "Something happened"
 
+@Singleton
+class CounterService:
+    invocation_count : int = 0
+    def increment(self):
+        self.invocation_count = self.invocation_count + 1
+
+    @Executable
+    def get_count(self) -> int:
+        return self.invocation_count
 
 @Singleton
 class SampleEventListener(ApplicationEventListener[StartupEvent]):
     invocation_count : int = 0
+    def __init__(self, counter : CounterService):
+        self.counter = counter
 
     def onApplicationEvent(self, event : StartupEvent):
-        self.invocation_count += 1
+        counter.increment()
+
+
 ''')
 
         when:
         def event = context.classLoader.loadClass('python.SampleEvent').newInstance("test")
         context.publishEvent(event)
+        def counterService = getBean(context, "python.CounterService")
 
-        Value value = getBean(context, "python.SampleEventListener").asPolyglotValue()
 
         then:
-        value.invocation_count == 1
+        counterService.get_count() == 1
     }
 
     void "test python event listener via annotation with java event"() {
