@@ -37,7 +37,7 @@ For example creating a subclass of `EngineConfig` with `@ConfigurationProperties
 YAML Reserved Words
 ~~~~~~~~~~~~~~~~~~~~
 
-When using YAML configuration files, certain words are reserved by the YAML specification and will be automatically converted to boolean values. This includes:
+When using YAML configuration files, certain words are reserved by the YAML specification and will be automatically converted to boolean values. These include:
 
 * `yes` / `no`
 * `true` / `false`
