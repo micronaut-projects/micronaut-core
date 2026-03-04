@@ -1,5 +1,5 @@
 from micronaut.test.extensions.junit5.annotation import MicronautTest
-from org.junit.jupiter.api import Test
+from org.junit.jupiter.api import Test, Disabled
 from jakarta.inject import Inject
 from typing import Annotated
 from .MyPersonRepository import MyPersonRepository
@@ -13,12 +13,14 @@ class MyPersonRepositorySpec:
 
     @Test
     def testDBAccess(self) -> None:
-        self.myPersonRepository.savePerson(MyPerson(-1, "Denis", 123))
+        # print(f"REPOSITORY TYPE {self.myPersonRepository.getClass().getName()}")
+        self.myPersonRepository.save(MyPerson(-1, "Denis", 123))
+        self.myPersonRepository.savePerson(MyPerson(-1, "Graeme", 456))
         print(self.myPersonRepository)
         print("Load all")
         people = self.myPersonRepository.findAll()
         print(people)
-        assert len(people) == 1
+        assert len(people) == 2
         person = people[0]
         assert person.name == "Denis"
         print("Load by id")

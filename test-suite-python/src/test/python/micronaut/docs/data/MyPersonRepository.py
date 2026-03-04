@@ -8,6 +8,7 @@ from micronaut.data.annotation import Id
 from typing import Annotated
 from typing import List
 from micronaut.data.jdbc.annotation import JdbcRepository
+from micronaut.data.repository import CrudRepository
 from abc import ABC, abstractmethod
 from jakarta.data.repository import Save
 
@@ -19,7 +20,7 @@ class MyPerson:
     age : int
 
 @JdbcRepository(dialect = "H2")
-class MyPersonRepository(ABC):
+class MyPersonRepository(CrudRepository[MyPerson, int], new_style=True):
 
     @Save
     @abstractmethod

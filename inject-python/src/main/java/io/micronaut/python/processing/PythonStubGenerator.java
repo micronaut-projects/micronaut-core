@@ -156,6 +156,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     }
 
                     boolean isIntrospectedBean = element.hasStereotype(Introspected.class);
+                    final boolean isIntroductionBean = element.hasStereotype(Introduction.class);
+                    final boolean skipInterfaceMethodBridges = isDeclaredBean && isIntroductionBean && !element.getInterfaces().isEmpty();
+                    if (skipInterfaceMethodBridges) {
+                        builder.addModifiers(Modifier.ABSTRACT);
+                    }
 
                     List<PropertyElement> beanProperties = element.getBeanProperties();
                     Map<String, FieldDef> propertyFields = new LinkedHashMap<>();
@@ -188,6 +193,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         for (ClassElement anInterface : interfaces) {
                             TypeDef interfaceTypeDef = parameterizedTypeDef(anInterface);
                             builder.addSuperinterface(interfaceTypeDef);
+                            if (skipInterfaceMethodBridges) {
+                                continue;
+                            }
                             List<MethodElement> methods = anInterface.getMethods();
                             Set<MethodElement> methodSet = new LinkedHashSet<>();
                             for (MethodElement method : methods) {
@@ -317,7 +325,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                     .isTrue()
                                     .doIfElse(
                                         ExpressionDef.nullValue().returning(),
-                                        thisType.instantiate(methodParameters).returning()
+                                        skipInterfaceMethodBridges
+                                            ? val.invoke("as", thisType, thisType.getStaticField("class", TypeDef.CLASS)).returning()
+                                            : thisType.instantiate(methodParameters).returning()
                                     );
                             }))
                         );
