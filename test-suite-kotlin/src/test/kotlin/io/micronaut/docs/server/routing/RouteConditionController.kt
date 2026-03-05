@@ -33,7 +33,7 @@ class RouteConditionController {
     }
 
     @Get("/hello")
-    @RouteCondition("#{request.parameters.getFirst('v').orElse(null) == '2'}") // <1>
+    @RouteCondition("#{request.parameters.getFirst('v') == '2'}") // <1>
     fun helloV2(): String {
         return "Hello v2"
     }
