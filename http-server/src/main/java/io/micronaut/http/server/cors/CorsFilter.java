@@ -437,7 +437,7 @@ public class CorsFilter implements Ordered, ConditionalFilter {
         return CorsUtil.isPreflightRequest(request) ? request.getHeaders().getFirst(ACCESS_CONTROL_REQUEST_METHOD, CONVERSION_CONTEXT_HTTP_METHOD).orElse(requestMethod) : requestMethod;
     }
 
-    private boolean hasAllowedHeaders( HttpRequest<?> request, CorsOriginConfiguration config) {
+    private boolean hasAllowedHeaders(HttpRequest<?> request, CorsOriginConfiguration config) {
         Optional<List<String>> accessControlHeaders = request.getHeaders().get(ACCESS_CONTROL_REQUEST_HEADERS, ConversionContext.LIST_OF_STRING);
         List<String> allowedHeaders = config.getAllowedHeaders();
         return isAny(allowedHeaders) || (
