@@ -54,6 +54,7 @@ import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static io.micronaut.expressions.EvaluatedExpressionConstants.EXPRESSION_PATTERN;
@@ -152,6 +153,26 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         } else {
             throw e;
         }
+    }
+
+    /**
+     * Builds an annotation value for the given annotation type name.
+     *
+     * @param annotationName The annotation name
+     * @return The built annotation value, if the annotation type can be resolved
+     */
+    public final Optional<io.micronaut.core.annotation.AnnotationValue<?>> buildAnnotation(String annotationName) {
+        return getAnnotationMirror(annotationName).map(annotationType -> {
+            RetentionPolicy retentionPolicy = getRetentionPolicy(annotationType);
+
+            Map<CharSequence, Object> defaultValues = getCachedAnnotationDefaults(annotationName, annotationType);
+            AnnotationValue<Annotation> annotationValue = new AnnotationValue<>(annotationName, Map.of(), defaultValues, retentionPolicy);
+            List<AnnotationValue<?>> stereotypes =
+                extractStereotypes(new ProcessingContext(getVisitorContext()), new ProcessedAnnotation(annotationType, annotationValue))
+                    .stream().map(pa -> pa.annotationValue)
+                    .collect(Collectors.toUnmodifiableList());
+            return new AnnotationValue<>(annotationName, Map.of(), defaultValues, retentionPolicy, stereotypes);
+        });
     }
 
     /**
