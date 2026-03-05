@@ -7,11 +7,6 @@ plugins {
 
 repositories {
     mavenCentral()
-    maven {
-        mavenContent {
-            snapshotsOnly()
-        }
-    }
 }
 
 tasks.named("updateVersionCatalogs") {
