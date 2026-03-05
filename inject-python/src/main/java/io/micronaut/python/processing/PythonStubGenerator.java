@@ -126,7 +126,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         .onlyDeclared()
                         .annotated(ann -> ann.hasStereotype("io.micronaut.http.annotation.HttpMethodMapping"))
                 ).isEmpty();
-                if (hasRoute || scriptElement.hasStereotype("io.micronaut.context.python.scope.Pooled")) {
+                if (hasRoute || scriptElement.hasStereotype("io.micronaut.context.python.scope.ContextPooled")) {
                     if (classBuilders.containsKey(scriptElement.getName())) {
                         return;
                     }
@@ -136,7 +136,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     visitScript(scriptElement, context);
                 }
             } else if (element instanceof AbstractPythonClassElement classElement) {
-                if (classElement.hasStereotype("io.micronaut.context.python.scope.Pooled")) {
+                if (classElement.hasStereotype("io.micronaut.context.python.scope.ContextPooled")) {
                     if (classBuilders.containsKey(classElement.getName())) {
                         return;
                     }
@@ -654,7 +654,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         } else if (genericType.isAssignable(List.class) && genericType.getTypeArguments().get("E") instanceof PythonClassElement) {
             parameters.add(RUNTIME_UTIL.invokeStatic("coerceList", TypeDef.of(List.class), methodParam));
         } else if (genericType instanceof PythonClassElement pce) {
-            boolean isPooled = pce.hasStereotype("io.micronaut.context.python.scope.Pooled");
+            boolean isPooled = pce.hasStereotype("io.micronaut.context.python.scope.ContextPooled");
             if (isPooled) {
                 // For pooled Python classes, inject the Java stub (host object), not the polyglot Value.
                 // This ensures method calls go through the Java wrapper which proxies to pooled contexts.

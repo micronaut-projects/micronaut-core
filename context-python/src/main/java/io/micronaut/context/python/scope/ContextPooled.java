@@ -26,14 +26,14 @@ import java.lang.annotation.Target;
 
 /**
  * An annotation that can be applied to Python types to indicate the type should use a {@link org.graalvm.polyglot.Context}
- * retrieved from a Pool to avoid GIL contention when running with multiple threads.
+ * retrieved from a pool to avoid GIL contention when running with multiple threads.
  *
- * <p>This annotation is implicitly applied to Python scripts and is recommended for Python controllers</p>
+ * <p>Pooling behaviour is automatically applied to routes Python scripts that define HTTP routes.</p>
  */
 @Documented
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.TYPE)
 @Executable
 @Prototype
-public @interface Pooled {
+public @interface ContextPooled {
 }

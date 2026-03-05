@@ -12,9 +12,9 @@ class PooledClassSpec extends AbstractPythonTypeElementSpec {
         def python = '''
 from jakarta.inject import Singleton as S
 from micronaut.http.annotation import Controller, Get
-from micronaut.context.python.scope import Pooled
+from micronaut.context.python.scope import ContextPooled
 
-@Pooled
+@ContextPooled
 @S
 class CtxReader:
 
@@ -72,9 +72,9 @@ class PoolController:
     void "pooled class with ctor args fails compilation"() {
         given:
         def python = '''
-from micronaut.context.python.scope import Pooled
+from micronaut.context.python.scope import ContextPooled
 
-@Pooled
+@ContextPooled
 class Bad:
     def __init__(self, a: int):
         self.a = a

@@ -64,13 +64,13 @@ public final class ContextHolder {
     }
 
     /**
-     * Obtain a pooled Python class instance (per-context cached). Used by generated code.
+     * Obtain a pooled Python class instance (per-context cached).
      * @param packageName The Python package (or null/python for top-level)
      * @param simpleName The class simple name
      * @return The pooled class instance (Value) from some context
      */
     @UsedByGeneratedCode
-    public static Value getPooled(@Nullable String packageName, String simpleName) {
+    public static Value findPooledClass(@Nullable String packageName, String simpleName) {
         if (isReuseContext() || pythonPool == null) {
             return findClass(packageName, simpleName);
         }
@@ -78,7 +78,7 @@ public final class ContextHolder {
     }
 
     /**
-     * Execute a function with a borrowed pooled class instance. Used by generated code.
+     * Execute a function with a borrowed pooled class instance.
      * @param packageName The Python package
      * @param simpleName The class name
      * @param fn Function receiving the pooled Value
@@ -93,13 +93,13 @@ public final class ContextHolder {
     }
 
     /**
-     * Obtain a pooled Python script/module object. Used by generated code.
+     * Obtain a pooled Python script/module object.
      * @param packageName The Python package
      * @param scriptName The script/module name
      * @return A pooled script Value
      */
     @UsedByGeneratedCode
-    public static Value getPooledScript(String packageName, String scriptName) {
+    public static Value findPooledScript(String packageName, String scriptName) {
         if (isReuseContext() || pythonPool == null) {
             return findScript(packageName, scriptName);
         }
@@ -107,7 +107,7 @@ public final class ContextHolder {
     }
 
     /**
-     * Execute a function with a borrowed pooled script/module object. Used by generated code.
+     * Execute a function with a borrowed pooled script/module object.
      * @param packageName The package
      * @param scriptName The script name
      * @param fn Function receiving the script Value
@@ -122,14 +122,16 @@ public final class ContextHolder {
     }
 
     /**
-     * Broadcast an injected attribute into all pooled script instances. Used by generated code.
+     * Injects an attribute value into the most recently created pooled context for a given script.
+     * This avoids broadcasting to all contexts and aligns with synchronous object creation flows.
+     *
      * @param packageName The package
      * @param scriptName The script name
      * @param attribute The attribute name
      * @param value The value to inject
      */
     @UsedByGeneratedCode
-    public static void injectedPooledScript(String packageName, String scriptName, String attribute, Object value) {
+    public static void injectPooledScript(String packageName, String scriptName, String attribute, Object value) {
         if (isReuseContext() || pythonPool == null) {
             Value script = findScript(packageName, scriptName);
             script.putMember(attribute, (value instanceof Value v) ? v : Value.asValue(value));
@@ -139,7 +141,7 @@ public final class ContextHolder {
     }
 
     /**
-     * Invoke a method on a pooled class instance. Used by generated code.
+     * Invoke a method on a pooled class instance.
      * @param packageName The package
      * @param simpleName The class name
      * @param methodName The method name
@@ -152,7 +154,7 @@ public final class ContextHolder {
     }
 
     /**
-     * Invoke a method on a pooled script instance. Used by generated code.
+     * Invoke a method on a pooled script instance.
      * @param packageName The package
      * @param scriptName The script name
      * @param methodName The method name
@@ -256,7 +258,7 @@ public final class ContextHolder {
     }
 
     /**
-     * Find a Python class by fully qualified name. Used by generated code.
+     * Find a Python class by fully qualified name.
      * @param simpleName The class name
      * @return The class Value
      */
@@ -276,7 +278,7 @@ public final class ContextHolder {
     }
 
     /**
-     * Find a Python script/module Value. Used by generated code.
+     * Find a Python script/module Value.
      * @param packageName The package name (or python for top-level)
      * @param scriptName The script/module name
      * @return The module Value

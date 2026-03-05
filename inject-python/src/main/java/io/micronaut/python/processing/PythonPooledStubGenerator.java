@@ -82,7 +82,7 @@ final class PythonPooledStubGenerator {
             .addModifiers(Modifier.PUBLIC)
             .returns(POLYGLOT_VALUE)
             .build(((aThis, params) -> CONTEXT_HOLDER
-                .invokeStatic("getPooled", POLYGLOT_VALUE, List.of(
+                .invokeStatic("findPooledClass", POLYGLOT_VALUE, List.of(
                     ExpressionDef.constant(element.getPackageName()),
                     ExpressionDef.constant(element.getSimpleName())
                 )).returning())));
@@ -137,7 +137,7 @@ final class PythonPooledStubGenerator {
             .addModifiers(Modifier.PUBLIC)
             .returns(POLYGLOT_VALUE)
             .build(((aThis, params) -> CONTEXT_HOLDER
-                .invokeStatic("getPooledScript", POLYGLOT_VALUE,
+                .invokeStatic("findPooledScript", POLYGLOT_VALUE,
                     List.of(ExpressionDef.constant(pkg), ExpressionDef.constant(script)))
                 .returning())));
 
@@ -278,7 +278,7 @@ final class PythonPooledStubGenerator {
             parameters.add(ExpressionDef.constant(script));
             parameters.add(ExpressionDef.constant(beanProperty.getName()));
             coerceParameterToPolyglotValue(beanProperty, parameters, methodParameters.getFirst());
-            var result = CONTEXT_HOLDER.invokeStatic("injectedPooledScript", TypeDef.VOID, parameters);
+            var result = CONTEXT_HOLDER.invokeStatic("injectPooledScript", TypeDef.VOID, parameters);
             if (returnType.equals(TypeDef.VOID)) {
                 return result;
             } else {

@@ -69,7 +69,7 @@ public final class PythonScriptElement extends AbstractPythonElement implements 
                 enclosedElement.hasStereotype(Executable.class)) {
                 // make bean.
                 // Mark pooled to opt the script into pooled stub generation
-                annotate("io.micronaut.context.python.scope.Pooled");
+                annotate("io.micronaut.context.python.scope.ContextPooled");
                 annotate(Bean.class);
                 applyTypeLevelDefaultAnnotations(enclosedElement);
             }
