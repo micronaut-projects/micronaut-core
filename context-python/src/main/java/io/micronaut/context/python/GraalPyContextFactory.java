@@ -24,6 +24,7 @@ import io.micronaut.runtime.exceptions.ApplicationStartupException;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.Engine;
 import org.graalvm.polyglot.HostAccess;
 import org.graalvm.polyglot.Source;
 import org.graalvm.python.embedding.GraalPyResources;
@@ -34,6 +35,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+
+import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
 
 /**
  * Factory bean that creates and initializes the GraalPy context.
@@ -62,12 +65,16 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
      * Create and initialize the GraalPy context.
      * This bean loads on startup due to the @Context annotation.
      *
+     * @param engine The engine
+     * @param hostAccess The host access
      * @return The initialized GraalPy context
      */
     @io.micronaut.context.annotation.Context
     @Singleton
-    @Named(GraalPyRuntimeUtil.PYTHON)
-    public org.graalvm.polyglot.Context graalPyContext(@Named(GraalPyRuntimeUtil.PYTHON) HostAccess hostAccess) {
+    @Named(PYTHON)
+    public org.graalvm.polyglot.Context graalPyContext(
+        @Named(PYTHON) HostAccess hostAccess,
+        @Named(PYTHON) Engine engine) {
         if (ContextHolder.isInitialized() && ContextHolder.isReuseContext()) {
             providedContext = true;
             // Reuse context: this is an optimization for reloading
@@ -76,34 +83,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
 
         try {
             var classLoader = applicationContext.getClassLoader();
-            var beacon = findBeacon(classLoader);
-            System.setProperty("org.graalvm.python.vfs.allow_multiple", "true");
-            System.setProperty("org.graalvm.python.vfs.multiple_vfs_checks_as_warning", "true");
-            var builder = GraalPyResources.contextBuilder(VirtualFileSystem.newBuilder()
-                    .resourceDirectory(APPLICATION_PATH)
-                    .resourceLoadingClass(beacon).build())
-                // restrict in future?
-//                .option("python.ExposeInternalSources", StringUtils.TRUE)
-//                .allowExperimentalOptions(true)
-                // required for reloading
-                .allowExperimentalOptions(true)
-                .allowCreateProcess(true)
-                .option("python.IsolateNativeModules", "true")
-                .option("python.WarnExperimentalFeatures", "false")
-                 // Allow access to host classes
-                 .allowHostAccess(hostAccess)
-                 .allowHostClassLookup(name -> true);
-            var pyEnv = System.getenv("PYENV_VERSION");
-            var venv = System.getenv("VIRTUAL_ENV");
-            if (pyEnv != null && venv != null && pyEnv.startsWith("graalpy")) {
-                builder.option("python.Executable", Path.of(venv).resolve("bin/python").toString());
-            }
-
-            var context = builder.build();
-            context.initialize(GraalPyRuntimeUtil.PYTHON);
-            // Try to load the generated pyronaut_application.py from META-INF
-            evaluateMain(classLoader, INTERNAL_MAIN, context);
-            evaluateMain(classLoader, APPLICATION_MAIN, context);
+            var context = buildContext(hostAccess, engine, classLoader);
 
             // Make context available to bridge classes
             ContextHolder.setContext(context);
@@ -116,13 +96,46 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
         }
     }
 
+    static @NonNull Context buildContext(HostAccess hostAccess, Engine engine, ClassLoader classLoader) throws IOException {
+        var beacon = findBeacon(classLoader);
+        System.setProperty("org.graalvm.python.vfs.allow_multiple", "true");
+        System.setProperty("org.graalvm.python.vfs.multiple_vfs_checks_as_warning", "true");
+        var builder = GraalPyResources.contextBuilder(VirtualFileSystem.newBuilder()
+                .resourceDirectory(APPLICATION_PATH)
+                .resourceLoadingClass(beacon).build())
+            .allowExperimentalOptions(true)
+            .allowCreateProcess(true)
+            .allowValueSharing(true)
+            .option("python.WarnExperimentalFeatures", "false")
+             // Allow access to host classes
+             .allowHostAccess(hostAccess)
+             .engine(engine)
+             .allowHostClassLookup(name -> true);
+        var pyEnv = System.getenv("PYENV_VERSION");
+        var venv = System.getenv("VIRTUAL_ENV");
+        if (pyEnv != null && venv != null && pyEnv.startsWith("graalpy")) {
+            builder.option("python.Executable", Path.of(venv).resolve("bin/python").toString());
+        }
+
+        var context = builder.build();
+        context.initialize(PYTHON);
+        // set a per-context unique id for tests and tracing via builtins
+        String id = java.util.UUID.randomUUID().toString();
+        context.eval(PYTHON, "import builtins; builtins.__MN_CTX_ID__ = '" + id + "'");
+
+        // Try to load the generated pyronaut_application.py from META-INF
+        evaluateMain(classLoader, INTERNAL_MAIN, context);
+        evaluateMain(classLoader, APPLICATION_MAIN, context);
+        return context;
+    }
+
     private static void evaluateMain(ClassLoader classLoader, String mainPy, Context context) throws IOException {
         try (InputStream inputStream = classLoader
             .getResourceAsStream(APPLICATION_SRC_PATH + mainPy)) {
 
             if (inputStream != null) {
                 String scriptContent = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
-                Source source = Source.newBuilder(GraalPyRuntimeUtil.PYTHON, scriptContent, mainPy)
+                Source source = Source.newBuilder(PYTHON, scriptContent, mainPy)
                     .build();
                 context.eval(source);
             }

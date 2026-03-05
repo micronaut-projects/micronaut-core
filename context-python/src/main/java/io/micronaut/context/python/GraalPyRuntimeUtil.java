@@ -80,21 +80,26 @@ public final class GraalPyRuntimeUtil {
      * @return a Java List with converted elements
      */
     public static <T> List<T> convertList(Value graalValue, Class<T> elementType) {
-        // TODO: Ideally a custom List implementation that doesn't create a new list would be better here
         if (graalValue == null || graalValue.isNull()) {
             return new ArrayList<>();
         }
-
         try {
-            // Try to get the size using different methods
+            if (graalValue.isHostObject()) {
+                Object host = graalValue.as(Object.class);
+                if (host instanceof List<?> list) {
+                    List<T> out = new ArrayList<>(list.size());
+                    for (Object o : list) {
+                        @SuppressWarnings("unchecked") T cast = (T) o;
+                        out.add(cast);
+                    }
+                    return out;
+                }
+            }
             long size = getSize(graalValue);
             if (size == 0) {
                 return List.of();
             }
-
             List<T> result = new ArrayList<>(Long.valueOf(size).intValue());
-
-            // Convert each element
             for (long i = 0; i < size; i++) {
                 Value elementValue = getElementAt(graalValue, i);
                 if (elementValue != null) {
@@ -104,7 +109,6 @@ public final class GraalPyRuntimeUtil {
             }
             return result;
         } catch (Exception e) {
-            // If conversion fails, return empty list
             return List.of();
         }
     }
@@ -119,15 +123,23 @@ public final class GraalPyRuntimeUtil {
      * @return a Java Map with converted keys and values
      */
     public static <K, V> Map<K, V> convertMap(Value graalValue, Class<K> keyType, Class<V> valueType) {
-        // TODO: Ideally a custom Map implementation that doesn't create a new map would be better here
         if (graalValue == null || graalValue.isNull()) {
             return new HashMap<>();
         }
-
-        Map<K, V> result = new HashMap<>();
-
         try {
-            // Try to use Python dict iteration
+            if (graalValue.isHostObject()) {
+                Object host = graalValue.as(Object.class);
+                if (host instanceof Map<?, ?> map) {
+                    Map<K, V> out = new HashMap<>();
+                    for (Map.Entry<?, ?> e : map.entrySet()) {
+                        @SuppressWarnings("unchecked") K k = (K) e.getKey();
+                        @SuppressWarnings("unchecked") V v = (V) e.getValue();
+                        out.put(k, v);
+                    }
+                    return out;
+                }
+            }
+            Map<K, V> result = new HashMap<>();
             Value keysValue = graalValue.invokeMember("keys");
             if (keysValue != null && keysValue.hasIterator()) {
                 Value iterator = keysValue.invokeMember("__iter__");
@@ -137,29 +149,23 @@ public final class GraalPyRuntimeUtil {
                         if (nextValue == null || nextValue.isNull()) {
                             break;
                         }
-
                         try {
                             K convertedKey = convertValue(nextValue, keyType);
                             Value mapValue = graalValue.invokeMember("__getitem__", nextValue);
                             V convertedValue = convertValue(mapValue, valueType);
-
                             result.put(convertedKey, convertedValue);
                         } catch (Exception e) {
                             // Skip problematic entries
-                            continue;
                         }
                     } catch (Exception e) {
-                        // Iterator exhausted (StopIteration in Python)
                         break;
                     }
                 }
             }
+            return result;
         } catch (Exception e) {
-            // If conversion fails, return empty map
             return new HashMap<>();
         }
-
-        return result;
     }
 
     /**
