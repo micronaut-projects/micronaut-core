@@ -23,6 +23,7 @@ import io.micronaut.context.banner.Banner;
 import io.micronaut.context.banner.MicronautBanner;
 import io.micronaut.context.banner.ResourceBanner;
 import io.micronaut.context.env.Environment;
+import io.micronaut.core.io.ResourceLoadStrategy;
 import io.micronaut.context.env.PropertySource;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -196,12 +197,12 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     }
 
     @Override
-    public Micronaut include(@Nullable String... configurations) {
+    public Micronaut include(String @Nullable ... configurations) {
         return (Micronaut) super.include(configurations);
     }
 
     @Override
-    public Micronaut exclude(@Nullable String... configurations) {
+    public Micronaut exclude(String @Nullable ... configurations) {
         return (Micronaut) super.exclude(configurations);
     }
 
@@ -231,7 +232,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     }
 
     @Override
-    public Micronaut singletons(Object... beans) {
+    public Micronaut singletons(Object @Nullable ... beans) {
         return (Micronaut) super.singletons(beans);
     }
 
@@ -241,7 +242,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     }
 
     @Override
-    public Micronaut propertySources(@Nullable PropertySource... propertySources) {
+    public Micronaut propertySources(PropertySource @Nullable ... propertySources) {
         return (Micronaut) super.propertySources(propertySources);
     }
 
@@ -251,12 +252,12 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     }
 
     @Override
-    public Micronaut environmentVariableIncludes(@Nullable String... environmentVariables) {
+    public Micronaut environmentVariableIncludes(String @Nullable ... environmentVariables) {
         return (Micronaut) super.environmentVariableIncludes(environmentVariables);
     }
 
     @Override
-    public Micronaut environmentVariableExcludes(@Nullable String... environmentVariables) {
+    public Micronaut environmentVariableExcludes(String @Nullable... environmentVariables) {
         return (Micronaut) super.environmentVariableExcludes(environmentVariables);
     }
 
@@ -271,22 +272,27 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     }
 
     @Override
-    public Micronaut args(@Nullable String... args) {
+    public Micronaut args(String @Nullable ... args) {
         return (Micronaut) super.args(args);
     }
 
     @Override
-    public Micronaut environments(@Nullable String... environments) {
+    public Micronaut environments(String @Nullable ... environments) {
         return (Micronaut) super.environments(environments);
     }
 
     @Override
-    public Micronaut defaultEnvironments(@Nullable String... environments) {
+    public Micronaut configurationLoadingStrategy(ResourceLoadStrategy.Builder builder) {
+        return (Micronaut) super.configurationLoadingStrategy(builder);
+    }
+
+    @Override
+    public Micronaut defaultEnvironments(String @Nullable ... environments) {
         return (Micronaut) super.defaultEnvironments(environments);
     }
 
     @Override
-    public Micronaut packages(@Nullable String... packages) {
+    public Micronaut packages(String @Nullable ... packages) {
         return (Micronaut) super.packages(packages);
     }
 

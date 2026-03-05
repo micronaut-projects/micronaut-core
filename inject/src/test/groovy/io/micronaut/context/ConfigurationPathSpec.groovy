@@ -3,6 +3,8 @@ package io.micronaut.context
 import io.micronaut.context.annotation.ConfigurationReader
 import io.micronaut.context.annotation.EachProperty
 import io.micronaut.context.env.ConfigurationPath
+import io.micronaut.context.env.PropertySource
+import io.micronaut.context.env.PropertySourcePropertyResolver
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.annotation.MutableAnnotationMetadata
 import io.micronaut.inject.qualifiers.PrimaryQualifier
@@ -124,6 +126,53 @@ class ConfigurationPathSpec extends Specification {
         configurationPath.kind() == ConfigurationPath.ConfigurationSegment.ConfigurationKind.INDEX
         configurationPath.prefix() == 'test.default.inner.indexed[1]'
 
+    }
+
+    void "test each property path traversal falls back to generated entries for hyphenated prefix env keys"() {
+        given:
+        ConfigurationPath path = ConfigurationPath.newPath()
+        path.pushEachPropertyRoot(newEachPropertyBean(null, "test.object-storage.*"))
+        def resolver = new PropertySourcePropertyResolver(
+                PropertySource.of(
+                        "test",
+                        [TEST_OBJECT_STORAGE_ONE_URL: 'jdbc:mysql://localhost/one'],
+                        PropertySource.PropertyConvention.ENVIRONMENT_VARIABLE
+                )
+        )
+        List<String> resolvedPrefixes = []
+
+        when:
+        path.traverseResolvableSegments(resolver) { subPath ->
+            resolvedPrefixes.add(subPath.prefix())
+        }
+
+        then:
+        resolvedPrefixes == ['test.object-storage.one']
+    }
+
+    void "test each property generated fallback filters flattened keys"() {
+        given:
+        ConfigurationPath path = ConfigurationPath.newPath()
+        path.pushEachPropertyRoot(newEachPropertyBean(null, "test.object-storage.*"))
+        def resolver = new PropertySourcePropertyResolver(
+                PropertySource.of(
+                        "test",
+                        [
+                                TEST_OBJECT_STORAGE_ONE_URL: 'jdbc:mysql://localhost/one',
+                                TEST_OBJECT_STORAGE_TWO_URL: 'jdbc:mysql://localhost/two'
+                        ],
+                        PropertySource.PropertyConvention.ENVIRONMENT_VARIABLE
+                )
+        )
+        List<String> names = []
+
+        when:
+        path.traverseResolvableSegments(resolver) { subPath ->
+            names.add(subPath.simpleName())
+        }
+
+        then:
+        names as Set == ['one', 'two'] as Set
     }
 
     private RuntimeBeanDefinition<Class<ConfigurationPathSpec>> newConfigurationReader(String prefix) {

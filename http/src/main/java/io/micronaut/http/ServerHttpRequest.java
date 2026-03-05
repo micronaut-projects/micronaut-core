@@ -16,7 +16,6 @@
 package io.micronaut.http;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.ByteBodyFactory;
@@ -37,7 +36,6 @@ public interface ServerHttpRequest<B> extends HttpRequest<B> {
      *
      * @return The body bytes of this request
      */
-    @NonNull
     ByteBody byteBody();
 
     /**
@@ -46,7 +44,6 @@ public interface ServerHttpRequest<B> extends HttpRequest<B> {
      *
      * @return The body factory
      */
-    @NonNull
     default ByteBodyFactory byteBodyFactory() {
         return ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE);
     }

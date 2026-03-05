@@ -30,7 +30,7 @@ import jakarta.inject.Singleton
 @Prototype
 class MapToLocalDateConverter : TypeConverter<Map<*, *>, LocalDate> { // <1>
     override fun convert(propertyMap: Map<*, *>, targetType: Class<LocalDate>, context: ConversionContext): Optional<LocalDate> {
-        val day = ConversionService.SHARED.convert(propertyMap["day"], Int::class.java)
+        val day = ConversionService.SHARED.convert(propertyMap["day"]!!, Int::class.java)
         val month = ConversionService.SHARED.convert(propertyMap["month"], Int::class.java)
         val year = ConversionService.SHARED.convert(propertyMap["year"], Int::class.java)
         if (day.isPresent && month.isPresent && year.isPresent) {

@@ -33,11 +33,16 @@ class KotlinUploadController {
 
     @Post(value = "/flow", consumes = [MULTIPART_FORM_DATA], produces = [TEXT_PLAIN])
     suspend fun uploadFlow(file: StreamingFileUpload): Int {
-        return file.asFlow().map { it.bytes.size }.reduce { accumulator, value -> accumulator + value }
+        return file.streamingBody().toReadBufferPublisher().asFlow()
+            .map { buf -> buf.use { buf.readable() } }
+            .reduce { accumulator, value -> accumulator + value }
     }
 
     @Post(value = "/await", consumes = [MULTIPART_FORM_DATA], produces = [TEXT_PLAIN])
     suspend fun uploadAwaitFlux(file: StreamingFileUpload): Int {
-        return Flux.from(file).map { it.bytes.size }.reduce { accumulator, value -> accumulator + value }.awaitFirstOrNull() ?: 0
+        return Flux.from(file.streamingBody().toReadBufferPublisher())
+            .map { buf -> buf.use { buf.readable() } }
+            .reduce { accumulator, value -> accumulator + value }
+            .awaitFirstOrNull() ?: 0
     }
 }

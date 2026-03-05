@@ -75,6 +75,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
     private String healthCheckUri = DEFAULT_HEALTHCHECKURI;
     private boolean healthCheck = DEFAULT_HEALTHCHECK;
     private Duration healthCheckInterval = Duration.ofSeconds(DEFAULT_HEALTHCHECKINTERVAL_SECONDS);
+    @Nullable
     private String path;
 
     /**

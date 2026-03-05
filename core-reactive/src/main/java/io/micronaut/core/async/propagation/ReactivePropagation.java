@@ -16,7 +16,6 @@
 package io.micronaut.core.async.propagation;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.propagation.PropagatedContext;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
@@ -68,7 +67,7 @@ public final class ReactivePropagation {
     public static <T> Publisher<T> propagate(PropagatedContext propagatedContext, CorePublisher<T> actual) {
         return new CorePublisher<>() {
             @Override
-            public void subscribe(@NonNull CoreSubscriber<? super T> subscriber) {
+            public void subscribe(CoreSubscriber<? super T> subscriber) {
                 try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
                     actual.subscribe(propagate(propagatedContext, subscriber));
                 }
@@ -98,7 +97,6 @@ public final class ReactivePropagation {
     public static <T> Subscriber<T> propagate(PropagatedContext propagatedContext, Subscriber<T> actual) {
         return new CoreSubscriber<>() {
 
-            @NonNull
             @Override
             public Context currentContext() {
                 Context ctx;
@@ -111,7 +109,7 @@ public final class ReactivePropagation {
             }
 
             @Override
-            public void onSubscribe(@NonNull Subscription s) {
+            public void onSubscribe(Subscription s) {
                 try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
                     actual.onSubscribe(s);
                 }

@@ -33,8 +33,7 @@ import io.micronaut.inject.annotation.EvaluatedAnnotationMetadata;
  * @since 4.0
  */
 @Internal
-final class ExpressionsAwareArgument<T> extends DefaultArgument<T> implements BeanContextConfigurable,
-                                                                        BeanDefinitionAware {
+final class ExpressionsAwareArgument<T> extends DefaultArgument<T> implements BeanContextConfigurable, BeanDefinitionAware {
 
     private final EvaluatedAnnotationMetadata annotationMetadata;
 
@@ -52,14 +51,10 @@ final class ExpressionsAwareArgument<T> extends DefaultArgument<T> implements Be
     public static <T> Argument<T> wrapIfNecessary(Argument<T> argument,
                                                   @Nullable BeanContext beanContext,
                                                   @Nullable BeanDefinition<?> owningBean) {
-        if (!(argument instanceof DefaultArgument<T>)) {
-            return null;
-        }
-
         AnnotationMetadata argumentAnnotationMetadata = argument.getAnnotationMetadata();
         if (argumentAnnotationMetadata.hasPropertyExpressions()) {
             if (!(argument instanceof EnvironmentAwareArgument<T>) && beanContext instanceof ApplicationContext ac) {
-                EnvironmentAwareArgument<T> environmentAwareArgument = new EnvironmentAwareArgument<>((DefaultArgument<T>) argument);
+                EnvironmentAwareArgument<T> environmentAwareArgument = new EnvironmentAwareArgument<>(argument);
                 environmentAwareArgument.configure(ac.getEnvironment());
                 return environmentAwareArgument;
             } else {

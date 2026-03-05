@@ -19,8 +19,8 @@ import io.micronaut.context.condition.Condition;
 import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.netty.util.internal.PlatformDependent;
+import org.jspecify.annotations.NullUnmarked;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
@@ -38,6 +38,7 @@ import java.util.concurrent.ForkJoinPool;
  */
 @Internal
 @Experimental
+@NullUnmarked
 public final class PrivateLoomSupport {
     private static final MethodHandle DEFAULT_SCHEDULER;
     private static final MethodHandle BUILDER_SCHEDULER;
@@ -97,7 +98,6 @@ public final class PrivateLoomSupport {
         CARRIER_THREAD = carrierThread;
     }
 
-    @NonNull
     static ForkJoinPool getDefaultScheduler() {
         try {
             return (ForkJoinPool) DEFAULT_SCHEDULER.invokeExact();

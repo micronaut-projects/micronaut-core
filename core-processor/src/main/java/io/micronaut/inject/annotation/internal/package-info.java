@@ -20,6 +20,9 @@
  * @author graemerocher
  */
 @Internal
+@NullMarked
 package io.micronaut.inject.annotation.internal;
 
+
+import org.jspecify.annotations.NullMarked;
 import io.micronaut.core.annotation.Internal;

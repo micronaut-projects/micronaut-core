@@ -17,7 +17,6 @@ package io.micronaut.http.client.jdk;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.ResourceResolver;
@@ -61,14 +60,16 @@ import java.util.List;
 public class DefaultJdkHttpClient extends AbstractJdkHttpClient implements JdkHttpClient {
     public DefaultJdkHttpClient(
         @Nullable LoadBalancer loadBalancer,
-        HttpVersionSelection httpVersion,
-        @NonNull HttpClientConfiguration configuration,
+        @Nullable HttpVersionSelection httpVersion,
+        HttpClientConfiguration configuration,
         @Nullable String contextPath,
         @Nullable HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver,
         @Nullable List<HttpFilterResolver.FilterEntry> clientFilterEntries,
+        @Nullable
         MediaTypeCodecRegistry mediaTypeCodecRegistry,
         MessageBodyHandlerRegistry messageBodyHandlerRegistry,
         RequestBinderRegistry requestBinderRegistry,
+        @Nullable
         String clientId,
         ConversionService conversionService,
         JdkClientSslBuilder sslBuilder,
@@ -92,7 +93,7 @@ public class DefaultJdkHttpClient extends AbstractJdkHttpClient implements JdkHt
         );
     }
 
-    public DefaultJdkHttpClient(URI uri, ConversionService conversionService) {
+    public DefaultJdkHttpClient(@Nullable URI uri, ConversionService conversionService) {
         this(
             uri == null ? null : LoadBalancer.fixed(uri),
             null,
@@ -111,8 +112,9 @@ public class DefaultJdkHttpClient extends AbstractJdkHttpClient implements JdkHt
     }
 
     public DefaultJdkHttpClient(
-        URI uri,
+        @Nullable URI uri,
         HttpClientConfiguration configuration,
+        @Nullable
         MediaTypeCodecRegistry mediaTypeCodecRegistry,
         MessageBodyHandlerRegistry messageBodyHandlerRegistry,
         ConversionService conversionService
@@ -163,7 +165,7 @@ public class DefaultJdkHttpClient extends AbstractJdkHttpClient implements JdkHt
     }
 
     @Override
-    public <I, O, E> Publisher<HttpResponse<O>> exchange(@NonNull HttpRequest<I> request, @NonNull Argument<O> bodyType, @NonNull Argument<E> errorType) {
+    public <I, O, E> Publisher<HttpResponse<O>> exchange(HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
         return exchangeImpl(request, bodyType);
     }
 

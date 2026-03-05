@@ -20,6 +20,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.health.HealthStatus;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Map;
 
@@ -34,6 +35,7 @@ import java.util.Map;
 class DefaultHealthResult implements HealthResult {
     private final String name;
     private final HealthStatus healthStatus;
+    @Nullable
     private final Object details;
 
     /**
@@ -43,7 +45,7 @@ class DefaultHealthResult implements HealthResult {
      * @param healthStatus The health status
      * @param details The details
      */
-    DefaultHealthResult(String name, HealthStatus healthStatus, Object details) {
+    DefaultHealthResult(String name, HealthStatus healthStatus, @Nullable Object details) {
         this.name = name;
         this.healthStatus = healthStatus;
         this.details = details;
@@ -86,6 +88,7 @@ class DefaultHealthResult implements HealthResult {
     }
 
     @Override
+    @Nullable
     public Object getDetails() {
         return this.details;
     }

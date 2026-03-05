@@ -27,7 +27,6 @@ import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.type.DefaultArgument;
 import io.micronaut.inject.ast.ClassElement;
@@ -47,6 +46,7 @@ import io.micronaut.inject.validation.RequiresValidation;
 import io.micronaut.inject.visitor.TypeElementQuery;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -73,7 +73,6 @@ public class ConfigurationMetadataWriterVisitor implements TypeElementVisitor<Co
 
     private ConfigurationMetadataBuilder metadataBuilder = new ConfigurationMetadataBuilder();
 
-    @NonNull
     @Override
     public VisitorKind getVisitorKind() {
         return VisitorKind.AGGREGATING;
@@ -220,6 +219,7 @@ public class ConfigurationMetadataWriterVisitor implements TypeElementVisitor<Co
         });
     }
 
+    @Nullable
     private String getPropertyDocs(PropertyElement propertyElement) {
         String doc = propertyElement.getDocumentation(true).orElse(null);
         Optional<MethodElement> writeMethod = propertyElement.getWriteMethod();

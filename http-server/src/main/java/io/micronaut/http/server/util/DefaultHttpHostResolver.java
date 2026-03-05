@@ -16,8 +16,6 @@
 package io.micronaut.http.server.util;
 
 import io.micronaut.context.BeanProvider;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
@@ -25,6 +23,7 @@ import io.micronaut.http.server.HttpServerConfiguration.HostResolutionConfigurat
 import io.micronaut.runtime.server.EmbeddedServer;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 
 import java.net.URI;
 import java.util.List;
@@ -41,6 +40,7 @@ import java.util.regex.Pattern;
 public class DefaultHttpHostResolver implements HttpHostResolver {
 
     private static final String DEFAULT_HOST = "http://localhost";
+    @Nullable
     private final BeanProvider<EmbeddedServer> embeddedServer;
     private final HttpServerConfiguration serverConfiguration;
 
@@ -55,7 +55,6 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
         this.embeddedServer = embeddedServer;
     }
 
-    @NonNull
     @Override
     public String resolve(@Nullable HttpRequest request) {
         String host;
@@ -77,7 +76,7 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
      * @param host The host
      * @return The transformed host
      */
-    protected @NonNull String validateHost(@NonNull String host) {
+    protected String validateHost(String host) {
         if (!host.equals(DEFAULT_HOST)) {
             HostResolutionConfiguration configuration = serverConfiguration.getHostResolution();
             if (configuration != null) {
@@ -148,7 +147,7 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
      * @param isPortInHost If the port can be part of the host value
      * @return The configured host
      */
-    protected String getConfiguredHost(HttpRequest request, String schemeHeader, String hostHeader, String portHeader, boolean isPortInHost) {
+    protected String getConfiguredHost(HttpRequest request, @Nullable String schemeHeader, @Nullable String hostHeader, @Nullable String portHeader, boolean isPortInHost) {
         HttpHeaders headers = request.getHeaders();
         String scheme = null;
         if (schemeHeader != null) {

@@ -17,7 +17,6 @@ package io.micronaut.management.endpoint.beans.impl;
 
 import io.micronaut.context.Qualifier;
 import io.micronaut.context.annotation.Requires;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.management.endpoint.beans.BeanDefinitionData;
@@ -65,7 +64,7 @@ public class DefaultBeanDefinitionData implements BeanDefinitionData<Map<String,
      * @return The qualifier
      */
     @Nullable
-    protected String getQualifier(@NonNull BeanDefinition<?> beanDefinition) {
+    protected String getQualifier(BeanDefinition<?> beanDefinition) {
         Qualifier<?> q = beanDefinition.getDeclaredQualifier();
         if (q != null) {
             return q.toString();
@@ -77,8 +76,7 @@ public class DefaultBeanDefinitionData implements BeanDefinitionData<Map<String,
      * @param beanDefinition A bean definition
      * @return A list of dependencies for the bean definition
      */
-    @NonNull
-    protected List<String> getDependencies(@NonNull BeanDefinition<?> beanDefinition) {
+    protected List<String> getDependencies(BeanDefinition<?> beanDefinition) {
         return beanDefinition.getRequiredComponents().stream().map(Class::getName).sorted().toList();
     }
 
@@ -87,7 +85,7 @@ public class DefaultBeanDefinitionData implements BeanDefinitionData<Map<String,
      * @return The scope for the bean
      */
     @Nullable
-    protected String getScope(@NonNull BeanDefinition<?> beanDefinition) {
+    protected String getScope(BeanDefinition<?> beanDefinition) {
         return beanDefinition.getScopeName().orElse(null);
     }
 
@@ -95,8 +93,7 @@ public class DefaultBeanDefinitionData implements BeanDefinitionData<Map<String,
      * @param beanDefinition A bean definition
      * @return The type of the bean as String
      */
-    @NonNull
-    protected String getType(@NonNull BeanDefinition<?> beanDefinition) {
+    protected String getType(BeanDefinition<?> beanDefinition) {
         return beanDefinition.getBeanType().getName();
     }
 }

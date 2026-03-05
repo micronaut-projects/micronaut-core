@@ -26,6 +26,8 @@ import spock.lang.Issue
 import spock.lang.Specification
 import spock.util.environment.RestoreSystemProperties
 
+import java.nio.file.Files
+import java.nio.file.Path
 import java.util.function.Function
 
 /**
@@ -96,6 +98,39 @@ class DefaultEnvironmentSpec extends Specification {
 
         cleanup:
         System.clearProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY)
+    }
+
+    void "test environment refresh and diff when bootstrap property changed"() {
+        given:
+        System.setProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY, StringUtils.TRUE)
+        System.setProperty(Environment.ENVIRONMENTS_PROPERTY, "ms")
+        Path tempConfigDir = Files.createTempDirectory("micronaut-data-config-")
+        Path tempConfigFile = tempConfigDir.resolve("bootstrap-ms.yml")
+        tempConfigFile.toFile().text = "prop-key: prop-value-1"
+
+        when:
+        ApplicationContext applicationContext = ApplicationContext.builder()
+                .overrideConfigLocations("file:" + tempConfigDir)
+                .build()
+                .start()
+
+        then:
+        applicationContext.getRequiredProperty("prop-key", String.class) == "prop-value-1"
+
+        when:
+        Files.deleteIfExists(tempConfigFile)
+        def diff = applicationContext.getEnvironment().refreshAndDiff()
+
+        then:
+        diff.get("prop-key") == "prop-value-1"
+        applicationContext.getProperty("prop-key", String.class).isEmpty()
+
+        cleanup:
+        if (tempConfigDir) {
+            Files.deleteIfExists(tempConfigDir)
+        }
+        System.clearProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY)
+        System.clearProperty(Environment.ENVIRONMENTS_PROPERTY)
     }
 
     void "test environment system property refresh"() {

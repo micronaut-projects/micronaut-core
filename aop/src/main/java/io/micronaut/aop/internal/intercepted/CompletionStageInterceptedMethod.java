@@ -23,6 +23,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
+import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -78,7 +79,7 @@ final class CompletionStageInterceptedMethod implements InterceptedMethod {
     }
 
     @Override
-    public Object handleResult(Object result) {
+    public Object handleResult(@Nullable Object result) {
         if (result == null) {
             result = CompletableFuture.completedFuture(null);
         }
@@ -92,7 +93,7 @@ final class CompletionStageInterceptedMethod implements InterceptedMethod {
         return convertCompletionStageResult(context.getReturnType(), newFuture);
     }
 
-    private CompletionStage<Object> convertToCompletionStage(Object result) {
+    private CompletionStage<Object> convertToCompletionStage(@Nullable Object result) {
         if (result instanceof CompletionStage stage) {
             return stage;
         }

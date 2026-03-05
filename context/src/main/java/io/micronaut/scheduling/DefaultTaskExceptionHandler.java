@@ -19,8 +19,6 @@ import io.micronaut.context.annotation.Primary;
 import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -37,7 +35,7 @@ public class DefaultTaskExceptionHandler implements TaskExceptionHandler<Object,
     static final Logger LOG = LoggerFactory.getLogger(DefaultTaskExceptionHandler.class);
 
     @Override
-    public void handle(@Nullable Object bean, @NonNull Throwable throwable) {
+    public void handle(@Nullable Object bean, Throwable throwable) {
         if (LOG.isErrorEnabled()) {
             StringBuilder message = new StringBuilder("Error invoking scheduled task ");
             if (bean != null) {

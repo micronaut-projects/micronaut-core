@@ -17,8 +17,6 @@ package io.micronaut.http.tck;
 
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
-
 import java.util.Iterator;
 import java.util.ServiceLoader;
 
@@ -38,7 +36,6 @@ public final class ServerUnderTestProviderUtils {
      * @return The first {@link ServerUnderTestProvider} loaded via a Service loader.
      * @throws ConfigurationException if it cannot load any {@link ServerUnderTestProvider}.
      */
-    @NonNull
     public static ServerUnderTestProvider getServerUnderTestProvider() {
         Iterator<ServerUnderTestProvider> it = ServiceLoader.load(ServerUnderTestProvider.class).iterator();
         if (it.hasNext()) {

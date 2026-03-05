@@ -16,7 +16,6 @@
 package io.micronaut.http.filter;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
@@ -63,7 +62,6 @@ final class DefaultFilterEntry implements HttpFilterResolver.FilterEntry {
         this.hasPatterns = ArrayUtils.isNotEmpty(patterns);
     }
 
-    @NonNull
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
         return annotationMetadata;

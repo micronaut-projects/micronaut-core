@@ -20,7 +20,6 @@ import io.micronaut.context.env.EnvironmentPackagesDeducer;
 import io.micronaut.context.env.PropertySourcesLocator;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanConfiguration;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
@@ -57,7 +56,7 @@ class ApplicationContextConfigurationDelegate implements ApplicationContextConfi
     }
 
     @Override
-    public @NonNull List<String> getEnvironments() {
+    public List<String> getEnvironments() {
         return delegate.getEnvironments();
     }
 
@@ -102,7 +101,7 @@ class ApplicationContextConfigurationDelegate implements ApplicationContextConfi
     }
 
     @Override
-    public @NonNull ClassPathResourceLoader getResourceLoader() {
+    public ClassPathResourceLoader getResourceLoader() {
         return delegate.getResourceLoader();
     }
 
@@ -132,7 +131,7 @@ class ApplicationContextConfigurationDelegate implements ApplicationContextConfi
     }
 
     @Override
-    public @NonNull String getApplicationName() {
+    public String getApplicationName() {
         return delegate.getApplicationName();
     }
 
@@ -142,7 +141,7 @@ class ApplicationContextConfigurationDelegate implements ApplicationContextConfi
     }
 
     @Override
-    public @NonNull BeanResolutionTraceConfiguration getTraceConfiguration() {
+    public BeanResolutionTraceConfiguration getTraceConfiguration() {
         return delegate.getTraceConfiguration();
     }
 
@@ -152,7 +151,7 @@ class ApplicationContextConfigurationDelegate implements ApplicationContextConfi
     }
 
     @Override
-    public @NonNull ClassLoader getClassLoader() {
+    public ClassLoader getClassLoader() {
         return delegate.getClassLoader();
     }
 

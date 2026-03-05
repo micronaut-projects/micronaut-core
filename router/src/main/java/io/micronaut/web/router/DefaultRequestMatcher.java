@@ -16,6 +16,7 @@
 package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
@@ -40,8 +41,8 @@ public sealed class DefaultRequestMatcher<T, R> extends DefaultMethodBasedRouteI
     private final List<Predicate<HttpRequest<?>>> predicates;
 
     public DefaultRequestMatcher(MethodExecutionHandle<T, R> targetMethod,
-                                 Argument<?> bodyArgument,
-                                 String bodyArgumentName,
+                                 @Nullable Argument<?> bodyArgument,
+                                 @Nullable String bodyArgumentName,
                                  List<MediaType> producesMediaTypes,
                                  List<MediaType> consumesMediaTypes,
                                  boolean isPermitsBody,

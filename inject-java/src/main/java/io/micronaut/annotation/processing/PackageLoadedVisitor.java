@@ -17,7 +17,6 @@ package io.micronaut.annotation.processing;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.inject.visitor.PackageElementVisitor;
@@ -40,8 +39,8 @@ import java.util.List;
  * @since 4.10
  */
 @Internal
-record PackageLoadedVisitor(@NonNull PackageElementVisitor<?> visitor,
-                            @NonNull String annotation) implements Ordered {
+record PackageLoadedVisitor(PackageElementVisitor<?> visitor,
+                            String annotation) implements Ordered {
 
     private static final String OBJECT_CLASS = Object.class.getName();
 

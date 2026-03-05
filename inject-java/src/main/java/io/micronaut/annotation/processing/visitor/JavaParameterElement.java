@@ -20,7 +20,6 @@ import com.github.javaparser.javadoc.Javadoc;
 import com.github.javaparser.javadoc.JavadocBlockTag;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
@@ -45,7 +44,9 @@ final class JavaParameterElement extends AbstractTypeAwareJavaElement implements
 
     private final JavaClassElement owningType;
     private final JavaMethodElement methodElement;
+    @Nullable
     private ClassElement typeElement;
+    @Nullable
     private ClassElement genericTypeElement;
 
     /**
@@ -68,7 +69,7 @@ final class JavaParameterElement extends AbstractTypeAwareJavaElement implements
     }
 
     @Override
-    public JavaNativeElement.@NonNull Variable getNativeType() {
+    public JavaNativeElement.Variable getNativeType() {
         return (JavaNativeElement.Variable) super.getNativeType();
     }
 
@@ -103,7 +104,6 @@ final class JavaParameterElement extends AbstractTypeAwareJavaElement implements
     }
 
     @Override
-    @NonNull
     public ClassElement getType() {
         if (typeElement == null) {
             typeElement = newClassElement(getNativeType(), getNativeType().element().asType(), Collections.emptyMap());
@@ -111,7 +111,6 @@ final class JavaParameterElement extends AbstractTypeAwareJavaElement implements
         return typeElement;
     }
 
-    @NonNull
     @Override
     public ClassElement getGenericType() {
         if (genericTypeElement == null) {

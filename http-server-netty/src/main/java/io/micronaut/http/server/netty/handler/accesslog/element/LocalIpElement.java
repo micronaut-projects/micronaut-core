@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.http.server.netty.handler.accesslog.element;
-
-import org.jspecify.annotations.NonNull;
 import io.netty.handler.codec.http.HttpHeaders;
 
 import java.util.Set;
@@ -47,7 +45,7 @@ final class LocalIpElement implements LogElement {
     }
 
     @Override
-    public String onRequestHeaders(@NonNull ConnectionMetadata metadata, @NonNull String method, @NonNull HttpHeaders headers, @NonNull String uri, @NonNull String protocol) {
+    public String onRequestHeaders(ConnectionMetadata metadata, String method, HttpHeaders headers, String uri, String protocol) {
         return metadata.localAddress().flatMap(ConnectionMetadata::getHostAddress).orElse(ConstantElement.UNKNOWN_VALUE);
     }
 

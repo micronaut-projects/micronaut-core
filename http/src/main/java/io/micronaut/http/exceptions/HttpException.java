@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.exceptions;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * Parent class of all exceptions thrown during HTTP processing.
  *
@@ -40,19 +42,20 @@ public abstract class HttpException extends RuntimeException {
      * @param message The message
      * @param cause   The throwable
      */
-    public HttpException(String message, Throwable cause) {
+    public HttpException(String message, @Nullable Throwable cause) {
         super(message, cause);
     }
 
     /**
-     * @param message The message
-     * @param cause   The throwable
-     * @param enableSuppression Enable suppression
+     * @param message            The message
+     * @param cause              The throwable
+     * @param enableSuppression  Enable suppression
      * @param writableStackTrace Writable stacktrace
      */
-    protected HttpException(String message, Throwable cause,
-                               boolean enableSuppression,
-                               boolean writableStackTrace) {
+    protected HttpException(String message,
+                            @Nullable Throwable cause,
+                            boolean enableSuppression,
+                            boolean writableStackTrace) {
         super(message, cause, enableSuppression, writableStackTrace);
     }
 }

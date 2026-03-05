@@ -19,4 +19,7 @@
  * @author Graeme Rocher
  * @since 1.0
  */
+@NullMarked
 package io.micronaut.management.health.indicator.discovery;
+
+import org.jspecify.annotations.NullMarked;

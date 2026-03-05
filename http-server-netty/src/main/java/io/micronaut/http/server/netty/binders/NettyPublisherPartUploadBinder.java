@@ -15,25 +15,30 @@
  */
 package io.micronaut.http.server.netty.binders;
 
+import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.type.Argument;
-import io.micronaut.http.MediaType;
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
+import io.micronaut.http.multipart.CompletedAttribute;
+import io.micronaut.http.multipart.CompletedFileUpload;
 import io.micronaut.http.multipart.CompletedPart;
 import io.micronaut.http.multipart.PartData;
 import io.micronaut.http.multipart.StreamingFileUpload;
-import io.micronaut.http.server.netty.MicronautHttpData;
+import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
+import io.micronaut.http.server.multipart.FormFactory;
+import io.micronaut.http.server.multipart.FormRouteCompleter;
 import io.micronaut.http.server.netty.NettyHttpRequest;
-import io.micronaut.http.server.netty.multipart.NettyPartData;
-import io.micronaut.http.server.netty.multipart.NettyStreamingFileUpload;
-import io.netty.handler.codec.http.multipart.FileUpload;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
+import reactor.core.scheduler.Schedulers;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.Optional;
 
 /**
@@ -46,20 +51,19 @@ import java.util.Optional;
 final class NettyPublisherPartUploadBinder implements TypedRequestArgumentBinder<Publisher<?>>, NettyRequestArgumentBinder<Publisher<?>> {
 
     private static final Argument<Publisher<?>> PUBLISHER_ARGUMENT = (Argument) Argument.of(Publisher.class);
-    private static final Argument<PartData> PART_DATA_ARGUMENT = Argument.of(PartData.class);
 
     private final ConversionService conversionService;
-    private final NettyStreamingFileUpload.Factory fileUploadFactory;
+    private final BeanProvider<FormFactory> formFactory;
 
-    NettyPublisherPartUploadBinder(ConversionService conversionService, NettyStreamingFileUpload.Factory fileUploadFactory) {
+    NettyPublisherPartUploadBinder(ConversionService conversionService, BeanProvider<FormFactory> formFactory) {
         this.conversionService = conversionService;
-        this.fileUploadFactory = fileUploadFactory;
+        this.formFactory = formFactory;
     }
 
     @Override
     public BindingResult<Publisher<?>> bindForNettyRequest(ArgumentConversionContext<Publisher<?>> context,
                                                            NettyHttpRequest<?> request) {
-        if (request.getContentType().isEmpty() || !request.isFormOrMultipartData()) {
+        if (!request.hasFormBody()) {
             return BindingResult.unsatisfied();
         }
 
@@ -71,43 +75,59 @@ final class NettyPublisherPartUploadBinder implements TypedRequestArgumentBinder
 
         Flux<?> publisher;
         if (contentTypeClass == StreamingFileUpload.class) {
-            publisher = request.formRouteCompleter().claimFields(inputName, (data, flux) -> fileUploadFactory.create((FileUpload) data, flux));
+            // Publisher<StreamingFileUpload>
+            publisher = Flux.from(formFactory.get().getOrCreateCompleter(request).subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.ASYNC, argument)))
+                .map(f -> formFactory.get().streamFileUpload(f))
+                .doOnDiscard(StreamingFileUpload.class, StreamingFileUpload::close);
         } else if (contentTypeClass == Publisher.class) {
+            // Publisher<Publisher<…>>
             Argument<?> nestedType = contentArgument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
-            publisher = request.formRouteCompleter()
-                .claimFields(inputName, (data, flux) -> flux.mapNotNull(partData -> conversionService.convert(partData, nestedType).orElse(null)));
-        } else {
-            Flux<? extends MicronautHttpData<?>> raw;
-            if (CompletedPart.class.isAssignableFrom(contentTypeClass)) {
-                // For CompletedPart, only include completed fields. Otherwise, if the publisher is
-                // only subscribed to after all components have been received (e.g. because another
-                // argument delays execution of the controller), each component will have
-                // isCompleted=true, so the part will show up many times in the publisher.
-                raw = request.formRouteCompleter().claimFieldsComplete(inputName);
-            } else {
-                raw = request.formRouteCompleter().claimFieldsRaw(inputName);
-            }
-            Flux<?> mnTypeIfNecessary;
-            if (contentTypeClass == PartData.class || ClassUtils.isJavaLangType(contentTypeClass)) {
-                mnTypeIfNecessary = raw
-                    .mapNotNull(data -> {
-                        MicronautHttpData<?>.Chunk chunk = data.pollChunk();
-                        if (chunk != null) {
-                            return new NettyPartData(() -> {
-                                if (data instanceof FileUpload fileUpload) {
-                                    return Optional.of(MediaType.of(fileUpload.getContentType()));
-                                } else {
-                                    return Optional.empty();
-                                }
-                            }, chunk::claim);
-                        } else {
-                            return null;
+            publisher = Flux.from(formFactory.get().getOrCreateCompleter(request).subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.ASYNC, argument)))
+                .mapNotNull(f -> Flux.from(f.byteBody().toReadBufferPublisher()).map(rb -> {
+                    if (nestedType.isAssignableFrom(ReadBuffer.class)) {
+                        return rb;
+                    } else {
+                        try (rb) {
+                            return conversionService.convertRequired(rb, nestedType);
                         }
-                    });
+                    }
+                }));
+        } else if (contentTypeClass == PartData.class) {
+            publisher = Flux.from(formFactory.get().getOrCreateCompleter(request).subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.ASYNC, argument)))
+                .concatMap(raw -> Flux.from(raw.byteBody().toReadBufferPublisher())
+                    .map(rb -> new PartData(raw.metadata(), rb.move())))
+                .doOnDiscard(PartData.class, PartData::close);
+        } else if (contentTypeClass == CompletedFileUpload.class) {
+            // Publisher<CompletedFileUpload>
+            // these objects consume little memory, and accept writing to disk anyway, so we
+            // subscribe eagerly here to avoid backpressure.
+            publisher = Flux.from(Publishers.bufferNow(Flux.from(formFactory.get().getOrCreateCompleter(request).subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.ASYNC_NO_BACKPRESSURE, argument)))
+                .flatMap(f -> {
+                    if (f.metadata().fileName() == null) {
+                        f.close();
+                        return Flux.error(new IllegalStateException("Field was not a file upload (no filename parameter)"));
+                    }
+                    return ReactiveExecutionFlow.toPublisher(formFactory.get().completePart(request, f));
+                })));
+        } else if (contentTypeClass == CompletedAttribute.class) {
+            // Publisher<CompletedAttribute>
+            publisher = Flux.from(Publishers.bufferNow(Flux.from(formFactory.get().getOrCreateCompleter(request).subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.ASYNC_NO_BACKPRESSURE, argument)))
+                .flatMap(f -> ReactiveExecutionFlow.toPublisher(formFactory.get().completeAttribute(request, f)))));
+        } else {
+            // Publisher<CompletedPart> or anything else
+            Flux<CompletedPart> cpublisher = Flux.from(Publishers.bufferNow(Flux.from(formFactory.get().getOrCreateCompleter(request).subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.ASYNC_NO_BACKPRESSURE, argument)))
+                .flatMap(f -> ReactiveExecutionFlow.toPublisher(formFactory.get().completePart(request, f)))));
+            if (contentTypeClass == CompletedPart.class) {
+                publisher = cpublisher;
             } else {
-                mnTypeIfNecessary = raw;
+                publisher = cpublisher.publishOn(Schedulers.fromExecutor(formFactory.get().getDiskWriteExecutor())).map(part -> {
+                    try (part) {
+                        return conversionService.convertRequired(part, contentArgument);
+                    } catch (IOException e) {
+                        throw new UncheckedIOException(e);
+                    }
+                });
             }
-            publisher = mnTypeIfNecessary.mapNotNull(it -> conversionService.convert(it, contentArgument).orElse(null));
         }
 
         return () -> Optional.of(publisher);

@@ -15,69 +15,74 @@
  */
 package io.micronaut.context;
 
-import org.jspecify.annotations.NonNull;
-
 import java.util.Map;
 import java.util.Optional;
 
 /**
  * Retrieve messages for the resolved locale.
+ *
  * @author Sergio del Amo
  * @since 3.4.0
  */
 public interface LocalizedMessageSource {
     /**
      * Resolve a message for the given code.
+     *
      * @param code The code
      * @return A message if present
      */
-    @NonNull Optional<String> getMessage(@NonNull String code);
+    Optional<String> getMessage(String code);
 
     /**
      * Resolve a message for the given code and variables for the messages.
-     * @param code The code
+     *
+     * @param code      The code
      * @param variables to be used to interpolate the message
      * @return A message if present
      */
-    @NonNull Optional<String> getMessage(@NonNull String code, Object... variables);
+    Optional<String> getMessage(String code, Object... variables);
 
     /**
      * Resolve a message for the given code and variables for the messages.
-     * @param code The code
+     *
+     * @param code      The code
      * @param variables to be used to interpolate the message
      * @return A message if present
      */
-    @NonNull Optional<String> getMessage(@NonNull String code, Map<String, Object> variables);
+    Optional<String> getMessage(String code, Map<String, Object> variables);
 
     /**
      * Resolve a message for the given code. If the message is not present then default message is returned.
-     * @param code The code
+     *
+     * @param code           The code
      * @param defaultMessage The default message to use if no other message is found
      * @return A message if present. If the message is not present then default message supplied is returned.
      */
-    default @NonNull String getMessageOrDefault(@NonNull String code, @NonNull String defaultMessage) {
+    default String getMessageOrDefault(String code, String defaultMessage) {
         return getMessage(code).orElse(defaultMessage);
     }
 
     /**
      * Resolve a message for the given code. If the message is not present then default message is returned.
-     * @param code The code
+     *
+     * @param code           The code
      * @param defaultMessage The default message to use if no other message is found
-     * @param variables to be used to interpolate the message
+     * @param variables      to be used to interpolate the message
      * @return A message if present. If the message is not present then default message supplied is returned.
      */
-    default @NonNull String getMessageOrDefault(@NonNull String code, @NonNull String defaultMessage, Object... variables) {
+    default String getMessageOrDefault(String code, String defaultMessage, Object... variables) {
         return getMessage(code, variables).orElse(defaultMessage);
     }
 
     /**
      * Resolve a message for the given code. If the message is not present then default message is returned.
-     * @param code The code
+     *
+     * @param code           The code
      * @param defaultMessage The default message to use if no other message is found
-     * @param variables to be used to interpolate the message
+     * @param variables      to be used to interpolate the message
      * @return A message if present. If the message is not present then default message supplied is returned.
      */
-    default @NonNull String getMessageOrDefault(@NonNull String code, @NonNull String defaultMessage, Map<String, Object> variables) {
+    default String getMessageOrDefault(String code, String defaultMessage, Map<String, Object> variables) {
         return getMessage(code, variables).orElse(defaultMessage);
     }
 }

@@ -15,13 +15,15 @@
  */
 package io.micronaut.http;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * A factory interface for {@link MutableHttpRequest} objects.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface HttpRequestFactory {
+ public interface HttpRequestFactory {
 
     /**
      * The default {@link io.micronaut.http.cookie.CookieFactory} instance.
@@ -93,7 +95,7 @@ public interface HttpRequestFactory {
      * @param <T>  The body type
      * @return The {@link MutableHttpRequest} instance
      */
-    <T> MutableHttpRequest<T> delete(String uri, T body);
+    <T> MutableHttpRequest<T> delete(String uri, @Nullable T body);
 
     /**
      * Create a new {@link MutableHttpRequest} for the given method and URI.

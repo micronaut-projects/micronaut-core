@@ -9,6 +9,7 @@ dependencies {
     api(projects.micronautJacksonCore)
 
     compileOnly(libs.graal)
+    compileOnly(libs.jackson2.databind)
     compileOnly(platform(libs.test.boms.micronaut.validation))
     compileOnly(libs.micronaut.validation) {
         exclude(group = "io.micronaut")
@@ -28,6 +29,7 @@ dependencies {
     testImplementation(projects.micronautInjectGroovy)
     testImplementation(libs.managed.jackson.dataformat.xml)
     testImplementation(libs.managed.snakeyaml)
+    testImplementation(libs.jackson2.databind)
     testImplementation(libs.micronaut.test.junit5) {
         exclude(group = "io.micronaut")
     }

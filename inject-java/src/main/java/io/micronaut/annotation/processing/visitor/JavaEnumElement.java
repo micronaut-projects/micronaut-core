@@ -20,6 +20,7 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.EnumConstantElement;
 import io.micronaut.inject.ast.EnumElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
+import org.jspecify.annotations.Nullable;
 
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
@@ -28,6 +29,7 @@ import javax.lang.model.element.VariableElement;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Implements the {@link EnumElement} interface for Java.
@@ -38,7 +40,9 @@ import java.util.List;
 @Internal
 class JavaEnumElement extends JavaClassElement implements EnumElement {
 
+    @Nullable
     protected List<EnumConstantElement> enumConstants;
+    @Nullable
     protected List<String> values;
 
     /**
@@ -50,7 +54,7 @@ class JavaEnumElement extends JavaClassElement implements EnumElement {
     JavaEnumElement(JavaNativeElement.Class nativeElement,
                     ElementAnnotationMetadataFactory annotationMetadataFactory,
                     JavaVisitorContext visitorContext,
-                    String doc) {
+                    @Nullable String doc) {
         this(nativeElement, annotationMetadataFactory, visitorContext, 0, doc);
     }
 
@@ -65,7 +69,7 @@ class JavaEnumElement extends JavaClassElement implements EnumElement {
                     ElementAnnotationMetadataFactory annotationMetadataFactory,
                     JavaVisitorContext visitorContext,
                     int arrayDimensions,
-                    String doc) {
+                    @Nullable String doc) {
         super(nativeElement, annotationMetadataFactory, visitorContext, Collections.emptyList(), Collections.emptyMap(), arrayDimensions, false, doc);
     }
 
@@ -80,7 +84,7 @@ class JavaEnumElement extends JavaClassElement implements EnumElement {
             return values;
         }
         initEnum();
-        return values;
+        return Objects.requireNonNull(values);
     }
 
     @Override
@@ -89,7 +93,7 @@ class JavaEnumElement extends JavaClassElement implements EnumElement {
             return enumConstants;
         }
         initEnum();
-        return enumConstants;
+        return Objects.requireNonNull(enumConstants);
     }
 
     private void initEnum() {

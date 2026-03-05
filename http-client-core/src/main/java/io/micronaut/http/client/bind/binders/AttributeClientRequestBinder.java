@@ -17,7 +17,6 @@ package io.micronaut.http.client.bind.binders;
 
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.core.annotation.AnnotationValue;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.annotation.RequestAttribute;
@@ -31,11 +30,9 @@ import java.util.List;
  */
 public class AttributeClientRequestBinder implements AnnotatedClientRequestBinder<RequestAttribute> {
     @Override
-    public void bind(
-            @NonNull MethodInvocationContext<Object, Object> context,
-            @NonNull ClientRequestUriContext uriContext,
-            @NonNull MutableHttpRequest<?> request
-    ) {
+    public void bind(MethodInvocationContext<Object, Object> context,
+                     ClientRequestUriContext uriContext,
+                     MutableHttpRequest<?> request) {
         List<AnnotationValue<RequestAttribute>> attributeAnnotations =
                 context.getAnnotationValuesByType(RequestAttribute.class);
 
@@ -49,7 +46,6 @@ public class AttributeClientRequestBinder implements AnnotatedClientRequestBinde
     }
 
     @Override
-    @NonNull
     public Class<RequestAttribute> getAnnotationType() {
         return RequestAttribute.class;
     }

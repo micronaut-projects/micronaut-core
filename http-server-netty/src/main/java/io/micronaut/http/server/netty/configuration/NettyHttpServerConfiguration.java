@@ -23,8 +23,6 @@ import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
@@ -32,10 +30,12 @@ import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.netty.channel.ChannelOption;
+import io.netty.contrib.multipart.DecoderQuirk;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.ssl.ApplicationProtocolNames;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,6 +45,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Allows configuring Netty within {@link io.micronaut.http.server.netty.NettyHttpServer}.
@@ -182,7 +183,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      *
      * @since 4.6.0
      */
-    public static final int DEFAULT_FORM_MAX_BUFFERED_BYTES = 1024;
+    public static final int DEFAULT_FORM_MAX_BUFFERED_BYTES = 4 * 1024 * 1024;
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServerConfiguration.class);
 
@@ -192,7 +193,9 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
 
     private Map<ChannelOption, Object> childOptions = Collections.emptyMap();
     private Map<ChannelOption, Object> options = Collections.emptyMap();
+    @Nullable
     private Worker worker;
+    @Nullable
     private Parent parent;
     private FileTypeHandlerConfiguration fileTypeHandlerConfiguration = new FileTypeHandlerConfiguration();
     private int maxInitialLineLength = DEFAULT_MAXINITIALLINELENGTH;
@@ -204,24 +207,32 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private boolean chunkedSupported = DEFAULT_CHUNKSUPPORTED;
     private boolean validateHeaders = DEFAULT_VALIDATEHEADERS;
     private int initialBufferSize = DEFAULT_INITIALBUFFERSIZE;
+    @Nullable
     private LogLevel logLevel;
     private int compressionThreshold = DEFAULT_COMPRESSIONTHRESHOLD;
     private int compressionLevel = DEFAULT_COMPRESSIONLEVEL;
     private int maxZstdEncodeSize = DEFAULT_MAX_ZSTD_ENCODE_SIZE;
     private boolean useNativeTransport = DEFAULT_USE_NATIVE_TRANSPORT;
     private String fallbackProtocol = ApplicationProtocolNames.HTTP_1_1;
+    @Nullable
     private AccessLogger accessLogger;
     private Http2Settings http2Settings = new Http2Settings();
     private Http3Settings http3Settings = new Http3Settings();
     private boolean keepAliveOnServerError = DEFAULT_KEEP_ALIVE_ON_SERVER_ERROR;
+    @Nullable
     private String pcapLoggingPathPattern = null;
-    private List<NettyListenerConfiguration> listeners = null;
+    @Nullable
+    private List<NettyListenerConfiguration> listeners;
     private boolean eagerParsing = DEFAULT_EAGER_PARSING;
     private int jsonBufferMaxComponents = DEFAULT_JSON_BUFFER_MAX_COMPONENTS;
     private boolean legacyMultiplexHandlers = false;
     private int formMaxFields = DEFAULT_FORM_MAX_FIELDS;
-    private int formMaxBufferedBytes = DEFAULT_FORM_MAX_BUFFERED_BYTES;
+    private long fieldMaxBufferedBytes = Long.MAX_VALUE;
+    private long fieldMaxBytes = Long.MAX_VALUE;
+    private long formMaxBufferedBytes = DEFAULT_FORM_MAX_BUFFERED_BYTES;
+    private long formMaxBytes = Long.MAX_VALUE;
     private boolean requestDecompressionEnabled = true;
+    private Set<DecoderQuirk> formDecoderQuirks = Collections.emptySet();
 
     /**
      * Default empty constructor.
@@ -233,7 +244,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     /**
      * @param applicationConfiguration The application configuration
      */
-    public NettyHttpServerConfiguration(ApplicationConfiguration applicationConfiguration) {
+    public NettyHttpServerConfiguration(@Nullable ApplicationConfiguration applicationConfiguration) {
         this(applicationConfiguration, Collections.emptyList());
     }
 
@@ -242,9 +253,8 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * @param pipelineCustomizers A list of pipeline customizers
      */
     @Inject
-    public NettyHttpServerConfiguration(
-            ApplicationConfiguration applicationConfiguration,
-            List<ChannelPipelineListener> pipelineCustomizers) {
+    public NettyHttpServerConfiguration(@Nullable ApplicationConfiguration applicationConfiguration,
+                                        List<ChannelPipelineListener> pipelineCustomizers) {
         super(applicationConfiguration);
         this.pipelineCustomizers = pipelineCustomizers;
     }
@@ -253,7 +263,6 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * @return Sets the server type.
      * @see HttpServerType
      */
-    @NonNull
     public HttpServerType getServerType() {
         return serverType;
     }
@@ -297,6 +306,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * Returns the AccessLogger configuration.
      * @return The AccessLogger configuration.
      */
+    @Nullable
     public AccessLogger getAccessLogger() {
         return accessLogger;
     }
@@ -341,7 +351,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * @param http3Settings The Http3Settings.
      */
     @Experimental
-    public void setHttp3Settings(Http3Settings http3Settings) {
+    public void setHttp3Settings(@Nullable Http3Settings http3Settings) {
         if (http3Settings != null) {
             this.http3Settings = http3Settings;
         }
@@ -368,7 +378,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * @param fallbackProtocol The fallback protocol to use when negotiating via ALPN
      * @see ApplicationProtocolNames
      */
-    public void setFallbackProtocol(String fallbackProtocol) {
+    public void setFallbackProtocol(@Nullable String fallbackProtocol) {
         if (fallbackProtocol != null) {
             this.fallbackProtocol = fallbackProtocol;
         }
@@ -510,6 +520,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     /**
      * @return Configuration for the worker {@link io.netty.channel.EventLoopGroup}
      */
+    @Nullable
     public Worker getWorker() {
         return worker;
     }
@@ -518,7 +529,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * @return The file type handler configuration.
      * @since 3.1.0
      */
-    public @NonNull FileTypeHandlerConfiguration getFileTypeHandlerConfiguration() {
+    public FileTypeHandlerConfiguration getFileTypeHandlerConfiguration() {
         return fileTypeHandlerConfiguration;
     }
 
@@ -528,7 +539,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * @since 3.1.0
      */
     @Inject
-    public void setFileTypeHandlerConfiguration(@NonNull FileTypeHandlerConfiguration fileTypeHandlerConfiguration) {
+    public void setFileTypeHandlerConfiguration(FileTypeHandlerConfiguration fileTypeHandlerConfiguration) {
         if (fileTypeHandlerConfiguration != null) {
             this.fileTypeHandlerConfiguration = fileTypeHandlerConfiguration;
         }
@@ -537,6 +548,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     /**
      * @return Configuration for the parent {@link io.netty.channel.EventLoopGroup}
      */
+    @Nullable
     public Parent getParent() {
         return parent;
     }
@@ -700,6 +712,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * @return The path pattern, or {@code null} if logging is disabled.
      */
     @Internal
+    @Nullable
     public String getPcapLoggingPathPattern() {
         return pcapLoggingPathPattern;
     }
@@ -719,6 +732,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * Get the explicit netty listener configurations, or {@code null} if they should be implicit.
      * @return The listeners
      */
+    @Nullable
     public List<NettyListenerConfiguration> getListeners() {
         return listeners;
     }
@@ -852,25 +866,119 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     }
 
     /**
-     * The maximum number of bytes the form / multipart decoders are allowed to buffer internally.
-     * This sets a limit on form field size.
+     * The maximum number of bytes that are allowed to be buffered per form value. If there are
+     * multiple fields, this limit is counted separately for each.
+     *
+     * @return The maximum number of bytes
+     * @since 5.0.0
+     */
+    @ReadableBytes
+    public long getFieldMaxBufferedBytes() {
+        return fieldMaxBufferedBytes;
+    }
+
+    /**
+     * The maximum number of bytes that are allowed to be buffered per form value. If there are
+     * multiple fields, this limit is counted separately for each.
+     *
+     * @param fieldMaxBufferedBytes The maximum number of bytes
+     * @since 5.0.0
+     */
+    public void setFieldMaxBufferedBytes(@ReadableBytes long fieldMaxBufferedBytes) {
+        this.fieldMaxBufferedBytes = fieldMaxBufferedBytes;
+    }
+
+    /**
+     * The maximum number of bytes per form <i>value</i>. If there are multiple fields, this limit
+     * is counted separately for each.
+     *
+     * @return The maximum number of bytes
+     * @since 5.0.0
+     */
+    @ReadableBytes
+    public long getFieldMaxBytes() {
+        return fieldMaxBytes;
+    }
+
+    /**
+     * The maximum number of bytes per form <i>value</i>. If there are multiple fields, this limit
+     * is counted separately for each.
+     *
+     * @param fieldMaxBytes The maximum number of bytes
+     * @since 5.0.0
+     */
+    public void setFieldMaxBytes(@ReadableBytes long fieldMaxBytes) {
+        this.fieldMaxBytes = fieldMaxBytes;
+    }
+
+    /**
+     * The maximum number of bytes the entire form is allowed to buffer internally. If multiple
+     * fields are buffered, this limit is shared.
      *
      * @return The maximum number of buffered bytes
      * @since 4.6.0
      */
-    public int getFormMaxBufferedBytes() {
+    @ReadableBytes
+    public long getFormMaxBufferedBytes() {
         return formMaxBufferedBytes;
     }
 
     /**
-     * The maximum number of bytes the form / multipart decoders are allowed to buffer internally.
-     * This sets a limit on form field size.
+     * The maximum number of bytes the entire form is allowed to buffer internally. If multiple
+     * fields are buffered, this limit is shared.
      *
      * @param formMaxBufferedBytes The maximum number of buffered bytes
      * @since 4.6.0
      */
-    public void setFormMaxBufferedBytes(int formMaxBufferedBytes) {
+    public void setFormMaxBufferedBytes(@ReadableBytes long formMaxBufferedBytes) {
         this.formMaxBufferedBytes = formMaxBufferedBytes;
+    }
+
+    /**
+     * The maximum number of bytes of all form <i>values</i>. If there are multiple fields, this
+     * limit is shared.
+     *
+     * @return The maximum number of bytes
+     * @since 5.0.0
+     */
+    @ReadableBytes
+    public long getFormMaxBytes() {
+        return formMaxBytes;
+    }
+
+    /**
+     * The maximum number of bytes of all form <i>values</i>. If there are multiple fields, this
+     * limit is shared.
+     *
+     * @param formMaxBytes The maximum number of bytes
+     * @since 5.0.0
+     */
+    public void setFormMaxBytes(@ReadableBytes long formMaxBytes) {
+        this.formMaxBytes = formMaxBytes;
+    }
+
+    /**
+     * The decoder quirks for the
+     * <a href="https://github.com/netty-contrib/codec-multipart/">next-generation multipart
+     * parser</a>, if present. No quirks by default.
+     *
+     * @return The decoder quirks
+     */
+    @Experimental
+    public Set<DecoderQuirk> getFormDecoderQuirks() {
+        return formDecoderQuirks;
+    }
+
+    /**
+     * The decoder quirks for the
+     * <a href="https://github.com/netty-contrib/codec-multipart/">next-generation multipart
+     * parser</a>, if present. No quirks by default.
+     *
+     * @param formDecoderQuirks The decoder quirks
+     */
+    @Experimental
+    public void setFormDecoderQuirks(Set<DecoderQuirk> formDecoderQuirks) {
+        this.formDecoderQuirks = formDecoderQuirks;
     }
 
     /**
@@ -904,7 +1012,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          * @param value The header table size.
          * @throws IllegalArgumentException if verification of the setting fails.
          */
-        public void setHeaderTableSize(Long value) {
+        public void setHeaderTableSize(@Nullable Long value) {
             if (value != null) {
                 settings.headerTableSize(value);
             }
@@ -973,7 +1081,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          * @param value The {@code SETTINGS_INITIAL_WINDOW_SIZE} value.
          * @throws IllegalArgumentException if verification of the setting fails.
          */
-        public void setInitialWindowSize(Integer value) {
+        public void setInitialWindowSize(@Nullable Integer value) {
             if (value != null) {
                 settings.initialWindowSize(value);
             }
@@ -994,7 +1102,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          * @param value The {@code SETTINGS_MAX_FRAME_SIZE} value.
          * @throws IllegalArgumentException if verification of the setting fails.
          */
-        public void setMaxFrameSize(Integer value) {
+        public void setMaxFrameSize(@Nullable Integer value) {
             if (value != null) {
                 settings.maxFrameSize(value);
             }
@@ -1112,8 +1220,11 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     @ConfigurationProperties("access-logger")
     public static class AccessLogger {
         private boolean enabled;
+        @Nullable
         private String loggerName;
+        @Nullable
         private String logFormat;
+        @Nullable
         private List<String> exclusions;
 
         /**
@@ -1136,6 +1247,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          * The logger name to use. Access logs will be logged at info level.
          * @return The logger name.
          */
+        @Nullable
         public String getLoggerName() {
             return loggerName;
         }
@@ -1152,6 +1264,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          * Returns the log format to use.
          * @return The log format.
          */
+        @Nullable
         public String getLogFormat() {
             return logFormat;
         }
@@ -1167,6 +1280,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         /**
          * @return The URI patterns to exclude from the access log.
          */
+        @Nullable
         public List<String> getExclusions() {
             return exclusions;
         }
@@ -1310,7 +1424,6 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
             /**
              * @return True if the cache control should be public
              */
-            @NonNull
             public boolean getPublic() {
                 return publicCache;
             }
@@ -1323,9 +1436,12 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     public abstract static class EventLoopConfig implements EventLoopGroupConfiguration {
         private int threads;
         private double threadCoreRatio = DEFAULT_THREAD_CORE_RATIO;
+        @Nullable
         private Integer ioRatio;
+        @Nullable
         private String executor;
         private boolean preferNativeTransport = false;
+        @Nullable
         private List<String> transport;
         private Duration shutdownQuietPeriod = Duration.ofSeconds(DEFAULT_SHUTDOWN_QUIET_PERIOD);
         private Duration shutdownTimeout = Duration.ofSeconds(DEFAULT_SHUTDOWN_TIMEOUT);
@@ -1339,7 +1455,6 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
             this.name = name;
         }
 
-        @NonNull
         @Override
         public String getName() {
             return name;
@@ -1394,7 +1509,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         /**
          * @param shutdownQuietPeriod Set the shutdown quiet period
          */
-        public void setShutdownQuietPeriod(Duration shutdownQuietPeriod) {
+        public void setShutdownQuietPeriod(@Nullable Duration shutdownQuietPeriod) {
             if (shutdownQuietPeriod != null) {
                 this.shutdownQuietPeriod = shutdownQuietPeriod;
             }
@@ -1403,7 +1518,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         /**
          * @param shutdownTimeout Set the shutdown timeout (must be >= shutdownQuietPeriod)
          */
-        public void setShutdownTimeout(Duration shutdownTimeout) {
+        public void setShutdownTimeout(@Nullable Duration shutdownTimeout) {
             if (shutdownTimeout != null) {
                 this.shutdownTimeout = shutdownTimeout;
             }
@@ -1464,7 +1579,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         }
 
         @Override
-        public @NonNull List<String> getTransport() {
+        public List<String> getTransport() {
             return transport == null ? EventLoopGroupConfiguration.super.getTransport() : transport;
         }
 
@@ -1479,7 +1594,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          *
          * @param transport The available transports, in order of preference
          */
-        public void setTransport(@NonNull List<String> transport) {
+        public void setTransport(List<String> transport) {
             this.transport = transport;
         }
 
@@ -1519,15 +1634,20 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         private final String name;
         private Family family = Family.TCP;
         private boolean ssl;
+        @Nullable
         private String keyName;
+        @Nullable
         private String trustName;
         @Nullable
         private String host;
         private int port;
+        @Nullable
         private String path;
         private boolean exposeDefaultRoutes = true;
         private boolean supportGracefulShutdown = true;
+        @Nullable
         private Integer fd = null;
+        @Nullable
         private Integer acceptedFd = null;
         private boolean bind = true;
         private boolean serverSocket = true;
@@ -1595,7 +1715,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          * The address family of this listener.
          * @param family The address family of this listener.
          */
-        public void setFamily(@NonNull Family family) {
+        public void setFamily(Family family) {
             Objects.requireNonNull(family, "family");
             this.family = family;
         }
@@ -1701,6 +1821,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          * For UNIX domain sockets, the path of the socket. For abstract domain sockets, this should start with a NUL byte.
          * @return For UNIX domain sockets, the path of the socket. For abstract domain sockets, this should start with a NUL byte.
          */
+        @Nullable
         public String getPath() {
             return path;
         }
@@ -1761,6 +1882,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          *
          * @return The file descriptor
          */
+        @Nullable
         public Integer getFd() {
             return fd;
         }
@@ -1820,6 +1942,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          *
          * @return The fd to register
          */
+        @Nullable
         public Integer getAcceptedFd() {
             return acceptedFd;
         }

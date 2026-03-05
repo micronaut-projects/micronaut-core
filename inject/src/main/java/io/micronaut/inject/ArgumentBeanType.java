@@ -21,8 +21,6 @@ import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
-
-import org.jspecify.annotations.NonNull;
 import java.util.Map;
 
 /**
@@ -40,7 +38,7 @@ public final class ArgumentBeanType<T> implements BeanType<T>, Argument<T> {
      * Default constructor.
      * @param argument The argument
      */
-    public ArgumentBeanType(@NonNull Argument<T> argument) {
+    public ArgumentBeanType(Argument<T> argument) {
         ArgumentUtils.requireNonNull("argument", argument);
         this.argument = argument;
     }
@@ -96,7 +94,7 @@ public final class ArgumentBeanType<T> implements BeanType<T>, Argument<T> {
     }
 
     @Override
-    public boolean isEnabled(@NonNull BeanContext context, @Nullable BeanResolutionContext resolutionContext) {
+    public boolean isEnabled(BeanContext context, @Nullable BeanResolutionContext resolutionContext) {
         return true;
     }
 }

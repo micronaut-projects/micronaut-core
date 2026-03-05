@@ -16,7 +16,6 @@
 package io.micronaut.http.client.netty;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
@@ -80,17 +79,17 @@ final class Pool40 implements Pool {
     }
 
     @Override
-    public Http1PoolEntry createHttp1PoolEntry(@NonNull EventLoop eventLoop, @NonNull ResizerConnection connection) {
+    public Http1PoolEntry createHttp1PoolEntry(EventLoop eventLoop, ResizerConnection connection) {
         return new Http1(eventLoop, connection);
     }
 
     @Override
-    public Http2PoolEntry createHttp2PoolEntry(@NonNull EventLoop eventLoop, @NonNull ResizerConnection connection) {
+    public Http2PoolEntry createHttp2PoolEntry(EventLoop eventLoop, ResizerConnection connection) {
         return new Http2(eventLoop, connection);
     }
 
     @Override
-    public void onNewConnectionFailure(@NonNull EventLoop eventLoop, @Nullable Throwable error) throws Exception {
+    public void onNewConnectionFailure(EventLoop eventLoop, @Nullable Throwable error) throws Exception {
         onNewConnectionFailure(error);
     }
 
@@ -278,7 +277,7 @@ final class Pool40 implements Pool {
         }
     }
 
-    void openNewConnection(@Nullable BlockHint blockedPendingRequests, @NonNull Thread requestingThread) throws Exception {
+    void openNewConnection(@Nullable BlockHint blockedPendingRequests, Thread requestingThread) throws Exception {
         EventLoop target = null;
         for (EventExecutor executor : group) {
             if (executor.inEventLoop(requestingThread)) {
@@ -296,7 +295,7 @@ final class Pool40 implements Pool {
         listener.openNewConnection(target);
     }
 
-    boolean containsThread(@NonNull Thread thread) {
+    boolean containsThread(Thread thread) {
         for (EventExecutor executor : group) {
             if (executor.inEventLoop(thread)) {
                 return true;
@@ -521,7 +520,7 @@ final class Pool40 implements Pool {
     final class Http1 extends PoolEntry implements Http1PoolEntry {
         private final AtomicBoolean earmarkedOrLive = new AtomicBoolean(false);
 
-        public Http1(EventLoop eventLoop, @NonNull ResizerConnection connection) {
+        public Http1(EventLoop eventLoop, ResizerConnection connection) {
             super(eventLoop, connection);
         }
 
@@ -556,7 +555,7 @@ final class Pool40 implements Pool {
         private final AtomicInteger earmarkedOrLiveRequests = new AtomicInteger(0);
         private int maxStreamCount;
 
-        public Http2(EventLoop eventLoop, @NonNull ResizerConnection connection) {
+        public Http2(EventLoop eventLoop, ResizerConnection connection) {
             super(eventLoop, connection);
         }
 

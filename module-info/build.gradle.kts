@@ -8,7 +8,9 @@ configurations.all {
     // Note: this module doesn't depend on core and is independent, so that it can be used by build tools
     // for example, without depending on Micronaut Core
     // This block will remove dependencies added automatically by Micronaut Build (e.g slf4j)
-    dependencies.removeAll { true }
+    dependencies.removeAll {
+        !it.name.contains("error_prone") && !it.name.contains("nullaway")
+    }
 }
 
 micronautBuild {
@@ -20,4 +22,8 @@ micronautBuild {
 tasks.named("ossIndexAudit") {
     // the task fails if there are no dependencies (:facepalm:)
     enabled = false
+}
+
+dependencies {
+    compileOnly(libs.managed.jspecify)
 }

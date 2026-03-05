@@ -17,7 +17,6 @@ package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.EnumConstantElement;
@@ -51,7 +50,7 @@ final class JavaEnumConstantElement extends AbstractJavaElement implements EnumC
     }
 
     @Override
-    public JavaNativeElement.@NonNull Variable getNativeType() {
+    public JavaNativeElement.Variable getNativeType() {
         return (JavaNativeElement.Variable) super.getNativeType();
     }
 
@@ -70,7 +69,6 @@ final class JavaEnumConstantElement extends AbstractJavaElement implements EnumC
         return declaringEnum;
     }
 
-    @NonNull
     @Override
     public ClassElement getType() {
         return declaringEnum;

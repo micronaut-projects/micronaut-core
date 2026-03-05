@@ -10,7 +10,7 @@ dependencies {
 
     annotationProcessor(projects.micronautInjectJava)
 
-    testRuntimeOnly(projects.micronautHttpTck) // leak detection module
+    testRuntimeOnly(libs.micronaut.test.netty.leak)
 }
 
 tasks {

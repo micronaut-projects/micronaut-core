@@ -23,6 +23,7 @@ import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.BeanDefinitionVisitor;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -86,7 +87,7 @@ final class IntroductionInterfaceBeanElementCreator extends AbstractBeanElementC
         beanDefinitionWriters.add(aopProxyWriter);
     }
 
-    private void handlePropertyMethod(BeanDefinitionVisitor aopProxyWriter, List<MethodElement> methods, MethodElement method) {
+    private void handlePropertyMethod(BeanDefinitionVisitor aopProxyWriter, List<MethodElement> methods, @Nullable MethodElement method) {
         if (method != null && method.isAbstract() && !methods.contains(method)) {
             visitIntrospectedMethod(
                 aopProxyWriter,

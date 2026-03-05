@@ -17,8 +17,6 @@ package io.micronaut.inject.visitor;
 
 import java.util.Collections;
 import java.util.List;
-
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.order.OrderUtil;
 
@@ -33,7 +31,7 @@ final class BeanElementVisitorLoader {
      * @return The loaded visitors
      */
     @SuppressWarnings("unchecked")
-    static @NonNull List<BeanElementVisitor<?>> load() {
+    static List<BeanElementVisitor<?>> load() {
         List<? extends BeanElementVisitor<?>> visitors = (List) SoftServiceLoader.load(BeanElementVisitor.class)
             .disableFork()
             .collectAll(BeanElementVisitor::isEnabled);

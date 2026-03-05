@@ -33,6 +33,7 @@ import java.util.stream.Collectors;
 public class StaticServiceInstanceList implements ServiceInstanceList {
     private final String id;
     private final Collection<URI> loadBalancedURIs;
+    @Nullable
     private final String contextPath;
 
     /**

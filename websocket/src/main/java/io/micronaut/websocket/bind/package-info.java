@@ -17,6 +17,9 @@
  * Package containing binding related classes. This package is regarded internal.
  */
 @Internal
+@NullMarked
 package io.micronaut.websocket.bind;
 
+
+import org.jspecify.annotations.NullMarked;
 import io.micronaut.core.annotation.Internal;

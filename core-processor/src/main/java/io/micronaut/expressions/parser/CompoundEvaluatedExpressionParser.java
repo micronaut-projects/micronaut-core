@@ -16,7 +16,6 @@
 package io.micronaut.expressions.parser;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.ast.collection.OneDimensionalArray;
 import io.micronaut.expressions.parser.ast.literal.StringLiteral;
@@ -50,7 +49,7 @@ public final class CompoundEvaluatedExpressionParser implements EvaluatedExpress
      *
      * @param expression either string or string[]
      */
-    public CompoundEvaluatedExpressionParser(@NonNull Object expression) {
+    public CompoundEvaluatedExpressionParser(Object expression) {
         if (!(expression instanceof String || expression instanceof String[])) {
             throw new ExpressionParsingException("Can not parse expression: " + expression);
         }

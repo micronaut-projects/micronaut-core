@@ -41,6 +41,7 @@ import java.nio.file.ProviderNotFoundException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Enumeration;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -115,6 +116,13 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
         this.baseURL = checkBase && basePath != null ? classLoader.getResource(normalize(basePath)) : null;
         this.missingPath = checkBase && basePath != null && baseURL == null;
         this.checkBase = checkBase;
+    }
+
+    @Override
+    public void reportResourceDuplicates(String resourceName, URL chosen, List<URL> duplicates) {
+        if (log.isWarnEnabled()) {
+            log.warn("Duplicate resource '{}' found on the classpath. Using: {}. Duplicates: {}", resourceName, chosen, duplicates);
+        }
     }
 
     /**

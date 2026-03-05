@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.context.exceptions;
-
-import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.BeanType;
 
 /**
@@ -30,7 +28,7 @@ public class BeanDestructionException extends BeanContextException {
      * @param beanType The bean type
      * @param cause   The throwable
      */
-    public BeanDestructionException(@NonNull BeanType<?> beanType, @NonNull Throwable cause) {
+    public BeanDestructionException(BeanType<?> beanType, Throwable cause) {
         super("Error destroying bean of type [" + beanType.getBeanType() + "]: " + cause.getMessage(), cause);
     }
 

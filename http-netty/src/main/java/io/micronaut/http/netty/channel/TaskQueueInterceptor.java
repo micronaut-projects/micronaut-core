@@ -17,8 +17,6 @@ package io.micronaut.http.netty.channel;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
-
 import java.util.Queue;
 
 /**
@@ -36,6 +34,5 @@ public interface TaskQueueInterceptor {
      * @param original  The original queue
      * @return The wrapped queue
      */
-    @NonNull
-    Queue<Runnable> wrapTaskQueue(@NonNull String groupName, @NonNull Queue<Runnable> original);
+    Queue<Runnable> wrapTaskQueue(String groupName, Queue<Runnable> original);
 }

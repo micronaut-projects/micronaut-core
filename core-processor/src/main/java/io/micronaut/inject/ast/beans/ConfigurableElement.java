@@ -17,7 +17,6 @@ package io.micronaut.inject.ast.beans;
 
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
@@ -36,7 +35,7 @@ public interface ConfigurableElement extends Element {
      * @param types The types
      * @return This element
      */
-    @NonNull ConfigurableElement typeArguments(@NonNull ClassElement... types);
+    ConfigurableElement typeArguments(ClassElement... types);
 
     /**
      * Adds a {@link jakarta.inject.Named} qualifier to the element.
@@ -44,8 +43,7 @@ public interface ConfigurableElement extends Element {
      * @param qualifier The qualifier. If {@code null} a named annotation with no value is added assuming the default name.
      * @return This element
      */
-    default @NonNull
-    ConfigurableElement qualifier(@Nullable String qualifier) {
+    default ConfigurableElement qualifier(@Nullable String qualifier) {
         return qualifier(AnnotationValue.builder(AnnotationUtil.NAMED).value(qualifier).build());
     }
 
@@ -55,8 +53,7 @@ public interface ConfigurableElement extends Element {
      * @param qualifier The qualifier
      * @return This element
      */
-    default @NonNull
-    ConfigurableElement qualifier(@NonNull AnnotationValue<?> qualifier) {
+    default ConfigurableElement qualifier(AnnotationValue<?> qualifier) {
         Objects.requireNonNull(qualifier, "Qualifier cannot be null");
         annotate(qualifier.getAnnotationName(), (builder) ->
                 builder.members(qualifier.getValues())

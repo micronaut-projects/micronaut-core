@@ -17,7 +17,6 @@ package io.micronaut.inject.ast.utils;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.Vetoed;
 import io.micronaut.inject.ast.ClassElement;
@@ -88,7 +87,7 @@ public abstract class EnclosedElementsQuery<C, N> {
      * @param <T>          The element type
      * @return The fields
      */
-    public <T extends io.micronaut.inject.ast.Element> List<T> getEnclosedElements(ClassElement classElement, @NonNull ElementQuery<T> query) {
+    public <T extends io.micronaut.inject.ast.Element> List<T> getEnclosedElements(ClassElement classElement, ElementQuery<T> query) {
         Objects.requireNonNull(query, "Query cannot be null");
         ElementQuery.Result<T> result = query.result();
 
@@ -440,7 +439,7 @@ public abstract class EnclosedElementsQuery<C, N> {
      * @param result The result
      * @return the collection of excluded elements
      */
-    protected Set<N> getExcludedNativeElements(ElementQuery.@NonNull Result<?> result) {
+    protected Set<N> getExcludedNativeElements(ElementQuery. Result<?> result) {
         return Collections.emptySet();
     }
 
@@ -459,7 +458,6 @@ public abstract class EnclosedElementsQuery<C, N> {
      * @param classNode The class
      * @return The interfaces
      */
-    @NonNull
     protected abstract Collection<C> getInterfaces(C classNode);
 
     /**
@@ -470,7 +468,6 @@ public abstract class EnclosedElementsQuery<C, N> {
      * @param includeAbstract If abstract/non-default elements should be included
      * @return The enclosed elements
      */
-    @NonNull
     protected abstract List<N> getEnclosedElements(C classNode, ElementQuery.Result<?> result, boolean includeAbstract);
 
     /**
@@ -480,7 +477,6 @@ public abstract class EnclosedElementsQuery<C, N> {
      * @param result    The query result
      * @return The enclosed elements
      */
-    @NonNull
     protected List<N> getEnclosedElements(C classNode, ElementQuery.Result<?> result) {
         return getEnclosedElements(classNode, result, true);
     }
@@ -518,7 +514,7 @@ public abstract class EnclosedElementsQuery<C, N> {
      * @param elementType The result type
      * @return The AST element
      */
-    protected abstract io.micronaut.inject.ast.@NonNull Element toAstElement(N nativeType, Class<?> elementType);
+    protected abstract io.micronaut.inject.ast. Element toAstElement(N nativeType, Class<?> elementType);
 
     private record CacheKey(Class<?> elementType, Object nativeType) {
     }

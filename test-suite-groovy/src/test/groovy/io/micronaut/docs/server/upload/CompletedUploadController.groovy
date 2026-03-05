@@ -20,6 +20,8 @@ import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.multipart.CompletedFileUpload
+import io.micronaut.scheduling.TaskExecutors
+import io.micronaut.scheduling.annotation.ExecuteOn
 
 import java.nio.file.Files
 import java.nio.file.Path
@@ -32,6 +34,7 @@ import static io.micronaut.http.MediaType.TEXT_PLAIN
 class CompletedUploadController {
 
     @Post(value = "/completed", consumes = MULTIPART_FORM_DATA, produces = TEXT_PLAIN) // <1>
+    @ExecuteOn(TaskExecutors.BLOCKING)
     HttpResponse<String> uploadCompleted(CompletedFileUpload file) { // <2>
         try {
             File tempFile = File.createTempFile(file.filename, "temp") //<3>
@@ -40,6 +43,8 @@ class CompletedUploadController {
             HttpResponse.ok("Uploaded")
         } catch (IOException e) {
             HttpResponse.badRequest("Upload Failed")
+        } finally {
+            file.close()
         }
     }
 }

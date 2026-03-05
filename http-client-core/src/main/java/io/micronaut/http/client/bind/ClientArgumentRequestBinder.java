@@ -17,7 +17,6 @@ package io.micronaut.http.client.bind;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Indexed;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.http.MutableHttpRequest;
 
@@ -42,9 +41,9 @@ public interface ClientArgumentRequestBinder<T> extends ClientRequestBinder {
      * @param value   The argument value
      * @param request The request
      */
-    void bind(@NonNull ArgumentConversionContext<T> context,
-              @NonNull ClientRequestUriContext uriContext,
-              @NonNull T value,
-              @NonNull MutableHttpRequest<?> request);
+    void bind(ArgumentConversionContext<T> context,
+              ClientRequestUriContext uriContext,
+              T value,
+              MutableHttpRequest<?> request);
 
 }

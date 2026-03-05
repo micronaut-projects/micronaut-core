@@ -16,8 +16,6 @@
 package io.micronaut.http;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
-
 import java.util.Objects;
 
 /**
@@ -282,7 +280,6 @@ public enum HttpStatus implements CharSequence {
      * @return The default reason phrase, or {@code "CUSTOM"} if the code is unknown.
      */
     @Internal
-    @NonNull
     public static String getDefaultReason(int code) {
         HttpStatus httpStatus;
         try {

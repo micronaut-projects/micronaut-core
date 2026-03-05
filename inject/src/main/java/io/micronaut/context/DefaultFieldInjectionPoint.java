@@ -18,7 +18,6 @@ package io.micronaut.context;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
@@ -50,6 +49,7 @@ class DefaultFieldInjectionPoint<B, T> implements FieldInjectionPoint<B, T>, Env
     private final String field;
     private final AnnotationMetadata annotationMetadata;
     private final Argument[] typeArguments;
+    @Nullable
     private Environment environment;
 
     /**
@@ -66,7 +66,7 @@ class DefaultFieldInjectionPoint<B, T> implements FieldInjectionPoint<B, T>, Env
         Class<T> fieldType,
         String field,
         @Nullable AnnotationMetadata annotationMetadata,
-        @Nullable Argument[] typeArguments) {
+        Argument @Nullable [] typeArguments) {
 
         this.declaringBean = declaringBean;
         this.declaringType = declaringType;
@@ -126,7 +126,6 @@ class DefaultFieldInjectionPoint<B, T> implements FieldInjectionPoint<B, T>, Env
     }
 
     @Override
-    @NonNull
     public Argument<T> asArgument() {
         return Argument.of(
             fieldType,
@@ -142,6 +141,7 @@ class DefaultFieldInjectionPoint<B, T> implements FieldInjectionPoint<B, T>, Env
     }
 
     @Override
+    @Nullable
     public <T extends Annotation> T synthesize(Class<T> annotationClass) {
         return getAnnotationMetadata().synthesize(annotationClass);
     }

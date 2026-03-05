@@ -43,6 +43,7 @@ public interface ExpressionEvaluationContext extends AutoCloseable {
      * @param index argument index
      * @return argument value
      */
+    @Nullable
     Object getArgument(int index);
 
     /**

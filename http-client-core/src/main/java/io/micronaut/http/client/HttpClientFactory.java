@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.client;
 
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 import java.net.URL;
@@ -36,7 +35,6 @@ public interface HttpClientFactory {
      * @param url The base URL
      * @return The client
      */
-    @NonNull
     HttpClient createClient(@Nullable URL url);
 
     /**
@@ -48,6 +46,5 @@ public interface HttpClientFactory {
      * @return The client
      * @since 2.2.0
      */
-    @NonNull
-    HttpClient createClient(@Nullable URL url, @NonNull HttpClientConfiguration configuration);
+    HttpClient createClient(@Nullable URL url, HttpClientConfiguration configuration);
 }

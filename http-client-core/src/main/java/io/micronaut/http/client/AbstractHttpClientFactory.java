@@ -16,7 +16,6 @@
 package io.micronaut.http.client;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
@@ -36,6 +35,7 @@ import java.net.URL;
 @Internal
 public abstract class AbstractHttpClientFactory<T extends HttpClient> implements HttpClientFactory {
 
+    @Nullable
     protected final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     protected final MessageBodyHandlerRegistry messageBodyHandlerRegistry;
     protected final ConversionService conversionService;
@@ -53,7 +53,6 @@ public abstract class AbstractHttpClientFactory<T extends HttpClient> implements
      * @param uri The URI
      * @return The client
      */
-    @NonNull
     protected abstract T createHttpClient(@Nullable URI uri);
 
     /**
@@ -62,22 +61,19 @@ public abstract class AbstractHttpClientFactory<T extends HttpClient> implements
      * @param configuration The configuration
      * @return The client
      */
-    @NonNull
-    protected abstract T createHttpClient(@Nullable URI uri, @NonNull HttpClientConfiguration configuration);
+    protected abstract T createHttpClient(@Nullable URI uri, HttpClientConfiguration configuration);
 
     @Override
-    @NonNull
-    public HttpClient createClient(URL url) {
+    public HttpClient createClient(@Nullable URL url) {
         return createHttpClient(url);
     }
 
     @Override
-    @NonNull
-    public HttpClient createClient(URL url, @NonNull HttpClientConfiguration configuration) {
+    public HttpClient createClient(@Nullable URL url, HttpClientConfiguration configuration) {
         return createHttpClient(url, configuration);
     }
 
-    private T createHttpClient(URL url) {
+    private T createHttpClient(@Nullable URL url) {
         try {
             return createHttpClient(url != null ? url.toURI() : null);
         } catch (URISyntaxException e) {
@@ -85,8 +81,7 @@ public abstract class AbstractHttpClientFactory<T extends HttpClient> implements
         }
     }
 
-    @NonNull
-    private T createHttpClient(@Nullable URL url, @NonNull HttpClientConfiguration configuration) {
+    private T createHttpClient(@Nullable URL url, HttpClientConfiguration configuration) {
         try {
             return createHttpClient(url != null ? url.toURI() : null, configuration);
         } catch (URISyntaxException e) {

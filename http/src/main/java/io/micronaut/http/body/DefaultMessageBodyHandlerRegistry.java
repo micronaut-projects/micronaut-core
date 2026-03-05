@@ -18,7 +18,6 @@ package io.micronaut.http.body;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
@@ -31,6 +30,7 @@ import io.micronaut.inject.qualifiers.FilteringQualifier;
 import io.micronaut.inject.qualifiers.MatchArgumentQualifier;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
@@ -67,6 +67,7 @@ public final class DefaultMessageBodyHandlerRegistry extends AbstractMessageBody
 
     @SuppressWarnings({"unchecked"})
     @Override
+    @Nullable
     protected <T> MessageBodyReader<T> findReaderImpl(Argument<T> type, List<MediaType> mediaTypes) {
         List<MediaType> resolvedMediaTypes = resolveMediaTypes(mediaTypes);
         return beanLocator.getBeansOfType(
@@ -82,7 +83,6 @@ public final class DefaultMessageBodyHandlerRegistry extends AbstractMessageBody
             .orElse(null);
     }
 
-    @NonNull
     private List<MediaType> resolveMediaTypes(List<MediaType> mediaTypes) {
         if (codecConfigurations.isEmpty()) {
             return mediaTypes;
@@ -105,6 +105,7 @@ public final class DefaultMessageBodyHandlerRegistry extends AbstractMessageBody
 
     @SuppressWarnings({"unchecked"})
     @Override
+    @Nullable
     protected <T> MessageBodyWriter<T> findWriterImpl(Argument<T> type, List<MediaType> mediaTypes) {
         List<MediaType> resolvedMediaTypes = resolveMediaTypes(mediaTypes);
         return beanLocator.getBeansOfType(

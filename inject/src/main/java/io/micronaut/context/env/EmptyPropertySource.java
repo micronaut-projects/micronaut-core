@@ -15,6 +15,8 @@
  */
 package io.micronaut.context.env;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.Iterator;
 
 /**
@@ -23,7 +25,7 @@ import java.util.Iterator;
  * @author James Kleeh
  * @since 1.0
  */
-public class EmptyPropertySource implements PropertySource {
+public final class EmptyPropertySource implements PropertySource {
 
     private final String name;
 
@@ -49,6 +51,7 @@ public class EmptyPropertySource implements PropertySource {
     }
 
     @Override
+    @Nullable
     public Object get(String key) {
         return null;
     }

@@ -1233,7 +1233,7 @@ class Test {
         def one = introspection.getRequiredProperty("one", String)
         one.isReadWrite()
 
-        def two = introspection.getRequiredProperty("two", int.class)
+        def two = introspection.getRequiredProperty("two", Integer.class)
         two.isReadOnly()
 
         def three = introspection.getRequiredProperty("three", String)
@@ -1301,7 +1301,7 @@ class Test {
         def one = introspection.getRequiredProperty("one", String)
         one.isReadWrite()
 
-        def two = introspection.getRequiredProperty("two", int.class)
+        def two = introspection.getRequiredProperty("two", Integer.class)
         two.isReadOnly()
 
     }
@@ -3792,8 +3792,8 @@ class ParentBean {
 
         when:
         BeanProperty nameProp = introspection.getProperty("name", String).get()
-        BeanProperty boolProp = introspection.getProperty("flag", boolean.class).get()
-        BeanProperty ageProp = introspection.getProperty("age", int.class).get()
+        BeanProperty boolProp = introspection.getProperty("flag", Boolean.class).get()
+        BeanProperty ageProp = introspection.getProperty("age", Integer.class).get()
         BeanProperty listProp = introspection.getProperty("list").get()
         BeanProperty primitiveArrayProp = introspection.getProperty("primitiveArray").get()
         BeanProperty stringArrayProp = introspection.getProperty("stringArray").get()
@@ -3981,8 +3981,8 @@ class ParentBean {
 
         when:
         BeanProperty nameProp = introspection.getProperty("name", String).get()
-        BeanProperty boolProp = introspection.getProperty("flag", boolean.class).get()
-        BeanProperty ageProp = introspection.getProperty("age", int.class).get()
+        BeanProperty boolProp = introspection.getProperty("flag", Boolean.class).get()
+        BeanProperty ageProp = introspection.getProperty("age", Integer.class).get()
         BeanProperty listProp = introspection.getProperty("list").get()
         BeanProperty primitiveArrayProp = introspection.getProperty("primitiveArray").get()
         BeanProperty stringArrayProp = introspection.getProperty("stringArray").get()
@@ -4381,7 +4381,7 @@ public enum Test {
 
         then:
         instance.name() == "A"
-        introspection.getRequiredProperty("number", int).get(instance) == 0
+        introspection.getRequiredProperty("number", Integer).get(instance) == 0
 
         when:
         introspection.instantiate()
@@ -4432,7 +4432,7 @@ public enum Test {
 
         then:
         instance.name() == "A"
-        introspection.getRequiredProperty("number", int).get(instance) == 0
+        introspection.getRequiredProperty("number", Integer).get(instance) == 0
 
         when:
         def annotationMetadata = enumIntrospection.constants.find { it.value == instance }.annotationMetadata
@@ -4481,7 +4481,7 @@ public enum Test {
 
         then:
         instance.name() == "A"
-        introspection.getRequiredProperty("number", int).get(instance) == 0
+        introspection.getRequiredProperty("number", Integer).get(instance) == 0
 
         when:
         introspection.instantiate()

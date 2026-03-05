@@ -17,7 +17,6 @@ package io.micronaut.core.beans;
 
 import io.micronaut.core.annotation.AnnotatedElement;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
@@ -45,15 +44,12 @@ public interface BeanWriteProperty<B, T> extends AnnotatedElement, AnnotationMet
     /**
      * @return The declaring bean introspection.
      */
-    @NonNull
     BeanIntrospection<B> getDeclaringBean();
-
 
     /**
      * The declaring type of the property.
      * @return The type
      */
-    @NonNull
     default Class<B> getDeclaringType() {
         return getDeclaringBean().getBeanType();
     }
@@ -74,7 +70,7 @@ public interface BeanWriteProperty<B, T> extends AnnotatedElement, AnnotationMet
      * @return Either the existing instance or the property is mutable or a newly created instance via the copy constructor pattern.
      * @throws UnsupportedOperationException if the property cannot be mutated
      */
-    B withValue(@NonNull B bean, @Nullable T value);
+    B withValue(B bean, @Nullable T value);
 
     /**
      * Write the bean value.
@@ -82,7 +78,7 @@ public interface BeanWriteProperty<B, T> extends AnnotatedElement, AnnotationMet
      * @param value The value to write
      * @throws IllegalArgumentException If either the bean type or value type are not correct
      */
-    void set(@NonNull B bean, @Nullable T value);
+    void set(B bean, @Nullable T value);
 
     /**
      * Convert the value and set if on the bean using the default conversion service.
@@ -91,7 +87,7 @@ public interface BeanWriteProperty<B, T> extends AnnotatedElement, AnnotationMet
      * @param value The value
      * @throws io.micronaut.core.convert.exceptions.ConversionErrorException If the value couldn't be converted
      */
-    default void convertAndSet(@NonNull B bean, @Nullable Object value) {
+    default void convertAndSet(B bean, @Nullable Object value) {
         ArgumentUtils.requireNonNull("bean", bean);
         if (value != null) {
             final Argument<T> argument = asArgument();
@@ -110,7 +106,7 @@ public interface BeanWriteProperty<B, T> extends AnnotatedElement, AnnotationMet
     /**
      * @return The property type.
      */
-    @NonNull Class<T> getType();
+    Class<T> getType();
 
     /**
      * Represent the type as an argument, including any generic type information.
@@ -118,7 +114,6 @@ public interface BeanWriteProperty<B, T> extends AnnotatedElement, AnnotationMet
      * @return The argument
      */
     @Override
-    @NonNull
     default Argument<T> asArgument() {
         return Argument.of(getType());
     }

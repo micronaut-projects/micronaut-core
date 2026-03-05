@@ -15,10 +15,10 @@
  */
 package io.micronaut.http.server.util;
 
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -50,9 +50,13 @@ public class ProxyHeaderParser {
     private static final String X_FORWARDED_PORT = "X-Forwarded-Port";
 
     private List<String> forwardedFor = new ArrayList<>();
+    @Nullable
     private String forwardedBy = null;
+    @Nullable
     private String forwardedHost = null;
+    @Nullable
     private String forwardedProto = null;
+    @Nullable
     private Integer forwardedPort = null;
 
     /**
@@ -121,7 +125,6 @@ public class ProxyHeaderParser {
     /**
      * @return The client addresses
      */
-    @NonNull
     public List<String> getFor() {
         return forwardedFor;
     }
@@ -129,6 +132,7 @@ public class ProxyHeaderParser {
     /**
      * @return The proxy
      */
+    @Nullable
     public String getBy() {
         return forwardedBy;
     }
@@ -136,6 +140,7 @@ public class ProxyHeaderParser {
     /**
      * @return The host
      */
+    @Nullable
     public String getHost() {
         return forwardedHost;
     }
@@ -143,6 +148,7 @@ public class ProxyHeaderParser {
     /**
      * @return The scheme or protocol
      */
+    @Nullable
     public String getScheme() {
         return forwardedProto;
     }
@@ -150,6 +156,7 @@ public class ProxyHeaderParser {
     /**
      * @return The port
      */
+    @Nullable
     public Integer getPort() {
         return forwardedPort;
     }

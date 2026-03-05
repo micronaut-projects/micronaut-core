@@ -18,7 +18,6 @@ package io.micronaut.inject.beans;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.beans.BeanIntrospectionReference;
 import io.micronaut.core.beans.EnumBeanIntrospection;
@@ -84,7 +83,6 @@ public abstract class AbstractEnumBeanIntrospectionAndReference<E extends Enum<E
         this.enumConstantRefs = List.of(enumValueRefs);
     }
 
-    @NonNull
     @Override
     public List<EnumConstant<E>> getConstants() {
         return enumConstantRefs;
@@ -97,16 +95,14 @@ public abstract class AbstractEnumBeanIntrospectionAndReference<E extends Enum<E
     @Internal
     @UsedByGeneratedCode
     @Deprecated
-    public record EnumConstantRef<E extends Enum<E>>(@NonNull E value,
-                                                     @NonNull AnnotationMetadata annotationMetadata) implements EnumConstant<E> {
+    public record EnumConstantRef<E extends Enum<E>>(E value,
+                                                     AnnotationMetadata annotationMetadata) implements EnumConstant<E> {
 
-        @NonNull
         @Override
         public E getValue() {
             return value;
         }
 
-        @NonNull
         @Override
         public AnnotationMetadata getAnnotationMetadata() {
             return annotationMetadata;
@@ -118,11 +114,10 @@ public abstract class AbstractEnumBeanIntrospectionAndReference<E extends Enum<E
      */
     @Internal
     @UsedByGeneratedCode
-    public record EnumConstantDynamicRef<E extends Enum<E>>(@NonNull AnnotationClassValue<E> enumClass,
-                                                            @NonNull String name,
-                                                            @NonNull AnnotationMetadata annotationMetadata) implements EnumConstant<E> {
+    public record EnumConstantDynamicRef<E extends Enum<E>>(AnnotationClassValue<E> enumClass,
+                                                            String name,
+                                                            AnnotationMetadata annotationMetadata) implements EnumConstant<E> {
 
-        @NonNull
         @Override
         public E getValue() {
             Class<E> type = enumClass.getType().orElse(null);
@@ -132,7 +127,6 @@ public abstract class AbstractEnumBeanIntrospectionAndReference<E extends Enum<E
             return Enum.valueOf(type, name);
         }
 
-        @NonNull
         @Override
         public AnnotationMetadata getAnnotationMetadata() {
             return annotationMetadata;

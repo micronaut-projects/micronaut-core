@@ -16,8 +16,6 @@
 package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
-import org.jspecify.annotations.NonNull;
-
 import java.util.Optional;
 
 /**
@@ -31,7 +29,6 @@ public interface PropertyElement extends TypedElement, MemberElement {
     /**
      * @return The type of the property
      */
-    @NonNull
     @Override
     ClassElement getType();
 

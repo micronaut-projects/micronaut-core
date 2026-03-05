@@ -64,11 +64,12 @@ public class HealthEndpoint {
      */
     public static final String PREFIX = EndpointConfiguration.PREFIX + "." + NAME;
 
-    private HealthAggregator<HealthResult> healthAggregator;
-    private HealthIndicator[] healthIndicators;
-    private HealthIndicator[] livenessHealthIndicators;
-    private HealthIndicator[] readinessHealthIndicators;
+    private final HealthAggregator<HealthResult> healthAggregator;
+    private final HealthIndicator[] healthIndicators;
+    private final HealthIndicator[] livenessHealthIndicators;
+    private final HealthIndicator[] readinessHealthIndicators;
     private DetailsVisibility detailsVisible = DetailsVisibility.AUTHENTICATED;
+    @Nullable
     private StatusConfiguration statusConfiguration;
 
     private boolean serviceReadyIndicatorEnabled = true;
@@ -169,6 +170,7 @@ public class HealthEndpoint {
     /**
      * @return The status configuration
      */
+    @Nullable
     public StatusConfiguration getStatusConfiguration() {
         return statusConfiguration;
     }
@@ -179,7 +181,7 @@ public class HealthEndpoint {
      * @param statusConfiguration The status configuration
      */
     @Inject
-    public void setStatusConfiguration(StatusConfiguration statusConfiguration) {
+    public void setStatusConfiguration(@Nullable StatusConfiguration statusConfiguration) {
         if (statusConfiguration != null) {
             this.statusConfiguration = statusConfiguration;
         }
@@ -218,7 +220,7 @@ public class HealthEndpoint {
      */
     @ConfigurationProperties("status")
     public static class StatusConfiguration {
-        private Map<String, HttpStatus> httpMapping = new HashMap<>(5);
+        private final Map<String, HttpStatus> httpMapping = new HashMap<>(5);
 
         /**
          * Default constructor.
@@ -241,7 +243,7 @@ public class HealthEndpoint {
          *
          * @param httpMapping The http mappings
          */
-        public void setHttpMapping(Map<String, HttpStatus> httpMapping) {
+        public void setHttpMapping(@Nullable Map<String, HttpStatus> httpMapping) {
             if (httpMapping != null) {
                 for (Map.Entry<String, HttpStatus> entry : httpMapping.entrySet()) {
                     this.httpMapping.put(

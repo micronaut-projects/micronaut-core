@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.context;
-
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.LocaleResolver;
 
 import java.util.Locale;
@@ -47,7 +45,6 @@ public abstract class AbstractLocalizedMessageSource<T> implements LocalizedMess
      *
      * @return The resolved locale;
      */
-    @NonNull
     protected abstract Locale getLocale();
 
     /**
@@ -57,8 +54,7 @@ public abstract class AbstractLocalizedMessageSource<T> implements LocalizedMess
      * @return A message if present
      */
     @Override
-    @NonNull
-    public Optional<String> getMessage(@NonNull String code, Object... variables) {
+    public Optional<String> getMessage(String code, Object... variables) {
         return messageSource.getMessage(code, getLocale(), variables);
     }
 
@@ -69,14 +65,12 @@ public abstract class AbstractLocalizedMessageSource<T> implements LocalizedMess
      * @return A message if present
      */
     @Override
-    @NonNull
-    public Optional<String> getMessage(@NonNull String code, Map<String, Object> variables) {
+    public Optional<String> getMessage(String code, Map<String, Object> variables) {
         return messageSource.getMessage(code, getLocale(), variables);
     }
 
     @Override
-    @NonNull
-    public Optional<String> getMessage(@NonNull String code) {
+    public Optional<String> getMessage(String code) {
         return messageSource.getMessage(code, getLocale());
     }
 
@@ -84,7 +78,6 @@ public abstract class AbstractLocalizedMessageSource<T> implements LocalizedMess
      * @param localeResolutionContext The context object which will be used to resolve the locale
      * @return The resolved locale;
      */
-    @NonNull
     protected Locale resolveLocale(T localeResolutionContext) {
         return localeResolver.resolveOrDefault(localeResolutionContext);
     }

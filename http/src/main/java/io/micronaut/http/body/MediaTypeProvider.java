@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.http.body;
-
-import org.jspecify.annotations.NonNull;
 import io.micronaut.http.MediaType;
 
 /**
@@ -27,6 +25,5 @@ public interface MediaTypeProvider {
     /**
      * @return The media type of the object.
      */
-    @NonNull
     MediaType getMediaType();
 }

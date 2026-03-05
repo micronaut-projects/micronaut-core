@@ -17,7 +17,6 @@ package io.micronaut.validation.routes;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ParameterElement;
@@ -47,7 +46,6 @@ class RouteParameterElement implements ParameterElement, AnnotationMetadataDeleg
         return delegate;
     }
 
-    @NonNull
     @Override
     public ClassElement getType() {
         return delegate.getType();

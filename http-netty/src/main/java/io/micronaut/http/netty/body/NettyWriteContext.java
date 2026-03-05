@@ -17,7 +17,6 @@ package io.micronaut.http.netty.body;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.http.body.ByteBody;
 import io.netty.handler.codec.http.HttpResponse;
 
@@ -35,7 +34,7 @@ public interface NettyWriteContext {
      * @param response The response status, headers etc
      * @param body     The response body
      */
-    void write(@NonNull HttpResponse response, @NonNull ByteBody body);
+    void write(HttpResponse response, ByteBody body);
 
     /**
      * Write a response to a {@code HEAD} request. This is special because it never has a body but
@@ -43,5 +42,5 @@ public interface NettyWriteContext {
      *
      * @param response The response status, headers etc
      */
-    void writeHeadResponse(@NonNull HttpResponse response);
+    void writeHeadResponse(HttpResponse response);
 }

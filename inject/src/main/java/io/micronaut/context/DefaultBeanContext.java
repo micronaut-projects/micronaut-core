@@ -58,8 +58,6 @@ import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NextMajorVersion;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.convert.DefaultMutableConversionService;
 import io.micronaut.core.convert.MutableConversionService;
@@ -108,6 +106,7 @@ import io.micronaut.inject.qualifiers.Qualified;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.inject.qualifiers.TypeArgumentQualifier;
 import io.micronaut.inject.validation.BeanDefinitionValidator;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -173,8 +172,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     protected final AtomicBoolean initializing = new AtomicBoolean(false);
     protected final AtomicBoolean terminating = new AtomicBoolean(false);
 
-    final @NonNull BeanResolutionTraceMode traceMode;
-    final @NonNull Set<String> tracePatterns;
+    final BeanResolutionTraceMode traceMode;
+    final Set<String> tracePatterns;
     final Map<BeanIdentifier, BeanRegistration<?>> singlesInCreation = new ConcurrentHashMap<>(5);
 
     protected final SingletonScope singletonScope = new SingletonScope();
@@ -212,18 +211,18 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
     private final CustomScopeRegistry customScopeRegistry;
 
-    private BeanDefinitionValidator beanValidator;
-    private List<BeanConfiguration> beanConfigurationsList;
+    private @Nullable BeanDefinitionValidator beanValidator;
+    private @Nullable List<BeanConfiguration> beanConfigurationsList;
 
-    List<Map.Entry<Class<?>, ListenersSupplier<BeanInitializedEventListener>>> beanInitializedEventListeners;
-    private List<Map.Entry<Class<?>, ListenersSupplier<BeanCreatedEventListener>>> beanCreationEventListeners;
-    private List<Map.Entry<Class<?>, ListenersSupplier<BeanPreDestroyEventListener>>> beanPreDestroyEventListeners;
-    private List<Map.Entry<Class<?>, ListenersSupplier<BeanDestroyedEventListener>>> beanDestroyedEventListeners;
+    @Nullable List<Map.Entry<Class<?>, ListenersSupplier<BeanInitializedEventListener>>> beanInitializedEventListeners;
+    private @Nullable List<Map.Entry<Class<?>, ListenersSupplier<BeanCreatedEventListener>>> beanCreationEventListeners;
+    private @Nullable List<Map.Entry<Class<?>, ListenersSupplier<BeanPreDestroyEventListener>>> beanPreDestroyEventListeners;
+    private @Nullable List<Map.Entry<Class<?>, ListenersSupplier<BeanDestroyedEventListener>>> beanDestroyedEventListeners;
 
     private final boolean eventsEnabled;
     private final boolean eagerBeansEnabled;
 
-    private ForkJoinTask<?> checkEnabledBeans;
+    private @Nullable ForkJoinTask<?> checkEnabledBeans;
 
     protected MutableConversionService conversionService;
 
@@ -241,9 +240,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      *
      * @param classLoader The class loader
      */
-    public DefaultBeanContext(@NonNull ClassLoader classLoader) {
+    public DefaultBeanContext(ClassLoader classLoader) {
         this(new BeanContextConfiguration() {
-            @NonNull
             @Override
             public ClassLoader getClassLoader() {
                 ArgumentUtils.requireNonNull("classLoader", classLoader);
@@ -257,9 +255,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      *
      * @param resourceLoader The resource loader
      */
-    public DefaultBeanContext(@NonNull ClassPathResourceLoader resourceLoader) {
+    public DefaultBeanContext(ClassPathResourceLoader resourceLoader) {
         this(new BeanContextConfiguration() {
-            @NonNull
             @Override
             public ClassLoader getClassLoader() {
                 ArgumentUtils.requireNonNull("resourceLoader", resourceLoader);
@@ -273,7 +270,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      *
      * @param contextConfiguration The context configuration
      */
-    public DefaultBeanContext(@NonNull BeanContextConfiguration contextConfiguration) {
+    public DefaultBeanContext(BeanContextConfiguration contextConfiguration) {
         ArgumentUtils.requireNonNull("contextConfiguration", contextConfiguration);
         // enable classloader logging
         System.setProperty(ClassUtils.PROPERTY_MICRONAUT_CLASSLOADER_LOGGING, "true");
@@ -301,7 +298,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * @return The custom scope registry to use.
      * @since 3.0.0
      */
-    @NonNull
     protected CustomScopeRegistry createCustomScopeRegistry() {
         return new DefaultCustomScopeRegistry(this);
     }
@@ -310,7 +306,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * @return The custom scope registry
      */
     @Internal
-    @NonNull
     CustomScopeRegistry getCustomScopeRegistry() {
         return customScopeRegistry;
     }
@@ -370,7 +365,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * @param <C>              The component type
      */
     @Internal
-    <C extends AnnotationMetadataProvider> void trackDisabledComponent(@NonNull ConditionContext<C> conditionContext) {
+    <C extends AnnotationMetadataProvider> void trackDisabledComponent(ConditionContext<C> conditionContext) {
         C component = conditionContext.getComponent();
         List<String> reasons = conditionContext.getFailures().stream().map(Failure::getMessage).toList();
         if (component instanceof QualifiedBeanType<?> beanType) {
@@ -461,8 +456,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     @Override
-    @NonNull
-    public AnnotationMetadata resolveMetadata(Class<?> type) {
+    public AnnotationMetadata resolveMetadata(@Nullable Class<?> type) {
         if (type == null) {
             return AnnotationMetadata.EMPTY_METADATA;
         }
@@ -485,7 +479,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     @Override
-    public <T> void refreshBean(@NonNull BeanRegistration<T> beanRegistration) {
+    public <T> void refreshBean(BeanRegistration<T> beanRegistration) {
         Objects.requireNonNull(beanRegistration, "BeanRegistration cannot be null");
         T bean = beanRegistration.bean;
         if (bean != null) {
@@ -521,12 +515,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     @Override
-    public <T> BeanRegistration<T> getBeanRegistration(Class<T> beanType, Qualifier<T> qualifier) {
+    public <T> BeanRegistration<T> getBeanRegistration(Class<T> beanType, @Nullable Qualifier<T> qualifier) {
         return getBeanRegistration(null, Argument.of(beanType), qualifier);
     }
 
     @Override
-    public <T> Collection<BeanRegistration<T>> getBeanRegistrations(Class<T> beanType, Qualifier<T> qualifier) {
+    public <T> Collection<BeanRegistration<T>> getBeanRegistrations(Class<T> beanType, @Nullable Qualifier<T> qualifier) {
         if (beanType == null) {
             return Collections.emptyList();
         }
@@ -534,7 +528,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     @Override
-    public <T> Collection<BeanRegistration<T>> getBeanRegistrations(Argument<T> beanType, Qualifier<T> qualifier) {
+    public <T> Collection<BeanRegistration<T>> getBeanRegistrations(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         return getBeanRegistrations(
             null,
             Objects.requireNonNull(beanType, "Bean type cannot be null"),
@@ -543,7 +537,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     @Override
-    public <T> BeanRegistration<T> getBeanRegistration(Argument<T> beanType, Qualifier<T> qualifier) {
+    public <T> BeanRegistration<T> getBeanRegistration(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         return getBeanRegistration(
             null,
             Objects.requireNonNull(beanType, "Bean type cannot be null"),
@@ -583,7 +577,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T, R> Optional<MethodExecutionHandle<T, R>> findExecutionHandle(Class<T> beanType, Qualifier<?> q, String method, Class<?>... arguments) {
+    public <T, R> Optional<MethodExecutionHandle<T, R>> findExecutionHandle(Class<T> beanType, @Nullable Qualifier<?> q, String method, Class<?>... arguments) {
         Qualifier<T> qualifier = (Qualifier<T>) q;
         Optional<BeanDefinition<T>> foundBean = findBeanDefinition(beanType, qualifier);
         if (foundBean.isEmpty()) {
@@ -611,7 +605,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     @Override
-    public <T, R> Optional<ExecutableMethod<T, R>> findExecutableMethod(Class<T> beanType, String method, Class<?>[] arguments) {
+    public <T, R> Optional<ExecutableMethod<T, R>> findExecutableMethod(Class<T> beanType, String method, Class<?>... arguments) {
         if (beanType == null) {
             return Optional.empty();
         }
@@ -629,7 +623,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T, R> Optional<MethodExecutionHandle<T, R>> findExecutionHandle(T bean, String method, Class<?>[] arguments) {
+    public <T, R> Optional<MethodExecutionHandle<T, R>> findExecutionHandle(T bean, String method, Class<?>... arguments) {
         if (bean != null) {
             Class<T> aClass = (Class<T>) bean.getClass();
             return findExecutionHandle(aClass, method, arguments);
@@ -638,7 +632,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     @Override
-    public <T> BeanContext registerSingleton(@NonNull Class<T> type, @NonNull T singleton, Qualifier<T> qualifier, boolean inject) {
+    public <T> BeanContext registerSingleton(Class<T> type, T singleton, @Nullable Qualifier<T> qualifier, boolean inject) {
         purgeCacheForBeanInstance(singleton);
 
         BeanDefinition<T> beanDefinition;
@@ -685,7 +679,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         containsBeanCache.entrySet().removeIf(entry -> entry.getKey().beanType.isInstance(singleton));
     }
 
-    @NonNull
     final BeanResolutionContext newResolutionContext(BeanDefinition<?> beanDefinition, @Nullable BeanResolutionContext currentContext) {
         if (currentContext == null) {
             return new SingletonBeanResolutionContext(beanDefinition);
@@ -718,13 +711,13 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     @Override
-    public <T> BeanDefinition<T> getBeanDefinition(Argument<T> beanType, Qualifier<T> qualifier) {
+    public <T> BeanDefinition<T> getBeanDefinition(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         return findBeanDefinition(beanType, qualifier)
             .orElseThrow(() -> newNoSuchBeanException(null, beanType, qualifier, null));
     }
 
     @Override
-    public <T> Optional<BeanDefinition<T>> findBeanDefinition(Argument<T> beanType, Qualifier<T> qualifier) {
+    public <T> Optional<BeanDefinition<T>> findBeanDefinition(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         BeanDefinition<T> beanDefinition = singletonScope.findCachedSingletonBeanDefinition(beanType, qualifier);
         if (beanDefinition != null) {
             return Optional.of(beanDefinition);
@@ -732,12 +725,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         return findConcreteCandidate(null, beanType, qualifier, true);
     }
 
-    private <T> Optional<BeanDefinition<T>> findBeanDefinitionInternal(Argument<T> beanType, Qualifier<T> qualifier) {
+    private <T> Optional<BeanDefinition<T>> findBeanDefinitionInternal(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         return findConcreteCandidate(null, beanType, qualifier, false);
     }
 
     @Override
-    public <T> Optional<BeanDefinition<T>> findBeanDefinition(Class<T> beanType, Qualifier<T> qualifier) {
+    public <T> Optional<BeanDefinition<T>> findBeanDefinition(Class<T> beanType, @Nullable Qualifier<T> qualifier) {
         return findBeanDefinition(Argument.of(beanType), qualifier);
     }
 
@@ -754,13 +747,13 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     @Override
-    public <T> Collection<BeanDefinition<T>> getBeanDefinitions(Class<T> beanType, Qualifier<T> qualifier) {
+    public <T> Collection<BeanDefinition<T>> getBeanDefinitions(Class<T> beanType, @Nullable Qualifier<T> qualifier) {
         Objects.requireNonNull(beanType, "Bean type cannot be null");
         return getBeanDefinitions(Argument.of(beanType), qualifier);
     }
 
     @Override
-    public <T> Collection<BeanDefinition<T>> getBeanDefinitions(Argument<T> beanType, Qualifier<T> qualifier) {
+    public <T> Collection<BeanDefinition<T>> getBeanDefinitions(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         Objects.requireNonNull(beanType, "Bean type cannot be null");
         Collection<BeanDefinition<T>> candidates = findBeanCandidatesInternal(null, beanType);
         if (qualifier != null) {
@@ -770,12 +763,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     @Override
-    public <T> boolean containsBean(@NonNull Class<T> beanType, Qualifier<T> qualifier) {
+    public <T> boolean containsBean(Class<T> beanType, @Nullable Qualifier<T> qualifier) {
         return containsBean(Argument.of(beanType), qualifier);
     }
 
     @Override
-    public <T> boolean containsBean(Argument<T> beanType, Qualifier<T> qualifier) {
+    public <T> boolean containsBean(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         ArgumentUtils.requireNonNull("beanType", beanType);
         BeanKey<T> beanKey = new BeanKey<>(beanType, qualifier);
         if (containsBeanCache.containsKey(beanKey)) {
@@ -789,23 +782,20 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
     }
 
-    @NonNull
     @Override
-    public <T> T getBean(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier) {
+    public <T> T getBean(Class<T> beanType, @Nullable Qualifier<T> qualifier) {
         Objects.requireNonNull(beanType, "Bean type cannot be null");
         return getBean(Argument.of(beanType), qualifier);
     }
 
-    @NonNull
     @Override
-    public <T> T getBean(@NonNull Class<T> beanType) {
+    public <T> T getBean(Class<T> beanType) {
         Objects.requireNonNull(beanType, "Bean type cannot be null");
         return getBean(Argument.of(beanType), null);
     }
 
-    @NonNull
     @Override
-    public <T> T getBean(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+    public <T> T getBean(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         Objects.requireNonNull(beanType, "Bean type cannot be null");
         try {
             return getBean(null, beanType, qualifier);
@@ -823,12 +813,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     @Override
-    public <T> Optional<T> findBean(Class<T> beanType, Qualifier<T> qualifier) {
+    public <T> Optional<T> findBean(Class<T> beanType, @Nullable Qualifier<T> qualifier) {
         return findBean(null, beanType, qualifier);
     }
 
     @Override
-    public <T> Optional<T> findBean(Argument<T> beanType, Qualifier<T> qualifier) {
+    public <T> Optional<T> findBean(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         return findBean(null, beanType, qualifier);
     }
 
@@ -838,7 +828,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     @Override
-    public <T> Collection<T> getBeansOfType(Class<T> beanType, Qualifier<T> qualifier) {
+    public <T> Collection<T> getBeansOfType(Class<T> beanType, @Nullable Qualifier<T> qualifier) {
         return getBeansOfType(Argument.of(beanType), qualifier);
     }
 
@@ -848,22 +838,22 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     @Override
-    public <T> Collection<T> getBeansOfType(Argument<T> beanType, Qualifier<T> qualifier) {
+    public <T> Collection<T> getBeansOfType(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         return getBeansOfType(null, beanType, qualifier);
     }
 
     @Override
-    public <T> Stream<T> streamOfType(Class<T> beanType, Qualifier<T> qualifier) {
-        return streamOfType(null, beanType, qualifier);
+    public <T> Stream<T> streamOfType(Class<T> beanType, @Nullable Qualifier<T> qualifier) {
+        return streamOfType((BeanResolutionContext) null, beanType, qualifier);
     }
 
     @Override
-    public <T> Stream<T> streamOfType(Argument<T> beanType, Qualifier<T> qualifier) {
-        return streamOfType(null, beanType, qualifier);
+    public <T> Stream<T> streamOfType(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+        return streamOfType((BeanResolutionContext) null, beanType, qualifier);
     }
 
     @Override
-    public <V> Map<String, V> mapOfType(Argument<V> beanType, Qualifier<V> qualifier) {
+    public <V> Map<String, V> mapOfType(Argument<V> beanType, @Nullable Qualifier<V> qualifier) {
         return mapOfType(null, beanType, qualifier);
     }
 
@@ -876,7 +866,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * @param <T>               The bean concrete type
      * @return A stream
      */
-    protected <T> Stream<T> streamOfType(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier) {
+    protected <T> Stream<T> streamOfType(@Nullable BeanResolutionContext resolutionContext, Class<T> beanType, @Nullable Qualifier<T> qualifier) {
         return streamOfType(resolutionContext, Argument.of(beanType), qualifier);
     }
 
@@ -890,7 +880,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * @return A map of beans, never {@code null}.
      * @since 4.0.0
      */
-    protected <V> @NonNull Map<String, V> mapOfType(@Nullable BeanResolutionContext resolutionContext, @NonNull Argument<V> beanType, @Nullable Qualifier<V> qualifier) {
+    protected <V> Map<String, V> mapOfType(@Nullable BeanResolutionContext resolutionContext, Argument<V> beanType, @Nullable Qualifier<V> qualifier) {
         // try and find a bean that implements the map with the generics
         Argument<Map<String, V>> mapType = Argument.mapOf(Argument.STRING, beanType);
         @SuppressWarnings("unchecked") Qualifier<Map<String, V>> mapQualifier = (Qualifier<Map<String, V>>) qualifier;
@@ -908,8 +898,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 reg -> reg.bean
             ));
         } catch (IllegalStateException e) { // occurs for duplicate keys
-            throw new DependencyInjectionException(
-                resolutionContext,
+            throw new BeanInstantiationException(
                 "Injecting a map of beans requires `@Named` qualifier. Multiple beans were found missing a qualifier resulting in duplicate keys: " + e.getMessage(),
                 new NonUniqueBeanException(
                     beanType.getType(),
@@ -919,7 +908,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
     }
 
-    @NonNull
     private static String resolveKey(BeanRegistration<?> reg) {
         BeanDefinition<?> definition = reg.beanDefinition;
         if (definition instanceof NameResolver resolver && resolver.resolveName().isPresent()) {
@@ -948,15 +936,14 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * @return A stream
      */
     @Internal
-    public <T> Stream<T> streamOfType(BeanResolutionContext resolutionContext, Argument<T> beanType, Qualifier<T> qualifier) {
+    public <T> Stream<T> streamOfType(@Nullable BeanResolutionContext resolutionContext, Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         Objects.requireNonNull(beanType, "Bean type cannot be null");
         return getBeanRegistrations(resolutionContext, beanType, qualifier).stream()
             .map(BeanRegistration::getBean);
     }
 
-    @NonNull
     @Override
-    public <T> T inject(@NonNull T instance) {
+    public <T> T inject(T instance) {
         Objects.requireNonNull(instance, "Instance cannot be null");
 
         Collection<BeanDefinition<T>> candidates = findBeanCandidatesForInstance(instance);
@@ -987,15 +974,13 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
     }
 
-    @NonNull
     @Override
-    public <T> T createBean(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier) {
+    public <T> T createBean(Class<T> beanType, @Nullable Qualifier<T> qualifier) {
         return createBean(null, beanType, qualifier);
     }
 
-    @NonNull
     @Override
-    public <T> T createBean(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier, @Nullable Map<String, Object> argumentValues) {
+    public <T> T createBean(Class<T> beanType, @Nullable Qualifier<T> qualifier, @Nullable Map<String, Object> argumentValues) {
         ArgumentUtils.requireNonNull("beanType", beanType);
         Argument<T> beanArg = Argument.of(beanType);
         Optional<BeanDefinition<T>> candidate = findBeanDefinition(beanArg, qualifier);
@@ -1016,9 +1001,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         );
     }
 
-    @NonNull
     @Override
-    public <T> T createBean(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier, @Nullable Object... args) {
+    public <T> T createBean(Class<T> beanType, @Nullable Qualifier<T> qualifier, @Nullable Object... args) {
         ArgumentUtils.requireNonNull("beanType", beanType);
         final Argument<T> beanArg = Argument.of(beanType);
         Optional<BeanDefinition<T>> candidate = findBeanDefinition(beanArg, qualifier);
@@ -1036,10 +1020,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         );
     }
 
-    @NonNull
-    private <T> T doCreateBeanWithArguments(@NonNull BeanResolutionContext resolutionContext,
-                                            @NonNull BeanDefinition<T> definition,
-                                            @NonNull Argument<T> beanType,
+    private <T> T doCreateBeanWithArguments(BeanResolutionContext resolutionContext,
+                                            BeanDefinition<T> definition,
+                                            Argument<T> beanType,
                                             @Nullable Qualifier<T> qualifier,
                                             @Nullable Object... args) {
         Map<String, Object> argumentValues = resolveArgumentValues(resolutionContext, definition, args);
@@ -1054,9 +1037,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
     }
 
-    @NonNull
-    private <T> Map<String, Object> resolveArgumentValues(BeanResolutionContext resolutionContext, BeanDefinition<T> definition, Object[] args) {
-        Argument[] requiredArguments;
+    @Nullable
+    private <T> Map<String, Object> resolveArgumentValues(BeanResolutionContext resolutionContext, BeanDefinition<T> definition, @Nullable Object[] args) {
+        Argument<?>[] requiredArguments;
         if (definition instanceof ParametrizedInstantiatableBeanDefinition<T> parametrizedInstantiatableBeanDefinition) {
             requiredArguments = parametrizedInstantiatableBeanDefinition.getRequiredArguments();
         } else {
@@ -1101,7 +1084,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
     @Nullable
     @Override
-    public <T> T destroyBean(@NonNull Argument<T> beanType, Qualifier<T> qualifier) {
+    public <T> T destroyBean(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         ArgumentUtils.requireNonNull("beanType", beanType);
         return findBeanDefinition(beanType, qualifier)
             .map(this::destroyBean)
@@ -1109,8 +1092,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     @Override
-    @NonNull
-    public <T> T destroyBean(@NonNull T bean) {
+    public <T> T destroyBean(T bean) {
         ArgumentUtils.requireNonNull("bean", bean);
         Optional<BeanRegistration<T>> beanRegistration = findBeanRegistration(bean);
         if (beanRegistration.isPresent()) {
@@ -1128,13 +1110,13 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
     @Override
     @Nullable
-    public <T> T destroyBean(@NonNull Class<T> beanType) {
+    public <T> T destroyBean(Class<T> beanType) {
         ArgumentUtils.requireNonNull("beanType", beanType);
         return destroyBean(Argument.of(beanType), null);
     }
 
     @Nullable
-    private <T> T destroyBean(@NonNull BeanDefinition<T> beanDefinition) {
+    private <T> T destroyBean(BeanDefinition<T> beanDefinition) {
         if (beanDefinition.isSingleton()) {
             BeanRegistration<T> beanRegistration = singletonScope.findBeanRegistration(beanDefinition);
             if (beanRegistration != null) {
@@ -1146,11 +1128,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     @Override
-    public <T> void destroyBean(@NonNull BeanRegistration<T> registration) {
+    public <T> void destroyBean(BeanRegistration<T> registration) {
         destroyBean(registration, false);
     }
 
-    private <T> void destroyBean(@NonNull BeanRegistration<T> registration, boolean dependent) {
+    private <T> void destroyBean(BeanRegistration<T> registration, boolean dependent) {
         if (LOG_LIFECYCLE.isDebugEnabled()) {
             LOG_LIFECYCLE.debug("Destroying bean [{}] with identifier [{}]", registration.bean, registration.identifier);
         }
@@ -1222,8 +1204,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     @SuppressWarnings("unchecked")
-    @NonNull
-    private <T> T triggerPreDestroyListeners(@NonNull BeanDefinition<T> beanDefinition, @NonNull T bean) {
+    private <T> T triggerPreDestroyListeners(BeanDefinition<T> beanDefinition, T bean) {
         if (beanPreDestroyEventListeners == null) {
             beanPreDestroyEventListeners = loadBeanEventListeners(BeanPreDestroyEventListener.class);
         }
@@ -1255,7 +1236,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         return bean;
     }
 
-    private <T> void destroyProxyTargetBean(@NonNull BeanRegistration<T> registration, boolean dependent) {
+    private <T> void destroyProxyTargetBean(BeanRegistration<T> registration, boolean dependent) {
         Set<Object> destroyed = Collections.emptySet();
         if (registration instanceof BeanDisposingRegistration<?> disposingRegistration) {
             if (disposingRegistration.getDependents() != null) {
@@ -1302,7 +1283,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
     }
 
-    private <T> void triggerBeanDestroyedListeners(@NonNull BeanDefinition<T> beanDefinition, @NonNull T bean) {
+    private <T> void triggerBeanDestroyedListeners(BeanDefinition<T> beanDefinition, T bean) {
         if (beanDestroyedEventListeners == null) {
             beanDestroyedEventListeners = loadBeanEventListeners(BeanDestroyedEventListener.class);
         }
@@ -1330,8 +1311,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
     }
 
-    @NonNull
-    private <T> Class<T> getBeanType(@NonNull BeanDefinition<T> beanDefinition) {
+    private <T> Class<T> getBeanType(BeanDefinition<T> beanDefinition) {
         if (beanDefinition instanceof ProxyBeanDefinition) {
             return ((ProxyBeanDefinition<T>) beanDefinition).getTargetType();
         }
@@ -1363,9 +1343,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * @param <T>               The bean generic type
      * @return The instance
      */
-    @NonNull
     protected <T> T createBean(@Nullable BeanResolutionContext resolutionContext,
-                               @NonNull Class<T> beanType,
+                               Class<T> beanType,
                                @Nullable Qualifier<T> qualifier) {
         ArgumentUtils.requireNonNull("beanType", beanType);
 
@@ -1399,10 +1378,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * @return The instance
      */
     @Internal
-    @NonNull
-    protected <T> T inject(@NonNull BeanResolutionContext resolutionContext,
+    protected <T> T inject(BeanResolutionContext resolutionContext,
                            @Nullable BeanDefinition<?> requestingBeanDefinition,
-                           @NonNull T instance) {
+                           T instance) {
         @SuppressWarnings("unchecked") Class<T> beanType = (Class<T>) instance.getClass();
         Optional<BeanDefinition<T>> concreteCandidate = findBeanDefinition(beanType, null);
         if (concreteCandidate.isPresent()) {
@@ -1424,8 +1402,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * @param <T>               The bean type parameter
      * @return The found beans
      */
-    @NonNull
-    protected <T> Collection<T> getBeansOfType(@Nullable BeanResolutionContext resolutionContext, @NonNull Argument<T> beanType) {
+    protected <T> Collection<T> getBeansOfType(@Nullable BeanResolutionContext resolutionContext, Argument<T> beanType) {
         return getBeansOfType(resolutionContext, beanType, null);
     }
 
@@ -1439,9 +1416,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * @return The found beans
      */
     @Internal
-    @NonNull
     public <T> Collection<T> getBeansOfType(@Nullable BeanResolutionContext resolutionContext,
-                                            @NonNull Argument<T> beanType,
+                                            Argument<T> beanType,
                                             @Nullable Qualifier<T> qualifier) {
         Collection<BeanRegistration<T>> beanRegistrations = getBeanRegistrations(resolutionContext, beanType, qualifier);
         List<T> list = new ArrayList<>(beanRegistrations.size());
@@ -1452,15 +1428,13 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     @Override
-    @NonNull
-    public <T> T getProxyTargetBean(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier) {
+    public <T> T getProxyTargetBean(Class<T> beanType, @Nullable Qualifier<T> qualifier) {
         ArgumentUtils.requireNonNull("beanType", beanType);
         return getProxyTargetBean(null, Argument.of(beanType), qualifier);
     }
 
-    @NonNull
     @Override
-    public <T> T getProxyTargetBean(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+    public <T> T getProxyTargetBean(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         ArgumentUtils.requireNonNull("beanType", beanType);
         return getProxyTargetBean(null, beanType, qualifier);
     }
@@ -1475,13 +1449,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * @return The proxied instance
      * @since 3.1.0
      */
-    @NonNull
     @UsedByGeneratedCode
     public <T> T getProxyTargetBean(@Nullable BeanResolutionContext resolutionContext,
-                                    @NonNull Argument<T> beanType,
+                                    Argument<T> beanType,
                                     @Nullable Qualifier<T> qualifier) {
         BeanDefinition<T> definition = getProxyTargetBeanDefinition(beanType, qualifier);
-        return resolveBeanRegistration(resolutionContext, definition, beanType, qualifier).bean;
+        return Objects.requireNonNull(resolveBeanRegistration(resolutionContext, definition, beanType, qualifier)).bean;
     }
 
     /**
@@ -1496,27 +1469,24 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * @since 4.3.0
      */
     @Internal
-    @NonNull
     @UsedByGeneratedCode
     public <T> T getProxyTargetBean(@Nullable BeanResolutionContext resolutionContext,
-                                    @NonNull BeanDefinition<T> definition,
-                                    @NonNull Argument<T> beanType,
+                                    BeanDefinition<T> definition,
+                                    Argument<T> beanType,
                                     @Nullable Qualifier<T> qualifier) {
-        return resolveBeanRegistration(resolutionContext, definition, beanType, qualifier).bean;
+        return Objects.requireNonNull(resolveBeanRegistration(resolutionContext, definition, beanType, qualifier)).bean;
     }
 
-    @NonNull
     @Override
-    public <T, R> Optional<ExecutableMethod<T, R>> findProxyTargetMethod(@NonNull Class<T> beanType, @NonNull String method, @NonNull Class<?>[] arguments) {
+    public <T, R> Optional<ExecutableMethod<T, R>> findProxyTargetMethod(Class<T> beanType, String method, Class<?>... arguments) {
         ArgumentUtils.requireNonNull("beanType", beanType);
         ArgumentUtils.requireNonNull("method", method);
         BeanDefinition<T> definition = getProxyTargetBeanDefinition(beanType, null);
         return definition.findMethod(method, arguments);
     }
 
-    @NonNull
     @Override
-    public <T, R> Optional<ExecutableMethod<T, R>> findProxyTargetMethod(@NonNull Class<T> beanType, Qualifier<T> qualifier, @NonNull String method, Class<?>... arguments) {
+    public <T, R> Optional<ExecutableMethod<T, R>> findProxyTargetMethod(Class<T> beanType, Qualifier<T> qualifier, String method, Class<?>... arguments) {
         ArgumentUtils.requireNonNull("beanType", beanType);
         ArgumentUtils.requireNonNull("method", method);
         BeanDefinition<T> definition = getProxyTargetBeanDefinition(beanType, qualifier);
@@ -1524,22 +1494,21 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     @Override
-    public <T, R> Optional<ExecutableMethod<T, R>> findProxyTargetMethod(@NonNull Argument<T> beanType, Qualifier<T> qualifier, @NonNull String method, Class<?>... arguments) {
+    public <T, R> Optional<ExecutableMethod<T, R>> findProxyTargetMethod(Argument<T> beanType, Qualifier<T> qualifier, String method, Class<?>... arguments) {
         ArgumentUtils.requireNonNull("beanType", beanType);
         ArgumentUtils.requireNonNull("method", method);
         BeanDefinition<T> definition = getProxyTargetBeanDefinition(beanType, qualifier);
         return definition.findMethod(method, arguments);
     }
 
-    @NonNull
     @Override
-    public <T> Optional<BeanDefinition<T>> findProxyTargetBeanDefinition(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier) {
+    public <T> Optional<BeanDefinition<T>> findProxyTargetBeanDefinition(Class<T> beanType, @Nullable Qualifier<T> qualifier) {
         return findProxyTargetBeanDefinition(Argument.of(beanType), qualifier);
     }
 
     @Override
     @SuppressWarnings("java:S2789") // performance optimization
-    public <T> Optional<BeanDefinition<T>> findProxyTargetBeanDefinition(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+    public <T> Optional<BeanDefinition<T>> findProxyTargetBeanDefinition(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         ArgumentUtils.requireNonNull("beanType", beanType);
         BeanCandidateKey<T> key = new BeanCandidateKey<>(beanType, qualifier, true);
 
@@ -1551,7 +1520,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         return beanDefinition;
     }
 
-    @NonNull
     @Override
     public Collection<BeanDefinition<Object>> getBeanDefinitions(@Nullable Qualifier<Object> qualifier) {
         if (qualifier == null) {
@@ -1582,7 +1550,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         return candidates;
     }
 
-    @NonNull
     @Override
     public Collection<BeanDefinition<Object>> getAllBeanDefinitions() {
         if (LOG.isDebugEnabled()) {
@@ -1596,7 +1563,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         return beanDefinitionProvider.getDisabledBeans(this);
     }
 
-    @NonNull
     @Override
     public Collection<BeanDefinitionReference<Object>> getBeanDefinitionReferences() {
         return beanDefinitionProvider.getBeanReferences();
@@ -1611,8 +1577,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     @Override
-    @NonNull
-    public <B> BeanContext registerBeanDefinition(@NonNull RuntimeBeanDefinition<B> definition) {
+    public <B> BeanContext registerBeanDefinition(RuntimeBeanDefinition<B> definition) {
         beanDefinitionProvider.addBeanDefinition(definition);
         purgeCacheForBeanType(definition.getBeanType());
         return this;
@@ -1634,15 +1599,13 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * @return The found bean
      */
     @UsedByGeneratedCode
-    @NonNull
-    public <T> T getBean(@Nullable BeanResolutionContext resolutionContext, @NonNull Class<T> beanType) {
+    public <T> T getBean(@Nullable BeanResolutionContext resolutionContext, Class<T> beanType) {
         ArgumentUtils.requireNonNull("beanType", beanType);
         return getBean(resolutionContext, Argument.of(beanType), null);
     }
 
-    @NonNull
     @Override
-    public <T> T getBean(@NonNull BeanDefinition<T> definition) {
+    public <T> T getBean(BeanDefinition<T> definition) {
         ArgumentUtils.requireNonNull("definition", definition);
         return resolveBeanRegistration(null, definition).bean;
     }
@@ -1656,9 +1619,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * @param <T>               The bean type parameter
      * @return The found bean
      */
-    @NonNull
     public <T> T getBean(@Nullable BeanResolutionContext resolutionContext,
-                         @NonNull Class<T> beanType,
+                         Class<T> beanType,
                          @Nullable Qualifier<T> qualifier) {
         return getBean(resolutionContext, Argument.of(beanType), qualifier);
     }
@@ -1673,12 +1635,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * @return The found bean
      * @since 3.0.0
      */
-    @NonNull
     public <T> T getBean(@Nullable BeanResolutionContext resolutionContext,
-                         @NonNull Argument<T> beanType,
+                         Argument<T> beanType,
                          @Nullable Qualifier<T> qualifier) {
         ArgumentUtils.requireNonNull("beanType", beanType);
-        return resolveBeanRegistration(resolutionContext, beanType, qualifier, true).bean;
+        return java.util.Objects.requireNonNull(resolveBeanRegistration(resolutionContext, beanType, qualifier, true)).bean;
     }
 
     /**
@@ -1693,10 +1654,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * @since 3.5.0
      */
     @Internal
-    @NonNull
     public <T> T getBean(@Nullable BeanResolutionContext resolutionContext,
-                         @NonNull BeanDefinition<T> beanDefinition,
-                         @NonNull Argument<T> beanType,
+                         BeanDefinition<T> beanDefinition,
+                         Argument<T> beanType,
                          @Nullable Qualifier<T> qualifier) {
         ArgumentUtils.requireNonNull("beanDefinition", beanDefinition);
         ArgumentUtils.requireNonNull("beanType", beanType);
@@ -1712,9 +1672,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * @param <T>               The bean type parameter
      * @return The found bean wrapped as an {@link Optional}
      */
-    @NonNull
     public <T> Optional<T> findBean(@Nullable BeanResolutionContext resolutionContext,
-                                    @NonNull Class<T> beanType,
+                                    Class<T> beanType,
                                     @Nullable Qualifier<T> qualifier) {
         return findBean(resolutionContext, Argument.of(beanType), qualifier);
     }
@@ -1730,9 +1689,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * @since 3.0.0
      */
     @Internal
-    @NonNull
     public <T> Optional<T> findBean(@Nullable BeanResolutionContext resolutionContext,
-                                    @NonNull Argument<T> beanType,
+                                    Argument<T> beanType,
                                     @Nullable Qualifier<T> qualifier) {
         ArgumentUtils.requireNonNull("beanType", beanType);
         // allow injection the bean context
@@ -1762,7 +1720,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
     @SuppressWarnings("unchecked")
     @Override
-    public void publishEvent(@NonNull Object event) {
+    public void publishEvent(Object event) {
         if (eventsEnabled) {
             Objects.requireNonNull(event, "Event cannot be null");
             getBean(Argument.of(ApplicationEventPublisher.class, event.getClass())).publishEvent(event);
@@ -1770,8 +1728,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     @Override
-    public @NonNull
-    Future<Void> publishEventAsync(@NonNull Object event) {
+    public Future<Void> publishEventAsync(Object event) {
         if (eventsEnabled) {
             Objects.requireNonNull(event, "Event cannot be null");
             return getBean(Argument.of(ApplicationEventPublisher.class, event.getClass())).publishEventAsync(event);
@@ -1779,9 +1736,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         return CompletableFuture.completedFuture(null);
     }
 
-    @NonNull
     @Override
-    public <T> Optional<BeanDefinition<T>> findProxyBeanDefinition(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+    public <T> Optional<BeanDefinition<T>> findProxyBeanDefinition(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         ArgumentUtils.requireNonNull("beanType", beanType);
         for (BeanDefinition<T> beanDefinition : getBeanDefinitions(beanType, qualifier)) {
             if (beanDefinition.isProxy()) {
@@ -1806,7 +1762,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      *
      * @return The bean definition classes
      */
-    @NonNull
     protected Iterable<BeanConfiguration> resolveBeanConfigurations() {
         if (beanConfigurationsList == null) {
             beanConfigurationsList = MicronautMetaServiceLoaderUtils.findMetaMicronautServiceEntries(
@@ -1827,8 +1782,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
     }
 
-    @NonNull
-    private <T extends EventListener> List<Map.Entry<Class<?>, ListenersSupplier<T>>> loadBeanEventListeners(@NonNull Class<T> listenerType) {
+    private <T extends EventListener> List<Map.Entry<Class<?>, ListenersSupplier<T>>> loadBeanEventListeners(Class<T> listenerType) {
         final Map<Class<?>, List<BeanDefinition<T>>> typeToListener = getTypeToListenerMap(listenerType);
         if (typeToListener.isEmpty()) {
             return new ArrayList<>(1);
@@ -1843,8 +1797,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         return eventToListeners;
     }
 
-    @NonNull
-    private <T extends EventListener> Map<Class<?>, List<BeanDefinition<T>>> getTypeToListenerMap(@NonNull Class<T> listenerType) {
+    private <T extends EventListener> Map<Class<?>, List<BeanDefinition<T>>> getTypeToListenerMap(Class<T> listenerType) {
         final Collection<BeanDefinition<T>> beanDefinitions = getBeanDefinitions(listenerType);
         if (beanDefinitions.isEmpty()) {
             return Collections.emptyMap();
@@ -1869,20 +1822,20 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         processExecutableMethodsProcessAtStartup();
         initializeEagerBeans();
         processParallelBeans();
-        checkEnabledBeans = ForkJoinPool.commonPool().submit(new ForkJoinTask<>() {
+        checkEnabledBeans = ForkJoinPool.commonPool().submit(new ForkJoinTask<Boolean>() {
 
             @Override
-            public Object getRawResult() {
-                return null;
+            public Boolean getRawResult() {
+                return Boolean.TRUE;
             }
 
             @Override
-            protected void setRawResult(Object value) {
+            protected void setRawResult(Boolean value) {
             }
 
             @Override
             protected boolean exec() {
-                for (BeanDefinitionReference<Object> ignore : beanDefinitionProvider.getBeanReferences(DefaultBeanContext.this)) {
+                for (BeanDefinitionReference<Object> unused : beanDefinitionProvider.getBeanReferences(DefaultBeanContext.this)) {
                     if (isCancelled()) {
                         return true;
                     }
@@ -1960,10 +1913,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * @param filter            A bean definition to filter out
      * @return The candidates
      */
-    @NonNull
     @Internal
     public final <T> Collection<BeanDefinition<T>> findBeanCandidates(@Nullable BeanResolutionContext resolutionContext,
-                                                                      @NonNull Argument<T> beanType,
+                                                                      Argument<T> beanType,
                                                                       @Nullable BeanDefinition<?> filter) {
         Predicate<BeanDefinition<T>> predicate = filter == null ? null : definition -> !definition.equals(filter);
         return findBeanCandidates(resolutionContext, beanType, true, predicate);
@@ -1979,11 +1931,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * @param predicate         The predicate to filter candidates
      * @return The candidates
      */
-    @NonNull
     protected <T> Collection<BeanDefinition<T>> findBeanCandidates(@Nullable BeanResolutionContext resolutionContext,
-                                                                   @NonNull Argument<T> beanType,
+                                                                   Argument<T> beanType,
                                                                    boolean collectIterables,
-                                                                   Predicate<BeanDefinition<T>> predicate) {
+                                                                   @Nullable Predicate<BeanDefinition<T>> predicate) {
         ArgumentUtils.requireNonNull("beanType", beanType);
         if (LOG.isDebugEnabled()) {
             LOG.debug("Finding candidate beans for type: {}", beanType);
@@ -2010,9 +1961,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         );
     }
 
-    @NonNull
     private <T> Set<BeanDefinition<T>> collectBeanCandidates(
-        BeanResolutionContext resolutionContext,
+        @Nullable BeanResolutionContext resolutionContext,
         Argument<T> beanType,
         boolean collectIterables,
         Iterable<BeanDefinition<T>> beanDefinitions) {
@@ -2056,9 +2006,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * @param <T>               The bean type
      */
     protected <T> void collectIterableBeans(@Nullable BeanResolutionContext resolutionContext,
-                                            @NonNull BeanDefinition<T> iterableBean,
-                                            @NonNull Set<BeanDefinition<T>> targetSet,
-                                            @NonNull Argument<T> beanType) {
+                                            BeanDefinition<T> iterableBean,
+                                            Set<BeanDefinition<T>> targetSet,
+                                            Argument<T> beanType) {
         // no-op
     }
 
@@ -2069,8 +2019,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * @param <T>      The bean generic type
      * @return The candidates
      */
-    @NonNull
-    protected <T> Collection<BeanDefinition<T>> findBeanCandidatesForInstance(@NonNull T instance) {
+    protected <T> Collection<BeanDefinition<T>> findBeanCandidatesForInstance(T instance) {
         ArgumentUtils.requireNonNull("instance", instance);
         if (LOG.isDebugEnabled()) {
             LOG.debug("Finding candidate beans for instance: {}", instance);
@@ -2120,15 +2069,14 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      *
      * @param configuration The configuration to register
      */
-    protected synchronized void registerConfiguration(@NonNull BeanConfiguration configuration) {
+    protected synchronized void registerConfiguration(BeanConfiguration configuration) {
         ArgumentUtils.requireNonNull("configuration", configuration);
         beanConfigurations.put(configuration.getName(), configuration);
         beanDefinitionProvider.registerConfiguration(configuration);
     }
 
-    @NonNull
-    private <T> T resolveByBeanFactory(@NonNull BeanResolutionContext resolutionContext,
-                                       @NonNull BeanDefinition<T> beanDefinition,
+    private <T> T resolveByBeanFactory(BeanResolutionContext resolutionContext,
+                                       BeanDefinition<T> beanDefinition,
                                        @Nullable Qualifier<T> qualifier,
                                        @Nullable Map<String, Object> argumentValues) {
         Qualifier<T> declaredQualifier = beanDefinition.getDeclaredQualifier();
@@ -2148,7 +2096,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             if (bean == null) {
                 throw new BeanInstantiationException(resolutionContext, "InstantiatableBeanDefinition [" + beanDefinition + "] returned null");
             }
-            if (bean instanceof Qualified qualified) {
+            if (bean instanceof Qualified qualified && declaredQualifier != null) {
                 qualified.$withBeanQualifier(declaredQualifier);
             }
             return bean;
@@ -2165,12 +2113,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
     }
 
-    @NonNull
-    private <T> T postBeanCreated(@NonNull BeanResolutionContext resolutionContext,
-                                  @NonNull BeanDefinition<T> beanDefinition,
-                                  @NonNull Argument<T> beanType,
+    private <T> T postBeanCreated(BeanResolutionContext resolutionContext,
+                                  BeanDefinition<T> beanDefinition,
+                                  Argument<T> beanType,
                                   @Nullable Qualifier<T> qualifier,
-                                  @NonNull T bean) {
+                                  T bean) {
         Qualifier<T> finalQualifier = qualifier != null ? qualifier : beanDefinition.getDeclaredQualifier();
 
         bean = triggerBeanCreatedEventListener(resolutionContext, beanDefinition, bean, beanType, finalQualifier);
@@ -2184,11 +2131,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         return bean;
     }
 
-    @NonNull
-    private <T> T triggerBeanCreatedEventListener(@NonNull BeanResolutionContext resolutionContext,
-                                                  @NonNull BeanDefinition<T> beanDefinition,
-                                                  @NonNull T bean,
-                                                  @NonNull Argument<T> beanType,
+    private <T> T triggerBeanCreatedEventListener(BeanResolutionContext resolutionContext,
+                                                  BeanDefinition<T> beanDefinition,
+                                                  T bean,
+                                                  Argument<T> beanType,
                                                   @Nullable Qualifier<T> finalQualifier) {
         if (!(beanDefinition instanceof AbstractProviderDefinition<?>)) {
             if (!(bean instanceof BeanCreatedEventListener) && CollectionUtils.isNotEmpty(beanCreationEventListeners)) {
@@ -2216,11 +2162,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         return bean;
     }
 
-    @NonNull
-    private <T> Map<String, Object> getRequiredArgumentValues(@NonNull BeanResolutionContext resolutionContext,
-                                                              @NonNull Argument<?>[] requiredArguments,
+    private <T> Map<String, Object> getRequiredArgumentValues(BeanResolutionContext resolutionContext,
+                                                              Argument<?>[] requiredArguments,
                                                               @Nullable Map<String, Object> argumentValues,
-                                                              @NonNull BeanDefinition<T> beanDefinition) {
+                                                              BeanDefinition<T> beanDefinition) {
         Map<String, Object> convertedValues;
         if (argumentValues == null) {
             convertedValues = requiredArguments.length == 0 ? null : CollectionUtils.newLinkedHashMap(requiredArguments.length);
@@ -2263,10 +2208,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * @param <T>        The generic time
      * @return The concrete bean definition
      */
-    @NonNull
-    protected <T> BeanDefinition<T> findConcreteCandidate(@NonNull Class<T> beanType,
+    protected <T> BeanDefinition<T> findConcreteCandidate(Class<T> beanType,
                                                           @Nullable Qualifier<T> qualifier,
-                                                          @NonNull Collection<BeanDefinition<T>> candidates) {
+                                                          Collection<BeanDefinition<T>> candidates) {
         if (qualifier instanceof AnyQualifier) {
             return candidates.iterator().next();
         } else {
@@ -2414,13 +2358,24 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      */
     @Nullable
     private <T> BeanRegistration<T> resolveBeanRegistration(@Nullable BeanResolutionContext resolutionContext,
-                                                            @NonNull Argument<T> beanType,
+                                                            Argument<T> beanType,
                                                             @Nullable Qualifier<T> qualifier,
                                                             boolean throwNoSuchBean) {
         // allow injection the bean context
         final Class<T> beanClass = beanType.getType();
         if (thisInterfaces.contains(beanClass)) {
-            return new BeanRegistration<>(BeanIdentifier.of(beanClass.getName()), null, (T) this);
+            @SuppressWarnings("unchecked")
+            BeanDefinition<T> def = (BeanDefinition<T>) new DefaultRuntimeBeanDefinition<>(
+                Argument.of(beanClass),
+                () -> (T) this,
+                null,
+                null,
+                true,
+                null,
+                ReflectionUtils.EMPTY_CLASS_ARRAY,
+                java.util.Collections.emptyMap()
+            );
+            return BeanRegistration.of(this, BeanIdentifier.of(beanClass.getName()), def, (T) this);
         }
         if (InjectionPoint.class.isAssignableFrom(beanClass)) {
             return provideInjectionPoint(resolutionContext, beanType, qualifier, throwNoSuchBean);
@@ -2468,7 +2423,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
     }
 
-    private <T> Optional<BeanDefinition<T>> findBeanDefinition(BeanResolutionContext resolutionContext, Argument<T> beanType, Qualifier<T> qualifier) {
+    private <T> Optional<BeanDefinition<T>> findBeanDefinition(@Nullable BeanResolutionContext resolutionContext, Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         BeanDefinition<T> beanDefinition = singletonScope.findCachedSingletonBeanDefinition(beanType, qualifier);
         if (beanDefinition != null) {
             return Optional.of(beanDefinition);
@@ -2487,11 +2442,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * @return A no such bean exception
      */
     @Internal
-    @NonNull
     protected <T> NoSuchBeanException newNoSuchBeanException(
         @Nullable BeanResolutionContext resolutionContext,
-        @NonNull Argument<T> beanType,
-        @NonNull Qualifier<T> qualifier,
+        Argument<T> beanType,
+        @Nullable Qualifier<T> qualifier,
         @Nullable String message) {
         if (message != null) {
             return new NoSuchBeanException(beanType, qualifier, message);
@@ -2516,9 +2470,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * @return The message or null if none exists
      */
     @Nullable
-    protected <T> String resolveDisabledBeanMessage(BeanResolutionContext resolutionContext, Argument<T> beanType, Qualifier<T> qualifier) {
+    protected <T> String resolveDisabledBeanMessage(@Nullable BeanResolutionContext resolutionContext, Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         StringBuilder stringBuilder = new StringBuilder();
-        resolveDisabledBeanMessage("", stringBuilder, CachedEnvironment.getProperty("line.separator"), resolutionContext, beanType, qualifier);
+        resolveDisabledBeanMessage("", stringBuilder, java.util.Objects.requireNonNullElse(CachedEnvironment.getProperty("line.separator"), System.lineSeparator()), resolutionContext, beanType, qualifier);
         return stringBuilder.isEmpty() ? null : stringBuilder.toString();
     }
 
@@ -2613,11 +2567,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
     }
 
-    @Nullable
-    private <T> BeanRegistration<T> provideInjectionPoint(BeanResolutionContext resolutionContext,
-                                                          Argument<T> beanType,
-                                                          Qualifier<T> qualifier,
-                                                          boolean throwNoSuchBean) {
+    private <T> @Nullable BeanRegistration<T> provideInjectionPoint(@Nullable BeanResolutionContext resolutionContext,
+                                                                    Argument<T> beanType,
+                                                                    @Nullable Qualifier<T> qualifier,
+                                                                    boolean throwNoSuchBean) {
         final BeanResolutionContext.Path path = resolutionContext != null ? resolutionContext.getPath() : null;
         BeanResolutionContext.Segment<?, ?> injectionPointSegment = null;
         if (path != null) {
@@ -2634,7 +2587,16 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 if (segment != null) {
                     T ip = (T) segment.getInjectionPoint();
                     if (ip != null && beanType.isInstance(ip)) {
-                        return new BeanRegistration<>(BeanIdentifier.of(InjectionPoint.class.getName()), null, ip);
+                        BeanDefinition<?> declaring = segment.getDeclaringType();
+                        if (declaring != null) {
+                            @SuppressWarnings("unchecked") BeanDefinition<T> bd = (BeanDefinition<T>) declaring;
+                            return BeanRegistration.of(this, BeanIdentifier.of(InjectionPoint.class.getName()), bd, ip);
+                        }
+                        if (throwNoSuchBean) {
+            throw newNoSuchBeanException(resolutionContext, beanType, qualifier, "");
+
+                        }
+                        return null;
                     }
                 }
             }
@@ -2660,9 +2622,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * @param <T>               The type
      * @return The bean registration or {@link NoSuchBeanException}
      */
-    @NonNull
     private <T> BeanRegistration<T> resolveBeanRegistration(@Nullable BeanResolutionContext resolutionContext,
-                                                            @NonNull BeanDefinition<T> definition) {
+                                                            BeanDefinition<T> definition) {
         return resolveBeanRegistration(resolutionContext, definition, definition.asArgument(), definition.getDeclaredQualifier());
     }
 
@@ -2676,10 +2637,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * @param <T>               The type
      * @return The bean registration
      */
-    @NonNull
     private <T> BeanRegistration<T> resolveBeanRegistration(@Nullable BeanResolutionContext resolutionContext,
-                                                            @NonNull BeanDefinition<T> definition,
-                                                            @NonNull Argument<T> beanType,
+                                                            BeanDefinition<T> definition,
+                                                            Argument<T> beanType,
                                                             @Nullable Qualifier<T> qualifier) {
         assertContextState();
         final boolean isScopedProxyDefinition = definition.hasStereotype(SCOPED_PROXY_ANN);
@@ -2708,7 +2668,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             BeanRegistration<T> registration = createRegistration(resolutionContext, beanType, q, definition, true);
             T bean = registration.bean;
             if (bean instanceof Qualified) {
-                ((Qualified<T>) bean).$withBeanQualifier(q);
+                if (q != null) {
+                    ((Qualified<T>) bean).$withBeanQualifier(q);
+                }
             }
             return registration;
         }
@@ -2724,10 +2686,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         return createRegistration(resolutionContext, beanType, qualifier, definition, true);
     }
 
-    @NonNull
     private <T> BeanRegistration<T> intializeEagerBean(@Nullable BeanResolutionContext resolutionContext,
-                                                       @NonNull BeanDefinition<T> definition,
-                                                       @NonNull Argument<T> beanType,
+                                                       BeanDefinition<T> definition,
+                                                       Argument<T> beanType,
                                                        @Nullable Qualifier<T> qualifier) {
         BeanRegistration<T> beanRegistration = singletonScope.findBeanRegistration(definition, beanType, qualifier);
         if (beanRegistration != null) {
@@ -2738,7 +2699,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
     @Nullable
     private <T> CustomScope<?> findCustomScope(@Nullable BeanResolutionContext resolutionContext,
-                                               @NonNull BeanDefinition<T> definition,
+                                               BeanDefinition<T> definition,
                                                boolean isProxy,
                                                boolean isScopedProxyDefinition) {
         Optional<Class<? extends Annotation>> scope = definition.getScope();
@@ -2785,28 +2746,24 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         return null;
     }
 
-    @NonNull
     private <T> BeanRegistration<T> getOrCreateScopedRegistration(@Nullable BeanResolutionContext resolutionContext,
-                                                                  @NonNull CustomScope<?> registeredScope,
+                                                                  CustomScope<?> registeredScope,
                                                                   @Nullable Qualifier<T> qualifier,
-                                                                  @NonNull Argument<T> beanType,
-                                                                  @NonNull BeanDefinition<T> definition) {
+                                                                  Argument<T> beanType,
+                                                                  BeanDefinition<T> definition) {
         BeanKey<T> beanKey = new BeanKey<>(definition.asArgument(), qualifier);
         T bean = registeredScope.getOrCreate(
             new BeanCreationContext<T>() {
-                @NonNull
                 @Override
                 public BeanDefinition<T> definition() {
                     return definition;
                 }
 
-                @NonNull
                 @Override
                 public BeanIdentifier id() {
                     return beanKey;
                 }
 
-                @NonNull
                 @Override
                 public CreatedBean<T> create() throws BeanCreationException {
                     return createRegistration(resolutionContext == null ? null : resolutionContext.copy(), beanKey.beanType, qualifier, definition, true);
@@ -2816,12 +2773,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         return BeanRegistration.of(this, beanKey, definition, bean);
     }
 
-    @NonNull
     @Internal
     final <T> BeanRegistration<T> createRegistration(@Nullable BeanResolutionContext resolutionContext,
-                                                     @NonNull Argument<T> beanType,
+                                                     Argument<T> beanType,
                                                      @Nullable Qualifier<T> qualifier,
-                                                     @NonNull BeanDefinition<T> definition,
+                                                     BeanDefinition<T> definition,
                                                      boolean dependent) {
         try (BeanResolutionContext context = newResolutionContext(definition, resolutionContext)) {
             final BeanResolutionContext.Path path = context.getPath();
@@ -2881,7 +2837,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      */
     @SuppressWarnings({"unchecked", "rawtypes", "java:S2789"}) // performance optimization
     private <T> Optional<BeanDefinition<T>> findConcreteCandidate(@Nullable BeanResolutionContext resolutionContext,
-                                                                  @NonNull Argument<T> beanType,
+                                                                  Argument<T> beanType,
                                                                   @Nullable Qualifier<T> qualifier,
                                                                   boolean throwNonUnique) {
         if (beanType.getType() == Object.class && qualifier == null) {
@@ -2901,7 +2857,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     private <T> Optional<BeanDefinition<T>> findConcreteCandidateNoCache(@Nullable BeanResolutionContext resolutionContext,
-                                                                         @NonNull Argument<T> beanType,
+                                                                         Argument<T> beanType,
                                                                          @Nullable Qualifier<T> qualifier,
                                                                          boolean throwNonUnique) {
 
@@ -2911,7 +2867,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     private <T> Optional<BeanDefinition<T>> findProxyTargetNoCache(@Nullable BeanResolutionContext resolutionContext,
-                                                                   @NonNull Argument<T> beanType,
+                                                                   Argument<T> beanType,
                                                                    @Nullable Qualifier<T> qualifier) {
 
         // TODO: Improve
@@ -2929,9 +2885,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         return pickOneBean(beanType, qualifier, false, candidates);
     }
 
-    @NonNull
     private <T> Optional<BeanDefinition<T>> pickOneBean(Argument<T> beanType,
-                                                        Qualifier<T> qualifier,
+                                                        @Nullable Qualifier<T> qualifier,
                                                         boolean throwNonUnique,
                                                         Collection<BeanDefinition<T>> candidates) {
         if (candidates.isEmpty()) {
@@ -2970,7 +2925,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
     @Nullable
     private <T> BeanDefinition<T> lastChanceResolve(Argument<T> beanType,
-                                                    Qualifier<T> qualifier,
+                                                    @Nullable Qualifier<T> qualifier,
                                                     boolean throwNonUnique,
                                                     Collection<BeanDefinition<T>> candidates) {
         if (candidates.size() > 1) {
@@ -3045,8 +3000,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     private void configureAndStartContext() {
-        configureContextInternal();
         registerConversionService();
+        configureContextInternal();
         initializeEventListeners();
         initializeTypeConverters();
         initializeContext();
@@ -3056,7 +3011,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     @SuppressWarnings("unchecked")
-    private <T> Collection<BeanDefinition<T>> findBeanCandidatesInternal(BeanResolutionContext resolutionContext, Argument<T> beanType) {
+    private <T> Collection<BeanDefinition<T>> findBeanCandidatesInternal(@Nullable BeanResolutionContext resolutionContext, Argument<T> beanType) {
         @SuppressWarnings("rawtypes")
         Collection beanDefinitions = beanCandidateCache.get(beanType);
         if (beanDefinitions == null) {
@@ -3077,9 +3032,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      */
     @Internal
     public <T> BeanRegistration<T> getBeanRegistration(@Nullable BeanResolutionContext resolutionContext,
-                                                       @NonNull Argument<T> beanType,
+                                                       Argument<T> beanType,
                                                        @Nullable Qualifier<T> qualifier) {
-        return resolveBeanRegistration(resolutionContext, beanType, qualifier, true);
+        return java.util.Objects.requireNonNull(resolveBeanRegistration(resolutionContext, beanType, qualifier, true));
     }
 
     /**
@@ -3094,7 +3049,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     @SuppressWarnings("unchecked")
     @Internal
     public <T> Collection<BeanRegistration<T>> getBeanRegistrations(@Nullable BeanResolutionContext resolutionContext,
-                                                                    @NonNull Argument<T> beanType,
+                                                                    Argument<T> beanType,
                                                                     @Nullable Qualifier<T> qualifier) {
         assertContextState();
         boolean hasQualifier = qualifier != null;
@@ -3161,10 +3116,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         return beanRegistrations;
     }
 
-    private <T> Collection<BeanRegistration<T>> resolveBeanRegistrations(BeanResolutionContext resolutionContext,
+    private <T> Collection<BeanRegistration<T>> resolveBeanRegistrations(@Nullable BeanResolutionContext resolutionContext,
                                                                          Collection<BeanDefinition<T>> beanDefinitions,
                                                                          Argument<T> beanType,
-                                                                         Qualifier<T> qualifier) {
+                                                                         @Nullable Qualifier<T> qualifier) {
         List<BeanRegistration<T>> beansOfTypeList = new ArrayList<>(beanDefinitions.size());
         for (BeanDefinition<T> definition : beanDefinitions) {
             addCandidateToList(resolutionContext, definition, beanType, qualifier, beansOfTypeList);
@@ -3173,7 +3128,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         return beansOfTypeList;
     }
 
-    private <T> void logResolvedExistingBeanRegistrations(Argument<T> beanType, Qualifier<T> qualifier, Collection<BeanRegistration<T>> existing) {
+    private <T> void logResolvedExistingBeanRegistrations(Argument<T> beanType, @Nullable Qualifier<T> qualifier, Collection<BeanRegistration<T>> existing) {
         if (LOG.isDebugEnabled()) {
             if (qualifier == null) {
                 LOG.debug("Found {} existing beans for type [{}]: {} ", existing.size(), beanType.getName(), existing);
@@ -3206,10 +3161,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     private <T> void addCandidateToList(@Nullable BeanResolutionContext resolutionContext,
-                                        @NonNull BeanDefinition<T> candidate,
-                                        @NonNull Argument<T> beanType,
+                                        BeanDefinition<T> candidate,
+                                        Argument<T> beanType,
                                         @Nullable Qualifier<T> qualifier,
-                                        @NonNull Collection<BeanRegistration<T>> beansOfTypeList) {
+                                        Collection<BeanRegistration<T>> beansOfTypeList) {
         BeanRegistration<T> beanRegistration = null;
         try {
             beanRegistration = resolveBeanRegistration(
@@ -3241,7 +3196,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                         }
                         beansOfTypeList.add(BeanRegistration.of(
                             this,
-                            new BeanKey<>(beanType, Qualifiers.byQualifiers(Qualifiers.byName(String.valueOf(i++)), qualifier)),
+                             new BeanKey<>(beanType, (qualifier == null ? Qualifiers.byName(String.valueOf(i++)) : Qualifiers.byQualifiers(Qualifiers.byName(String.valueOf(i++)), qualifier))),
+
                             candidate,
                             (T) o
                         ));
@@ -3253,7 +3209,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
     }
 
-    private <T> boolean isCandidatePresent(Argument<T> beanType, Qualifier<T> qualifier) {
+    private <T> boolean isCandidatePresent(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         final Collection<BeanDefinition<T>> candidates = findBeanCandidates(null, beanType, true, null);
         if (!candidates.isEmpty()) {
             filterReplacedBeans(candidates);
@@ -3265,7 +3221,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         return false;
     }
 
-    private static <T> List<T> nullSafe(List<T> list) {
+    private static <T> List<T> nullSafe(@Nullable List<T> list) {
         if (list == null) {
             return Collections.emptyList();
         }
@@ -3332,13 +3288,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         return sorted;
     }
 
-    @NonNull
     @Override
     public MutableConvertibleValues<Object> getAttributes() {
         return MutableConvertibleValues.of(attributes);
     }
 
-    @NonNull
     @Override
     public Optional<Object> getAttribute(CharSequence name) {
         if (name != null) {
@@ -3348,7 +3302,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
     }
 
-    @NonNull
     @Override
     public <T> Optional<T> getAttribute(CharSequence name, Class<T> type) {
         if (name != null) {
@@ -3362,9 +3315,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         return Optional.empty();
     }
 
-    @NonNull
     @Override
-    public BeanContext setAttribute(@NonNull CharSequence name, @Nullable Object value) {
+    public BeanContext setAttribute(CharSequence name, @Nullable Object value) {
         if (name != null) {
             if (value != null) {
                 attributes.put(name, value);
@@ -3375,9 +3327,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         return this;
     }
 
-    @NonNull
     @Override
-    public <T> Optional<T> removeAttribute(@NonNull CharSequence name, @NonNull Class<T> type) {
+    public <T> Optional<T> removeAttribute(CharSequence name, Class<T> type) {
         final Object o = attributes.remove(name);
         if (type.isInstance(o)) {
             return Optional.of((T) o);
@@ -3433,7 +3384,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             this.method = method;
         }
 
-        @NonNull
         @Override
         public ExecutableMethod<T, R> getExecutableMethod() {
             return method;
@@ -3495,12 +3445,14 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
 
         @Override
-        public R invoke(Object... arguments) {
+        @Nullable
+        public R invoke(@Nullable Object... arguments) {
             return method.invoke(target, arguments);
         }
 
         @Override
-        public R invokeUnsafe(Object... arguments) {
+        @Nullable
+        public R invokeUnsafe(@Nullable Object... arguments) {
             if (unsafeExecutable == null) {
                 return invoke(arguments);
             }
@@ -3527,11 +3479,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         private final DefaultBeanContext beanContext;
         private final Class<T> beanType;
         private final Argument<T> beanArgument;
-        private final Qualifier<T> qualifier;
+        private final @Nullable Qualifier<T> qualifier;
         private final boolean isSingleton;
         private final BeanDefinition<T> definition;
 
-        private T target;
+        private volatile @Nullable T target;
 
         /**
          * @param beanContext The bean context
@@ -3539,7 +3491,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
          * @param qualifier   The qualifier
          * @param method      The method
          */
-        BeanExecutionHandle(DefaultBeanContext beanContext, BeanDefinition<T> definition, Class<T> beanType, Qualifier<T> qualifier, ExecutableMethod<T, R> method) {
+        BeanExecutionHandle(DefaultBeanContext beanContext, BeanDefinition<T> definition, Class<T> beanType, @Nullable Qualifier<T> qualifier, ExecutableMethod<T, R> method) {
             super(method);
             this.beanContext = beanContext;
             this.beanType = beanType;
@@ -3577,11 +3529,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
 
         @Override
-        public R invoke(Object... arguments) {
+        @Nullable
+        public R invoke(@Nullable Object... arguments) {
             if (isSingleton) {
-                T target = getTarget();
-
-                return method.invoke(target, arguments);
+                return method.invoke(getTarget(), arguments);
             } else {
                 return method.invoke(beanContext.getBean(beanType, qualifier), arguments);
             }
@@ -3604,7 +3555,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
          * @param beanResolutionContext The bean resolution context
          * @return the collection of listeners along with their order value for later sorting.
          */
-        @NonNull
         Iterable<ListenerAndOrder<T>> get(@Nullable BeanResolutionContext beanResolutionContext);
 
         record ListenerAndOrder<T>(T bean, int order) implements Ordered {
@@ -3623,7 +3573,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     @SuppressWarnings("java:S1948")
     static final class BeanKey<T> implements BeanIdentifier {
         final Argument<T> beanType;
-        private final Qualifier<T> qualifier;
+        private final @Nullable Qualifier<T> qualifier;
         private final int hashCode;
 
         /**
@@ -3632,7 +3582,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
          * @param definition The definition
          * @param qualifier  The qualifier
          */
-        BeanKey(BeanDefinition<T> definition, Qualifier<T> qualifier) {
+        BeanKey(BeanDefinition<T> definition, @Nullable Qualifier<T> qualifier) {
             this(definition.asArgument(), qualifier);
         }
 
@@ -3642,7 +3592,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
          * @param argument  The argument
          * @param qualifier The qualifier
          */
-        BeanKey(Argument<T> argument, Qualifier<T> qualifier) {
+        BeanKey(Argument<T> argument, @Nullable Qualifier<T> qualifier) {
             this.beanType = argument;
             this.qualifier = qualifier;
             this.hashCode = argument.typeHashCode();
@@ -3653,7 +3603,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
          * @param qualifier     The qualifier
          * @param typeArguments The type arguments
          */
-        BeanKey(Class<T> beanType, Qualifier<T> qualifier, @Nullable Class<?>... typeArguments) {
+        BeanKey(Class<T> beanType, @Nullable Qualifier<T> qualifier, @Nullable Class<?>... typeArguments) {
             this(Argument.of(beanType, typeArguments), qualifier);
         }
 
@@ -3711,7 +3661,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      */
     static final class BeanCandidateKey<T> {
         private final Argument<T> beanType;
-        private final Qualifier<T> qualifier;
+        private final @Nullable Qualifier<T> qualifier;
         private final boolean throwNonUnique;
         private final int hashCode;
 
@@ -3722,7 +3672,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
          * @param qualifier      The qualifier
          * @param throwNonUnique The throwNonUnique
          */
-        BeanCandidateKey(Argument<T> argument, Qualifier<T> qualifier, boolean throwNonUnique) {
+        BeanCandidateKey(Argument<T> argument, @Nullable Qualifier<T> qualifier, boolean throwNonUnique) {
             this.beanType = argument;
             this.qualifier = qualifier;
             this.hashCode = argument.typeHashCode();
@@ -3756,6 +3706,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         // The supplier can be triggered concurrently.
         // We allow for the listeners collection to be initialized multiple times.
         @SuppressWarnings("java:S3077")
+        @Nullable
         private volatile List<ListenerAndOrder<T>> listeners;
 
         EventListenerListenersSupplier(Argument<?> eventType, List<BeanDefinition<T>> listenersDefinitions) {
@@ -3764,7 +3715,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
 
         @Override
-        public Iterable<ListenerAndOrder<T>> get(BeanResolutionContext beanResolutionContext) {
+        public Iterable<ListenerAndOrder<T>> get(@Nullable BeanResolutionContext beanResolutionContext) {
             if (listeners == null) {
                 List<ListenerAndOrder<T>> listeners = new ArrayList<>(listenersDefinitions.size());
                 List<BeanRegistration<T>> registrations = new ArrayList<>(listenersDefinitions.size());
@@ -3801,7 +3752,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     private static final class BeanDefinitionProcessorListenerSupplier implements ListenersSupplier<BeanCreatedEventListener> {
 
         @Override
-        public Iterable<ListenerAndOrder<BeanCreatedEventListener>> get(BeanResolutionContext beanResolutionContext) {
+        public Iterable<ListenerAndOrder<BeanCreatedEventListener>> get(@Nullable BeanResolutionContext beanResolutionContext) {
             return Collections.singletonList(new ListenerAndOrder<>(new BeanDefinitionProcessorListener(), 0));
         }
 
@@ -3810,7 +3761,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     private static final class ExecutableMethodProcessorListenerSupplier implements ListenersSupplier<BeanCreatedEventListener> {
 
         @Override
-        public Iterable<ListenerAndOrder<BeanCreatedEventListener>> get(BeanResolutionContext beanResolutionContext) {
+        public Iterable<ListenerAndOrder<BeanCreatedEventListener>> get(@Nullable BeanResolutionContext beanResolutionContext) {
             return Collections.singletonList(new ListenerAndOrder<>(new ExecutableMethodProcessorListener(), 0));
         }
 
@@ -3818,7 +3769,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
     private final class SingletonBeanResolutionContext extends AbstractBeanResolutionContext {
 
-        public SingletonBeanResolutionContext(BeanDefinition<?> beanDefinition) {
+        public SingletonBeanResolutionContext(@Nullable BeanDefinition<?> beanDefinition) {
             super(DefaultBeanContext.this, beanDefinition);
         }
 
@@ -3847,7 +3798,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     private static final class CollectionHolder<T> {
-        Collection<BeanRegistration<T>> registrations;
+        @Nullable Collection<BeanRegistration<T>> registrations;
     }
 
     private final class BeanContextUnsafeExecutionHandle extends BeanContextExecutionHandle implements UnsafeExecutionHandle<Object, Object> {
@@ -3860,7 +3811,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
 
         @Override
-        public Object invokeUnsafe(Object... arguments) {
+        @Nullable
+        public Object invokeUnsafe(@Nullable Object... arguments) {
             return unsafeExecutionHandle.invokeUnsafe(getTarget(), arguments);
         }
 
@@ -3874,14 +3826,13 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
         private final ExecutableMethod<Object, ?> method;
         private final BeanDefinition<?> beanDefinition;
-        private Object target;
+        private volatile @Nullable Object target;
 
         public BeanContextExecutionHandle(ExecutableMethod<Object, ?> method, BeanDefinition<?> beanDefinition) {
             this.method = method;
             this.beanDefinition = beanDefinition;
         }
 
-        @NonNull
         @Override
         public AnnotationMetadata getAnnotationMetadata() {
             return method.getAnnotationMetadata();
@@ -3928,11 +3879,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
 
         @Override
-        public Object invoke(Object... arguments) {
+        @Nullable
+        public Object invoke( @Nullable Object... arguments) {
             return method.invoke(getTarget(), arguments);
         }
 
-        @NonNull
         @Override
         public ExecutableMethod<Object, Object> getExecutableMethod() {
             return (ExecutableMethod<Object, Object>) method;

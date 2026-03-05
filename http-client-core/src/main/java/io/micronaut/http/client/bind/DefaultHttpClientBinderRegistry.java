@@ -18,7 +18,6 @@ package io.micronaut.http.client.bind;
 import io.micronaut.context.BeanContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanProperty;
 import io.micronaut.core.bind.annotation.Bindable;
@@ -163,7 +162,7 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
     }
 
     @Override
-    public <T> Optional<ClientArgumentRequestBinder<?>> findArgumentBinder(@NonNull Argument<T> argument) {
+    public <T> Optional<ClientArgumentRequestBinder<?>> findArgumentBinder(Argument<T> argument) {
         Optional<Class<? extends Annotation>> opt = argument.getAnnotationMetadata().getAnnotationTypeByStereotype(Bindable.class);
         if (opt.isPresent()) {
             Class<? extends Annotation> annotationType = opt.get();
@@ -183,7 +182,7 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
     }
 
     @Override
-    public Optional<AnnotatedClientRequestBinder<?>> findAnnotatedBinder(@NonNull Class<?> annotationType) {
+    public Optional<AnnotatedClientRequestBinder<?>> findAnnotatedBinder(Class<?> annotationType) {
         return Optional.ofNullable(methodByAnnotation.get(annotationType));
     }
 

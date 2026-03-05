@@ -16,7 +16,6 @@
 package io.micronaut.function;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.http.MediaType;
 
@@ -46,7 +45,6 @@ public class BinaryTypeConfiguration {
 
     private boolean useDefaultBinaryTypes = true;
 
-    @NonNull
     private List<String> additionalTypes = new ArrayList<>();
 
     /**
@@ -78,7 +76,7 @@ public class BinaryTypeConfiguration {
      *
      * @return A lists of {@link MediaType} objects
      */
-    public @NonNull List<String> getAdditionalTypes() {
+    public List<String> getAdditionalTypes() {
         return additionalTypes;
     }
 
@@ -87,7 +85,7 @@ public class BinaryTypeConfiguration {
      *
      * @param additionalTypes The media types
      */
-    public void setAdditionalTypes(@NonNull List<String> additionalTypes) {
+    public void setAdditionalTypes(List<String> additionalTypes) {
         ArgumentUtils.requireNonNull("additionalTypes", additionalTypes);
         this.additionalTypes = additionalTypes;
     }

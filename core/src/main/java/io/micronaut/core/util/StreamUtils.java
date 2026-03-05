@@ -15,6 +15,7 @@
  */
 package io.micronaut.core.util;
 
+import org.jspecify.annotations.Nullable;
 import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.function.BinaryOperator;
@@ -51,7 +52,7 @@ public class StreamUtils {
          */
         class Container {
             A acc;
-            T obj;
+            @Nullable T obj;
             boolean hasAny;
 
             /**
@@ -123,7 +124,7 @@ public class StreamUtils {
          */
         class Container {
             A acc;
-            T obj;
+            @Nullable T obj;
             boolean hasAny;
 
             /**

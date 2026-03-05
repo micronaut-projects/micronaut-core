@@ -16,7 +16,6 @@
 package io.micronaut.core.io.buffer;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 import java.io.ByteArrayInputStream;
@@ -62,7 +61,6 @@ public abstract class ReadBuffer implements AutoCloseable {
      * @return A new, independent buffer
      * @throws IllegalStateException If this buffer is already closed or consumed
      */
-    @NonNull
     public abstract ReadBuffer duplicate();
 
     /**
@@ -75,7 +73,6 @@ public abstract class ReadBuffer implements AutoCloseable {
      * @throws IllegalStateException     If this buffer is already closed or consumed
      * @throws IndexOutOfBoundsException If {@code n > readable()}
      */
-    @NonNull
     public abstract ReadBuffer split(int splitPosition) throws IndexOutOfBoundsException;
 
     /**
@@ -87,7 +84,6 @@ public abstract class ReadBuffer implements AutoCloseable {
      * @return a new ReadBuffer containing all the bytes that were previously in this ReadBuffer
      * @throws IllegalStateException If this buffer is already closed or consumed
      */
-    @NonNull
     public abstract ReadBuffer move();
 
     /**
@@ -104,7 +100,7 @@ public abstract class ReadBuffer implements AutoCloseable {
      *                                   offset is negative or exceeds the destination array's
      *                                   length
      */
-    public abstract void toArray(byte @NonNull [] destination, int offset) throws IndexOutOfBoundsException;
+    public abstract void toArray(byte[] destination, int offset) throws IndexOutOfBoundsException;
 
     /**
      * Returns the contents of this ReadBuffer as a byte array. Some implementations may share the
@@ -115,7 +111,7 @@ public abstract class ReadBuffer implements AutoCloseable {
      * @return a byte array containing the contents of this ReadBuffer
      * @throws IllegalStateException If this buffer is already closed or consumed
      */
-    public byte @NonNull [] toArray() {
+    public byte[] toArray() {
         byte[] bytes = new byte[readable()];
         toArray(bytes, 0);
         return bytes;
@@ -131,7 +127,6 @@ public abstract class ReadBuffer implements AutoCloseable {
      * @return a string representation of the contents of this ReadBuffer
      * @throws IllegalStateException If this buffer is already closed or consumed
      */
-    @NonNull
     public String toString(Charset charset) {
         return new String(this.toArray(), charset);
     }
@@ -145,7 +140,6 @@ public abstract class ReadBuffer implements AutoCloseable {
      * @return a {@link ByteBuffer} containing the contents of this {@link ReadBuffer}
      * @throws IllegalStateException If this buffer is already closed or consumed
      */
-    @NonNull
     public ByteBuffer<?> toByteBuffer() {
         return new ByteArrayByteBuffer(toArray());
     }
@@ -159,7 +153,6 @@ public abstract class ReadBuffer implements AutoCloseable {
      * @return A stream reading from this buffer
      * @throws IllegalStateException If this buffer is already closed or consumed
      */
-    @NonNull
     public InputStream toInputStream() {
         return new ByteArrayInputStream(toArray());
     }
@@ -184,7 +177,7 @@ public abstract class ReadBuffer implements AutoCloseable {
      * @since 5.0.0
      */
     @Nullable
-    public <R> R useFastHeapBuffer(@NonNull Function<java.nio.@NonNull ByteBuffer, @NonNull R> function) {
+    public <R> R useFastHeapBuffer(Function<java.nio. ByteBuffer, R> function) {
         return null;
     }
 
@@ -197,7 +190,7 @@ public abstract class ReadBuffer implements AutoCloseable {
      * @throws IllegalStateException If this buffer is already closed or consumed
      * @throws IOException           If the {@link OutputStream} throws an exception
      */
-    public void transferTo(@NonNull OutputStream stream) throws IOException {
+    public void transferTo(OutputStream stream) throws IOException {
         // if possible, write using array directly
         if (useFastHeapBuffer(bb -> {
             try {

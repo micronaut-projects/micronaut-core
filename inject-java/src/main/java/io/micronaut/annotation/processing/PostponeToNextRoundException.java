@@ -46,6 +46,7 @@ public final class PostponeToNextRoundException extends RuntimeException {
         return resolvedFailedElement(errorElement);
     }
 
+    @Nullable
     public static Element resolvedFailedElement(Object errorElement) {
         Element failedElement;
         if (errorElement instanceof Element el) {

@@ -45,6 +45,7 @@ public class NettyHttpParameters implements MutableHttpParameters {
 
     private final LinkedHashMap<CharSequence, List<String>> valuesMap;
     private final ConvertibleMultiValuesMap<String> values;
+    @Nullable
     private final BiConsumer<CharSequence, List<String>> onChange;
 
     /**
@@ -79,6 +80,7 @@ public class NettyHttpParameters implements MutableHttpParameters {
     }
 
     @Override
+    @Nullable
     public String get(CharSequence name) {
         return values.get(name);
     }

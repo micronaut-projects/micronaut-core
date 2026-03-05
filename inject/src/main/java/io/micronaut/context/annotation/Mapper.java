@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.context.annotation;
-
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.ElementType;
@@ -152,7 +150,7 @@ public @interface Mapper {
          * @return The new value to set
          */
         @Nullable
-        Object merge(@Nullable Object currentValue, @Nullable Object value, @NonNull Object valueOwner, @NonNull String propertyName, @NonNull String mappedPropertyName);
+        Object merge(@Nullable Object currentValue, @Nullable Object value, Object valueOwner, String propertyName, String mappedPropertyName);
 
     }
 }

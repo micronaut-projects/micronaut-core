@@ -21,6 +21,9 @@ import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
+import org.jspecify.annotations.Nullable;
+
+import java.util.Objects;
 
 /**
  * Utility methods for building error messages.
@@ -37,7 +40,7 @@ class MessageUtils {
      * @param message           The message
      * @return The message
      */
-    static String buildMessage(BeanResolutionContext resolutionContext, String message) {
+    static String buildMessage(BeanResolutionContext resolutionContext, @Nullable String message) {
         BeanResolutionContext.Path path = resolutionContext.getPath();
         BeanDefinition declaringType;
         boolean hasPath = !path.isEmpty();
@@ -47,10 +50,10 @@ class MessageUtils {
         } else {
             declaringType = resolutionContext.getRootDefinition();
         }
-        String ls = CachedEnvironment.getProperty("line.separator");
+        String ls = lineSeparator();
         StringBuilder builder = new StringBuilder("Error instantiating bean of type  [");
         builder
-                .append(declaringType.getName())
+                .append(declaringType == null ? "<unknown>" : declaringType.getName())
                 .append("]")
                 .append(ls)
                 .append(ls);
@@ -65,7 +68,7 @@ class MessageUtils {
         return builder.toString();
     }
 
-    static String buildMessage(BeanResolutionContext resolutionContext, String message, boolean circular) {
+    static String buildMessage(BeanResolutionContext resolutionContext, @Nullable String message, boolean circular) {
         BeanResolutionContext.Segment<?, ?> currentSegment = resolutionContext.getPath().peek();
         if (currentSegment instanceof AbstractBeanResolutionContext.ConstructorSegment) {
             return buildMessage(resolutionContext, currentSegment.getArgument(), message, circular);
@@ -93,9 +96,9 @@ class MessageUtils {
      * @param circular             Is the path circular
      * @return The message
      */
-    static String buildMessageForMethod(BeanResolutionContext resolutionContext, BeanDefinition declaringType, String methodName, Argument argument, String message, boolean circular) {
+    static String buildMessageForMethod(BeanResolutionContext resolutionContext, BeanDefinition declaringType, String methodName, Argument argument, @Nullable String message, boolean circular) {
         StringBuilder builder = new StringBuilder("Failed to inject value for parameter [");
-        String ls = CachedEnvironment.getProperty("line.separator");
+        String ls = lineSeparator();
         String declaringTypeName = declaringType.getName();
         if (declaringType.hasAnnotation(Factory.class)) {
             declaringTypeName = declaringType.getConstructor().getDeclaringBeanType().getName();
@@ -125,9 +128,9 @@ class MessageUtils {
      * @param circular            Is the path circular
      * @return The message
      */
-    static String buildMessageForField(BeanResolutionContext resolutionContext, BeanDefinition declaringType, String fieldName, String message, boolean circular) {
+    static String buildMessageForField(BeanResolutionContext resolutionContext, BeanDefinition declaringType, String fieldName, @Nullable String message, boolean circular) {
         StringBuilder builder = new StringBuilder("Failed to inject value for field [");
-        String ls = CachedEnvironment.getProperty("line.separator");
+        String ls = lineSeparator();
         builder
                 .append(fieldName).append("] of class: ")
                 .append(declaringType.getName())
@@ -150,13 +153,14 @@ class MessageUtils {
      * @param circular          Is the path circular
      * @return The message
      */
-    static String buildMessage(BeanResolutionContext resolutionContext, Argument argument, String message, boolean circular) {
+    static String buildMessage(BeanResolutionContext resolutionContext, Argument argument, @Nullable String message, boolean circular) {
         StringBuilder builder = new StringBuilder("Failed to inject value for parameter [");
-        String ls = CachedEnvironment.getProperty("line.separator");
+        String ls = lineSeparator();
         BeanResolutionContext.Path path = resolutionContext.getPath();
+        BeanResolutionContext.Segment<?, ?> peek = Objects.requireNonNull(path.peek());
         builder
                 .append(argument.getName()).append("] of class: ")
-                .append(path.peek().getDeclaringType().getName())
+                .append(peek.getDeclaringType().getName())
                 .append(ls)
                 .append(ls);
         if (message != null) {
@@ -164,6 +168,10 @@ class MessageUtils {
         }
         appendPath(circular, builder, ls, path);
         return builder.toString();
+    }
+
+    private static String lineSeparator() {
+        return Objects.requireNonNullElse(CachedEnvironment.getProperty("line.separator"), System.lineSeparator());
     }
 
     private static void appendPath(BeanResolutionContext resolutionContext, boolean circular, StringBuilder builder, String ls) {

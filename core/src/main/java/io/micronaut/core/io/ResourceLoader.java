@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Indexed;
 
 import java.io.InputStream;
 import java.net.URL;
+import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 
@@ -54,6 +55,19 @@ public interface ResourceLoader {
      * @return A stream of URLs
      */
     Stream<URL> getResources(String name);
+
+    /**
+     * Hook to handle duplicate resources for {@link ResourceLoadStrategyType#FIRST_MATCH}.
+     * Default implementation is a no-op.
+     *
+     * @param resourceName The resource name
+     * @param chosen       The chosen resource URL
+     * @param duplicates   The duplicate resource URLs
+     * @since 5.0.0
+     */
+    default void reportResourceDuplicates(String resourceName, URL chosen, List<URL> duplicates) {
+        // no-op
+    }
 
     /**
      * @param path The path to a resource including a prefix

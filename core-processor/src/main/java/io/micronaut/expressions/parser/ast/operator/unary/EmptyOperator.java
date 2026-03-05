@@ -16,7 +16,6 @@
 package io.micronaut.expressions.parser.ast.operator.unary;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
@@ -116,7 +115,7 @@ public final class EmptyOperator extends UnaryOperator {
     }
 
     @Override
-    public TypeDef doResolveType(@NonNull ExpressionVisitorContext ctx) {
+    public TypeDef doResolveType(ExpressionVisitorContext ctx) {
         return TypeDef.Primitive.BOOLEAN;
     }
 

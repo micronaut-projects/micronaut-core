@@ -16,7 +16,6 @@
 package io.micronaut.context.event;
 
 import io.micronaut.context.BeanContext;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
@@ -33,7 +32,7 @@ public class BeanCreatedEvent<T> extends BeanEvent<T> {
 
     private final BeanIdentifier beanIdentifier;
 
-    private final @NonNull Argument<T> beanType;
+    private final Argument<T> beanType;
 
     public BeanCreatedEvent(BeanContext beanContext,
                             BeanDefinition<T> beanDefinition,
@@ -52,7 +51,7 @@ public class BeanCreatedEvent<T> extends BeanEvent<T> {
     public BeanCreatedEvent(BeanContext beanContext,
                             BeanDefinition<T> beanDefinition,
                             BeanIdentifier beanIdentifier,
-                            @NonNull Argument<T> beanType,
+                            Argument<T> beanType,
                             T bean) {
         super(beanContext, beanDefinition, bean);
         this.beanIdentifier = beanIdentifier;
@@ -70,7 +69,6 @@ public class BeanCreatedEvent<T> extends BeanEvent<T> {
      * @return The argument used to create the bean
      * @since 4.9.0
      */
-    @NonNull
     public Argument<T> getBeanType() {
         return beanType;
     }

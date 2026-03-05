@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty.handler.accesslog.element;
 
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.http.HttpHeaders;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.EnumSet;
@@ -56,7 +57,8 @@ final class ElapseTimeElement implements LogElement {
     }
 
     @Override
-    public String onRequestHeaders(SocketChannel channel, String method, HttpHeaders headers, String uri, String protocol) {
+    @Nullable
+    public String onRequestHeaders(@Nullable SocketChannel channel, String method, HttpHeaders headers, String uri, String protocol) {
         start = System.nanoTime();
         return null;
     }

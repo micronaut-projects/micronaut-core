@@ -16,7 +16,6 @@
 package io.micronaut.expressions.parser.ast.operator.binary;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.sourcegen.model.TypeDef;
@@ -42,7 +41,7 @@ public abstract sealed class BinaryOperator extends ExpressionNode permits AddOp
     }
 
     @Override
-    protected TypeDef doResolveType(@NonNull ExpressionVisitorContext ctx) {
+    protected TypeDef doResolveType(ExpressionVisitorContext ctx) {
         TypeDef leftType = leftOperand.resolveType(ctx);
         TypeDef rightType = rightOperand.resolveType(ctx);
         return resolveOperationType(leftType, rightType);

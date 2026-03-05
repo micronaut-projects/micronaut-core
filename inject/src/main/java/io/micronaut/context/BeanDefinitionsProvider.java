@@ -16,7 +16,6 @@
 package io.micronaut.context;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.BeanDefinitionReference;
 
 import java.util.List;
@@ -36,7 +35,6 @@ public interface BeanDefinitionsProvider {
      * @param classLoader The class loader to use for loading bean definitions
      * @return A list of bean definition references
      */
-    @NonNull
-    List<BeanDefinitionReference<?>> provide(@NonNull ClassLoader classLoader);
+    List<BeanDefinitionReference<?>> provide(ClassLoader classLoader);
 
 }

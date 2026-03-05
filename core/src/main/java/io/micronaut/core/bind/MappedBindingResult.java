@@ -17,6 +17,7 @@ package io.micronaut.core.bind;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionError;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.Optional;
@@ -26,7 +27,7 @@ import java.util.function.Function;
 final class MappedBindingResult<T, R> implements ArgumentBinder.BindingResult<R> {
     private final ArgumentBinder.BindingResult<T> source;
     private final Function<T, ArgumentBinder.BindingResult<R>> function;
-    private ArgumentBinder.BindingResult<R> second;
+    private ArgumentBinder. @Nullable BindingResult<R> second;
 
     MappedBindingResult(ArgumentBinder.BindingResult<T> source, Function<T, ArgumentBinder.BindingResult<R>> function) {
         this.source = source;

@@ -18,6 +18,7 @@ package io.micronaut.http.server.netty.handler.accesslog.element;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.http.HttpHeaders;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Set;
 
@@ -30,7 +31,7 @@ import java.util.Set;
 abstract class AbstractHttpMessageLogElement implements LogElement {
     private static final Set<Character> CHARACTERS_TO_ESCAPE = Set.of('\b', '\n', '\t', '\r', '\\', '"');
 
-    protected Set<Event> events;
+    protected Set<Event> events = Set.of();
 
     /**
      * Process the specified headers.
@@ -39,7 +40,7 @@ abstract class AbstractHttpMessageLogElement implements LogElement {
      */
     protected abstract String value(HttpHeaders headers);
 
-    private static String wrapValue(String value) {
+    private static String wrapValue(@Nullable String value) {
         // Does the value contain a " ? If so must encode it
         if (value == null || ConstantElement.UNKNOWN_VALUE.equals(value) || value.isEmpty()) {
             return ConstantElement.UNKNOWN_VALUE;
@@ -73,7 +74,7 @@ abstract class AbstractHttpMessageLogElement implements LogElement {
     }
 
     @Override
-    public String onRequestHeaders(SocketChannel channel, String method, HttpHeaders headers, String uri, String protocol) {
+    public String onRequestHeaders(@Nullable SocketChannel channel, String method, HttpHeaders headers, String uri, String protocol) {
         if (events.contains(Event.ON_REQUEST_HEADERS)) {
             return wrapValue(value(headers));
         } else {

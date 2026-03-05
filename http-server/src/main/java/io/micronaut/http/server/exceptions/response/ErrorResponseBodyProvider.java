@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.server.exceptions.response;
 
-import org.jspecify.annotations.NonNull;
 import io.micronaut.http.HttpResponse;
 
 /**
@@ -31,13 +30,11 @@ public interface ErrorResponseBodyProvider<T> {
      * @param response Base HTTP Response
      * @return The HTTP Response Body
      */
-    @NonNull
-    T body(@NonNull ErrorContext errorContext, @NonNull HttpResponse<?> response);
+    T body(ErrorContext errorContext, HttpResponse<?> response);
 
     /**
      * @return The content type of the HTTP response
      */
-    @NonNull
     String contentType();
 
 }

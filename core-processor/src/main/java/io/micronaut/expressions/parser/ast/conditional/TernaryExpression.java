@@ -16,7 +16,6 @@
 package io.micronaut.expressions.parser.ast.conditional;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
@@ -91,7 +90,7 @@ public class TernaryExpression extends ExpressionNode {
     }
 
     @Override
-    protected TypeDef doResolveType(@NonNull ExpressionVisitorContext ctx) {
+    protected TypeDef doResolveType(ExpressionVisitorContext ctx) {
         if (!shouldCoerceConditionToBoolean() && !isOneOf(condition.resolveType(ctx), BOOLEAN, BOOLEAN_WRAPPER)) {
             throw new ExpressionCompilationException("Invalid ternary operator. Condition should resolve to boolean type");
         }

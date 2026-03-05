@@ -16,6 +16,7 @@
 package io.micronaut.core.convert.converters;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import org.jspecify.annotations.NullUnmarked;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.beans.BeanIntrospection;
@@ -55,6 +56,7 @@ import java.util.stream.Collectors;
  * @since 3.0.0
  * @author Andriy Dmytruk
  */
+@NullUnmarked
 public class MultiValuesConverterFactory {
     /**
      * Values separated with commas ",". In case of iterables, the values are converted to {@link String} and joined

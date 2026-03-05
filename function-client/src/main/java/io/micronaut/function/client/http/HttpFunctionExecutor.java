@@ -29,6 +29,7 @@ import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.client.HttpClient;
 import jakarta.annotation.PreDestroy;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 
 import java.io.Closeable;
@@ -62,7 +63,8 @@ public class HttpFunctionExecutor<I, O> implements FunctionInvoker<I, O>, Closea
     }
 
     @Override
-    public O invoke(FunctionDefinition definition, I input, Argument<O> outputType) {
+    @Nullable
+    public O invoke(FunctionDefinition definition, @Nullable I input, Argument<O> outputType) {
         Optional<URI> opt = definition.getURI();
         if (opt.isEmpty()) {
             throw new FunctionNotFoundException(definition.getName());

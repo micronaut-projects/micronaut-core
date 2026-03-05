@@ -17,7 +17,6 @@ package io.micronaut.core.io.scan;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.io.ResourceLoader;
-import org.jspecify.annotations.NullMarked;
 
 import java.io.InputStream;
 import java.net.URL;
@@ -31,9 +30,8 @@ import java.util.stream.Stream;
  * @author Denis Stepanov
  * @since 5.0
  */
-@NullMarked
 @Experimental
-public class CombinedClassPathResourceLoader implements ClassPathResourceLoader {
+public final class CombinedClassPathResourceLoader implements ClassPathResourceLoader {
 
     private final ClassPathResourceLoader[] loaders;
 

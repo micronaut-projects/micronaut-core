@@ -19,7 +19,6 @@ import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.Indexed;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.core.io.file.DefaultFileSystemResourceLoader;
@@ -60,7 +59,7 @@ public class ResourceLoaderFactory {
      */
     @Singleton
     @BootstrapContextCompatible
-    protected @NonNull ClassPathResourceLoader getClassPathResourceLoader() {
+    protected ClassPathResourceLoader getClassPathResourceLoader() {
         return new DefaultClassPathResourceLoader(classLoader);
     }
 
@@ -69,7 +68,7 @@ public class ResourceLoaderFactory {
      */
     @Singleton
     @BootstrapContextCompatible
-    protected @NonNull FileSystemResourceLoader fileSystemResourceLoader() {
+    protected FileSystemResourceLoader fileSystemResourceLoader() {
         return new DefaultFileSystemResourceLoader();
     }
 
@@ -78,7 +77,7 @@ public class ResourceLoaderFactory {
      */
     @Singleton
     @BootstrapContextCompatible
-    protected @NonNull ResourceLoader getStringResourceLoader() {
+    protected ResourceLoader getStringResourceLoader() {
         return StringResourceLoader.getInstance();
     }
 
@@ -87,7 +86,7 @@ public class ResourceLoaderFactory {
      */
     @Singleton
     @BootstrapContextCompatible
-    protected @NonNull ResourceLoader getBase64ResourceLoader() {
+    protected ResourceLoader getBase64ResourceLoader() {
         return Base64ResourceLoader.getInstance();
     }
 
@@ -98,7 +97,7 @@ public class ResourceLoaderFactory {
     @Singleton
     @BootstrapContextCompatible
     @Indexed(ResourceResolver.class)
-    protected @NonNull ResourceResolver resourceResolver(@NonNull List<ResourceLoader> resourceLoaders) {
+    protected ResourceResolver resourceResolver(List<ResourceLoader> resourceLoaders) {
         return new ResourceResolver(resourceLoaders);
     }
 }

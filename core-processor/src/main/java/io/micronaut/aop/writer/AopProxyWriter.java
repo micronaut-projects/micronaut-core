@@ -63,6 +63,7 @@ import io.micronaut.sourcegen.model.ParameterDef;
 import io.micronaut.sourcegen.model.StatementDef;
 import io.micronaut.sourcegen.model.TypeDef;
 import io.micronaut.sourcegen.model.VariableDef;
+import org.jspecify.annotations.NullUnmarked;
 
 import javax.lang.model.element.Modifier;
 import java.io.File;
@@ -94,6 +95,7 @@ import static io.micronaut.inject.ast.ParameterElement.ZERO_PARAMETER_ELEMENTS;
  * @author Graeme Rocher
  * @since 1.0
  */
+@NullUnmarked
 @Internal
 public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
 

@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.util;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.regex.Pattern;
 
 /**
@@ -28,12 +30,14 @@ public interface OutgoingRequestProcessorMatcher {
     /**
      * @return a regular expression to validate the service id against.
      */
+    @Nullable
     Pattern getServiceIdPattern();
 
     /**
      *
      * @return a regular expression to validate the target request uri against.
      */
+    @Nullable
     Pattern getUriPattern();
 
 }

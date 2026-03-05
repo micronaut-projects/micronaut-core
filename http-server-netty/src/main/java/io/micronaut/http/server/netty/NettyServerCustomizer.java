@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.http.server.netty;
-
-import org.jspecify.annotations.NonNull;
 import io.netty.channel.Channel;
 
 /**
@@ -56,8 +54,7 @@ public interface NettyServerCustomizer {
      * @param role The role (or scope) of the channel.
      * @return The new customizer, or {@code this} if no specialization needs to take place.
      */
-    @NonNull
-    default NettyServerCustomizer specializeForChannel(@NonNull Channel channel, @NonNull ChannelRole role) {
+    default NettyServerCustomizer specializeForChannel(Channel channel, ChannelRole role) {
         return this;
     }
 
@@ -94,7 +91,7 @@ public interface NettyServerCustomizer {
          *
          * @param customizer The customizer to register.
          */
-        void register(@NonNull NettyServerCustomizer customizer);
+        void register(NettyServerCustomizer customizer);
     }
 
     /**

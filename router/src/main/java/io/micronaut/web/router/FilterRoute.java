@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.web.router;
-
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.annotation.FilterMatcher;
@@ -58,7 +56,6 @@ public interface FilterRoute extends HttpFilterResolver.FilterEntry {
      * @return The filter for this {@link FilterRoute}
      */
     @Override
-    @NonNull
     GenericHttpFilter getFilter();
 
     /**

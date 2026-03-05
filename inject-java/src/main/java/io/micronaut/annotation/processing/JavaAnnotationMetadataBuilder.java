@@ -19,7 +19,6 @@ import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.reflect.ClassUtils;
@@ -116,12 +115,12 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     }
 
     @Override
-    protected void addError(@NonNull Element originatingElement, @NonNull String error) {
+    protected void addError(Element originatingElement, String error) {
         messager.printMessage(Diagnostic.Kind.ERROR, error, originatingElement);
     }
 
     @Override
-    protected void addWarning(@NonNull Element originatingElement, @NonNull String warning) {
+    protected void addWarning(Element originatingElement, String warning) {
         messager.printMessage(Diagnostic.Kind.WARNING, warning, originatingElement);
     }
 
@@ -175,9 +174,8 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
         return visitorContext;
     }
 
-    @NonNull
     @Override
-    protected RetentionPolicy getRetentionPolicy(@NonNull Element annotation) {
+    protected RetentionPolicy getRetentionPolicy(Element annotation) {
         final List<? extends AnnotationMirror> annotationMirrors = annotation.getAnnotationMirrors();
         for (AnnotationMirror annotationMirror : annotationMirrors) {
             final String annotationTypeName = getAnnotationTypeName(annotationMirror);
@@ -235,7 +233,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     }
 
     @Override
-    protected boolean isExcludedAnnotation(@NonNull Element element, @NonNull String annotationName) {
+    protected boolean isExcludedAnnotation(Element element, String annotationName) {
         if (annotationName.startsWith("java.lang.annotation") && element.getKind() == ElementKind.ANNOTATION_TYPE) {
             return false;
         } else {
@@ -321,7 +319,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     }
 
     @Override
-    protected String getOriginatingClassName(@NonNull Element orginatingElement) {
+    protected String getOriginatingClassName(Element orginatingElement) {
         TypeElement typeElement = getOriginatingTypeElement(orginatingElement);
         if (typeElement != null) {
             return JavaModelUtils.getClassName(typeElement);

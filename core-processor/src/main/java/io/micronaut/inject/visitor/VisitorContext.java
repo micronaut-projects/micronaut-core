@@ -17,7 +17,6 @@ package io.micronaut.inject.visitor;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.expressions.context.ExpressionCompilationContextFactory;
@@ -65,7 +64,6 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * @return The element factory
      * @since 2.3.0
      */
-    @NonNull
     ElementFactory<?, ?, ?, ?> getElementFactory();
 
     /**
@@ -74,7 +72,6 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * @return The element annotation metadata factory
      * @since 4.0.0
      */
-    @NonNull
     ElementAnnotationMetadataFactory getElementAnnotationMetadataFactory();
 
     /**
@@ -82,7 +79,6 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * @since 4.0.0
      */
     @Experimental
-    @NonNull
     ExpressionCompilationContextFactory getExpressionCompilationContextFactory();
 
     /**
@@ -93,7 +89,6 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * @since 4.0.0
      */
     @Internal
-    @NonNull
     AbstractAnnotationMetadataBuilder<?, ?> getAnnotationMetadataBuilder();
 
     /**
@@ -130,7 +125,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     /**
      * @return The visitor configuration
      */
-    default @NonNull VisitorConfiguration getConfiguration() {
+    default VisitorConfiguration getConfiguration() {
         return VisitorConfiguration.DEFAULT;
     }
 
@@ -162,7 +157,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * @return An iterable of resources
      */
     @Experimental
-    default @NonNull Iterable<URL> getClasspathResources(@NonNull String path) {
+    default Iterable<URL> getClasspathResources(String path) {
         return Collections.emptyList();
     }
 
@@ -217,8 +212,12 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
         Optional<GeneratedFile> dummy = visitMetaInfFile("dummy", Element.EMPTY_ELEMENT_ARRAY);
         if (dummy.isPresent()) {
             // we want the parent directory of META-INF/dummy
-            Path classesOutputDir = Path.of(dummy.get().toURI()).getParent().getParent();
-            return Optional.of(classesOutputDir);
+            Path parent = Path.of(dummy.get().toURI()).getParent();
+            if (parent == null) {
+                return Optional.empty();
+            }
+            Path classesOutputDir = parent.getParent();
+            return Optional.ofNullable(classesOutputDir);
         }
         return Optional.empty();
     }
@@ -277,7 +276,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * @param stereotypes The stereotypes
      * @return The class elements
      */
-    default @NonNull ClassElement[] getClassElements(@NonNull String aPackage, @NonNull String... stereotypes) {
+    default ClassElement[] getClassElements(String aPackage, String... stereotypes) {
         return ClassElement.ZERO_CLASS_ELEMENTS;
     }
 
@@ -288,7 +287,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * @return The class elements
      * @see 4.10
      */
-    default @NonNull List<ClassElement> getClassElements(@NonNull PackageElement packageElement) {
+    default List<ClassElement> getClassElements(PackageElement packageElement) {
         return List.of(getClassElements(packageElement.getName(), "*"));
     }
 

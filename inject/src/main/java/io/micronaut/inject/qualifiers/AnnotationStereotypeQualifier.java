@@ -17,7 +17,6 @@ package io.micronaut.inject.qualifiers;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.inject.BeanType;
 
@@ -38,7 +37,7 @@ final class AnnotationStereotypeQualifier<T> extends FilteringQualifier<T> {
     /**
      * @param stereotype The stereotype
      */
-    AnnotationStereotypeQualifier(@NonNull String stereotype) {
+    AnnotationStereotypeQualifier(String stereotype) {
         this.stereotype = Objects.requireNonNull(stereotype, "Stereotype cannot be null");
     }
 

@@ -19,7 +19,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.form.FormConfiguration;
 import io.micronaut.http.form.FormUrlEncodedDecoder;
 import jakarta.inject.Singleton;
-import reactor.util.annotation.NonNull;
+
 import java.nio.charset.Charset;
 import java.util.Map;
 
@@ -33,12 +33,11 @@ final class DefaultFormUrlEncodedDecoder implements FormUrlEncodedDecoder {
     }
 
     @Override
-    @NonNull
-    public Map<String, Object> decode(@NonNull String formUrlEncodedString,
-                                      @NonNull Charset charset) {
+    public Map<String, Object> decode(String formUrlEncodedString,
+                                      Charset charset) {
         QueryStringDecoder decoder = new QueryStringDecoder(formUrlEncodedString, charset, false,
-                                                            formConfiguration.getMaxDecodedKeyValueParameters(),
-                                                            formConfiguration.isSemicolonIsNormalChar());
+            formConfiguration.getMaxDecodedKeyValueParameters(),
+            formConfiguration.isSemicolonIsNormalChar());
         return flatten(decoder.parameters());
     }
 }

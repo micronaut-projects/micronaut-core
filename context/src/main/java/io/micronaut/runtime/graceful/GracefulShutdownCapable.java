@@ -16,7 +16,6 @@
 package io.micronaut.runtime.graceful;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,7 +46,6 @@ public interface GracefulShutdownCapable {
      *
      * @return A future that completes when this bean is fully shut down
      */
-    @NonNull
     CompletionStage<?> shutdownGracefully();
 
     /**
@@ -67,8 +65,7 @@ public interface GracefulShutdownCapable {
      * @param stages The input futures
      * @return A future that completes when all inputs have completed
      */
-    @NonNull
-    static CompletionStage<?> allOf(@NonNull Stream<CompletionStage<?>> stages) {
+    static CompletionStage<?> allOf(Stream<CompletionStage<?>> stages) {
         return CompletableFuture.allOf(stages.map(CompletionStage::toCompletableFuture).toArray(CompletableFuture[]::new));
     }
 
@@ -78,8 +75,7 @@ public interface GracefulShutdownCapable {
      * @param stages The input lifecycles
      * @return A future that completes when all inputs have completed shutdown
      */
-    @NonNull
-    static CompletionStage<?> shutdownAll(@NonNull Stream<? extends GracefulShutdownCapable> stages) {
+    static CompletionStage<?> shutdownAll(Stream<? extends GracefulShutdownCapable> stages) {
         return CompletableFuture.allOf(stages.map(l -> {
             CompletionStage<?> s;
             try {
@@ -92,8 +88,7 @@ public interface GracefulShutdownCapable {
         }).toArray(CompletableFuture[]::new));
     }
 
-    @NonNull
-    static OptionalLong combineActiveTasks(@NonNull Iterable<? extends GracefulShutdownCapable> delegates) {
+    static OptionalLong combineActiveTasks(Iterable<? extends GracefulShutdownCapable> delegates) {
         long sum = 0;
         boolean anyPresent = false;
         for (GracefulShutdownCapable delegate : delegates) {

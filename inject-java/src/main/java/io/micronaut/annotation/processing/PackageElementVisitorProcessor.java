@@ -16,7 +16,6 @@
 package io.micronaut.annotation.processing;
 
 import io.micronaut.annotation.processing.visitor.JavaPackageElement;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.Toggleable;
@@ -203,7 +202,6 @@ public sealed class PackageElementVisitorProcessor extends AbstractInjectAnnotat
         return false;
     }
 
-    @NonNull
     private static Collection<? extends PackageElementVisitor<?>> findPackageElementVisitors() {
         return SoftServiceLoader.load(PackageElementVisitor.class, PackageElementVisitorProcessor.class.getClassLoader())
             .disableFork()

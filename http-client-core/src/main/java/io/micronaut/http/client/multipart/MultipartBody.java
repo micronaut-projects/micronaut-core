@@ -87,7 +87,7 @@ public final class MultipartBody {
          * Add a file object to MultipartBody.
          *
          * @param name Name of the parameter for file object to be passed in multipart request
-         * @param file The file object to copy the content to {@link io.micronaut.http.multipart.FileUpload}
+         * @param file The file object to copy the content from
          * @return A {@link MultipartBody.Builder} to build MultipartBody
          */
         public Builder addPart(String name, File file) {
@@ -99,7 +99,7 @@ public final class MultipartBody {
          *
          * @param name     Name of the parameter for file object to be passed in multipart request
          * @param filename Name of the file
-         * @param file     The file object to copy the content to {@link io.micronaut.http.multipart.FileUpload}
+         * @param file     The file object to copy the content from
          * @return A {@link MultipartBody.Builder} to build MultipartBody
          */
         public Builder addPart(String name, String filename, File file) {
@@ -112,7 +112,7 @@ public final class MultipartBody {
          * @param name        Name of the parameter for file object to be passed in multipart request
          * @param filename    Name of the file
          * @param contentType File content of type {@link MediaType}, possible values could be "text/plain", "application/json" etc
-         * @param file        The file object to copy the content to {@link io.micronaut.http.multipart.FileUpload}
+         * @param file        The file object to copy the content from
          * @return A {@link MultipartBody.Builder} to build MultipartBody
          */
         public Builder addPart(String name, String filename, MediaType contentType, File file) {

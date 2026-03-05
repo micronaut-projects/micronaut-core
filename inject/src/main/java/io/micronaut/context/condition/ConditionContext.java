@@ -19,8 +19,6 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
-
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.value.PropertyResolver;
 import io.micronaut.inject.BeanDefinition;
@@ -64,8 +62,7 @@ public interface ConditionContext<T extends AnnotationMetadataProvider> extends 
      * @return A collection of {@link BeanDefinition} instances corresponding to the specified type.
      * @since 5.0
      */
-    @NonNull
-    <K> Collection<BeanDefinition<K>> findBeanDefinitions(@NonNull Class<K> beanType);
+    <K> Collection<BeanDefinition<K>> findBeanDefinitions(Class<K> beanType);
 
     /**
      * Fail the condition with the given message.
@@ -73,7 +70,7 @@ public interface ConditionContext<T extends AnnotationMetadataProvider> extends 
      * @param failure The failure
      * @return The {@link ConditionContext}
      */
-    ConditionContext<T> fail(@NonNull Failure failure);
+    ConditionContext<T> fail(Failure failure);
 
     /**
      * Fail the condition with the given message.
@@ -81,7 +78,7 @@ public interface ConditionContext<T extends AnnotationMetadataProvider> extends 
      * @param failure The failure
      * @return The {@link ConditionContext}
      */
-    default ConditionContext<T> fail(@NonNull String failure) {
+    default ConditionContext<T> fail(String failure) {
         return fail(Failure.simple(failure));
     }
 

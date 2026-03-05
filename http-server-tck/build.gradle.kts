@@ -31,3 +31,7 @@ micronautBuild {
         enabled.set(false)
     }
 }
+tasks.named<Test>("test") {
+    useJUnitPlatform()
+    systemProperty("junit.jupiter.extensions.autodetection.enabled", "true")
+}

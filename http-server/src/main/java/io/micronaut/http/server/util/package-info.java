@@ -16,4 +16,7 @@
 /**
  * Utilities used in the context of an HTTP server.
  */
+@NullMarked
 package io.micronaut.http.server.util;
+
+import org.jspecify.annotations.NullMarked;

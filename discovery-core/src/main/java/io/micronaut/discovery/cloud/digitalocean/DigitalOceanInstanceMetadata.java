@@ -18,6 +18,7 @@ package io.micronaut.discovery.cloud.digitalocean;
 import io.micronaut.context.env.ComputePlatform;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.discovery.cloud.AbstractComputeInstanceMetadata;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Represents {@link io.micronaut.discovery.cloud.ComputeInstanceMetadata} for Digital Ocean.
@@ -30,7 +31,9 @@ public class DigitalOceanInstanceMetadata extends AbstractComputeInstanceMetadat
 
     private final ComputePlatform computePlatform = ComputePlatform.DIGITAL_OCEAN;
 
+    @Nullable
     private String userData;
+    @Nullable
     private String vendorData;
 
     @Override
@@ -41,6 +44,7 @@ public class DigitalOceanInstanceMetadata extends AbstractComputeInstanceMetadat
     /**
      * @return the user data
      */
+    @Nullable
     public String getUserData() {
         return userData;
     }
@@ -48,13 +52,14 @@ public class DigitalOceanInstanceMetadata extends AbstractComputeInstanceMetadat
     /**
      * @param userData the user data
      */
-    public void setUserData(String userData) {
+    public void setUserData(@Nullable String userData) {
         this.userData = userData;
     }
 
     /**
      * @return the vendor data
      */
+    @Nullable
     public String getVendorData() {
         return vendorData;
     }
@@ -62,7 +67,7 @@ public class DigitalOceanInstanceMetadata extends AbstractComputeInstanceMetadat
     /**
      * @param vendorData the vendor data
      */
-    public void setVendorData(String vendorData) {
+    public void setVendorData(@Nullable String vendorData) {
         this.vendorData = vendorData;
     }
 

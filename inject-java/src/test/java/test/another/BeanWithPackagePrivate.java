@@ -6,6 +6,7 @@ import test.Middle;
 @Singleton
 public class BeanWithPackagePrivate extends Middle {
     public boolean root;
+    @SuppressWarnings("MissingOverride")
     void injectPackagePrivateMethod() {
         root = true;
     }

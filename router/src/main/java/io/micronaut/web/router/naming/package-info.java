@@ -19,5 +19,8 @@
  * @author graemerocher
  * @since 1.0
  */
+@NullMarked
 package io.micronaut.web.router.naming;
 
+
+import org.jspecify.annotations.NullMarked;

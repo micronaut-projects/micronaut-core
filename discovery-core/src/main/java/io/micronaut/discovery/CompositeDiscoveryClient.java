@@ -15,7 +15,6 @@
  */
 package io.micronaut.discovery;
 
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
 import org.reactivestreams.Publisher;
@@ -48,7 +47,6 @@ public abstract class CompositeDiscoveryClient implements DiscoveryClient {
         this.discoveryClients = discoveryClients;
     }
 
-    @NonNull
     @Override
     public String getDescription() {
         return toString();

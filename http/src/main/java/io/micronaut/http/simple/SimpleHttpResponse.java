@@ -48,7 +48,7 @@ class SimpleHttpResponse<B> implements MutableHttpResponse<B> {
     private int status = HttpStatus.OK.getCode();
     private String reason = HttpStatus.OK.getReason();
 
-    private Object body;
+    private @Nullable Object body;
 
     @Override
     public MutableHttpResponse<B> cookie(Cookie cookie) {
@@ -105,7 +105,7 @@ class SimpleHttpResponse<B> implements MutableHttpResponse<B> {
     }
 
     @Override
-    public MutableHttpResponse<B> status(int status, CharSequence message) {
+    public MutableHttpResponse<B> status(int status, @Nullable CharSequence message) {
         this.status = status;
         if (message == null) {
             this.reason = HttpStatus.getDefaultReason(status);

@@ -14,9 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.json.tree;
-
-import org.jspecify.annotations.NonNull;
-
 /**
  * JsonNode implementation for boolean values, two singletons.
  *
@@ -43,7 +40,6 @@ final class JsonBoolean extends JsonScalar {
         return value;
     }
 
-    @NonNull
     @Override
     public String coerceStringValue() {
         return Boolean.toString(value);

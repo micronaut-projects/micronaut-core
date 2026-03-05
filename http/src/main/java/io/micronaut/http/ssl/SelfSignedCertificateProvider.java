@@ -20,7 +20,6 @@ import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Requires;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.naming.Named;
 import io.micronaut.scheduling.TaskExecutors;
 import io.netty.pkitesting.CertificateBuilder;
@@ -53,7 +52,7 @@ public final class SelfSignedCertificateProvider implements CertificateProvider 
     private final String name;
     private final Flux<KeyStore> bundleFlux;
 
-    SelfSignedCertificateProvider(@NonNull Config config, @NonNull @jakarta.inject.Named(TaskExecutors.SCHEDULED) ExecutorService scheduler) throws Exception {
+    SelfSignedCertificateProvider(Config config, @jakarta.inject.Named(TaskExecutors.SCHEDULED) ExecutorService scheduler) throws Exception {
         name = config.name;
         Sinks.Many<KeyStore> sink = Sinks.many().replay().latest();
         update(config, sink);
@@ -71,7 +70,7 @@ public final class SelfSignedCertificateProvider implements CertificateProvider 
         bundleFlux = sink.asFlux();
     }
 
-    private static void update(@NonNull Config config, Sinks.@NonNull Many<KeyStore> sink) throws Exception {
+    private static void update(Config config, Sinks. Many<KeyStore> sink) throws Exception {
         X509Bundle bundle = new CertificateBuilder()
             .algorithm(config.algorithm)
             .subject(config.subject)
@@ -82,12 +81,12 @@ public final class SelfSignedCertificateProvider implements CertificateProvider 
     }
 
     @Override
-    public @NonNull Publisher<@NonNull KeyStore> getKeyStore() {
+    public Publisher<KeyStore> getKeyStore() {
         return bundleFlux;
     }
 
     @Override
-    public @NonNull String getName() {
+    public String getName() {
         return name;
     }
 
@@ -104,12 +103,12 @@ public final class SelfSignedCertificateProvider implements CertificateProvider 
         private Duration updateInterval = Duration.ofDays(1);
         private Duration lifetime = Duration.ofDays(7);
 
-        public Config(@Parameter @NonNull String name) {
+        public Config(@Parameter String name) {
             this.name = name;
         }
 
         @Override
-        public @NonNull String getName() {
+        public String getName() {
             return name;
         }
 
@@ -118,7 +117,7 @@ public final class SelfSignedCertificateProvider implements CertificateProvider 
          * parameters used by {@link io.netty.pkitesting.CertificateBuilder}. Defaults to {@code rsa4096}.
          * @return the certificate generation algorithm
          */
-        public CertificateBuilder.@NonNull Algorithm getAlgorithm() {
+        public CertificateBuilder. Algorithm getAlgorithm() {
             return algorithm;
         }
 
@@ -127,7 +126,7 @@ public final class SelfSignedCertificateProvider implements CertificateProvider 
          * parameters used by {@link io.netty.pkitesting.CertificateBuilder}. Defaults to {@code rsa4096}.
          * @param algorithm the certificate generation algorithm
          */
-        public void setAlgorithm(CertificateBuilder.@NonNull Algorithm algorithm) {
+        public void setAlgorithm(CertificateBuilder. Algorithm algorithm) {
             this.algorithm = algorithm;
         }
 
@@ -136,7 +135,7 @@ public final class SelfSignedCertificateProvider implements CertificateProvider 
          * This value is passed to the certificate builder and becomes the certificate's subject. Defaults to {@code CN=localhost}.
          * @return the subject DN for the certificate
          */
-        public @NonNull String getSubject() {
+        public String getSubject() {
             return subject;
         }
 
@@ -145,7 +144,7 @@ public final class SelfSignedCertificateProvider implements CertificateProvider 
          * This value is passed to the certificate builder and becomes the certificate's subject. Defaults to {@code CN=localhost}.
          * @param subject the subject DN for the certificate
          */
-        public void setSubject(@NonNull String subject) {
+        public void setSubject(String subject) {
             this.subject = subject;
         }
 
@@ -154,7 +153,7 @@ public final class SelfSignedCertificateProvider implements CertificateProvider 
          * regeneration via a fixed-rate task so updated material is picked up automatically. Defaults to 1 day.
          * @return the certificate regeneration interval
          */
-        public @NonNull Duration getUpdateInterval() {
+        public Duration getUpdateInterval() {
             return updateInterval;
         }
 
@@ -163,7 +162,7 @@ public final class SelfSignedCertificateProvider implements CertificateProvider 
          * regeneration via a fixed-rate task so updated material is picked up automatically. Defaults to 1 day.
          * @param updateInterval the certificate regeneration interval
          */
-        public void setUpdateInterval(@NonNull Duration updateInterval) {
+        public void setUpdateInterval(Duration updateInterval) {
             this.updateInterval = updateInterval;
         }
 
@@ -172,7 +171,7 @@ public final class SelfSignedCertificateProvider implements CertificateProvider 
          * duration when building the self-signed certificate. Defaults to 7 days.
          * @return the certificate lifetime
          */
-        public @NonNull Duration getLifetime() {
+        public Duration getLifetime() {
             return lifetime;
         }
 
@@ -181,7 +180,7 @@ public final class SelfSignedCertificateProvider implements CertificateProvider 
          * duration when building the self-signed certificate. Defaults to 7 days.
          * @param lifetime the certificate lifetime
          */
-        public void setLifetime(@NonNull Duration lifetime) {
+        public void setLifetime(Duration lifetime) {
             this.lifetime = lifetime;
         }
     }

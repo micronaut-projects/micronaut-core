@@ -18,7 +18,6 @@ package io.micronaut.inject.ast.beans;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.ast.MethodElement;
 
 import java.util.Objects;
@@ -38,7 +37,7 @@ public interface BeanMethodElement extends MethodElement {
      * @return This bean method
      * @since 3.5.2
      */
-    default @NonNull BeanMethodElement intercept(AnnotationValue<?>... annotationValue) {
+    default BeanMethodElement intercept(AnnotationValue<?>... annotationValue) {
         if (annotationValue != null) {
             for (AnnotationValue<?> value : annotationValue) {
                 annotate(value);
@@ -52,8 +51,7 @@ public interface BeanMethodElement extends MethodElement {
      *
      * @return This bean method
      */
-    default @NonNull
-    BeanMethodElement executable() {
+    default BeanMethodElement executable() {
         annotate(Executable.class);
         return this;
     }
@@ -65,8 +63,7 @@ public interface BeanMethodElement extends MethodElement {
      * @return This bean method
      * @since 3.4.0
      */
-    default @NonNull
-    BeanMethodElement executable(boolean processOnStartup) {
+    default BeanMethodElement executable(boolean processOnStartup) {
         annotate(Executable.class, (builder) ->
             builder.member(Executable.MEMBER_PROCESS_ON_STARTUP, processOnStartup)
         );
@@ -78,8 +75,7 @@ public interface BeanMethodElement extends MethodElement {
      *
      * @return This bean method
      */
-    default @NonNull
-    BeanMethodElement inject() {
+    default BeanMethodElement inject() {
         if (hasAnnotation(AnnotationUtil.PRE_DESTROY)) {
             throw new IllegalStateException("Cannot inject a method annotated with @PreDestroy");
         }
@@ -95,8 +91,7 @@ public interface BeanMethodElement extends MethodElement {
      *
      * @return This bean method
      */
-    default @NonNull
-    BeanMethodElement preDestroy() {
+    default BeanMethodElement preDestroy() {
         if (hasAnnotation(AnnotationUtil.INJECT)) {
             throw new IllegalStateException("Cannot make a method annotated with @Inject a @PreDestroy handler");
         }
@@ -112,8 +107,7 @@ public interface BeanMethodElement extends MethodElement {
      *
      * @return This bean method
      */
-    default @NonNull
-    BeanMethodElement postConstruct() {
+    default BeanMethodElement postConstruct() {
         if (hasAnnotation(AnnotationUtil.INJECT)) {
             throw new IllegalStateException("Cannot make a method annotated with @Inject a @PostConstruct handler");
         }
@@ -130,14 +124,12 @@ public interface BeanMethodElement extends MethodElement {
      * @param parameterConsumer The parameter consumer
      * @return This bean method
      */
-    default @NonNull
-    BeanMethodElement withParameters(@NonNull Consumer<BeanParameterElement[]> parameterConsumer) {
+    default BeanMethodElement withParameters(Consumer<BeanParameterElement[]> parameterConsumer) {
         Objects.requireNonNull(parameterConsumer, "The parameter consumer cannot be null");
         parameterConsumer.accept(getParameters());
         return this;
     }
 
-    @NonNull
     @Override
     BeanParameterElement[] getParameters();
 }

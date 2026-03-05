@@ -20,6 +20,7 @@ import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
+import org.jspecify.annotations.Nullable;
 
 import javax.inject.Provider;
 
@@ -33,7 +34,7 @@ import javax.inject.Provider;
 public final class JavaxProviderBeanDefinition extends AbstractProviderDefinition<Provider<Object>> {
 
     @Override
-    public boolean isEnabled(BeanContext context, BeanResolutionContext resolutionContext) {
+    public boolean isEnabled(BeanContext context, @Nullable BeanResolutionContext resolutionContext) {
         return isTypePresent();
     }
 
@@ -49,9 +50,10 @@ public final class JavaxProviderBeanDefinition extends AbstractProviderDefinitio
     }
 
     @Override
-    protected Provider<Object> buildProvider(BeanResolutionContext resolutionContext, BeanContext context, Argument<Object> argument, Qualifier<Object> qualifier, boolean singleton) {
+    protected Provider<Object> buildProvider(BeanResolutionContext resolutionContext, BeanContext context, Argument<Object> argument, @Nullable Qualifier<Object> qualifier, boolean singleton) {
         if (singleton) {
             return new Provider<>() {
+                @Nullable
                 Object bean;
 
                 @Override

@@ -324,7 +324,7 @@ annotation class TestAnn
 @InterceptorBean(TestAnn::class)
 class TestConstructInterceptor: ConstructorInterceptor<Any> {
     var invoked = false
-    var parameters: Array<Any>? = null
+    var parameters: Array<Any?>? = null
 
     override fun intercept(context: ConstructorInvocationContext<Any>): Any {
         invoked = true
@@ -337,7 +337,7 @@ class TestConstructInterceptor: ConstructorInterceptor<Any> {
 @InterceptorBean(TestAnn::class)
 class TypeSpecificConstructInterceptor: ConstructorInterceptor<MyBean> {
     var invoked = false
-    var parameters: Array<Any>? = null
+    var parameters: Array<Any?>? = null
 
     override fun intercept(context: ConstructorInvocationContext<MyBean>): MyBean {
         invoked = true
@@ -462,7 +462,7 @@ annotation class TestAnn
 @InterceptorBean(TestAnn::class)
 class TestConstructInterceptor: ConstructorInterceptor<Any> {
     var invoked = false
-    var parameters: Array<Any>? = null
+    var parameters: Array<Any?>? = null
 
     override fun intercept(context: ConstructorInvocationContext<Any>): Any {
         invoked = true
@@ -569,7 +569,7 @@ annotation class TestAnn
 @InterceptorBean(TestAnn::class)
 class TestConstructInterceptor: ConstructorInterceptor<Any> {
     var invoked = false
-    var parameters: Array<Any>? = null
+    var parameters: Array<Any?>? = null
 
     override fun intercept(context: ConstructorInvocationContext<Any>): Any {
         invoked = true
@@ -673,7 +673,7 @@ annotation class TestAnn
 @InterceptorBean(TestAnn::class)
 class TestConstructInterceptor: ConstructorInterceptor<Any> {
     var invoked = false
-    var parameters: Array<Any>? = null
+    var parameters: Array<Any?>? = null
 
     override fun intercept(context: ConstructorInvocationContext<Any>): Any {
         invoked = true

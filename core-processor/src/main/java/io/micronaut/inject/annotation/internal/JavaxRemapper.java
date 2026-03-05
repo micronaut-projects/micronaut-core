@@ -18,7 +18,6 @@ package io.micronaut.inject.annotation.internal;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.annotation.AnnotationRemapper;
 import io.micronaut.inject.visitor.VisitorContext;
 import jakarta.inject.Named;
@@ -38,13 +37,12 @@ public final class JavaxRemapper implements AnnotationRemapper {
     private static final Pattern JAVAX = Pattern.compile("^javax");
 
     @Override
-    @NonNull
     public String getPackageName() {
         return "javax.inject";
     }
 
     @Override
-    @NonNull public List<AnnotationValue<?>> remap(AnnotationValue<?> annotation, VisitorContext visitorContext) {
+    public List<AnnotationValue<?>> remap(AnnotationValue<?> annotation, VisitorContext visitorContext) {
         String name = annotation.getAnnotationName();
         Matcher matcher = JAVAX.matcher(name);
 

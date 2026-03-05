@@ -47,12 +47,15 @@ import io.netty.handler.codec.http.HttpVersion;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 
 final class Compressor {
     private final HttpCompressionStrategy strategy;
+    @Nullable
     private final BrotliOptions brotliOptions;
     private final GzipOptions gzipOptions;
     private final DeflateOptions deflateOptions;
+    @Nullable
     private final ZstdOptions zstdOptions;
     private final SnappyOptions snappyOptions;
 
@@ -101,7 +104,7 @@ final class Compressor {
         response.headers().add(HttpHeaderNames.CONTENT_ENCODING, encoding.contentEncoding);
         ChannelHandler handler = switch (encoding) {
             case BR -> makeBrotliEncoder();
-            case ZSTD -> new ZstdEncoder(zstdOptions.compressionLevel(), zstdOptions.blockSize(), strategy.getMaxZstdEncodeSize());
+            case ZSTD -> new ZstdEncoder(Objects.requireNonNull(zstdOptions, "ZSTD not available").compressionLevel(), zstdOptions.blockSize(), strategy.getMaxZstdEncodeSize());
             case SNAPPY -> new SnappyFrameEncoder();
             case GZIP -> ZlibCodecFactory.newZlibEncoder(ZlibWrapper.GZIP, gzipOptions.compressionLevel(), gzipOptions.windowBits(), gzipOptions.memLevel());
             case DEFLATE -> ZlibCodecFactory.newZlibEncoder(ZlibWrapper.ZLIB, deflateOptions.compressionLevel(), deflateOptions.windowBits(), deflateOptions.memLevel());
@@ -110,10 +113,11 @@ final class Compressor {
     }
 
     private BrotliEncoder makeBrotliEncoder() {
-        return new BrotliEncoder(brotliOptions.parameters());
+        return new BrotliEncoder(Objects.requireNonNull(brotliOptions, "Brotli not available").parameters());
     }
 
     @SuppressWarnings("FloatingPointEquality")
+    @Nullable
     private Algorithm determineEncoding(List<String> acceptEncoding) {
         // from HttpContentCompressor, slightly modified
         float starQ = -1.0f;

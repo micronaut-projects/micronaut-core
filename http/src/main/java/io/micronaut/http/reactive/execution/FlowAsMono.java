@@ -18,6 +18,7 @@ package io.micronaut.http.reactive.execution;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.execution.ImperativeExecutionFlow;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Subscription;
 import reactor.core.CoreSubscriber;
 import reactor.core.Fuseable;
@@ -90,8 +91,8 @@ final class FlowAsMono<T> extends Mono<T> implements Fuseable {
 
         private boolean requested;
 
-        private T result;
-        private Throwable error;
+        private @Nullable T result;
+        private @Nullable Throwable error;
 
         SubscriptionImpl(CoreSubscriber<? super T> actual) {
             this.actual = actual;
@@ -122,7 +123,7 @@ final class FlowAsMono<T> extends Mono<T> implements Fuseable {
             }
         }
 
-        private void forward(T v, Throwable e) {
+        private void forward(@Nullable T v, @Nullable Throwable e) {
             if (v != null) {
                 actual.onNext(v);
             }

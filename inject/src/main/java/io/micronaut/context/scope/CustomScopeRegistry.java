@@ -16,7 +16,6 @@
 package io.micronaut.context.scope;
 
 import io.micronaut.context.BeanRegistration;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanType;
 
@@ -38,7 +37,7 @@ public interface CustomScopeRegistry {
      * @return An optional scope
      * @since 3.0.0
      */
-    default Optional<CustomScope<?>> findDeclaredScope(@NonNull Argument<?> argument) {
+    default Optional<CustomScope<?>> findDeclaredScope(Argument<?> argument) {
         return Optional.empty();
     }
 
@@ -49,7 +48,7 @@ public interface CustomScopeRegistry {
      * @return An optional scope
      * @since 3.0.0
      */
-    default Optional<CustomScope<?>> findDeclaredScope(@NonNull BeanType<?> beanType) {
+    default Optional<CustomScope<?>> findDeclaredScope(BeanType<?> beanType) {
         return Optional.empty();
     }
 

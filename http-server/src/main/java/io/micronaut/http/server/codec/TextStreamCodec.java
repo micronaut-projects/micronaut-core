@@ -72,6 +72,7 @@ public class TextStreamCodec implements MediaTypeCodec {
     private final ByteBufferFactory byteBufferFactory;
     private final List<MediaType> additionalTypes;
     private final Charset defaultCharset;
+    @Nullable
     private MediaTypeCodecRegistry codecRegistry;
 
     /**
@@ -207,7 +208,7 @@ public class TextStreamCodec implements MediaTypeCodec {
      * @param attribute The attribute
      * @param value     The value
      */
-    protected void writeAttribute(ByteBuffer eventData, byte[] attribute, String value) {
+    protected void writeAttribute(ByteBuffer eventData, byte[] attribute, @Nullable String value) {
         if (value != null) {
             eventData.write(attribute)
                 .write(value, defaultCharset)

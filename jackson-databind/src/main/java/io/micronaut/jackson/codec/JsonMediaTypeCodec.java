@@ -15,6 +15,7 @@
  */
 package io.micronaut.jackson.codec;
 
+import org.jspecify.annotations.NullUnmarked;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.cfg.MapperBuilder;
 import io.micronaut.context.BeanProvider;
@@ -40,6 +41,7 @@ import jakarta.inject.Singleton;
  * @since 1.0.0
  * @deprecated Replaced with message body writers / readers API
  */
+@NullUnmarked
 @Named("json")
 @Singleton
 @Secondary

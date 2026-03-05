@@ -43,6 +43,7 @@ class DiskUploadSpec extends AbstractMicronautSpec {
                 .addPart("title", "bar-disk")
                 .addPart("data", "data.json", MediaType.APPLICATION_JSON_TYPE, data.bytes)
                 .build()
+        File file = new File(uploadDir, "bar-disk.json")
 
         when:
         Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
@@ -52,14 +53,17 @@ class DiskUploadSpec extends AbstractMicronautSpec {
         ))
         HttpResponse<String> response = flowable.blockFirst()
         def result = response.getBody().get()
-        File file = new File(uploadDir, "bar-disk.json")
-        file.deleteOnExit()
 
         then:
         response.code() == HttpStatus.OK.code
         result == "Uploaded ${data.size()}"
         file.exists()
         file.length() == data.size()
+
+        cleanup:
+        if (file.exists()) {
+            file.delete()
+        }
     }
 
     void "test upload big FileUpload object via transferTo"() {

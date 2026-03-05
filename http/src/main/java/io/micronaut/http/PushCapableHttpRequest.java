@@ -16,8 +16,6 @@
 package io.micronaut.http;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
-
 /**
  * A {@link HttpRequest} that is potentially capable of HTTP2 server push. Code should check
  * {@link #isServerPushSupported()} before attempting to send any server push.
@@ -64,5 +62,5 @@ public interface PushCapableHttpRequest<B> extends HttpRequest<B> {
      *                                       {@link #isServerPushSupported()}.
      */
     @Experimental
-    PushCapableHttpRequest<B> serverPush(@NonNull HttpRequest<?> request);
+    PushCapableHttpRequest<B> serverPush(HttpRequest<?> request);
 }

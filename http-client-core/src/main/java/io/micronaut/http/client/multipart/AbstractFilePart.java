@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.client.multipart;
 
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.http.MediaType;
@@ -60,7 +59,6 @@ abstract class AbstractFilePart<D> extends Part<D> {
      */
     abstract long getLength();
 
-    @NonNull
     @Override
     <T> T getData(MultipartDataFactory<T> factory) {
         MediaType mediaType = contentType;

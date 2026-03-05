@@ -48,12 +48,14 @@ import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
+import org.jspecify.annotations.Nullable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Handler for WebSocket clients.
@@ -70,10 +72,15 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
      */
     private final WebSocketBean<T> genericWebSocketBean;
     private final Sinks.One<T> completion = Sinks.one();
+    @Nullable
     private final UriMatchInfo matchInfo;
+    @Nullable
     private NettyWebSocketSession clientSession;
+    @Nullable
     private FullHttpResponse handshakeResponse;
+    @Nullable
     private Argument<?> clientBodyArgument;
+    @Nullable
     private Argument<?> clientPongArgument;
 
     /**
@@ -117,17 +124,17 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
 
     @Override
     public Argument<?> getBodyArgument() {
-        return clientBodyArgument;
+        return Objects.requireNonNull(clientBodyArgument);
     }
 
     @Override
     public Argument<?> getPongArgument() {
-        return clientPongArgument;
+        return Objects.requireNonNull(clientPongArgument);
     }
 
     @Override
     public NettyWebSocketSession getSession() {
-        return clientSession;
+        return Objects.requireNonNull(clientSession);
     }
 
     @Override
@@ -178,7 +185,7 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
             }
 
             ExecutableBinder<WebSocketState> binder = new DefaultExecutableBinder<>();
-            BoundExecutable<?, ?> bound = binder.tryBind(messageHandler.getExecutableMethod(), webSocketBinder, new WebSocketState(clientSession, originatingRequest));
+            BoundExecutable<?, ?> bound = binder.tryBind(Objects.requireNonNull(messageHandler).getExecutableMethod(), webSocketBinder, new WebSocketState(clientSession, originatingRequest));
             List<Argument<?>> unboundArguments = bound.getUnboundArguments();
 
             if (unboundArguments.size() == 1) {
@@ -233,26 +240,23 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
 
     @Override
     protected NettyWebSocketSession createWebSocketSession(ChannelHandlerContext ctx) {
-        if (ctx != null) {
-            return new NettyWebSocketSession(
-                    handshakeResponse.headers().get(HttpHeaderNames.SEC_WEBSOCKET_ACCEPT),
-                    ctx.channel(),
-                    originatingRequest,
-                    mediaTypeCodecRegistry,
-                    messageBodyHandlerRegistry,
-                    handshaker.version().toHttpHeaderValue(),
-                    ctx.pipeline().get(SslHandler.class) != null
-            ) {
-                @Override
-                public ConvertibleValues<Object> getUriVariables() {
-                    if (matchInfo != null) {
-                        return ConvertibleValues.of(matchInfo.getVariableValues(), conversionService);
-                    }
-                    return ConvertibleValues.empty();
+        return new NettyWebSocketSession(
+            Objects.requireNonNull(handshakeResponse).headers().get(HttpHeaderNames.SEC_WEBSOCKET_ACCEPT),
+            ctx.channel(),
+            originatingRequest,
+            mediaTypeCodecRegistry,
+            messageBodyHandlerRegistry,
+            handshaker.version().toHttpHeaderValue(),
+            ctx.pipeline().get(SslHandler.class) != null
+        ) {
+            @Override
+            public ConvertibleValues<Object> getUriVariables() {
+                if (matchInfo != null) {
+                    return ConvertibleValues.of(matchInfo.getVariableValues(), conversionService);
                 }
-            };
-        }
-        return null;
+                return ConvertibleValues.empty();
+            }
+        };
     }
 
     @Override

@@ -20,7 +20,6 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 
 import io.micronaut.core.annotation.AnnotationUtil;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -35,7 +34,7 @@ public interface InjectionPoint<T> extends AnnotationMetadataProvider {
     /**
      * @return The bean that declares this injection point
      */
-    @NonNull BeanDefinition<T> getDeclaringBean();
+ BeanDefinition<T> getDeclaringBean();
 
     /**
      * @return The qualifier of the bean that declares this injection point

@@ -15,6 +15,8 @@
  */
 package io.micronaut.core.type;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * An {@link Argument} with a value.
  *
@@ -27,6 +29,7 @@ public interface ArgumentValue<V> extends Argument<V> {
     /**
      * @return The current value of the argument
      */
+    @Nullable
     V getValue();
 
     /**
@@ -37,7 +40,7 @@ public interface ArgumentValue<V> extends Argument<V> {
      * @param <T>      The value type
      * @return The created instance
      */
-    static <T> ArgumentValue<T> create(Argument<T> argument, T value) {
+    static <T> ArgumentValue<@Nullable T> create(Argument<T> argument, @Nullable T value) {
         return new DefaultArgumentValue<>(argument, value);
     }
 }

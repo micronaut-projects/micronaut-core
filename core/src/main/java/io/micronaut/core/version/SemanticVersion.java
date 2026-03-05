@@ -15,6 +15,8 @@
  */
 package io.micronaut.core.version;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * Utility class for comparing semantic versions.
  *
@@ -111,7 +113,7 @@ public class SemanticVersion implements Comparable<SemanticVersion> {
      * @param requiredVersion The required version
      * @return True if it is
      */
-    public static boolean isAtLeast(String version, String requiredVersion) {
+    public static boolean isAtLeast(@Nullable String version, String requiredVersion) {
         if (version != null) {
             SemanticVersion thisVersion = new SemanticVersion(version);
             SemanticVersion otherVersion = new SemanticVersion(requiredVersion);
@@ -120,7 +122,7 @@ public class SemanticVersion implements Comparable<SemanticVersion> {
         return false;
     }
 
-    private static boolean isAtLeastMajorMinorImpl(SemanticVersion version, int majorVersion, int minorVersion) {
+    private static boolean isAtLeastMajorMinorImpl(@Nullable SemanticVersion version, int majorVersion, int minorVersion) {
         if (version != null) {
             if (version.major == majorVersion) {
                 return version.minor >= minorVersion;

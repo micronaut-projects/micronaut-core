@@ -16,7 +16,6 @@
 package io.micronaut.inject.ast.annotation;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.GenericElement;
@@ -35,8 +34,7 @@ public interface ElementAnnotationMetadataFactory {
      * @param element The element
      * @return the element's metadata
      */
-    @NonNull
-    ElementAnnotationMetadata build(@NonNull Element element);
+    ElementAnnotationMetadata build(Element element);
 
     /**
      * Build new class element type annotation metadata from the class element.
@@ -44,8 +42,7 @@ public interface ElementAnnotationMetadataFactory {
      * @param element The element
      * @return the element's metadata
      */
-    @NonNull
-    ElementAnnotationMetadata buildTypeAnnotations(@NonNull ClassElement element);
+    ElementAnnotationMetadata buildTypeAnnotations(ClassElement element);
 
     /**
      * Build new generic element type annotation metadata from the class element.
@@ -53,8 +50,7 @@ public interface ElementAnnotationMetadataFactory {
      * @param element The element
      * @return the element's metadata
      */
-    @NonNull
-    ElementAnnotationMetadata buildGenericTypeAnnotations(@NonNull GenericElement element);
+    ElementAnnotationMetadata buildGenericTypeAnnotations(GenericElement element);
 
     /**
      * Build new mutable element annotation metadata.
@@ -62,15 +58,13 @@ public interface ElementAnnotationMetadataFactory {
      * @param annotationMetadata The preloaded annotation
      * @return the element's metadata
      */
-    @NonNull
-    ElementAnnotationMetadata buildMutable(@NonNull AnnotationMetadata annotationMetadata);
+    ElementAnnotationMetadata buildMutable(AnnotationMetadata annotationMetadata);
 
     /**
      * Makes this factory read-only. No modification to the annotation metadata should be persisted into the shared cache.
      *
      * @return read-only factory
      */
-    @NonNull
     ElementAnnotationMetadataFactory readOnly();
 
 }

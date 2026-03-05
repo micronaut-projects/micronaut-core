@@ -36,6 +36,7 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Objects;
 
 import static io.micronaut.core.util.ArrayUtils.EMPTY_CHAR_ARRAY;
 
@@ -68,6 +69,7 @@ final class JsonNodeTraversingParser extends ParserMinimalBase {
         contextStack.add(root);
     }
 
+    @Nullable
     private JsonNode currentNodeOrNull() {
         for (Context context : contextStack) {
             JsonNode node = context.currentNode();
@@ -79,6 +81,7 @@ final class JsonNodeTraversingParser extends ParserMinimalBase {
     }
 
     @Override
+    @Nullable
     public JsonToken nextToken() {
         if (first) {
             // the context stack starts out positioned on the first token, so we need to intercept the first nextToken call.
@@ -112,7 +115,11 @@ final class JsonNodeTraversingParser extends ParserMinimalBase {
     public boolean isNaN() {
         JsonNode node = currentNodeOrNull();
         if (node != null && node.isNumber()) {
-            return NumberOutput.notFinite((Double) node.getValue());
+            Object value = node.getValue();
+            if (value == null) {
+                return false;
+            }
+            return NumberOutput.notFinite((Double) value);
         }
         return false;
     }
@@ -123,6 +130,7 @@ final class JsonNodeTraversingParser extends ParserMinimalBase {
     }
 
     @Override
+    @Nullable
     public String currentName() {
         return contextStack.isEmpty() ? null : contextStack.peekFirst().currentName();
     }
@@ -133,6 +141,7 @@ final class JsonNodeTraversingParser extends ParserMinimalBase {
     }
 
     @Override
+    @Nullable
     public TokenStreamContext streamReadContext() {
         return contextStack.isEmpty() ? null : contextStack.peekFirst();
     }
@@ -171,6 +180,7 @@ final class JsonNodeTraversingParser extends ParserMinimalBase {
     }
 
     @Override
+    @Nullable
     public Object currentValue() {
         return contextStack.isEmpty() ? null : contextStack.peekFirst().currentValue();
     }
@@ -183,6 +193,7 @@ final class JsonNodeTraversingParser extends ParserMinimalBase {
     }
 
     @Override
+    @Nullable
     public String getString() {
         if (contextStack.isEmpty()) {
             return null;
@@ -203,7 +214,8 @@ final class JsonNodeTraversingParser extends ParserMinimalBase {
 
     @Override
     public int getStringLength() throws JacksonException {
-        return getString().length();
+        String string = getString();
+        return string == null ? 0 : string.length();
     }
 
     @Override
@@ -231,6 +243,7 @@ final class JsonNodeTraversingParser extends ParserMinimalBase {
     }
 
     @Override
+    @Nullable
     public NumberType getNumberType() {
         JsonNode currentNode = currentNodeOrNull();
         if (currentNode == null || !currentNode.isNumber()) {
@@ -296,7 +309,7 @@ final class JsonNodeTraversingParser extends ParserMinimalBase {
     }
 
     @Override
-    public byte[] getBinaryValue(Base64Variant b64variant) {
+    public byte @Nullable [] getBinaryValue(Base64Variant b64variant) {
         JsonNode currentNode = currentNodeOrNull();
 
         if (currentNode != null && currentNode.isNull()) {
@@ -351,12 +364,14 @@ final class JsonNodeTraversingParser extends ParserMinimalBase {
         /**
          * Only used to implement {@link TokenStreamContext#getParent()}.
          */
+        @Nullable
         private final Context parent;
 
-        Context(Context parent) {
+        Context(@Nullable Context parent) {
             this.parent = parent;
         }
 
+        @Nullable
         protected Context createSubContextIfContainer(JsonNode node) {
             if (node.isArray()) {
                 return new ArrayContext(this, node.values().iterator());
@@ -368,6 +383,7 @@ final class JsonNodeTraversingParser extends ParserMinimalBase {
         }
 
         @Override
+        @Nullable
         public final Context getParent() {
             return parent;
         }
@@ -378,6 +394,7 @@ final class JsonNodeTraversingParser extends ParserMinimalBase {
         @Nullable
         abstract JsonNode currentNode();
 
+        @Nullable
         @Override
         public abstract String currentName();
 
@@ -385,6 +402,7 @@ final class JsonNodeTraversingParser extends ParserMinimalBase {
 
         abstract JsonToken currentToken();
 
+        @Nullable
         abstract String getText();
     }
 
@@ -393,9 +411,10 @@ final class JsonNodeTraversingParser extends ParserMinimalBase {
         /**
          * If {@code null}, we're either at the start or the end array token.
          */
+        @Nullable
         JsonNode currentNode = null;
 
-        ArrayContext(Context parent, Iterator<JsonNode> iterator) {
+        ArrayContext(@Nullable Context parent, Iterator<JsonNode> iterator) {
             super(parent);
             this._type = TYPE_ARRAY;
             this.iterator = iterator;
@@ -415,11 +434,13 @@ final class JsonNodeTraversingParser extends ParserMinimalBase {
         }
 
         @Override
+        @Nullable
         JsonNode currentNode() {
             return currentNode;
         }
 
         @Override
+        @Nullable
         public String currentName() {
             return null;
         }
@@ -456,7 +477,7 @@ final class JsonNodeTraversingParser extends ParserMinimalBase {
 
         boolean inFieldName = false;
 
-        ObjectContext(Context parent, Iterator<Map.Entry<String, JsonNode>> iterator) {
+        ObjectContext(@Nullable Context parent, Iterator<Map.Entry<String, JsonNode>> iterator) {
             super(parent);
             this._type = TYPE_OBJECT;
             this.iterator = iterator;
@@ -467,8 +488,7 @@ final class JsonNodeTraversingParser extends ParserMinimalBase {
         Context next() {
             if (inFieldName) {
                 inFieldName = false;
-                assert currentValue != null;
-                return createSubContextIfContainer(currentValue);
+                return createSubContextIfContainer(Objects.requireNonNull(currentValue));
             } else {
                 if (iterator.hasNext()) {
                     Map.Entry<String, JsonNode> entry = iterator.next();
@@ -515,6 +535,7 @@ final class JsonNodeTraversingParser extends ParserMinimalBase {
         }
 
         @Override
+        @Nullable
         String getText() {
             if (inFieldName) {
                 return currentName;
@@ -545,13 +566,13 @@ final class JsonNodeTraversingParser extends ParserMinimalBase {
             return null;
         }
 
-        @Nullable
         @Override
         JsonNode currentNode() {
             return value;
         }
 
         @Override
+        @Nullable
         public String currentName() {
             return null;
         }

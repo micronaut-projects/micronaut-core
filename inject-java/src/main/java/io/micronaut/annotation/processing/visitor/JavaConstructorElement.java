@@ -16,7 +16,6 @@
 package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
@@ -50,12 +49,12 @@ class JavaConstructorElement extends JavaMethodElement implements ConstructorEle
     }
 
     @Override
-    public boolean overrides(@NonNull MethodElement overridden) {
+    public boolean overrides(MethodElement overridden) {
         return false;
     }
 
     @Override
-    public boolean hides(@NonNull MemberElement hidden) {
+    public boolean hides(MemberElement hidden) {
         return false;
     }
 }

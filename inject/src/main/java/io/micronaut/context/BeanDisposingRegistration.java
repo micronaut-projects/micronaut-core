@@ -18,6 +18,7 @@ package io.micronaut.context;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 
@@ -31,6 +32,7 @@ import java.util.List;
 @Internal
 final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> {
     private final BeanContext beanContext;
+    @Nullable
     private final List<BeanRegistration<?>> dependents;
 
     BeanDisposingRegistration(BeanContext beanContext,
@@ -57,6 +59,7 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> {
         beanContext.destroyBean(this);
     }
 
+    @Nullable
     public List<BeanRegistration<?>> getDependents() {
         return dependents;
     }

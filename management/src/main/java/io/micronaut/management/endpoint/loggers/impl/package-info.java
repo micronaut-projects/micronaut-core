@@ -20,6 +20,9 @@
  * @since 1.0
  */
 @Internal
+@NullMarked
 package io.micronaut.management.endpoint.loggers.impl;
 
+
+import org.jspecify.annotations.NullMarked;
 import io.micronaut.core.annotation.Internal;

@@ -1,16 +1,16 @@
 [versions]
 awaitility = "4.3.0"
 bcpkix = "1.70"
-blaze = "1.6.17"
+blaze = "1.6.18"
 brotli4j = "1.18.0"
-bytebuddy = "1.18.3"
+bytebuddy = "1.18.7"
 caffeine = "2.9.3"
 classgraph = "4.8.184"
 compile-testing = "0.21.0"
 
 geb = "7.0"
 # be sure to update graal version in gradle.properties as well
-graal-svm = "23.1.9"
+graal-svm = "23.1.10"
 h2 = "2.2.224"
 hibernate = "5.5.9.Final"
 htmlunit = "2.70.0"
@@ -34,22 +34,22 @@ jazzer = "0.24.0"
 jcache = "1.1.1"
 junit5 = "5.12.2"
 junit-platform="1.12.2"
-logback = "1.5.22"
+logback = "1.5.32"
 lombok = "1.18.42"
 logbook-netty = "3.12.3"
-log4j = "2.24.3"
+log4j = "2.25.3"
 micronaut-aws = "4.11.0"
 micronaut-groovy = "4.7.0"
 micronaut-session = "4.6.0"
-micronaut-sql = "5.3.0"
-micronaut-test = "4.10.2"
-micronaut-validation = "4.9.0"
-micronaut-rxjava2 = "2.7.0"
-micronaut-rxjava3 = "3.7.0"
-micronaut-reactor = "3.7.0"
-micronaut-kotlin = "4.6.0"
+micronaut-sql = "7.0.0"
+micronaut-test = "5.0.0-M6"
+micronaut-validation = "5.0.0-M1"
+micronaut-rxjava2 = "2.9.0"
+micronaut-rxjava3 = "4.0.0-M1"
+micronaut-reactor = "4.0.0-M1"
+micronaut-kotlin = "4.7.0"
 micronaut-data = "5.0.0-SNAPSHOT"
-native-gradle-plugin = "0.11.3"
+native-gradle-plugin = "0.11.4"
 neo4j-java-driver = "5.17.0"
 selenium = "4.27.0"
 okio = "3.9.1"
@@ -60,36 +60,42 @@ spotbugs = "4.9.8"
 systemlambda = "1.2.1"
 testcontainers = "1.21.4"
 tomlj="1.1.1"
-vertx = "4.5.17"
+vertx = "4.5.23"
 wiremock = "2.33.2"
 mimepull = "1.10.0"
-micronaut-sourcegen = "1.8.2"
+micronaut-sourcegen = "2.0.0-M1"
 icu4j = "76.1"
 jfrunit = "1.0.0.Alpha2"
 junit4 = "4.13.2"
+zacsweers-kotlin-compile-testing = "0.12.1"
+errorprone-gradle-plugin = "4.3.0"
+nullaway = "0.12.15"
+error_prone_core = "2.45.0"
+jackson2 = "2.21.1"
 
 #
 # Versions which start with managed- are managed by Micronaut in the sense
 # that they will appear in the Micronaut BOM as <properties>
 #
-managed-groovy = "5.0.3"
+managed-groovy = "5.0.4"
 managed-jakarta-annotation-api = "2.1.1"
 managed-jackson = "3.0.1"
 managed-jackson-annotations = "2.20"
-managed-kotlin = "2.2.21"
+managed-kotlin = "2.3.10"
 managed-kotlin-coroutines = "1.10.2"
 managed-graalpy = "25.0.1"
 managed-methvin-directory-watcher = "0.19.1"
 managed-netty = "4.2.9.Final"
-managed-netty-tcnative = "2.0.74.Final"
+managed-netty-tcnative = "2.0.75.Final"
+managed-netty-contrib-multipart = "1.0.0.Final"
 managed-reactive-streams = "1.0.4"
 # This should be kept aligned with https://github.com/micronaut-projects/micronaut-reactor/blob/master/gradle.properties from the BOM
 managed-reactor = "3.7.12"
 managed-snakeyaml = "2.4"
 managed-java-parser-core = "3.27.1"
-managed-ksp = "2.2.21-2.0.4"
+managed-ksp = "2.3.6"
 managed-jspecify = "1.0.0"
-sonatype-scan = "3.0.0"
+sonatype-scan = "3.1.4"
 micronaut-docs = "3.0.0"
 
 [libraries]
@@ -167,6 +173,7 @@ managed-netty-transport-native-iouring = { module = "io.netty:netty-transport-na
 managed-netty-transport-native-unix-common = { module = "io.netty:netty-transport-native-unix-common", version.ref = "managed-netty" }
 managed-netty-pkitesting = { module = "io.netty:netty-pkitesting", version.ref = "managed-netty" }
 managed-netty-tcnative-boringssl-static = { module = "io.netty:netty-tcnative-boringssl-static", version.ref = "managed-netty-tcnative" }
+managed-netty-contrib-multipart-core = { module = "io.netty.contrib:netty-codec-multipart-core", version.ref = "managed-netty-contrib-multipart" }
 
 managed-reactive-streams = { module = "org.reactivestreams:reactive-streams", version.ref = "managed-reactive-streams" }
 
@@ -246,6 +253,8 @@ junit4 = { module = "junit:junit", version.ref = "junit4" }
 jazzer-junit = { module = "com.code-intelligence:jazzer-junit", version.ref = "jazzer" }
 jazzer-api = { module = "com.code-intelligence:jazzer-api", version.ref = "jazzer" }
 
+jackson2-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson2" }
+
 jetbrains-annotations = { module = "org.jetbrains:annotations", version.ref = "jetbrains-annotations" }
 
 kotlin-kotest-junit5 = { module = "io.kotest:kotest-runner-junit5-jvm" }
@@ -266,6 +275,7 @@ micronaut-test-junit5 = { module = "io.micronaut.test:micronaut-test-junit5", ve
 micronaut-test-kotest5 = { module = "io.micronaut.test:micronaut-test-kotest5", version.ref = "micronaut-test" }
 micronaut-test-spock = { module = "io.micronaut.test:micronaut-test-spock", version.ref = "micronaut-test" }
 micronaut-test-type-pollution = { module = "io.micronaut.test:micronaut-test-type-pollution", version.ref = "micronaut-test" }
+micronaut-test-netty-leak = { module = "io.micronaut.test:micronaut-test-netty-leak", version.ref = "micronaut-test" }
 
 micronaut-sql-jdbc = { module = "io.micronaut.sql:micronaut-jdbc", version.ref = "micronaut-sql" }
 micronaut-sql-jdbc-tomcat = { module = "io.micronaut.sql:micronaut-jdbc-tomcat", version.ref = "micronaut-sql" }
@@ -318,6 +328,13 @@ ksp-commonDeps = { module = "com.google.devtools.ksp:symbol-processing-common-de
 ksp-aaEmbeddable = { module = "com.google.devtools.ksp:symbol-processing-aa-embeddable", version.ref = "managed-ksp" }
 
 jfrunit-core = { module = "org.moditect.jfrunit:jfrunit-core", version.ref = "jfrunit" }
+
+zacsweers-kct-ksp = { module = "dev.zacsweers.kctfork:ksp", version.ref = "zacsweers-kotlin-compile-testing" }
+
+nullaway = { module = "com.uber.nullaway:nullaway", version.ref = "nullaway" }
+error-prone-core = { module = "com.google.errorprone:error_prone_core", version.ref = "error_prone_core" }
+
+gradle-errorprone = { module = "net.ltgt.errorprone:net.ltgt.errorprone.gradle.plugin", version.ref = "errorprone-gradle-plugin"}
 
 [plugins]
 managed-kotlin-allopen = { id = "org.jetbrains.kotlin.plugin.allopen", version.ref = "managed-kotlin" }

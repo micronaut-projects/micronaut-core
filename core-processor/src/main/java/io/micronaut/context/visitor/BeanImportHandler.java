@@ -17,8 +17,6 @@ package io.micronaut.context.visitor;
 
 import java.util.Collections;
 import java.util.Set;
-
-import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
 import io.micronaut.inject.visitor.VisitorContext;
 
@@ -34,7 +32,7 @@ public interface BeanImportHandler {
     /**
      * @return The supported annotation names.
      */
-    default @NonNull Set<String> getSupportedAnnotationNames() {
+    default Set<String> getSupportedAnnotationNames() {
         return Collections.emptySet();
     }
 

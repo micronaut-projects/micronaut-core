@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.http.netty.channel;
-
-import org.jspecify.annotations.NonNull;
 import io.netty.channel.EventLoopGroup;
 
 import java.util.Optional;
@@ -33,17 +31,17 @@ public interface EventLoopGroupRegistry {
      * @param name The name of the group
      * @return The event loop group if configured
      */
-    Optional<EventLoopGroup> getEventLoopGroup(@NonNull String name);
+    Optional<EventLoopGroup> getEventLoopGroup(String name);
 
     /**
      * @return Obtains the default event loop group.
      */
-    @NonNull EventLoopGroup getDefaultEventLoopGroup();
+    EventLoopGroup getDefaultEventLoopGroup();
 
     /**
      * Obtain a configured Event Loop Group from the registry.
      * @param name The name of the group
      * @return The event loop group if configured
      */
-    Optional<EventLoopGroupConfiguration> getEventLoopGroupConfiguration(@NonNull String name);
+    Optional<EventLoopGroupConfiguration> getEventLoopGroupConfiguration(String name);
 }

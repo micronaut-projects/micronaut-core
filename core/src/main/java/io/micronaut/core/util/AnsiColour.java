@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.core.util;
-
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -134,7 +132,7 @@ public enum AnsiColour {
      * @param text The text
      * @return The formatted string
      */
-    public static String yellow(@NonNull String text) {
+    public static String yellow(String text) {
         if (isSupported()) {
             return AnsiColour.YELLOW + text + AnsiColour.RESET;
         } else {
@@ -199,7 +197,7 @@ public enum AnsiColour {
      * @param object The object
      * @return The formatted object
      */
-    public static @NonNull String formatObject(@Nullable Object object) {
+    public static String formatObject(@Nullable Object object) {
         if (object instanceof CharSequence charSequence) {
             return green("\"" + charSequence + "\"");
         } else if (object instanceof Number number) {
@@ -216,7 +214,7 @@ public enum AnsiColour {
      * @param text The text
      * @return The formatted text
      */
-    public static @NonNull String blue(@NonNull String text) {
+    public static String blue(String text) {
         if (isSupported()) {
             return AnsiColour.BLUE + text + AnsiColour.RESET;
         } else {

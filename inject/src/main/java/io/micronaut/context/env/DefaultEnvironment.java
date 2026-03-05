@@ -22,6 +22,10 @@ import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.DefaultMutableConversionService;
 import io.micronaut.core.convert.MutableConversionService;
+import io.micronaut.core.io.ResourceConflictException;
+import io.micronaut.core.io.ResourceDuplicateException;
+import io.micronaut.core.io.ResourceLoadStrategy;
+import io.micronaut.core.io.ResourceLoadStrategyType;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.core.io.file.DefaultFileSystemResourceLoader;
@@ -37,7 +41,6 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.value.PropertyCatalog;
 import io.micronaut.core.value.PropertyResolver;
 import io.micronaut.inject.BeanConfiguration;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,14 +57,18 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /**
@@ -93,6 +100,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     private final AnnotationScanner annotationScanner;
     private final Collection<String> configurationIncludes = new HashSet<>(3);
     private final Collection<String> configurationExcludes = new HashSet<>(3);
+    @Nullable
     private Collection<PropertySourceLoader> propertySourceLoaderList;
     private final Map<String, PropertySourceLoader> loaderByFormatMap = Collections.synchronizedMap(CollectionUtils.newLinkedHashMap(10));
     private final Map<String, Boolean> presenceCache = new ConcurrentHashMap<>();
@@ -114,7 +122,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
      *
      * @param configuration The configuration
      */
-    public DefaultEnvironment(@NonNull ApplicationContextConfiguration configuration) {
+    public DefaultEnvironment(ApplicationContextConfiguration configuration) {
         MutableConversionService conversionService = configuration.getConversionService().orElseGet(MutableConversionService::create);
         this.propertyPlaceholderResolver = new PropertySourcePropertyResolver(
             conversionService,
@@ -355,6 +363,9 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
                 for (PropertySource propertySource : propertySourcesLocator.load(this)) {
                     internalAddPropertySource(propertySource);
                     propertySources.add(propertySource);
+                    if (!PropertySource.CONTEXT.equals(propertySource.getName())) {
+                        refreshablePropertySources.add(propertySource);
+                    }
                 }
             }
         }
@@ -522,15 +533,224 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     }
 
     private void loadPropertySourceFromLoader(String name, PropertySourceLoader propertySourceLoader, List<PropertySource> propertySources, ResourceLoader resourceLoader) {
-        Optional<PropertySource> defaultPropertySource = propertySourceLoader.load(name, resourceLoader);
+        ResourceLoadStrategy strategy = configuration.getConfigurationLoadingStrategy();
+
+        Optional<PropertySource> defaultPropertySource = loadPropertySourceFromLoader(name, propertySourceLoader, resourceLoader, strategy);
         defaultPropertySource.ifPresent(propertySources::add);
+
         Set<String> activeNames = getActiveNames();
         int i = 0;
-        for (String activeName: activeNames) {
-            Optional<PropertySource> propertySource = propertySourceLoader.loadEnv(name, resourceLoader, ActiveEnvironment.of(activeName, i));
+        for (String activeName : activeNames) {
+            ActiveEnvironment activeEnvironment = ActiveEnvironment.of(activeName, i);
+            Optional<PropertySource> propertySource = loadPropertySourceFromLoader(name, propertySourceLoader, resourceLoader, activeEnvironment, strategy);
             propertySource.ifPresent(propertySources::add);
             i++;
         }
+    }
+
+    private Optional<PropertySource> loadPropertySourceFromLoader(String name,
+                                                                   PropertySourceLoader propertySourceLoader,
+                                                                   ResourceLoader resourceLoader,
+                                                                   ResourceLoadStrategy strategy) {
+        if (propertySourceLoader instanceof AbstractPropertySourceLoader abstractPropertySourceLoader) {
+            return loadPropertySourceFromAbstractLoader(name, abstractPropertySourceLoader, resourceLoader, abstractPropertySourceLoader.getOrder(), strategy);
+        }
+        return propertySourceLoader.load(name, resourceLoader);
+    }
+
+    private Optional<PropertySource> loadPropertySourceFromLoader(String name,
+                                                                   PropertySourceLoader propertySourceLoader,
+                                                                   ResourceLoader resourceLoader,
+                                                                   ActiveEnvironment activeEnvironment,
+                                                                   ResourceLoadStrategy strategy) {
+        if (propertySourceLoader instanceof AbstractPropertySourceLoader abstractPropertySourceLoader) {
+            String envName = name + "-" + activeEnvironment.getName();
+            int order = abstractPropertySourceLoader.getOrder() + 1 + activeEnvironment.getPriority();
+            return loadPropertySourceFromAbstractLoader(envName, abstractPropertySourceLoader, resourceLoader, order, strategy);
+        }
+        return propertySourceLoader.loadEnv(name, resourceLoader, activeEnvironment);
+    }
+
+    private Optional<PropertySource> loadPropertySourceFromAbstractLoader(String fileName,
+                                                                          AbstractPropertySourceLoader propertySourceLoader,
+                                                                          ResourceLoader resourceLoader,
+                                                                          int order,
+                                                                          ResourceLoadStrategy strategy) {
+        if (!propertySourceLoader.isEnabled()) {
+            return Optional.empty();
+        }
+
+        final boolean needsAllResources = strategy.type() == ResourceLoadStrategyType.MERGE_ALL
+            || strategy.type() == ResourceLoadStrategyType.FAIL_ON_DUPLICATE
+            || (strategy.type() == ResourceLoadStrategyType.FIRST_MATCH && strategy.warnOnDuplicates());
+
+        String[] extensions = propertySourceLoader.getExtensions().toArray(new String[0]);
+        if (!needsAllResources) {
+            // FIRST_MATCH with warnOnDuplicates=false: use first resource without enumerating all
+            for (String ext : extensions) {
+                String fileExt = fileName + "." + ext;
+                Optional<InputStream> config = propertySourceLoader.readInput(resourceLoader, fileExt);
+                if (config.isPresent()) {
+                    try (InputStream input = config.get()) {
+                        Map<String, Object> merged = propertySourceLoader.read(fileName, input);
+                        if (!merged.isEmpty()) {
+                            return Optional.of(propertySourceLoader.createPropertySource(fileName, merged, order, PropertySource.Origin.of(fileExt)));
+                        }
+                    } catch (IOException e) {
+                        throw new ConfigurationException("I/O exception occurred reading [" + fileExt + "]: " + e.getMessage(), e);
+                    }
+                }
+            }
+            return Optional.empty();
+        }
+
+        Map<String, List<URL>> extensionResources = new LinkedHashMap<>(extensions.length);
+        Set<String> mergeExtensions = new HashSet<>();
+        int extensionsWithResources = 0;
+
+        for (String ext : extensions) {
+            String fileExt = fileName + "." + ext;
+            List<URL> urls;
+            try {
+                urls = ClassPathResourceLoader.resolveResources(resourceLoader, fileExt, strategy);
+            } catch (ResourceDuplicateException e) {
+                throw new ConfigurationException(buildDuplicateConfigurationMessage(e.getResourceName(), e.getResources()));
+            } catch (ResourceConflictException e) {
+                urls = e.getResources();
+                mergeExtensions.add(ext);
+            }
+            extensionResources.put(ext, urls);
+            if (!urls.isEmpty()) {
+                extensionsWithResources++;
+            }
+        }
+
+        if (extensionsWithResources > 1 && strategy.type() != ResourceLoadStrategyType.MERGE_ALL) {
+            List<URL> allUrls = new ArrayList<>();
+            for (List<URL> urls : extensionResources.values()) {
+                allUrls.addAll(urls);
+            }
+            if (!allUrls.isEmpty() && strategy.type() == ResourceLoadStrategyType.FAIL_ON_DUPLICATE) {
+                throw new ConfigurationException(buildDuplicateConfigurationMessage(fileName, allUrls));
+            }
+        }
+
+        for (String ext : extensions) {
+            String fileExt = fileName + "." + ext;
+            List<URL> urls = Objects.requireNonNullElse(extensionResources.get(ext), Collections.emptyList());
+            Map<String, Object> merged = Collections.emptyMap();
+
+            if (urls.isEmpty()) {
+                Optional<InputStream> config = propertySourceLoader.readInput(resourceLoader, fileExt);
+                if (config.isPresent()) {
+                    try (InputStream input = config.get()) {
+                        merged = propertySourceLoader.read(fileName, input);
+                    } catch (IOException e) {
+                        throw new ConfigurationException("I/O exception occurred reading [" + fileExt + "]: " + e.getMessage(), e);
+                    }
+                }
+            } else if (mergeExtensions.contains(ext) && urls.size() > 1) {
+                List<URL> orderedUrls = urls;
+                if (!strategy.mergeOrder().isEmpty()) {
+                    orderedUrls = orderByArtifactPatterns(urls, strategy.mergeOrder());
+                }
+
+                if (LOG.isInfoEnabled()) {
+                    LOG.info("Merging configuration resources '{}' in order: {}", fileExt, orderedUrls);
+                }
+
+                Map<String, Object> mergedMap = new LinkedHashMap<>(64);
+                for (URL url : orderedUrls) {
+                    try (InputStream input = url.openStream()) {
+                        mergedMap.putAll(propertySourceLoader.read(fileName, input));
+                    } catch (IOException e) {
+                        throw new ConfigurationException("I/O exception occurred reading [" + fileExt + "] from [" + url + "]: " + e.getMessage(), e);
+                    }
+                }
+                merged = mergedMap;
+            } else {
+                Optional<InputStream> config = propertySourceLoader.readInput(resourceLoader, fileExt);
+                if (config.isPresent()) {
+                    try (InputStream input = config.get()) {
+                        merged = propertySourceLoader.read(fileName, input);
+                    } catch (IOException e) {
+                        throw new ConfigurationException("I/O exception occurred reading [" + fileExt + "]: " + e.getMessage(), e);
+                    }
+                }
+            }
+
+            if (!merged.isEmpty()) {
+                return Optional.of(propertySourceLoader.createPropertySource(fileName, merged, order, PropertySource.Origin.of(fileExt)));
+            }
+        }
+
+        return Optional.empty();
+    }
+
+    private static String buildDuplicateConfigurationMessage(String resourceName, List<URL> urls) {
+        StringBuilder sb = new StringBuilder(128);
+        sb.append("Duplicate configuration resource '").append(resourceName).append("' found on the classpath:");
+        for (URL url : urls) {
+            sb.append("\n - ").append(url.toExternalForm());
+        }
+        return sb.toString();
+    }
+
+    private static List<URL> orderByArtifactPatterns(List<URL> urls, List<String> artifactPatterns) {
+        final List<Pattern> patterns = new ArrayList<>(artifactPatterns.size());
+        for (String p : artifactPatterns) {
+            try {
+                patterns.add(Pattern.compile(p));
+            } catch (Exception e) {
+                throw new ConfigurationException("Invalid mergeOrder regex pattern: " + p, e);
+            }
+        }
+
+        record IndexedUrl(int originalIndex, int patternIndex, URL url) {
+        }
+
+        List<IndexedUrl> indexed = new ArrayList<>(urls.size());
+        for (int i = 0; i < urls.size(); i++) {
+            URL url = urls.get(i);
+            String artifactName = artifactName(url);
+            int index = patterns.size();
+            for (int p = 0; p < patterns.size(); p++) {
+                if (patterns.get(p).matcher(artifactName).matches()) {
+                    index = p;
+                    break;
+                }
+            }
+            indexed.add(new IndexedUrl(i, index, url));
+        }
+
+        indexed.sort(Comparator
+            .comparingInt(IndexedUrl::patternIndex)
+            .thenComparingInt(IndexedUrl::originalIndex));
+
+        List<URL> ordered = new ArrayList<>(urls.size());
+        for (IndexedUrl idx : indexed) {
+            ordered.add(idx.url());
+        }
+        return ordered;
+    }
+
+    private static String artifactName(URL url) {
+        String external = url.toExternalForm();
+
+        int bangIndex = external.indexOf("!/");
+        String withoutEntry = bangIndex > -1 ? external.substring(0, bangIndex) : external;
+        if (withoutEntry.startsWith("jar:")) {
+            withoutEntry = withoutEntry.substring(4);
+        }
+        if (withoutEntry.startsWith("file:")) {
+            withoutEntry = withoutEntry.substring(5);
+        }
+
+        int slashIndex = withoutEntry.lastIndexOf('/');
+        if (slashIndex > -1 && slashIndex < withoutEntry.length() - 1) {
+            return withoutEntry.substring(slashIndex + 1);
+        }
+        return withoutEntry;
     }
 
     /**

@@ -16,6 +16,7 @@
 package io.micronaut.core.convert.value;
 
 import io.micronaut.core.convert.ConversionService;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Map;
 
@@ -55,7 +56,7 @@ public class MutableConvertibleValuesMap<V> extends ConvertibleValuesMap<V> impl
     }
 
     @Override
-    public MutableConvertibleValues<V> put(CharSequence key, V value) {
+    public MutableConvertibleValues<V> put(CharSequence key, @Nullable V value) {
         if (value == null) {
             this.map.remove(key);
         } else {

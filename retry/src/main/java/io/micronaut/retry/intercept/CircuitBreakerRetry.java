@@ -45,9 +45,11 @@ class CircuitBreakerRetry implements MutableRetryState {
     private final RetryStateBuilder retryStateBuilder;
     private final long openTimeout;
     private final ExecutableMethod<?, ?> method;
+    @Nullable
     private final ApplicationEventPublisher eventPublisher;
     private final boolean throwWrappedException;
-    private AtomicReference<CircuitState> state = new AtomicReference<>(CircuitState.CLOSED);
+    private final AtomicReference<CircuitState> state = new AtomicReference<>(CircuitState.CLOSED);
+    @Nullable
     private volatile Throwable lastError;
     private volatile long time = System.currentTimeMillis();
     private volatile MutableRetryState childState;
@@ -59,11 +61,11 @@ class CircuitBreakerRetry implements MutableRetryState {
      * @param eventPublisher To publish circuit events
      * @param throwWrappedException If {@code true}, the original exception will be wrapped in {@link CircuitOpenException}
      */
-    CircuitBreakerRetry(
-        long openTimeout,
-        RetryStateBuilder childStateBuilder,
-        ExecutableMethod<?, ?> method,
-        ApplicationEventPublisher eventPublisher, boolean throwWrappedException) {
+    CircuitBreakerRetry(long openTimeout,
+                        RetryStateBuilder childStateBuilder,
+                        ExecutableMethod<?, ?> method,
+                        @Nullable ApplicationEventPublisher eventPublisher,
+                        boolean throwWrappedException) {
 
         this.retryStateBuilder = childStateBuilder;
         this.openTimeout = openTimeout;
@@ -158,6 +160,7 @@ class CircuitBreakerRetry implements MutableRetryState {
     }
 
     @Override
+    @Nullable
     public Class<? extends Throwable> getCapturedException() {
         return childState.getCapturedException();
     }
@@ -170,6 +173,7 @@ class CircuitBreakerRetry implements MutableRetryState {
     /**
      * @return The current state
      */
+    @Nullable
     CircuitState currentState() {
         if (state.get() == CircuitState.OPEN) {
             long now = System.currentTimeMillis();
