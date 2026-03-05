@@ -16,6 +16,7 @@
 package io.micronaut.python.processing.visitor;
 
 import io.micronaut.annotation.processing.visitor.ElementProvider;
+import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
@@ -67,7 +68,9 @@ public final class PythonScriptElement extends AbstractPythonElement implements 
                 enclosedElement.hasStereotype(AnnotationUtil.QUALIFIER) ||
                 enclosedElement.hasStereotype(Executable.class)) {
                 // make bean.
-                annotate(Singleton.class);
+                // Mark pooled to opt the script into pooled stub generation
+                annotate("io.micronaut.context.python.scope.ContextPooled");
+                annotate(Bean.class);
                 applyTypeLevelDefaultAnnotations(enclosedElement);
             }
         }

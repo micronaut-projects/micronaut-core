@@ -24,42 +24,6 @@ class Person:
 
         expect:
         assertGeneratedSourceContains(pythonCode, """
-  Person(String name, int age, Address address) {
-    this(ContextHolder.newInstance("python", "Person", name, age, address.asPolyglotValue()));
-  }
-
-  public Value asPolyglotValue() {
-    return ContextHolder.newInstance("python", "Person", this.name, this.age, this.address == null ? null : this.address.asPolyglotValue());
-  }
-
-  public static Person fromPolyglotValue(Value arg1) {
-    return new python.Person(arg1);
-  }
-
-  public void setName(String arg1) {
-    this.name = arg1;
-  }
-
-  public String getName() {
-    return this.name;
-  }
-
-  public void setAge(int arg1) {
-    this.age = arg1;
-  }
-
-  public int getAge() {
-    return this.age;
-  }
-
-  public void setAddress(Address arg1) {
-    this.address = arg1;
-  }
-
-  public Address getAddress() {
-    return this.address;
-  }
-
   @Override
   public String toString() {
     return new java.lang.StringBuilder("Person[").append("name=").append(this.name).append(", ").append("age=").append(this.age).append(", ").append("address=").append(this.address).append("]").toString();

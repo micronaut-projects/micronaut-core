@@ -119,9 +119,31 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         if (context instanceof PythonVisitorContext) {
 
             if (element instanceof PythonScriptElement scriptElement) {
-                // Handle script elements
-                visitScript(scriptElement, context);
+                boolean hasRoute = !scriptElement.getEnclosedElements(
+                    ElementQuery.ALL_METHODS
+                        .onlyAccessible()
+                        .onlyInstance()
+                        .onlyDeclared()
+                        .annotated(ann -> ann.hasStereotype("io.micronaut.http.annotation.HttpMethodMapping"))
+                ).isEmpty();
+                if (hasRoute || scriptElement.hasStereotype("io.micronaut.context.python.scope.ContextPooled")) {
+                    if (classBuilders.containsKey(scriptElement.getName())) {
+                        return;
+                    }
+                    var builder = PythonPooledStubGenerator.generatePooledScript(scriptElement, context, allClasses);
+                    classBuilders.put(scriptElement.getName(), new StubEntry(builder, scriptElement, Map.of()));
+                } else {
+                    visitScript(scriptElement, context);
+                }
             } else if (element instanceof AbstractPythonClassElement classElement) {
+                if (classElement.hasStereotype("io.micronaut.context.python.scope.ContextPooled")) {
+                    if (classBuilders.containsKey(classElement.getName())) {
+                        return;
+                    }
+                    var builder = PythonPooledStubGenerator.generatePooledClass(classElement, context, allClasses);
+                    classBuilders.put(classElement.getName(), new StubEntry(builder, classElement, Map.of()));
+                    return;
+                }
 
                 try {
                     if (classBuilders.containsKey(classElement.getName())) {
@@ -450,7 +472,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
                     // Generate static factory methods for @Creator methods
                     for (MethodElement creatorMethod : staticCreatorMethod) {
-                        addCreatorFactoryMethod(creatorMethod, builder, element, context);
+                        addCreatorFactoryMethod(creatorMethod, builder, element);
                     }
 
                     for (PropertyElement beanProperty : beanProperties) {
@@ -617,12 +639,12 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         }
     }
 
-    private static TypeDef erasedType(ClassElement t) {
+    static TypeDef erasedType(ClassElement t) {
         var parameterType = !t.getTypeArguments().isEmpty() ? ClassTypeDef.of(t.getName()) : TypeDef.of(t);
         return parameterType;
     }
 
-    private static void coerceParameterToPolyglotValue(
+    static void coerceParameterToPolyglotValue(
         TypedElement param,
         List<ExpressionDef> parameters,
         VariableDef.MethodParameter methodParam) {
@@ -631,15 +653,17 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             parameters.add(RUNTIME_UTIL.invokeStatic("coerceMap", TypeDef.of(Map.class), methodParam));
         } else if (genericType.isAssignable(List.class) && genericType.getTypeArguments().get("E") instanceof PythonClassElement) {
             parameters.add(RUNTIME_UTIL.invokeStatic("coerceList", TypeDef.of(List.class), methodParam));
-        } else if (genericType instanceof PythonClassElement) {
-            if (param.hasAnnotation("jakarta.annotation.Nullable")) {
-                // Handle nullable Python class parameters
-                parameters.add(
-                    methodParam.isNull().doIfElse(
+        } else if (genericType instanceof PythonClassElement pce) {
+            boolean isPooled = pce.hasStereotype("io.micronaut.context.python.scope.ContextPooled");
+            if (isPooled) {
+                // For pooled Python classes, inject the Java stub (host object), not the polyglot Value.
+                // This ensures method calls go through the Java wrapper which proxies to pooled contexts.
+                parameters.add(methodParam);
+            } else if (param.hasAnnotation("jakarta.annotation.Nullable")) {
+                parameters.add(methodParam.isNull().doIfElse(
                         ExpressionDef.nullValue(),
                         methodParam.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE)
-                    )
-                );
+                ));
             } else {
                 parameters.add(methodParam.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE));
             }
@@ -753,7 +777,12 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 if (isJunit5Test) {
                     return invokedValue;
                 } else {
-                    return handleReturnType(returnType, invokedValue);
+                    ExpressionDef expressionDef = handleReturnType(allClasses, returnType, invokedValue);
+                    if (returnType.isVoid()) {
+                        return invokedValue;
+                    } else {
+                        return expressionDef.returning();
+                    }
                 }
             })));
     }
@@ -811,7 +840,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 POLYGLOT_VALUE,
                 ExpressionDef.constant(beanProperty.getName())
             );
-            return handleReturnType(beanProperty.getType(), invokedValue);
+            return handleReturnType(allClasses, beanProperty.getType(), invokedValue).returning();
         })));
     }
 
@@ -829,7 +858,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 POLYGLOT_VALUE,
                 ExpressionDef.constant(beanProperty.getName())
             );
-            return handleReturnType(beanProperty.getType(), invokedValue);
+            return handleReturnType(allClasses, beanProperty.getType(), invokedValue).returning();
         })));
     }
 
@@ -900,7 +929,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 POLYGLOT_VALUE,
                 ExpressionDef.constant(beanProperty.getName())
             );
-            return handleReturnType(beanProperty.getType(), invokedValue);
+            return handleReturnType(allClasses, beanProperty.getType(), invokedValue).returning();
         })));
     }
 
@@ -940,7 +969,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         })));
     }
 
-    private StatementDef handleReturnType(ClassElement returnType, ExpressionDef.InvokeInstanceMethod invokedValue) {
+    static ExpressionDef handleReturnType(Map<String, ClassElement> allClasses, ClassElement returnType, ExpressionDef invokedValue) {
         // Choose appropriate conversion method based on return type
         if (returnType.isVoid()) {
             // For void methods, just invoke the Python method without returning
@@ -952,23 +981,23 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             String referenceTypeName = returnType.getName();
             return switch (referenceTypeName) {
                 case "java.lang.Integer" ->
-                    invokedValue.invoke("asInt", TypeDef.Primitive.INT).returning();
+                    invokedValue.invoke("asInt", TypeDef.Primitive.INT);
                 case "java.lang.Boolean" ->
-                    invokedValue.invoke("asBoolean", TypeDef.Primitive.BOOLEAN).returning();
+                    invokedValue.invoke("asBoolean", TypeDef.Primitive.BOOLEAN);
                 case "java.lang.Double" ->
-                    invokedValue.invoke("asDouble", TypeDef.Primitive.DOUBLE).returning();
+                    invokedValue.invoke("asDouble", TypeDef.Primitive.DOUBLE);
                 case "java.lang.Float" ->
-                    invokedValue.invoke("asFloat", TypeDef.Primitive.FLOAT).returning();
+                    invokedValue.invoke("asFloat", TypeDef.Primitive.FLOAT);
                 case "java.lang.Long" ->
-                    invokedValue.invoke("asLong", TypeDef.Primitive.LONG).returning();
+                    invokedValue.invoke("asLong", TypeDef.Primitive.LONG);
                 case "java.lang.Short" ->
-                    invokedValue.invoke("asShort", TypeDef.Primitive.SHORT).returning();
+                    invokedValue.invoke("asShort", TypeDef.Primitive.SHORT);
                 case "java.lang.Byte" ->
-                    invokedValue.invoke("asByte", TypeDef.Primitive.BYTE).returning();
+                    invokedValue.invoke("asByte", TypeDef.Primitive.BYTE);
                 case "java.lang.Character" -> invokedValue.invoke("asString", ClassTypeDef.STRING)
-                    .invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0)).returning();
+                    .invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0));
                 case "java.lang.String" ->
-                    invokedValue.invoke("asString", ClassTypeDef.STRING).returning();
+                    invokedValue.invoke("asString", ClassTypeDef.STRING);
                 default -> {
                     // Check for collection types
                     if (returnType.isAssignable(List.class)) {
@@ -976,43 +1005,37 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         ExpressionDef genericType = toClassExpression(componentType);
                         yield RUNTIME_UTIL
                             .invokeStatic("convertList", ClassTypeDef.of(List.class),
-                                invokedValue, genericType)
-                            .returning();
+                                invokedValue, genericType);
                     } else if (returnType.isAssignable(Map.class)) {
                         Map<String, ClassElement> typeArguments = returnType.getTypeArguments();
                         ExpressionDef keyType = toClassExpression(typeArguments.get("K"));
                         ExpressionDef valueType = toClassExpression(typeArguments.get("V"));
                         yield RUNTIME_UTIL
                             .invokeStatic("convertMap", ClassTypeDef.of(Map.class),
-                                invokedValue, keyType, valueType)
-                            .returning();
+                                invokedValue, keyType, valueType);
                     } else if (returnType.isAssignable(Set.class)) {
                         ClassElement componentType = returnType.getFirstTypeArgument().orElse(null);
                         ExpressionDef genericType = toClassExpression(componentType);
 
                         yield RUNTIME_UTIL
                             .invokeStatic("convertSet", ClassTypeDef.of(Set.class),
-                                invokedValue, genericType)
-                            .returning();
+                                invokedValue, genericType);
                     } else if (returnType.isAssignable(java.util.Optional.class)) {
                         ClassElement componentType = returnType.getFirstTypeArgument().orElse(null);
                         ExpressionDef genericType = toClassExpression(componentType);
 
                         yield RUNTIME_UTIL
                             .invokeStatic("convertOptional", ClassTypeDef.of(java.util.Optional.class),
-                                invokedValue, genericType)
-                            .returning();
+                                invokedValue, genericType);
                     } else {
                         if (allClasses.containsKey(returnType.getName())) {
                             yield ClassTypeDef.of(returnType)
-                                .invokeStatic(FROM_POLYGLOT_VALUE, POLYGLOT_VALUE, invokedValue)
-                                .returning();
+                                .invokeStatic(FROM_POLYGLOT_VALUE, POLYGLOT_VALUE, invokedValue);
                         } else {
                             yield RUNTIME_UTIL
                                 .invokeStatic("convertValue", ClassTypeDef.OBJECT,
                                     invokedValue, ClassTypeDef.of(returnType.getRawClassElement().getName()).getStaticField("class", TypeDef.CLASS))
-                                .cast(TypeDef.of(returnType))
-                                .returning();
+                                .cast(TypeDef.of(returnType));
                         }
                     }
                 }
@@ -1030,7 +1053,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return genericType;
     }
 
-    private void addCreatorFactoryMethod(MethodElement creatorMethod, ClassDef.ClassDefBuilder builder, ClassElement element, VisitorContext context) {
+    private void addCreatorFactoryMethod(MethodElement creatorMethod, ClassDef.ClassDefBuilder builder, ClassElement element) {
         String pythonMethodName = creatorMethod.getName();
         ClassTypeDef thisType = ClassTypeDef.of(element.getName());
 
@@ -1076,27 +1099,27 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             })));
     }
 
-    private static StatementDef convertPrimitive(ClassElement returnType, ExpressionDef.InvokeInstanceMethod invokedValue) {
+    private static ExpressionDef convertPrimitive(ClassElement returnType, ExpressionDef invokedValue) {
         String primitiveTypeName = returnType.getName();
         return switch (primitiveTypeName) {
             case "int", "java.lang.Integer" ->
-                invokedValue.invoke("asInt", TypeDef.Primitive.INT).returning();
+                invokedValue.invoke("asInt", TypeDef.Primitive.INT);
             case "boolean", "java.lang.Boolean" ->
-                invokedValue.invoke("asBoolean", TypeDef.Primitive.BOOLEAN).returning();
+                invokedValue.invoke("asBoolean", TypeDef.Primitive.BOOLEAN);
             case "double", "java.lang.Double" ->
-                invokedValue.invoke("asDouble", TypeDef.Primitive.DOUBLE).returning();
+                invokedValue.invoke("asDouble", TypeDef.Primitive.DOUBLE);
             case "float", "java.lang.Float" ->
-                invokedValue.invoke("asFloat", TypeDef.Primitive.FLOAT).returning();
+                invokedValue.invoke("asFloat", TypeDef.Primitive.FLOAT);
             case "long", "java.lang.Long" ->
-                invokedValue.invoke("asLong", TypeDef.Primitive.LONG).returning();
+                invokedValue.invoke("asLong", TypeDef.Primitive.LONG);
             case "short", "java.lang.Short" ->
-                invokedValue.invoke("asShort", TypeDef.Primitive.SHORT).returning();
+                invokedValue.invoke("asShort", TypeDef.Primitive.SHORT);
             case "byte", "java.lang.Byte" ->
-                invokedValue.invoke("asByte", TypeDef.Primitive.BYTE).returning();
+                invokedValue.invoke("asByte", TypeDef.Primitive.BYTE);
             case "char", "java.lang.Character" ->
                 invokedValue.invoke("asString", ClassTypeDef.STRING)
-                    .invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0)).returning();
-            default -> invokedValue.invoke("asString", ClassTypeDef.STRING).returning();
+                    .invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0));
+            default -> invokedValue.invoke("asString", ClassTypeDef.STRING);
         };
     }
 

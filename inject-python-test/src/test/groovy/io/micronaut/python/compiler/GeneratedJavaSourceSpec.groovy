@@ -31,7 +31,7 @@ abstract class GeneratedJavaSourceSpec extends Specification {
             javaCode.contains(expectedSnippet.stripIndent().trim())
         }
         assert matched : ("None of the generated sources contained the expected snippet. Available sources:\n" +
-                sources.collect { it.toUri().toString() }.join('\n'))
+                sources.collect { it.toUri().toString() + "\n-----------\n" + it.getCharContent(true).toString() + '----------' }.join('\n'))
     }
 
     protected void assertGeneratedSourceEquals(String pythonCode, String expectedFull, String fqcn = null) {
