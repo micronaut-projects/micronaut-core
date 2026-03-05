@@ -533,6 +533,17 @@ public class DefaultHttpClient implements
         return this;
     }
 
+    @Override
+    public HttpClient refresh() {
+        if (isRunning()) {
+            connectionManager.refresh();
+        } else {
+            start();
+            connectionManager.refresh();
+        }
+        return this;
+    }
+
     /**
      * @return The {@link MediaTypeCodecRegistry} used by this client
      * @deprecated Use body handlers instead
