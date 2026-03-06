@@ -20,6 +20,7 @@ import io.netty.handler.ssl.util.SelfSignedCertificate
 import spock.lang.Shared
 import spock.lang.Specification
 
+import javax.net.ssl.SSLServerSocketFactory
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.KeyStore
@@ -52,6 +53,8 @@ class SslRefreshSpec extends Specification {
             println "Using OpenSSL provider. Supported ciphers: $ciphers"
         } else {
             // JDK will be used
+            def supportedCiphers = SSLServerSocketFactory.default.getSupportedCipherSuites() as List
+            ciphers = requiredCiphers.findAll { supportedCiphers.contains(it) }
             println "Using JDK provider. Supported ciphers: $ciphers"
         }
     }
