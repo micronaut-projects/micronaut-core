@@ -20,7 +20,6 @@ import io.netty.handler.ssl.util.SelfSignedCertificate
 import spock.lang.Shared
 import spock.lang.Specification
 
-import javax.net.ssl.SSLContext
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.KeyStore
@@ -30,7 +29,8 @@ import java.security.cert.X509Certificate
 class SslRefreshSpec extends Specification {
 
     // List of required ciphers
-    @Shared List<String> requiredCiphers = ['TLS_RSA_WITH_AES_128_CBC_SHA',
+    @Shared
+    List<String> requiredCiphers = ['TLS_RSA_WITH_AES_128_CBC_SHA',
                                     'TLS_RSA_WITH_AES_256_CBC_SHA',
                                     'TLS_RSA_WITH_AES_128_GCM_SHA256',
                                     'TLS_RSA_WITH_AES_256_GCM_SHA384',
@@ -40,7 +40,9 @@ class SslRefreshSpec extends Specification {
                                     'TLS_DHE_DSS_WITH_AES_256_GCM_SHA384']
 
     // Dynamically determine enabled ciphers
-    @Shared List<String> ciphers;
+    @Shared
+    List<String> ciphers
+
     def setupSpec() {
         if (SslProvider.isAlpnSupported(SslProvider.OPENSSL_REFCNT)) {
             // OpenSSL will be used
@@ -50,36 +52,28 @@ class SslRefreshSpec extends Specification {
             println "Using OpenSSL provider. Supported ciphers: $ciphers"
         } else {
             // JDK will be used
-            def context = SSLContext.getInstance("TLS")
-            context.init(null, null, null)
-            def engine = context.createSSLEngine()
-            ciphers = requiredCiphers.findAll { cipher ->
-                try {
-                    engine.setEnabledCipherSuites([cipher] as String[])
-                    true
-                } catch (IllegalArgumentException ignored) {
-                    false
-                }
-            }
             println "Using JDK provider. Supported ciphers: $ciphers"
         }
     }
 
-    @Shared Path keyStorePath
-    @Shared Path trustStorePath
-    @Shared Map<String, Object> config = [
-            'spec.name': 'SslRefreshSpec',
-            'micronaut.ssl.enabled': true,
-            'micronaut.server.ssl.port':-1,
-            'micronaut.server.ssl.client-authentication': 'NEED',
-            'micronaut.server.ssl.key-store.path': 'classpath:certs/server.p12',
-            'micronaut.server.ssl.key-store.password': 'secret',
-            'micronaut.server.ssl.ciphers': ciphers,
-            'micronaut.http.client.ssl.client-authentication': 'NEED',
+    @Shared
+    Path keyStorePath
+    @Shared
+    Path trustStorePath
+    @Shared
+    Map<String, Object> config = [
+            'spec.name'                                                : 'SslRefreshSpec',
+            'micronaut.ssl.enabled'                                    : true,
+            'micronaut.server.ssl.port'                                : -1,
+            'micronaut.server.ssl.client-authentication'               : 'NEED',
+            'micronaut.server.ssl.key-store.path'                      : 'classpath:certs/server.p12',
+            'micronaut.server.ssl.key-store.password'                  : 'secret',
+            'micronaut.server.ssl.ciphers'                             : ciphers,
+            'micronaut.http.client.ssl.client-authentication'          : 'NEED',
             'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
-            'micronaut.http.client.pool.enabled': false,
+            'micronaut.http.client.pool.enabled'                       : false,
             // need to force http1 because our ciphers are not supported by http2
-            'micronaut.http.client.http-version': '1.1',
+            'micronaut.http.client.http-version'                       : '1.1',
     ]
 
     private void makeClientCert(SelfSignedCertificate certificate) {
@@ -107,11 +101,11 @@ class SslRefreshSpec extends Specification {
         }
 
         config.putAll([
-                'micronaut.server.ssl.trust-store.path': 'file://' + trustStorePath.toString(),
-                'micronaut.server.ssl.trust-store.type': 'JKS',
-                'micronaut.server.ssl.trust-store.password': '123456',
-                'micronaut.http.client.ssl.key-store.path': 'file://' + keyStorePath.toString(),
-                'micronaut.http.client.ssl.key-store.type': 'PKCS12',
+                'micronaut.server.ssl.trust-store.path'       : 'file://' + trustStorePath.toString(),
+                'micronaut.server.ssl.trust-store.type'       : 'JKS',
+                'micronaut.server.ssl.trust-store.password'   : '123456',
+                'micronaut.http.client.ssl.key-store.path'    : 'file://' + keyStorePath.toString(),
+                'micronaut.http.client.ssl.key-store.type'    : 'PKCS12',
                 'micronaut.http.client.ssl.key-store.password': '',
         ])
     }
@@ -149,9 +143,9 @@ class SslRefreshSpec extends Specification {
 
         when:
         config.putAll('micronaut.server.ssl.key-store.path': 'classpath:keystore.p12',
-                        'micronaut.server.ssl.key-store.password': 'foobar',
-                        'micronaut.server.ssl.key-store.type': 'PKCS12',
-                        'micronaut.server.ssl.ciphers': ciphers[0..-2])
+                'micronaut.server.ssl.key-store.password': 'foobar',
+                'micronaut.server.ssl.key-store.type': 'PKCS12',
+                'micronaut.server.ssl.ciphers': ciphers[0..-2])
         def diff = embeddedServer.applicationContext.environment.refreshAndDiff()
         embeddedServer.applicationContext
                 .getBean(Argument.of(ApplicationEventPublisher, RefreshEvent))
