@@ -977,9 +977,12 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         if (convention == PropertySource.PropertyConvention.ENVIRONMENT_VARIABLE) {
             return environmentProperties.findPropertyNamesForEnvironmentVariable(property);
         }
-        return Collections.singletonList(
-                NameUtils.hyphenate(property, true)
-        );
+        String hyphenated = NameUtils.hyphenate(property, true);
+        String dehyphenated = NameUtils.hyphenate(NameUtils.dehyphenate(property), true);
+        if (hyphenated.equals(dehyphenated)) {
+            return Collections.singletonList(hyphenated);
+        }
+        return Arrays.asList(hyphenated, dehyphenated);
     }
 
     private void fill(List list, int toIndex, @Nullable Object value) {

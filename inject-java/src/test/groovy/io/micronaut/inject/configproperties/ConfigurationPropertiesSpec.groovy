@@ -186,6 +186,7 @@ class ConfigurationPropertiesSpec extends Specification {
         ApplicationContext context = ApplicationContext.run([
                 'configuration-example.camelCaseProp': 1,
                 'configuration-example.camelCase1234Prop': 2,
+                'configuration-example.foo-123-bar': 3,
                 'configuration-example.snake_case_prop': 5,
                 'configuration-example.snake_case1234_prop': 6,
                 'configuration-example.kebab-case-prop': 7,
@@ -198,6 +199,7 @@ class ConfigurationPropertiesSpec extends Specification {
         then:
         cfg.camelCaseProp == 1
         cfg.camelCase1234Prop == 2
+        cfg.foo123Bar == 3
         cfg.snakeCaseProp == 5
         cfg.snakeCase1234Prop == 6
         cfg.kebabCaseProp == 7

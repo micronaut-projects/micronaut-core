@@ -6,6 +6,7 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 class DigitsConfigurationExample {
     int camelCaseProp;
     int camelCase1234Prop;
+    int foo123Bar;
     int snakeCaseProp;
     int snakeCase1234Prop;
     int kebabCaseProp;
