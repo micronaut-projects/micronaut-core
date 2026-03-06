@@ -74,7 +74,7 @@ import static javax.lang.model.element.Modifier.PUBLIC;
  * @since 1.0
  */
 @Internal
-public abstract class AbstractJavaElement extends AbstractAnnotationElement {
+public abstract class AbstractJavaElement extends AbstractAnnotationElement implements ElementProvider {
 
     protected final JavaVisitorContext visitorContext;
     private final JavaNativeElement nativeElement;
@@ -88,6 +88,12 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement {
         super(annotationMetadataFactory);
         this.nativeElement = nativeElement;
         this.visitorContext = visitorContext;
+    }
+
+    @jakarta.annotation.Nullable
+    @Override
+    public Element element() {
+        return nativeElement.element();
     }
 
     /**

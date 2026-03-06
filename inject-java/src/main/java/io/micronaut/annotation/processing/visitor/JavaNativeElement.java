@@ -33,11 +33,12 @@ import javax.lang.model.type.TypeVariable;
  * @since 4.0.0
  */
 @Internal
-public sealed interface JavaNativeElement {
+public sealed interface JavaNativeElement extends ElementProvider {
 
     /**
      * @return The native element.
      */
+    @Override
     @Nullable
     Element element();
 
