@@ -978,6 +978,13 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             return environmentProperties.findPropertyNamesForEnvironmentVariable(property);
         }
         String hyphenated = NameUtils.hyphenate(property, true);
+        // Keep both key forms when a kebab key contains a standalone numeric segment.
+        // Example from #10215:
+        //   hyphenate("foo-123-bar")               -> "foo-123-bar" (already hyphenated)
+        //   dehyphenate("foo-123-bar")             -> "Foo123Bar"
+        //   hyphenate(dehyphenate("foo-123-bar"))  -> "foo123-bar"
+        // Generated @ConfigurationProperties metadata for field foo123Bar uses "foo123-bar",
+        // so storing both aliases allows user-supplied "foo-123-bar" to resolve correctly.
         String dehyphenated = NameUtils.hyphenate(NameUtils.dehyphenate(property), true);
         if (hyphenated.equals(dehyphenated)) {
             return Collections.singletonList(hyphenated);
