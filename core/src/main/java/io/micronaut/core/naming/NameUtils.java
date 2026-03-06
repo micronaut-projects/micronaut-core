@@ -567,14 +567,13 @@ public class NameUtils {
                 return propertyName;
             case 1:
                 return prefix + propertyName.toUpperCase(Locale.ENGLISH);
-            default: {
+            default:
                 var firstChar = propertyName.charAt(0);
                 var secondChar = propertyName.charAt(1);
                 if (Character.isLowerCase(firstChar) && Character.isUpperCase(secondChar)) {
                     return prefix + propertyName;
                 }
                 return prefix + Character.toUpperCase(firstChar) + propertyName.substring(1);
-            }
         }
     }
 
