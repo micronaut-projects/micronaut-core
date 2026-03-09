@@ -56,6 +56,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -498,9 +499,10 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             return visitors;
         }
         visitors = new ArrayList<>();
-        for (ServiceLoader.Provider<TypeElementVisitor> provider : ServiceLoader.load(TypeElementVisitor.class, classLoader).stream().toList()) {
+        Iterator<ServiceLoader.Provider<TypeElementVisitor>> it = ServiceLoader.load(TypeElementVisitor.class, classLoader).stream().iterator();
+        while (it.hasNext()) {
             try {
-                visitors.add(provider.get());
+                visitors.add(it.next().get());
             } catch (Throwable e) {
                 if (e instanceof VirtualMachineError virtualMachineError) {
                     throw virtualMachineError;
