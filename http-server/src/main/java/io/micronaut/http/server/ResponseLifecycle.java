@@ -132,6 +132,11 @@ public abstract class ResponseLifecycle {
             // usually this is a UriRouteInfo, avoid scalability issues here
             @SuppressWarnings("unchecked") final RouteInfo<Object> routeInfo = (RouteInfo<Object>) (routeInfoO instanceof DefaultUrlRouteInfo<?, ?> uri ? uri : (RouteInfo<?>) routeInfoO);
 
+            if (isImplicitlyEmptyBody(body)) {
+                response.body(null);
+                return encodeNoBody(response);
+            }
+
             if (Publishers.isConvertibleToPublisher(body)) {
                 response.body(null);
                 return mapToHttpContent(nettyRequest, response, body, routeInfo);
@@ -147,8 +152,7 @@ public abstract class ResponseLifecycle {
             } else {
                 responseBodyType = Argument.of((Class<Object>) body.getClass());
             }
-            boolean emptyBody = isImplicitlyEmptyBody(body);
-            if (responseMediaType == null && !emptyBody) {
+            if (responseMediaType == null) {
                 // perf: check for common body types
                 //noinspection ConditionCoveredByFurtherCondition
                 if (!(body instanceof String) && !(body instanceof byte[]) && body instanceof MediaTypeProvider mediaTypeProvider) {
