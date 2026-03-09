@@ -56,6 +56,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
@@ -82,7 +83,6 @@ import static io.micronaut.core.util.StringUtils.EMPTY_STRING;
     VisitorContext.MICRONAUT_PROCESSING_MODULE
 })
 public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcessor {
-    private static final String USE_CONTEXT_CLASSLOADER_PROPERTY = "micronaut.processing.use.context.classloader";
 
     private static final Set<String> VISITOR_WARNINGS;
     private static final Set<String> SUPPORTED_ANNOTATION_NAMES;
@@ -447,7 +447,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
     private static Collection<? extends TypeElementVisitor<?, ?>> findCoreTypeElementVisitors(@Nullable Set<String> warnings) {
         ClassLoader classLoader = TypeElementVisitorProcessor.class.getClassLoader();
-        if (Boolean.getBoolean(USE_CONTEXT_CLASSLOADER_PROPERTY)) {
+        if (Boolean.getBoolean(VisitorContext.MICRONAUT_PROCESSING_USE_CONTEXT_CLASSLOADER)) {
             ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
             if (contextClassLoader != null) {
                 classLoader = contextClassLoader;
@@ -485,8 +485,8 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                 }
                 return true;
             })
-            // remove duplicate classes
-            .collect(Collectors.toMap(Object::getClass, v -> v, (a, b) -> a)).values();
+            // remove duplicate classes, preserving encounter order via LinkedHashMap
+            .collect(Collectors.toMap(Object::getClass, v -> v, (a, b) -> a, LinkedHashMap::new)).values();
     }
 
     @SuppressWarnings("unchecked")

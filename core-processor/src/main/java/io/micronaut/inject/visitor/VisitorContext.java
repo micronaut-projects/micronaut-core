@@ -51,6 +51,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     String MICRONAUT_PROCESSING_PROJECT_DIR = "micronaut.processing.project.dir";
     String MICRONAUT_PROCESSING_GROUP = "micronaut.processing.group";
     String MICRONAUT_PROCESSING_MODULE = "micronaut.processing.module";
+    String MICRONAUT_PROCESSING_USE_CONTEXT_CLASSLOADER = "micronaut.processing.use.context.classloader";
 
     /**
      * @return The visitor context's language.

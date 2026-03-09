@@ -21,6 +21,7 @@ import io.micronaut.core.reflect.ClassUtils;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.InaccessibleObjectException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -292,7 +293,13 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
     private static <S> S instantiateUsingReflection(Class<S> clazz) throws ReflectiveOperationException {
         Constructor<S> constructor = clazz.getDeclaredConstructor();
         if (!constructor.canAccess(null)) {
-            constructor.setAccessible(true);
+            try {
+                constructor.setAccessible(true);
+            } catch (InaccessibleObjectException | SecurityException e) {
+                // Module system or security policy denies reflective access; treat as illegal access
+                // so dynamic service scanning can skip this class gracefully
+                throw new IllegalAccessException("Cannot access constructor of " + clazz.getName() + ": " + e.getMessage());
+            }
         }
         return constructor.newInstance();
     }
