@@ -59,6 +59,7 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -81,6 +82,8 @@ import static io.micronaut.core.util.StringUtils.EMPTY_STRING;
     VisitorContext.MICRONAUT_PROCESSING_MODULE
 })
 public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcessor {
+    private static final String USE_CONTEXT_CLASSLOADER_PROPERTY = "micronaut.processing.use.context.classloader";
+
     private static final Set<String> VISITOR_WARNINGS;
     private static final Set<String> SUPPORTED_ANNOTATION_NAMES;
 
@@ -214,13 +217,21 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             .flatMap(Collection::stream);
         Stream<String> visitorsAnnotationsOptions = typeElementVisitors
             .stream()
-            .filter(tev -> tev.getClass().isAnnotationPresent(SupportedOptions.class))
+            .filter(this::hasSupportedOptionsAnnotation)
             .map(TypeElementVisitor::getClass)
             .map(cls -> (SupportedOptions) cls.getAnnotation(SupportedOptions.class))
             .flatMap((SupportedOptions supportedOptions) -> Arrays.stream(supportedOptions.value()));
         return Stream.of(baseOption, visitorsAnnotationsOptions, visitorsOptions)
             .flatMap(Stream::sequential)
             .collect(Collectors.toSet());
+    }
+
+    private boolean hasSupportedOptionsAnnotation(TypeElementVisitor<?, ?> visitor) {
+        try {
+            return visitor.getClass().isAnnotationPresent(SupportedOptions.class);
+        } catch (UnsupportedOperationException e) {
+            return false;
+        }
     }
 
     @NextMajorVersion("`roundEnv.getRootElements()` should be removed in Micronaut 4. " +
@@ -435,14 +446,27 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
     }
 
     private static Collection<? extends TypeElementVisitor<?, ?>> findCoreTypeElementVisitors(@Nullable Set<String> warnings) {
-        return SoftServiceLoader.load(TypeElementVisitor.class, TypeElementVisitorProcessor.class.getClassLoader())
-            .disableFork()
-            .collectAll(visitor -> {
+        ClassLoader classLoader = TypeElementVisitorProcessor.class.getClassLoader();
+        if (Boolean.getBoolean(USE_CONTEXT_CLASSLOADER_PROPERTY)) {
+            ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
+            if (contextClassLoader != null) {
+                classLoader = contextClassLoader;
+            }
+        }
+        return loadTypeElementVisitors(classLoader)
+            .stream()
+            .filter(visitor -> {
                 if (!visitor.isEnabled()) {
                     return false;
                 }
 
-                final Requires requires = visitor.getClass().getAnnotation(Requires.class);
+                final Requires requires;
+                try {
+                    requires = visitor.getClass().getAnnotation(Requires.class);
+                } catch (UnsupportedOperationException e) {
+                    // Crema can throw UnsupportedOperationException for runtime annotation lookup; ignore @Requires checks in that case.
+                    return true;
+                }
                 if (requires != null) {
                     final Requires.Sdk sdk = requires.sdk();
                     if (sdk == Requires.Sdk.MICRONAUT) {
@@ -460,10 +484,29 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                     }
                 }
                 return true;
-            }).stream()
-            .filter(Objects::nonNull)
-            .<TypeElementVisitor<?, ?>>map(e -> e)
+            })
             // remove duplicate classes
             .collect(Collectors.toMap(Object::getClass, v -> v, (a, b) -> a)).values();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<TypeElementVisitor<?, ?>> loadTypeElementVisitors(ClassLoader classLoader) {
+        List<TypeElementVisitor<?, ?>> visitors = (List) SoftServiceLoader.load(TypeElementVisitor.class, classLoader)
+            .disableFork()
+            .collectAll();
+        if (!visitors.isEmpty()) {
+            return visitors;
+        }
+        visitors = new ArrayList<>();
+        for (ServiceLoader.Provider<TypeElementVisitor> provider : ServiceLoader.load(TypeElementVisitor.class, classLoader).stream().toList()) {
+            try {
+                visitors.add(provider.get());
+            } catch (Throwable e) {
+                if (e instanceof VirtualMachineError virtualMachineError) {
+                    throw virtualMachineError;
+                }
+            }
+        }
+        return visitors;
     }
 }

@@ -20,6 +20,7 @@ import io.micronaut.core.reflect.ClassUtils;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
+import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -181,8 +182,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
             try {
                 @SuppressWarnings("unchecked") final Class<S> loadedClass =
                         (Class<S>) Class.forName(className, false, classLoader);
-                // MethodHandler should more performant than the basic reflection
-                S result = (S) LOOKUP.findConstructor(loadedClass, VOID_TYPE).invoke();
+                S result = instantiate(loadedClass);
                 if (predicate != null && !predicate.test(result)) {
                     return null;
                 }
@@ -276,6 +276,27 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
         return new ServiceScanner<>(classLoader, serviceName, lineCondition, transformer).createCollector();
     }
 
+    private static <S> S instantiate(Class<S> clazz) throws Throwable {
+        try {
+            return instantiateUsingMethodHandle(clazz);
+        } catch (NoSuchMethodException | IllegalAccessException | IllegalAccessError e) {
+            return instantiateUsingReflection(clazz);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <S> S instantiateUsingMethodHandle(Class<S> clazz) throws Throwable {
+        return (S) LOOKUP.findConstructor(clazz, VOID_TYPE).invoke();
+    }
+
+    private static <S> S instantiateUsingReflection(Class<S> clazz) throws ReflectiveOperationException {
+        Constructor<S> constructor = clazz.getDeclaredConstructor();
+        if (!constructor.canAccess(null)) {
+            constructor.setAccessible(true);
+        }
+        return constructor.newInstance();
+    }
+
     /**
      * A {@link ServiceDefinition} implementation that uses a {@link MethodHandles.Lookup} object to find a public constructor.
      *
@@ -317,7 +338,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
         @SuppressWarnings({"unchecked"})
         private static <S> S doCreate(Class<S> clazz) {
             try {
-                return (S) LOOKUP.findConstructor(clazz, VOID_TYPE).invoke();
+                return instantiate(clazz);
             } catch (Throwable e) {
                 throw new ServiceLoadingException(e);
             }
