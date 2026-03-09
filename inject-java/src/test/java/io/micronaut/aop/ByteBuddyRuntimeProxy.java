@@ -104,6 +104,10 @@ public class ByteBuddyRuntimeProxy implements RuntimeProxyCreator {
         }
     }
 
+    public interface SuperCall {
+        Object call(Object[] args) throws Exception;
+    }
+
     public static class ProxyTargetInterceptor<T> {
 
         private final ExecutableMethod<T, Object> executableMethod;
@@ -153,9 +157,5 @@ public class ByteBuddyRuntimeProxy implements RuntimeProxyCreator {
 
             return new MethodInterceptorChain<>(newInterceptors, target, executableMethod, args).proceed();
         }
-    }
-
-    public interface SuperCall {
-        Object call(Object[] args) throws Exception;
     }
 }

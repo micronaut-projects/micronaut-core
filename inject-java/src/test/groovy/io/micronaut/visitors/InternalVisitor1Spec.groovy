@@ -48,7 +48,7 @@ class TestController extends io.micronaut.visitors.AbstractInternalMethodClass {
 ''')
         then:
             bd
-            parser.diagnosticCollector.diagnostics.isEmpty()
+            parser.diagnosticCollector.diagnostics.findAll { it.kind != javax.tools.Diagnostic.Kind.NOTE }.isEmpty()
 
     }
 

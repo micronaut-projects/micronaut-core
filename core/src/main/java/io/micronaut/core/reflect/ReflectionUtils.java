@@ -546,4 +546,49 @@ public class ReflectionUtils {
         }
     }
 
+    /**
+     * Instantiate the class.
+     *
+     * @param clazz The class
+     * @param args  The args
+     * @since 5.0.
+     */
+    public static Object instantiate(@NonNull Class<?> clazz, @NonNull Object... args) {
+        try {
+            Class<?>[] argTypes = Arrays.stream(args).map(Object::getClass).toArray(Class[]::new);
+            Constructor<?> constructor = getRequiredInternalConstructor(clazz, argTypes);
+            constructor.setAccessible(true);
+            return constructor.newInstance(args);
+        } catch (Throwable e) {
+            throw new InvocationException("Exception occurred instantiating class [" + clazz + "]: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Invokes an inaccessible method.
+     *
+     * @param instance   The instance
+     * @param methodName The method
+     * @param arguments  The arguments
+     * @param <R>        The return type
+     * @param <T>        The instance type
+     * @return The result
+     * @since 5.0
+     */
+    @UsedByGeneratedCode
+    public static <R, T> R invokeInaccessibleMethod(T instance, String methodName, Object... arguments) {
+        try {
+            Class<?>[] argTypes = Arrays.stream(arguments).map(Object::getClass).toArray(Class[]::new);
+            Method method = instance.getClass().getDeclaredMethod(methodName, argTypes);
+            method.setAccessible(true);
+            return (R) method.invoke(instance, arguments);
+        } catch (IllegalAccessException e) {
+            throw new InvocationException("Illegal access invoking method [" + methodName + "]: " + e.getMessage(), e);
+        } catch (InvocationTargetException e) {
+            throw new InvocationException("Exception occurred invoking method [" + methodName + "]: " + e.getMessage(), e);
+        } catch (NoSuchMethodException e) {
+            throw new InvocationException("Not found method [" + methodName + "]: " + e.getMessage(), e);
+        }
+    }
+
 }

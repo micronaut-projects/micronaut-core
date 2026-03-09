@@ -2,8 +2,8 @@ io.micronaut.visitors.CustomAnnMapper
 io.micronaut.aop.factory.mapped.TestConfigurationMapper
 io.micronaut.inject.annotation.CustomHeaderMapper
 io.micronaut.aop.introduction.ListenerAdviceMarkerMapper
-io.micronaut.aop.compile.AroundCompileSpec$NamedTestAnnMapper
+io.micronaut.aop.compile.AroundCompileTest$NamedTestAnnMapper
 io.micronaut.annotation.mapping.CustomEmbeddedIdMapper
 io.micronaut.annotation.mapping.NonNullProducingMapper
-io.micronaut.annotation.mapping.MapToRepeatableAnnotationSpec$TheAnnotationMapper
-io.micronaut.annotation.mapping.MappedValueHasDefaultSpec$TheAnnotationMapper
+io.micronaut.annotation.mapping.MapToRepeatableAnnotationTest$TheAnnotationMapper
+io.micronaut.annotation.mapping.MappedValueHasDefaultTest$TheAnnotationMapper

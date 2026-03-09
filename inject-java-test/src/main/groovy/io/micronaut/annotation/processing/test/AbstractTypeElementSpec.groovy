@@ -33,6 +33,7 @@ import io.micronaut.context.event.ApplicationEventPublisherFactory
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationMetadataProvider
 import io.micronaut.core.annotation.Experimental
+import io.micronaut.inject.test.JavaFileObjectClassLoader
 import org.jspecify.annotations.NonNull
 import org.jspecify.annotations.Nullable
 import io.micronaut.core.beans.BeanIntrospection

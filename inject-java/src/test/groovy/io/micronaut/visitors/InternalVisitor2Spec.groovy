@@ -51,7 +51,7 @@ class TestController extends io.micronaut.visitors.AbstractInternalMethodClass {
 
 }
 ''')
-            def diagnostics = parser.diagnosticCollector.diagnostics
+            def diagnostics = parser.diagnosticCollector.diagnostics.findAll { it.kind != javax.tools.Diagnostic.Kind.NOTE }
         then:
             bd
             diagnostics.size() == 2

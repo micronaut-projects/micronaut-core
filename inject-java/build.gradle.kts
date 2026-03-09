@@ -46,6 +46,7 @@ dependencies {
     }
     testImplementation(projects.micronautJacksonDatabind)
     testImplementation(libs.junit.jupiter.api)
+    testImplementation(libs.junit.jupiter.params)
     testImplementation(libs.javax.annotation.api)
     testImplementation(libs.javax.inject)
     testImplementation(libs.graal)

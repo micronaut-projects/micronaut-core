@@ -72,7 +72,8 @@ public class JdkRuntimeProxy implements RuntimeProxyCreator {
             return switch (method.getName()) {
                 case "equals" -> proxy == (args != null && args.length == 1 ? args[0] : null);
                 case "hashCode" -> System.identityHashCode(proxy);
-                case "toString" -> targetType.getName() + "@" + Integer.toHexString(System.identityHashCode(proxy));
+                case "toString" ->
+                    targetType.getName() + "@" + Integer.toHexString(System.identityHashCode(proxy));
                 default -> throw new UnsupportedOperationException(method.getName());
             };
         }
