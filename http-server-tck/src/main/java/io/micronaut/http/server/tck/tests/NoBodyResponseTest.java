@@ -282,9 +282,57 @@ public class NoBodyResponseTest {
     }
 
     @Test
+    void noContentByteArrayWithParameterizedWildcardAcceptDoesNotSetContentType() throws IOException {
+        asserts(SPEC_NAME,
+            HttpRequest.GET("/response-no-body/no-content-byte-array")
+                .header(HttpHeaders.ACCEPT, "*/*;q=0.8"),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
+                HttpResponseAssertion.builder()
+                    .status(HttpStatus.NO_CONTENT)
+                    .body(BodyAssertion.IS_MISSING)
+                    .assertResponse(response -> org.junit.jupiter.api.Assertions.assertFalse(response.getHeaders().contains(HttpHeaders.CONTENT_TYPE)))
+                    .build()));
+    }
+
+    @Test
     void nonEmptyByteArrayDefaultsToApplicationJson() throws IOException {
         asserts(SPEC_NAME,
             HttpRequest.GET("/response-no-body/non-empty-byte-array"),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
+                HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .assertResponse(response -> org.junit.jupiter.api.Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getContentType().orElse(null)))
+                    .build()));
+    }
+
+    @Test
+    void nonEmptyByteArrayWithParameterizedWildcardAcceptDefaultsToApplicationJson() throws IOException {
+        asserts(SPEC_NAME,
+            HttpRequest.GET("/response-no-body/non-empty-byte-array")
+                .header(HttpHeaders.ACCEPT, "*/*;q=0.8"),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
+                HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .assertResponse(response -> org.junit.jupiter.api.Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getContentType().orElse(null)))
+                    .build()));
+    }
+
+    @Test
+    void noContentByteArrayWithParameterizedWildcardProducesDoesNotSetContentType() throws IOException {
+        asserts(SPEC_NAME,
+            HttpRequest.GET("/response-no-body/no-content-byte-array-wildcard-parameterized-produces"),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
+                HttpResponseAssertion.builder()
+                    .status(HttpStatus.NO_CONTENT)
+                    .body(BodyAssertion.IS_MISSING)
+                    .assertResponse(response -> org.junit.jupiter.api.Assertions.assertFalse(response.getHeaders().contains(HttpHeaders.CONTENT_TYPE)))
+                    .build()));
+    }
+
+    @Test
+    void nonEmptyByteArrayWithParameterizedWildcardProducesDefaultsToApplicationJson() throws IOException {
+        asserts(SPEC_NAME,
+            HttpRequest.GET("/response-no-body/non-empty-byte-array-wildcard-parameterized-produces"),
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
                 HttpResponseAssertion.builder()
                     .status(HttpStatus.OK)
@@ -364,6 +412,16 @@ public class NoBodyResponseTest {
 
         @Get("/non-empty-byte-array")
         HttpResponse<byte[]> nonEmptyByteArray() {
+            return HttpResponse.ok(new byte[]{1});
+        }
+
+        @Get(uri = "/no-content-byte-array-wildcard-parameterized-produces", produces = "*/*;v=1")
+        HttpResponse<byte[]> noContentByteArrayWildcardParameterizedProduces() {
+            return HttpResponse.<byte[]>status(HttpStatus.NO_CONTENT).body(new byte[0]);
+        }
+
+        @Get(uri = "/non-empty-byte-array-wildcard-parameterized-produces", produces = "*/*;v=1")
+        HttpResponse<byte[]> nonEmptyByteArrayWildcardParameterizedProduces() {
             return HttpResponse.ok(new byte[]{1});
         }
 
