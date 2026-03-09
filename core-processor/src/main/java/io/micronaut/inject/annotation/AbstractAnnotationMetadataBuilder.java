@@ -50,6 +50,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -68,6 +69,8 @@ import static io.micronaut.expressions.EvaluatedExpressionConstants.EXPRESSION_P
  */
 @Internal
 public abstract class AbstractAnnotationMetadataBuilder<T, A> {
+    private static final String USE_CONTEXT_CLASSLOADER_PROPERTY = "micronaut.processing.use.context.classloader";
+
 
     /**
      * Names of annotations that should produce deprecation warnings.
@@ -84,8 +87,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     private static final Map<String, Map<CharSequence, Object>> ANNOTATION_DEFAULTS = new HashMap<>(20);
 
     static {
-        for (AnnotationMapper<?> mapper : SoftServiceLoader.load(AnnotationMapper.class, AbstractAnnotationMetadataBuilder.class.getClassLoader())
-                .disableFork().collectAll()) {
+        ClassLoader classLoader = resolveServiceClassLoader();
+
+        for (AnnotationMapper<?> mapper : loadServices(AnnotationMapper.class, classLoader)) {
             try {
                 String name = null;
                 if (mapper instanceof TypedAnnotationMapper<?> typedAnnotationMapper) {
@@ -101,8 +105,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             }
         }
 
-        for (AnnotationTransformer<?> transformer : SoftServiceLoader.load(AnnotationTransformer.class, AbstractAnnotationMetadataBuilder.class.getClassLoader())
-                .disableFork().collectAll()) {
+        for (AnnotationTransformer<?> transformer : loadServices(AnnotationTransformer.class, classLoader)) {
             try {
                 String name = null;
                 if (transformer instanceof TypedAnnotationTransformer<?> typedAnnotationTransformer) {
@@ -118,8 +121,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             }
         }
 
-        for (AnnotationRemapper mapper : SoftServiceLoader.load(AnnotationRemapper.class, AbstractAnnotationMetadataBuilder.class.getClassLoader())
-                .disableFork().collectAll()) {
+        for (AnnotationRemapper mapper : loadServices(AnnotationRemapper.class, classLoader)) {
             try {
                 String name = mapper.getPackageName();
                 if (name.equals(AnnotationRemapper.ALL_PACKAGES)) {
@@ -131,7 +133,45 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 // mapper, missing dependencies, continue
             }
         }
-        ELEMENT_VALIDATOR = SoftServiceLoader.load(AnnotatedElementValidator.class).firstAvailable().orElse(null);
+        ELEMENT_VALIDATOR = loadFirstService(AnnotatedElementValidator.class, classLoader).orElse(null);
+    }
+
+    private static ClassLoader resolveServiceClassLoader() {
+        if (Boolean.getBoolean(USE_CONTEXT_CLASSLOADER_PROPERTY)) {
+            ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
+            if (contextClassLoader != null) {
+                return contextClassLoader;
+            }
+        }
+        return AbstractAnnotationMetadataBuilder.class.getClassLoader();
+    }
+
+    private static <S> List<S> loadServices(Class<S> serviceType, ClassLoader classLoader) {
+        List<S> services = SoftServiceLoader.load(serviceType, classLoader)
+            .disableFork()
+            .collectAll();
+        if (!services.isEmpty()) {
+            return services;
+        }
+        services = new ArrayList<>();
+        ServiceLoader<S> serviceLoader = ServiceLoader.load(serviceType, classLoader);
+        for (ServiceLoader.Provider<S> provider : serviceLoader.stream().toList()) {
+            try {
+                services.add(provider.get());
+            } catch (Throwable e) {
+                if (e instanceof VirtualMachineError virtualMachineError) {
+                    throw virtualMachineError;
+                }
+            }
+        }
+        return services;
+    }
+
+    private static <S> Optional<S> loadFirstService(Class<S> serviceType, ClassLoader classLoader) {
+        for (S service : loadServices(serviceType, classLoader)) {
+            return Optional.of(service);
+        }
+        return Optional.empty();
     }
 
     private boolean validating = true;
