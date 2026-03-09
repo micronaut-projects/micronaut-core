@@ -24,52 +24,13 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * <p>
- * Represents a Python decorator in the annotation processing pipeline.
- * This record models a decorator instance (e.g., {@code @mydeco} or {@code @mydeco(param=42)}),
- * typically encountered while traversing Python AST nodes from user-provided source code.
- * </p>
+ * Represents a parsed Python decorator and its resolved metadata.
  *
- * <p>
- * Each {@code DecoratorDef} consists of:
- * </p>
- * <ul>
- *     <li>{@code name}: The qualified name of the decorator function as a string.
- *         For example, {@code "singleton"}, {@code "named"}, or {@code "micronaut.inject"}.</li>
- *     <li>{@code members}: A mapping of argument names to their values, as extracted from keyword arguments
- *         or call-time arguments (if any) in the Python decorator usage. Values are represented using GraalVM
- *         {@link org.graalvm.polyglot.Value} to support interop between Python and Java data models.</li>
- * </ul>
- *
- * <h2>Example</h2>
- * <p>
- * Given the Python decorator usage:
- * <pre>
- * &#64;named("example")
- * def myfunc(): ...
- * </pre>
- * This results in a {@code DecoratorDef} with name {@code "named"} and {@code members} possibly containing
- * {"name": Value.asString("example")} if arguments are parsed.
- * </p>
- *
- * <h2>Usage in Processing Pipeline</h2>
- * <p>
- * {@code DecoratorDef} instances are typically produced during AST traversal
- * (e.g., by the embedded Python {@code MicronautAstVisitor}) and are used to construct
- * higher-level Java elements such as {@link ClassDef} and {@link FunctionDef}.
- * </p>
- *
- * <h2>Null Safety</h2>
- * <ul>
- *     <li>Both {@code name} and {@code members} are required and validated non-null.</li>
- *     <li>When constructing from name only, an empty member map is used.</li>
- * </ul>
- *
- * @param name           The identifier of the decorator, must not be null.
- * @param annotationName The Micronaut annotation name associated with this decorator
- * @param repeatedName   The repeated name for repeatable annotations
- * @param members        The argument mapping for the decorator; must not be null, but may be empty.
- * @param stereotypes    Stereotypes are decorators applied to decorators
+ * @param name The decorator name
+ * @param annotationName The mapped Micronaut annotation name
+ * @param repeatedName The repeatable annotation container name
+ * @param members The decorator member values
+ * @param stereotypes Stereotype decorators applied to this decorator
  */
 public record DecoratorDef(
     String name,

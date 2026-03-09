@@ -61,8 +61,7 @@ final class PythonPooledStubGenerator {
         builder.addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.ValueCoercible"));
 
         ClassElement superType = element.getSuperType().orElse(null);
-        boolean extendsPythonClass = superType instanceof AbstractPythonClassElement;
-        if (extendsPythonClass) {
+        if (superType instanceof AbstractPythonClassElement) {
             builder.superclass(ClassTypeDef.of(superType.getName()));
         }
 

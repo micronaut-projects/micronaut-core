@@ -44,7 +44,7 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
 
     @Override
     public <T> T createProxy(RuntimeProxyDefinition<T> proxyDefinition) {
-        T targetBean;
+        @Nullable T targetBean;
         Value value;
         if (proxyDefinition.introduction()) {
             Class<T> beanType = proxyDefinition.proxyBeanDefinition().getBeanType();
@@ -76,7 +76,11 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
                         toPolyglotArray(invocationContext.getParameterValues(), originalFunction.getContext())
                     );
                 }
-                T tb = targetBean == null ? (T) targetBeanRef.get() : targetBean;
+                @SuppressWarnings("unchecked")
+                T tb = targetBean != null ? targetBean : (T) targetBeanRef.get();
+                if (tb == null) {
+                    throw new IllegalStateException("Target bean has not been initialized yet");
+                }
                 Object result = new MethodInterceptorChain(finalInterceptors, tb, executableMethod, javaArgs).proceed();
                 return unbox(result);
             };
@@ -88,6 +92,9 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
             T target = box(type, value.newInstance());
             targetBeanRef.set(target);
             return target;
+        }
+        if (targetBean == null) {
+            throw new IllegalStateException("Target bean is null for non-introduction proxy");
         }
         return targetBean;
     }

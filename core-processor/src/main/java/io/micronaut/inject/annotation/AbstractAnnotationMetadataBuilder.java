@@ -213,20 +213,6 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         }
     }
 
-    public final Optional<io.micronaut.core.annotation.AnnotationValue<?>> buildAnnotation(String annotationName) {
-        return getAnnotationMirror(annotationName).map(annotationType -> {
-            RetentionPolicy retentionPolicy = getRetentionPolicy(annotationType);
-
-            Map<CharSequence, Object> defaultValues = getCachedAnnotationDefaults(annotationName, annotationType);
-            AnnotationValue<Annotation> annotationValue = new AnnotationValue<>(annotationName, Map.of(), defaultValues, retentionPolicy);
-            List<AnnotationValue<?>> stereotypes =
-                extractStereotypes(new ProcessingContext(getVisitorContext()), new ProcessedAnnotation(annotationType, annotationValue))
-                    .stream().map(pa -> pa.annotationValue)
-                    .collect(Collectors.toUnmodifiableList());
-            return new AnnotationValue<>(annotationName, Map.of(), defaultValues, retentionPolicy, stereotypes);
-        });
-    }
-
     /**
      * Builds an annotation value for the given annotation type name.
      *

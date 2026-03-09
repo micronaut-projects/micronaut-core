@@ -24,6 +24,7 @@ import java.util.stream.Collectors;
 
 import io.micronaut.core.annotation.Internal;
 import org.graalvm.polyglot.Value;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Runtime utility class for converting GraalPy Values to Java collections.
@@ -256,7 +257,7 @@ public final class GraalPyRuntimeUtil {
      * Generic value conversion method that handles primitives and recursively converts collections.
      */
     @SuppressWarnings("unchecked")
-    public static <T> T convertValue(Value value, Class<T> targetType) {
+    public static <T> @Nullable T convertValue(Value value, Class<T> targetType) {
         if (value == null || value.isNull()) {
             return null;
         }
@@ -312,7 +313,7 @@ public final class GraalPyRuntimeUtil {
     /**
      * Get element at index from a GraalPy collection.
      */
-    private static Value getElementAt(Value collection, long index) {
+    private static @Nullable Value getElementAt(Value collection, long index) {
         try {
             // Try array access first
             try {

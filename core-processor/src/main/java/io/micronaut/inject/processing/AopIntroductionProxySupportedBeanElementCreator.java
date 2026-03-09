@@ -23,6 +23,9 @@ import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.BeanDefinitionVisitor;
 import io.micronaut.inject.writer.ProxyingBeanDefinitionVisitor;
+import org.jspecify.annotations.Nullable;
+
+import java.util.Objects;
 
 /**
  * Ordinary bean with AOP introduction.
@@ -63,8 +66,8 @@ final class AopIntroductionProxySupportedBeanElementCreator extends DeclaredBean
     }
 
     @Override
-    protected ProxyingBeanDefinitionVisitor getAroundAopProxyVisitor(BeanDefinitionVisitor visitor, MethodElement methodElement) {
-        return aopProxyVisitor;
+    protected ProxyingBeanDefinitionVisitor getAroundAopProxyVisitor(BeanDefinitionVisitor visitor, @Nullable MethodElement methodElement) {
+        return Objects.requireNonNull(aopProxyVisitor);
     }
 
     @Override

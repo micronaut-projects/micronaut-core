@@ -75,6 +75,7 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
     private static final String MSG_ADAPTER_METHOD_PREFIX = "Cannot adapt method [";
     private static final String MSG_TARGET_METHOD_PREFIX = "] to target method [";
 
+    @Nullable
     protected ProxyingBeanDefinitionVisitor aopProxyVisitor;
     protected final boolean isAopProxy;
     private final AtomicInteger adaptedMethodIndex = new AtomicInteger(0);
