@@ -31,6 +31,7 @@ import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.expressions.EvaluatedExpressionReference;
 import io.micronaut.core.io.service.SoftServiceLoader;
+import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
@@ -69,7 +70,6 @@ import static io.micronaut.expressions.EvaluatedExpressionConstants.EXPRESSION_P
  */
 @Internal
 public abstract class AbstractAnnotationMetadataBuilder<T, A> {
-    private static final String USE_CONTEXT_CLASSLOADER_PROPERTY = "micronaut.processing.use.context.classloader";
 
 
     /**
@@ -137,7 +137,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     private static ClassLoader resolveServiceClassLoader() {
-        if (Boolean.getBoolean(USE_CONTEXT_CLASSLOADER_PROPERTY)) {
+        if (Boolean.getBoolean(VisitorContext.MICRONAUT_PROCESSING_USE_CONTEXT_CLASSLOADER)) {
             ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
             if (contextClassLoader != null) {
                 return contextClassLoader;
@@ -168,8 +168,26 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     private static <S> Optional<S> loadFirstService(Class<S> serviceType, ClassLoader classLoader) {
-        for (S service : loadServices(serviceType, classLoader)) {
-            return Optional.of(service);
+        for (ServiceDefinition<S> definition : SoftServiceLoader.load(serviceType, classLoader).disableFork()) {
+            try {
+                if (definition.isPresent()) {
+                    return Optional.of(definition.load());
+                }
+            } catch (Throwable e) {
+                if (e instanceof VirtualMachineError virtualMachineError) {
+                    throw virtualMachineError;
+                }
+            }
+        }
+        Iterator<ServiceLoader.Provider<S>> it = ServiceLoader.load(serviceType, classLoader).stream().iterator();
+        while (it.hasNext()) {
+            try {
+                return Optional.of(it.next().get());
+            } catch (Throwable e) {
+                if (e instanceof VirtualMachineError virtualMachineError) {
+                    throw virtualMachineError;
+                }
+            }
         }
         return Optional.empty();
     }

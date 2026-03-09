@@ -30,7 +30,6 @@ import io.micronaut.core.order.OrderUtil;
  * @since 3.0.0
  */
 final class BeanElementVisitorLoader {
-    private static final String USE_CONTEXT_CLASSLOADER_PROPERTY = "micronaut.processing.use.context.classloader";
 
     /**
      * @return The loaded visitors
@@ -38,7 +37,7 @@ final class BeanElementVisitorLoader {
     @SuppressWarnings("unchecked")
     static List<BeanElementVisitor<?>> load() {
         ClassLoader classLoader = BeanElementVisitorLoader.class.getClassLoader();
-        if (Boolean.getBoolean(USE_CONTEXT_CLASSLOADER_PROPERTY)) {
+        if (Boolean.getBoolean(VisitorContext.MICRONAUT_PROCESSING_USE_CONTEXT_CLASSLOADER)) {
             ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
             if (contextClassLoader != null) {
                 classLoader = contextClassLoader;
