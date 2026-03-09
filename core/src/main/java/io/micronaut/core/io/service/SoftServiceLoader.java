@@ -298,14 +298,21 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
             } catch (InaccessibleObjectException | SecurityException e) {
                 // Module system or security policy denies reflective access; treat as illegal access
                 // so dynamic service scanning can skip this class gracefully
-                throw new IllegalAccessException("Cannot access constructor of " + clazz.getName() + ": " + e.getMessage());
+                IllegalAccessException iae = new IllegalAccessException("Cannot access constructor of " + clazz.getName() + ": " + e.getMessage());
+                iae.initCause(e);
+                throw iae;
             }
         }
         return constructor.newInstance();
     }
 
     /**
-     * A {@link ServiceDefinition} implementation that uses a {@link MethodHandles.Lookup} object to find a public constructor.
+     * A {@link ServiceDefinition} implementation that creates instances using the same instantiation
+     * strategy as {@link SoftServiceLoader#instantiate(Class)}: it first attempts to invoke a no-argument
+     * constructor via a {@link MethodHandles.Lookup} method handle, and if that fails due to access
+     * restrictions or similar conditions, it falls back to reflective instantiation using
+     * {@link java.lang.Class#getDeclaredConstructor()}. Depending on module and security configuration,
+     * this may allow invoking non-public no-argument constructors.
      *
      * @param <S> The service type
      */

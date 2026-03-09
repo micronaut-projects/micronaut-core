@@ -164,10 +164,10 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             return services;
         }
         services = new ArrayList<>();
-        ServiceLoader<S> serviceLoader = ServiceLoader.load(serviceType, classLoader);
-        for (ServiceLoader.Provider<S> provider : serviceLoader.stream().toList()) {
+        Iterator<ServiceLoader.Provider<S>> it = ServiceLoader.load(serviceType, classLoader).stream().iterator();
+        while (it.hasNext()) {
             try {
-                services.add(provider.get());
+                services.add(it.next().get());
             } catch (Throwable e) {
                 if (e instanceof VirtualMachineError virtualMachineError) {
                     throw virtualMachineError;
