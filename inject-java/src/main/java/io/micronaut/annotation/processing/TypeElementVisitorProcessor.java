@@ -438,12 +438,16 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
      */
     protected synchronized Collection<? extends TypeElementVisitor<?, ?>> findTypeElementVisitors() {
         if (typeElementVisitors == null) {
-            for (String visitorWarning : VISITOR_WARNINGS) {
-                warning(visitorWarning);
-            }
+            reportWarnings();
             typeElementVisitors = findCoreTypeElementVisitors(null);
         }
         return typeElementVisitors;
+    }
+
+    private void reportWarnings() {
+        for (String visitorWarning : VISITOR_WARNINGS) {
+            warning(visitorWarning);
+        }
     }
 
     private static Collection<? extends TypeElementVisitor<?, ?>> findCoreTypeElementVisitors(@Nullable Set<String> warnings) {
@@ -454,7 +458,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                 classLoader = contextClassLoader;
             }
         }
-        return loadTypeElementVisitors(classLoader)
+        return loadTypeElementVisitors(classLoader, warnings)
             .stream()
             .filter(visitor -> {
                 if (!visitor.isEnabled()) {
@@ -491,7 +495,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
     }
 
     @SuppressWarnings("unchecked")
-    private static List<TypeElementVisitor<?, ?>> loadTypeElementVisitors(ClassLoader classLoader) {
+    private static List<TypeElementVisitor<?, ?>> loadTypeElementVisitors(ClassLoader classLoader, @Nullable Set<String> warnings) {
         List<TypeElementVisitor<?, ?>> visitors = (List) SoftServiceLoader.load(TypeElementVisitor.class, classLoader)
             .disableFork()
             .collectAll();
@@ -501,11 +505,18 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         visitors = new ArrayList<>();
         Iterator<ServiceLoader.Provider<TypeElementVisitor>> it = ServiceLoader.load(TypeElementVisitor.class, classLoader).stream().iterator();
         while (it.hasNext()) {
+            Class<? extends TypeElementVisitor> type = null;
             try {
-                visitors.add(it.next().get());
+                ServiceLoader.Provider<TypeElementVisitor> provider = it.next();
+                type = provider.type();
+                visitors.add(provider.get());
             } catch (Throwable e) {
                 if (e instanceof VirtualMachineError virtualMachineError) {
                     throw virtualMachineError;
+                } else {
+                    if (warnings != null) {
+                        warnings.add("Error loading TypeElementVisitor " + (type != null ? type.getSimpleName() : "") + ": " + e.getMessage());
+                    }
                 }
             }
         }
