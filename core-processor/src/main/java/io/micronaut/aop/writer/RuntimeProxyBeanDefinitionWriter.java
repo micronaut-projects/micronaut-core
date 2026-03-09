@@ -46,6 +46,8 @@ import java.lang.reflect.Method;
 @Internal
 public class RuntimeProxyBeanDefinitionWriter extends ProxyingBeanDefinitionWriter {
 
+    public static final String RUNTIME_PROXY_SUFFIX = "$RuntimeProxy";
+
     private static final Method GET_BEAN = ReflectionUtils.getRequiredInternalMethod(
         BeanResolutionContext.class,
         "getBean",
@@ -65,8 +67,6 @@ public class RuntimeProxyBeanDefinitionWriter extends ProxyingBeanDefinitionWrit
         DefaultRuntimeProxyDefinition.class,
         "introduction",
         BeanResolutionContext.class, BeanDefinition.class);
-
-    public static final String RUNTIME_PROXY_SUFFIX = "$RuntimeProxy";
 
     public RuntimeProxyBeanDefinitionWriter(ClassElement targetType, BeanDefinitionWriter parent, OptionalValues<Boolean> settings, VisitorContext visitorContext, AnnotationValue<?>... interceptorBinding) {
         super(RUNTIME_PROXY_SUFFIX, targetType, targetType, parent, settings, visitorContext, interceptorBinding);

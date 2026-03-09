@@ -17,6 +17,7 @@ package io.micronaut.annotation.processing;
 
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.core.annotation.Generated;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.util.CollectionUtils;
@@ -49,6 +50,7 @@ import java.util.Set;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 public abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
 
     /**

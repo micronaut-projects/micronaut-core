@@ -32,9 +32,10 @@ import io.micronaut.core.annotation.Internal;
 @Experimental
 public interface Boxed<T> {
     /**
-     * Unbox the type
+     * Unboxes the type.
      *
      * @return The unboxed type.
      */
+    @SuppressWarnings("checkstyle:MethodName")
     T $unbox();
 }

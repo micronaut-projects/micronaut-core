@@ -29,6 +29,7 @@ public class MicronautModuleInfoLoader {
     private static final class Holder {
 
         private static final List<MicronautModuleInfo> MODULES;
+
         static {
             MODULES = ServiceLoader.load(MicronautModuleInfo.class)
                 .stream()
