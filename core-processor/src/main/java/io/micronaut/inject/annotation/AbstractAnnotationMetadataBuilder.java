@@ -136,6 +136,16 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         ELEMENT_VALIDATOR = loadFirstService(AnnotatedElementValidator.class, classLoader).orElse(null);
     }
 
+    private boolean validating = true;
+    private final Set<T> erroneousElements = new HashSet<>();
+
+    /**
+     * Default constructor.
+     */
+    protected AbstractAnnotationMetadataBuilder() {
+
+    }
+
     private static ClassLoader resolveServiceClassLoader() {
         if (Boolean.getBoolean(VisitorContext.MICRONAUT_PROCESSING_USE_CONTEXT_CLASSLOADER)) {
             ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
@@ -190,16 +200,6 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             }
         }
         return Optional.empty();
-    }
-
-    private boolean validating = true;
-    private final Set<T> erroneousElements = new HashSet<>();
-
-    /**
-     * Default constructor.
-     */
-    protected AbstractAnnotationMetadataBuilder() {
-
     }
 
     @SuppressWarnings("java:S1872")
