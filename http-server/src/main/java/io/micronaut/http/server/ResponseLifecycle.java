@@ -147,7 +147,8 @@ public abstract class ResponseLifecycle {
             } else {
                 responseBodyType = Argument.of((Class<Object>) body.getClass());
             }
-            if (responseMediaType == null) {
+            boolean emptyBody = isImplicitlyEmptyBody(body);
+            if (responseMediaType == null && !emptyBody) {
                 // perf: check for common body types
                 //noinspection ConditionCoveredByFurtherCondition
                 if (!(body instanceof String) && !(body instanceof byte[]) && body instanceof MediaTypeProvider mediaTypeProvider) {
@@ -158,7 +159,6 @@ public abstract class ResponseLifecycle {
                     responseMediaType = MediaType.APPLICATION_JSON_TYPE;
                 }
             }
-
             if (messageBodyWriter == null) {
                 // lookup write to use, any logic that hits this path should consider setting
                 // a body writer on the response before writing
@@ -312,8 +312,8 @@ public abstract class ResponseLifecycle {
     }
 
     private <T> ExecutionFlow<ByteBodyHttpResponse<?>> buildFinalResponse(HttpRequest<?> nettyRequest,
-                                                                          MutableHttpResponse<T> response,
-                                                                          Argument<T> responseBodyType,
+                                                                           MutableHttpResponse<T> response,
+                                                                           Argument<T> responseBodyType,
                                                                           MediaType mediaType,
                                                                           T body,
                                                                           MessageBodyWriter<T> messageBodyWriter,
@@ -339,6 +339,10 @@ public abstract class ResponseLifecycle {
                     .write(byteBodyFactory, nettyRequest, errorResponse, type, errorContentType, errorBody));
             }
         }
+    }
+
+    private static boolean isImplicitlyEmptyBody(Object body) {
+        return body instanceof byte[] bytes && bytes.length == 0;
     }
 
 }

@@ -236,7 +236,7 @@ public final class RouteExecutor {
             if (i.hasNext()) {
                 final MediaType mt = i.next();
                 if (producesList.contains(mt)) {
-                    return mt;
+                    return MediaType.ALL_TYPE.equals(mt) ? MediaType.APPLICATION_JSON_TYPE : mt;
                 }
             }
         }
@@ -248,7 +248,7 @@ public final class RouteExecutor {
         } else {
             defaultResponseMediaType = MediaType.APPLICATION_JSON_TYPE;
         }
-        return defaultResponseMediaType;
+        return MediaType.ALL_TYPE.equals(defaultResponseMediaType) ? MediaType.APPLICATION_JSON_TYPE : defaultResponseMediaType;
     }
 
     private MutableHttpResponse<?> notFoundErrorResponse(HttpRequest<?> request) {
