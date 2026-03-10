@@ -62,9 +62,17 @@ class ContinuationArgumentBinder : TypedRequestArgumentBinder<Continuation<*>> {
                 if (reactorContextPresent) {
                     coroutineContext += propagateReactorContext(contextView)
                 }
-                coroutineContext = KotlinCoroutinePropagation.addPropagatedContext(coroutineContext, propagatedContext)
-                continuationArgumentBinderCoroutineContextFactories.forEach {
-                    coroutineContext += it.create()
+                val coroutinePropagatedContext = propagatedContext.plus(io.micronaut.http.context.ServerHttpRequestContext(source))
+                coroutineContext = KotlinCoroutinePropagation.addPropagatedContext(coroutineContext, coroutinePropagatedContext)
+                val factoryContext = try {
+                    coroutinePropagatedContext.propagate()
+                } catch (e: Exception) {
+                    throw IllegalStateException("Failed to propagate request context for coroutine setup", e)
+                }
+                factoryContext.use {
+                    continuationArgumentBinderCoroutineContextFactories.forEach {
+                        coroutineContext += it.create()
+                    }
                 }
                 customContinuation.context.delegatingCoroutineContext = coroutineContext
             }
