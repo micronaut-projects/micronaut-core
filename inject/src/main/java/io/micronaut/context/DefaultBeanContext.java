@@ -183,7 +183,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     private final Map<String, List<String>> disabledConfigurations = new ConcurrentHashMap<>(5);
     private final Map<String, BeanConfiguration> beanConfigurations = new HashMap<>(10);
 
-    private final Map<BeanKey, Boolean> containsBeanCache = new ConcurrentHashMap<>(30);
+    final Map<BeanKey, Boolean> containsBeanCache = new ConcurrentHashMap<>(30);
     private final Map<CharSequence, Object> attributes = Collections.synchronizedMap(new HashMap<>(5));
 
     private final Map<BeanKey, CollectionHolder> singletonBeanRegistrations = new ConcurrentHashMap<>(50);

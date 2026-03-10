@@ -3,7 +3,6 @@ package io.micronaut.context;
 import org.junit.jupiter.api.Test;
 import spock.lang.Issue;
 
-import java.lang.reflect.Field;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -14,10 +13,9 @@ class DefaultBeanContextContainsBeanRaceTest {
 
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/11768")
     @Test
-    void containsBeanDoesNotThrowWhenCacheIsClearedConcurrently() throws Exception {
-        ApplicationContext context = ApplicationContext.run();
-        @SuppressWarnings("unchecked")
-        Map<Object, Boolean> containsBeanCache = (Map<Object, Boolean>) getField(context, "containsBeanCache");
+    void containsBeanDoesNotThrowWhenCacheIsClearedConcurrently() throws InterruptedException {
+        DefaultBeanContext context = (DefaultBeanContext) ApplicationContext.run();
+        Map<?, Boolean> containsBeanCache = context.containsBeanCache;
         context.containsBean(MissingBean.class);
 
         AtomicReference<Throwable> failure = new AtomicReference<>();
@@ -54,11 +52,6 @@ class DefaultBeanContextContainsBeanRaceTest {
         assertNull(failure.get());
     }
 
-    private static Object getField(Object target, String fieldName) throws Exception {
-        Field field = DefaultBeanContext.class.getDeclaredField(fieldName);
-        field.setAccessible(true);
-        return field.get(target);
-    }
     static class MissingBean {
     }
 }
