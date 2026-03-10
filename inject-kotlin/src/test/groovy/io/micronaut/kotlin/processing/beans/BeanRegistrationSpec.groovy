@@ -67,4 +67,37 @@ class Foo2: Foo
         cleanup:
         context.close()
     }
+
+    void 'test inject bean registration for suspend lambda bean from factory'() {
+        given:
+        def className = 'beanreg.SuspendConsumer'
+        def context = buildContext('''
+package beanreg
+
+import io.micronaut.context.BeanRegistration
+import io.micronaut.context.annotation.Factory
+import jakarta.inject.Singleton
+
+interface Bar
+
+@Singleton
+class SuspendConsumer(val registration: BeanRegistration<suspend (Bar) -> Unit>)
+
+@Factory
+class SuspendFactory {
+    @Singleton
+    fun barLambda(): suspend (Bar) -> Unit = { _ -> }
+}
+''')
+
+        when:
+        def bean = getBean(context, className)
+
+        then:
+        bean.registration != null
+        bean.registration.bean != null
+
+        cleanup:
+        context.close()
+    }
 }
