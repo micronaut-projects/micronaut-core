@@ -21,7 +21,6 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.processing.ProcessingException;
-import io.micronaut.python.processing.annotation.PythonApplication;
 import io.micronaut.python.processing.beans.PythonBeanDefinitionProcessor;
 import io.micronaut.python.processing.visitor.PythonTypeElementVisitorProcessor;
 import org.graalvm.polyglot.Source;
@@ -30,7 +29,10 @@ import org.jetbrains.annotations.NotNull;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
+import javax.lang.model.element.AnnotationMirror;
+import javax.lang.model.element.AnnotationValue;
 import javax.lang.model.element.Element;
+import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -46,14 +48,15 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 /**
- * Annotation processor for {@link PythonApplication} that enables Python AST processing
+ * Annotation processor for {@code io.micronaut.context.python.annotation.PythonApplication} that enables Python AST processing
  * during Java compilation.
  *
  * @author Micronaut
  * @since 4.8.0
  */
-@SupportedAnnotationTypes("io.micronaut.python.processing.annotation.PythonApplication")
+@SupportedAnnotationTypes(PythonAnnotationProcessor.PYTHON_APPLICATION_ANNOTATION)
 public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor implements AutoCloseable {
+    static final String PYTHON_APPLICATION_ANNOTATION = "io.micronaut.context.python.annotation.PythonApplication";
     public static final String APPLICATION_PATH = "GRAALPY-VFS/micronaut-application/";
     public static final String APPLICATION_SRC_PATH = "GRAALPY-VFS/micronaut-application/src/";
     public static final String APPLICATION_LAUNCHER_PATH = APPLICATION_SRC_PATH + "__main__.py";
@@ -89,7 +92,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         }
 
         for (TypeElement annotation : annotations) {
-            if (PythonApplication.class.getName().equals(annotation.getQualifiedName().toString())) {
+            if (PYTHON_APPLICATION_ANNOTATION.equals(annotation.getQualifiedName().toString())) {
                 processPythonApplications(roundEnv);
             }
         }
@@ -102,17 +105,23 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     }
 
     private void processPythonApplications(RoundEnvironment roundEnv) {
-        Set<? extends Element> elements = roundEnv.getElementsAnnotatedWith(PythonApplication.class);
+        TypeElement pythonApplication = processingEnv.getElementUtils().getTypeElement(PYTHON_APPLICATION_ANNOTATION);
+        if (pythonApplication == null) {
+            return;
+        }
+        Set<? extends Element> elements = roundEnv.getElementsAnnotatedWith(pythonApplication);
 
         for (Element element : elements) {
-            PythonApplication annotation = element.getAnnotation(PythonApplication.class);
-            if (annotation != null && element instanceof TypeElement typeElement) {
-                processAnnotation(typeElement, annotation);
+            if (element instanceof TypeElement typeElement) {
+                PythonApplicationValues values = readPythonApplicationValues(element).orElse(null);
+                if (values != null) {
+                    processAnnotation(typeElement, values);
+                }
             }
         }
     }
 
-    private void processAnnotation(TypeElement element, PythonApplication annotation) {
+    private void processAnnotation(TypeElement element, PythonApplicationValues values) {
         try {
             ClassElement originatingElement = javaVisitorContext.getRequiredClassElement(
                 element.getQualifiedName().toString(),
@@ -121,14 +130,14 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             PythonEnvironment environment = null;
             // Transform the code for processing (to detect Micronaut annotations)
             List<PythonAstParser.TransformResult> transformedList =
-                applyASTTransforms(annotation, originatingElement);
+                applyASTTransforms(values, originatingElement);
             // Extract decorators from the code
             if (transformedList.isEmpty()) {
                 return;
             }
 
             // Then parse the transformed code
-            String[] srcDirs = annotation.src();
+            String[] srcDirs = values.src();
             boolean hasSrcDirs = srcDirs != null && srcDirs.length != 0;
             if (hasSrcDirs) {
                 try {
@@ -148,8 +157,8 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
 
             String mainPy;
             StringBuilder filesList = new StringBuilder();
-            if (StringUtils.isNotEmpty(annotation.code())) {
-                mainPy = annotation.code();
+            if (StringUtils.isNotEmpty(values.code())) {
+                mainPy = values.code();
                 // Write original Python code to META-INF
                 javaVisitorContext.visitMetaInfFile(APPLICATION_LAUNCHER_PATH, originatingElement)
                     .ifPresent(generatedFile -> {
@@ -331,9 +340,9 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         }
     }
 
-    private List<PythonAstParser.TransformResult> applyASTTransforms(PythonApplication annotation, ClassElement originatingElement) {
+    private List<PythonAstParser.TransformResult> applyASTTransforms(PythonApplicationValues values, ClassElement originatingElement) {
         // Process inline code if provided
-        String code = annotation.code();
+        String code = values.code();
         if (!code.isEmpty()) {
             // Transform the source code first
             try {
@@ -344,7 +353,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
 
         } else {
             // Process directory scanning if provided
-            String[] srcDirs = annotation.src();
+            String[] srcDirs = values.src();
             List<Source> sources = new ArrayList<>();
             if (srcDirs != null) {
                 for (var srcDir : srcDirs) {
@@ -389,6 +398,63 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             }
             return parser.transform(javaVisitorContext, sources.toArray(new Source[0]));
         }
+    }
+
+    private Optional<PythonApplicationValues> readPythonApplicationValues(Element element) {
+        AnnotationMirror mirror = getAnnotationMirror(element, PYTHON_APPLICATION_ANNOTATION);
+        if (mirror == null) {
+            return Optional.empty();
+        }
+
+        Map<String, AnnotationValue> values = new LinkedHashMap<>();
+        for (Map.Entry<? extends ExecutableElement, ? extends AnnotationValue> e : processingEnv.getElementUtils().getElementValuesWithDefaults(mirror).entrySet()) {
+            values.put(e.getKey().getSimpleName().toString(), e.getValue());
+        }
+
+        String code = getString(values.get("code"));
+        String[] src = getStringArray(values.get("src"));
+        return Optional.of(new PythonApplicationValues(code, src));
+    }
+
+    private static AnnotationMirror getAnnotationMirror(Element element, String annotationFqcn) {
+        for (AnnotationMirror am : element.getAnnotationMirrors()) {
+            Element annotationElement = am.getAnnotationType().asElement();
+            if (annotationElement instanceof TypeElement te && annotationFqcn.equals(te.getQualifiedName().toString())) {
+                return am;
+            }
+        }
+        return null;
+    }
+
+    private static String getString(AnnotationValue value) {
+        if (value == null) {
+            return "";
+        }
+        Object v = value.getValue();
+        return v instanceof String s ? s : String.valueOf(v);
+    }
+
+    private static String[] getStringArray(AnnotationValue value) {
+        if (value == null) {
+            return null;
+        }
+        Object v = value.getValue();
+        if (v instanceof List<?> list) {
+            List<String> out = new ArrayList<>(list.size());
+            for (Object o : list) {
+                if (o instanceof AnnotationValue av) {
+                    Object vv = av.getValue();
+                    if (vv instanceof String s) {
+                        out.add(s);
+                    }
+                }
+            }
+            return out.toArray(String[]::new);
+        }
+        if (v instanceof String s) {
+            return new String[]{s};
+        }
+        return null;
     }
 
     private void writeAllToVFS(
@@ -572,5 +638,8 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     }
 
     record PathEntry(String parent, String filename) {
+    }
+
+    private record PythonApplicationValues(String code, String[] src) {
     }
 }
