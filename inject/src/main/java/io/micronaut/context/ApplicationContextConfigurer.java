@@ -16,7 +16,6 @@
 package io.micronaut.context;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.order.Ordered;
 
 /**
@@ -53,7 +52,7 @@ public interface ApplicationContextConfigurer extends Ordered {
      * @param builder the builder to configure
      * @see ApplicationContextBuilder
      */
-    default void configure(@NonNull ApplicationContextBuilder builder) {
+    default void configure(ApplicationContextBuilder builder) {
         // no-op
     }
 
@@ -66,7 +65,7 @@ public interface ApplicationContextConfigurer extends Ordered {
      * @param applicationContext The context.
      * @since 4.5.0
      */
-    default void configure(@NonNull ApplicationContext applicationContext) {
+    default void configure(ApplicationContext applicationContext) {
         // no-op
     }
 }

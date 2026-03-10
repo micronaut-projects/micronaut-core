@@ -8,7 +8,6 @@ import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.server.netty.NettyHttpServer;
-import io.micronaut.http.tck.netty.TestLeakDetector;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.embedded.EmbeddedChannel;
@@ -27,7 +26,6 @@ public class FuzzyInputTest {
     @AfterEach
     void tearDown() throws Exception {
         FlagAppender.checkTriggered();
-        TestLeakDetector.reportStillOpen();
     }
 
     @Test

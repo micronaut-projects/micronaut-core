@@ -25,8 +25,10 @@ import io.micronaut.function.LocalFunctionRegistry;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
+import java.util.Objects;
 import java.util.function.Function;
 
 /**
@@ -97,7 +99,7 @@ public class FunctionInitializer extends AbstractExecutor {
      * @param supplier The function that executes this function
      */
     public void run(String[] args, Function<ParseContext, ?> supplier) {
-        ApplicationContext applicationContext = this.applicationContext;
+        ApplicationContext applicationContext = Objects.requireNonNull(this.applicationContext, "ApplicationContext is required");
         this.functionExitHandler = applicationContext.findBean(FunctionExitHandler.class).orElse(this.functionExitHandler);
         ParseContext context = new ParseContext(args);
         try {
@@ -137,6 +139,7 @@ public class FunctionInitializer extends AbstractExecutor {
      * The parse context supplied from the {@link #run(String[], Function)} method. Consumers can use the {@link #get(Class)} method to obtain the data is the desired type.
      */
     public class ParseContext {
+        @Nullable
         private final String data;
         private final boolean debug;
 
@@ -148,7 +151,7 @@ public class FunctionInitializer extends AbstractExecutor {
         ParseContext(String[] args) {
             CommandLine commandLine = FunctionApplication.parseCommandLine(args);
             debug = commandLine.hasOption(FunctionApplication.DEBUG_OPTIONS);
-            data = commandLine.hasOption(FunctionApplication.DATA_OPTION) ? commandLine.optionValue(FunctionApplication.DATA_OPTION).toString() : null;
+            data = commandLine.hasOption(FunctionApplication.DATA_OPTION) ? Objects.requireNonNull(commandLine.optionValue(FunctionApplication.DATA_OPTION)).toString() : null;
         }
 
         /**
@@ -159,6 +162,7 @@ public class FunctionInitializer extends AbstractExecutor {
          * @return Type
          */
         public final <T> T get(Class<T> type) {
+            Objects.requireNonNull(applicationContext);
             if (ClassUtils.isJavaLangType(type)) {
                 return applicationContext
                     .getConversionService()
@@ -178,7 +182,7 @@ public class FunctionInitializer extends AbstractExecutor {
             }
         }
 
-        private <T> IllegalArgumentException newIllegalArgument(Class<T> dataType, String data) {
+        private <T> IllegalArgumentException newIllegalArgument(Class<T> dataType, @Nullable String data) {
             if (data != null) {
                 return new IllegalArgumentException("Passed data [" + data + "] cannot be converted to type: " + dataType);
             } else {

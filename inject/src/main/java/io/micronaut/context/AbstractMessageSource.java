@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.context;
-
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ObjectUtils;
 
@@ -33,9 +31,8 @@ public abstract class AbstractMessageSource implements MessageSource {
     private static final char L_BRACE = '{';
     private static final char R_BRACE = '}';
 
-    @NonNull
     @Override
-    public String interpolate(@NonNull String template, @NonNull MessageContext context) {
+    public String interpolate(String template, MessageContext context) {
         ArgumentUtils.requireNonNull("template", template);
         ArgumentUtils.requireNonNull("context", context);
 
@@ -116,7 +113,7 @@ public abstract class AbstractMessageSource implements MessageSource {
          * @param locale The locale
          * @param code The code
          */
-        public MessageKey(@NonNull Locale locale, @NonNull String code) {
+        public MessageKey(Locale locale, String code) {
             this.locale = locale;
             this.code = code;
         }

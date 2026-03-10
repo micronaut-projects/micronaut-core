@@ -32,7 +32,7 @@ import java.io.InterruptedIOException;
 @Internal
 public final class PublisherAsStream extends ExtendedInputStream {
     private final PublisherAsBlocking publisherAsBlocking;
-    private ReadBuffer buffer;
+    private @Nullable ReadBuffer buffer;
 
     public PublisherAsStream(PublisherAsBlocking publisherAsBlocking) {
         this.publisherAsBlocking = publisherAsBlocking;
@@ -44,13 +44,14 @@ public final class PublisherAsStream extends ExtendedInputStream {
             return -1;
         }
 
-        int readable = buffer.readable();
+        ReadBuffer buf = java.util.Objects.requireNonNull(buffer);
+        int readable = buf.readable();
         if (len >= readable) {
-            buffer.toArray(b, off);
+            buf.toArray(b, off);
             buffer = null;
             return readable;
         } else {
-            ReadBuffer piece = buffer.split(len);
+            ReadBuffer piece = buf.split(len);
             piece.toArray(b, off);
             return len;
         }
@@ -61,7 +62,8 @@ public final class PublisherAsStream extends ExtendedInputStream {
         if (!populateBuffer()) {
             return null;
         }
-        byte[] array = buffer.toArray();
+        ReadBuffer buf = java.util.Objects.requireNonNull(buffer);
+        byte[] array = buf.toArray();
         buffer = null;
         return array;
     }

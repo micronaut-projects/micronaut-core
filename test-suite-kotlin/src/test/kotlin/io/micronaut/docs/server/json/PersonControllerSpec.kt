@@ -28,11 +28,12 @@ import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import reactor.core.publisher.Flux
+import kotlin.Any
 
 class PersonControllerSpec: StringSpec() {
 
     val embeddedServer = autoClose(
-            ApplicationContext.run(EmbeddedServer::class.java, mapOf("spec.name" to PersonControllerSpec::class.simpleName))
+            ApplicationContext.run(EmbeddedServer::class.java, mapOf("spec.name" to PersonControllerSpec::class.simpleName as Any))
     )
 
     val client = autoClose(
@@ -42,7 +43,7 @@ class PersonControllerSpec: StringSpec() {
     init {
         "test global error handler" {
             val e = shouldThrow<HttpClientResponseException> {
-                Flux.from(client!!.exchange("/people/error", Map::class.java))
+                Flux.from(client.exchange("/people/error", Map::class.java))
                         .blockFirst()
             }
             val response = e.response as HttpResponse<Map<*, *>>
@@ -74,7 +75,7 @@ class PersonControllerSpec: StringSpec() {
         }
 
         "test save future" {
-            val response = client!!.toBlocking().exchange(HttpRequest.POST("/people/saveFuture", "{\"firstName\":\"Pebbles\",\"lastName\":\"Flintstone\",\"age\":0}"), Person::class.java)
+            val response = client.toBlocking().exchange(HttpRequest.POST("/people/saveFuture", "{\"firstName\":\"Pebbles\",\"lastName\":\"Flintstone\",\"age\":0}"), Person::class.java)
             val person = response.body.get()
 
             person.firstName shouldBe "Pebbles"
@@ -82,7 +83,7 @@ class PersonControllerSpec: StringSpec() {
         }
 
         "test save args" {
-            val response = client!!.toBlocking().exchange(HttpRequest.POST("/people/saveWithArgs", "{\"firstName\":\"Dino\",\"lastName\":\"Flintstone\",\"age\":3}"), Person::class.java)
+            val response = client.toBlocking().exchange(HttpRequest.POST("/people/saveWithArgs", "{\"firstName\":\"Dino\",\"lastName\":\"Flintstone\",\"age\":3}"), Person::class.java)
             val person = response.body.get()
 
             person.firstName shouldBe "Dino"

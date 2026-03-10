@@ -14,9 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.inject;
-
-import org.jspecify.annotations.NonNull;
-
 /**
  * A constructor injection point.
  *
@@ -26,7 +23,7 @@ import org.jspecify.annotations.NonNull;
  */
 public interface ConstructorInjectionPoint<T> extends CallableInjectionPoint<T> {
 
-    default @NonNull Class<T> getDeclaringBeanType() {
+    default Class<T> getDeclaringBeanType() {
         return getDeclaringBean().getBeanType();
     }
 

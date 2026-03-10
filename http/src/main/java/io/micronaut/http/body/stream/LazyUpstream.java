@@ -35,6 +35,9 @@ public final class LazyUpstream implements BufferConsumer.Upstream {
 
     @Override
     public void start() {
+        if (start) {
+            throw new IllegalStateException("Already started");
+        }
         this.start = true;
     }
 

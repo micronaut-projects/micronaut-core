@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.client.bind.binders;
 
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
@@ -49,7 +48,6 @@ public class QueryValueClientArgumentRequestBinder implements AnnotatedClientArg
     }
 
     @Override
-    @NonNull
     public Class<QueryValue> getAnnotationType() {
         return QueryValue.class;
     }
@@ -70,12 +68,10 @@ public class QueryValueClientArgumentRequestBinder implements AnnotatedClientArg
      * Optionally, the value can be formatted if the path template states so.
      */
     @Override
-    public void bind(
-            @NonNull ArgumentConversionContext<Object> context,
-            @NonNull ClientRequestUriContext uriContext,
-            @NonNull Object value,
-            @NonNull MutableHttpRequest<?> request
-    ) {
+    public void bind(ArgumentConversionContext<Object> context,
+                     ClientRequestUriContext uriContext,
+                     Object value,
+                     MutableHttpRequest<?> request) {
         String parameterName = context.getAnnotationMetadata().stringValue(QueryValue.class)
                 .filter(StringUtils::isNotEmpty)
                 .orElse(context.getArgument().getName());

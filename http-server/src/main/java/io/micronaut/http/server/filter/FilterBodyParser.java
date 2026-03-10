@@ -18,7 +18,6 @@ package io.micronaut.http.server.filter;
 import io.micronaut.context.annotation.DefaultImplementation;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.HttpRequest;
-import reactor.util.annotation.NonNull;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
@@ -40,7 +39,6 @@ public interface FilterBodyParser {
      * @param request HTTP Request
      * @return a publisher which emits a single item or an empty publisher if the request body cannot be parsed to a Map.
      */
-    @NonNull
-    CompletableFuture<Map<String, Object>> parseBody(@NonNull HttpRequest<?> request);
+    CompletableFuture<Map<String, Object>> parseBody(HttpRequest<?> request);
 
 }

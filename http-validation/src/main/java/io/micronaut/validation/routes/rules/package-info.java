@@ -16,4 +16,7 @@
 /**
  * Package to store classes that provide route validation rules.
  */
+@NullMarked
 package io.micronaut.validation.routes.rules;
+
+import org.jspecify.annotations.NullMarked;

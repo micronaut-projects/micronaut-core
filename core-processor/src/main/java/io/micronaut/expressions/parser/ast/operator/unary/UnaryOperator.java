@@ -16,7 +16,6 @@
 package io.micronaut.expressions.parser.ast.operator.unary;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.sourcegen.model.TypeDef;
@@ -36,7 +35,7 @@ public abstract sealed class UnaryOperator extends ExpressionNode permits EmptyO
     }
 
     @Override
-    public TypeDef doResolveType(@NonNull ExpressionVisitorContext ctx) {
+    public TypeDef doResolveType(ExpressionVisitorContext ctx) {
         return operand.resolveType(ctx);
     }
 

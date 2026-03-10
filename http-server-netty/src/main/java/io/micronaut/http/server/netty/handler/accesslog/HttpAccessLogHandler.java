@@ -38,6 +38,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.LinkedList;
+import java.util.Objects;
 import java.util.Queue;
 import java.util.function.Predicate;
 
@@ -60,6 +61,7 @@ public class HttpAccessLogHandler extends ChannelDuplexHandler {
 
     private final Logger logger;
     private final AccessLogFormatParser accessLogFormatParser;
+    @Nullable
     private final Predicate<String> uriInclusion;
 
     /**
@@ -68,7 +70,7 @@ public class HttpAccessLogHandler extends ChannelDuplexHandler {
      * @param loggerName A logger name.
      * @param spec The log format specification.
      */
-    public HttpAccessLogHandler(String loggerName, String spec) {
+    public HttpAccessLogHandler(@Nullable String loggerName, @Nullable String spec) {
         this(loggerName == null || loggerName.isEmpty() ? null : LoggerFactory.getLogger(loggerName), spec, null);
     }
 
@@ -79,7 +81,7 @@ public class HttpAccessLogHandler extends ChannelDuplexHandler {
      * @param spec The log format specification.
      * @param uriInclusion A filtering Predicate that will be checked per URI.
      */
-    public HttpAccessLogHandler(String loggerName, String spec, Predicate<String> uriInclusion) {
+    public HttpAccessLogHandler(@Nullable String loggerName, @Nullable String spec, @Nullable Predicate<String> uriInclusion) {
         this(loggerName == null || loggerName.isEmpty() ? null : LoggerFactory.getLogger(loggerName), spec, uriInclusion);
     }
 
@@ -89,7 +91,7 @@ public class HttpAccessLogHandler extends ChannelDuplexHandler {
      * @param logger A logger. Will log at info level.
      * @param spec The log format specification.
      */
-    public HttpAccessLogHandler(Logger logger, String spec) {
+    public HttpAccessLogHandler(@Nullable Logger logger, @Nullable String spec) {
         this(logger, spec, null);
     }
 
@@ -100,7 +102,7 @@ public class HttpAccessLogHandler extends ChannelDuplexHandler {
      * @param spec The log format specification.
      * @param uriInclusion A filtering Predicate that will be checked per URI.
      */
-    public HttpAccessLogHandler(Logger logger, String spec, Predicate<String> uriInclusion) {
+    public HttpAccessLogHandler(@Nullable Logger logger, @Nullable String spec, @Nullable Predicate<String> uriInclusion) {
         super();
         this.logger = logger == null ? LoggerFactory.getLogger(HTTP_ACCESS_LOGGER) : logger;
         this.accessLogFormatParser = new AccessLogFormatParser(spec);
@@ -110,8 +112,7 @@ public class HttpAccessLogHandler extends ChannelDuplexHandler {
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Http2Exception {
         if (logger.isInfoEnabled() && msg instanceof HttpRequest request) {
-            AccessLogHolder accessLogHolder = getAccessLogHolder(ctx, true);
-            assert accessLogHolder != null; // can only return null when createIfMissing is false
+            AccessLogHolder accessLogHolder = Objects.requireNonNull(getAccessLogHolder(ctx, true));
             if (uriInclusion == null || uriInclusion.test(request.uri())) {
                 final HttpHeaders headers = request.headers();
                 // Trying to detect http/2
@@ -191,6 +192,7 @@ public class HttpAccessLogHandler extends ChannelDuplexHandler {
      */
     private final class AccessLogHolder {
         private final Queue<AccessLog> liveLogs = new LinkedList<>(); // ArrayDeque doesn't like null elements :(
+        @Nullable
         private AccessLog logForReuse;
 
         AccessLog createLogForRequest() {

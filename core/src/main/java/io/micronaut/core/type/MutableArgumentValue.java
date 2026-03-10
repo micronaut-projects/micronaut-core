@@ -15,6 +15,8 @@
  */
 package io.micronaut.core.type;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * A mutable version of the {@link ArgumentValue} interface.
  *
@@ -30,7 +32,7 @@ public interface MutableArgumentValue<V> extends ArgumentValue<V> {
      * @param value The value
      * @throws IllegalArgumentException If the argument is not a compatible argument
      */
-    void setValue(V value);
+    void setValue(@Nullable V value);
 
     /**
      * Create a new {@link MutableArgumentValue} for the given {@link Argument} and value.
@@ -40,7 +42,7 @@ public interface MutableArgumentValue<V> extends ArgumentValue<V> {
      * @param <T>      The value type
      * @return The created instance
      */
-    static <T> MutableArgumentValue<T> create(Argument<T> argument, T value) {
+    static <T> MutableArgumentValue<@Nullable T> create(Argument<T> argument, @Nullable T value) {
         return new DefaultMutableArgumentValue<>(argument, value);
     }
 }

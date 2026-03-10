@@ -14,9 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.inject.ast;
-
-import org.jspecify.annotations.NonNull;
-
 /**
  * Element for constructors.
  *
@@ -30,7 +27,6 @@ public interface ConstructorElement extends MethodElement {
         return "<init>";
     }
 
-    @NonNull
     @Override
     default ClassElement getReturnType() {
         return getDeclaringType();

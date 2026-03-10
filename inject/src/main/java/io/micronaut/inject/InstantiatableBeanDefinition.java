@@ -20,8 +20,6 @@ import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.DefaultBeanResolutionContext;
 import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
-
 /**
  * <p>An type of {@link BeanDefinition} that can build a new instance.</p>
  *
@@ -39,8 +37,7 @@ public interface InstantiatableBeanDefinition<T> extends BeanDefinition<T> {
      * @return The instance
      * @throws BeanInstantiationException if the instance could not be instantiated
      */
-    @NonNull
-    default T instantiate(@NonNull BeanContext context) throws BeanInstantiationException {
+    default T instantiate(BeanContext context) throws BeanInstantiationException {
         try (DefaultBeanResolutionContext resolutionContext = new DefaultBeanResolutionContext(context, this)) {
             return instantiate(resolutionContext, context);
         }
@@ -54,6 +51,5 @@ public interface InstantiatableBeanDefinition<T> extends BeanDefinition<T> {
      * @return The instance
      * @throws BeanInstantiationException if the instance could not be instantiated
      */
-    @NonNull
-    T instantiate(@NonNull BeanResolutionContext resolutionContext, @NonNull BeanContext context) throws BeanInstantiationException;
+    T instantiate(BeanResolutionContext resolutionContext, BeanContext context) throws BeanInstantiationException;
 }

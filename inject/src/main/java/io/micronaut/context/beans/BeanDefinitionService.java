@@ -20,7 +20,6 @@ import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.DisabledBean;
 import io.micronaut.context.RuntimeBeanDefinition;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanConfiguration;
@@ -46,14 +45,14 @@ public sealed interface BeanDefinitionService permits DefaultBeanDefinitionServi
      *
      * @param definition the runtime definition to register, never null
      */
-    void addBeanDefinition(@NonNull RuntimeBeanDefinition<?> definition);
+    void addBeanDefinition(RuntimeBeanDefinition<?> definition);
 
     /**
      * Unregisters a runtime bean definition that was previously added.
      *
      * @param definition the runtime definition to remove, never null
      */
-    void removeBeanDefinition(@NonNull RuntimeBeanDefinition<?> definition);
+    void removeBeanDefinition(RuntimeBeanDefinition<?> definition);
 
     /**
      * Records that a qualified bean type has been disabled, along with human-readable reasons.
@@ -69,7 +68,7 @@ public sealed interface BeanDefinitionService permits DefaultBeanDefinitionServi
      * @param beanContext the bean context to eliminate disabled beans
      * @return an iterable of bean definitions that should be eagerly instantiated
      */
-    Iterable<BeanDefinition<Object>> getEagerInitBeans(@NonNull BeanContext beanContext);
+    Iterable<BeanDefinition<Object>> getEagerInitBeans(BeanContext beanContext);
 
     /**
      * Returns bean definitions that require contextual processing during startup.
@@ -77,7 +76,7 @@ public sealed interface BeanDefinitionService permits DefaultBeanDefinitionServi
      * @param beanContext the bean context to eliminate disabled beans
      * @return an iterable of bean definitions that require processing at startup
      */
-    Iterable<BeanDefinition<Object>> getProcessedBeans(@NonNull BeanContext beanContext);
+    Iterable<BeanDefinition<Object>> getProcessedBeans(BeanContext beanContext);
 
     /**
      * Returns bean definitions that are safe to be instantiated in parallel during startup.
@@ -85,7 +84,7 @@ public sealed interface BeanDefinitionService permits DefaultBeanDefinitionServi
      * @param beanContext the bean context to eliminate disabled beans
      * @return an iterable of bean definitions eligible for parallel creation
      */
-    Iterable<BeanDefinition<Object>> getParallelBeans(@NonNull BeanContext beanContext);
+    Iterable<BeanDefinition<Object>> getParallelBeans(BeanContext beanContext);
 
     /**
      * Returns target proxy bean definitions.
@@ -93,7 +92,7 @@ public sealed interface BeanDefinitionService permits DefaultBeanDefinitionServi
      * @param beanContext the bean context to eliminate disabled beans
      * @return an iterable of bean definitions that should be treated as target proxy candidates
      */
-    Iterable<BeanDefinition<Object>> getTargetProxyBeans(@NonNull BeanContext beanContext);
+    Iterable<BeanDefinition<Object>> getTargetProxyBeans(BeanContext beanContext);
 
     /**
      * Returns a disabled beans.
@@ -101,7 +100,7 @@ public sealed interface BeanDefinitionService permits DefaultBeanDefinitionServi
      * @param beanContext the bean context to eliminate disabled beans
      * @return a list of disabled beans with their associated reasons
      */
-    List<DisabledBean<?>> getDisabledBeans(@NonNull BeanContext beanContext);
+    List<DisabledBean<?>> getDisabledBeans(BeanContext beanContext);
 
     /**
      * Returns whether at least one bean definition exists for the given raw type.
@@ -110,7 +109,6 @@ public sealed interface BeanDefinitionService permits DefaultBeanDefinitionServi
      * @param beanType the raw type to check
      * @return true if at least one definition of the given type is known; false otherwise
      */
-    @NonNull
     boolean exists(Class<?> beanType);
 
     /**
@@ -120,9 +118,8 @@ public sealed interface BeanDefinitionService permits DefaultBeanDefinitionServi
      * @param defPredicate optional filter applied to definitions
      * @return a list of loaded bean definitions matching the filter
      */
-    @NonNull
     default List<BeanDefinition<Object>> getBeanDefinitions(
-        @NonNull BeanContext beanContext,
+        BeanContext beanContext,
         @Nullable Predicate<BeanDefinition<Object>> defPredicate
     ) {
         return getBeanDefinitions(beanContext, null, defPredicate);
@@ -136,9 +133,8 @@ public sealed interface BeanDefinitionService permits DefaultBeanDefinitionServi
      * @param defPredicate optional filter applied to definitions
      * @return a list of loaded bean definitions matching the filters
      */
-    @NonNull
     default List<BeanDefinition<Object>> getBeanDefinitions(
-        @NonNull BeanContext beanContext,
+        BeanContext beanContext,
         @Nullable Predicate<BeanDefinitionReference<Object>> refPredicate,
         @Nullable Predicate<BeanDefinition<Object>> defPredicate
     ) {
@@ -159,10 +155,9 @@ public sealed interface BeanDefinitionService permits DefaultBeanDefinitionServi
      * @param <B>          the bean generic type
      * @return an iterable over matching bean definitions; iteration may trigger loading
      */
-    @NonNull
     <B> Iterable<BeanDefinition<B>> getBeanDefinitions(
-        @NonNull BeanContext beanContext,
-        @NonNull Argument<B> beanType,
+        BeanContext beanContext,
+        Argument<B> beanType,
         @Nullable Predicate<BeanDefinitionReference<B>> refPredicate,
         @Nullable Predicate<BeanDefinition<B>> defPredicate
     );
@@ -177,10 +172,9 @@ public sealed interface BeanDefinitionService permits DefaultBeanDefinitionServi
      * @param <B>                   the bean generic type
      * @return an iterable over matching bean definitions]]
      */
-    @NonNull
     <B> Iterable<BeanDefinition<B>> getBeanDefinitions(
-        @NonNull BeanResolutionContext beanResolutionContext,
-        @NonNull Argument<B> beanType,
+        BeanResolutionContext beanResolutionContext,
+        Argument<B> beanType,
         @Nullable Predicate<BeanDefinitionReference<B>> refPredicate,
         @Nullable Predicate<BeanDefinition<B>> defPredicate
     );
@@ -191,9 +185,8 @@ public sealed interface BeanDefinitionService permits DefaultBeanDefinitionServi
      * @param beanContext the context for which references are requested
      * @return an iterable of bean definition references
      */
-    @NonNull
     Iterable<BeanDefinitionReference<Object>> getBeanReferences(
-        @NonNull BeanContext beanContext
+        BeanContext beanContext
     );
 
     /**
@@ -201,7 +194,6 @@ public sealed interface BeanDefinitionService permits DefaultBeanDefinitionServi
      *
      * @return a list of all known bean definition references
      */
-    @NonNull
     List<BeanDefinitionReference<Object>> getBeanReferences();
 
     /**
@@ -209,7 +201,7 @@ public sealed interface BeanDefinitionService permits DefaultBeanDefinitionServi
      *
      * @param configuration the configuration to register
      */
-    void registerConfiguration(@NonNull BeanConfiguration configuration);
+    void registerConfiguration(BeanConfiguration configuration);
 
     /**
      * Resets the provider by clearing internal caches and runtime registrations.

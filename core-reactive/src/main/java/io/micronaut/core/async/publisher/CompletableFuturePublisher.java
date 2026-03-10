@@ -16,6 +16,7 @@
 package io.micronaut.core.async.publisher;
 
 import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
@@ -55,6 +56,7 @@ public class CompletableFuturePublisher<T> implements Publishers.MicronautPublis
     class CompletableFutureSubscription implements Subscription {
         private final Subscriber<? super T> subscriber;
         private final AtomicBoolean completed = new AtomicBoolean(false);
+        @Nullable
         private CompletableFuture<T> future; // to allow cancellation
 
         /**

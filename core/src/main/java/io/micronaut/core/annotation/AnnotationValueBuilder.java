@@ -18,6 +18,7 @@ package io.micronaut.core.annotation;
 import io.micronaut.core.expressions.EvaluatedExpression;
 import io.micronaut.core.expressions.EvaluatedExpressionReference;
 import io.micronaut.core.reflect.ReflectionUtils;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
@@ -84,7 +85,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param retentionPolicy The retention policy
      */
     @Internal
-    AnnotationValueBuilder(AnnotationValue<T> value, RetentionPolicy retentionPolicy) {
+    AnnotationValueBuilder(AnnotationValue<T> value, @Nullable RetentionPolicy retentionPolicy) {
         this.annotationName = value.getAnnotationName();
         this.values.putAll(value.getValues());
         this.defaultValues = value.getDefaultValues();
@@ -97,7 +98,6 @@ public class AnnotationValueBuilder<T extends Annotation> {
      *
      * @return The {@link AnnotationValue}
      */
-    @NonNull
     public AnnotationValue<T> build() {
         return new AnnotationValue<>(annotationName, values, defaultValues, retentionPolicy, stereotypes);
     }
@@ -108,8 +108,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param annotation The stereotype
      * @return This builder
      */
-    @NonNull
-    public AnnotationValueBuilder<T> stereotype(AnnotationValue<?> annotation) {
+    public AnnotationValueBuilder<T> stereotype(@Nullable AnnotationValue<?> annotation) {
         if (annotation != null) {
             if (stereotypes == null) {
                 stereotypes = new ArrayList<>(10);
@@ -127,9 +126,8 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @return This builder
      * @since 4.0.0
      */
-    @NonNull
-    public AnnotationValueBuilder<T> replaceStereotype(@NonNull AnnotationValue<?> originalAnnotationValue,
-                                                       @NonNull AnnotationValue<?> newAnnotationValue) {
+    public AnnotationValueBuilder<T> replaceStereotype(AnnotationValue<?> originalAnnotationValue,
+ AnnotationValue<?> newAnnotationValue) {
         Objects.requireNonNull(stereotypes);
         List<AnnotationValue<?>> values = new ArrayList<>(stereotypes);
         int index = values.indexOf(originalAnnotationValue);
@@ -148,8 +146,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @return This builder
      * @since 4.0.0
      */
-    @NonNull
-    public AnnotationValueBuilder<T> removeStereotype(@NonNull AnnotationValue<?> annotationValueToRemove) {
+    public AnnotationValueBuilder<T> removeStereotype(AnnotationValue<?> annotationValueToRemove) {
         Objects.requireNonNull(stereotypes);
         List<AnnotationValue<?>> values = new ArrayList<>(stereotypes);
         int index = values.indexOf(annotationValueToRemove);
@@ -168,8 +165,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @return This builder
      * @since 4.0.0
      */
-    @NonNull
-    public AnnotationValueBuilder<T> stereotypes(@NonNull Collection<AnnotationValue<?>> newStereotypes) {
+    public AnnotationValueBuilder<T> stereotypes(Collection<AnnotationValue<?>> newStereotypes) {
         if (stereotypes == null) {
             stereotypes = new ArrayList<>(10);
         }
@@ -184,8 +180,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @return This builder
      * @since 4.0.0
      */
-    @NonNull
-    public AnnotationValueBuilder<T> replaceStereotypes(@NonNull Collection<AnnotationValue<?>> newStereotypes) {
+    public AnnotationValueBuilder<T> replaceStereotypes(Collection<AnnotationValue<?>> newStereotypes) {
         stereotypes = new ArrayList<>(newStereotypes);
         return this;
     }
@@ -196,8 +191,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param defaultValues The default values
      * @return This builder
      */
-    @NonNull
-    public AnnotationValueBuilder<T> defaultValues(Map<? extends CharSequence, Object> defaultValues) {
+    public AnnotationValueBuilder<T> defaultValues(@Nullable Map<? extends CharSequence, Object> defaultValues) {
         if (defaultValues != null) {
             if (this.defaultValues == null) {
                 this.defaultValues = new LinkedHashMap<>(defaultValues);
@@ -208,14 +202,12 @@ public class AnnotationValueBuilder<T extends Annotation> {
         return this;
     }
 
-
     /**
      * Sets the value member to the given integer value.
      *
      * @param i The integer
      * @return This builder
      */
-    @NonNull
     public AnnotationValueBuilder<T> value(int i) {
         return member(AnnotationMetadata.VALUE_MEMBER, i);
     }
@@ -226,8 +218,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param ints The integer[]
      * @return This builder
      */
-    @NonNull
-    public AnnotationValueBuilder<T> values(@Nullable int... ints) {
+    public AnnotationValueBuilder<T> values(int @Nullable ... ints) {
         return member(AnnotationMetadata.VALUE_MEMBER, ints);
     }
 
@@ -237,7 +228,6 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param i The long
      * @return This builder
      */
-    @NonNull
     public AnnotationValueBuilder<T> value(long i) {
         return member(AnnotationMetadata.VALUE_MEMBER, i);
     }
@@ -248,8 +238,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param longs The long[]
      * @return This builder
      */
-    @NonNull
-    public AnnotationValueBuilder<T> values(@Nullable long... longs) {
+    public AnnotationValueBuilder<T> values(long @Nullable ... longs) {
         return member(AnnotationMetadata.VALUE_MEMBER, longs);
     }
 
@@ -259,7 +248,6 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param str The string
      * @return This builder
      */
-    @NonNull
     public AnnotationValueBuilder<T> value(@Nullable String str) {
         return member(AnnotationMetadata.VALUE_MEMBER, str);
     }
@@ -270,8 +258,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param strings The String[]
      * @return This builder
      */
-    @NonNull
-    public AnnotationValueBuilder<T> values(@Nullable String... strings) {
+    public AnnotationValueBuilder<T> values(String @Nullable ... strings) {
         return member(AnnotationMetadata.VALUE_MEMBER, strings);
     }
 
@@ -281,7 +268,6 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param bool The boolean
      * @return This builder
      */
-    @NonNull
     public AnnotationValueBuilder<T> value(boolean bool) {
         return member(AnnotationMetadata.VALUE_MEMBER, bool);
     }
@@ -293,7 +279,6 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @return This builder
      * @since 3.0.0
      */
-    @NonNull
     public AnnotationValueBuilder<T> value(char character) {
         return member(AnnotationMetadata.VALUE_MEMBER, character);
     }
@@ -305,7 +290,6 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @return This builder
      * @since 3.0.0
      */
-    @NonNull
     public AnnotationValueBuilder<T> value(double number) {
         return member(AnnotationMetadata.VALUE_MEMBER, number);
     }
@@ -317,7 +301,6 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @return This builder
      * @since 3.0.0
      */
-    @NonNull
     public AnnotationValueBuilder<T> value(float f) {
         return member(AnnotationMetadata.VALUE_MEMBER, f);
     }
@@ -328,7 +311,6 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param enumObj The enum
      * @return This builder
      */
-    @NonNull
     public AnnotationValueBuilder<T> value(@Nullable Enum<?> enumObj) {
         return member(AnnotationMetadata.VALUE_MEMBER, enumObj);
     }
@@ -339,8 +321,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param enumObjs The enum[]
      * @return This builder
      */
-    @NonNull
-    public AnnotationValueBuilder<T> values(@Nullable Enum<?>... enumObjs) {
+    public AnnotationValueBuilder<T> values(Enum<?> @Nullable ... enumObjs) {
         return member(AnnotationMetadata.VALUE_MEMBER, enumObjs);
     }
 
@@ -350,8 +331,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param type The type
      * @return This builder
      */
-    @NonNull
-    public AnnotationValueBuilder<T> value(@Nullable Class<?> type) {
+    public AnnotationValueBuilder<T> value(Class<?> type) {
         return member(AnnotationMetadata.VALUE_MEMBER, type);
     }
 
@@ -361,8 +341,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param types The type[]
      * @return This builder
      */
-    @NonNull
-    public AnnotationValueBuilder<T> values(@Nullable Class<?>... types) {
+    public AnnotationValueBuilder<T> values(Class<?> @Nullable ... types) {
         return member(AnnotationMetadata.VALUE_MEMBER, types);
     }
 
@@ -372,8 +351,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param types The type[]
      * @return This builder
      */
-    @NonNull
-    public AnnotationValueBuilder<T> values(@Nullable AnnotationClassValue<?>... types) {
+    public AnnotationValueBuilder<T> values(AnnotationClassValue<?> @Nullable ... types) {
         return member(AnnotationMetadata.VALUE_MEMBER, types);
     }
 
@@ -383,7 +361,6 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param annotation The annotation
      * @return This builder
      */
-    @NonNull
     public AnnotationValueBuilder<T> value(@Nullable AnnotationValue<?> annotation) {
         return member(AnnotationMetadata.VALUE_MEMBER, annotation);
     }
@@ -394,8 +371,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param annotations The annotation[]
      * @return This builder
      */
-    @NonNull
-    public AnnotationValueBuilder<T> values(@Nullable AnnotationValue<?>... annotations) {
+    public AnnotationValueBuilder<T> values(AnnotationValue<?> @Nullable ... annotations) {
         return member(AnnotationMetadata.VALUE_MEMBER, annotations);
     }
 
@@ -406,8 +382,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param i The integer
      * @return This builder
      */
-    @NonNull
-    public AnnotationValueBuilder<T> member(@NonNull String name, int i) {
+    public AnnotationValueBuilder<T> member(String name, int i) {
         values.put(name, i);
         return this;
     }
@@ -420,8 +395,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @return This builder
      * @since 3.0.0
      */
-    @NonNull
-    public AnnotationValueBuilder<T> member(@NonNull String name, byte b) {
+    public AnnotationValueBuilder<T> member(String name, byte b) {
         values.put(name, b);
         return this;
     }
@@ -434,8 +408,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @return This builder
      * @since 3.0.0
      */
-    @NonNull
-    public AnnotationValueBuilder<T> member(@NonNull String name, char c) {
+    public AnnotationValueBuilder<T> member(String name, char c) {
         values.put(name, c);
         return this;
     }
@@ -448,8 +421,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @return This builder
      * @since 3.0.0
      */
-    @NonNull
-    public AnnotationValueBuilder<T> member(@NonNull String name, char... chars) {
+    public AnnotationValueBuilder<T> member(String name, char... chars) {
         values.put(name, chars);
         return this;
     }
@@ -462,8 +434,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @return This builder
      * @since 3.0.0
      */
-    @NonNull
-    public AnnotationValueBuilder<T> member(@NonNull String name, double d) {
+    public AnnotationValueBuilder<T> member(String name, double d) {
         values.put(name, d);
         return this;
     }
@@ -476,8 +447,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @return This builder
      * @since 3.0.0
      */
-    @NonNull
-    public AnnotationValueBuilder<T> member(@NonNull String name, double... doubles) {
+    public AnnotationValueBuilder<T> member(String name, double... doubles) {
         values.put(name, doubles);
         return this;
     }
@@ -490,8 +460,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @return This builder
      * @since 3.0.0
      */
-    @NonNull
-    public AnnotationValueBuilder<T> member(@NonNull String name, float f) {
+    public AnnotationValueBuilder<T> member(String name, float f) {
         values.put(name, f);
         return this;
     }
@@ -504,8 +473,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @return This builder
      * @since 3.0.0
      */
-    @NonNull
-    public AnnotationValueBuilder<T> member(@NonNull String name, float... floats) {
+    public AnnotationValueBuilder<T> member(String name, float... floats) {
         values.put(name, floats);
         return this;
     }
@@ -517,8 +485,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param ints The integer[]
      * @return This builder
      */
-    @NonNull
-    public AnnotationValueBuilder<T> member(@NonNull String name, @Nullable int... ints) {
+    public AnnotationValueBuilder<T> member(String name, int @Nullable ... ints) {
         if (ints != null) {
             values.put(name, ints);
         }
@@ -533,8 +500,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @return This builder
      * @since 3.0.0
      */
-    @NonNull
-    public AnnotationValueBuilder<T> member(@NonNull String name, @Nullable byte... bytes) {
+    public AnnotationValueBuilder<T> member(String name, byte @Nullable ... bytes) {
         if (bytes != null) {
             values.put(name, bytes);
         }
@@ -548,8 +514,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param i The long
      * @return This builder
      */
-    @NonNull
-    public AnnotationValueBuilder<T> member(@NonNull String name, long i) {
+    public AnnotationValueBuilder<T> member(String name, long i) {
         values.put(name, i);
         return this;
     }
@@ -561,8 +526,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param i The short
      * @return This builder
      */
-    @NonNull
-    public AnnotationValueBuilder<T> member(@NonNull String name, short i) {
+    public AnnotationValueBuilder<T> member(String name, short i) {
         values.put(name, i);
         return this;
     }
@@ -574,8 +538,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param shorts The short[]
      * @return This builder
      */
-    @NonNull
-    public AnnotationValueBuilder<T> member(@NonNull String name, short... shorts) {
+    public AnnotationValueBuilder<T> member(String name, short... shorts) {
         values.put(name, shorts);
         return this;
     }
@@ -587,8 +550,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param longs The long[]
      * @return This builder
      */
-    @NonNull
-    public AnnotationValueBuilder<T> member(@NonNull String name, @Nullable long... longs) {
+    public AnnotationValueBuilder<T> member(String name, long @Nullable ... longs) {
         if (longs != null) {
             values.put(name, longs);
         }
@@ -602,8 +564,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param str The string
      * @return This builder
      */
-    @NonNull
-    public AnnotationValueBuilder<T> member(@NonNull String name, @Nullable String str) {
+    public AnnotationValueBuilder<T> member(String name, @Nullable String str) {
         if (str != null) {
             values.put(name, str);
         }
@@ -617,8 +578,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param strings The String[]
      * @return This builder
      */
-    @NonNull
-    public AnnotationValueBuilder<T> member(@NonNull String name, @Nullable String... strings) {
+    public AnnotationValueBuilder<T> member(String name, String @Nullable ... strings) {
         if (strings != null) {
             values.put(name, strings);
         }
@@ -632,8 +592,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param bool The boolean
      * @return This builder
      */
-    @NonNull
-    public AnnotationValueBuilder<T> member(@NonNull String name, boolean bool) {
+    public AnnotationValueBuilder<T> member(String name, boolean bool) {
         values.put(name, bool);
         return this;
     }
@@ -646,8 +605,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @return This builder
      * @since 3.0.0
      */
-    @NonNull
-    public AnnotationValueBuilder<T> member(@NonNull String name, boolean... booleans) {
+    public AnnotationValueBuilder<T> member(String name, boolean... booleans) {
         values.put(name, booleans);
         return this;
     }
@@ -659,8 +617,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param enumObj The enum
      * @return This builder
      */
-    @NonNull
-    public AnnotationValueBuilder<T> member(@NonNull String name, @Nullable Enum<?> enumObj) {
+    public AnnotationValueBuilder<T> member(String name, @Nullable Enum<?> enumObj) {
         if (enumObj != null) {
             values.put(name, enumObj);
         }
@@ -674,8 +631,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param enumObjs The enum[]
      * @return This builder
      */
-    @NonNull
-    public AnnotationValueBuilder<T> member(@NonNull String name, @Nullable Enum<?>... enumObjs) {
+    public AnnotationValueBuilder<T> member(String name, Enum<?> @Nullable ... enumObjs) {
         if (enumObjs != null) {
             values.put(name, enumObjs);
         }
@@ -689,8 +645,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param type The type
      * @return This builder
      */
-    @NonNull
-    public AnnotationValueBuilder<T> member(@NonNull String name, @Nullable Class<?> type) {
+    public AnnotationValueBuilder<T> member(String name, @Nullable Class<?> type) {
         if (type != null) {
             values.put(name, new AnnotationClassValue<>(type));
         }
@@ -704,8 +659,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param types The type[]
      * @return This builder
      */
-    @NonNull
-    public AnnotationValueBuilder<T> member(@NonNull String name, @Nullable Class<?>... types) {
+    public AnnotationValueBuilder<T> member(String name, Class<?> @Nullable ... types) {
         if (types != null) {
             AnnotationClassValue<?>[] classValues = new AnnotationClassValue[types.length];
             for (int i = 0; i < types.length; i++) {
@@ -724,8 +678,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param annotation The annotation
      * @return This builder
      */
-    @NonNull
-    public AnnotationValueBuilder<T> member(@NonNull String name, @Nullable AnnotationValue<?> annotation) {
+    public AnnotationValueBuilder<T> member(String name, @Nullable AnnotationValue<?> annotation) {
         if (annotation != null) {
             values.put(name, annotation);
         }
@@ -739,8 +692,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param annotations The annotation[]
      * @return This builder
      */
-    @NonNull
-    public AnnotationValueBuilder<T> member(@NonNull String name, @Nullable AnnotationValue<?>... annotations) {
+    public AnnotationValueBuilder<T> member(String name, AnnotationValue<?> @Nullable ... annotations) {
         if (annotations != null) {
             values.put(name, annotations);
         }
@@ -754,8 +706,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param classValues The annotation[]
      * @return This builder
      */
-    @NonNull
-    public AnnotationValueBuilder<T> member(@NonNull String name, @Nullable AnnotationClassValue<?>... classValues) {
+    public AnnotationValueBuilder<T> member(String name, AnnotationClassValue<?> @Nullable ... classValues) {
         if (classValues != null) {
             values.put(name, classValues);
         }
@@ -770,47 +721,47 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @return This builder
      * @since 2.4.0
      */
-    @NonNull
     public AnnotationValueBuilder<T> members(@Nullable Map<CharSequence, Object> members) {
-        if (members != null) {
-            for (Map.Entry<CharSequence, Object> entry: members.entrySet()) {
-                Object value = entry.getValue();
-                if (value != null) {
-                    Class<?> clazz = value.getClass();
-                    boolean isArray = clazz.isArray();
-                    if (isArray) {
-                        clazz = clazz.getComponentType();
-                    }
-                    boolean isValid = !clazz.isArray() &&
-                            (
-                                    clazz.isPrimitive() ||
-                                    (ReflectionUtils.getPrimitiveType(clazz).isPrimitive() && !isArray) ||
-                                    clazz.isEnum() ||
-                                    clazz == Class.class ||
-                                    clazz == String.class ||
-                                    clazz == Enum.class ||
-                                    clazz == AnnotationClassValue.class ||
-                                    clazz == AnnotationValue.class ||
-                                    clazz == EvaluatedExpressionReference.class ||
-                                    clazz == EvaluatedExpression.class
-                            );
-                    if (!isValid) {
-                        throw new IllegalArgumentException("The member named [" + entry.getKey().toString() + "] with type [" + value.getClass().getName() + "] is not a valid member type");
-                    }
+        if (members == null) {
+            return this;
+        }
+        for (Map.Entry<CharSequence, Object> entry : members.entrySet()) {
+            Object value = entry.getValue();
+            if (value != null) {
+                Class<?> clazz = value.getClass();
+                boolean isArray = clazz.isArray();
+                if (isArray) {
+                    clazz = clazz.getComponentType();
+                }
+                boolean isValid = !clazz.isArray() &&
+                    (
+                        clazz.isPrimitive() ||
+                            (ReflectionUtils.getPrimitiveType(clazz).isPrimitive() && !isArray) ||
+                            clazz.isEnum() ||
+                            clazz == Class.class ||
+                            clazz == String.class ||
+                            clazz == Enum.class ||
+                            clazz == AnnotationClassValue.class ||
+                            clazz == AnnotationValue.class ||
+                            clazz == EvaluatedExpressionReference.class ||
+                            clazz == EvaluatedExpression.class
+                    );
+                if (!isValid) {
+                    throw new IllegalArgumentException("The member named [" + entry.getKey().toString() + "] with type [" + value.getClass().getName() + "] is not a valid member type");
                 }
             }
-            for (Map.Entry<CharSequence, Object> entry: members.entrySet()) {
-                Object value = entry.getValue();
-                if (value != null) {
-                    Class<?> clazz = value.getClass();
-                    String key = entry.getKey().toString();
-                    if (clazz == Class.class) {
-                        member(key, (Class<?>) value);
-                    } else if (clazz.isArray() && clazz.getComponentType() == Class.class) {
-                        member(key, (Class<?>[]) value);
-                    } else {
-                        values.put(key, value);
-                    }
+        }
+        for (Map.Entry<CharSequence, Object> entry : members.entrySet()) {
+            Object value = entry.getValue();
+            if (value != null) {
+                Class<?> clazz = value.getClass();
+                String key = entry.getKey().toString();
+                if (clazz == Class.class) {
+                    member(key, (Class<?>) value);
+                } else if (clazz.isArray() && clazz.getComponentType() == Class.class) {
+                    member(key, (Class<?>[]) value);
+                } else {
+                    values.put(key, value);
                 }
             }
         }

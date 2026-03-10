@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.server.util.locale;
 
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.locale.LocaleResolutionConfiguration;
 
 import java.util.Optional;
@@ -30,13 +29,11 @@ public interface HttpLocaleResolutionConfiguration extends LocaleResolutionConfi
     /**
      * @return The key in the session that stores the locale
      */
-    @NonNull
     Optional<String> getSessionAttribute();
 
     /**
      * @return The name of the cookie that contains the locale.
      */
-    @NonNull
     Optional<String> getCookieName();
 
     /**

@@ -19,4 +19,7 @@
  * @author graemerocher
  * @since 1.0
  */
+@NullMarked
 package io.micronaut.context.event;
+
+import org.jspecify.annotations.NullMarked;

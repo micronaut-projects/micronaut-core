@@ -212,4 +212,7 @@
  * @author graemerocher
  * @since 1.0
  */
+@NullMarked
 package io.micronaut.http.netty.stream;
+
+import org.jspecify.annotations.NullMarked;

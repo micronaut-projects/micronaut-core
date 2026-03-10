@@ -31,6 +31,7 @@ import org.graalvm.polyglot.Engine;
 import org.graalvm.polyglot.HostAccess;
 import org.graalvm.polyglot.Value;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -170,7 +171,7 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, Ordered {
         pooledQueue.addLast(c);
     }
 
-    <T> T withClass(String packageName, String simpleName, java.util.function.Function<Value, T> fn) {
+    <T> T withClass(@Nullable String packageName, String simpleName, java.util.function.Function<Value, T> fn) {
         Context c = borrow();
         try {
             Value v = getOrCreateClass(c, packageName, simpleName);
@@ -190,7 +191,7 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, Ordered {
         }
     }
 
-    Value getAnyClass(String packageName, String simpleName) {
+    Value getAnyClass(@Nullable String packageName, String simpleName) {
         Context c = pooledQueue.peekFirst();
         if (c == null) {
             c = primaryContext;
@@ -248,7 +249,7 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, Ordered {
         return new ArrayList<>(pooledContexts);
     }
 
-    private Value getOrCreateClass(Context c, String packageName, String simpleName) {
+    private Value getOrCreateClass(Context c, @Nullable String packageName, String simpleName) {
         Map<String, Value> m = cache.computeIfAbsent(c, k -> new ConcurrentHashMap<>());
         String key = classInstanceKey(packageName, simpleName);
         return m.computeIfAbsent(key, k -> {
@@ -266,7 +267,7 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, Ordered {
         return m.computeIfAbsent(key, k -> loadScript(c, packageName, scriptName));
     }
 
-    private static String classInstanceKey(String pkg, String simple) {
+    private static String classInstanceKey(@Nullable String pkg, String simple) {
         return "class-instance:" + Objects.toString(pkg, PYTHON) + "." + simple;
     }
 
@@ -274,7 +275,7 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, Ordered {
         return "script:" + Objects.toString(pkg, PYTHON) + ":" + script;
     }
 
-    private static Value loadClass(Context ctx, String packageName, String simpleName) {
+    private static Value loadClass(Context ctx, @Nullable String packageName, String simpleName) {
         if (packageName == null || PYTHON.equals(packageName)) {
             Value v = ctx.getBindings(PYTHON).getMember(simpleName);
             if (v == null) {

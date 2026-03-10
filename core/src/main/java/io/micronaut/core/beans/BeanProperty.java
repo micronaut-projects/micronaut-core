@@ -16,7 +16,6 @@
 package io.micronaut.core.beans;
 
 import io.micronaut.core.annotation.NextMajorVersion;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
@@ -50,7 +49,7 @@ public interface BeanProperty<B, T> extends BeanReadProperty<B, T>, BeanWritePro
      * @return The declaring bean introspection.
      */
     @Override
-    @NonNull BeanIntrospection<B> getDeclaringBean();
+ BeanIntrospection<B> getDeclaringBean();
 
     /**
      * Read the bean value.
@@ -59,7 +58,7 @@ public interface BeanProperty<B, T> extends BeanReadProperty<B, T>, BeanWritePro
      * @throws IllegalArgumentException If the bean instance if not of the correct type
      */
     @Override
-    @Nullable T get(@NonNull B bean);
+    @Nullable T get(B bean);
 
     /**
      * Read the value and try to convert it to the given type.
@@ -69,7 +68,7 @@ public interface BeanProperty<B, T> extends BeanReadProperty<B, T>, BeanWritePro
      * @return The value if conversion was possible.
      */
     @Override
-    default @NonNull <T2> Optional<T2> get(@NonNull B bean, @NonNull Class<T2> type) {
+    default <T2> Optional<T2> get(B bean, Class<T2> type) {
         ArgumentUtils.requireNonNull("bean", bean);
         ArgumentUtils.requireNonNull("type", type);
         final Argument<T2> argument = Argument.of(type);
@@ -84,7 +83,7 @@ public interface BeanProperty<B, T> extends BeanReadProperty<B, T>, BeanWritePro
      * @return The value if conversion was possible.
      */
     @Override
-    default <T2> Optional<T2> get(@NonNull B bean, @NonNull Argument<T2> argument) {
+    default <T2> Optional<T2> get(B bean, Argument<T2> argument) {
         ArgumentUtils.requireNonNull("bean", bean);
         ArgumentUtils.requireNonNull("type", argument);
 
@@ -100,7 +99,7 @@ public interface BeanProperty<B, T> extends BeanReadProperty<B, T>, BeanWritePro
      * @return The value if conversion was possible.
      */
     @Override
-    default <T2> Optional<T2> get(@NonNull B bean, @NonNull ArgumentConversionContext<T2> conversionContext) {
+    default <T2> Optional<T2> get(B bean, ArgumentConversionContext<T2> conversionContext) {
         ArgumentUtils.requireNonNull("bean", bean);
         ArgumentUtils.requireNonNull("conversionContext", conversionContext);
 
@@ -117,7 +116,7 @@ public interface BeanProperty<B, T> extends BeanReadProperty<B, T>, BeanWritePro
      * @return The value if conversion was possible.
      */
     @Override
-    default @Nullable <T2> T2 get(@NonNull B bean, @NonNull Class<T2> type, @Nullable T2 defaultValue) {
+    default @Nullable <T2> T2 get(B bean, Class<T2> type, @Nullable T2 defaultValue) {
         ArgumentUtils.requireNonNull("bean", bean);
         //noinspection ConstantConditions
         if (type == null) {
@@ -159,7 +158,7 @@ public interface BeanProperty<B, T> extends BeanReadProperty<B, T>, BeanWritePro
      * @since 2.3.0
      */
     @Override
-    default B withValue(@NonNull B bean, @Nullable T value) {
+    default B withValue(B bean, @Nullable T value) {
         if (isReadOnly())  {
             if (value == get(bean)) {
                 return bean;
@@ -217,7 +216,7 @@ public interface BeanProperty<B, T> extends BeanReadProperty<B, T>, BeanWritePro
      * @throws IllegalArgumentException If either the bean type or value type are not correct
      */
     @Override
-    default void set(@NonNull B bean, @Nullable T value) {
+    default void set(B bean, @Nullable T value) {
         if (isReadOnly()) {
             throw new UnsupportedOperationException("Cannot write read-only property: " + getName());
         } else {
@@ -233,7 +232,7 @@ public interface BeanProperty<B, T> extends BeanReadProperty<B, T>, BeanWritePro
      * @throws io.micronaut.core.convert.exceptions.ConversionErrorException If the value couldn't be converted
      */
     @Override
-    default void convertAndSet(@NonNull B bean, @Nullable Object value) {
+    default void convertAndSet(B bean, @Nullable Object value) {
         ArgumentUtils.requireNonNull("bean", bean);
         if (value != null) {
             final Argument<T> argument = asArgument();
@@ -253,7 +252,7 @@ public interface BeanProperty<B, T> extends BeanReadProperty<B, T>, BeanWritePro
      * @return The property type.
      */
     @Override
-    @NonNull Class<T> getType();
+ Class<T> getType();
 
     /**
      * Represent the type as an argument, including any generic type information.
@@ -261,7 +260,6 @@ public interface BeanProperty<B, T> extends BeanReadProperty<B, T>, BeanWritePro
      * @return The argument
      */
     @Override
-    @NonNull
     default Argument<T> asArgument() {
         return Argument.of(getType());
     }

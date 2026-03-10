@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.core.util;
-
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.order.Ordered;
 
 import java.util.Locale;
@@ -36,14 +34,12 @@ public interface LocaleResolver<T> extends Ordered {
      * @param context The context to retrieve the locale from
      * @return The locale
      */
-    @NonNull
-    Optional<Locale> resolve(@NonNull T context);
+    Optional<Locale> resolve(T context);
 
     /**
      * Resolves the local or returns the default locale.
      * @param context The context
      * @return The locale
      */
-    @NonNull
-    Locale resolveOrDefault(@NonNull T context);
+    Locale resolveOrDefault(T context);
 }

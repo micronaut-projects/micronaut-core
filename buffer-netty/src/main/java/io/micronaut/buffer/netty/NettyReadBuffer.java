@@ -20,7 +20,7 @@ import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
-import org.jspecify.annotations.NonNull;
+import io.netty.util.IllegalReferenceCountException;
 import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
@@ -37,10 +37,32 @@ import java.util.function.Function;
  */
 @Internal
 final class NettyReadBuffer extends ReadBuffer {
+    /**
+     * If this is set, we copy the ByteBuf on ReadBuffer creation. This ensures it has its own
+     * reference count, so incorrectly releasing the original buffer will not leave this ReadBuffer
+     * in an invalid state. In practice this should not be necessary, but it can help with
+     * debugging.
+     */
+    private static final boolean STRICT_REFCNT = Boolean.getBoolean("io.micronaut.buffer.netty.NettyReadBuffer.STRICT_REFCNT");
+
+    @Nullable
     ByteBuf buf;
 
     NettyReadBuffer(ByteBuf buf) {
-        this.buf = buf;
+        checkAccessible(buf);
+        if (STRICT_REFCNT) {
+            ByteBuf copy = buf.copy();
+            buf.release();
+            this.buf = copy;
+        } else {
+            this.buf = buf;
+        }
+    }
+
+    private static void checkAccessible(ByteBuf buf) {
+        if (buf.refCnt() <= 0) {
+            throw new IllegalReferenceCountException(buf.refCnt());
+        }
     }
 
     private ByteBuf getBuf() {
@@ -48,6 +70,7 @@ final class NettyReadBuffer extends ReadBuffer {
         if (buf == null) {
             throw new IllegalStateException("Already released");
         }
+        checkAccessible(buf);
         return buf;
     }
 
@@ -57,12 +80,12 @@ final class NettyReadBuffer extends ReadBuffer {
     }
 
     @Override
-    public @NonNull ReadBuffer duplicate() {
+    public ReadBuffer duplicate() {
         return new NettyReadBuffer(getBuf().retainedDuplicate());
     }
 
     @Override
-    public @NonNull ReadBuffer split(int splitPosition) {
+    public ReadBuffer split(int splitPosition) {
         return new NettyReadBuffer(getBuf().readRetainedSlice(splitPosition));
     }
 
@@ -74,7 +97,7 @@ final class NettyReadBuffer extends ReadBuffer {
     }
 
     @Override
-    public void toArray(byte @NonNull [] destination, int offset) throws IndexOutOfBoundsException {
+    public void toArray(byte[] destination, int offset) throws IndexOutOfBoundsException {
         ByteBuf b = getBuf();
         try {
             buf = null;
@@ -88,7 +111,7 @@ final class NettyReadBuffer extends ReadBuffer {
     }
 
     @Override
-    public @NonNull String toString(Charset charset) {
+    public String toString(Charset charset) {
         ByteBuf b = getBuf();
         try {
             buf = null;
@@ -99,7 +122,7 @@ final class NettyReadBuffer extends ReadBuffer {
     }
 
     @Override
-    public @NonNull ByteBuffer<?> toByteBuffer() {
+    public ByteBuffer<?> toByteBuffer() {
         ByteBuf b = getBuf();
         buf = null;
         return new NettyByteBuffer(b);
@@ -113,7 +136,7 @@ final class NettyReadBuffer extends ReadBuffer {
     }
 
     @Override
-    public <R> @Nullable R useFastHeapBuffer(@NonNull Function<java.nio.ByteBuffer, @NonNull R> function) {
+    public <R> @Nullable R useFastHeapBuffer(Function<java.nio.ByteBuffer, R> function) {
         ByteBuf b = getBuf();
         if (b.hasArray()) {
             buf = null;
@@ -124,7 +147,7 @@ final class NettyReadBuffer extends ReadBuffer {
     }
 
     @Override
-    public void transferTo(@NonNull OutputStream stream) throws IOException {
+    public void transferTo(OutputStream stream) throws IOException {
         ByteBuf b = getBuf();
         buf = null;
         try {

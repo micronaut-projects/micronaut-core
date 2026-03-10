@@ -16,7 +16,6 @@
 package io.micronaut.http.client.netty;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.client.exceptions.ContentLengthExceededException;
 import io.netty.buffer.ByteBuf;
@@ -41,8 +40,7 @@ final class SseSplitter {
      * @param buf The buffer
      * @return The individual split pieces
      */
-    @NonNull
-    static List<ByteBuf> split(@NonNull ByteBuf buf) {
+    static List<ByteBuf> split(ByteBuf buf) {
         buf.touch();
         List<ByteBuf> split = new ArrayList<>();
         while (true) {
@@ -70,8 +68,7 @@ final class SseSplitter {
      * @param limits Buffer limits
      * @return The output buffers, split into lines
      */
-    @NonNull
-    static Flux<ByteBuf> split(@NonNull Flux<ByteBuf> buf, @NonNull BodySizeLimits limits) {
+    static Flux<ByteBuf> split(Flux<ByteBuf> buf, BodySizeLimits limits) {
         AtomicReference<CompositeByteBuf> last = new AtomicReference<>();
         return buf.concatMapIterable(bb -> {
                 CompositeByteBuf joined = last.getAndSet(null);

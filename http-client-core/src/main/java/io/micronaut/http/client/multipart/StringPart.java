@@ -15,8 +15,6 @@
  */
 package io.micronaut.http.client.multipart;
 
-import org.jspecify.annotations.NonNull;
-
 /**
  * A class representing a String {@link Part} in {@link MultipartBody} to build a Netty multipart request.
  *
@@ -45,9 +43,8 @@ class StringPart extends Part<String> {
         return value;
     }
 
-    @NonNull
     @Override
-    <T> T getData(@NonNull MultipartDataFactory<T> factory) {
+    <T> T getData(MultipartDataFactory<T> factory) {
         return factory.createAttribute(name, value);
     }
 }

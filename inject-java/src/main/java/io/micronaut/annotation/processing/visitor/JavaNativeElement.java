@@ -38,6 +38,7 @@ public sealed interface JavaNativeElement extends ElementProvider {
     /**
      * @return The native element.
      */
+    @Override
     @Nullable
     Element element();
 

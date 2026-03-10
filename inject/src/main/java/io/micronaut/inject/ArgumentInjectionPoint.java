@@ -16,8 +16,6 @@
 package io.micronaut.inject;
 
 import io.micronaut.core.type.Argument;
-
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.type.ArgumentCoercible;
 
 /**
@@ -33,12 +31,12 @@ public interface ArgumentInjectionPoint<B, T> extends InjectionPoint<B>, Argumen
     /**
      * @return The outer injection point (method or constructor)
      */
-    @NonNull CallableInjectionPoint<B> getOuterInjectionPoint();
+    CallableInjectionPoint<B> getOuterInjectionPoint();
 
     /**
      * @return The argument that is being injected
      */
-    @NonNull Argument<T> getArgument();
+    Argument<T> getArgument();
 
     @Override
     default Argument<T> asArgument() {

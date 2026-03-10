@@ -18,7 +18,6 @@ package io.micronaut.web.router.resource;
 import java.util.List;
 
 import io.micronaut.context.annotation.Factory;
-import org.jspecify.annotations.NonNull;
 import jakarta.inject.Singleton;
 
 /**
@@ -37,7 +36,6 @@ public class StaticResourceResolverFactory {
      * @return The {@link io.micronaut.web.router.resource.StaticResourceResolver}
      */
     @Singleton
-    @NonNull
     protected StaticResourceResolver build(List<StaticResourceConfiguration> configurations) {
         if (configurations.isEmpty()) {
             return StaticResourceResolver.EMPTY;

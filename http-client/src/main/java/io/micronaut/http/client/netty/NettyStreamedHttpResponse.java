@@ -17,7 +17,6 @@ package io.micronaut.http.client.netty;
 
 import com.google.errorprone.annotations.concurrent.GuardedBy;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
@@ -47,8 +46,11 @@ final class NettyStreamedHttpResponse<B> implements MutableHttpResponse<B>, Nett
     private final StreamedHttpResponse nettyResponse;
     private final NettyHttpHeaders headers;
     @GuardedBy("this")
+    @Nullable
     private NettyCookies nettyCookies; // initialized lazily
+    @Nullable
     private B body;
+    @Nullable
     private MutableConvertibleValues<Object> attributes;
 
     /**
@@ -111,20 +113,18 @@ final class NettyStreamedHttpResponse<B> implements MutableHttpResponse<B>, Nett
         return Optional.ofNullable(body);
     }
 
-    @NonNull
     @Override
     public FullHttpResponse toFullHttpResponse() {
         throw new UnsupportedOperationException("Cannot convert a stream response to a full response");
     }
 
-    @NonNull
     @Override
     public StreamedHttpResponse toStreamHttpResponse() {
         return this.nettyResponse;
     }
 
     @Override
-    public io.netty.handler.codec.http.@NonNull HttpResponse toHttpResponse() {
+    public io.netty.handler.codec.http.HttpResponse toHttpResponse() {
         return this.nettyResponse;
     }
 
@@ -160,7 +160,7 @@ final class NettyStreamedHttpResponse<B> implements MutableHttpResponse<B>, Nett
     }
 
     @Override
-    public MutableHttpResponse<B> status(int status, CharSequence message) {
+    public MutableHttpResponse<B> status(int status, @Nullable CharSequence message) {
         if (message == null) {
             nettyResponse.setStatus(HttpResponseStatus.valueOf(status));
         } else {

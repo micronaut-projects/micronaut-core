@@ -16,7 +16,6 @@
 package io.micronaut.http.util;
 
 import io.micronaut.context.annotation.Requires;
-import org.jspecify.annotations.NonNull;
 import jakarta.annotation.Nullable;
 import jakarta.inject.Singleton;
 
@@ -42,7 +41,6 @@ public class HtmlEntityEncodingHtmlSanitizer implements HtmlSanitizer {
     }
 
     @Override
-    @NonNull
     public String sanitize(@Nullable String html) {
         if (html == null) {
             return "";

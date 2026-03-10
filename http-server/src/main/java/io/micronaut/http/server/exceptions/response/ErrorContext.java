@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.server.exceptions.response;
 
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.HttpRequest;
 
@@ -30,19 +29,16 @@ public interface ErrorContext {
     /**
      * @return The request that caused the error
      */
-    @NonNull
     HttpRequest<?> getRequest();
 
     /**
      * @return The optional root cause exception
      */
-    @NonNull
     Optional<Throwable> getRootCause();
 
     /**
      * @return The errors
      */
-    @NonNull
     List<Error> getErrors();
 
     /**
@@ -58,8 +54,7 @@ public interface ErrorContext {
      * @param request        The request
      * @return A new context builder
      */
-    @NonNull
-    static Builder builder(@NonNull HttpRequest<?> request) {
+    static Builder builder(HttpRequest<?> request) {
         return DefaultErrorContext.builder(request);
     }
 
@@ -77,7 +72,7 @@ public interface ErrorContext {
          * @param cause The root cause
          * @return This builder instance
          */
-        ErrorContext.@NonNull Builder cause(@Nullable Throwable cause);
+        ErrorContext.Builder cause(@Nullable Throwable cause);
 
         /**
          * Adds an error to the context for the given message.
@@ -85,7 +80,7 @@ public interface ErrorContext {
          * @param message The message
          * @return This builder instance
          */
-        ErrorContext.@NonNull Builder errorMessage(@NonNull String message);
+        ErrorContext.Builder errorMessage(String message);
 
         /**
          * Adds an error to the context.
@@ -93,7 +88,7 @@ public interface ErrorContext {
          * @param error The message
          * @return This builder instance
          */
-        ErrorContext.@NonNull Builder error(@NonNull Error error);
+        ErrorContext.Builder error(Error error);
 
         /**
          * Adds errors to the context for the given messages.
@@ -101,7 +96,7 @@ public interface ErrorContext {
          * @param errors The errors
          * @return This builder instance
          */
-        ErrorContext.@NonNull Builder errorMessages(@NonNull List<String> errors);
+        ErrorContext.Builder errorMessages(List<String> errors);
 
         /**
          * Adds the errors to the context.
@@ -109,14 +104,13 @@ public interface ErrorContext {
          * @param errors The errors
          * @return This builder instance
          */
-        ErrorContext.@NonNull Builder errors(@NonNull List<Error> errors);
+        ErrorContext.Builder errors(List<Error> errors);
 
         /**
          * Builds the context.
          *
          * @return A new context
          */
-        @NonNull
         ErrorContext build();
     }
 }

@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.http.server.netty;
-
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.util.SupplierUtil;
@@ -93,6 +91,7 @@ import java.net.SocketAddress;
 import java.nio.channels.ClosedChannelException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
@@ -124,19 +123,22 @@ final class HttpPipelineBuilder {
 
     private final NettyHttpServer server;
     private final NettyEmbeddedServices embeddedServices;
+    @Nullable
     private final ServerSslConfiguration sslConfiguration;
     private final RoutingInBoundHandler routingInBoundHandler;
     private final HttpHostResolver hostResolver;
 
+    @Nullable
     private final LoggingHandler loggingHandler;
+    @Nullable
     private final HttpAccessLogHandler accessLogHandler;
-    private final Http2AccessLogManager.Factory accessLogManagerFactory;
+    private final Http2AccessLogManager. @Nullable Factory accessLogManagerFactory;
 
     private final NettyServerCustomizer serverCustomizer;
 
     private final boolean quic;
 
-    HttpPipelineBuilder(NettyHttpServer server, NettyEmbeddedServices embeddedServices, ServerSslConfiguration sslConfiguration, RoutingInBoundHandler routingInBoundHandler, HttpHostResolver hostResolver, NettyServerCustomizer serverCustomizer, boolean quic) {
+    HttpPipelineBuilder(NettyHttpServer server, NettyEmbeddedServices embeddedServices, @Nullable ServerSslConfiguration sslConfiguration, RoutingInBoundHandler routingInBoundHandler, HttpHostResolver hostResolver, NettyServerCustomizer serverCustomizer, boolean quic) {
         this.server = server;
         this.embeddedServices = embeddedServices;
         this.sslConfiguration = sslConfiguration;
@@ -168,7 +170,7 @@ final class HttpPipelineBuilder {
             requestHandler = webSocketUpgradeHandler.get();
         }
         if (server.getServerConfiguration().isDualProtocol() && server.getServerConfiguration().isHttpToHttpsRedirect() && !ssl) {
-            requestHandler = new HttpToHttpsRedirectHandler(routingInBoundHandler.conversionService, server.getServerConfiguration(), sslConfiguration, hostResolver);
+            requestHandler = new HttpToHttpsRedirectHandler(routingInBoundHandler.conversionService, server.getServerConfiguration(), Objects.requireNonNull(sslConfiguration), hostResolver);
         }
         return requestHandler;
     }
@@ -182,7 +184,9 @@ final class HttpPipelineBuilder {
      */
     private final class SslHandlerHolder {
         private final SslContextHolder contextHolder;
+        @Nullable
         private SslHandler sslHandler;
+        @Nullable
         private SSLEngine quicSslEngine;
 
         SslHandlerHolder(SslContextHolder contextHolder) {
@@ -196,13 +200,13 @@ final class HttpPipelineBuilder {
          * @return The handler
          */
         SslHandler makeNormal(ByteBufAllocator alloc) {
-            sslHandler = contextHolder.sslContext().newHandler(alloc);
-            sslHandler.setHandshakeTimeoutMillis(sslConfiguration.getHandshakeTimeout().toMillis());
+            sslHandler = Objects.requireNonNull(contextHolder.sslContext()).newHandler(alloc);
+            sslHandler.setHandshakeTimeoutMillis(Objects.requireNonNull(sslConfiguration).getHandshakeTimeout().toMillis());
             return sslHandler;
         }
 
         Supplier<SSLSession> findSslSession() {
-            return SupplierUtil.memoized(() -> (quicSslEngine == null ? sslHandler.engine() : quicSslEngine).getSession());
+            return SupplierUtil.memoized(() -> (quicSslEngine == null ? Objects.requireNonNull(sslHandler).engine() : quicSslEngine).getSession());
         }
     }
 
@@ -234,13 +238,14 @@ final class HttpPipelineBuilder {
 
         private final NettyServerCustomizer connectionCustomizer;
 
+        @Nullable
         private volatile GracefulShutdownCapable specificGracefulShutdown;
 
         /**
          * @param channel The channel of this connection
-         * @param https   Whether this connection is HTTPS
+         * @param contextHolder The SSL context holder, or null if not using SSL
          */
-        ConnectionPipeline(Channel channel, SslContextHolder contextHolder) {
+        ConnectionPipeline(Channel channel, @Nullable SslContextHolder contextHolder) {
             this.channel = channel;
             this.pipeline = channel.pipeline();
             this.sslHandler = contextHolder == null ? null : new SslHandlerHolder(contextHolder);
@@ -262,8 +267,8 @@ final class HttpPipelineBuilder {
                 path = path.replace("{remoteAddress}", resolveIfNecessary(ch.remoteAddress()));
             }
             if (quic && ch instanceof QuicStreamChannel qsc) {
-                path = path.replace("{localAddress}", resolveIfNecessary(qsc.parent().localSocketAddress()));
-                path = path.replace("{remoteAddress}", resolveIfNecessary(qsc.parent().remoteSocketAddress()));
+                path = path.replace("{localAddress}", resolveIfNecessary(Objects.requireNonNull(qsc.parent().localSocketAddress())));
+                path = path.replace("{remoteAddress}", resolveIfNecessary(Objects.requireNonNull(qsc.parent().remoteSocketAddress())));
             }
             path = path.replace("{random}", Long.toHexString(ThreadLocalRandom.current().nextLong()));
             path = path.replace("{timestamp}", Instant.now().toString());
@@ -276,7 +281,7 @@ final class HttpPipelineBuilder {
                 PcapWriteHandler.Builder builder = PcapWriteHandler.builder();
 
                 if (quic && ch instanceof QuicStreamChannel qsc) {
-                    builder.forceTcpChannel((InetSocketAddress) qsc.parent().localSocketAddress(), (InetSocketAddress) qsc.parent().remoteSocketAddress(), true);
+                    builder.forceTcpChannel((InetSocketAddress) Objects.requireNonNull(qsc.parent().localSocketAddress()), (InetSocketAddress) Objects.requireNonNull(qsc.parent().remoteSocketAddress()), true);
                 }
 
                 ch.pipeline().addLast(builder.build(new FileOutputStream(path)));
@@ -324,12 +329,12 @@ final class HttpPipelineBuilder {
 
         void initHttp3Channel() {
             insertPcapLoggingHandler(channel, "udp-encapsulated");
-            channel.closeFuture().addListener((ChannelFutureListener) future -> sslHandler.contextHolder.release());
+            channel.closeFuture().addListener((ChannelFutureListener) future -> Objects.requireNonNull(sslHandler).contextHolder.release());
 
             Set<Http3GracefulShutdown> activeChannels = ConcurrentHashMap.newKeySet();
             AtomicBoolean shuttingDown = new AtomicBoolean(false);
             pipeline.addLast(Http3.newQuicServerCodecBuilder()
-                .sslEngineProvider(QuicFactory.quicEngineFactory(sslHandler))
+                .sslEngineProvider(QuicFactory.quicEngineFactory(Objects.requireNonNull(sslHandler)))
                 .initialMaxData(server.getServerConfiguration().getHttp3().getInitialMaxData())
                 .initialMaxStreamDataBidirectionalLocal(server.getServerConfiguration().getHttp3().getInitialMaxStreamDataBidirectionalLocal())
                 .initialMaxStreamDataBidirectionalRemote(server.getServerConfiguration().getHttp3().getInitialMaxStreamDataBidirectionalRemote())
@@ -337,7 +342,7 @@ final class HttpPipelineBuilder {
                 .tokenHandler(QuicTokenHandlerImpl.create(channel.alloc()))
                 .handler(new ChannelInitializer<Channel>() {
                     @Override
-                    protected void initChannel(@NonNull Channel ch) throws Exception {
+                    protected void initChannel(Channel ch) throws Exception {
                         if (shuttingDown.get()) {
                             ch.close();
                             return;
@@ -347,7 +352,7 @@ final class HttpPipelineBuilder {
                         insertPcapLoggingHandler(ch, "quic-decapsulated");
                         Http3ServerConnectionHandler connectionHandler = new Http3ServerConnectionHandler(new ChannelInitializer<QuicStreamChannel>() {
                             @Override
-                            protected void initChannel(@NonNull QuicStreamChannel ch) throws Exception {
+                            protected void initChannel(QuicStreamChannel ch) throws Exception {
                                 while (true) {
                                     long m = maxStreamId.get();
                                     if (m >= ch.streamId() || maxStreamId.compareAndSet(m, ch.streamId())) {
@@ -361,7 +366,7 @@ final class HttpPipelineBuilder {
                             }
                         }, new ChannelInitializer<QuicStreamChannel>() {
                             @Override
-                            protected void initChannel(@NonNull QuicStreamChannel ch) throws Exception {
+                            protected void initChannel(QuicStreamChannel ch) throws Exception {
                             }
                         }, null, null, true);
 
@@ -374,7 +379,7 @@ final class HttpPipelineBuilder {
                 .build());
             specificGracefulShutdown = new GracefulShutdownCapable() {
                 @Override
-                public @NonNull CompletionStage<?> shutdownGracefully() {
+                public CompletionStage<?> shutdownGracefully() {
                     shuttingDown.set(true);
                     return GracefulShutdownCapable.shutdownAll(activeChannels.stream());
                 }
@@ -414,7 +419,7 @@ final class HttpPipelineBuilder {
          */
         private void insertIdleStateHandler() {
             final Duration idleTime = server.getServerConfiguration().getIdleTimeout();
-            if (!idleTime.isNegative()) {
+            if (idleTime != null && !idleTime.isNegative()) {
                 pipeline.addLast(ChannelPipelineCustomizer.HANDLER_IDLE_STATE, new IdleStateHandler(
                         (int) server.getServerConfiguration().getReadIdleTimeout().getSeconds(),
                         (int) server.getServerConfiguration().getWriteIdleTimeout().getSeconds(),
@@ -474,6 +479,7 @@ final class HttpPipelineBuilder {
 
         private Http2ConnectionHandler createHttp2ServerHandler(boolean ssl) {
             Http2ServerHandler.ConnectionHandlerBuilder builder = new Http2ServerHandler.ConnectionHandlerBuilder(makeRequestHandler(embeddedServices.getWebSocketUpgradeHandler(server), ssl))
+                .decompress(server.getServerConfiguration().isRequestDecompressionEnabled())
                 .compressor(embeddedServices.getHttpCompressionStrategy())
                 .bodySizeLimits(bodySizeLimits())
                 .accessLogManagerFactory(accessLogManagerFactory)
@@ -547,7 +553,7 @@ final class HttpPipelineBuilder {
                 connectionHandler = frameCodec;
                 multiplexHandler = new Http2MultiplexHandler(new ChannelInitializer<Http2StreamChannel>() {
                     @Override
-                    protected void initChannel(@NonNull Http2StreamChannel ch) {
+                    protected void initChannel(Http2StreamChannel ch) {
                         StreamPipeline streamPipeline = new StreamPipeline(ch, sslHandler, connectionCustomizer.specializeForChannel(ch, NettyServerCustomizer.ChannelRole.REQUEST_STREAM));
                         streamPipeline.insertHttp2FrameHandlers();
                         streamPipeline.streamCustomizer.onStreamPipelineBuilt();
@@ -580,7 +586,7 @@ final class HttpPipelineBuilder {
                         }
                     }
 
-                    if (frameCodec == null) {
+                    if (frameCodec == null || multiplexHandler == null) {
                         return new Http2ServerUpgradeCodecImpl(connectionHandler);
                     } else {
                         return new Http2ServerUpgradeCodecImpl(frameCodec, multiplexHandler);
@@ -598,7 +604,7 @@ final class HttpPipelineBuilder {
             );
             ChannelHandler priorKnowledgeHandler = frameCodec == null ? connectionHandler : new ChannelInitializer<>() {
                 @Override
-                protected void initChannel(@NonNull Channel ch) {
+                protected void initChannel(Channel ch) {
                     ch.pipeline().addLast(connectionHandler, multiplexHandler);
                 }
             };
@@ -634,11 +640,10 @@ final class HttpPipelineBuilder {
             connectionCustomizer.onInitialPipelineBuilt();
         }
 
-        @NonNull
         private Http2MultiplexHandler makeHttp2Handler() {
             return new Http2MultiplexHandler(new ChannelInitializer<Channel>() {
                 @Override
-                protected void initChannel(@NonNull Channel ch) {
+                protected void initChannel(Channel ch) {
                     StreamPipeline streamPipeline = new StreamPipeline(ch, sslHandler, connectionCustomizer.specializeForChannel(ch, NettyServerCustomizer.ChannelRole.REQUEST_STREAM));
                     streamPipeline.insertHttp2FrameHandlers();
                     streamPipeline.streamCustomizer.onStreamPipelineBuilt();
@@ -646,7 +651,6 @@ final class HttpPipelineBuilder {
             });
         }
 
-        @NonNull
         private HttpServerCodec createServerCodec() {
             return new HttpServerCodec(
                     server.getServerConfiguration().getMaxInitialLineLength(),

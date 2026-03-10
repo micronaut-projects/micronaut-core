@@ -100,9 +100,9 @@ internal class KotlinVisitorContext(
 
     override fun getLanguage() = VisitorContext.Language.KOTLIN
 
-    override fun <T : Any?> get(
-        name: CharSequence?,
-        conversionContext: ArgumentConversionContext<T>?
+    override fun <T : Any> get(
+        name: CharSequence,
+        conversionContext: ArgumentConversionContext<T>
     ): Optional<T> {
         return visitorAttributes.get(name, conversionContext)
     }
@@ -115,12 +115,12 @@ internal class KotlinVisitorContext(
         return visitorAttributes.values()
     }
 
-    override fun put(key: CharSequence?, value: Any?): MutableConvertibleValues<Any> {
+    override fun put(key: CharSequence, value: Any?): MutableConvertibleValues<Any> {
         visitorAttributes.put(key, value)
         return this
     }
 
-    override fun remove(key: CharSequence?): MutableConvertibleValues<Any> {
+    override fun remove(key: CharSequence): MutableConvertibleValues<Any> {
         visitorAttributes.remove(key)
         return this
     }

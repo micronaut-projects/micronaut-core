@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.client.sse;
 
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
@@ -43,7 +42,7 @@ public interface SseClient {
      * @param <I>     The request body type
      * @return A {@link Publisher} that emits an {@link Event} with the data represented as a {@link ByteBuffer}
      */
-    <I> Publisher<Event<ByteBuffer<?>>> eventStream(@NonNull HttpRequest<I> request);
+    <I> Publisher<Event<ByteBuffer<?>>> eventStream(HttpRequest<I> request);
 
     /**
      * <p>Perform an HTTP request and receive data as a stream of SSE {@link Event} objects as they become available without blocking.</p>
@@ -56,7 +55,7 @@ public interface SseClient {
      * @param <B> The event body type
      * @return A {@link Publisher} that emits an {@link Event} with the data represented by the eventType argument
      */
-    <I, B> Publisher<Event<B>> eventStream(@NonNull HttpRequest<I> request, @NonNull Argument<B> eventType);
+    <I, B> Publisher<Event<B>> eventStream(HttpRequest<I> request, Argument<B> eventType);
 
     /**
      * <p>Perform an HTTP request and receive data as a stream of SSE {@link Event} objects as they become available without blocking.</p>
@@ -71,7 +70,7 @@ public interface SseClient {
      * @param <B>       The event body type
      * @return A {@link Publisher} that emits an {@link Event} with the data represented by the eventType argument
      */
-    <I, B> Publisher<Event<B>> eventStream(@NonNull HttpRequest<I> request, @NonNull Argument<B> eventType, @NonNull Argument<?> errorType);
+    <I, B> Publisher<Event<B>> eventStream(HttpRequest<I> request, Argument<B> eventType, Argument<?> errorType);
 
     /**
      * <p>Perform an HTTP request and receive data as a stream of SSE {@link Event} objects as they become available without blocking.</p>
@@ -84,7 +83,7 @@ public interface SseClient {
      * @param <B> The event body type
      * @return A {@link Publisher} that emits an {@link Event} with the data represented by the eventType argument
      */
-    default <I, B> Publisher<Event<B>> eventStream(@NonNull HttpRequest<I> request, @NonNull Class<B> eventType) {
+    default <I, B> Publisher<Event<B>> eventStream(HttpRequest<I> request, Class<B> eventType) {
         return eventStream(request, Argument.of(eventType));
     }
 
@@ -98,7 +97,7 @@ public interface SseClient {
      * @param <B> The event body type
      * @return A {@link Publisher} that emits an {@link Event} with the data represented by the eventType argument
      */
-    default <B> Publisher<Event<B>> eventStream(@NonNull String uri, @NonNull Class<B> eventType) {
+    default <B> Publisher<Event<B>> eventStream(String uri, Class<B> eventType) {
         return eventStream(HttpRequest.GET(uri), Argument.of(eventType));
     }
 
@@ -112,7 +111,7 @@ public interface SseClient {
      * @param <B> The event body type
      * @return A {@link Publisher} that emits an {@link Event} with the data represented by the eventType argument
      */
-    default <B> Publisher<Event<B>> eventStream(@NonNull String uri, @NonNull Argument<B> eventType) {
+    default <B> Publisher<Event<B>> eventStream(String uri, Argument<B> eventType) {
         return eventStream(HttpRequest.GET(uri), eventType);
     }
 
@@ -139,7 +138,7 @@ public interface SseClient {
      * @return The client
      * @since 2.2.0
      */
-    static SseClient create(@Nullable URL url, @NonNull HttpClientConfiguration configuration) {
+    static SseClient create(@Nullable URL url, HttpClientConfiguration configuration) {
         return SseClientFactoryResolver.getFactory().createSseClient(url, configuration);
     }
 }

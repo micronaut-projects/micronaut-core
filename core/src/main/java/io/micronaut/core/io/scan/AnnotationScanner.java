@@ -20,9 +20,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Objects;
 import java.util.stream.Stream;
-
-import org.jspecify.annotations.NonNull;
-
 /**
  * Interface for classes that scan for classes with a given annotation.
  *
@@ -37,7 +34,7 @@ public interface AnnotationScanner {
      * @param pkg        The package to scan
      * @return A stream of classes
      */
-    @NonNull Stream<Class<?>> scan(@NonNull String annotation, @NonNull String pkg);
+ Stream<Class<?>> scan(String annotation, String pkg);
 
     /**
      * Scan the given packages.
@@ -46,7 +43,7 @@ public interface AnnotationScanner {
      * @param packages   The packages to scan
      * @return A stream of classes
      */
-    default @NonNull Stream<Class<?>> scan(@NonNull String annotation, @NonNull Package... packages) {
+    default Stream<Class<?>> scan(String annotation, Package... packages) {
         Objects.requireNonNull(annotation, "Annotation type cannot be null");
         Objects.requireNonNull(packages, "Packages to scan cannot be null");
 
@@ -62,7 +59,7 @@ public interface AnnotationScanner {
      * @param packages   The packages
      * @return A stream of classes
      */
-    default @NonNull Stream<Class<?>> scan(@NonNull Class<? extends Annotation> annotation, @NonNull Package... packages) {
+    default Stream<Class<?>> scan(Class<? extends Annotation> annotation, Package... packages) {
         Objects.requireNonNull(annotation, "Annotation type cannot be null");
         Objects.requireNonNull(packages, "Packages to scan cannot be null");
 
@@ -76,7 +73,7 @@ public interface AnnotationScanner {
      * @param pkg        The package to scan
      * @return A stream of classes
      */
-    default @NonNull Stream<Class<?>> scan(@NonNull Class<? extends Annotation> annotation, @NonNull Package pkg) {
+    default Stream<Class<?>> scan(Class<? extends Annotation> annotation, Package pkg) {
         return scan(annotation.getName(), pkg.getName());
     }
 
@@ -87,7 +84,7 @@ public interface AnnotationScanner {
      * @param packages   The package names
      * @return A stream of classes
      */
-    default @NonNull Stream<Class<?>> scan(@NonNull String annotation, @NonNull String... packages) {
+    default Stream<Class<?>> scan(String annotation, String... packages) {
         Objects.requireNonNull(annotation, "Annotation type cannot be null");
         Objects.requireNonNull(packages, "Packages to scan cannot be null");
 
@@ -102,7 +99,7 @@ public interface AnnotationScanner {
      * @param packages   The package names
      * @return A stream of classes
      */
-    default @NonNull Stream<Class<?>> scan(@NonNull String annotation, @NonNull Collection<String> packages) {
+    default Stream<Class<?>> scan(String annotation, Collection<String> packages) {
         Objects.requireNonNull(annotation, "Annotation type cannot be null");
         Objects.requireNonNull(packages, "Packages to scan cannot be null");
 
@@ -116,7 +113,7 @@ public interface AnnotationScanner {
      * @param packages   The package names
      * @return A stream of classes
      */
-    default @NonNull Stream<Class<?>> scan(@NonNull Class<? extends Annotation> annotation, @NonNull Collection<String> packages) {
+    default Stream<Class<?>> scan(Class<? extends Annotation> annotation, Collection<String> packages) {
         Objects.requireNonNull(annotation, "Annotation type cannot be null");
         Objects.requireNonNull(packages, "Packages to scan cannot be null");
         return scan(annotation.getName(), packages.stream());
@@ -129,7 +126,7 @@ public interface AnnotationScanner {
      * @param packages   The package names
      * @return A stream of classes
      */
-    default @NonNull Stream<Class<?>> scan(@NonNull String annotation, @NonNull Stream<String> packages) {
+    default Stream<Class<?>> scan(String annotation, Stream<String> packages) {
         Objects.requireNonNull(annotation, "Annotation type cannot be null");
         Objects.requireNonNull(packages, "Packages to scan cannot be null");
 
@@ -144,7 +141,7 @@ public interface AnnotationScanner {
      * @param packages   The package names
      * @return A stream of classes
      */
-    default @NonNull Stream<Class<?>> scan(@NonNull Class<? extends Annotation> annotation, @NonNull String... packages) {
+    default Stream<Class<?>> scan(Class<? extends Annotation> annotation, String... packages) {
         Objects.requireNonNull(annotation, "Annotation type cannot be null");
         Objects.requireNonNull(packages, "Packages to scan cannot be null");
 

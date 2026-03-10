@@ -20,7 +20,6 @@ import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ReplacesDefinition;
@@ -42,13 +41,13 @@ import java.util.Optional;
  * @since 5.0
  */
 @Internal
-public record DefaultReplacesDefinition<T>(@NonNull Class<T> beanType,
+public record DefaultReplacesDefinition<T>(Class<T> beanType,
                                            @Nullable Class<T> beanTypeToReplace,
                                            @Nullable Qualifier<T> qualifier,
                                            @Nullable Class<?> factoryClass) implements ReplacesDefinition<T> {
 
 
-    public DefaultReplacesDefinition(@NonNull Class<T> beanType, AnnotationValue<Replaces> replacesAnnotation) {
+    public DefaultReplacesDefinition(Class<T> beanType, AnnotationValue<Replaces> replacesAnnotation) {
         this(
             beanType,
             (Class<T>) replacesAnnotation.classValue(Replaces.MEMBER_BEAN).orElse(beanType),
@@ -58,7 +57,7 @@ public record DefaultReplacesDefinition<T>(@NonNull Class<T> beanType,
     }
 
     @Nullable
-    private static <K> Qualifier<K> findQualifier(@NonNull AnnotationValue<Replaces> replacesAnnotation) {
+    private static <K> Qualifier<K> findQualifier(AnnotationValue<Replaces> replacesAnnotation) {
         String named = replacesAnnotation.stringValue(Replaces.MEMBER_NAMED).orElse(null);
         AnnotationClassValue<?> qualifierClassValue = replacesAnnotation.annotationClassValue(Replaces.MEMBER_QUALIFIER).orElse(null);
         if (named != null && qualifierClassValue != null) {

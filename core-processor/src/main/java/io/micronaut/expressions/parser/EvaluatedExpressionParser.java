@@ -16,7 +16,6 @@
 package io.micronaut.expressions.parser;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.exception.ExpressionParsingException;
 
@@ -35,6 +34,5 @@ public sealed interface EvaluatedExpressionParser permits SingleEvaluatedExpress
      * @return expression AST
      * @throws ExpressionParsingException when expression violates syntactic rules
      */
-    @NonNull
     ExpressionNode parse() throws ExpressionParsingException;
 }

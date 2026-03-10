@@ -14,7 +14,9 @@ import reactor.core.publisher.Flux
 class KotlinUploadControllerSpec: StringSpec() {
 
     val embeddedServer = autoClose(
-            ApplicationContext.run(EmbeddedServer::class.java, mapOf("spec.name" to KotlinUploadControllerSpec::class.simpleName))
+        ApplicationContext.run(EmbeddedServer::class.java,
+            mapOf("spec.name" to KotlinUploadControllerSpec::class.simpleName as Any)
+        )
     )
 
     val client = autoClose(
@@ -33,7 +35,7 @@ class KotlinUploadControllerSpec: StringSpec() {
                     .accept(MediaType.TEXT_PLAIN_TYPE),
                 Int::class.java
             ))
-            val response = flowable.blockFirst()
+            val response = flowable.blockFirst()!!
 
             response.status() shouldBe HttpStatus.OK
             response.body.get() shouldBe 15
@@ -50,7 +52,7 @@ class KotlinUploadControllerSpec: StringSpec() {
                     .accept(MediaType.TEXT_PLAIN_TYPE),
                 Int::class.java
             ))
-            val response = flowable.blockFirst()
+            val response = flowable.blockFirst()!!
 
             response.status() shouldBe HttpStatus.OK
             response.body.get() shouldBe 15

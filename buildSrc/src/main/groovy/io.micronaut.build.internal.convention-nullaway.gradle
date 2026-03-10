@@ -1,0 +1,26 @@
+import net.ltgt.gradle.errorprone.CheckSeverity
+
+plugins {
+    id "io.micronaut.build.internal.base"
+    id 'net.ltgt.errorprone'
+}
+
+dependencies {
+    errorprone libs.nullaway
+    errorprone libs.error.prone.core
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.errorprone {
+        check("NullAway", CheckSeverity.ERROR)
+        check("MissingOverride", CheckSeverity.ERROR)
+        option("NullAway:AnnotatedPackages", "io.micronaut")
+    }
+    // Disable NullAway on test code and TCK
+    if (name.toLowerCase().contains("test") || project.name.contains("tck")) {
+        options.errorprone {
+            disable("NullAway")
+        }
+    }
+}
+

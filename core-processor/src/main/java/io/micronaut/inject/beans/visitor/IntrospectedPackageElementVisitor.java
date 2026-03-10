@@ -19,7 +19,6 @@ import io.micronaut.core.annotation.AccessorsStyle;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.PackageElement;
 import io.micronaut.inject.processing.ProcessingException;
@@ -51,7 +50,7 @@ public final class IntrospectedPackageElementVisitor implements PackageElementVi
     }
 
     @Override
-    public TypeElementVisitor.@NonNull VisitorKind getVisitorKind() {
+    public TypeElementVisitor. VisitorKind getVisitorKind() {
         return TypeElementVisitor.VisitorKind.ISOLATING;
     }
 

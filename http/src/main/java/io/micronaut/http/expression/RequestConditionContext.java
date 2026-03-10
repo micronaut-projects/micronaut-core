@@ -17,7 +17,6 @@ package io.micronaut.http.expression;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.context.ServerRequestContext;
 import jakarta.inject.Singleton;
@@ -46,7 +45,7 @@ public final class RequestConditionContext {
      * @return The request object.
      */
     @SuppressWarnings("java:S1452")
-    public @NonNull HttpRequest<?> getRequest() {
+    public HttpRequest<?> getRequest() {
         return currentRequest();
     }
 

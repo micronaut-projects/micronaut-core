@@ -17,8 +17,6 @@ package io.micronaut.http.server.netty.handler;
 
 import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.util.NativeImageUtils;
 import io.micronaut.http.body.AvailableByteBody;
@@ -41,11 +39,13 @@ import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http2.Http2Exception;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.OptionalLong;
 
 /**
@@ -58,6 +58,7 @@ import java.util.OptionalLong;
 abstract class MultiplexedServerHandler {
     final Logger LOG = LoggerFactory.getLogger(getClass());
 
+    @Nullable
     ChannelHandlerContext ctx;
     BodySizeLimits bodySizeLimits = BodySizeLimits.UNLIMITED;
     private final RequestHandler requestHandler;
@@ -77,26 +78,35 @@ abstract class MultiplexedServerHandler {
      */
     abstract void flush();
 
-    private @NonNull NettyByteBodyFactory byteBodyFactory() {
-        return new NettyByteBodyFactory(ctx.channel());
+    private NettyByteBodyFactory byteBodyFactory() {
+        return new NettyByteBodyFactory(requiredCtx().channel());
+    }
+
+    protected ChannelHandlerContext requiredCtx() {
+        return Objects.requireNonNull(ctx);
     }
 
     /**
      * An HTTP/2 or HTTP/3 stream.
      */
     abstract class MultiplexedStream implements OutboundAccess {
+        @Nullable
         private final Http2RequestEvent jfrEvent;
+        @Nullable
         private HttpRequest request;
-
+        @Nullable
         private List<ByteBuf> bufferedContent;
-        private BufferConsumer.Upstream writerUpstream;
+        private BufferConsumer.@Nullable Upstream writerUpstream;
+        @Nullable
         private InputStreamer streamer;
 
+        @Nullable
         private Object attachment;
 
         private boolean requestAccepted;
-        private boolean responseDone;
-        private Compressor.Session compressionSession;
+        private boolean finished;
+        private boolean reset;
+        private Compressor. @Nullable Session compressionSession;
 
         MultiplexedStream(int streamId) {
             if (NativeImageUtils.JFR_AVAILABLE && Http2RequestEvent.isTurnedOn()) {
@@ -142,7 +152,7 @@ abstract class MultiplexedServerHandler {
             this.request = headers;
             if (endOfStream) {
                 requestAccepted = true;
-                requestHandler.accept(ctx, headers, NettyByteBodyFactory.empty(), this);
+                requestHandler.accept(requiredCtx(), headers, NettyByteBodyFactory.empty(), this);
             }
         }
 
@@ -166,7 +176,7 @@ abstract class MultiplexedServerHandler {
                     if (bufferedContent == null) {
                         fullBody = data;
                     } else {
-                        CompositeByteBuf composite = ctx.alloc().compositeBuffer();
+                        CompositeByteBuf composite = requiredCtx().alloc().compositeBuffer();
                         for (ByteBuf c : bufferedContent) {
                             composite.addComponent(true, c);
                         }
@@ -177,7 +187,7 @@ abstract class MultiplexedServerHandler {
 
                     requestAccepted = true;
                     notifyDataConsumed(fullBody.readableBytes());
-                    requestHandler.accept(ctx, request, byteBodyFactory().createChecked(bodySizeLimits, fullBody), this);
+                    requestHandler.accept(requiredCtx(), Objects.requireNonNull(request), byteBodyFactory().createChecked(bodySizeLimits, fullBody), this);
                 } else {
                     if (bufferedContent == null) {
                         bufferedContent = new ArrayList<>();
@@ -210,7 +220,7 @@ abstract class MultiplexedServerHandler {
             }
             requestAccepted = true;
             streamer.dest.setExpectedLengthFrom(request.headers());
-            requestHandler.accept(ctx, request, new StreamingNettyByteBody(streamer.dest), this);
+            requestHandler.accept(requiredCtx(), request, new StreamingNettyByteBody(streamer.dest), this);
         }
 
         /**
@@ -228,17 +238,14 @@ abstract class MultiplexedServerHandler {
          * @param e The exception that should be forwarded to the stream consumer
          */
         final void onRstStreamRead(Exception e) {
+            reset = true;
             if (streamer != null) {
                 streamer.error(e);
             }
-            finish();
+            disposeWriteSide();
         }
 
-        private boolean finish() {
-            if (responseDone) {
-                return false;
-            }
-            responseDone = true;
+        private void disposeWriteSide() {
             if (writerUpstream != null) {
                 writerUpstream.allowDiscard();
                 writerUpstream.disregardBackpressure();
@@ -246,14 +253,22 @@ abstract class MultiplexedServerHandler {
             if (compressionSession != null) {
                 compressionSession.discard();
             }
+        }
+
+        private boolean finish() {
+            if (finished) {
+                return false;
+            }
+            finished = true;
+            disposeWriteSide();
             requestHandler.responseWritten(attachment);
             return true;
         }
 
         @Override
-        public void write(@NonNull HttpResponse response, @NonNull ByteBody body) {
+        public void write(HttpResponse response, ByteBody body) {
             body.touch();
-            if (responseDone) {
+            if (finished) {
                 body.touch();
                 // stream reset
                 return;
@@ -278,8 +293,9 @@ abstract class MultiplexedServerHandler {
             } else {
                 StreamingNettyByteBody snbb = byteBodyFactory.toStreaming(body);
                 var consumer = new BufferConsumer() {
+                    @Nullable
                     Upstream upstream;
-                    final EventLoopFlow flow = new EventLoopFlow(ctx.channel().eventLoop());
+                    final EventLoopFlow flow = new EventLoopFlow(requiredCtx().channel().eventLoop());
 
                     @Override
                     public void add(ReadBuffer buf) {
@@ -290,13 +306,13 @@ abstract class MultiplexedServerHandler {
 
                     private void add0(ReadBuffer buf) {
                         int n = buf.readable();
-                        writeData(NettyReadBufferFactory.toByteBuf(buf), false, ctx.newPromise()
+                        writeData(NettyReadBufferFactory.toByteBuf(buf), false, requiredCtx().newPromise()
                             .addListener((ChannelFutureListener) future -> {
                                 if (future.isSuccess()) {
-                                    upstream.onBytesConsumed(n);
+                                    Objects.requireNonNull(upstream).onBytesConsumed(n);
                                 } else {
                                     logStreamWriteFailure(future.cause());
-                                    upstream.allowDiscard();
+                                    Objects.requireNonNull(upstream).allowDiscard();
                                 }
                             }));
                         flush();
@@ -310,10 +326,14 @@ abstract class MultiplexedServerHandler {
                     }
 
                     private void complete0() {
-                        if (!responseDone) {
-                            writeData(Unpooled.EMPTY_BUFFER, true, endPromise(response));
+                        if (!finished) {
+                            if (!reset) {
+                                writeData(Unpooled.EMPTY_BUFFER, true, endPromise(response));
+                            }
                             if (finish()) {
-                                flush();
+                                if (!reset) {
+                                    flush();
+                                }
                             }
                         }
                     }
@@ -339,15 +359,20 @@ abstract class MultiplexedServerHandler {
         }
 
         private void writeStreaming(HttpResponse response, BufferConsumer.Upstream upstream, long contentLength) {
-            if (!ctx.executor().inEventLoop()) {
-                ctx.executor().execute(() -> writeStreaming(response, upstream, contentLength));
+            if (!requiredCtx().executor().inEventLoop()) {
+                requiredCtx().executor().execute(() -> writeStreaming(response, upstream, contentLength));
                 return;
             }
 
-            if (responseDone) {
+            if (finished) {
+                upstream.allowDiscard();
+                upstream.disregardBackpressure();
+                return;
+            } else if (reset) {
                 // connection closed?
-                writerUpstream.allowDiscard();
-                writerUpstream.disregardBackpressure();
+                upstream.allowDiscard();
+                upstream.disregardBackpressure();
+                finish();
                 return;
             }
 
@@ -355,25 +380,29 @@ abstract class MultiplexedServerHandler {
 
             prepareCompression(response, contentLength);
 
-            writeHeaders(response, false, ctx.voidPromise());
+            writeHeaders(response, false, requiredCtx().voidPromise());
             upstream.start();
         }
 
         @Override
-        public void writeHeadResponse(@NonNull HttpResponse response) {
+        public void writeHeadResponse(HttpResponse response) {
             response.headers().remove(HttpHeaderNames.TRANSFER_ENCODING);
             writeFull(response, Unpooled.EMPTY_BUFFER);
         }
 
-        private void writeFull(@NonNull HttpResponse response, @NonNull ByteBuf content) {
-            if (responseDone) {
-                // stream closed
+        private void writeFull(HttpResponse response, ByteBuf content) {
+            if (finished) {
                 content.release();
                 return;
+            } else if (reset) {
+                // stream closed
+                content.release();
+                finish();
+                return;
             }
-            if (!ctx.executor().inEventLoop()) {
+            if (!requiredCtx().executor().inEventLoop()) {
                 ByteBuf finalContent = content;
-                ctx.executor().execute(() -> writeFull(response, finalContent));
+                requiredCtx().executor().execute(() -> writeFull(response, finalContent));
                 return;
             }
 
@@ -391,10 +420,10 @@ abstract class MultiplexedServerHandler {
                 empty = content == null;
             }
 
-            writeHeaders(response, empty, empty ? endPromise(response) : ctx.voidPromise());
+            writeHeaders(response, empty, empty ? endPromise(response) : requiredCtx().voidPromise());
             if (!empty) {
                 // bypass writeDataCompressing
-                writeData0(content, true, endPromise(response));
+                writeData0(Objects.requireNonNull(content), true, endPromise(response));
             } else if (content != null) {
                 content.release();
             }
@@ -404,15 +433,15 @@ abstract class MultiplexedServerHandler {
             flush();
         }
 
-        private ChannelPromise endPromise(@NonNull HttpResponse response) {
+        private ChannelPromise endPromise(HttpResponse response) {
             if (jfrEvent == null) {
-                return ctx.voidPromise();
+                return requiredCtx().voidPromise();
             }
-            return ctx.newPromise().addListener((ChannelFutureListener) future -> {
+            return requiredCtx().newPromise().addListener((ChannelFutureListener) future -> {
                 jfrEvent.end();
                 if (jfrEvent.shouldCommit()) {
-                    jfrEvent.populateChannel(ctx.channel());
-                    jfrEvent.populateRequest(request);
+                    jfrEvent.populateChannel(requiredCtx().channel());
+                    jfrEvent.populateRequest(Objects.requireNonNull(request));
                     jfrEvent.populateResponse(response);
                     jfrEvent.commit();
                 }
@@ -440,7 +469,7 @@ abstract class MultiplexedServerHandler {
 
         private void prepareCompression(HttpResponse headers, long contentLength) {
             if (compressor != null) {
-                Compressor.Session session = compressor.prepare(ctx, request, headers, contentLength);
+                Compressor.Session session = compressor.prepare(requiredCtx(), Objects.requireNonNull(request), headers, contentLength);
                 if (session != null) {
                     headers.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
                     compressionSession = session;
@@ -461,12 +490,11 @@ abstract class MultiplexedServerHandler {
             if (compressionSession == null) {
                 writeData0(data, endStream, promise);
             } else {
-                writeDataCompressing(data, endStream, promise);
+                writeDataCompressing(compressionSession, data, endStream, promise);
             }
         }
 
-        private void writeDataCompressing(ByteBuf data, boolean endStream, ChannelPromise promise) {
-            Compressor.Session compressionChannel = this.compressionSession;
+        private void writeDataCompressing(Compressor.Session compressionChannel, ByteBuf data, boolean endStream, ChannelPromise promise) {
             compressionChannel.push(data);
             if (endStream) {
                 compressionChannel.finish();
@@ -512,14 +540,14 @@ abstract class MultiplexedServerHandler {
 
             @Override
             public void start() {
-                EventLoop eventLoop = ctx.channel().eventLoop();
+                EventLoop eventLoop = requiredCtx().channel().eventLoop();
                 if (!eventLoop.inEventLoop()) {
                     eventLoop.execute(this::start);
                     return;
                 }
 
                 if (sendContinue) {
-                    writeHeaders(PipeliningServerHandler.ContinueOutboundHandler.CONTINUE_11, false, ctx.voidPromise());
+                    writeHeaders(PipeliningServerHandler.ContinueOutboundHandler.CONTINUE_11, false, requiredCtx().voidPromise());
                     sendContinue = false;
                 }
             }
@@ -530,7 +558,7 @@ abstract class MultiplexedServerHandler {
                     throw new IllegalArgumentException("Negative bytes consumed");
                 }
 
-                EventLoop eventLoop = ctx.channel().eventLoop();
+                EventLoop eventLoop = requiredCtx().channel().eventLoop();
                 if (!eventLoop.inEventLoop()) {
                     eventLoop.execute(() -> onBytesConsumed(bytesConsumed));
                     return;
@@ -570,7 +598,7 @@ abstract class MultiplexedServerHandler {
 
             @Override
             public void allowDiscard() {
-                EventLoop eventLoop = ctx.channel().eventLoop();
+                EventLoop eventLoop = requiredCtx().channel().eventLoop();
                 if (!eventLoop.inEventLoop()) {
                     eventLoop.execute(this::allowDiscard);
                     return;
@@ -582,7 +610,7 @@ abstract class MultiplexedServerHandler {
 
             @Override
             public void disregardBackpressure() {
-                EventLoop eventLoop = ctx.channel().eventLoop();
+                EventLoop eventLoop = requiredCtx().channel().eventLoop();
                 if (!eventLoop.inEventLoop()) {
                     eventLoop.execute(this::disregardBackpressure);
                     return;
@@ -593,7 +621,7 @@ abstract class MultiplexedServerHandler {
 
             @Override
             public void add(ReadBuffer buf) {
-                assert ctx.channel().eventLoop().inEventLoop();
+                assert requiredCtx().channel().eventLoop().inEventLoop();
 
                 if (unacknowledged < 0) {
                     // -MIN_VALUE is still MIN_VALUE so we need to special case it

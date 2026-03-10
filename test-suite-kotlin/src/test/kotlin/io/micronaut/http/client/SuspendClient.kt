@@ -12,7 +12,7 @@ interface SuspendClient {
     suspend fun call(newState: String): String
 
     @Get
-    suspend fun notFound(): HttpResponse<String?>
+    suspend fun notFound(): HttpResponse<String>
 
     @Get
     suspend fun notFoundWithoutHttpResponseWrapper(): String?

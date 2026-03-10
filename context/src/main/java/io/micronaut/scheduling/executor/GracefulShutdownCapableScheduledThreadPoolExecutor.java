@@ -16,7 +16,6 @@
 package io.micronaut.scheduling.executor;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.runtime.graceful.GracefulShutdownCapable;
 
 import java.util.OptionalLong;
@@ -45,7 +44,7 @@ final class GracefulShutdownCapableScheduledThreadPoolExecutor extends Scheduled
     }
 
     @Override
-    public @NonNull CompletionStage<?> shutdownGracefully() {
+    public CompletionStage<?> shutdownGracefully() {
         shutdown();
         return terminationFuture;
     }

@@ -18,6 +18,7 @@ package io.micronaut.http.server.types.files;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
+import org.jspecify.annotations.Nullable;
 
 import java.io.File;
 
@@ -32,6 +33,7 @@ public class SystemFile implements FileCustomizableResponseType {
 
     private final File file;
     private final MediaType mediaType;
+    @Nullable
     private String attachmentName;
 
     /**

@@ -16,7 +16,6 @@
 package io.micronaut.expressions.context;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.expressions.EvaluatedExpressionReference;
 import io.micronaut.inject.ast.ClassElement;
@@ -36,9 +35,8 @@ public interface ExpressionCompilationContextFactory {
      * @param methodElement annotated method
      * @return evaluation context for method
      */
-    @NonNull
-    ExpressionEvaluationContext buildContextForMethod(@NonNull EvaluatedExpressionReference expression,
-                                                      @NonNull MethodElement methodElement);
+    ExpressionEvaluationContext buildContextForMethod(EvaluatedExpressionReference expression,
+                                                      MethodElement methodElement);
 
     /**
      * Builds expression evaluation context for expression reference.
@@ -47,7 +45,6 @@ public interface ExpressionCompilationContextFactory {
      * @param thisElement
      * @return evaluation context for method
      */
-    @NonNull
     ExpressionEvaluationContext buildContext(EvaluatedExpressionReference expression, @Nullable ClassElement thisElement);
 
     /**
@@ -59,7 +56,6 @@ public interface ExpressionCompilationContextFactory {
      * @param contextClass context class element
      * @return This context factory
      */
-    @NonNull
-    ExpressionCompilationContextFactory registerContextClass(@NonNull ClassElement contextClass);
+    ExpressionCompilationContextFactory registerContextClass(ClassElement contextClass);
 
 }

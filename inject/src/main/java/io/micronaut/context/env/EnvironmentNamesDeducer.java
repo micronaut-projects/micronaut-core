@@ -14,9 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.context.env;
-
-import org.jspecify.annotations.NonNull;
-
 import java.util.Set;
 
 /**
@@ -50,7 +47,6 @@ public interface EnvironmentNamesDeducer {
      * @return a non-null set of environment names, which may be empty if no environment
      *         names can be deduced.
      */
-    @NonNull
     Set<String> deduceEnvironmentNames();
 
 }

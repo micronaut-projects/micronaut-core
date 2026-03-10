@@ -18,11 +18,11 @@ package io.micronaut.annotation.processing.test;
 import com.google.devtools.ksp.processing.SymbolProcessor;
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment;
 import com.google.devtools.ksp.symbol.KSClassDeclaration;
-import io.micronaut.annotation.processing.test.support.JvmCompilationResult;
-import io.micronaut.annotation.processing.test.support.KotlinCompilation;
-import io.micronaut.annotation.processing.test.support.Ksp2Kt;
-import io.micronaut.annotation.processing.test.support.KspKt;
-import io.micronaut.annotation.processing.test.support.SourceFile;
+import com.tschuchort.compiletesting.JvmCompilationResult;
+import com.tschuchort.compiletesting.KotlinCompilation;
+import com.tschuchort.compiletesting.Ksp2Kt;
+import com.tschuchort.compiletesting.KspKt;
+import com.tschuchort.compiletesting.SourceFile;
 import io.micronaut.aop.internal.InterceptorRegistryBean;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanContext;
@@ -76,7 +76,7 @@ public class KotlinCompiler {
 
     static {
 
-        KOTLIN_COMPILATION.setJvmDefault("all");
+        KOTLIN_COMPILATION.setJvmDefault("enable");
         KOTLIN_COMPILATION.setInheritClassPath(true);
         KOTLIN_COMPILATION.setLanguageVersion("2.0");
         Ksp2Kt.useKsp2(KOTLIN_COMPILATION);

@@ -16,7 +16,6 @@
 package io.micronaut.http.client.netty;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
 
@@ -44,8 +43,7 @@ public interface NettyClientCustomizer {
      * @param role The role (or scope) of the channel.
      * @return The new customizer, or {@code this} if no specialization needs to take place.
      */
-    @NonNull
-    default NettyClientCustomizer specializeForChannel(@NonNull Channel channel, @NonNull ChannelRole role) {
+    default NettyClientCustomizer specializeForChannel(Channel channel, ChannelRole role) {
         return this;
     }
 
@@ -55,8 +53,7 @@ public interface NettyClientCustomizer {
      * @since 4.7.0
      */
     @Experimental
-    @NonNull
-    default NettyClientCustomizer specializeForBootstrap(@NonNull Bootstrap bootstrap) {
+    default NettyClientCustomizer specializeForBootstrap(Bootstrap bootstrap) {
         return this;
     }
 
@@ -109,6 +106,6 @@ public interface NettyClientCustomizer {
          *
          * @param customizer The customizer to register.
          */
-        void register(@NonNull NettyClientCustomizer customizer);
+        void register(NettyClientCustomizer customizer);
     }
 }

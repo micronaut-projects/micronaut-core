@@ -17,7 +17,6 @@ package io.micronaut.http.tck;
 
 import io.micronaut.context.ApplicationContextProvider;
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -107,12 +106,10 @@ public interface ServerUnderTest extends ApplicationContextProvider, Closeable, 
         return Optional.of("http");
     }
 
-    @NonNull
     default Optional<Integer> getPort() {
         return Optional.empty();
     }
 
-    @NonNull
     default Optional<URL> getURL() {
         return Optional.empty();
     }

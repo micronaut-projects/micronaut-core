@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.handler.accesslog.element;
 
 import io.micronaut.core.order.Ordered;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Builder for LogElement.
@@ -32,5 +33,6 @@ public interface LogElementBuilder extends Ordered {
      * @param param An optional paramter.
      * @return A LogElement or null if not supported by the builder.
      */
-    LogElement build(String token, String param);
+    @Nullable
+    LogElement build(String token, @Nullable String param);
 }

@@ -23,6 +23,7 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Implementation of {@link HttpResponseFactory} for Netty.
@@ -34,17 +35,17 @@ import io.netty.handler.codec.http.HttpVersion;
 public class NettyHttpResponseFactory implements HttpResponseFactory {
 
     @Override
-    public <T> MutableHttpResponse<T> ok(T body) {
+    public <T> MutableHttpResponse<T> ok(@Nullable T body) {
         return new NettyMutableHttpResponse<>(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, null, body, ConversionService.SHARED);
     }
 
     @Override
-    public <T> MutableHttpResponse<T> status(HttpStatus status, T body) {
+    public <T> MutableHttpResponse<T> status(HttpStatus status, @Nullable T body) {
         return ok(body).status(status);
     }
 
     @Override
-    public <T> MutableHttpResponse<T> status(HttpStatus status, String reason) {
+    public <T> MutableHttpResponse<T> status(HttpStatus status, @Nullable String reason) {
         HttpResponseStatus nettyStatus;
         if (reason == null) {
             nettyStatus = HttpResponseStatus.valueOf(status.getCode());
@@ -55,7 +56,7 @@ public class NettyHttpResponseFactory implements HttpResponseFactory {
     }
 
     @Override
-    public <T> MutableHttpResponse<T> status(int status, String reason) {
+    public <T> MutableHttpResponse<T> status(int status, @Nullable String reason) {
         HttpResponseStatus nettyStatus;
         if (reason == null) {
             nettyStatus = HttpResponseStatus.valueOf(status);

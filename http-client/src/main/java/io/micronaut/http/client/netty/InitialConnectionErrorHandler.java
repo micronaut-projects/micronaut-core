@@ -16,7 +16,6 @@
 package io.micronaut.http.client.netty;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandler;
@@ -50,5 +49,5 @@ abstract class InitialConnectionErrorHandler extends ChannelInboundHandlerAdapte
         onNewConnectionFailure(ctx.channel().eventLoop(), ctx.channel().attr(FAILURE_KEY).get());
     }
 
-    protected abstract void onNewConnectionFailure(@NonNull EventLoop eventLoop, @Nullable Throwable cause) throws Exception;
+    protected abstract void onNewConnectionFailure(EventLoop eventLoop, @Nullable Throwable cause) throws Exception;
 }

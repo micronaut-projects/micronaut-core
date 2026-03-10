@@ -40,14 +40,9 @@ class UploadController {
         Publisher<Boolean> uploadPublisher = file.transferTo(tempFile) // <3>
 
         Mono.from(uploadPublisher)  // <4>
-            .map({ success ->
-                if (success) {
-                    HttpResponse.ok("Uploaded")
-                } else {
-                    HttpResponse.<String>status(CONFLICT)
-                            .body("Upload Failed")
-                }
-            })
+            .thenReturn(HttpResponse.ok("Uploaded"))
+            .onErrorReturn(HttpResponse.<String>status(CONFLICT)
+                    .body("Upload Failed"))
     }
     // end::file[]
 
@@ -61,14 +56,9 @@ class UploadController {
         Publisher<Boolean> uploadPublisher = file.transferTo(outputStream) // <4>
 
         Mono.from(uploadPublisher)  // <5>
-                .map({ success ->
-                    if (success) {
-                        HttpResponse.ok("Uploaded")
-                    } else {
-                        HttpResponse.<String>status(CONFLICT)
-                                .body("Upload Failed")
-                    }
-                })
+                .thenReturn(HttpResponse.ok("Uploaded"))
+                .onErrorReturn(HttpResponse.<String>status(CONFLICT)
+                        .body("Upload Failed"))
     }
     // end::outputStream[]
 

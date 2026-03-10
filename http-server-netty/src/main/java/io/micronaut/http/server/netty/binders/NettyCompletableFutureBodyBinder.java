@@ -16,7 +16,6 @@
 package io.micronaut.http.server.netty.binders;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
@@ -53,7 +52,6 @@ final class NettyCompletableFutureBodyBinder
         this.nettyBodyAnnotationBinder = nettyBodyAnnotationBinder;
     }
 
-    @NonNull
     @Override
     public List<Class<?>> superTypes() {
         return Arrays.asList(CompletionStage.class, Future.class);

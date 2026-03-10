@@ -17,6 +17,7 @@ package io.micronaut.context;
 
 import io.micronaut.context.env.EnvironmentNamesDeducer;
 import io.micronaut.context.env.EnvironmentPackagesDeducer;
+import io.micronaut.core.io.ResourceLoadStrategy;
 import io.micronaut.context.env.PropertySourcesLocator;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -205,6 +206,16 @@ public interface ApplicationContextConfiguration extends BeanContextConfiguratio
      */
     default Collection<PropertySourcesLocator> getPropertySourcesLocators() {
         return Collections.emptyList();
+    }
+
+    /**
+     * Defines how configuration resources are loaded when duplicates exist on the classpath.
+     *
+     * @return The configuration loading strategy
+     * @since 5.0.0
+     */
+    default ResourceLoadStrategy getConfigurationLoadingStrategy() {
+        return ResourceLoadStrategy.defaultStrategy();
     }
 
 }

@@ -16,7 +16,6 @@
 package io.micronaut.http.netty;
 
 import io.micronaut.context.exceptions.ConfigurationException;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.ssl.ClientAuthentication;
 import io.netty.handler.codec.http2.Http2SecurityUtil;
@@ -85,7 +84,7 @@ public class NettySslContextBuilder {
      * @param openssl true to prefer OpenSSL (via Netty), false for JDK provider
      * @return this builder
      */
-    public final @NonNull NettySslContextBuilder openssl(boolean openssl) {
+    public final NettySslContextBuilder openssl(boolean openssl) {
         this.openssl = openssl;
         return this;
     }
@@ -114,7 +113,7 @@ public class NettySslContextBuilder {
      * @param keyStore the key store or {@code null}
      * @return this builder
      */
-    public final @NonNull NettySslContextBuilder keyStore(@Nullable KeyStore keyStore) {
+    public final NettySslContextBuilder keyStore(@Nullable KeyStore keyStore) {
         this.keyStore = keyStore;
         return this;
     }
@@ -134,7 +133,7 @@ public class NettySslContextBuilder {
      * @param keyPassword the password or {@code null}
      * @return this builder
      */
-    public final @NonNull NettySslContextBuilder keyPassword(@Nullable String keyPassword) {
+    public final NettySslContextBuilder keyPassword(@Nullable String keyPassword) {
         this.keyPassword = keyPassword;
         return this;
     }
@@ -154,7 +153,7 @@ public class NettySslContextBuilder {
      * @param trustStore the trust store or {@code null}
      * @return this builder
      */
-    public final @NonNull NettySslContextBuilder trustStore(@Nullable KeyStore trustStore) {
+    public final NettySslContextBuilder trustStore(@Nullable KeyStore trustStore) {
         this.trustStore = trustStore;
         return this;
     }
@@ -175,7 +174,6 @@ public class NettySslContextBuilder {
      * @param trustAll {@code true} to trust all certificates
      * @return this builder
      */
-    @NonNull
     public final NettySslContextBuilder trustAll(boolean trustAll) {
         this.trustAll = trustAll;
         return this;
@@ -196,7 +194,7 @@ public class NettySslContextBuilder {
      * @param protocols list of protocol names or {@code null} to use defaults
      * @return this builder
      */
-    public final @NonNull NettySslContextBuilder protocols(@Nullable List<String> protocols) {
+    public final NettySslContextBuilder protocols(@Nullable List<String> protocols) {
         this.protocols = protocols;
         return this;
     }
@@ -217,7 +215,7 @@ public class NettySslContextBuilder {
      * @param ignoreUnsupportedCiphers whether to ignore unsupported ciphers (true) or fail (false)
      * @return this builder
      */
-    public final @NonNull NettySslContextBuilder ciphers(@Nullable List<String> ciphers, boolean ignoreUnsupportedCiphers) {
+    public final NettySslContextBuilder ciphers(@Nullable List<String> ciphers, boolean ignoreUnsupportedCiphers) {
         this.ciphers = ciphers;
         this.ignoreUnsupportedCiphers = ignoreUnsupportedCiphers;
         return this;
@@ -238,7 +236,7 @@ public class NettySslContextBuilder {
      * @param alpnProtocols ALPN protocols (e.g. h2, http/1.1) or {@code null}
      * @return this builder
      */
-    public final @NonNull NettySslContextBuilder alpnProtocols(@Nullable List<String> alpnProtocols) {
+    public final NettySslContextBuilder alpnProtocols(@Nullable List<String> alpnProtocols) {
         this.alpnProtocols = alpnProtocols;
         return this;
     }
@@ -248,7 +246,7 @@ public class NettySslContextBuilder {
      *
      * @return this builder
      */
-    public final @NonNull NettySslContextBuilder http2() {
+    public final NettySslContextBuilder http2() {
         if (ciphers == null) {
             ciphers(Http2SecurityUtil.CIPHERS, true);
         }
@@ -273,7 +271,7 @@ public class NettySslContextBuilder {
      * @param clientAuthentication NEED, WANT, or {@code null} for none
      * @return this builder
      */
-    public final @NonNull NettySslContextBuilder clientAuthentication(@Nullable ClientAuthentication clientAuthentication) {
+    public final NettySslContextBuilder clientAuthentication(@Nullable ClientAuthentication clientAuthentication) {
         this.clientAuthentication = clientAuthentication;
         return this;
     }
@@ -283,7 +281,7 @@ public class NettySslContextBuilder {
      *
      * @return initialized trust manager factory
      */
-    protected @NonNull TrustManagerFactory createTrustManagerFactory() throws Exception {
+    protected TrustManagerFactory createTrustManagerFactory() throws Exception {
         if (trustAll) {
             if (trustStore != null) {
                 throw new ConfigurationException("If you want to trust all certificates, please don't also specify a trust store");
@@ -301,7 +299,7 @@ public class NettySslContextBuilder {
      *
      * @return initialized key manager factory
      */
-    protected @NonNull KeyManagerFactory createKeyManagerFactory() throws Exception {
+    protected KeyManagerFactory createKeyManagerFactory() throws Exception {
         KeyManagerFactory keyManagerFactory;
         if (openssl && keyStore != null) {
             // I don't understand why, but netty uses this logic, so we will too.
@@ -322,7 +320,7 @@ public class NettySslContextBuilder {
      *
      * @return the built SSL context
      */
-    public @NonNull SslContext buildTcp() throws Exception {
+    public SslContext buildTcp() throws Exception {
         SslContextBuilder sslBuilder;
         if (server) {
             sslBuilder = SslContextBuilder.forServer(createKeyManagerFactory());
@@ -359,7 +357,7 @@ public class NettySslContextBuilder {
      *
      * @return the built QUIC SSL context
      */
-    public @NonNull QuicSslContext buildHttp3() throws Exception {
+    public QuicSslContext buildHttp3() throws Exception {
         QuicSslContextBuilder sslBuilder;
         if (server) {
             sslBuilder = QuicSslContextBuilder.forServer(createKeyManagerFactory(), keyPassword);

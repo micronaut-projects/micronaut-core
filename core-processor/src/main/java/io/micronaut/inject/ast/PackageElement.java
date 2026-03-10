@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.inject.ast;
-
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.StringUtils;
 
 import java.util.Objects;
@@ -37,7 +35,7 @@ public interface PackageElement extends Element {
      * @param name The package name
      * @return The package element
      */
-    static @NonNull PackageElement of(@NonNull String name) {
+    static PackageElement of(String name) {
         Objects.requireNonNull(name, "Name cannot be null");
         return new SimplePackageElement(name);
     }

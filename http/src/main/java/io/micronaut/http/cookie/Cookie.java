@@ -15,9 +15,8 @@
  */
 package io.micronaut.http.cookie;
 
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.ArgumentUtils;
+import org.jspecify.annotations.Nullable;
 
 import java.io.Serializable;
 import java.time.temporal.ChronoUnit;
@@ -26,9 +25,9 @@ import java.util.Optional;
 
 /**
  * An interface representing a Cookie. See .
- * @see <a href="https://tools.ietf.org/html/rfc6265">RFC6265</a>
  *
  * @author Graeme Rocher
+ * @see <a href="https://tools.ietf.org/html/rfc6265">RFC6265</a>
  * @since 1.0
  */
 public interface Cookie extends Comparable<Cookie>, Serializable {
@@ -76,12 +75,12 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
     /**
      * @return The name of the cookie
      */
-    @NonNull String getName();
+    String getName();
 
     /**
      * @return The value of the cookie
      */
-    @NonNull String getValue();
+    String getValue();
 
     /**
      * Gets the domain name of this Cookie.
@@ -128,6 +127,7 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
      * Checks to see if this {@link Cookie} can be sent along cross-site requests.
      * For more information, please look
      * <a href="https://tools.ietf.org/html/draft-ietf-httpbis-rfc6265bis-05">here</a>
+     *
      * @return The SameSite attribute of the cookie
      */
     default Optional<SameSite> getSameSite() {
@@ -137,11 +137,12 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
     /**
      * Determines if this {@link Cookie} can be sent along cross-site requests.
      * For more information, please look
-     *  <a href="https://tools.ietf.org/html/draft-ietf-httpbis-rfc6265bis-05">here</a>
+     * <a href="https://tools.ietf.org/html/draft-ietf-httpbis-rfc6265bis-05">here</a>
+     *
      * @param sameSite SameSite value
      * @return This cookie
      */
-    default @NonNull Cookie sameSite(@Nullable SameSite sameSite) {
+    default Cookie sameSite(@Nullable SameSite sameSite) {
         return this;
     }
 
@@ -152,7 +153,7 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
      * @param maxAge The max age
      * @return This cookie
      */
-    @NonNull Cookie maxAge(long maxAge);
+    Cookie maxAge(long maxAge);
 
     /**
      * Sets the value.
@@ -160,7 +161,7 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
      * @param value The value of the cookie
      * @return This cookie
      */
-    @NonNull Cookie value(@NonNull String value);
+    Cookie value(String value);
 
     /**
      * Sets the domain of the cookie.
@@ -168,7 +169,7 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
      * @param domain The domain of the cookie
      * @return This cookie
      */
-    @NonNull Cookie domain(@Nullable String domain);
+    Cookie domain(@Nullable String domain);
 
     /**
      * Sets the path of the cookie.
@@ -176,7 +177,7 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
      * @param path The path of the cookie
      * @return This cookie
      */
-    @NonNull Cookie path(@Nullable String path);
+    Cookie path(@Nullable String path);
 
     /**
      * Sets whether the cookie is secure.
@@ -184,14 +185,14 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
      * @param secure Is the cookie secure
      * @return This cookie
      */
-    @NonNull Cookie secure(boolean secure);
+    Cookie secure(boolean secure);
 
     /**
      * Sets this cookie as secure.
+     *
      * @return This Cookie
      * @since 4.3.0
      */
-    @NonNull
     default Cookie secure() {
         return secure(true);
     }
@@ -202,7 +203,7 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
      * @param httpOnly Is the cookie HTTP-Only
      * @return This cookie
      */
-    @NonNull Cookie httpOnly(boolean httpOnly);
+    Cookie httpOnly(boolean httpOnly);
 
     /**
      * Sets this cookie as HTTP-Only.
@@ -210,30 +211,31 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
      * @return This cookie
      * @since 4.3.0
      */
-    @NonNull
     default Cookie httpOnly() {
         return httpOnly(true);
     }
 
     /**
      * Configure the Cookie with the given configuration.
+     *
      * @param configuration The configuration
      * @return The cookie
      */
-    default @NonNull Cookie configure(@NonNull CookieConfiguration configuration) {
+    default Cookie configure(CookieConfiguration configuration) {
         ArgumentUtils.requireNonNull("configuration", configuration);
         return configure(configuration, true);
     }
 
     /**
      * Configure the Cookie with the given configuration.
+     *
      * @param configuration The configuration
-     * @param isSecure Is the request secure
+     * @param isSecure      Is the request secure
      * @return The cookie
      */
-    default @NonNull Cookie configure(
-            @NonNull CookieConfiguration configuration,
-            boolean isSecure) {
+    default Cookie configure(
+        CookieConfiguration configuration,
+        boolean isSecure) {
         ArgumentUtils.requireNonNull("configuration", configuration);
         configuration.getCookiePath().ifPresent(this::path);
         configuration.getCookieDomain().ifPresent(this::domain);
@@ -255,7 +257,7 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
      * @param maxAge The max age
      * @return This cookie
      */
-    default @NonNull Cookie maxAge(@NonNull TemporalAmount maxAge) {
+    default Cookie maxAge(TemporalAmount maxAge) {
         ArgumentUtils.requireNonNull("maxAge", maxAge);
         return maxAge(maxAge.get(ChronoUnit.SECONDS));
     }
@@ -267,7 +269,7 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
      * @param value The value
      * @return The Cookie
      */
-    static @NonNull Cookie of(@NonNull String name, @NonNull String value) {
+    static Cookie of(String name, String value) {
         CookieFactory instance = CookieFactory.INSTANCE;
         if (instance != null) {
             return instance.create(name, value);

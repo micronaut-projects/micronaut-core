@@ -1,6 +1,5 @@
 package io.micronaut.http.server.exceptions.response;
 
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.http.*;
 import io.micronaut.http.simple.SimpleHttpRequest;
@@ -31,17 +30,17 @@ class HtmlErrorResponseBodyProviderTest extends Specification {
 
             ErrorContext errorContext = new ErrorContext() {
                 @Override
-                public @NonNull HttpRequest<?> getRequest() {
+                public HttpRequest<?> getRequest() {
                     return new SimpleHttpRequest(HttpMethod.GET, "/foobar", null);
                 }
 
                 @Override
-                public @NonNull Optional<Throwable> getRootCause() {
+                public Optional<Throwable> getRootCause() {
                     return Optional.empty();
                 }
 
                 @Override
-                public @NonNull List<Error> getErrors() {
+                public List<Error> getErrors() {
                     return Collections.emptyList();
                 }
             };

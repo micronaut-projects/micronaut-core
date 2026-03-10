@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.management.endpoint.env;
-
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.SupplierUtil;
 
 import java.util.ArrayList;
@@ -54,7 +52,7 @@ public final class EnvironmentFilterSpecification {
      *
      * @return this
      */
-    public @NonNull EnvironmentFilterSpecification maskAll() {
+    public EnvironmentFilterSpecification maskAll() {
         allMasked = true;
         return this;
     }
@@ -64,7 +62,7 @@ public final class EnvironmentFilterSpecification {
      *
      * @return this
      */
-    public @NonNull EnvironmentFilterSpecification maskNone() {
+    public EnvironmentFilterSpecification maskNone() {
         allMasked = false;
         return this;
     }
@@ -77,7 +75,7 @@ public final class EnvironmentFilterSpecification {
      * @param keyPredicate A predicate to match against property keys for masking
      * @return this
      */
-    public @NonNull EnvironmentFilterSpecification exclude(@NonNull Predicate<String> keyPredicate) {
+    public EnvironmentFilterSpecification exclude(Predicate<String> keyPredicate) {
         exclusions.add(keyPredicate);
         return this;
     }
@@ -90,7 +88,7 @@ public final class EnvironmentFilterSpecification {
      * @param keys Literal keys that should be excluded
      * @return this
      */
-    public @NonNull EnvironmentFilterSpecification exclude(@NonNull String... keys) {
+    public EnvironmentFilterSpecification exclude(String... keys) {
         if (keys.length > 0) {
             if (keys.length == 1) {
                 exclusions.add(name -> keys[0].equals(name));
@@ -111,7 +109,7 @@ public final class EnvironmentFilterSpecification {
      * @param keyPatterns The patterns used to compare keys to exclude them
      * @return this
      */
-    public @NonNull EnvironmentFilterSpecification exclude(@NonNull Pattern... keyPatterns) {
+    public EnvironmentFilterSpecification exclude(Pattern... keyPatterns) {
         if (keyPatterns.length > 0) {
             if (keyPatterns.length == 1) {
                 exclusions.add(name -> keyPatterns[0].matcher(name).matches());
@@ -127,7 +125,7 @@ public final class EnvironmentFilterSpecification {
      *
      * @return this
      */
-    public @NonNull EnvironmentFilterSpecification legacyMasking() {
+    public EnvironmentFilterSpecification legacyMasking() {
         allMasked = false;
         for (Pattern pattern : LEGACY_MASK_PATTERNS.get()) {
             exclude(pattern);

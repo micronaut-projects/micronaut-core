@@ -15,7 +15,7 @@
  */
 package io.micronaut.json.tree;
 
-import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * JsonNode implementation for the null value, singleton.
@@ -31,11 +31,11 @@ final class JsonNull extends JsonScalar {
     }
 
     @Override
+    @Nullable
     public Object getValue() {
         return null;
     }
 
-    @NonNull
     @Override
     public String coerceStringValue() {
         return "null";

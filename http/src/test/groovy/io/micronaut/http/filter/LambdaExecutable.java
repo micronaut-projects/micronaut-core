@@ -1,10 +1,10 @@
 package io.micronaut.http.filter;
 
 import groovy.lang.Closure;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.inject.ExecutableMethod;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.reflect.Method;
 

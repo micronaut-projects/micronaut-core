@@ -16,7 +16,6 @@
 package io.micronaut.inject.ast.annotation;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.MethodElement;
 
@@ -32,7 +31,7 @@ public final class MethodElementAnnotationMetadata extends AbstractElementAnnota
     private final MutableAnnotationMetadataDelegate<?> writeAnnotationMetadata;
     private final AnnotationMetadata readAnnotationMetadata;
 
-    public MethodElementAnnotationMetadata(@NonNull MethodElement methodElement) {
+    public MethodElementAnnotationMetadata(MethodElement methodElement) {
         this.methodElement = methodElement;
         writeAnnotationMetadata = methodElement.getMethodAnnotationMetadata();
         readAnnotationMetadata = new AnnotationMetadataHierarchy(

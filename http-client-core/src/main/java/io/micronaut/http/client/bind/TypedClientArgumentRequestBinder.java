@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.client.bind;
 
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.type.Argument;
 
 import java.util.Collections;
@@ -33,7 +32,6 @@ public interface TypedClientArgumentRequestBinder<T> extends ClientArgumentReque
     /**
      * @return The argument type.
      */
-    @NonNull
     Argument<T> argumentType();
 
     /**
@@ -41,8 +39,7 @@ public interface TypedClientArgumentRequestBinder<T> extends ClientArgumentReque
      *
      * @return Additional supers types
      */
-    default @NonNull
-    List<Class<?>> superTypes() {
+    default List<Class<?>> superTypes() {
         return Collections.emptyList();
     }
 }

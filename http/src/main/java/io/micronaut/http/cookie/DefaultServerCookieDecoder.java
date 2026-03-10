@@ -16,8 +16,6 @@
 package io.micronaut.http.cookie;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
-
 import java.net.HttpCookie;
 import java.util.List;
 
@@ -30,8 +28,7 @@ import java.util.List;
 @Internal
 public final class DefaultServerCookieDecoder implements ServerCookieDecoder {
     @Override
-    @NonNull
-    public List<Cookie> decode(@NonNull String header) {
+    public List<Cookie> decode(String header) {
         return HttpCookie.parse(header)
                 .stream()
                 .map(httpCookie -> (Cookie) new CookieHttpCookieAdapter(httpCookie))

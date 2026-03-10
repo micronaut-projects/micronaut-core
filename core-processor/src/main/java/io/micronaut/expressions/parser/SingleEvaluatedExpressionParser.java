@@ -54,6 +54,7 @@ import io.micronaut.expressions.parser.token.Token;
 import io.micronaut.expressions.parser.token.TokenType;
 import io.micronaut.expressions.parser.token.Tokenizer;
 import io.micronaut.sourcegen.model.ExpressionDef.ComparisonOperation.OpType;
+import org.jspecify.annotations.NullUnmarked;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -114,6 +115,7 @@ import static io.micronaut.sourcegen.model.ExpressionDef.MathBinaryOperation.OpT
  * @author Sergey Gavrilov
  * @since 4.0.0
  */
+@NullUnmarked
 @Internal
 public final class SingleEvaluatedExpressionParser implements EvaluatedExpressionParser {
     private final Tokenizer tokenizer;

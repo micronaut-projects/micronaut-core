@@ -17,7 +17,6 @@ package io.micronaut.http.client.jdk;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
@@ -49,12 +48,12 @@ public class JdkHttpClientFactory extends AbstractHttpClientFactory<DefaultJdkHt
     }
 
     @Override
-    protected DefaultJdkHttpClient createHttpClient(URI uri) {
+    protected DefaultJdkHttpClient createHttpClient(@Nullable URI uri) {
         return new DefaultJdkHttpClient(uri, conversionService);
     }
 
     @Override
-    protected DefaultJdkHttpClient createHttpClient(URI uri, HttpClientConfiguration configuration) {
+    protected DefaultJdkHttpClient createHttpClient(@Nullable URI uri, HttpClientConfiguration configuration) {
         return new DefaultJdkHttpClient(uri, configuration, mediaTypeCodecRegistry, messageBodyHandlerRegistry, conversionService);
     }
 
@@ -72,7 +71,7 @@ public class JdkHttpClientFactory extends AbstractHttpClientFactory<DefaultJdkHt
     }
 
     @Override
-    public @NonNull RawHttpClient createRawClient(@Nullable URI url, @NonNull HttpClientConfiguration configuration) {
+    public RawHttpClient createRawClient(@Nullable URI url, HttpClientConfiguration configuration) {
         return new JdkRawHttpClient(createHttpClient(url, configuration));
     }
 }

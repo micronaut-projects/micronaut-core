@@ -39,22 +39,20 @@ import java.util.Optional;
 @Internal
 public final class ConstantPropertySourceLoader implements PropertySourceLoader {
 
-    private final List<PropertySource> constantPropertySources;
-
-    public ConstantPropertySourceLoader() {
-        constantPropertySources = StaticOptimizations.get(ConstantPropertySources.class)
-        .map(ConstantPropertySources::getSources)
-        .orElse(Collections.emptyList());
+    private static List<PropertySource> getConstantPropertySources() {
+        return StaticOptimizations.get(ConstantPropertySources.class)
+            .map(ConstantPropertySources::getSources)
+            .orElse(Collections.emptyList());
     }
 
     @Override
     public boolean isEnabled() {
-        return !constantPropertySources.isEmpty();
+        return !getConstantPropertySources().isEmpty();
     }
 
     @Override
     public Optional<PropertySource> load(String resourceName, ResourceLoader resourceLoader) {
-        for (PropertySource p : constantPropertySources) {
+        for (PropertySource p : getConstantPropertySources()) {
             if (p.getName().equals(resourceName)) {
                 return Optional.of(p);
             }
@@ -64,7 +62,7 @@ public final class ConstantPropertySourceLoader implements PropertySourceLoader 
 
     @Override
     public Optional<PropertySource> loadEnv(String resourceName, ResourceLoader resourceLoader, ActiveEnvironment activeEnvironment) {
-        for (PropertySource p : constantPropertySources) {
+        for (PropertySource p : getConstantPropertySources()) {
             if (p.getName().equals(resourceName + "-" + activeEnvironment.getName())) {
                 return Optional.of(p);
             }

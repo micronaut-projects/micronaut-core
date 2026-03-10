@@ -16,7 +16,6 @@
 package io.micronaut.expressions.parser.ast.access;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
@@ -86,7 +85,6 @@ final class CandidateMethod {
     /**
      * @return Returns candidate method return type.
      */
-    @NonNull
     public TypeDef getReturnType() {
         return TypeDef.erasure(methodElement.getReturnType());
     }
@@ -94,7 +92,6 @@ final class CandidateMethod {
     /**
      * @return Type of class that owns candidate method.
      */
-    @NonNull
     public TypeDef getOwningType() {
         return TypeDef.erasure(methodElement.getOwningType());
     }
@@ -102,7 +99,6 @@ final class CandidateMethod {
     /**
      * @return last parameter of candidate method.
      */
-    @NonNull
     public ClassElement getLastParameter() {
         return CollectionUtils.last(parameterTypes);
     }
@@ -110,7 +106,6 @@ final class CandidateMethod {
     /**
      * @return list of candidate method parameters.
      */
-    @NonNull
     public List<ClassElement> getParameters() {
         return parameterTypes;
     }

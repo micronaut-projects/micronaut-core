@@ -18,7 +18,6 @@ package io.micronaut.core.io.service;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.BuildTimeInit;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.beans.BeanInfo;
 import io.micronaut.core.graal.GraalReflectionConfigurer;
@@ -204,7 +203,6 @@ class ServiceLoaderFeature implements Feature {
      * @param access The access
      * @return The definitions
      */
-    @NonNull
     protected StaticServiceDefinitions buildStaticServiceDefinitions(BeforeAnalysisAccess access) {
         try {
             Map<String, Set<String>> services = MicronautMetaServiceLoaderUtils.findAllMicronautMetaServices(getClass().getClassLoader());
@@ -234,7 +232,7 @@ class ServiceLoaderFeature implements Feature {
 
         final GraalReflectionConfigurer.ReflectionConfigurationContext context = new GraalReflectionConfigurer.ReflectionConfigurationContext() {
             @Override
-            public Class<?> findClassByName(@NonNull String name) {
+            public Class<?> findClassByName(String name) {
                 return access.findClassByName(name);
             }
 
@@ -271,7 +269,6 @@ class ServiceLoaderFeature implements Feature {
         }
     }
 
-    @NonNull
     protected Collection<GraalReflectionConfigurer> loadReflectionConfigurers(BeforeAnalysisAccess access) {
         Collection<GraalReflectionConfigurer> configurers = new ArrayList<>();
         SoftServiceLoader.load(GraalReflectionConfigurer.class, access.getApplicationClassLoader())

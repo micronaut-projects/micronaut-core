@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.http.server.netty.ssl;
-
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.netty.NettyTlsUtils;
@@ -94,7 +92,7 @@ public abstract class AbstractServerSslBuilder extends SslBuilder<SslContext> im
      * @param ssl         The ssl configuration
      * @param httpVersion The http version
      */
-    protected void processBuilder(@NonNull SslContextBuilder sslBuilder, @NonNull SslConfiguration ssl, @NonNull HttpVersion httpVersion) {
+    protected void processBuilder(SslContextBuilder sslBuilder, SslConfiguration ssl, HttpVersion httpVersion) {
         // no additional processing by default
     }
 

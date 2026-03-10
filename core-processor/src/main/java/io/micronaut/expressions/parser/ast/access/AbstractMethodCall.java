@@ -16,7 +16,6 @@
 package io.micronaut.expressions.parser.ast.access;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.ast.collection.OneDimensionalArray;
 import io.micronaut.expressions.parser.ast.types.TypeIdentifier;
@@ -55,7 +54,7 @@ public abstract sealed class AbstractMethodCall extends ExpressionNode permits C
     }
 
     @Override
-    protected TypeDef doResolveType(@NonNull ExpressionVisitorContext ctx) {
+    protected TypeDef doResolveType(ExpressionVisitorContext ctx) {
         if (usedMethod == null) {
             usedMethod = resolveUsedMethod(ctx);
         }
@@ -76,7 +75,6 @@ public abstract sealed class AbstractMethodCall extends ExpressionNode permits C
      * @throws io.micronaut.expressions.parser.exception.ExpressionCompilationException if no
      *                                                                                  candidate method can be found or if there is more than one candidate method.
      */
-    @NonNull
     abstract CandidateMethod resolveUsedMethod(ExpressionVisitorContext ctx);
 
     /**

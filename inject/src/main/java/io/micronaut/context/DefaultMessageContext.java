@@ -16,8 +16,6 @@
 package io.micronaut.context;
 
 import io.micronaut.core.annotation.Internal;
-
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import java.util.Collections;
 import java.util.Locale;
@@ -45,7 +43,6 @@ class DefaultMessageContext implements MessageSource.MessageContext {
         this.variables = variables;
     }
 
-    @NonNull
     @Override
     public Map<String, Object> getVariables() {
         if (variables != null) {
@@ -54,7 +51,6 @@ class DefaultMessageContext implements MessageSource.MessageContext {
         return Collections.emptyMap();
     }
 
-    @NonNull
     @Override
     public Locale getLocale() {
         return getLocale(Locale.getDefault());
@@ -66,7 +62,6 @@ class DefaultMessageContext implements MessageSource.MessageContext {
      * @return The locale
      */
     @Override
-    @NonNull
     public Locale getLocale(@Nullable Locale defaultLocale) {
         if (locale != null) {
             return locale;

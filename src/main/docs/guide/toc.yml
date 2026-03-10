@@ -159,6 +159,9 @@ httpServer:
     errorFormatting: Error Formatting
   apiVersioning: API Versioning
   formData: Handling Form Data
+  form:
+    title: Forms
+    formCapable: Detailed Form API
   serverIO: Writing Response Data
   uploads: File Uploads
   transfers: File Transfers

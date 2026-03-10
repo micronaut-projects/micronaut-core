@@ -16,11 +16,10 @@
 package io.micronaut.http.filter;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
 
@@ -34,15 +33,15 @@ import java.util.Objects;
  * @since 4.2.0
  */
 @Internal
-record FilterContext(@NonNull HttpRequest<?> request,
+record FilterContext(HttpRequest<?> request,
                      @Nullable HttpResponse<?> response,
-                     @NonNull PropagatedContext propagatedContext) {
+                     PropagatedContext propagatedContext) {
 
     FilterContext(HttpRequest<?> request, PropagatedContext propagatedContext) {
         this(request, null, propagatedContext);
     }
 
-    FilterContext withRequest(@NonNull HttpRequest<?> request) {
+    FilterContext withRequest(HttpRequest<?> request) {
         if (this.request == request) {
             return this;
         }
@@ -53,7 +52,7 @@ record FilterContext(@NonNull HttpRequest<?> request,
         return new FilterContext(request, response, propagatedContext);
     }
 
-    FilterContext withResponse(@NonNull HttpResponse<?> response) {
+    FilterContext withResponse(HttpResponse<?> response) {
         if (this.response == response) {
             return this;
         }
@@ -61,7 +60,7 @@ record FilterContext(@NonNull HttpRequest<?> request,
         return new FilterContext(request, response, propagatedContext);
     }
 
-    FilterContext withPropagatedContext(@NonNull PropagatedContext propagatedContext) {
+    FilterContext withPropagatedContext(PropagatedContext propagatedContext) {
         if (this.propagatedContext == propagatedContext) {
             return this;
         }

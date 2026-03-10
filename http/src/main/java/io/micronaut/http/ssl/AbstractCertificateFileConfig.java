@@ -16,7 +16,6 @@
 package io.micronaut.http.ssl;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.naming.Named;
 
@@ -38,12 +37,12 @@ abstract sealed class AbstractCertificateFileConfig implements Named permits Fil
     /**
      * @param name the configuration name that is used to look up the provider
      */
-    AbstractCertificateFileConfig(@NonNull String name) {
+    AbstractCertificateFileConfig(String name) {
         this.name = name;
     }
 
     @Override
-    public @NonNull String getName() {
+    public String getName() {
         return name;
     }
 

@@ -1,7 +1,7 @@
 package io.micronaut.inject.configproperties.inheritance;
 
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public class NotAbstractConfig {
     @NotNull

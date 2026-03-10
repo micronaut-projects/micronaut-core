@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.scheduling.instrument;
-
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.annotation.Experimental;
 
 import java.util.concurrent.Executor;
@@ -65,7 +63,7 @@ public interface InstrumentedExecutor extends Executor, RunnableInstrumenter {
     Executor getTarget();
 
     @Override
-    default void execute(@NonNull Runnable command) {
+    default void execute(Runnable command) {
         getTarget().execute(instrument(command));
     }
 

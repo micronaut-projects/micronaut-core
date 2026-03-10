@@ -32,6 +32,7 @@ import io.micronaut.inject.writer.BeanDefinitionWriter;
 import io.micronaut.sourcegen.model.ClassTypeDef;
 import io.micronaut.sourcegen.model.ExpressionDef;
 import io.micronaut.sourcegen.model.TypeDef;
+import org.jspecify.annotations.NullUnmarked;
 
 import java.lang.reflect.Method;
 
@@ -41,8 +42,11 @@ import java.lang.reflect.Method;
  * @author Denis Stepanov
  * @since 5.0
  */
+@NullUnmarked
 @Internal
 public class RuntimeProxyBeanDefinitionWriter extends ProxyingBeanDefinitionWriter {
+
+    public static final String RUNTIME_PROXY_SUFFIX = "$RuntimeProxy";
 
     private static final Method GET_BEAN = ReflectionUtils.getRequiredInternalMethod(
         BeanResolutionContext.class,
@@ -63,8 +67,6 @@ public class RuntimeProxyBeanDefinitionWriter extends ProxyingBeanDefinitionWrit
         DefaultRuntimeProxyDefinition.class,
         "introduction",
         BeanResolutionContext.class, BeanDefinition.class);
-
-    public static final String RUNTIME_PROXY_SUFFIX = "$RuntimeProxy";
 
     public RuntimeProxyBeanDefinitionWriter(ClassElement targetType, BeanDefinitionWriter parent, OptionalValues<Boolean> settings, VisitorContext visitorContext, AnnotationValue<?>... interceptorBinding) {
         super(RUNTIME_PROXY_SUFFIX, targetType, targetType, parent, settings, visitorContext, interceptorBinding);

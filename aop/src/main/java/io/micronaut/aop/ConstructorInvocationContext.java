@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.aop;
-
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.beans.BeanConstructor;
 
 /**
@@ -29,20 +27,16 @@ public interface ConstructorInvocationContext<T> extends InvocationContext<T, T>
     /**
      * @return The bean type.
      */
-    @NonNull
     BeanConstructor<T> getConstructor();
 
-    @NonNull
     @Override
     default Class<T> getDeclaringType() {
         return getConstructor().getDeclaringBeanType();
     }
 
     @Override
-    @NonNull
     T proceed() throws RuntimeException;
 
     @Override
-    @NonNull
     T proceed(Interceptor from) throws RuntimeException;
 }

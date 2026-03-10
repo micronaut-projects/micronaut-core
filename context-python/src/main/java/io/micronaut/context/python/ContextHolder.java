@@ -15,14 +15,13 @@
  */
 package io.micronaut.context.python;
 
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.reflect.exception.InstantiationException;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.Value;
 import org.graalvm.polyglot.proxy.ProxyExecutable;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -38,8 +37,8 @@ import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
 public final class ContextHolder {
 
     private static final AtomicBoolean REUSE_CONTEXT = new AtomicBoolean();
-    private static volatile Context context;
-    private static volatile PythonPool pythonPool;
+    private static volatile @Nullable Context context;
+    private static volatile @Nullable PythonPool pythonPool;
 
     private ContextHolder() {
     }
@@ -48,7 +47,7 @@ public final class ContextHolder {
      * Internal hook to register the PythonPool once initialized.
      * @param pool The Python pool
      */
-    public static void setPythonPool(PythonPool pool) {
+    public static void setPythonPool(@Nullable PythonPool pool) {
         ContextHolder.pythonPool = pool;
     }
 
@@ -244,7 +243,7 @@ public final class ContextHolder {
         return instance;
     }
 
-    private static Value instantiate(String packageName, String simpleName, Object[] args, Value pythonClass) {
+    private static Value instantiate(@Nullable String packageName, String simpleName, Object[] args, Value pythonClass) {
         if (pythonClass.canInstantiate()) {
             return pythonClass.newInstance(args);
         } else {
@@ -265,7 +264,7 @@ public final class ContextHolder {
         return instantiate(null, simpleName, args, pythonClass);
     }
 
-    public static Value findClass(String packageName, String simpleName) {
+    public static Value findClass(@org.jspecify.annotations.Nullable String packageName, String simpleName) {
         if (packageName == null || PYTHON.equals(packageName)) {
             return findClass(simpleName);
         }
@@ -285,7 +284,7 @@ public final class ContextHolder {
      * @return The class Value
      */
     @UsedByGeneratedCode
-    public static @NotNull Value findClass(String simpleName) {
+    public static Value findClass(String simpleName) {
         Context ctx = getContext();
         Value v = ctx.getBindings(PYTHON).getMember(simpleName);
         if (v == null) {
@@ -306,12 +305,12 @@ public final class ContextHolder {
      * @return The module Value
      */
     @UsedByGeneratedCode
-    public static @NotNull Value findScript(String packageName, String scriptName) {
+    public static Value findScript(String packageName, String scriptName) {
         Context ctx = getContext();
         return findScript(packageName, scriptName, ctx);
     }
 
-    static @NotNull Value findScript(String packageName, String scriptName, Context ctx) {
+    static Value findScript(String packageName, String scriptName, Context ctx) {
         Value v = ctx.getBindings(PYTHON);
         if (v != null) {
             if (PYTHON.equals(packageName)) {
@@ -347,7 +346,7 @@ public final class ContextHolder {
      * @param args        The method arguments
      * @return The method result
      */
-    public static Value invokeStaticMethod(String packageName, String simpleName, String methodName, Object... args) {
+    public static Value invokeStaticMethod(@Nullable String packageName, String simpleName, String methodName, Object... args) {
         if (packageName == null || PYTHON.equals(packageName)) {
             return invokeStaticMethod(simpleName, methodName, args);
         } else {
@@ -406,7 +405,11 @@ public final class ContextHolder {
      */
     public static void resetContext() {
         if (REUSE_CONTEXT.get()) {
-            context.eval(Source.create("python", """
+            Context ctx = context;
+            if (ctx == null) {
+                return;
+            }
+            ctx.eval(Source.create("python", """
                 import importlib
                 import sys
                 for module in sys.modules.values():

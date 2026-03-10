@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.http.util;
-
-import org.jspecify.annotations.NonNull;
 import io.micronaut.http.HttpMessage;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
@@ -56,7 +54,7 @@ public class HttpUtil {
      * @param request The request
      * @return An {@link Optional} of {@link Charset}
      */
-    public static Optional<Charset> resolveCharset(@NonNull HttpMessage<?> request) {
+    public static Optional<Charset> resolveCharset(HttpMessage<?> request) {
         try {
             MediaType contentType = request
                 .getContentType().orElse(null);
@@ -85,8 +83,7 @@ public class HttpUtil {
      * @since 4.8
      */
     @SuppressWarnings("Duplicates")
-    @NonNull
-    public static Charset getCharset(@NonNull HttpMessage<?> request) {
+    public static Charset getCharset(HttpMessage<?> request) {
         MediaType contentType = request.getContentType().orElse(null);
         return HttpHeadersUtil.parseCharacterEncoding(contentType,
             request.getHeaders() != null ? request.getHeaders().findAcceptCharset().orElse(DEFAULT_CHARSET) : DEFAULT_CHARSET);

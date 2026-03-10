@@ -14,9 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.core.convert;
-
-import org.jspecify.annotations.NonNull;
-
 /**
  * Interface used when the component requires to set up bean context's {@link ConversionService}.
  *
@@ -30,6 +27,6 @@ public interface ConversionServiceAware {
      *
      * @param conversionService The conversion service
      */
-    void setConversionService(@NonNull ConversionService conversionService);
+    void setConversionService(ConversionService conversionService);
 
 }

@@ -16,8 +16,6 @@
 package io.micronaut.core.type;
 
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
-import org.jspecify.annotations.NonNull;
-
 import java.util.Optional;
 
 /**
@@ -32,7 +30,7 @@ public interface TypeInformationProvider {
      * @param annotationMetadataProvider The annotation metadata provider
      * @return True if it does
      */
-    default boolean isSpecifiedSingle(@NonNull AnnotationMetadataProvider annotationMetadataProvider) {
+    default boolean isSpecifiedSingle(AnnotationMetadataProvider annotationMetadataProvider) {
         return false;
     }
 
@@ -41,7 +39,7 @@ public interface TypeInformationProvider {
      * @param type True if it does
      * @return True if it is single
      */
-    default boolean isSingle(@NonNull Class<?> type) {
+    default boolean isSingle(Class<?> type) {
         return false;
     }
 
@@ -50,7 +48,7 @@ public interface TypeInformationProvider {
      * @param type The type
      * @return True if it is reactive
      */
-    default boolean isReactive(@NonNull Class<?> type) {
+    default boolean isReactive(Class<?> type) {
         return false;
     }
 
@@ -59,7 +57,7 @@ public interface TypeInformationProvider {
      * @param type The type
      * @return True if it is completable
      */
-    default boolean isCompletable(@NonNull Class<?> type) {
+    default boolean isCompletable(Class<?> type) {
         return false;
     }
 

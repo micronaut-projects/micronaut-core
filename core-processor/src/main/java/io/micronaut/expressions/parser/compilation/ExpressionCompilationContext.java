@@ -16,7 +16,6 @@
 package io.micronaut.expressions.parser.compilation;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.sourcegen.model.ExpressionDef;
 import io.micronaut.sourcegen.model.StatementDef;
@@ -33,9 +32,9 @@ import java.util.List;
  * @since 4.0.0
  */
 @Internal
-public record ExpressionCompilationContext(@NonNull ExpressionVisitorContext evaluationVisitorContext,
-                                           @NonNull ExpressionDef expressionEvaluationContextVar,
-                                           @NonNull List<StatementDef> additionalStatements) {
+public record ExpressionCompilationContext(ExpressionVisitorContext evaluationVisitorContext,
+                                           ExpressionDef expressionEvaluationContextVar,
+                                           List<StatementDef> additionalStatements) {
 
     /**
      * @return The visitor context

@@ -20,7 +20,6 @@ import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.processor.BeanDefinitionProcessor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.StringUtils;
@@ -62,9 +61,8 @@ public class ServerFilterRouteBuilder extends DefaultRouteBuilder implements Bea
     ) {
         super(executionHandleLocator, uriNamingStrategy, conversionService);
         delegate = new BaseFilterProcessor<>(beanContext, ServerFilter.class) {
-            @NonNull
             @Override
-            protected List<String> prependContextPath(@NonNull List<String> patterns) {
+            protected List<String> prependContextPath(List<String> patterns) {
                 String contextPath = contextPathProvider != null ? contextPathProvider.getContextPath() : null;
                 if (contextPath != null) {
                     patterns = patterns.stream()

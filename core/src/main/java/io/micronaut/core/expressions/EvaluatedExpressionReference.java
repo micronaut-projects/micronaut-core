@@ -16,8 +16,6 @@
 package io.micronaut.core.expressions;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
-
 import java.util.Objects;
 
 /**
@@ -34,10 +32,10 @@ import java.util.Objects;
  * @since 4.0.0
  */
 @Internal
-public record EvaluatedExpressionReference(@NonNull Object annotationValue,
-                                           @NonNull String annotationName,
-                                           @NonNull String annotationMember,
-                                           @NonNull String expressionClassName) {
+public record EvaluatedExpressionReference(Object annotationValue,
+ String annotationName,
+ String annotationMember,
+ String expressionClassName) {
 
     @Override
     public boolean equals(Object o) {

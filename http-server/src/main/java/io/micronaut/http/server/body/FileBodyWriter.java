@@ -17,7 +17,6 @@ package io.micronaut.http.server.body;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.ByteBodyHttpResponse;
@@ -52,7 +51,7 @@ public final class FileBodyWriter implements ResponseBodyWriter<File> {
     }
 
     @Override
-    public ByteBodyHttpResponse<?> write(@NonNull ByteBodyFactory bodyFactory,
+    public ByteBodyHttpResponse<?> write(ByteBodyFactory bodyFactory,
                                          HttpRequest<?> request,
                                          MutableHttpResponse<File> outgoingResponse,
                                          Argument<File> type,
@@ -64,11 +63,11 @@ public final class FileBodyWriter implements ResponseBodyWriter<File> {
     }
 
     @Override
-    public CloseableByteBody writePiece(@NonNull ByteBodyFactory bodyFactory,
-                                        @NonNull HttpRequest<?> request,
-                                        @NonNull HttpResponse<?> response,
-                                        @NonNull Argument<File> type,
-                                        @NonNull MediaType mediaType,
+    public CloseableByteBody writePiece(ByteBodyFactory bodyFactory,
+                                        HttpRequest<?> request,
+                                        HttpResponse<?> response,
+                                        Argument<File> type,
+                                        MediaType mediaType,
                                         File object) {
         return systemFileBodyWriter.writePiece(bodyFactory, new SystemFile(object));
     }

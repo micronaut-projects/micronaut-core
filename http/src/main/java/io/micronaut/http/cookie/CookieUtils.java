@@ -16,7 +16,6 @@
 package io.micronaut.http.cookie;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.MutableHttpHeaders;
 
@@ -37,37 +36,38 @@ public final class CookieUtils {
 
     /**
      *
-     * @param cookie Cookie
+     * @param cookie        Cookie
      * @param cookieEncoded Encoded cookie
      */
-    public static void verifyCookieSize(@NonNull Cookie cookie,
-                                        @NonNull String cookieEncoded) {
+    public static void verifyCookieSize(Cookie cookie,
+                                        String cookieEncoded) {
         verifyCookieSize(cookie, cookieEncoded, COOKIE_BYTE_LIMIT);
     }
 
     /**
-     * @param cookie Cookie
-     * @param cookieEncoded Encoded cookie
+     * @param cookie          Cookie
+     * @param cookieEncoded   Encoded cookie
      * @param cookieByteLimit Cookie byte Limit
      */
-    public static void verifyCookieSize(@NonNull Cookie cookie,
-                                        @NonNull String cookieEncoded,
-                                        @NonNull Integer cookieByteLimit) {
-            int byteCount = StringUtils.utf8Bytes(cookieEncoded);
-            if (byteCount > cookieByteLimit) {
-                throw new CookieSizeExceededException(cookie.getName(), cookieByteLimit, byteCount);
-            }
+    public static void verifyCookieSize(Cookie cookie,
+                                        String cookieEncoded,
+                                        Integer cookieByteLimit) {
+        int byteCount = StringUtils.utf8Bytes(cookieEncoded);
+        if (byteCount > cookieByteLimit) {
+            throw new CookieSizeExceededException(cookie.getName(), cookieByteLimit, byteCount);
+        }
     }
 
     /**
      * Sets the HTTP Header Set-Cookie with the supplied cookie encoded.
-     * @param headers HTTP Headers
-     * @param cookie Cookie
+     *
+     * @param headers         HTTP Headers
+     * @param cookie          Cookie
      * @param cookieByteLimit Cookie byte Limit
      */
-    public static void setCookieHeader(@NonNull MutableHttpHeaders headers,
-                                       @NonNull Cookie cookie,
-                                       @NonNull Integer cookieByteLimit) {
+    public static void setCookieHeader(MutableHttpHeaders headers,
+                                       Cookie cookie,
+                                       Integer cookieByteLimit) {
         ServerCookieEncoder.INSTANCE.encode(cookie)
             .forEach(cookieEncoded -> {
                 CookieUtils.verifyCookieSize(cookie, cookieEncoded, cookieByteLimit);
@@ -77,10 +77,11 @@ public final class CookieUtils {
 
     /**
      * Sets the HTTP Header Set-Cookie with the supplied cookie encoded.
+     *
      * @param headers HTTP Headers
-     * @param cookie Cookie
+     * @param cookie  Cookie
      */
-    public static void setCookieHeader(@NonNull MutableHttpHeaders headers, @NonNull Cookie cookie) {
+    public static void setCookieHeader(MutableHttpHeaders headers, Cookie cookie) {
         setCookieHeader(headers, cookie, COOKIE_BYTE_LIMIT);
     }
 }

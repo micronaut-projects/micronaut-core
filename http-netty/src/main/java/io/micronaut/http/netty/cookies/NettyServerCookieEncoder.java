@@ -16,7 +16,6 @@
 package io.micronaut.http.netty.cookies;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.ServerCookieEncoder;
 
@@ -32,14 +31,13 @@ import static io.netty.handler.codec.http.cookie.ServerCookieEncoder.STRICT;
 @Internal
 public final class NettyServerCookieEncoder implements ServerCookieEncoder {
     @Override
-    public List<String> encode(@NonNull Cookie... cookies) {
+    public List<String> encode(Cookie... cookies) {
         return Arrays.stream(cookies)
                 .map(this::encodeCookie)
                 .toList();
     }
 
-    @NonNull
-    private String encodeCookie(@NonNull Cookie cookie) {
+    private String encodeCookie(Cookie cookie) {
         if (cookie instanceof NettyCookie nettyCookie) {
             return STRICT.encode(nettyCookie.getNettyCookie());
         }

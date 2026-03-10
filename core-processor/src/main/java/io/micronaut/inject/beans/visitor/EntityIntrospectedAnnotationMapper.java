@@ -21,8 +21,6 @@ import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.inject.annotation.NamedAnnotationMapper;
 import io.micronaut.inject.visitor.VisitorContext;
-
-import org.jspecify.annotations.NonNull;
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
 import java.util.List;
@@ -36,7 +34,6 @@ import java.util.List;
 @Internal
 // tag::class[]
 public class EntityIntrospectedAnnotationMapper implements NamedAnnotationMapper {
-    @NonNull
     @Override
     public String getName() {
         return "javax.persistence.Entity";

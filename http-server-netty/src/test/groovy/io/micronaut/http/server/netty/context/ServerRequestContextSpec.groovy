@@ -128,7 +128,7 @@ class ServerRequestContextSpec extends Specification {
             Mono.fromCallable({ ->
                 def request = ServerRequestContext.currentRequest().orElseThrow { -> new RuntimeException("no request") }
                 request.uri.toString()
-            }).subscribeOn(Schedulers.boundedElastic())
+            }).subscribeOn(Schedulers.fromExecutor(executorService))
         }
 
         @Get("/reactor-context")

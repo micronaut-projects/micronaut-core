@@ -16,13 +16,13 @@
 package io.micronaut.jackson.core.parser;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.async.processor.SingleThreadedBufferingProcessor;
 import io.micronaut.jackson.core.tree.JsonNodeTreeCodec;
 import io.micronaut.jackson.core.tree.JsonStreamTransfer;
 import io.micronaut.jackson.core.tree.TreeGenerator;
 import io.micronaut.json.JsonStreamConfig;
 import io.micronaut.json.tree.JsonNode;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Subscriber;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,6 +50,7 @@ public class JacksonCoreProcessor extends SingleThreadedBufferingProcessor<byte[
     private static final Logger LOG = LoggerFactory.getLogger(JacksonCoreProcessor.class);
 
     private NonBlockingByteArrayJsonParser currentNonBlockingByteArrayJsonParser;
+    @Nullable
     private TreeGenerator currentGenerator = null;
 
     private final TokenStreamFactory jsonFactory;
@@ -69,7 +70,7 @@ public class JacksonCoreProcessor extends SingleThreadedBufferingProcessor<byte[
      * @param jsonFactory Factory to use for creating the parser
      * @param deserializationConfig The deserialization configuration (in particular bignum handling)
      */
-    public JacksonCoreProcessor(boolean streamArray, TokenStreamFactory jsonFactory, @NonNull JsonStreamConfig deserializationConfig) {
+    public JacksonCoreProcessor(boolean streamArray, TokenStreamFactory jsonFactory, JsonStreamConfig deserializationConfig) {
         this.jsonFactory = jsonFactory;
         this.streamArray = streamArray;
         this.treeCodec = JsonNodeTreeCodec.getInstance().withConfig(deserializationConfig);

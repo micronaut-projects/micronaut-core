@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Experimental;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Arrays;
+import java.util.Objects;
 import java.util.function.BiPredicate;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -232,8 +233,8 @@ public final class BodyAssertion<T, E> {
         @Override
         public boolean test(String expected, String received) {
             return switch (type) {
-                case EQUAL -> received.equals(expected);
-                case CONTAIN -> received.contains(expected);
+                case EQUAL -> Objects.equals(received, expected);
+                case CONTAIN -> (received == null && expected == null) || received.contains(expected);
                 case DOESNT_CONTAIN -> !received.contains(expected);
             };
         }

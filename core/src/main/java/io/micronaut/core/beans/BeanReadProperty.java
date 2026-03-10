@@ -17,7 +17,6 @@ package io.micronaut.core.beans;
 
 import io.micronaut.core.annotation.AnnotatedElement;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
@@ -46,7 +45,6 @@ public interface BeanReadProperty<B, T> extends AnnotatedElement, AnnotationMeta
     /**
      * @return The declaring bean introspection.
      */
-    @NonNull
     BeanIntrospection<B> getDeclaringBean();
 
     /**
@@ -64,7 +62,7 @@ public interface BeanReadProperty<B, T> extends AnnotatedElement, AnnotationMeta
      * @throws IllegalArgumentException If the bean instance if not of the correct type
      */
     @Nullable
-    T get(@NonNull B bean);
+    T get(B bean);
 
     /**
      * Read the value and try to convert it to the given type.
@@ -73,7 +71,7 @@ public interface BeanReadProperty<B, T> extends AnnotatedElement, AnnotationMeta
      * @param <T2> The generic type
      * @return The value if conversion was possible.
      */
-    default @NonNull <T2> Optional<T2> get(@NonNull B bean, @NonNull Class<T2> type) {
+    default <T2> Optional<T2> get(B bean, Class<T2> type) {
         ArgumentUtils.requireNonNull("bean", bean);
         ArgumentUtils.requireNonNull("type", type);
         final Argument<T2> argument = Argument.of(type);
@@ -87,7 +85,7 @@ public interface BeanReadProperty<B, T> extends AnnotatedElement, AnnotationMeta
      * @param <T2> The generic type
      * @return The value if conversion was possible.
      */
-    default <T2> Optional<T2> get(@NonNull B bean, @NonNull Argument<T2> argument) {
+    default <T2> Optional<T2> get(B bean, Argument<T2> argument) {
         ArgumentUtils.requireNonNull("bean", bean);
         ArgumentUtils.requireNonNull("type", argument);
 
@@ -102,7 +100,7 @@ public interface BeanReadProperty<B, T> extends AnnotatedElement, AnnotationMeta
      * @param <T2> The generic type
      * @return The value if conversion was possible.
      */
-    default <T2> Optional<T2> get(@NonNull B bean, @NonNull ArgumentConversionContext<T2> conversionContext) {
+    default <T2> Optional<T2> get(B bean, ArgumentConversionContext<T2> conversionContext) {
         ArgumentUtils.requireNonNull("bean", bean);
         ArgumentUtils.requireNonNull("conversionContext", conversionContext);
 
@@ -118,7 +116,7 @@ public interface BeanReadProperty<B, T> extends AnnotatedElement, AnnotationMeta
      * @param <T2> The generic type
      * @return The value if conversion was possible.
      */
-    default @Nullable <T2> T2 get(@NonNull B bean, @NonNull Class<T2> type, @Nullable T2 defaultValue) {
+    default @Nullable <T2> T2 get(B bean, Class<T2> type, @Nullable T2 defaultValue) {
         ArgumentUtils.requireNonNull("bean", bean);
         //noinspection ConstantConditions
         if (type == null) {
@@ -132,7 +130,7 @@ public interface BeanReadProperty<B, T> extends AnnotatedElement, AnnotationMeta
     /**
      * @return The property type.
      */
-    @NonNull Class<T> getType();
+ Class<T> getType();
 
     /**
      * Represent the type as an argument, including any generic type information.
@@ -140,7 +138,6 @@ public interface BeanReadProperty<B, T> extends AnnotatedElement, AnnotationMeta
      * @return The argument
      */
     @Override
-    @NonNull
     default Argument<T> asArgument() {
         return Argument.of(getType());
     }

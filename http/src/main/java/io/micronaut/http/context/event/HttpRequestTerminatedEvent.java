@@ -17,9 +17,6 @@ package io.micronaut.http.context.event;
 
 import io.micronaut.context.event.ApplicationEvent;
 import io.micronaut.http.HttpRequest;
-
-import org.jspecify.annotations.NonNull;
-
 /**
  * An event fired when an {@link HttpRequest} is finalized by the server. Note that the event is fired asynchronously and
  * consumers of the event should generally not perform I/O, instead this designed for tracing of headers, URI etc.
@@ -32,12 +29,11 @@ public class HttpRequestTerminatedEvent extends ApplicationEvent {
     /**
      * @param request The request. Never null.
      */
-    public HttpRequestTerminatedEvent(@NonNull HttpRequest<?> request) {
+    public HttpRequestTerminatedEvent(HttpRequest<?> request) {
         super(request);
     }
 
     @Override
-    @NonNull
     public HttpRequest<?> getSource() {
         return (HttpRequest<?>) super.getSource();
     }

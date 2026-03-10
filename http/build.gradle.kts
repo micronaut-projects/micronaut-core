@@ -16,6 +16,7 @@ dependencies {
     compileOnly(libs.managed.netty.pkitesting)
 
     compileOnly(libs.managed.jackson.annotations)
+    compileOnly(libs.managed.jspecify)
 
     testCompileOnly(projects.micronautInjectGroovy)
     testAnnotationProcessor(projects.micronautInjectJava)

@@ -27,6 +27,7 @@ import io.micronaut.core.convert.format.ReadableBytesTypeConverter;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.convert.value.ConvertibleValuesMap;
 import io.micronaut.core.io.IOUtils;
+import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.reflect.ClassUtils;
@@ -37,6 +38,7 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.CopyOnWriteMap;
 import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.core.util.StringUtils;
+import org.jspecify.annotations.Nullable;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -168,12 +170,12 @@ public class DefaultMutableConversionService implements MutableConversionService
         }
 
         @Override
-        public <T> Optional<T> convert(Object object, Class<T> targetType, ConversionContext context) {
+        public <T> Optional<T> convert(@Nullable Object object, Class<T> targetType, ConversionContext context) {
             return DefaultMutableConversionService.this.convert(object, targetType, context);
         }
 
         @Override
-        public <S, T> Optional<T> convert(S object, Class<? super S> sourceType, Class<T> targetType, ConversionContext context) {
+        public <S, T> Optional<T> convert(@Nullable S object, Class<? super S> sourceType, Class<T> targetType, ConversionContext context) {
             return DefaultMutableConversionService.this.convert(object, sourceType, targetType, context);
         }
 
@@ -183,32 +185,32 @@ public class DefaultMutableConversionService implements MutableConversionService
         }
 
         @Override
-        public <T> Optional<T> convert(Object object, Class<T> targetType) {
+        public <T> Optional<T> convert(@Nullable Object object, Class<T> targetType) {
             return DefaultMutableConversionService.this.convert(object, targetType);
         }
 
         @Override
-        public <T> Optional<T> convert(Object object, Argument<T> targetType) {
+        public <T> Optional<T> convert(@Nullable Object object, Argument<T> targetType) {
             return DefaultMutableConversionService.this.convert(object, targetType);
         }
 
         @Override
-        public <T> Optional<T> convert(Object object, ArgumentConversionContext<T> context) {
+        public <T> Optional<T> convert(@Nullable Object object, ArgumentConversionContext<T> context) {
             return DefaultMutableConversionService.this.convert(object, context);
         }
 
         @Override
-        public <T> T convertRequired(Object value, Class<T> type) {
+        public <T> T convertRequired(@Nullable Object value, Class<T> type) {
             return DefaultMutableConversionService.this.convertRequired(value, type);
         }
 
         @Override
-        public <T> T convertRequired(Object value, Argument<T> argument) {
+        public <T> T convertRequired(@Nullable Object value, Argument<T> argument) {
             return DefaultMutableConversionService.this.convertRequired(value, argument);
         }
 
         @Override
-        public <T> T convertRequired(Object value, ArgumentConversionContext<T> context) {
+        public <T> T convertRequired(@Nullable Object value, ArgumentConversionContext<T> context) {
             return DefaultMutableConversionService.this.convertRequired(value, context);
         }
     };
@@ -222,7 +224,7 @@ public class DefaultMutableConversionService implements MutableConversionService
 
     @SuppressWarnings("unchecked")
     @Override
-    public <S, T> Optional<T> convert(S object, Class<? super S> sourceType, Class<T> targetType, ConversionContext context) {
+    public <S, T> Optional<T> convert(@Nullable S object, Class<? super S> sourceType, Class<T> targetType, ConversionContext context) {
         if (object == null || targetType == null || context == null) {
             return Optional.empty();
         }
@@ -245,12 +247,7 @@ public class DefaultMutableConversionService implements MutableConversionService
         TypeConverter<Object, T> typeConverter = findConverter(pair);
         if (typeConverter == null) {
             typeConverter = findTypeConverter(sourceType, targetType, formattingAnnotation);
-            if (typeConverter == null) {
-                addToConverterCache(pair, UNCONVERTIBLE);
-                return Optional.empty();
-            } else {
-                addToConverterCache(pair, typeConverter);
-            }
+            addToConverterCache(pair, typeConverter);
         }
         if (typeConverter == UNCONVERTIBLE) {
             return Optional.empty();
@@ -264,15 +261,13 @@ public class DefaultMutableConversionService implements MutableConversionService
         TypeConverter<Object, T> typeConverter = findConverter(pair);
         if (typeConverter == null) {
             typeConverter = findTypeConverter(sourceType, targetType, null);
-            if (typeConverter != null) {
-                addToConverterCache(pair, typeConverter);
-                return typeConverter != UNCONVERTIBLE;
-            }
-            return false;
+            addToConverterCache(pair, typeConverter);
+            return typeConverter != UNCONVERTIBLE;
         }
         return typeConverter != UNCONVERTIBLE;
     }
 
+    @Nullable
     private <T, S> TypeConverter<T, S> findConverter(ConvertiblePair pair) {
         TypeConverter typeConverter = internalConverters.get(pair);
         if (typeConverter != null) {
@@ -281,6 +276,7 @@ public class DefaultMutableConversionService implements MutableConversionService
         return converterCache.get(pair);
     }
 
+    @Nullable
     private <T, S> TypeConverter<T, S> findRegisteredConverter(ConvertiblePair pair) {
         TypeConverter typeConverter = internalConverters.get(pair);
         if (typeConverter != null) {
@@ -455,16 +451,16 @@ public class DefaultMutableConversionService implements MutableConversionService
         addInternalConverter(AnnotationClassValue.class, Object.class, (object, targetType, context) -> {
             if (targetType.equals(Class.class)) {
                 return object.getType();
+            } else if (CharSequence.class.isAssignableFrom(targetType)) {
+                return Optional.of(object.getName());
+            } else if (targetType.isArray() && CharSequence.class.isAssignableFrom(targetType.getComponentType())) {
+                return Optional.of(new String[] {object.getName()});
             } else {
-                if (CharSequence.class.isAssignableFrom(targetType)) {
-                    return Optional.of(object.getName());
-                } else {
-                    Optional i = object.getInstance();
-                    if (i.isPresent() && targetType.isInstance(i.get())) {
-                        return i;
-                    }
-                    return Optional.empty();
+                Optional i = object.getInstance();
+                if (i.isPresent() && targetType.isInstance(i.get())) {
+                    return i;
                 }
+                return Optional.empty();
             }
         });
         addInternalConverter(AnnotationClassValue[].class, Class.class, (object, targetType, context) -> {
@@ -1180,6 +1176,11 @@ public class DefaultMutableConversionService implements MutableConversionService
         // Boolean -> String
         addInternalConverter(Boolean.class, String.class, Object::toString);
 
+        // ReadBuffer
+        addInternalConverter(ReadBuffer.class, byte[].class, (object, targetType, context) -> Optional.of(object.toArray()));
+        addInternalConverter(ReadBuffer.class, String.class, (object, targetType, context) -> Optional.of(object.toString(context.getCharset())));
+        addInternalConverter(ReadBuffer.class, InputStream.class, (object, targetType, context) -> Optional.of(object.toInputStream()));
+
         Collection<TypeConverterRegistrar> registrars = new ArrayList<>();
         SoftServiceLoader.load(TypeConverterRegistrar.class)
                 .disableFork()
@@ -1211,7 +1212,7 @@ public class DefaultMutableConversionService implements MutableConversionService
      * @param <T>                  Generic type
      * @return type converter
      */
-    protected <T> TypeConverter<Object, T> findTypeConverter(Class<?> sourceType, Class<T> targetType, String formattingAnnotation) {
+    protected <T> TypeConverter<Object, T> findTypeConverter(Class<?> sourceType, Class<T> targetType, @Nullable String formattingAnnotation) {
         List<Class<?>> sourceHierarchy = resolveHierarchy(sourceType);
         List<Class<?>> targetHierarchy = resolveHierarchy(targetType);
         for (Class<?> sourceSuperType : sourceHierarchy) {
@@ -1256,6 +1257,7 @@ public class DefaultMutableConversionService implements MutableConversionService
                 .orElseGet(() -> new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", context.getLocale()));
     }
 
+    @Nullable
     private NumberFormat resolveNumberFormat(ConversionContext context) {
         return context.getAnnotationMetadata().stringValue(Format.class)
                 .map(DecimalFormat::new)
@@ -1288,6 +1290,7 @@ public class DefaultMutableConversionService implements MutableConversionService
     private static final class ConvertiblePair {
         final Class<?> source;
         final Class<?> target;
+        @Nullable
         final String formattingAnnotation;
         final int hashCode;
 
@@ -1295,7 +1298,7 @@ public class DefaultMutableConversionService implements MutableConversionService
             this(source, target, null);
         }
 
-        ConvertiblePair(Class<?> source, Class<?> target, String formattingAnnotation) {
+        ConvertiblePair(Class<?> source, Class<?> target, @Nullable String formattingAnnotation) {
             this.source = source;
             this.target = target;
             this.formattingAnnotation = formattingAnnotation;

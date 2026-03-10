@@ -14,9 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.aop;
-
-import org.jspecify.annotations.NonNull;
-
 /**
  * A {@link ConstructorInterceptor} extends the default {@link Interceptor} interface and allows intercepting constructors.
  *
@@ -35,11 +32,10 @@ public interface ConstructorInterceptor<T> extends Interceptor<T, T> {
      * @param context The context
      * @return The constructed object. Should never be <code>null</code>.
      */
-    @NonNull
-    T intercept(@NonNull ConstructorInvocationContext<T> context);
+    T intercept(ConstructorInvocationContext<T> context);
 
     @Override
-    default @NonNull T intercept(@NonNull InvocationContext<T, T> context) {
+    default T intercept(InvocationContext<T, T> context) {
         if (context instanceof ConstructorInvocationContext) {
             return intercept((ConstructorInvocationContext<T>) context);
         } else {

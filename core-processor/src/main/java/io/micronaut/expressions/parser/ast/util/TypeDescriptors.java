@@ -16,7 +16,6 @@
 package io.micronaut.expressions.parser.ast.util;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
 import io.micronaut.sourcegen.model.ClassTypeDef;
 import io.micronaut.sourcegen.model.TypeDef;
@@ -81,7 +80,7 @@ public final class TypeDescriptors {
      * @param type type to check
      * @return true if it is
      */
-    public static boolean isPrimitive(@NonNull TypeDef type) {
+    public static boolean isPrimitive(TypeDef type) {
         return type.isPrimitive();
     }
 
@@ -91,7 +90,7 @@ public final class TypeDescriptors {
      * @param type type to check
      * @return true if it is
      */
-    public static boolean isBoolean(@NonNull TypeDef type) {
+    public static boolean isBoolean(TypeDef type) {
         return isOneOf(type, BOOLEAN, BOOLEAN_WRAPPER);
     }
 
@@ -101,8 +100,7 @@ public final class TypeDescriptors {
      * @param type type to check
      * @return true if it is
      */
-    @NonNull
-    public static boolean isNumeric(@NonNull TypeDef type) {
+    public static boolean isNumeric(TypeDef type) {
         return isOneOf(type,
             DOUBLE, DOUBLE_WRAPPER,
             FLOAT, FLOAT_WRAPPER,
@@ -120,8 +118,7 @@ public final class TypeDescriptors {
      * @param type type to check
      * @return unboxed type or original passed type
      */
-    @NonNull
-    public static TypeDef toUnboxedIfNecessary(@NonNull TypeDef type) {
+    public static TypeDef toUnboxedIfNecessary(TypeDef type) {
         if (type instanceof ClassTypeDef classTypeDef) {
             return WRAPPER_TO_PRIMITIVE.getOrDefault(classTypeDef.getName(), type);
         }
@@ -135,8 +132,7 @@ public final class TypeDescriptors {
      * @param type type to check
      * @return boxed type or original passed type
      */
-    @NonNull
-    public static ClassTypeDef toBoxedIfNecessary(@NonNull TypeDef type) {
+    public static ClassTypeDef toBoxedIfNecessary(TypeDef type) {
         if (PRIMITIVE_TO_WRAPPER.containsKey(type)) {
             return PRIMITIVE_TO_WRAPPER.get(type);
         }
@@ -155,9 +151,8 @@ public final class TypeDescriptors {
      * @return numeric operation result type
      * @throws ExpressionCompilationException if ony of the passed types is not a numeric type
      */
-    @NonNull
-    public static TypeDef computeNumericOperationTargetType(@NonNull TypeDef leftOperandType,
-                                                         @NonNull TypeDef rightOperandType) {
+    public static TypeDef computeNumericOperationTargetType(TypeDef leftOperandType,
+                                                            TypeDef rightOperandType) {
         if (!isNumeric(leftOperandType) || !isNumeric(rightOperandType)) {
             throw new ExpressionCompilationException("Numeric operation can only be applied to numeric types");
         }

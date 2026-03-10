@@ -16,7 +16,6 @@
 package io.micronaut.http.client.jdk;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.ByteBodyHttpResponseWrapper;
@@ -46,17 +45,17 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
     }
 
     @Override
-    public @NonNull Publisher<? extends HttpResponse<?>> exchange(@NonNull HttpRequest<?> request, @Nullable CloseableByteBody requestBody, @Nullable Thread blockedThread) {
-        return exchangeImpl(new RawHttpRequestWrapper(conversionService, request.toMutableRequest(), requestBody), null);
+    public Publisher<? extends HttpResponse<?>> exchange(HttpRequest<?> request, @Nullable CloseableByteBody requestBody, @Nullable Thread blockedThread) {
+        return exchangeImpl(new RawHttpRequestWrapper<>(conversionService, request.toMutableRequest(), requestBody), null);
     }
 
     @Override
-    public void close() throws IOException {
+    public void close() {
         // Nothing to do here, we do not need to close clients
     }
 
     @Override
-    protected <O> Publisher<HttpResponse<O>> responsePublisher(@NonNull HttpRequest<?> request, @Nullable Argument<O> bodyType) {
+    protected <O> Publisher<HttpResponse<O>> responsePublisher(HttpRequest<?> request, @Nullable Argument<O> bodyType) {
         return Mono.defer(() -> mapToHttpRequest(request, bodyType)) // defered so any client filter changes are used
             .map(httpRequest -> {
                 if (log.isDebugEnabled()) {
@@ -81,7 +80,7 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
                 //noinspection unchecked
                 return (HttpResponse<O>) ByteBodyHttpResponseWrapper.wrap(new BaseHttpResponseAdapter<CloseableByteBody, O>(netResponse, conversionService) {
                     @Override
-                    public @NonNull Optional<O> getBody() {
+                    public Optional<O> getBody() {
                         return Optional.empty();
                     }
                 }, netResponse.body());

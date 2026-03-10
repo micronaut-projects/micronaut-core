@@ -15,10 +15,11 @@
  */
 package io.micronaut.core.graal;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 
 /**
- * Internal interface to allow integration with Graal Polylot languages that marks a top as boxing or
+ * Internal interface to allow integration with Graal Polyglot languages that marks a type as boxing or
  * wrapping a foreign value of another language.
  *
  * <p>NOTE: regarded as internal and not for public consumption.</p>
@@ -28,11 +29,13 @@ import io.micronaut.core.annotation.Internal;
  * @since 5.0.0
  */
 @Internal
+@Experimental
 public interface Boxed<T> {
     /**
-     * Unbox the type
+     * Unboxes the type.
      *
      * @return The unboxed type.
      */
+    @SuppressWarnings("checkstyle:MethodName")
     T $unbox();
 }

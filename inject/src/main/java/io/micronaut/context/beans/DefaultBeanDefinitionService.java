@@ -29,7 +29,6 @@ import io.micronaut.context.event.BeanInitializedEventListener;
 import io.micronaut.context.event.BeanPreDestroyEventListener;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
@@ -106,6 +105,7 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
     private final Predicate<BeanConfiguration> beanConfigurationsPredicate;
 
     private final ClassLoader classLoader;
+    @Nullable
     private Beans beans;
 
     private final List<BeanDefinitionProducer> additionalBeanDefinitions = new ArrayList<>();
@@ -116,7 +116,7 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
      *
      * @param contextConfiguration The context configuration
      */
-    public DefaultBeanDefinitionService(@NonNull BeanContextConfiguration contextConfiguration) {
+    public DefaultBeanDefinitionService(BeanContextConfiguration contextConfiguration) {
         Set<Class<? extends Annotation>> eagerInitAnnotated = contextConfiguration.getEagerInitAnnotated();
         List<String> configuredEagerSingletonAnnotations = new ArrayList<>(eagerInitAnnotated.size());
         for (Class<? extends Annotation> ann : eagerInitAnnotated) {
@@ -138,6 +138,7 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
      * Configures the context reading all bean definitions.
      */
     @Internal
+    @Override
     public void initialize(BeanContext beanContext) {
         readBeanDefinitionReferences(beanContext);
         for (Class<?> indexType : KNOWN_INDEX_TYPES) {
@@ -146,14 +147,14 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
     }
 
     @Override
-    public void registerConfiguration(@NonNull BeanConfiguration configuration) {
+    public void registerConfiguration(BeanConfiguration configuration) {
         if (beanConfigurationsPredicate == null || beanConfigurationsPredicate.test(configuration)) {
             additionalBeanConfigurations.add(configuration);
         }
     }
 
     @Override
-    public void addBeanDefinition(@NonNull RuntimeBeanDefinition<?> definition) {
+    public void addBeanDefinition(RuntimeBeanDefinition<?> definition) {
         Objects.requireNonNull(definition, "Bean definition cannot be null");
         BeanDefinitionProducer producer = new BeanDefinitionProducer(definition);
         if (beans == null) {
@@ -164,9 +165,12 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
     }
 
     private void addBeanDefinition(BeanDefinitionProducer producer) {
-        beans.all.add(producer);
         BeanDefinitionReference<?> reference = producer.reference;
-        Class<?> beanType = producer.reference.getBeanType();
+        if (reference == null) {
+            return;
+        }
+        Objects.requireNonNull(beans).all.add(producer);
+        Class<?> beanType = reference.getBeanType();
         boolean beanTypeIndexAdded = false;
         for (Class<?> exposedType : reference.getExposedTypes()) {
             resolveTypeIndex(exposedType).add(producer);
@@ -182,8 +186,8 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
     @Override
     public <B> Iterable<BeanDefinition<B>> getBeanDefinitions(BeanContext beanContext,
                                                               Argument<B> beanType,
-                                                              Predicate<BeanDefinitionReference<B>> refPredicate,
-                                                              Predicate<BeanDefinition<B>> defPredicate) {
+                                                              @Nullable Predicate<BeanDefinitionReference<B>> refPredicate,
+                                                              @Nullable Predicate<BeanDefinition<B>> defPredicate) {
         return getBeanDefinitions(resolveProducersForBeanType(beanType), beanContext, null, beanType, refPredicate, defPredicate);
     }
 
@@ -204,15 +208,18 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
     }
 
     @Override
-    public <B> Iterable<BeanDefinition<B>> getBeanDefinitions(BeanResolutionContext beanResolutionContext, Argument<B> beanType, Predicate<BeanDefinitionReference<B>> refPredicate, Predicate<BeanDefinition<B>> defPredicate) {
+    public <B> Iterable<BeanDefinition<B>> getBeanDefinitions(BeanResolutionContext beanResolutionContext,
+                                                              Argument<B> beanType,
+                                                              @Nullable Predicate<BeanDefinitionReference<B>> refPredicate,
+                                                              @Nullable Predicate<BeanDefinition<B>> defPredicate) {
         return getBeanDefinitions(resolveProducersForBeanType(beanType), null, beanResolutionContext, beanType, refPredicate, defPredicate);
     }
 
     private <B> Iterable<BeanDefinition<B>> getBeanDefinitions(Collection<BeanDefinitionProducer> producers,
                                                                BeanContext beanContext,
                                                                Argument<B> beanType,
-                                                               Predicate<BeanDefinitionReference<B>> refPredicate,
-                                                               Predicate<BeanDefinition<B>> defPredicate) {
+                                                               @Nullable Predicate<BeanDefinitionReference<B>> refPredicate,
+                                                               @Nullable Predicate<BeanDefinition<B>> defPredicate) {
         return getBeanDefinitions(producers, beanContext, null, beanType, refPredicate, defPredicate);
     }
 
@@ -222,8 +229,8 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
                                                                @Nullable
                                                                BeanResolutionContext beanResolutionContext,
                                                                Argument<B> beanType,
-                                                               Predicate<BeanDefinitionReference<B>> refPredicate,
-                                                               Predicate<BeanDefinition<B>> defPredicate) {
+                                                               @Nullable Predicate<BeanDefinitionReference<B>> refPredicate,
+                                                               @Nullable Predicate<BeanDefinition<B>> defPredicate) {
         return new Iterable<>() {
 
             @Override
@@ -231,12 +238,13 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
                 Iterator<BeanDefinitionProducer> iterator = producers.iterator();
                 return new Iterator<>() {
 
+                    @Nullable
                     private BeanDefinition<B> next;
 
                     private void advance() {
                         while (next == null && iterator.hasNext()) {
                             next = iterator.next().getDefinitionIfEnabled(
-                                beanResolutionContext != null ? beanResolutionContext.getContext() : beanContext,
+                                beanResolutionContext != null ? beanResolutionContext.getContext() : Objects.requireNonNull(beanContext, "Bean context is required"),
                                 beanResolutionContext,
                                 beanType,
                                 refPredicate,
@@ -272,9 +280,10 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
 
             @Override
             public Iterator<BeanDefinitionReference<Object>> iterator() {
-                Iterator<BeanDefinitionProducer> iterator = beans.all.iterator();
+                Iterator<BeanDefinitionProducer> iterator = Objects.requireNonNull(beans).all.iterator();
                 return new Iterator<>() {
 
+                    @Nullable
                     private BeanDefinitionReference<Object> next;
 
                     private void advance() {
@@ -306,10 +315,11 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
 
     private List<BeanDefinitionProducer> resolveProducersForBeanType(Argument<?> beanType) {
         Class<?> type = beanType.getType();
+        Beans beansNotNull = Objects.requireNonNull(beans);
         if (type == Object.class) {
-            return beans.all;
+            return beansNotNull.all;
         }
-        List<BeanDefinitionProducer> producers = beans.beanIndex.get(type);
+        List<BeanDefinitionProducer> producers = beansNotNull.beanIndex.get(type);
         if (producers == null) {
             return List.of();
         }
@@ -330,9 +340,10 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
      * @param definition The definition to remove
      */
     @Internal
+    @Override
     public void removeBeanDefinition(RuntimeBeanDefinition<?> definition) {
         Class<?> beanType = definition.getBeanType();
-        for (Class<?> indexedType : beans.beanIndex.keySet()) {
+        for (Class<?> indexedType : Objects.requireNonNull(beans).beanIndex.keySet()) {
             if (indexedType == beanType || indexedType.isAssignableFrom(beanType)) {
                 resolveTypeIndex(indexedType).forEach(p -> p.disableIfMatch(definition));
                 break;
@@ -361,22 +372,22 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
 
     @Override
     public Iterable<BeanDefinition<Object>> getEagerInitBeans(BeanContext beanContext) {
-        return getBeanDefinitions(beans.eagerInitBeans, beanContext, Argument.OBJECT_ARGUMENT, null, null);
+        return getBeanDefinitions(Objects.requireNonNull(beans).eagerInitBeans, beanContext, Argument.OBJECT_ARGUMENT, null, null);
     }
 
     @Override
     public Iterable<BeanDefinition<Object>> getProcessedBeans(BeanContext beanContext) {
-        return getBeanDefinitions(beans.processedBeans, beanContext, Argument.OBJECT_ARGUMENT, null, null);
+        return getBeanDefinitions(Objects.requireNonNull(beans).processedBeans, beanContext, Argument.OBJECT_ARGUMENT, null, null);
     }
 
     @Override
     public Iterable<BeanDefinition<Object>> getParallelBeans(BeanContext beanContext) {
-        return getBeanDefinitions(beans.parallelBeans, beanContext, Argument.OBJECT_ARGUMENT, null, null);
+        return getBeanDefinitions(Objects.requireNonNull(beans).parallelBeans, beanContext, Argument.OBJECT_ARGUMENT, null, null);
     }
 
     @Override
     public Iterable<BeanDefinition<Object>> getTargetProxyBeans(BeanContext beanContext) {
-        return getBeanDefinitions(beans.proxyTargetBeans, beanContext, Argument.OBJECT_ARGUMENT, null, null);
+        return getBeanDefinitions(Objects.requireNonNull(beans).proxyTargetBeans, beanContext, Argument.OBJECT_ARGUMENT, null, null);
     }
 
     @Override
@@ -387,9 +398,8 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
             .collect(Collectors.toList());
     }
 
-    @NonNull
     private Collection<BeanDefinitionProducer> resolveTypeIndex(Class<?> indexedType) {
-        return beans.beanIndex.computeIfAbsent(indexedType, COMPUTE_INDEXES_FN);
+        return Objects.requireNonNull(beans).beanIndex.computeIfAbsent(indexedType, COMPUTE_INDEXES_FN);
     }
 
     @Override
@@ -488,6 +498,9 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
 
         for (BeanDefinitionProducer beanDefinitionProducer : all) {
             BeanDefinitionReference<?> beanDefinitionReference = beanDefinitionProducer.reference;
+            if (beanDefinitionReference == null) {
+                continue;
+            }
             for (Map.Entry<BeanConfiguration, List<BeanDefinitionProducer>> e : byConfiguration) {
                 BeanConfiguration configuration = e.getKey();
                 if (configuration.isWithin(beanDefinitionReference)) {
@@ -529,6 +542,9 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
 
     private static void indexBean(Map<Class<?>, List<BeanDefinitionProducer>> indexByType, BeanDefinitionProducer beanDefinitionProducer) {
         BeanDefinitionReference<?> reference = beanDefinitionProducer.reference;
+        if (reference == null) {
+            return;
+        }
         Set<Class<?>> exposedTypes = reference.getExposedTypes();
         if (exposedTypes.isEmpty()) {
             // The reference must be compiled prior to v5, use reflection to find exposed types till it's recompiled
@@ -546,7 +562,6 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
         }
     }
 
-    @NonNull
     private List<BeanDefinitionReference<?>> resolveBeanDefinitionReferences() {
         List<BeanDefinitionReference<?>> refs = beanDefinitionReferencesProvider.provide(classLoader);
         if (beansPredicate != null) {
@@ -601,11 +616,11 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
         @SuppressWarnings("java:S3077")
         private volatile Object definition;
 
-        BeanDefinitionProducer(@NonNull BeanDefinitionReference<?> reference) {
+        BeanDefinitionProducer(BeanDefinitionReference<?> reference) {
             this.reference = reference;
         }
 
-        private static boolean isReferenceEnabled(BeanDefinitionReference<?> ref, BeanContext context, BeanResolutionContext resolutionContext) {
+        private static boolean isReferenceEnabled(@Nullable BeanDefinitionReference<?> ref, BeanContext context, @Nullable BeanResolutionContext resolutionContext) {
             if (ref == null) {
                 return false;
             }
@@ -615,7 +630,7 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
             return ref.isEnabled(context);
         }
 
-        static boolean isDefinitionEnabled(@NonNull BeanContext context,
+        static boolean isDefinitionEnabled(BeanContext context,
                                            @Nullable BeanResolutionContext resolutionContext,
                                            @Nullable BeanDefinition<?> def) {
             if (def == null) {
@@ -641,7 +656,13 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
             if (isReferenceEnabled(ref, context, resolutionContext)) {
                 return ref;
             } else {
-                this.reference = null;
+                // Only permanently disable if the context is running.
+                // Before startup, property sources may not yet be processed
+                // into the environment resolver, so condition evaluation
+                // results are unreliable and should not be cached.
+                if (context.isRunning()) {
+                    this.reference = null;
+                }
                 return null;
             }
         }
@@ -671,8 +692,10 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
             }
             BeanDefinitionReference<T> ref = getReferenceIfEnabled(context, resolutionContext);
             if (ref == null) {
-                // shortcut for future calls
-                this.definition = DEFINITION_DISABLED_SENTINEL;
+                if (context.isRunning()) {
+                    // shortcut for future calls
+                    this.definition = DEFINITION_DISABLED_SENTINEL;
+                }
                 return null;
             }
             if (beanType != null && !(beanType.getType().equals(Object.class) || ref.isCandidateBean(beanType))) {

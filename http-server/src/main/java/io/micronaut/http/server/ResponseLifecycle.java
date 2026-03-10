@@ -16,7 +16,6 @@
 package io.micronaut.http.server;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.async.subscriber.LazySendingSubscriber;
 import io.micronaut.core.convert.ConversionService;
@@ -44,11 +43,13 @@ import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.web.router.DefaultUrlRouteInfo;
 import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteInfo;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.Executor;
 
 /**
@@ -80,7 +81,6 @@ public abstract class ResponseLifecycle {
      *
      * @return The blocking executor
      */
-    @NonNull
     protected abstract Executor ioExecutor();
 
     /**
@@ -90,8 +90,7 @@ public abstract class ResponseLifecycle {
      * @return The response writer
      * @param <T> The writer type
      */
-    @NonNull
-    protected <T> ResponseBodyWriter<T> wrap(@NonNull MessageBodyWriter<T> messageBodyWriter) {
+    protected <T> ResponseBodyWriter<T> wrap(MessageBodyWriter<T> messageBodyWriter) {
         return ResponseBodyWriter.wrap(messageBodyWriter);
     }
 
@@ -102,8 +101,7 @@ public abstract class ResponseLifecycle {
      * @param response The unencoded response
      * @return The encoded response
      */
-    @NonNull
-    public final ExecutionFlow<? extends ByteBodyHttpResponse<?>> encodeHttpResponseSafe(@NonNull HttpRequest<?> httpRequest, @NonNull HttpResponse<?> response) {
+    public final ExecutionFlow<? extends ByteBodyHttpResponse<?>> encodeHttpResponseSafe(HttpRequest<?> httpRequest, HttpResponse<?> response) {
         try {
             return encodeHttpResponse(
                 httpRequest,
@@ -198,7 +196,7 @@ public abstract class ResponseLifecycle {
     private ExecutionFlow<? extends ByteBodyHttpResponse<?>> mapToHttpContent(HttpRequest<?> request,
                                                                               MutableHttpResponse<?> response,
                                                                               Object body,
-                                                                              RouteInfo<Object> routeInfo) {
+                                                                              @Nullable RouteInfo<Object> routeInfo) {
         MediaType mediaType = response.getContentType().orElse(null);
         Flux<Object> bodyPublisher = Flux.from(Publishers.convertToPublisher(conversionService, body));
         Flux<ByteBody> httpContentPublisher;
@@ -207,8 +205,7 @@ public abstract class ResponseLifecycle {
             if (mediaType == null) {
                 mediaType = routeExecutor.resolveDefaultResponseContentType(request, routeInfo);
             }
-            isJson = mediaType != null &&
-                mediaType.getExtension().equals(MediaType.EXTENSION_JSON) && routeInfo.isResponseBodyJsonFormattable();
+            isJson = mediaType.getExtension().equals(MediaType.EXTENSION_JSON) && routeInfo.isResponseBodyJsonFormattable();
             MediaType finalMediaType = mediaType;
             httpContentPublisher = bodyPublisher.concatMap(message -> {
                 MessageBodyWriter<Object> messageBodyWriter = routeInfo.getMessageBodyWriter();
@@ -235,7 +232,7 @@ public abstract class ResponseLifecycle {
                 .concatMap(message -> {
                     Argument<Object> type = Argument.ofInstance(message);
                     MessageBodyWriter<Object> messageBodyWriter = messageBodyHandlerRegistry.getWriter(type, finalMediaType == null ? List.of() : List.of(finalMediaType));
-                    ExecutionFlow<CloseableByteBody> flow = writePieceAsync(messageBodyWriter, request, response, type, finalMediaType, message);
+                    ExecutionFlow<CloseableByteBody> flow = writePieceAsync(messageBodyWriter, request, response, type, finalMediaType == null ? MediaType.ALL_TYPE : finalMediaType, message);
                     return ReactiveExecutionFlow.toPublisher(() -> flow);
                 });
         }
@@ -253,7 +250,7 @@ public abstract class ResponseLifecycle {
      * @param items The items
      * @return The concatenated body
      */
-    protected @NonNull CloseableByteBody concatenate(@NonNull Publisher<ByteBody> items) {
+    protected CloseableByteBody concatenate(Publisher<ByteBody> items) {
         return ConcatenatingSubscriber.concatenate(byteBodyFactory, items, ConcatenatingSubscriber.Separators.NONE);
     }
 
@@ -262,7 +259,7 @@ public abstract class ResponseLifecycle {
      * @param items The items
      * @return The concatenated body
      */
-    protected @NonNull CloseableByteBody concatenateJson(@NonNull Publisher<ByteBody> items) {
+    protected CloseableByteBody concatenateJson(Publisher<ByteBody> items) {
         return ConcatenatingSubscriber.concatenate(byteBodyFactory, items, ConcatenatingSubscriber.Separators.JDK_JSON);
     }
 
@@ -273,8 +270,7 @@ public abstract class ResponseLifecycle {
      * @param t The error
      * @return The encoded error response
      */
-    @NonNull
-    protected final ExecutionFlow<? extends ByteBodyHttpResponse<?>> handleStreamingError(@NonNull HttpRequest<?> request, @NonNull Throwable t) {
+    protected final ExecutionFlow<? extends ByteBodyHttpResponse<?>> handleStreamingError(HttpRequest<?> request, Throwable t) {
         // limited error handling
         MutableHttpResponse<?> errorResponse;
         if (t instanceof HttpStatusException hse) {
@@ -293,14 +289,12 @@ public abstract class ResponseLifecycle {
         );
     }
 
-    private <T> ExecutionFlow<CloseableByteBody> writePieceAsync(
-        @NonNull MessageBodyWriter<T> messageBodyWriter,
-        @NonNull HttpRequest<?> request,
-        @NonNull HttpResponse<?> response,
-        @NonNull Argument<T> type,
-        @NonNull MediaType mediaType,
-        T object
-    ) {
+    private <T> ExecutionFlow<CloseableByteBody> writePieceAsync(MessageBodyWriter<T> messageBodyWriter,
+                                                                 HttpRequest<?> request,
+                                                                 HttpResponse<?> response,
+                                                                 Argument<T> type,
+                                                                 MediaType mediaType,
+                                                                 T object) {
         if (messageBodyWriter.isBlocking()) {
             return ExecutionFlow.async(ioExecutor(), () -> ExecutionFlow.just(writePieceSync(messageBodyWriter, request, response, type, mediaType, object)));
         } else {
@@ -308,7 +302,12 @@ public abstract class ResponseLifecycle {
         }
     }
 
-    private <T> CloseableByteBody writePieceSync(@NonNull MessageBodyWriter<T> messageBodyWriter, @NonNull HttpRequest<?> request, @NonNull HttpResponse<?> response, @NonNull Argument<T> type, @NonNull MediaType mediaType, T object) {
+    private <T> CloseableByteBody writePieceSync(MessageBodyWriter<T> messageBodyWriter,
+                                                 HttpRequest<?> request,
+                                                 HttpResponse<?> response,
+                                                 Argument<T> type,
+                                                 MediaType mediaType,
+                                                 T object) {
         return wrap(messageBodyWriter).writePiece(byteBodyFactory, request, response, type, mediaType, object);
     }
 
@@ -328,7 +327,7 @@ public abstract class ResponseLifecycle {
                 .write(byteBodyFactory, nettyRequest, response, responseBodyType, mediaType, body));
         } catch (CodecException e) {
             final MutableHttpResponse<Object> errorResponse = (MutableHttpResponse<Object>) routeExecutor.createDefaultErrorResponse(nettyRequest, e);
-            Object errorBody = errorResponse.body();
+            Object errorBody = Objects.requireNonNull(errorResponse.getBody().orElse(null));
             Argument<Object> type = Argument.ofInstance(errorBody);
             MediaType errorContentType = errorResponse.getContentType().orElse(MediaType.APPLICATION_JSON_TYPE);
             MessageBodyWriter<Object> errorBodyWriter = messageBodyHandlerRegistry.getWriter(type, List.of(errorContentType));

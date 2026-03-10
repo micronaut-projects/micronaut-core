@@ -24,7 +24,6 @@ import tools.jackson.databind.JavaType;
 import tools.jackson.databind.ValueDeserializer;
 import tools.jackson.databind.DatabindException;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
@@ -44,11 +43,11 @@ final class ConvertibleValuesDeserializer<V> extends ValueDeserializer<Convertib
     @Nullable
     private final TypeDeserializer typeDeserializer;
 
-    ConvertibleValuesDeserializer(@NonNull ConversionService conversionService, @Nullable JavaType valueType) {
+    ConvertibleValuesDeserializer(ConversionService conversionService, @Nullable JavaType valueType) {
         this(conversionService, valueType, null, null);
     }
 
-    private ConvertibleValuesDeserializer(@NonNull ConversionService conversionService, @Nullable JavaType valueType, @Nullable ValueDeserializer<V> valueDeserializer, @Nullable TypeDeserializer typeDeserializer) {
+    private ConvertibleValuesDeserializer(ConversionService conversionService, @Nullable JavaType valueType, @Nullable ValueDeserializer<V> valueDeserializer, @Nullable TypeDeserializer typeDeserializer) {
         this.conversionService = conversionService;
         this.valueType = valueType;
         this.valueDeserializer = valueDeserializer;

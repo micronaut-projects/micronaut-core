@@ -45,6 +45,7 @@ import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.python.processing.visitor.PythonVisitorContext;
 import io.micronaut.sourcegen.model.AbstractElementBuilder;
 import io.micronaut.sourcegen.model.AnnotationDef;
+import org.jspecify.annotations.Nullable;
 import org.graalvm.polyglot.Value;
 
 import io.micronaut.context.annotation.Executable;
@@ -170,10 +171,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     // Check if this class extends another PythonClassElement
                     ClassElement superType = element.getSuperType().orElse(null);
                     boolean extendsPythonClass = superType instanceof AbstractPythonClassElement;
-
-                    ClassTypeDef superClassType;
-                    if (extendsPythonClass) {
-                        superClassType = ClassTypeDef.of(superType.getName());
+                    if (superType instanceof AbstractPythonClassElement) {
+                        ClassTypeDef superClassType = ClassTypeDef.of(superType.getName());
                         builder.superclass(superClassType);
                     }
 
@@ -237,6 +236,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
                     // Constructor from polyglot Value
                     final FieldDef pythonValueFinal = pythonValue;
+                    if (!isIntrospectedBean && !extendsPythonClass && pythonValueFinal == null) {
+                        throw new IllegalStateException("Expected graalpyInternalValue field to be initialized");
+                    }
 
                     if (!isJunit5Test) {
                         if (isIntrospectedBean) {
@@ -252,6 +254,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                             }
                                             for (PropertyElement beanProperty : beanProperties) {
                                                 FieldDef field = propertyFields.get(beanProperty.getName());
+                                                if (field == null) {
+                                                    continue;
+                                                }
                                                 ExpressionDef.InvokeInstanceMethod has = val.invoke("hasMember", TypeDef.Primitive.BOOLEAN, ExpressionDef.constant(beanProperty.getName()));
                                                 ExpressionDef.InvokeInstanceMethod member = val.invoke("getMember", POLYGLOT_VALUE, ExpressionDef.constant(beanProperty.getName()));
                                                 ExpressionDef valueExpr = convertValueForType(beanProperty.getType(), member);
@@ -272,7 +277,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                             if (extendsPythonClass) {
                                                 return aThis.superRef().invokeConstructor(methodParameters.get(0));
                                             } else {
-                                                return aThis.field(pythonValueFinal).assign(methodParameters.get(0));
+                                                return aThis.field(requireField(pythonValueFinal, "Expected graalpyInternalValue field")).assign(methodParameters.get(0));
                                             }
                                         })
                                     ));
@@ -313,7 +318,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                         args.add(ExpressionDef.constant(element.getSimpleName()));
                                         for (PropertyElement beanProperty : beanProperties) {
                                             FieldDef field = propertyFields.get(beanProperty.getName());
-                                            ExpressionDef fieldRef = aThis.field(field);
+                                            if (field == null) {
+                                            continue;
+                                        }ExpressionDef fieldRef = aThis.field(field);
                                             args.add(coerceTypedElementToPolyglotValue(beanProperty, fieldRef).cast(TypeDef.OBJECT));
                                         }
                                         return CONTEXT_HOLDER.invokeStatic(isAbstractIntro ? "newIntroduction" : "newInstance", POLYGLOT_VALUE, args).returning();
@@ -421,7 +428,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                     if (extendsPythonClass) {
                                         return aThis.superRef().invokeConstructor(pythonInstance);
                                     } else {
-                                        return aThis.field(pythonValueFinal).assign(pythonInstance);
+                                        return aThis.field(requireField(pythonValueFinal, "Expected graalpyInternalValue field")).assign(pythonInstance);
                                     }
                                 }
                             }))
@@ -453,7 +460,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                 if (extendsPythonClass) {
                                     return aThis.superRef().invokeConstructor(pythonInstance);
                                 } else {
-                                    return aThis.field(pythonValueFinal).assign(pythonInstance);
+                                    return aThis.field(requireField(pythonValueFinal, "Expected graalpyInternalValue field")).assign(pythonInstance);
                                 }
                             }
                         })));
@@ -1127,7 +1134,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         }
     }
 
-    private static ExpressionDef toClassExpression(ClassElement componentType) {
+    private static ExpressionDef toClassExpression(@Nullable ClassElement componentType) {
         ExpressionDef genericType;
         if (componentType == null) {
             genericType = CLASS_OBJECT;
@@ -1205,6 +1212,13 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     .invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0));
             default -> invokedValue.invoke("asString", ClassTypeDef.STRING);
         };
+    }
+
+    private static FieldDef requireField(@Nullable FieldDef field, String message) {
+        if (field == null) {
+            throw new IllegalStateException(message);
+        }
+        return field;
     }
 
     private ExpressionDef convertValueForType(ClassElement type, ExpressionDef member) {

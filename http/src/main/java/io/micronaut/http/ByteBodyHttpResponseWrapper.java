@@ -16,7 +16,6 @@
 package io.micronaut.http;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.CloseableByteBody;
 
@@ -43,13 +42,12 @@ public final class ByteBodyHttpResponseWrapper<B> extends HttpResponseWrapper<B>
      * @param byteBody The bytes to respond with
      * @return A {@link ByteBodyHttpResponse} implementation with the given response and bytes
      */
-    @NonNull
-    public static ByteBodyHttpResponse<?> wrap(@NonNull HttpResponse<?> delegate, @NonNull CloseableByteBody byteBody) {
+    public static ByteBodyHttpResponse<?> wrap(HttpResponse<?> delegate, CloseableByteBody byteBody) {
         return new ByteBodyHttpResponseWrapper<>(delegate, byteBody);
     }
 
     @Override
-    public @NonNull ByteBody byteBody() {
+    public ByteBody byteBody() {
         return byteBody;
     }
 

@@ -17,4 +17,7 @@
  * Package to organize classes responsible for validating
  * route arguments at compile time.
  */
+@NullMarked
 package io.micronaut.validation.routes;
+
+import org.jspecify.annotations.NullMarked;

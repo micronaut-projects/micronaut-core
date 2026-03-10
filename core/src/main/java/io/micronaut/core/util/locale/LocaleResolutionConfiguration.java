@@ -14,9 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.core.util.locale;
-
-import org.jspecify.annotations.NonNull;
-
 import java.util.Locale;
 import java.util.Optional;
 
@@ -31,12 +28,10 @@ public interface LocaleResolutionConfiguration {
     /**
      * @return The fixed locale.
      */
-    @NonNull
     Optional<Locale> getFixed();
 
     /**
      * @return The locale to be used if one cannot be resolved.
      */
-    @NonNull
     Locale getDefaultLocale();
 }

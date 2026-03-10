@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.client.bind;
 
-import org.jspecify.annotations.NonNull;
 
 import java.lang.annotation.Annotation;
 
@@ -32,6 +31,5 @@ public interface AnnotatedClientArgumentRequestBinder<A extends Annotation> exte
     /**
      * @return The annotation type.
      */
-    @NonNull
     Class<A> getAnnotationType();
 }

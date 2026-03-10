@@ -17,12 +17,13 @@ package io.micronaut.annotation.processing;
 
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.core.annotation.Generated;
-import org.jspecify.annotations.NonNull;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.visitor.TypeElementVisitor;
+import org.jspecify.annotations.Nullable;
 
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.Filer;
@@ -49,6 +50,7 @@ import java.util.Set;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 public abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
 
     /**
@@ -156,7 +158,6 @@ public abstract class AbstractInjectAnnotationProcessor extends AbstractProcesso
      *
      * @return A set of patterns
      */
-    @NonNull
     private Set<String> getProcessedAnnotationTypePatterns() {
         if (processedTypes == null) {
 
@@ -215,8 +216,7 @@ public abstract class AbstractInjectAnnotationProcessor extends AbstractProcesso
      * @param processingEnv The processing env
      * @return The context
      */
-    @NonNull
-    protected JavaVisitorContext newVisitorContext(@NonNull ProcessingEnvironment processingEnv) {
+    protected JavaVisitorContext newVisitorContext(ProcessingEnvironment processingEnv) {
         return new JavaVisitorContext(
             processingEnv,
             messager,
@@ -235,7 +235,7 @@ public abstract class AbstractInjectAnnotationProcessor extends AbstractProcesso
      *
      * @return The visitor kind
      */
-    protected TypeElementVisitor.@NonNull VisitorKind getVisitorKind() {
+    protected TypeElementVisitor.VisitorKind getVisitorKind() {
         return getIncrementalProcessorType().equals(GRADLE_PROCESSING_ISOLATING) ? TypeElementVisitor.VisitorKind.ISOLATING : TypeElementVisitor.VisitorKind.AGGREGATING;
     }
 
@@ -246,7 +246,7 @@ public abstract class AbstractInjectAnnotationProcessor extends AbstractProcesso
      * @param msg The message
      * @param args The string format args
      */
-    protected final void error(Element e, String msg, Object... args) {
+    protected final void error(@Nullable Element e, String msg, Object... args) {
         if (messager == null) {
             illegalState();
             return;
@@ -332,7 +332,7 @@ public abstract class AbstractInjectAnnotationProcessor extends AbstractProcesso
      * @param processingEnv The processing environment.
      * @return True if it is
      */
-    protected boolean isIncremental(@NonNull ProcessingEnvironment processingEnv) {
+    protected boolean isIncremental(ProcessingEnvironment processingEnv) {
         final Map<String, String> options = processingEnv.getOptions();
         final String v = options.get(MICRONAUT_PROCESSING_INCREMENTAL);
         if (v != null) {

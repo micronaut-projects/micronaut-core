@@ -16,8 +16,6 @@
 package io.micronaut.core.optim;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
-
 import java.util.Map;
 import java.util.Optional;
 import java.util.ServiceLoader;
@@ -74,8 +72,7 @@ public abstract class StaticOptimizations {
      * @param <T> the optimization type
      * @return the optimization if set, otherwise empty
      */
-    @NonNull
-    public static <T> Optional<T> get(@NonNull Class<T> optimizationClass) {
+    public static <T> Optional<T> get(Class<T> optimizationClass) {
         CHECKED.put(optimizationClass, maybeCaptureStackTrace());
         T value = (T) OPTIMIZATIONS.get(optimizationClass);
         return Optional.ofNullable(value);
@@ -95,7 +92,7 @@ public abstract class StaticOptimizations {
      * @param value the optimization to store
      * @param <T> the type of the optimization
      */
-    public static <T> void set(@NonNull T value) {
+    public static <T> void set(T value) {
         Class<?> optimizationClass = value.getClass();
         if (CHECKED.containsKey(optimizationClass)) {
             if (!CAPTURE_STACKTRACE_ON_READ) {

@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.client;
 
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 import java.net.URL;
@@ -36,7 +35,6 @@ public interface StreamingHttpClientFactory {
      * @param url The base URL
      * @return The client
      */
-    @NonNull
     StreamingHttpClient createStreamingClient(@Nullable URL url);
 
     /**
@@ -48,7 +46,6 @@ public interface StreamingHttpClientFactory {
      * @return The client
      * @since 2.2.0
      */
-    @NonNull
-    StreamingHttpClient createStreamingClient(@Nullable URL url, @NonNull HttpClientConfiguration configuration);
+    StreamingHttpClient createStreamingClient(@Nullable URL url, HttpClientConfiguration configuration);
 
 }

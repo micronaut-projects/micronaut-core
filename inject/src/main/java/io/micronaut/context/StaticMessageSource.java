@@ -17,8 +17,6 @@ package io.micronaut.context;
 
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.StringUtils;
-
-import org.jspecify.annotations.NonNull;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -40,7 +38,7 @@ public class StaticMessageSource extends AbstractMessageSource {
      * @param message The message
      * @return This message source
      */
-    public @NonNull StaticMessageSource addMessage(@NonNull String code, @NonNull String message) {
+    public StaticMessageSource addMessage(String code, String message) {
         if (StringUtils.isNotEmpty(code) && StringUtils.isNotEmpty(message)) {
             messageMap.put(new MessageKey(Locale.getDefault(), code), message);
         }
@@ -54,7 +52,7 @@ public class StaticMessageSource extends AbstractMessageSource {
      * @param message The message
      * @return This message source
      */
-    public @NonNull StaticMessageSource addMessage(@NonNull Locale locale, @NonNull String code, @NonNull String message) {
+    public StaticMessageSource addMessage(Locale locale, String code, String message) {
         ArgumentUtils.requireNonNull("locale", locale);
         if (StringUtils.isNotEmpty(code) && StringUtils.isNotEmpty(message)) {
             messageMap.put(new MessageKey(locale, code), message);
@@ -62,9 +60,8 @@ public class StaticMessageSource extends AbstractMessageSource {
         return this;
     }
 
-    @NonNull
     @Override
-    public Optional<String> getRawMessage(@NonNull String code, @NonNull MessageContext context) {
+    public Optional<String> getRawMessage(String code, MessageContext context) {
         ArgumentUtils.requireNonNull("code", code);
         ArgumentUtils.requireNonNull("context", context);
         final String msg = messageMap.get(new MessageKey(context.getLocale(), code));

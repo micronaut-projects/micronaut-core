@@ -15,6 +15,7 @@
  */
 package io.micronaut.core.async.publisher;
 
+import org.jspecify.annotations.NullUnmarked;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
@@ -31,6 +32,7 @@ import java.util.function.Supplier;
  * @author Graeme Rocher
  * @since 1.0
  */
+@NullUnmarked
 public class AsyncSingleResultPublisher<T> implements Publishers.MicronautPublisher<T> {
 
     private final ExecutorService executor;

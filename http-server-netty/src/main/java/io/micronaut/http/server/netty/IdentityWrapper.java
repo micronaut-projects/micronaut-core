@@ -14,9 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.http.server.netty;
-
-import org.jspecify.annotations.NonNull;
-
 import java.util.Objects;
 
 /**
@@ -26,7 +23,7 @@ import java.util.Objects;
 final class IdentityWrapper {
     private final Object object;
 
-    IdentityWrapper(@NonNull Object object) {
+    IdentityWrapper(Object object) {
         this.object = Objects.requireNonNull(object);
     }
 

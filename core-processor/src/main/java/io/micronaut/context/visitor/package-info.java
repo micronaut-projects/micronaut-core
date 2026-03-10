@@ -16,4 +16,7 @@
 /**
  * Additional visitors.
  */
+@NullMarked
 package io.micronaut.context.visitor;
+
+import org.jspecify.annotations.NullMarked;

@@ -16,7 +16,6 @@
 package io.micronaut.http.client;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -35,6 +34,5 @@ public interface RawHttpClientRegistry {
      * @param path        The path (Optional)
      * @return The client
      */
-    @NonNull
-    RawHttpClient getRawClient(@NonNull HttpVersionSelection httpVersion, @NonNull String clientId, @Nullable String path);
+    RawHttpClient getRawClient(HttpVersionSelection httpVersion, String clientId, @Nullable String path);
 }

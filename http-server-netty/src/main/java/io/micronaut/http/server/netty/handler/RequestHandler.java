@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.body.CloseableByteBody;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpRequest;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Handler for incoming requests.
@@ -55,7 +56,7 @@ public interface RequestHandler {
      *
      * @param attachment Object passed to {@link OutboundAccess#attachment(Object)}
      */
-    default void responseWritten(Object attachment) {
+    default void responseWritten(@Nullable Object attachment) {
     }
 
     /**

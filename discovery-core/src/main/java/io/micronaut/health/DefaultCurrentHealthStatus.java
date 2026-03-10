@@ -16,7 +16,9 @@
 package io.micronaut.health;
 
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -32,14 +34,14 @@ class DefaultCurrentHealthStatus implements CurrentHealthStatus {
 
     @Override
     public HealthStatus current() {
-        return current.get();
+        return Objects.requireNonNull(current.get());
     }
 
     @Override
-    public HealthStatus update(HealthStatus newStatus) {
+    public HealthStatus update(@Nullable HealthStatus newStatus) {
         if (newStatus != null) {
             return current.getAndSet(newStatus);
         }
-        return current.get();
+        return current();
     }
 }

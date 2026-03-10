@@ -16,8 +16,6 @@
 package io.micronaut.http.tck;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
-
 import java.util.HashMap;
 import java.util.Map;
 
@@ -27,7 +25,7 @@ import java.util.Map;
 @Experimental
 public class EmbeddedHttp2ServerUnderTestProvider implements ServerUnderTestProvider {
     @Override
-    public @NonNull ServerUnderTest getServer(Map<String, Object> properties) {
+    public ServerUnderTest getServer(Map<String, Object> properties) {
         Map<String, Object> mod = new HashMap<>(properties);
         mod.put("micronaut.server.ssl.enabled", true);
         mod.put("micronaut.server.ssl.build-self-signed", true);

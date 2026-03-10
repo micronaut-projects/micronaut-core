@@ -127,6 +127,7 @@ final class ServiceScanner<S> {
         private final Predicate<String> lineCondition;
         private final Function<String, S> transformer;
         private final boolean fork;
+        @Nullable
         private final Set<String> serviceEntries;
 
         private ServiceEntriesLoader(String serviceName, ClassLoader classLoader, Predicate<String> lineCondition, Function<String, S> transformer, boolean fork) {
@@ -293,7 +294,9 @@ final class ServiceScanner<S> {
     private static final class ServiceInstanceLoader<S> extends RecursiveActionValuesCollector<S> {
 
         private final String className;
+        @Nullable
         private S result;
+        @Nullable
         private Throwable throwable;
         private final Function<String, S> transformer;
 

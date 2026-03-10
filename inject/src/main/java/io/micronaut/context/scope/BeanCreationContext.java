@@ -16,7 +16,6 @@
 package io.micronaut.context.scope;
 
 import io.micronaut.context.exceptions.BeanCreationException;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
 
@@ -30,13 +29,11 @@ public interface BeanCreationContext<T> {
     /**
      * @return The bean definition
      */
-    @NonNull
     BeanDefinition<T> definition();
 
     /**
      * @return An ID that can be used to store the created bean instance
      */
-    @NonNull
     BeanIdentifier id();
 
     /**
@@ -47,5 +44,5 @@ public interface BeanCreationContext<T> {
      * @return The {@link CreatedBean} instance
      * @throws BeanCreationException If the bean failed to create
      */
-    @NonNull CreatedBean<T> create() throws BeanCreationException;
+    CreatedBean<T> create() throws BeanCreationException;
 }

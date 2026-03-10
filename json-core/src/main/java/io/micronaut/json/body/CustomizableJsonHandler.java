@@ -16,7 +16,6 @@
 package io.micronaut.json.body;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.json.JsonFeatures;
 
 /**
@@ -27,6 +26,5 @@ import io.micronaut.json.JsonFeatures;
  */
 @Internal
 public interface CustomizableJsonHandler {
-    @NonNull
-    CustomizableJsonHandler customize(@NonNull JsonFeatures jsonFeatures);
+    CustomizableJsonHandler customize(JsonFeatures jsonFeatures);
 }

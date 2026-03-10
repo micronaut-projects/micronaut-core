@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.WildcardElement;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -35,6 +36,7 @@ public final class WildcardElementAnnotationMetadata extends AbstractElementAnno
 
     private final WildcardElement wildcardElement;
     private final ClassElement representingClassElement;
+    @Nullable
     private AnnotationMetadata annotationMetadata;
 
     public WildcardElementAnnotationMetadata(WildcardElement wildcardElement,

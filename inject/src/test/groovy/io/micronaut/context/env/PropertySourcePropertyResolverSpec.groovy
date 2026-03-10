@@ -23,6 +23,7 @@ import io.micronaut.core.convert.ConversionService
 import io.micronaut.core.convert.format.MapFormat
 import io.micronaut.core.naming.conventions.StringConvention
 import io.micronaut.core.value.MapPropertyResolver
+import io.micronaut.core.value.PropertyCatalog
 import io.micronaut.core.value.PropertyResolver
 import io.micronaut.core.value.ValueException
 import spock.lang.Issue
@@ -90,6 +91,18 @@ class PropertySourcePropertyResolverSpec extends Specification {
         resolver.getProperties("camelCase", StringConvention.RAW) == ['fooBar': 'xxx',
                                                                       'URL'   : "http://localhost"]
         resolver.getProperty("camelCase.URL", URL).get() == new URL("http://localhost")
+    }
+
+    void "test resolve property entries for env key with hyphenated prefix"() {
+        given:
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("test", [MICRONAUT_OBJECT_STORAGE_ORACLE_CLOUD_DEFAULT_BUCKET: 'bucket'], PropertySource.PropertyConvention.ENVIRONMENT_VARIABLE)
+        )
+        Set<String> generatedEntries = resolver.getPropertyEntries("micronaut.object-storage.oracle-cloud", PropertyCatalog.GENERATED)
+
+        expect:
+        generatedEntries.contains('default')
+        resolver.getPropertyEntries("micronaut.object-storage.oracle-cloud").isEmpty()
     }
 
     @Unroll

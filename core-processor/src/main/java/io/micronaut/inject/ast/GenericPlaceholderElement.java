@@ -17,8 +17,6 @@ package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NextMajorVersion;
-import org.jspecify.annotations.NonNull;
-
 import java.util.List;
 import java.util.Optional;
 
@@ -39,13 +37,11 @@ public interface GenericPlaceholderElement extends GenericElement {
      *
      * @return The bounds declared for this type variable.
      */
-    @NonNull
     List<? extends ClassElement> getBounds();
 
     /**
      * @return The name of the placeholder variable.
      */
-    @NonNull
     String getVariableName();
 
     /**
@@ -57,7 +53,6 @@ public interface GenericPlaceholderElement extends GenericElement {
      * @return The required element declaring this variable, if it can be determined. Must be either a method or a class. Or throws an exception.
      * @since 4.0.0
      */
-    @NonNull
     default Element getRequiredDeclaringElement() {
         return getDeclaringElement().orElseThrow(() -> new IllegalStateException("Declared element is not present!"));
     }

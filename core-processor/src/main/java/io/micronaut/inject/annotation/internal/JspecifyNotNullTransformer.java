@@ -18,7 +18,6 @@ package io.micronaut.inject.annotation.internal;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.annotation.NamedAnnotationTransformer;
 import io.micronaut.inject.visitor.VisitorContext;
 
@@ -37,7 +36,7 @@ import java.util.List;
 public final class JspecifyNotNullTransformer implements NamedAnnotationTransformer {
 
     @Override
-    public @NonNull String getName() {
+    public String getName() {
         return "org.jspecify.annotations.NonNull";
     }
 

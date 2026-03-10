@@ -18,7 +18,6 @@ package io.micronaut.http.client.bind;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Indexed;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.http.MutableHttpRequest;
 
 import java.lang.annotation.Annotation;
@@ -45,13 +44,12 @@ public interface AnnotatedClientRequestBinder<A extends Annotation> extends Clie
      * @param uriContext The URI context
      * @param request The request
      */
-    void bind(@NonNull MethodInvocationContext<Object, Object> context,
-              @NonNull ClientRequestUriContext uriContext,
-              @NonNull MutableHttpRequest<?> request);
+    void bind(MethodInvocationContext<Object, Object> context,
+              ClientRequestUriContext uriContext,
+              MutableHttpRequest<?> request);
 
     /**
      * @return The annotation type.
      */
-    @NonNull
     Class<A> getAnnotationType();
 }

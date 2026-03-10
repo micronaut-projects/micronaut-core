@@ -32,6 +32,40 @@ Note for more complex configurations you can structure ann:context.annotation.Co
 
 For example creating a subclass of `EngineConfig` with `@ConfigurationProperties('bar')` will resolve all properties under the path `my.engine.bar`.
 
+[NOTE]
+====
+YAML Reserved Words
+~~~~~~~~~~~~~~~~~~~~
+
+When using YAML configuration files, certain words are reserved by the YAML specification and will be automatically converted to boolean values. These include:
+
+* `yes` / `no`
+* `true` / `false`
+* `on` / `off`
+
+If you use these words as unquoted property keys in YAML, they will be parsed as booleans instead of strings:
+
+[source,yaml]
+----
+foo:
+  bar:
+    yes: "1"     # yes is parsed as true (boolean)
+    no: "2"      # no is parsed as false (boolean)
+----
+
+To use these words as property names, you must quote the keys:
+
+[source,yaml]
+----
+foo:
+  bar:
+    "yes": "1"   # forces YAML to treat as string
+    "no": "2"    # forces YAML to treat as string
+----
+
+This is a limitation of YAML/SnakeYAML parsing and not specific to Micronaut. For more information, see the link:https://yaml.org/spec/1.2/spec.html#id2765879[YAML 1.2 Specification].
+====
+
 == Includes / Excludes
 
 For the cases where the configuration properties class inherits properties from a parent class, it may be desirable to exclude properties from the parent class. The `includes` and `excludes` members of the ann:io.micronaut.context.annotation.ConfigurationProperties[] annotation allow for that functionality. The list applies to both local properties and inherited properties.

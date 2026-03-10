@@ -15,6 +15,8 @@
  */
 package io.micronaut.module.info;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.Arrays;
 import java.util.Optional;
 import java.util.Set;
@@ -26,18 +28,25 @@ import java.util.Set;
 public abstract class AbstractMicronautModuleInfo implements MicronautModuleInfo {
     private final String id;
     private final String name;
+    @Nullable
     private final String description;
     private final String version;
+    @Nullable
     private final MavenCoordinates mavenCoordinates;
+    @Nullable
     private final String parentModuleId;
     private final Set<String> tags;
 
     public AbstractMicronautModuleInfo(String id,
                                        String name,
+                                       @Nullable
                                        String description,
                                        String version,
+                                       @Nullable
                                        MavenCoordinates mavenCoordinates,
+                                       @Nullable
                                        String parentModuleId,
+                                       @Nullable
                                        Set<String> tags) {
         this.id = validateId(id);
         this.name = name;

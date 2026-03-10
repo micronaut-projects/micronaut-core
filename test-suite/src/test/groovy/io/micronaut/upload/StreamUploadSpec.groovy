@@ -23,6 +23,7 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.client.multipart.MultipartBody
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
+import spock.lang.Ignore
 import spock.lang.Retry
 
 import java.nio.file.Files
@@ -547,6 +548,7 @@ class StreamUploadSpec extends AbstractMicronautSpec {
         calculateMd5(file.toPath()) == originalmd5
     }
 
+    @Ignore("buffering with StreamingFileUpload is now forbidden")
     void "test the file is not corrupted with transferTo when file has to be buffered"() {
         given:
         Path toUpload = Files.createTempFile("random", "bytes")

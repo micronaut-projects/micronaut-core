@@ -21,4 +21,7 @@
  * @see io.micronaut.context.ApplicationContext
  * @since 1.0
  */
+@NullMarked
 package io.micronaut.context;
+
+import org.jspecify.annotations.NullMarked;

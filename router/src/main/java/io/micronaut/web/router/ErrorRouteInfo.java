@@ -15,6 +15,8 @@
  */
 package io.micronaut.web.router;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.Optional;
 
 /**
@@ -29,7 +31,7 @@ public interface ErrorRouteInfo<T, R> extends MethodBasedRouteInfo<T, R>, Reques
     /**
      * @return The type the exception originates from. Null if the error route is global.
      */
-    Class<?> originatingType();
+    @Nullable Class<?> originatingType();
 
     /**
      * @return The type of exception
@@ -51,6 +53,6 @@ public interface ErrorRouteInfo<T, R> extends MethodBasedRouteInfo<T, R>, Reques
      * @param exception        The exception to match
      * @return The route match
      */
-    Optional<RouteMatch<R>> match(Class<?> originatingClass, Throwable exception);
+    Optional<RouteMatch<R>> match(@Nullable Class<?> originatingClass, Throwable exception);
 
 }

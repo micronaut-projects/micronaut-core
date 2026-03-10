@@ -40,7 +40,6 @@ import io.micronaut.python.processing.PythonProcessingEnvironment;
  * <li>@property decorated methods with optional @property.setter decorators</li>
  * <li>Regular Python attributes (fields)</li>
  * </ul>
- * </p>
  *
  * @author Micronaut Team
  * @since 5.0.0

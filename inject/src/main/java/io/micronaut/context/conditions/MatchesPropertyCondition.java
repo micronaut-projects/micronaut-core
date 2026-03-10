@@ -19,7 +19,6 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.context.condition.Condition;
 import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.convert.ConversionContext;
@@ -40,10 +39,10 @@ import java.util.Objects;
  */
 @UsedByGeneratedCode
 @Internal
-public record MatchesPropertyCondition(@NonNull String property,
+public record MatchesPropertyCondition(String property,
                                        @Nullable String value,
                                        @Nullable String defaultValue,
-                                       @NonNull Condition condition) implements Condition {
+                                       Condition condition) implements Condition {
     @Override
     public boolean matches(ConditionContext context) {
         BeanContext beanContext = context.getBeanContext();
@@ -80,7 +79,7 @@ public record MatchesPropertyCondition(@NonNull String property,
                     yield result;
                 }
                 case PATTERN -> {
-                    boolean result = resolved != null && resolved.matches(value);
+                    boolean result = resolved != null && resolved.matches(Objects.requireNonNull(value, "Regexp is required"));
                     if (!result) {
                         context.fail("Property [" + property + "] with value [" + resolved + "] does not match required pattern: " + value);
                     }
@@ -93,7 +92,8 @@ public record MatchesPropertyCondition(@NonNull String property,
         return false;
     }
 
-    private String resolvePropertyValue(String property, PropertyResolver propertyResolver, String defaultValue) {
+    @Nullable
+    private String resolvePropertyValue(String property, PropertyResolver propertyResolver, @Nullable String defaultValue) {
         return propertyResolver.getProperty(property, ConversionContext.STRING).orElse(defaultValue);
     }
 

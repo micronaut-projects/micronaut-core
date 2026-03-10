@@ -22,7 +22,6 @@ import io.micronaut.context.scope.CustomScope;
 import io.micronaut.context.scope.CustomScopeRegistry;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.BeanIdentifier;
@@ -73,7 +72,7 @@ public class DefaultCustomScopeRegistry implements CustomScopeRegistry {
     }
 
     @Override
-    public Optional<CustomScope<?>> findDeclaredScope(@NonNull Argument<?> argument) {
+    public Optional<CustomScope<?>> findDeclaredScope(Argument<?> argument) {
         final AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
         if (annotationMetadata.hasStereotype(AnnotationUtil.SCOPE)) {
             return annotationMetadata.getAnnotationNameByStereotype(AnnotationUtil.SCOPE).flatMap(this::findScope);
@@ -82,7 +81,7 @@ public class DefaultCustomScopeRegistry implements CustomScopeRegistry {
     }
 
     @Override
-    public Optional<CustomScope<?>> findDeclaredScope(@NonNull BeanType<?> beanType) {
+    public Optional<CustomScope<?>> findDeclaredScope(BeanType<?> beanType) {
         if (beanType.getAnnotationMetadata().hasStereotype(AnnotationUtil.SCOPE)) {
             final List<String> scopeHierarchy = beanType.getAnnotationMetadata().getAnnotationNamesByStereotype(AnnotationUtil.SCOPE);
             if (CollectionUtils.isNotEmpty(scopeHierarchy)) {

@@ -139,6 +139,7 @@ public record FunctionDef(
     /**
      * Get the parsed return type as ReturnDef.
      */
+    @Override
     public ReturnDef returnType() {
         return returnType;
     }

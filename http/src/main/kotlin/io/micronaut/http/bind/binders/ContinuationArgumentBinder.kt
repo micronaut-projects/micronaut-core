@@ -37,7 +37,7 @@ import kotlin.coroutines.jvm.internal.CoroutineStackFrame
 @Internal
 class ContinuationArgumentBinder : TypedRequestArgumentBinder<Continuation<*>> {
     override fun bind(
-        context: ArgumentConversionContext<Continuation<*>>?,
+        context: ArgumentConversionContext<Continuation<*>>,
         source: HttpRequest<*>
     ): ArgumentBinder.BindingResult<Continuation<*>> {
         val cc = CustomContinuation()
