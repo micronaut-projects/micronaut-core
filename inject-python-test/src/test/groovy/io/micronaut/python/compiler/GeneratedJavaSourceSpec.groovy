@@ -54,7 +54,7 @@ abstract class GeneratedJavaSourceSpec extends Specification {
     private static Iterable<JavaFileObject> compile(String pythonCode) {
         String source = """
 package pyronaut_application;
-import io.micronaut.python.processing.annotation.PythonApplication;
+import io.micronaut.context.python.annotation.PythonApplication;
 @PythonApplication(code=\"${escape(pythonCode)}\")
 class PyronautMain { }
 """.stripIndent()
