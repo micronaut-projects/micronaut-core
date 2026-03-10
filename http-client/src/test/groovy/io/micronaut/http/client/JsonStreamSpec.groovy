@@ -22,16 +22,19 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.scheduling.TaskExecutors
 import io.micronaut.scheduling.annotation.ExecuteOn
+import jakarta.inject.Singleton
 import org.reactivestreams.Publisher
 import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
+import reactor.core.scheduler.Schedulers
 import spock.lang.AutoCleanup
 import spock.lang.Issue
 import spock.lang.Shared
@@ -40,6 +43,11 @@ import spock.util.concurrent.PollingConditions
 
 import java.time.Duration
 import java.time.temporal.ChronoUnit
+import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.BlockingQueue
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
+import java.util.UUID
 
 /**
  * Created by graemerocher on 19/01/2018.
@@ -58,6 +66,9 @@ class JsonStreamSpec  extends Specification {
     @Shared
     @AutoCleanup
     StreamingHttpClient client = embeddedServer.applicationContext.createBean(StreamingHttpClient, embeddedServer.URL)
+
+    @Shared
+    StreamGate streamGate = embeddedServer.applicationContext.getBean(StreamGate)
 
     void "test read JSON stream demand all"() {
         when:
@@ -139,15 +150,23 @@ class JsonStreamSpec  extends Specification {
     }
 
     void "we can stream books to the server"() {
+        given:
+        String requestId = UUID.randomUUID().toString()
+        streamGate.reset(requestId)
+
         when:
         Flux stream = Flux.from(client.jsonStream(HttpRequest.POST(
                 '/jsonstream/books/count',
-                Flux.range(1, 10)
-                        .map { new Book(title: "Micronaut for dummies ${it}") }
-                ).contentType(MediaType.APPLICATION_JSON_STREAM_TYPE).accept(MediaType.APPLICATION_JSON_STREAM_TYPE)))
+                pacedBooks(10, "Micronaut for dummies ", requestId)
+        ).header("X-Pacing-Id", requestId)
+                .contentType(MediaType.APPLICATION_JSON_STREAM_TYPE)
+                .accept(MediaType.APPLICATION_JSON_STREAM_TYPE)))
 
         then:
         stream.timeout(Duration.of(5, ChronoUnit.SECONDS)).blockFirst().bookCount == 10
+
+        cleanup:
+        streamGate.clear(requestId)
     }
 
     void "we can stream data from the server through the generated client"() {
@@ -159,13 +178,32 @@ class JsonStreamSpec  extends Specification {
     }
 
     void "we can use a generated client to stream books to the server"() {
+        given:
+        String requestId = UUID.randomUUID().toString()
+        streamGate.reset(requestId)
+
         when:
         Mono<LibraryStats> result = Mono.from(bookClient.count(
-                Flux.range(1, 7)
-                        .map { new Book(title: "Micronaut for dummies, volume 2 - ${it}") }))
+                requestId,
+                pacedBooks(7, "Micronaut for dummies, volume 2 - ", requestId)))
 
         then:
         result.timeout(Duration.of(10, ChronoUnit.SECONDS)).block().bookCount == 7
+
+        cleanup:
+        streamGate.clear(requestId)
+    }
+
+    private Flux<Book> pacedBooks(int total, String titlePrefix, String requestId) {
+        Flux.range(1, total)
+                .concatMap { index ->
+                    Mono.fromCallable {
+                        if (index > 1) {
+                            streamGate.awaitPreviousReceived(requestId)
+                        }
+                        new Book(title: "${titlePrefix}${index}")
+                    }.subscribeOn(Schedulers.boundedElastic())
+                }
     }
 
     @Requires(property = "spec.name", value = 'JsonStreamSpec' )
@@ -175,13 +213,19 @@ class JsonStreamSpec  extends Specification {
         Publisher<Book> list();
 
         @Post(uri = "/count", processes = MediaType.APPLICATION_JSON_STREAM)
-        Publisher<LibraryStats> count(@Body Flux<Book> theBooks)
+        Publisher<LibraryStats> count(@Header("X-Pacing-Id") String requestId,
+                                      @Body Flux<Book> theBooks)
     }
 
     @Requires(property = "spec.name", value = 'JsonStreamSpec' )
     @Controller("/jsonstream/books")
     @ExecuteOn(TaskExecutors.IO)
     static class BookController {
+        private final StreamGate streamGate
+
+        BookController(StreamGate streamGate) {
+            this.streamGate = streamGate
+        }
 
         @Get(produces = MediaType.APPLICATION_JSON_STREAM)
         Publisher<Book> list() {
@@ -189,9 +233,11 @@ class JsonStreamSpec  extends Specification {
         }
 
         @Post(uri = "/count", processes = MediaType.APPLICATION_JSON_STREAM)
-        Publisher<LibraryStats> count(@Body Publisher<Book> theBooks) {
+        Publisher<LibraryStats> count(@Header("X-Pacing-Id") String requestId,
+                                      @Body Publisher<Book> theBooks) {
             Flux.from(theBooks).map {
                 Book b ->
+                    streamGate.markReceived(requestId)
                     b.title
             }.count().map {
                 bookCount -> new LibraryStats(bookCount: bookCount)
@@ -205,6 +251,41 @@ class JsonStreamSpec  extends Specification {
                     .collectList()
                     .map({ chunkList -> "\n" + chunkList.join("\n")})
                     .block()
+        }
+    }
+
+    @Requires(property = "spec.name", value = 'JsonStreamSpec' )
+    @Singleton
+    static class StreamGate {
+        private final Map<String, BlockingQueue<Boolean>> acknowledgements = new ConcurrentHashMap<>()
+
+        void reset(String requestId) {
+            acknowledgements.put(requestId, new ArrayBlockingQueue<>(1))
+        }
+
+        void awaitPreviousReceived(String requestId) {
+            try {
+                if (queueFor(requestId).poll(10, TimeUnit.SECONDS) == null) {
+                    throw new IllegalStateException("Timed out waiting for server to receive previous streamed item")
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt()
+                throw new IllegalStateException("Interrupted while waiting for server receive acknowledgement", e)
+            }
+        }
+
+        void markReceived(String requestId) {
+            BlockingQueue<Boolean> queue = queueFor(requestId)
+            queue.clear()
+            queue.offer(Boolean.TRUE)
+        }
+
+        void clear(String requestId) {
+            acknowledgements.remove(requestId)
+        }
+
+        private BlockingQueue<Boolean> queueFor(String requestId) {
+            acknowledgements.computeIfAbsent(requestId) { new ArrayBlockingQueue<>(1) }
         }
     }
 
