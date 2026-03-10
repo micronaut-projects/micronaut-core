@@ -771,15 +771,15 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     public <T> boolean containsBean(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         ArgumentUtils.requireNonNull("beanType", beanType);
         BeanKey<T> beanKey = new BeanKey<>(beanType, qualifier);
-        if (containsBeanCache.containsKey(beanKey)) {
-            return containsBeanCache.get(beanKey);
-        } else {
-            boolean result = singletonScope.containsBean(beanType, qualifier) ||
-                isCandidatePresent(beanKey.beanType, qualifier);
-
-            containsBeanCache.put(beanKey, result);
+        Boolean result = containsBeanCache.get(beanKey);
+        if (result != null) {
             return result;
         }
+        result = singletonScope.containsBean(beanType, qualifier) ||
+            isCandidatePresent(beanKey.beanType, qualifier);
+
+        containsBeanCache.put(beanKey, result);
+        return result;
     }
 
     @Override
