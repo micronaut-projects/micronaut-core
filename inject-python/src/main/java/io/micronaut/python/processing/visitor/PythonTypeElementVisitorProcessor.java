@@ -169,9 +169,10 @@ public class PythonTypeElementVisitorProcessor {
         System.err.println("WARNING: " + visitorWarning);
     }
 
+    @SuppressWarnings("rawtypes")
     @NonNull
     private Collection<? extends TypeElementVisitor<?, ?>> findCoreTypeElementVisitors(@Nullable Set<String> warnings) {
-        List<TypeElementVisitor<?, ?>> visitors = SoftServiceLoader.load(TypeElementVisitor.class, classLoader)
+        List visitors = SoftServiceLoader.load(TypeElementVisitor.class, classLoader)
             .disableFork()
             .collectAll(visitor -> {
                 if (!visitor.isEnabled()) {
@@ -198,9 +199,7 @@ public class PythonTypeElementVisitorProcessor {
                 return true;
             }).stream()
             .filter(Objects::nonNull)
-            .<TypeElementVisitor<?, ?>>map(e -> e)
-            // remove duplicate classes
-            .toList();
+            .collect(Collectors.toMap(Object::getClass, v -> v, (a, b) -> a)).values().stream().toList();
         if (visitors.isEmpty()) {
             visitors = new ArrayList<>();
             Iterator<ServiceLoader.Provider<TypeElementVisitor>> it = ServiceLoader.load(TypeElementVisitor.class, classLoader).stream().iterator();
@@ -221,6 +220,6 @@ public class PythonTypeElementVisitorProcessor {
                 }
             }
         }
-        return visitors;
+        return (Collection<? extends TypeElementVisitor<?, ?>>) visitors;
     }
 }
