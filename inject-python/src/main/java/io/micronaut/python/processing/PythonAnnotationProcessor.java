@@ -63,6 +63,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
 
     private PythonAstParser parser;
     private Consumer<ClassElement> classElementCallback;
+    private ClassLoader classLoader;
 
     /**
      * Set the callback to be invoked for each class element created during processing.
@@ -78,6 +79,10 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     public synchronized void init(ProcessingEnvironment processingEnv) {
         super.init(processingEnv);
         parser = new PythonAstParser();
+        classLoader = Thread.currentThread().getContextClassLoader();
+        if (classLoader == null) {
+            classLoader = PythonAnnotationProcessor.class.getClassLoader();
+        }
     }
 
     @Override
@@ -303,7 +308,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
 
             // Run type element visitor processing
             PythonTypeElementVisitorProcessor typeElementVisitorProcessor =
-                new PythonTypeElementVisitorProcessor();
+                new PythonTypeElementVisitorProcessor(this.classLoader != null ? this.classLoader : PythonAnnotationProcessor.class.getClassLoader());
             typeElementVisitorProcessor.init(processingEnvironment);
             typeElementVisitorProcessor.process(processingEnvironment);
 
@@ -635,6 +640,10 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             // Ignore and return false
         }
         return false;
+    }
+
+    public void setClassLoader(ClassLoader classLoader) {
+        this.classLoader = classLoader;
     }
 
     record PathEntry(String parent, String filename) {
