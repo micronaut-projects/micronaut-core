@@ -50,7 +50,7 @@ import io.micronaut.http.filter.HttpClientFilterResolver;
 import io.micronaut.http.filter.HttpFilterResolver;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.ssl.ClientAuthentication;
-import io.micronaut.http.ssl.ClientSslConfiguration;
+import io.micronaut.http.ssl.AbstractClientSslConfiguration;
 import io.micronaut.http.util.HttpHeadersUtil;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
@@ -236,8 +236,8 @@ abstract class AbstractJdkHttpClient {
             builder = configureProxy(builder, socketAddress, configuration.getProxyUsername().orElse(null), configuration.getProxyPassword().orElse(null));
         }
 
-        if (configuration.getSslConfiguration() instanceof ClientSslConfiguration clientSslConfiguration) {
-            configureSsl(builder, clientSslConfiguration);
+        if (configuration.getSslConfiguration() instanceof AbstractClientSslConfiguration sslConfiguration) {
+            configureSsl(builder, sslConfiguration);
         }
 
         this.client = builder.build();
@@ -293,18 +293,18 @@ abstract class AbstractJdkHttpClient {
         return builder;
     }
 
-    private void configureSsl(HttpClient.Builder builder, ClientSslConfiguration clientSslConfiguration) {
-        sslBuilder.build(clientSslConfiguration).ifPresent(builder::sslContext);
+    private void configureSsl(HttpClient.Builder builder, AbstractClientSslConfiguration sslConfiguration) {
+        sslBuilder.build(sslConfiguration).ifPresent(builder::sslContext);
         SSLParameters sslParameters = new SSLParameters();
-        clientSslConfiguration.getClientAuthentication().ifPresent(a -> {
+        sslConfiguration.getClientAuthentication().ifPresent(a -> {
             if (a == ClientAuthentication.WANT) {
                 sslParameters.setWantClientAuth(true);
             } else if (a == ClientAuthentication.NEED) {
                 sslParameters.setNeedClientAuth(true);
             }
         });
-        clientSslConfiguration.getProtocols().ifPresent(sslParameters::setProtocols);
-        clientSslConfiguration.getCiphers().ifPresent(sslParameters::setCipherSuites);
+        sslConfiguration.getProtocols().ifPresent(sslParameters::setProtocols);
+        sslConfiguration.getCiphers().ifPresent(sslParameters::setCipherSuites);
         builder.sslParameters(sslParameters);
     }
 
