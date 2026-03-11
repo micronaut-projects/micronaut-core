@@ -553,13 +553,15 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
     protected fun newClassElement(
         owner: KotlinNativeElement?,
         type: KSType,
-        parentTypeArguments: Map<String, ClassElement> = emptyMap()
+        parentTypeArguments: Map<String, ClassElement> = emptyMap(),
+        allowPrimitive: Boolean = true
     ) = newClassElement(
         owner,
         type,
         type.declaration.getClassDeclaration(visitorContext),
         parentTypeArguments,
-        HashSet()
+        HashSet(),
+        allowPrimitive
     )
 
     private fun newTypeArgument(
