@@ -440,9 +440,9 @@ public final class RouteExecutor {
                         );
                     }));
             } else if (routeInfo.isReactive()) {
-                executeMethodResponseFlow = ReactiveExecutionFlow.async(executorService, () -> executeRouteAndConvertBody(propagatedContext, routeMatch, request));
+                executeMethodResponseFlow = ReactiveExecutionFlow.async(executorService, () -> executeRouteAndConvertBody(propagatedContext, routeMatch, request, false, null));
             } else {
-                executeMethodResponseFlow = ExecutionFlow.async(executorService, () -> executeRouteAndConvertBody(propagatedContext, routeMatch, request));
+                executeMethodResponseFlow = ExecutionFlow.async(executorService, () -> executeRouteAndConvertBody(propagatedContext, routeMatch, request, false, null));
             }
         } else {
             if (routeInfo.isSuspended()) {
@@ -452,16 +452,12 @@ public final class RouteExecutor {
                         );
                     }));
             } else if (routeInfo.isReactive()) {
-                executeMethodResponseFlow = ReactiveExecutionFlow.fromFlow(executeRouteAndConvertBody(propagatedContext, routeMatch, request));
+                executeMethodResponseFlow = ReactiveExecutionFlow.fromFlow(executeRouteAndConvertBody(propagatedContext, routeMatch, request, false, null));
             } else {
-                executeMethodResponseFlow = executeRouteAndConvertBody(propagatedContext, routeMatch, request);
+                executeMethodResponseFlow = executeRouteAndConvertBody(propagatedContext, routeMatch, request, false, null);
             }
         }
         return executeMethodResponseFlow;
-    }
-
-    private ExecutionFlow<HttpResponse<?>> executeRouteAndConvertBody(PropagatedContext propagatedContext, RouteMatch<?> routeMatch, HttpRequest<?> httpRequest) {
-        return executeRouteAndConvertBody(propagatedContext, routeMatch, httpRequest, false, null);
     }
 
     private ExecutionFlow<HttpResponse<?>> executeRouteAndConvertBody(PropagatedContext propagatedContext,
