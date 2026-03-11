@@ -230,9 +230,9 @@ public class RequestLifecycle {
     protected final ExecutionFlow<HttpResponse<?>> onError(HttpRequest<?> request, Throwable throwable) {
         try {
             return runWithFilters(request, (filteredRequest, propagatedContext) -> onErrorNoFilter(filteredRequest, throwable, propagatedContext))
-                .onErrorResume(t -> createDefaultErrorResponseFlow(request, t));
+                .onErrorResume(t -> createDefaultErrorResponseFlow(request, t, PropagatedContext.getOrEmpty()));
         } catch (Throwable e) {
-            return createDefaultErrorResponseFlow(request, e);
+            return createDefaultErrorResponseFlow(request, e, PropagatedContext.getOrEmpty());
         }
     }
 
@@ -262,7 +262,7 @@ public class RequestLifecycle {
                 // the client won't see this response, but we need one for filters and such
                 return ExecutionFlow.just(HttpResponse.badRequest("Stream closed"));
             }
-            return createDefaultErrorResponseFlow(request, cause);
+            return createDefaultErrorResponseFlow(request, cause, propagatedContext);
         }
     }
 
@@ -283,14 +283,14 @@ public class RequestLifecycle {
                 .flatMap(routeMatch -> routeExecutor.callRoute(propagatedContext, routeMatch, request)
                     .flatMap(res -> handleStatusException(request, res, routeMatch, propagatedContext))
                 )
-                .onErrorResume(u -> createDefaultErrorResponseFlow(request, u))
+                .onErrorResume(u -> createDefaultErrorResponseFlow(request, u, propagatedContext))
                 .<HttpResponse<?>>map(response -> {
                     RouteAttributes.setException(response, cause);
                     return response;
                 })
-                .onErrorResume(throwable -> createDefaultErrorResponseFlow(request, throwable));
+                .onErrorResume(throwable -> createDefaultErrorResponseFlow(request, throwable, propagatedContext));
         } catch (Throwable e) {
-            return createDefaultErrorResponseFlow(request, e);
+            return createDefaultErrorResponseFlow(request, e, propagatedContext);
         }
     }
 
@@ -322,7 +322,7 @@ public class RequestLifecycle {
                     return routeExecutor.createResponseForBody(propagatedContext, request, result, routeInfo, null);
                 }
             } catch (Throwable e) {
-                return createDefaultErrorResponseFlow(request, e);
+                return createDefaultErrorResponseFlow(request, e, propagatedContext);
             }
         };
         ExecutionFlow<HttpResponse<?>> responseFlow;
@@ -337,7 +337,7 @@ public class RequestLifecycle {
                 RouteAttributes.setException(response, cause);
                 return response;
             })
-            .onErrorResume(throwable -> createDefaultErrorResponseFlow(request, throwable));
+            .onErrorResume(throwable -> createDefaultErrorResponseFlow(request, throwable, propagatedContext));
     }
 
     /**
@@ -469,8 +469,10 @@ public class RequestLifecycle {
         return ExecutionFlow.just(response);
     }
 
-    private ExecutionFlow<HttpResponse<?>> createDefaultErrorResponseFlow(HttpRequest<?> httpRequest, Throwable cause) {
-        return ExecutionFlow.just(routeExecutor.createDefaultErrorResponse(httpRequest, cause));
+    private ExecutionFlow<HttpResponse<?>> createDefaultErrorResponseFlow(HttpRequest<?> httpRequest,
+                                                                          Throwable cause,
+                                                                          PropagatedContext propagatedContext) {
+        return propagatedContext.propagate(() -> ExecutionFlow.just(routeExecutor.createDefaultErrorResponse(httpRequest, cause)));
     }
 
     final ExecutionFlow<HttpResponse<?>> onRouteMiss(HttpRequest<?> httpRequest) {
@@ -680,6 +682,5 @@ public class RequestLifecycle {
                 .orElse(null);
     }
 }
-
 
 
