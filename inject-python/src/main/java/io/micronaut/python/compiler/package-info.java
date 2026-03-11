@@ -13,5 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-@org.jspecify.annotations.NullUnmarked
+/**
+ * Compiler support for Python source generation.
+ */
+@NullUnmarked
 package io.micronaut.python.compiler;
+
+import org.jspecify.annotations.NullUnmarked;

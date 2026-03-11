@@ -81,6 +81,7 @@ public final class ContextHolder {
      * @param packageName The Python package
      * @param simpleName The class name
      * @param fn Function receiving the pooled Value
+     * @param <T> Result type returned by the function
      * @return Result returned from the function
      */
     @UsedByGeneratedCode
@@ -110,6 +111,7 @@ public final class ContextHolder {
      * @param packageName The package
      * @param scriptName The script name
      * @param fn Function receiving the script Value
+     * @param <T> Result type returned by the function
      * @return Result returned from the function
      */
     @UsedByGeneratedCode

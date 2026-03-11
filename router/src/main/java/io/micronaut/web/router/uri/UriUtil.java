@@ -54,10 +54,8 @@ public final class UriUtil {
                     PercentEncoder.appendEncodedByte(sb, (byte) '%');
                 }
             } else {
-                //noinspection StatementWithEmptyBody
-                if (cp == '/' && sb.length() == 1 && sb.charAt(0) == '/') {
-                    // prevent '//' at start of url
-                } else {
+                boolean duplicateLeadingSlash = cp == '/' && sb.length() == 1 && sb.charAt(0) == '/';
+                if (!duplicateLeadingSlash) {
                     PercentEncoder.RFC3986_QUERY_CHAR.encodeUtf8(sb, cp);
                 }
             }

@@ -13,5 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-@org.jspecify.annotations.NullUnmarked
+/**
+ * Annotation metadata helpers for Python processing.
+ */
+@NullUnmarked
 package io.micronaut.python.processing.annotation;
+
+import org.jspecify.annotations.NullUnmarked;

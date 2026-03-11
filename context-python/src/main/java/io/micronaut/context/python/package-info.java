@@ -13,5 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-@org.jspecify.annotations.NullMarked
+/**
+ * Core APIs for Python integration.
+ */
+@NullMarked
 package io.micronaut.context.python;
+
+import org.jspecify.annotations.NullMarked;

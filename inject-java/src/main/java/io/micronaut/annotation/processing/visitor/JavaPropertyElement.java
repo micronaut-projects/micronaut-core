@@ -55,9 +55,10 @@ final class JavaPropertyElement extends AbstractJavaMemberElement implements Pro
     @Nullable
     private final String doc;
 
+    @SuppressWarnings("checkstyle:ParameterNumber")
     JavaPropertyElement(ClassElement owningElement,
-                        ClassElement type,
-                        @Nullable MethodElement getter,
+                         ClassElement type,
+                         @Nullable MethodElement getter,
                         @Nullable MethodElement setter,
                         @Nullable FieldElement field,
                         @Nullable AnnotationMetadata propertyComponentAnnotationMetadata,

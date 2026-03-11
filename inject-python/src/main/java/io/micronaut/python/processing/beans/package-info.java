@@ -13,5 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-@org.jspecify.annotations.NullUnmarked
+/**
+ * Bean generation support for Python processing.
+ */
+@NullUnmarked
 package io.micronaut.python.processing.beans;
+
+import org.jspecify.annotations.NullUnmarked;

@@ -13,5 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-@org.jspecify.annotations.NullUnmarked
+/**
+ * Visitor support for Python processing.
+ */
+@NullUnmarked
 package io.micronaut.python.processing.visitor;
+
+import org.jspecify.annotations.NullUnmarked;

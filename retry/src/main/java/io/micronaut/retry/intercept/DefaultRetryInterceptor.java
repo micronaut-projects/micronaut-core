@@ -268,6 +268,8 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
     /**
      * Performs the sleep between retries, can be overridden to customize the sleep behavior.
      * The default implementation just calls {@link Thread#sleep(long)}.
+     *
+     * @param delayMillis The delay in milliseconds.
      */
     protected void sleep(long delayMillis) throws InterruptedException {
         Thread.sleep(delayMillis);

@@ -91,7 +91,6 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, Ordered {
         this.targetSize = configuration.enabled() ? (configuredPoolSize > 0 ? configuredPoolSize : defaultSize) : 0;
     }
 
-
     @Override
     public int getOrder() {
         return Ordered.LOWEST_PRECEDENCE;
@@ -141,8 +140,6 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, Ordered {
             t.start();
         }
     }
-
-
 
     Context borrow() {
         long waitedMs = 0L;

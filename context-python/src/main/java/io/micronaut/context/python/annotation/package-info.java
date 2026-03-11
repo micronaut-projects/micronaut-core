@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 /**
- * Annotation processing support for Python integration.
+ * Annotations for Python integration.
  */
-@NullUnmarked
-package io.micronaut.python.processing;
+@NullMarked
+package io.micronaut.context.python.annotation;
 
-import org.jspecify.annotations.NullUnmarked;
+import org.jspecify.annotations.NullMarked;

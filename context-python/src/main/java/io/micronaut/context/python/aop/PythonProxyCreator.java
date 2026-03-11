@@ -211,34 +211,6 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
         return null;
     }
 
-    public static final class AbstractMethodInterceptor {
-
-        private final PythonProxyCreator owner;
-
-        public AbstractMethodInterceptor(PythonProxyCreator owner) {
-            this.owner = owner;
-        }
-
-        @RuntimeType
-        @Nullable
-        public Object intercept(
-            @This ValueCoercible proxy,
-            @Origin Method method,
-            @AllArguments Object[] args
-        ) {
-            Value value = proxy.asPolyglotValue();
-            Value function = value.getMember(method.getName());
-            if (function == null || !function.canExecute()) {
-                return defaultValue(method.getReturnType());
-            }
-            Value result = function.execute(owner.toPolyglotArray(args, value.getContext()));
-            if (method.getReturnType() == void.class) {
-                return null;
-            }
-            return owner.box(method.getReturnType(), result);
-        }
-    }
-
     private void fillAllAbstractMethods(Value pythonClass) {
         Context context = pythonClass.getContext();
         if (pythonClass.hasMember("__abstractmethods__")) {
@@ -278,5 +250,33 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
             out[i] = box(argType.getType(), arg);
         }
         return out;
+    }
+
+    public static final class AbstractMethodInterceptor {
+
+        private final PythonProxyCreator owner;
+
+        public AbstractMethodInterceptor(PythonProxyCreator owner) {
+            this.owner = owner;
+        }
+
+        @RuntimeType
+        @Nullable
+        public Object intercept(
+            @This ValueCoercible proxy,
+            @Origin Method method,
+            @AllArguments Object[] args
+        ) {
+            Value value = proxy.asPolyglotValue();
+            Value function = value.getMember(method.getName());
+            if (function == null || !function.canExecute()) {
+                return defaultValue(method.getReturnType());
+            }
+            Value result = function.execute(owner.toPolyglotArray(args, value.getContext()));
+            if (method.getReturnType() == void.class) {
+                return null;
+            }
+            return owner.box(method.getReturnType(), result);
+        }
     }
 }
