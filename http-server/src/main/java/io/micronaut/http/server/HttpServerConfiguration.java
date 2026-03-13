@@ -232,7 +232,10 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
     }
 
     /**
-     * @return Whether executor redispatch should only happen on non-blocking threads
+     * @return Whether executor redispatch should only happen on non-blocking threads.
+     * When enabled, Micronaut stays on the current thread until request processing reaches
+     * a non-blocking thread where redispatch is required by the configured executor.
+     * When disabled, Micronaut may redispatch earlier even from already blocking threads.
      */
     @Override
     public boolean isRedispatchNonBlockingOnly() {
@@ -251,6 +254,17 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
 
     /**
      * Sets whether configured executors are used only for calls from non-blocking threads.
+     *
+     * If this is {@code true}, Micronaut delays redispatch until request processing reaches a
+     * non-blocking thread. This avoids repeatedly hopping between executors when processing has
+     * already been moved to a blocking or virtual-thread executor, but it also means filters,
+     * event listeners, and route code may continue on that current blocking thread instead of
+     * switching again for each stage.
+     *
+     * If this is {@code false}, Micronaut applies the configured executor at each stage even when
+     * the current thread is already blocking-capable. This more closely matches the older behavior,
+     * but can introduce additional executor hops and, with virtual threads, more virtual thread
+     * creation during a single request.
      *
      * @param redispatchNonBlockingOnly {@code true} to redispatch only from non-blocking threads
      */
