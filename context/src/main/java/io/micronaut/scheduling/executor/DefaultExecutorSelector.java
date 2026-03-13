@@ -83,12 +83,10 @@ public class DefaultExecutorSelector implements ExecutorSelector {
                 );
             }
         } else if (threadSelection == ThreadSelection.AUTO) {
-            if (method != null && method.hasStereotype(NonBlocking.class)) {
+            if (method == null || method.hasStereotype(NonBlocking.class)) {
                 return Optional.empty();
-            } else if (method != null && method.hasStereotype(Blocking.class)) {
+            } else if (method.hasStereotype(Blocking.class)) {
                 return Optional.of(blockingExecutor.get());
-            } else if (method == null) {
-                return Optional.empty();
             } else {
                 TypeInformation<?> returnType = method.getReturnType();
                 if (returnType.isWrapperType()) {
