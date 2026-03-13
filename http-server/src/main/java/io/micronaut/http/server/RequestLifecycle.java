@@ -326,10 +326,7 @@ public class RequestLifecycle {
             }
         };
         final Executor executor = routeExecutor.findExecutor(routeInfo);
-        final ExecutionFlow<HttpResponse<?>> responseFlow = executor == null
-            ? responseSupplier.get()
-            : ExecutionFlow.async(executor, responseSupplier);
-        return responseFlow
+        return ExecutionFlow.async(executor, responseSupplier)
             .<HttpResponse<?>>map(response -> {
                 RouteAttributes.setException(response, cause);
                 return response;
