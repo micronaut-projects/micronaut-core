@@ -40,7 +40,12 @@ import java.io.OutputStream;
 @Experimental
 @Singleton
 @Order(-11)
-public final class FileCustomizableResponseTypeBodyWriter implements ResponseBodyWriter<FileCustomizableResponseType> {
+/**
+ * Delegates {@link FileCustomizableResponseType} responses to the writer for the runtime subtype.
+ * This avoids preselecting the generic JSON writer for declared
+ * {@code HttpResponse<FileCustomizableResponseType>} responses.
+ */
+final class FileCustomizableResponseTypeBodyWriter implements ResponseBodyWriter<FileCustomizableResponseType> {
     private final MessageBodyHandlerRegistry messageBodyHandlerRegistry;
 
     FileCustomizableResponseTypeBodyWriter(MessageBodyHandlerRegistry messageBodyHandlerRegistry) {
