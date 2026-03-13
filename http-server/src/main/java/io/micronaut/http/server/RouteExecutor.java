@@ -370,6 +370,10 @@ public final class RouteExecutor {
     }
 
     private <T> Flux<T> applyExecutorToPublisher(Publisher<T> publisher, Executor executor, PropagatedContext propagatedContext) {
+        if (executor == ImmediateExecutor.INSTANCE) {
+            return Flux.from(publisher)
+                .subscribeOn(Schedulers.fromExecutor(command -> propagatedContext.wrap(command).run()));
+        }
         final Scheduler scheduler = Schedulers.fromExecutor(r -> executor.execute(propagatedContext.wrap(r)));
         return Flux.from(publisher)
             .subscribeOn(scheduler)
