@@ -21,7 +21,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.propagation.ReactivePropagation;
 import io.micronaut.core.async.propagation.ReactorPropagation;
 import io.micronaut.core.async.publisher.Publishers;
-import io.micronaut.core.execution.ConditionalExecutionExecutor;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
@@ -364,43 +363,38 @@ public final class RouteExecutor {
         return statusRoute;
     }
 
-    Executor findExecutor(RouteInfo<?> routeInfo) {
+    @Nullable
+    ExecutorService findExecutor(RouteInfo<?> routeInfo) {
         // Select the most appropriate Executor
-        Executor executor;
+        ExecutorService executor;
         if (routeInfo instanceof MethodReference<?, ?> methodReference) {
-            executor = executorSelector.selectExecutor(methodReference, serverConfiguration);
+            executor = executorSelector.select(methodReference, serverConfiguration.getThreadSelection()).orElse(null);
         } else if (routeInfo instanceof MethodBasedRouteInfo<?, ?> methodBasedRouteInfo) {
-            executor = executorSelector.selectExecutor(methodBasedRouteInfo.getTargetMethod().getExecutableMethod(), serverConfiguration);
+            executor = executorSelector.select(methodBasedRouteInfo.getTargetMethod().getExecutableMethod(), serverConfiguration.getThreadSelection()).orElse(null);
         } else {
-            executor = ImmediateExecutor.INSTANCE;
+            executor = null;
         }
         return executor;
     }
 
-    private <T> Flux<T> applyExecutorToPublisher(Publisher<T> publisher, Executor executor, PropagatedContext propagatedContext) {
-        if (executor instanceof ConditionalExecutionExecutor conditionalExecutionExecutor && conditionalExecutionExecutor.canExecuteImmediately()) {
+    private <T> Flux<T> applyExecutorToPublisher(Publisher<T> publisher, @Nullable ExecutorService executor, PropagatedContext propagatedContext) {
+        if (executor == null) {
             return Flux.from(publisher).subscribeOn(Schedulers.fromExecutor(command -> propagatedContext.wrap(command).run()));
         }
-        if (!(executor instanceof ExecutorService executorService)) {
-            final Scheduler scheduler = Schedulers.fromExecutor(r -> executor.execute(propagatedContext.wrap(r)));
-            return Flux.from(publisher)
-                .subscribeOn(scheduler)
-                .publishOn(scheduler);
-        }
-        Optional<ExecutorService> wrappedTarget = ContextPropagatingExecutorService.unwrap(executorService);
+        Optional<ExecutorService> wrappedTarget = ContextPropagatingExecutorService.unwrap(executor);
         if (wrappedTarget.isPresent()) {
-            executorService = wrappedTarget.get();
+            executor = wrappedTarget.get();
         }
-        if (executorService instanceof ScheduledExecutorService scheduledExecutorService) {
-            executorService = new ContextPropagatingScheduledExecutorService(
+        if (executor instanceof ScheduledExecutorService scheduledExecutorService) {
+            executor = new ContextPropagatingScheduledExecutorService(
                 scheduledExecutorService,
                 propagatedContext
             );
         } else {
-            ExecutorService finalExecutor = executorService;
-            executorService = new ContextPropagatingExecutorService(finalExecutor, propagatedContext);
+            ExecutorService finalExecutor = executor;
+            executor = new ContextPropagatingExecutorService(finalExecutor, propagatedContext);
         }
-        final Scheduler scheduler = Schedulers.fromExecutorService(executorService);
+        final Scheduler scheduler = Schedulers.fromExecutorService(executor);
         return Flux.from(publisher)
             .subscribeOn(scheduler)
             .publishOn(scheduler);
