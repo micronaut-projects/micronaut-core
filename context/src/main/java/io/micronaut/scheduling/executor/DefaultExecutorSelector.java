@@ -88,7 +88,7 @@ public class DefaultExecutorSelector implements ExecutorSelector {
             } else if (method != null && method.hasStereotype(Blocking.class)) {
                 return Optional.of(blockingExecutor.get());
             } else if (method == null) {
-                return Optional.of(blockingExecutor.get());
+                return Optional.empty();
             } else {
                 TypeInformation<?> returnType = method.getReturnType();
                 if (returnType.isWrapperType()) {
