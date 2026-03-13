@@ -134,18 +134,22 @@ public final class RoutingInBoundHandler implements RequestHandler {
         try {
             request.release();
         } finally {
-            ExecutionFlow<Void> terminatedFlow;
-            if (terminateEventPublisher.isEmpty()) {
-                terminatedFlow = ExecutionFlow.empty();
-            } else {
-                terminatedFlow = ExecutionFlow.async(getRequestEventExecutor(), () -> {
-                    try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty()
-                        .plus(new ServerHttpRequestContext(request))
-                        .propagate()) {
-                        terminateEventPublisher.publishEvent(new HttpRequestTerminatedEvent(request));
-                    }
-                    return ExecutionFlow.empty();
-                });
+            ExecutionFlow<Void> terminatedFlow = ExecutionFlow.empty();
+            try {
+                if (!terminateEventPublisher.isEmpty()) {
+                    terminatedFlow = ExecutionFlow.async(getRequestEventExecutor(), () -> {
+                        try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty()
+                            .plus(new ServerHttpRequestContext(request))
+                            .propagate()) {
+                            terminateEventPublisher.publishEvent(new HttpRequestTerminatedEvent(request));
+                        }
+                        return ExecutionFlow.empty();
+                    });
+                }
+            } catch (RuntimeException e) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Skipping request terminated event publication during shutdown: {}", e.getMessage(), e);
+                }
             }
             terminatedFlow.onComplete((ignore, throwable) -> {
                 if (throwable != null && LOG.isErrorEnabled()) {

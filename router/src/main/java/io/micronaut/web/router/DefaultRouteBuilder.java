@@ -971,7 +971,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
         private final class RouteExecutorSelector implements ExecutorSelector {
             @Override
-            public Optional<ExecutorService> select(MethodReference<?, ?> method, ThreadSelection threadSelection) {
+            public Optional<ExecutorService> select(@Nullable MethodReference<?, ?> method, ThreadSelection threadSelection) {
                 if (DefaultRouteBuilder.this.executorSelector != null) {
                     return DefaultRouteBuilder.this.executorSelector.select(targetMethod.getExecutableMethod(), threadSelection);
                 } else {
@@ -989,7 +989,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             }
 
             @Override
-            public Executor selectExecutor(MethodReference<?, ?> method, ThreadSelectionConfiguration configuration) {
+            public Executor selectExecutor(@Nullable MethodReference<?, ?> method, ThreadSelectionConfiguration configuration) {
                 if (DefaultRouteBuilder.this.executorSelector != null) {
                     return DefaultRouteBuilder.this.executorSelector.selectExecutor(method, configuration);
                 } else {
