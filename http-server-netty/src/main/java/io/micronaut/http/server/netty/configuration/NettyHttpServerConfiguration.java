@@ -1131,10 +1131,9 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     }
 
     /**
-     * Configuration for the experimental HTTP/3 server.
+     * Configuration for the HTTP/3 server.
      */
     @ConfigurationProperties("http3")
-    @Experimental
     public static final class Http3Settings {
         private int initialMaxData = DEFAULT_HTTP3_INITIAL_MAX_DATA;
         private int initialMaxStreamDataBidirectionalLocal = DEFAULT_HTTP3_INITIAL_MAX_STREAM_DATA_BIDIRECTIONAL_LOCAL;

@@ -28,6 +28,7 @@ import io.micronaut.http.HttpRequest.GET
 import io.micronaut.http.HttpRequest.OPTIONS
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.HttpClient
+import io.micronaut.http.client.multipart.MultipartBody
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import kotlinx.coroutines.reactive.awaitSingle
@@ -228,6 +229,20 @@ class SuspendControllerSpec : StringSpec() {
             beforeRequestId shouldBe afterRequestId
             beforeThreadId shouldNotBe afterThreadId // it will be the default co-routine dispatcher
             response.status shouldBe HttpStatus.OK
+        }
+
+        "test request context is available for completed upload coroutine factory" {
+            val body = MultipartBody.builder()
+                .addPart("file", "file.json", io.micronaut.http.MediaType.APPLICATION_JSON_TYPE, "{\"title\":\"Foo\"}".toByteArray())
+                .build()
+            val response = client.exchange(
+                io.micronaut.http.HttpRequest.POST("/suspend/completedUpload", body)
+                    .contentType(io.micronaut.http.MediaType.MULTIPART_FORM_DATA)
+                    .accept(io.micronaut.http.MediaType.TEXT_PLAIN_TYPE),
+                String::class.java
+            ).awaitSingle()
+            response.status shouldBe HttpStatus.OK
+            response.body.get() shouldBe "file.json"
         }
 
         "test request context is available" {

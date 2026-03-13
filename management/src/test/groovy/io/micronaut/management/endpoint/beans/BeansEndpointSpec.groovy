@@ -16,9 +16,11 @@
 package io.micronaut.management.endpoint.beans
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.RuntimeBeanDefinition
 import io.micronaut.context.env.Environment
 import io.micronaut.http.HttpResponse
 import io.micronaut.core.annotation.AnnotationUtil
+import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.http.HttpStatus
 import io.micronaut.inject.writer.BeanDefinitionWriter
 import io.micronaut.http.client.HttpClient
@@ -54,4 +56,34 @@ class BeansEndpointSpec extends Specification {
         rxClient.close()
         embeddedServer.close()
     }
+
+    void "test beans endpoint handles runtime bean definitions with duplicate implementation class"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.builder()
+            .properties(['endpoints.beans.sensitive': false])
+            .beanDefinitions(
+                RuntimeBeanDefinition.builder(String, () -> "one").singleton(true).named("one").build(),
+                RuntimeBeanDefinition.builder(String, () -> "two").singleton(true).named("two").build()
+            )
+            .environments(Environment.TEST)
+            .run(EmbeddedServer)
+        HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
+
+        when:
+        HttpResponse<Map> response = rxClient.toBlocking().exchange("/beans", Map)
+        Map result = response.body()
+        Map<String, Map<String, Object>> beans = result.beans
+        List<Map<String, Object>> runtimeBeans = beans.findAll { key, value ->
+            key.startsWith('io.micronaut.context.RuntimeBeanDefinition#') && value.type == 'java.lang.String'
+        }.values().toList()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        runtimeBeans*.qualifier.toSet() == [Qualifiers.byName('one').toString(), Qualifiers.byName('two').toString()] as Set
+
+        cleanup:
+        rxClient.close()
+        embeddedServer.close()
+    }
+
 }

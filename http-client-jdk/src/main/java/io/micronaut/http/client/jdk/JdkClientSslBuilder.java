@@ -22,7 +22,7 @@ import org.jspecify.annotations.Nullable;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.client.HttpVersionSelection;
-import io.micronaut.http.ssl.ClientSslConfiguration;
+import io.micronaut.http.ssl.AbstractClientSslConfiguration;
 import io.micronaut.http.ssl.SslBuilder;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.http.ssl.SslConfigurationException;
@@ -87,7 +87,7 @@ public final class JdkClientSslBuilder extends SslBuilder<SSLContext> {
                 trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
             }
             TrustManager[] trustManagers = trustManagerFactory.getTrustManagers();
-            if (ssl instanceof ClientSslConfiguration clientSslConfiguration && clientSslConfiguration.isInsecureTrustAllCertificates()) {
+            if (ssl instanceof AbstractClientSslConfiguration clientSslConfiguration && clientSslConfiguration.isInsecureTrustAllCertificates()) {
                 if (LOG.isWarnEnabled()) {
                     LOG.warn("Trust all certificates is enabled. This is insecure and should not be used in production");
                 }

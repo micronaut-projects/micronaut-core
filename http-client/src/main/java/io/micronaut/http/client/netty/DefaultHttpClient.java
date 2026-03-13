@@ -878,9 +878,9 @@ public class DefaultHttpClient implements
 
     @Override
     public <I, O, E> Publisher<HttpResponse<O>> exchange(io.micronaut.http. HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
-        return exchange(request, bodyType, errorType, null)
+        return Flux.defer(() -> exchange(request, bodyType, errorType, null).flux())
             // some tests expect flux...
-            .flux();
+            ;
     }
 
     private <I, O, E> Mono<HttpResponse<O>> exchange(io.micronaut.http.HttpRequest<I> request, @Nullable Argument<O> bodyType, Argument<E> errorType, @Nullable BlockHint blockHint) {
