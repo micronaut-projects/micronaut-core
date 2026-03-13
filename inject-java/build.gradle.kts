@@ -48,7 +48,7 @@ dependencies {
     testImplementation(libs.junit.jupiter.api)
     testImplementation(libs.javax.annotation.api)
     testImplementation(libs.javax.inject)
-    testImplementation(libs.graal)
+    testImplementation(libs.managed.graalvm.nativeimage)
     testImplementation(libs.managed.snakeyaml)
     testImplementation(libs.managed.jspecify)
     testImplementation(libs.bytebuddy)

@@ -9,8 +9,6 @@ classgraph = "4.8.184"
 compile-testing = "0.21.0"
 
 geb = "7.0"
-# be sure to update graal version in gradle.properties as well
-graal-svm = "25.0.2"
 h2 = "2.2.224"
 hibernate = "5.5.9.Final"
 htmlunit = "2.70.0"
@@ -77,6 +75,8 @@ jackson2 = "2.21.1"
 # Versions which start with managed- are managed by Micronaut in the sense
 # that they will appear in the Micronaut BOM as <properties>
 #
+# be sure to update graal version in gradle.properties as well
+managed-graal = "25.0.2"
 managed-groovy = "5.0.4"
 managed-jakarta-annotation-api = "2.1.1"
 managed-jackson = "3.1.0"
@@ -118,7 +118,7 @@ boms-micronaut-sourcegen = { module = "io.micronaut.sourcegen:micronaut-sourcege
 # Libraries which start with managed- are managed by Micronaut in the sense
 # that they will appear in the Micronaut BOM
 #
-
+managed-graalvm-nativeimage = { module = "org.graalvm.sdk:nativeimage", version.ref = "managed-graal" }
 managed-groovy = { module = "org.apache.groovy:groovy", version.ref = "managed-groovy" }
 managed-groovy-json = { module = "org.apache.groovy:groovy-json", version.ref = "managed-groovy" }
 managed-groovy-sql = { module = "org.apache.groovy:groovy-sql", version.ref = "managed-groovy" }
@@ -204,7 +204,6 @@ classgraph = { module = "io.github.classgraph:classgraph", version.ref= "classgr
 compile-testing = { module = "com.google.testing.compile:compile-testing", version.ref = "compile-testing" }
 
 geb-spock = { module = "org.gebish:geb-spock", version.ref = "geb" }
-graal = { module = "org.graalvm.sdk:nativeimage", version.ref = "graal-svm" }
 groovy-test-junit5 = { module = "org.apache.groovy:groovy-test-junit5", version.ref = "managed-groovy" }
 
 h2 = { module = "com.h2database:h2", version.ref = "h2" }
