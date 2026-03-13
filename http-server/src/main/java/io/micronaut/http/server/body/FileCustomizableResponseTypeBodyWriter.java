@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.server.body;
 
-import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Order;
 import io.micronaut.core.type.Argument;
@@ -37,13 +36,15 @@ import jakarta.inject.Singleton;
 import java.io.OutputStream;
 
 @Internal
-@Experimental
 @Singleton
 @Order(-11)
 /**
  * Delegates {@link FileCustomizableResponseType} responses to the writer for the runtime subtype.
  * This avoids preselecting the generic JSON writer for declared
  * {@code HttpResponse<FileCustomizableResponseType>} responses.
+ *
+ * @author Jonas Konrad
+ * @since 5.0.0
  */
 final class FileCustomizableResponseTypeBodyWriter implements ResponseBodyWriter<FileCustomizableResponseType> {
     private final MessageBodyHandlerRegistry messageBodyHandlerRegistry;
