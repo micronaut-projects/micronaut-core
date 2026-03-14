@@ -107,7 +107,7 @@ dependencies {
     testCompileOnly(projects.micronautInjectJavaHelper2)
 
     testImplementation(platform(libs.test.boms.micronaut.rxjava3))
-    
+
     testImplementation("io.micronaut.rxjava3:micronaut-rxjava3") {
         exclude(group = "io.micronaut")
     }
