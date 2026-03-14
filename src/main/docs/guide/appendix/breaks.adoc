@@ -429,3 +429,15 @@ In Micronaut Framework 4, users need to extend the <<contextPropagation, propaga
 ==== Micronaut 3 libraries not compatible with Micronaut 4 applications
 
 In order for Micronaut 3 library beans to be discoverable in an application running Micronaut 4, the library must be recompiled with Micronaut 4 - https://github.com/micronaut-projects/micronaut-core/discussions/9758
+
+==== @Retryable Default Exception Type
+
+The default exception type used by `@Retryable` has changed.
+Previously, `@Retryable` would retry only when a `RuntimeException` (or subclass) was thrown.
+In Micronaut 5, the default has been changed to `Exception`. As a result, checked exceptions will now also trigger retry behavior.
+If the previous behavior is desired, configure the retryable annotation explicitly:
+
+[source,java]
+----
+@Retryable(includes = RuntimeException.class)
+----
