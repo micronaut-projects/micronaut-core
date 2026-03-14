@@ -44,56 +44,30 @@ public class ReactiveController {
         return Flux.just("Hello world");
     }
 
-    @Get("/rxjava2-single")
-    public Single<String> rxJava2Single() {
+    @Get("/rxjava3-single")
+    public Single<String> rxJava3Single() {
         return Single.just("Hello world");
     }
 
-    @Get("/rxjava2-maybe")
-    public Maybe<String> rxJava2Maybe() {
+    @Get("/rxjava3-maybe")
+    public Maybe<String> rxJava3Maybe() {
         return Maybe.just("Hello world");
     }
 
-    @Get("/rxjava2-flowable")
-    public Flowable<String> rxJava2Flowable() {
-        return Flowable.just("Hello world");
-    }
-
-    @SingleResult
-    @Get("/rxjava2-flowable-single")
-    public Flowable<String> rxJava2FlowableSingle() {
-        return Flowable.just("Hello world");
-    }
-
-    @Get("/rxjava2-flowable-completable")
-    public Completable rxJava2FlowableCompletable() {
-        return Completable.complete();
-    }
-
-    @Get("/rxjava3-single")
-    public io.reactivex.rxjava3.core.Single<String> rxJava3Single() {
-        return io.reactivex.rxjava3.core.Single.just("Hello world");
-    }
-
-    @Get("/rxjava3-maybe")
-    public io.reactivex.rxjava3.core.Maybe<String> rxJava3Maybe() {
-        return io.reactivex.rxjava3.core.Maybe.just("Hello world");
-    }
-
     @Get("/rxjava3-flowable")
-    public io.reactivex.rxjava3.core.Flowable<String> rxJava3Flowable() {
-        return io.reactivex.rxjava3.core.Flowable.just("Hello world");
+    public Flowable<String> rxJava3Flowable() {
+        return Flowable.just("Hello world");
     }
 
     @SingleResult
     @Get("/rxjava3-flowable-single")
-    public io.reactivex.rxjava3.core.Flowable<String> rxJava3FlowableSingle() {
-        return io.reactivex.rxjava3.core.Flowable.just("Hello world");
+    public Flowable<String> rxJava3FlowableSingle() {
+        return Flowable.just("Hello world");
     }
 
     @Get("/rxjava3-flowable-completable")
-    public io.reactivex.rxjava3.core.Completable rxJava3FlowableCompletable() {
-        return io.reactivex.rxjava3.core.Completable.complete();
+    public Completable rxJava3FlowableCompletable() {
+        return Completable.complete();
     }
 
 }
