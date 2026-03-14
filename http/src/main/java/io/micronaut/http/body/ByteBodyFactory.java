@@ -18,8 +18,6 @@ package io.micronaut.http.body;
 import io.micronaut.core.annotation.Blocking;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.io.buffer.ReadBuffer;
@@ -32,6 +30,8 @@ import io.micronaut.http.body.stream.BaseSharedBuffer;
 import io.micronaut.http.body.stream.BaseStreamingByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 
 import java.io.IOException;
@@ -59,7 +59,7 @@ public class ByteBodyFactory {
      * @param readBufferFactory The read buffer factory
      */
     @Internal
-    protected ByteBodyFactory(@NonNull ByteBufferFactory<?, ?> byteBufferFactory, ReadBufferFactory readBufferFactory) {
+    protected ByteBodyFactory(ByteBufferFactory<?, ?> byteBufferFactory, ReadBufferFactory readBufferFactory) {
         this.byteBufferFactory = byteBufferFactory;
         this.readBufferFactory = readBufferFactory;
     }
@@ -72,8 +72,7 @@ public class ByteBodyFactory {
      * @param byteBufferFactory The base buffer factory
      * @return The body factory
      */
-    @NonNull
-    public static ByteBodyFactory createDefault(@NonNull ByteBufferFactory<?, ?> byteBufferFactory) {
+    public static ByteBodyFactory createDefault(ByteBufferFactory<?, ?> byteBufferFactory) {
         return new ByteBodyFactory(byteBufferFactory, ReadBufferFactory.getJdkFactory());
     }
 
@@ -84,7 +83,6 @@ public class ByteBodyFactory {
      * @return The buffer factory
      * @deprecated Use {@link #readBufferFactory()}
      */
-    @NonNull
     @Deprecated
     public final ByteBufferFactory<?, ?> byteBufferFactory() {
         return byteBufferFactory;
@@ -96,7 +94,6 @@ public class ByteBodyFactory {
      * @return The factory
      * @since 4.10.0
      */
-    @NonNull
     public ReadBufferFactory readBufferFactory() {
         return readBufferFactory;
     }
@@ -110,8 +107,7 @@ public class ByteBodyFactory {
      * @param buffer The buffer
      * @return A {@link ByteBody} with the same content as the buffer
      */
-    @NonNull
-    public CloseableAvailableByteBody adapt(@NonNull ByteBuffer<?> buffer) {
+    public CloseableAvailableByteBody adapt(ByteBuffer<?> buffer) {
         return adapt(readBufferFactory.adapt(buffer));
     }
 
@@ -123,8 +119,7 @@ public class ByteBodyFactory {
      * @param array The array
      * @return A {@link ByteBody} with the same content as the array
      */
-    @NonNull
-    public CloseableAvailableByteBody adapt(byte @NonNull [] array) {
+    public CloseableAvailableByteBody adapt(byte [] array) {
         return adapt(readBufferFactory().adapt(array));
     }
 
@@ -136,8 +131,7 @@ public class ByteBodyFactory {
      * @return A {@link ByteBody} with the same content as the buffer
      * @since 4.10.0
      */
-    @NonNull
-    public CloseableAvailableByteBody adapt(@NonNull ReadBuffer readBuffer) {
+    public CloseableAvailableByteBody adapt(ReadBuffer readBuffer) {
         return AvailableByteArrayBody.create(readBuffer);
     }
 
@@ -149,8 +143,7 @@ public class ByteBodyFactory {
      * @param <T> Exception type thrown by the consumer
      * @throws T Exception thrown by the consumer
      */
-    @NonNull
-    public <T extends Throwable> CloseableAvailableByteBody buffer(@NonNull ThrowingConsumer<? super OutputStream, T> writer) throws T {
+    public <T extends Throwable> CloseableAvailableByteBody buffer(ThrowingConsumer<? super OutputStream, T> writer) throws T {
         return adapt(readBufferFactory().buffer(writer));
     }
 
@@ -159,7 +152,6 @@ public class ByteBodyFactory {
      *
      * @return The empty body
      */
-    @NonNull
     public CloseableAvailableByteBody createEmpty() {
         return adapt(readBufferFactory().createEmpty());
     }
@@ -171,8 +163,7 @@ public class ByteBodyFactory {
      * @param charset The charset to use for encoding
      * @return The encoded body
      */
-    @NonNull
-    public CloseableAvailableByteBody copyOf(@NonNull CharSequence cs, @NonNull Charset charset) {
+    public CloseableAvailableByteBody copyOf(CharSequence cs, Charset charset) {
         return adapt(readBufferFactory().copyOf(cs, charset));
     }
 
@@ -184,9 +175,8 @@ public class ByteBodyFactory {
      * @return A body containing the data read from the input
      * @throws IOException Any exception thrown by the {@link InputStream} read methods
      */
-    @NonNull
     @Blocking
-    public CloseableAvailableByteBody copyOf(@NonNull InputStream stream) throws IOException {
+    public CloseableAvailableByteBody copyOf(InputStream stream) throws IOException {
         return adapt(readBufferFactory().copyOf(stream));
     }
 
@@ -198,8 +188,7 @@ public class ByteBodyFactory {
      * @return The streaming body tuple
      */
     @Internal
-    @NonNull
-    public StreamingBody createStreamingBody(@NonNull BodySizeLimits limits, @NonNull BufferConsumer.Upstream upstream) {
+    public StreamingBody createStreamingBody(BodySizeLimits limits, BufferConsumer. Upstream upstream) {
         ReactiveByteBufferByteBody.SharedBuffer sb = new ReactiveByteBufferByteBody.SharedBuffer(this.readBufferFactory(), limits, upstream);
         return new StreamingBody(sb, new ReactiveByteBufferByteBody(sb));
     }
@@ -213,8 +202,33 @@ public class ByteBodyFactory {
      * @return The adapter
      */
     @Internal
-    protected AbstractBodyAdapter createBodyAdapter(@NonNull Publisher<ReadBuffer> publisher, @Nullable Runnable onDiscard) {
+    protected AbstractBodyAdapter createBodyAdapter(Publisher<ReadBuffer> publisher, @Nullable Runnable onDiscard) {
         return new AbstractBodyAdapter(publisher, onDiscard);
+    }
+
+    /**
+     * Create a new {@link ByteBody} that wraps the given buffer, but also check the buffer size
+     * against the given size limits. If the buffer is too large, this will return a streaming body
+     * with an error. If that is not the case, this will return a normal available body.
+     *
+     * @param bodySizeLimits The size limits
+     * @param buf            The buffer
+     * @return The body that wraps the buffer
+     */
+    @NonNull
+    public final CloseableByteBody createChecked(@NonNull BodySizeLimits bodySizeLimits, @NonNull ReadBuffer buf) {
+        // AvailableNettyByteBody does not support exceptions, so if we hit one of the configured
+        // limits, we return a StreamingNettyByteBody instead.
+        int readable = buf.readable();
+        if (readable > bodySizeLimits.maxBodySize() || readable > bodySizeLimits.maxBufferSize()) {
+            BufferConsumer.Upstream upstream = bytesConsumed -> {
+            };
+            StreamingBody streamingBody = createStreamingBody(bodySizeLimits, upstream);
+            streamingBody.sharedBuffer.add(buf); // this will trigger the exception for exceeded body or buffer size
+            return streamingBody.rootBody;
+        } else {
+            return adapt(buf);
+        }
     }
 
     /**
@@ -223,8 +237,7 @@ public class ByteBodyFactory {
      * @param publisher The input buffer publisher
      * @return The combined {@link ByteBody}
      */
-    @NonNull
-    public CloseableByteBody adapt(@NonNull Publisher<ReadBuffer> publisher) {
+    public CloseableByteBody adapt(Publisher<ReadBuffer> publisher) {
         return adapt(publisher, BodySizeLimits.UNLIMITED, null, null);
     }
 
@@ -239,8 +252,7 @@ public class ByteBodyFactory {
      *                         {@link ByteBody#allowDiscard() discarded}
      * @return The combined {@link ByteBody}
      */
-    @NonNull
-    public CloseableByteBody adapt(@NonNull Publisher<ReadBuffer> publisher, @NonNull BodySizeLimits sizeLimits, @Nullable HttpHeaders headersForLength, @Nullable Runnable onDiscard) {
+    public CloseableByteBody adapt(Publisher<ReadBuffer> publisher, BodySizeLimits sizeLimits, @Nullable HttpHeaders headersForLength, @Nullable Runnable onDiscard) {
         AbstractBodyAdapter adapter = createBodyAdapter(publisher, onDiscard);
         StreamingBody sb = createStreamingBody(sizeLimits, adapter);
         adapter.setSharedBuffer(sb.sharedBuffer);
@@ -257,8 +269,7 @@ public class ByteBodyFactory {
      * @param contentLength The optional content length for {@link ByteBody#expectedLength()}
      * @return The combined {@link ByteBody}
      */
-    @NonNull
-    public CloseableByteBody adapt(@NonNull Publisher<ReadBuffer> publisher, @NonNull OptionalLong contentLength) {
+    public CloseableByteBody adapt(Publisher<ReadBuffer> publisher, OptionalLong contentLength) {
         AbstractBodyAdapter adapter = createBodyAdapter(publisher, null);
         StreamingBody sb = createStreamingBody(BodySizeLimits.UNLIMITED, adapter);
         adapter.setSharedBuffer(sb.sharedBuffer);
@@ -274,7 +285,7 @@ public class ByteBodyFactory {
      * @return A streaming body with the same content
      */
     @Internal
-    public BaseStreamingByteBody<?> toStreaming(@NonNull ByteBody body) {
+    public BaseStreamingByteBody<?> toStreaming(ByteBody body) {
         if (body instanceof BaseStreamingByteBody<?> bsbb) {
             return bsbb;
         }

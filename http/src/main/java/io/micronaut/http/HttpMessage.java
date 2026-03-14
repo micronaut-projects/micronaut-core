@@ -15,7 +15,6 @@
  */
 package io.micronaut.http;
 
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.attr.MutableAttributeHolder;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
@@ -25,6 +24,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.util.HttpUtil;
+import org.jspecify.annotations.Nullable;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -45,7 +45,7 @@ public interface HttpMessage<B> extends MutableAttributeHolder {
     /**
      * @return The {@link HttpHeaders} object
      */
-    @NonNull HttpHeaders getHeaders();
+    HttpHeaders getHeaders();
 
     /**
      * <p>A {@link MutableConvertibleValues} of the attributes for this HTTP message.</p>
@@ -55,12 +55,12 @@ public interface HttpMessage<B> extends MutableAttributeHolder {
      * @return The attributes of the message
      */
     @Override
-    @NonNull MutableConvertibleValues<Object> getAttributes();
+    MutableConvertibleValues<Object> getAttributes();
 
     /**
      * @return The request body
      */
-    @NonNull Optional<B> getBody();
+    Optional<B> getBody();
 
     /**
      * @return The body writer.
@@ -74,12 +74,12 @@ public interface HttpMessage<B> extends MutableAttributeHolder {
     /**
      * @return The request character encoding. Defaults to {@link StandardCharsets#UTF_8}
      */
-    default @NonNull Charset getCharacterEncoding() {
+    default Charset getCharacterEncoding() {
         return HttpUtil.getCharset(this);
     }
 
     @Override
-    default @NonNull HttpMessage<B> setAttribute(@NonNull CharSequence name, Object value) {
+    default HttpMessage<B> setAttribute(CharSequence name, @Nullable Object value) {
         return (HttpMessage<B>) MutableAttributeHolder.super.setAttribute(name, value);
     }
 
@@ -90,7 +90,7 @@ public interface HttpMessage<B> extends MutableAttributeHolder {
      * @param <T>  The generic type
      * @return An {@link Optional} of the type or {@link Optional#empty()} if the body cannot be returned as the given type
      */
-    default @NonNull <T> Optional<T> getBody(@NonNull Argument<T> type) {
+    default <T> Optional<T> getBody(Argument<T> type) {
         return getBody(ConversionContext.of(type));
     }
 
@@ -102,7 +102,7 @@ public interface HttpMessage<B> extends MutableAttributeHolder {
      * @return An {@link Optional} of the type or {@link Optional#empty()} if the body cannot be returned as the given type
      * @since 4.0.0
      */
-    default @NonNull <T> Optional<T> getBody(@NonNull ArgumentConversionContext<T> conversionContext) {
+    default <T> Optional<T> getBody(ArgumentConversionContext<T> conversionContext) {
         ArgumentUtils.requireNonNull("conversionContext", conversionContext);
         return getBody().flatMap(b -> ConversionService.SHARED.convert(b, conversionContext));
     }
@@ -114,7 +114,7 @@ public interface HttpMessage<B> extends MutableAttributeHolder {
      * @param <T>  The generic type
      * @return An {@link Optional} of the type or {@link Optional#empty()} if the body cannot be returned as the given type
      */
-    default @NonNull <T> Optional<T> getBody(@NonNull Class<T> type) {
+    default <T> Optional<T> getBody(Class<T> type) {
         ArgumentUtils.requireNonNull("type", type);
         return getBody(Argument.of(type));
     }
@@ -122,7 +122,7 @@ public interface HttpMessage<B> extends MutableAttributeHolder {
     /**
      * @return The locale of the message
      */
-    default @NonNull Optional<Locale> getLocale() {
+    default Optional<Locale> getLocale() {
         return getHeaders().findFirst(HttpHeaders.CONTENT_LANGUAGE)
             .map(Locale::new);
     }
@@ -141,7 +141,7 @@ public interface HttpMessage<B> extends MutableAttributeHolder {
      *
      * @return The content type
      */
-    default @NonNull Optional<MediaType> getContentType() {
+    default Optional<MediaType> getContentType() {
         return getHeaders().contentType();
     }
 }

@@ -18,7 +18,7 @@ package io.micronaut.http.netty.channel;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.netty.channel.Channel;
 import io.netty.channel.IoHandlerFactory;
 import io.netty.channel.kqueue.KQueue;
@@ -41,9 +41,10 @@ import org.slf4j.LoggerFactory;
 @Singleton
 @Internal
 @Requires(classes = KQueue.class, condition = KQueueAvailabilityCondition.class)
-@Named(EventLoopGroupFactory.NATIVE)
+@Named(KQueueEventLoopGroupFactory.NAME)
 @BootstrapContextCompatible
 public class KQueueEventLoopGroupFactory implements EventLoopGroupFactory {
+    public static final String NAME = "kqueue";
     private static final Logger LOG = LoggerFactory.getLogger(KQueueEventLoopGroupFactory.class);
 
     @Override
@@ -84,7 +85,7 @@ public class KQueueEventLoopGroupFactory implements EventLoopGroupFactory {
     }
 
     @Override
-    public Channel channelInstance(NettyChannelType type, EventLoopGroupConfiguration configuration, Channel parent, int fd) {
+    public Channel channelInstance(NettyChannelType type, @Nullable EventLoopGroupConfiguration configuration, @Nullable Channel parent, int fd) {
         if (parent != null) {
             LOG.warn("kqueue does not support FD-based channels with a parent channel. This may cause issues with HTTP2.");
         }

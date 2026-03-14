@@ -36,6 +36,7 @@ import io.micronaut.sourcegen.model.ClassDef;
 import io.micronaut.sourcegen.model.ClassTypeDef;
 import io.micronaut.sourcegen.model.MethodDef;
 import io.micronaut.sourcegen.model.StatementDef;
+import org.jspecify.annotations.NullUnmarked;
 
 import javax.lang.model.element.Modifier;
 import java.io.IOException;
@@ -52,6 +53,7 @@ import java.util.List;
  * @since 4.0.0
  */
 @Internal
+@NullUnmarked
 public final class EvaluatedExpressionWriter implements ClassOutputWriter {
 
     private static final Method DO_EVALUATE_METHOD

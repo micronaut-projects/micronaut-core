@@ -16,7 +16,9 @@
 package io.micronaut.inject.field.nullableinjection
 
 import jakarta.inject.Inject
+import jakarta.inject.Singleton
 
+@Singleton
 class B {
     internal var a: A? = null
     @Inject set

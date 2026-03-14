@@ -1,11 +1,11 @@
 package io.micronaut.jackson.databind
 
-import com.fasterxml.jackson.core.JsonParser
-import com.fasterxml.jackson.core.JsonProcessingException
-import com.fasterxml.jackson.databind.DeserializationContext
-import com.fasterxml.jackson.databind.JsonDeserializer
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.databind.module.SimpleModule
+import tools.jackson.core.JsonParser
+import tools.jackson.core.JacksonException
+import tools.jackson.databind.DeserializationContext
+import tools.jackson.databind.ValueDeserializer
+import tools.jackson.databind.ObjectMapper
+import tools.jackson.databind.module.SimpleModule
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.type.Argument
 import io.micronaut.json.JsonMapper
@@ -36,11 +36,11 @@ class JacksonDatabindMapperSpec extends Specification {
     def 'parsing from JsonNode uses the right object codec'() {
         given:
         def objectMapper = new ObjectMapper()
-        objectMapper.registerModule(new SimpleModule() {
+        objectMapper = objectMapper.rebuild().addModule(new SimpleModule() {
             {
                 addDeserializer(TestBean, new TestDeserializer())
             }
-        })
+        }).build()
         def jsonMapper = new JacksonDatabindMapper(objectMapper)
 
         expect:
@@ -53,19 +53,19 @@ class JacksonDatabindMapperSpec extends Specification {
         testBean.value == BigInteger.valueOf(42)
     }
 
-    private static class TestBean {
+    private static final class TestBean {
         BigInteger value
     }
 
-    private static class TestDeserializer extends JsonDeserializer<TestBean> {
+    private static final class TestDeserializer extends ValueDeserializer<TestBean> {
         @Override
-        TestBean deserialize(JsonParser p, DeserializationContext ctxt) throws IOException, JsonProcessingException {
-            return new TestBean(value: p.codec.readValue(p, BigInteger))
+        TestBean deserialize(JsonParser p, DeserializationContext ctxt) throws IOException, JacksonException {
+            return new TestBean(value: p.objectReadContext().readValue(p, BigInteger))
         }
 
         @Override
         TestBean deserialize(JsonParser p, DeserializationContext ctxt, TestBean intoValue) throws IOException {
-            intoValue.value = p.codec.readValue(p, BigInteger)
+            intoValue.value = p.objectReadContext().readValue(p, BigInteger)
             return intoValue
         }
     }

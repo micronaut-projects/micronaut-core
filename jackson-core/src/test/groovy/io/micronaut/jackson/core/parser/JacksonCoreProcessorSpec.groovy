@@ -16,9 +16,9 @@
 package io.micronaut.jackson.core.parser
 
 
-import com.fasterxml.jackson.core.JsonFactory
-import com.fasterxml.jackson.core.JsonParseException
-import com.fasterxml.jackson.core.io.JsonEOFException
+import tools.jackson.core.json.JsonFactory
+import tools.jackson.core.exc.StreamReadException
+import tools.jackson.core.exc.UnexpectedEndOfInputException
 import io.micronaut.context.ApplicationContext
 import io.micronaut.json.JsonStreamConfig
 import io.micronaut.json.tree.JsonNode
@@ -560,7 +560,7 @@ class JacksonCoreProcessorSpec extends Specification {
         !complete
         node == null
         error != null
-        error instanceof JsonEOFException
+        error instanceof UnexpectedEndOfInputException
 
     }
 
@@ -614,7 +614,7 @@ class JacksonCoreProcessorSpec extends Specification {
         !complete
         node == null
         error != null
-        error instanceof JsonParseException
+        error instanceof StreamReadException
 
     }
 

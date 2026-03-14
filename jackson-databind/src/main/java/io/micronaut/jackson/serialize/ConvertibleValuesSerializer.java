@@ -15,13 +15,12 @@
  */
 package io.micronaut.jackson.serialize;
 
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.databind.JsonSerializer;
-import com.fasterxml.jackson.databind.SerializerProvider;
+import tools.jackson.core.JsonGenerator;
+import tools.jackson.databind.ValueSerializer;
+import tools.jackson.databind.SerializationContext;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import jakarta.inject.Singleton;
 
-import java.io.IOException;
 import java.util.Map;
 
 /**
@@ -31,23 +30,23 @@ import java.util.Map;
  * @since 1.0
  */
 @Singleton
-public class ConvertibleValuesSerializer extends JsonSerializer<ConvertibleValues<?>> {
+public class ConvertibleValuesSerializer extends ValueSerializer<ConvertibleValues<?>> {
 
     @Override
-    public boolean isEmpty(SerializerProvider provider, ConvertibleValues<?> value) {
+    public boolean isEmpty(SerializationContext provider, ConvertibleValues<?> value) {
         return value.isEmpty();
     }
 
     @Override
-    public void serialize(ConvertibleValues<?> value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+    public void serialize(ConvertibleValues<?> value, JsonGenerator gen, SerializationContext serializers) {
         gen.writeStartObject();
 
         for (Map.Entry<String, ?> entry : value) {
             String fieldName = entry.getKey();
             Object v = entry.getValue();
             if (v != null) {
-                gen.writeFieldName(fieldName);
-                serializers.defaultSerializeValue(v, gen);
+                gen.writeName(fieldName);
+                serializers.defaultSerializeProperty(fieldName, v, gen);
             }
         }
         gen.writeEndObject();

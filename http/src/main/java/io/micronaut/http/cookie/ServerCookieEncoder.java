@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.http.cookie;
-
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
 
@@ -37,13 +35,18 @@ public interface ServerCookieEncoder {
             .load(ServerCookieEncoder.class)
             .firstOr("io.micronaut.http.cookie.DefaultServerCookieEncoder", ServerCookieEncoder.class.getClassLoader())
             .map(ServiceDefinition::load)
-            .orElse(null);
+            .orElseGet(() -> cookies -> {
+                java.util.List<String> encoded = new java.util.ArrayList<>(cookies.length);
+                for (Cookie c : cookies) {
+                    encoded.add(c.getName() + "=" + c.getValue());
+                }
+                return encoded;
+            });
 
     /**
      *
      * @param cookies Cookies to encode
      * @return Returns a string representation for each supplied cookie. The string representation is typically used as the value of the {@link io.micronaut.http.HttpHeaders#SET_COOKIE} header.
      */
-    @NonNull
-    List<String> encode(@NonNull Cookie... cookies);
+    List<String> encode(Cookie... cookies);
 }

@@ -19,7 +19,7 @@ import io.micronaut.aop.InterceptedMethod;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.core.annotation.AnnotationUtil;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
@@ -107,7 +107,7 @@ public class FunctionClientAdvice implements MethodInterceptor<Object, Object> {
         }
     }
 
-    private Flux<Object> invokeFn(Object body, String functionName, Flux<FunctionDefinition> functionDefinition, Argument<?> valueType) {
+    private Flux<Object> invokeFn(@Nullable Object body, String functionName, Flux<FunctionDefinition> functionDefinition, Argument<?> valueType) {
         return functionDefinition.next().flatMap(def -> {
             FunctionInvoker functionInvoker = functionInvokerChooser.choose(def).orElseThrow(() -> new FunctionNotFoundException(def.getName()));
             return Mono.from((Publisher<Object>) functionInvoker.invoke(

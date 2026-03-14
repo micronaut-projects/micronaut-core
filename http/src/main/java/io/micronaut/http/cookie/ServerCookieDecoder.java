@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.http.cookie;
-
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
 
@@ -35,7 +33,7 @@ public interface ServerCookieDecoder {
             .load(ServerCookieDecoder.class)
             .firstOr("io.micronaut.http.cookie.DefaultServerCookieDecoder", ServerCookieDecoder.class.getClassLoader())
             .map(ServiceDefinition::load)
-            .orElse(null);
+            .orElseGet(DefaultServerCookieDecoder::new);
 
     /**
      *
@@ -43,6 +41,5 @@ public interface ServerCookieDecoder {
      * @param headerValue The Set-Cookie header value
      * @return a List of Cookies
      */
-    @NonNull
-    List<Cookie> decode(@NonNull String headerValue);
+    List<Cookie> decode(String headerValue);
 }

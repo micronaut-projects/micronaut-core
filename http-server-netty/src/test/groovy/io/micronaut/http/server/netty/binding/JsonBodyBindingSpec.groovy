@@ -19,12 +19,16 @@ import io.micronaut.http.hateoas.JsonError
 import io.micronaut.http.hateoas.Link
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.micronaut.json.JsonSyntaxException
+import io.micronaut.scheduling.TaskExecutors
+import jakarta.inject.Inject
+import jakarta.inject.Named
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import reactor.core.scheduler.Schedulers
 import spock.lang.Issue
 
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.Executor
 
 class JsonBodyBindingSpec extends AbstractMicronautSpec {
 
@@ -79,8 +83,8 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
 
         then:
         HttpClientResponseException e = thrown()
-        e.message == """Invalid JSON: Unrecognized token 'The': was expecting (JSON String, Number, Array, Object or token 'null', 'true' or 'false')
- at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION` disabled); line: 1, column: 14]"""
+        e.message.startsWith("Invalid JSON: Unrecognized token 'The': was expecting (JSON String, Number, Array, Object or token 'null', 'true' or 'false')")
+        e.message.contains("at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION` disabled); byte offset: #")
         e.response.status == HttpStatus.BAD_REQUEST
 
         when:
@@ -164,7 +168,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
 
     void "test simple POGO body parse and return"() {
         when:
-        String json = '{"name":"Fred","age":10}'
+        String json = '{"age":10,"name":"Fred"}'
         HttpResponse<String> response = Flux.from(httpClient.exchange(
                 HttpRequest.POST('/json/object-to-object', json), String
         )).blockFirst()
@@ -186,7 +190,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
 
     void "test array POGO body parsing and return"() {
         when:
-        String json = '[{"name":"Fred","age":10},{"name":"Barney","age":11}]'
+        String json = '[{"age":10,"name":"Fred"},{"age":11,"name":"Barney"}]'
         HttpResponse<String> response = Flux.from(httpClient.exchange(
                 HttpRequest.POST('/json/array-to-array', json), String
         )).blockFirst()
@@ -204,6 +208,17 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
 
         then:
         response.body() == "Body: Foo(Fred, 10),Foo(Barney, 11)"
+    }
+
+    void "test nested POGO body parsing"() {
+        when:
+        String json = '{"foo":{"name":"Fred", "age":10}}'
+        HttpResponse<String> response = Flux.from(httpClient.exchange(
+                HttpRequest.POST('/json/nested', json), String
+        )).blockFirst()
+
+        then:
+        response.body() == "Body: Foo(Fred, 10)"
     }
 
     void "test future argument handling with string"() {
@@ -324,9 +339,62 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
     response.body() == 'true'
   }
 
+    void "Test part @Body with primitive defaultValue"() {
+        when:
+        String json = '{"title":"The Stand"}'
+        HttpResponse<String> response1 = Flux.from(httpClient.exchange(
+                HttpRequest.POST("/json/part-body-default-primitive", json), String
+        )).blockFirst()
+
+        then:
+        response1.code() == 200
+        response1.body() == "Body: {\"name\":\"Fred\", \"age\":10}"
+    }
+
+    void "Test part @Body with object defaultValue"() {
+        when:
+        String json = '{"title":"The Stand"}'
+        HttpResponse<String> response1 = Flux.from(httpClient.exchange(
+                HttpRequest.POST("/json/part-body-default-object", json), String
+        )).blockFirst()
+
+        then:
+        def e = thrown(HttpClientResponseException)
+        def response = e.response
+        response.getStatus() == HttpStatus.BAD_REQUEST
+    }
+
+    void "Test full @Body with primitive defaultValue"() {
+        when:
+        String json = ''
+        HttpResponse<String> response1 = Flux.from(httpClient.exchange(
+                HttpRequest.POST("/json/full-body-default-primitive", json), String
+        )).blockFirst()
+
+        then:
+        response1.code() == 200
+        response1.body() == "Body: {\"name\":\"Fred\", \"age\":10}"
+    }
+
+    void "Test full @Body with object defaultValue"() {
+        when:
+        String json = ''
+        HttpResponse<String> response1 = Flux.from(httpClient.exchange(
+                HttpRequest.POST("/json/full-body-default-object", json), String
+        )).blockFirst()
+
+        then:
+        def e = thrown(HttpClientResponseException)
+        def response = e.response
+        response.getStatus() == HttpStatus.BAD_REQUEST
+    }
+
   @Controller(value = "/json", produces = io.micronaut.http.MediaType.APPLICATION_JSON)
     @Requires(property = "test.controller", value = "JsonController")
     static class JsonController {
+      @Inject
+      @Named(TaskExecutors.BLOCKING)
+      Executor blocking
 
         @Post("/params")
         String params(String name, int age) {
@@ -411,7 +479,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         @Post("/publisher-object")
         Publisher<String> publisherObject(@Body Publisher<Foo> publisher) {
             return Flux.from(publisher)
-                    .subscribeOn(Schedulers.boundedElastic())
+                    .subscribeOn(Schedulers.fromExecutor(blocking))
                     .map({ Foo foo ->
                         foo.toString()
             })
@@ -431,6 +499,27 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         String verifyContextAccessOnDeserialization(@Body ContextChecker contextChecker) {
             return Boolean.toString(contextChecker.contextAccess)
         }
+
+        @Post("/part-body-default-primitive")
+        String partBodyDefaultPrimitive(@Body(value = 'foo', defaultValue = '{"name":"Fred", "age":10}') String body) {
+            return "Body: $body"
+        }
+
+        @Post("/part-body-default-object")
+        String partBodyDefaultObject(@Body(value = 'foo', defaultValue = '{"name":"Fred", "age":10}') Foo body) {
+            return "Body: $body"
+        }
+
+        @Post("/full-body-default-primitive")
+        String fullBodyDefaultPrimitive(@Body(defaultValue = '{"name":"Fred", "age":10}') String body) {
+            return "Body: $body"
+        }
+
+        @Post("/full-body-default-object")
+        String fullBodyDefaultObject(@Body(defaultValue = '{"name":"Fred", "age":10}') Foo body) {
+            return "Body: $body"
+        }
+
 
         @Error(JsonSyntaxException)
         HttpResponse jsonError(HttpRequest request, JsonSyntaxException jsonSyntaxException) {

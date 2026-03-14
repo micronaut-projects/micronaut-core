@@ -16,7 +16,6 @@
 package io.micronaut.core.beans;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
@@ -52,19 +51,16 @@ public abstract class AbstractBeanConstructor<T> implements BeanConstructor<T> {
     }
 
     @Override
-    @NonNull
     public AnnotationMetadata getAnnotationMetadata() {
         return annotationMetadata;
     }
 
     @Override
-    @NonNull
     public Class<T> getDeclaringBeanType() {
         return beanType;
     }
 
     @Override
-    @NonNull
     public Argument<?>[] getArguments() {
         return arguments;
     }

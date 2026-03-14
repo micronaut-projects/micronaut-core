@@ -16,8 +16,7 @@
 package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ReadBuffer;
@@ -52,11 +51,12 @@ public final class ReactiveByteBufferByteBody extends BaseStreamingByteBody<Reac
     }
 
     @Override
-    public BufferConsumer.Upstream primary(BufferConsumer primary) {
+    public BufferConsumer.Upstream primary(@Nullable BufferConsumer primary) {
         BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {
-            BaseSharedBuffer.failClaim();
+            failClaim();
         }
+        recordPrimaryOp();
         this.upstream = null;
         BaseSharedBuffer.logClaim();
         sharedBuffer.subscribe(primary, upstream);
@@ -69,10 +69,10 @@ public final class ReactiveByteBufferByteBody extends BaseStreamingByteBody<Reac
     }
 
     @Override
-    public @NonNull CloseableByteBody split(@NonNull SplitBackpressureMode backpressureMode) {
+    public CloseableByteBody split(SplitBackpressureMode backpressureMode) {
         BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {
-            BaseSharedBuffer.failClaim();
+            failClaim();
         }
         UpstreamBalancer.UpstreamPair pair = UpstreamBalancer.balancer(upstream, backpressureMode);
         this.upstream = pair.left();
@@ -81,11 +81,12 @@ public final class ReactiveByteBufferByteBody extends BaseStreamingByteBody<Reac
     }
 
     @Override
-    public @NonNull ExecutionFlow<? extends CloseableAvailableByteBody> bufferFlow() {
+    public ExecutionFlow<? extends CloseableAvailableByteBody> bufferFlow() {
         BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {
-            BaseSharedBuffer.failClaim();
+            failClaim();
         }
+        recordPrimaryOp();
         this.upstream = null;
         BaseSharedBuffer.logClaim();
         upstream.start();
@@ -99,6 +100,7 @@ public final class ReactiveByteBufferByteBody extends BaseStreamingByteBody<Reac
         if (upstream == null) {
             return;
         }
+        recordClosed();
         this.upstream = null;
         BaseSharedBuffer.logClaim();
         upstream.allowDiscard();

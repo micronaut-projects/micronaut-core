@@ -9,12 +9,17 @@ ext {
 }
 repositories {
     mavenCentral() // <1>
-    maven { url "https://central.sonatype.com/repository/maven-snapshots/" } // <2>
+    maven {
+      url = "https://central.sonatype.com/repository/maven-snapshots/" // <2>
+      mavenContent {
+        snapshotsOnly()
+      }
+    }
 }
 ----
 
 <1> Micronaut releases are available on Maven Central
-<2> Micronaut snapshots are available on Sonatype.
+<2> Micronaut snapshots are available on Central Sonatype `maven-snapshots` repository.
 
 In the case of Maven, edit `pom.xml`:
 

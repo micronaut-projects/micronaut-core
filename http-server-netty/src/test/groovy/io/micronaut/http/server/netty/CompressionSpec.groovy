@@ -4,7 +4,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.event.BeanCreatedEvent
 import io.micronaut.context.event.BeanCreatedEventListener
-import io.micronaut.core.annotation.NonNull
+import org.jspecify.annotations.NonNull
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
@@ -217,7 +217,7 @@ class CompressionSpec extends Specification {
         }
     }
 
-    private static class ClientCustomizer implements NettyClientCustomizer {
+    private static final class ClientCustomizer implements NettyClientCustomizer {
         final Channel channel
 
         ClientCustomizer(Channel channel) {

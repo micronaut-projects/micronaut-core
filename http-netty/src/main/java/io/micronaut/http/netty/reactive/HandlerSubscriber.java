@@ -21,9 +21,11 @@ import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.util.concurrent.EventExecutor;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static io.micronaut.http.netty.reactive.HandlerSubscriber.State.CANCELLED;
@@ -45,12 +47,15 @@ import static io.micronaut.http.netty.reactive.HandlerSubscriber.State.RUNNING;
 @Internal
 public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscriber<T> {
 
+    @Nullable
     protected ChannelFuture lastWriteFuture;
 
     private final EventExecutor executor;
     private final AtomicBoolean hasSubscription = new AtomicBoolean();
 
+    @Nullable
     private volatile Subscription subscription;
+    @Nullable
     private volatile ChannelHandlerContext ctx;
 
     private State state = NO_SUBSCRIPTION_OR_CONTEXT;
@@ -174,7 +179,7 @@ public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscr
     @Override
     public void onNext(T t) {
         // Publish straight to the context.
-        onNext(t, ctx.newPromise());
+        onNext(t, Objects.requireNonNull(ctx).newPromise());
     }
 
     /**
@@ -185,7 +190,7 @@ public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscr
      */
     protected void onNext(T t, ChannelPromise promise) {
         // Publish straight to the context.
-        lastWriteFuture = ctx.writeAndFlush(t, promise);
+        lastWriteFuture = Objects.requireNonNull(ctx).writeAndFlush(t, promise);
         lastWriteFuture.addListener(future ->
                 maybeRequestMore()
         );
@@ -214,7 +219,7 @@ public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscr
                 case NO_SUBSCRIPTION:
                 case INACTIVE:
                 case RUNNING:
-                    ctx.close();
+                    Objects.requireNonNull(ctx).close();
                     state = COMPLETE;
                     break;
                 default:
@@ -224,8 +229,8 @@ public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscr
     }
 
     private void maybeRequestMore() {
-        if (ctx.channel().isWritable() && !(state == COMPLETE || state == CANCELLED)) {
-            subscription.request(1);
+        if (Objects.requireNonNull(ctx).channel().isWritable() && !(state == COMPLETE || state == CANCELLED)) {
+            Objects.requireNonNull(subscription).request(1);
         }
     }
 
@@ -242,7 +247,7 @@ public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscr
                 break;
             case RUNNING:
             case INACTIVE:
-                subscription.cancel();
+                Objects.requireNonNull(subscription).cancel();
                 state = CANCELLED;
                 break;
             default:
@@ -259,7 +264,7 @@ public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscr
                 maybeStart();
                 break;
             case CANCELLED:
-                subscription.cancel();
+                Objects.requireNonNull(subscription).cancel();
                 break;
             default:
                 // no-op
@@ -267,7 +272,7 @@ public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscr
     }
 
     private void maybeStart() {
-        if (ctx.channel().isActive()) {
+        if (Objects.requireNonNull(ctx).channel().isActive()) {
             state = RUNNING;
             maybeRequestMore();
         } else {

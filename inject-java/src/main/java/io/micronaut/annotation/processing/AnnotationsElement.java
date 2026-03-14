@@ -16,6 +16,7 @@
 package io.micronaut.annotation.processing;
 
 import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.Nullable;
 
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.Element;
@@ -65,6 +66,7 @@ final class AnnotationsElement implements Element {
     }
 
     @Override
+    @Nullable
     public Element getEnclosingElement() {
         return null;
     }

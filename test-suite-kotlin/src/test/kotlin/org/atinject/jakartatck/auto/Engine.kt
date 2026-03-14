@@ -23,10 +23,6 @@ import jakarta.inject.Named
 abstract class Engine {
 
     var publicNoArgsConstructorInjected: Boolean = false
-    var subPackagePrivateMethodInjected: Boolean = false
-    var superPackagePrivateMethodInjected: Boolean = false
-    var subPackagePrivateMethodForOverrideInjected: Boolean = false
-    var superPackagePrivateMethodForOverrideInjected: Boolean = false
 
     var overriddenTwiceWithOmissionInMiddleInjected: Boolean = false
     var overriddenTwiceWithOmissionInSubclassInjected: Boolean = false
@@ -36,17 +32,8 @@ abstract class Engine {
     protected var tireA: Tire? = null
     protected var tireB: Tire? = null
 
-    var overriddenPackagePrivateMethodInjectedTwice: Boolean = false
     var qualifiersInheritedFromOverriddenMethod: Boolean = false
     var overriddenMethodInjected: Boolean = false
-
-    @Inject internal open fun injectPackagePrivateMethod() {
-        superPackagePrivateMethodInjected = true
-    }
-
-    @Inject internal open fun injectPackagePrivateMethodForOverride() {
-        superPackagePrivateMethodForOverrideInjected = true
-    }
 
     @Inject
     open fun injectQualifiers(@Drivers seatA: Seat, seatB: Seat,

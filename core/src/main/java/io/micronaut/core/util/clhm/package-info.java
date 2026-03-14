@@ -20,4 +20,7 @@
  * @author graemerocher
  * @since 1.1
  */
+@NullMarked
 package io.micronaut.core.util.clhm;
+
+import org.jspecify.annotations.NullMarked;

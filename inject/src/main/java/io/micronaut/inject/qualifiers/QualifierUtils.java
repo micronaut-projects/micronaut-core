@@ -18,8 +18,7 @@ package io.micronaut.inject.qualifiers;
 import io.micronaut.context.Qualifier;
 import io.micronaut.context.annotation.Any;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.naming.NameResolver;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanType;
@@ -98,7 +97,7 @@ final class QualifierUtils {
      * @param o2 The annotation object 2
      * @return true if equals
      */
-    public static boolean annotationQualifiersEquals(@NonNull Object o1, @NonNull Object o2) {
+    public static boolean annotationQualifiersEquals(Object o1, Object o2) {
         Map.Entry<String, Map<CharSequence, Object>> val1 = extractAnnotationAndBindingValues(o1);
         if (val1 == null) {
             return false;
@@ -110,8 +109,7 @@ final class QualifierUtils {
         return Objects.equals(val1.getKey(), val2.getKey()) && Objects.equals(val1.getValue(), val2.getValue());
     }
 
-    @Nullable
-    private static Map.Entry<String, Map<CharSequence, Object>> extractAnnotationAndBindingValues(@NonNull Object o) {
+    private static Map.@Nullable Entry<String, Map<CharSequence, Object>> extractAnnotationAndBindingValues(Object o) {
         if (o instanceof AnnotationStereotypeQualifier<?> that) {
             return new AbstractMap.SimpleEntry<>(that.stereotype, null);
         } else if (o instanceof AnnotationMetadataQualifier<?> that) {

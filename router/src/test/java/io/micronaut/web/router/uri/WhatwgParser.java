@@ -1,8 +1,8 @@
 package io.micronaut.web.router.uri;
 
 import com.ibm.icu.text.IDNA;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;

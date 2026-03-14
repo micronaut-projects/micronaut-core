@@ -16,7 +16,6 @@
 package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableHeaders;
@@ -28,6 +27,7 @@ import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.codec.CodecException;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -50,12 +50,12 @@ final class TextPlainObjectBodyWriter implements TypedMessageBodyWriter<Object>,
     }
 
     @Override
-    public boolean isWriteable(Argument<Object> type, MediaType mediaType) {
+    public boolean isWriteable(Argument<Object> type, @Nullable MediaType mediaType) {
         return ClassUtils.isJavaBasicType(type.getType());
     }
 
     @Override
-    public void writeTo(Argument<Object> type, MediaType mediaType, Object object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
+    public void writeTo(Argument<Object> type, @Nullable MediaType mediaType, Object object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
         outgoingHeaders.setIfMissing(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN);
         try {
             outputStream.write(object.toString().getBytes(MessageBodyWriter.getCharset(mediaType, outgoingHeaders)));
@@ -65,7 +65,7 @@ final class TextPlainObjectBodyWriter implements TypedMessageBodyWriter<Object>,
     }
 
     @Override
-    public @NonNull CloseableByteBody writePiece(@NonNull ByteBodyFactory bodyFactory, @NonNull HttpRequest<?> request, @NonNull HttpResponse<?> response, @NonNull Argument<Object> type, @NonNull MediaType mediaType, Object object) throws CodecException {
+    public CloseableByteBody writePiece(ByteBodyFactory bodyFactory, HttpRequest<?> request, HttpResponse<?> response, Argument<Object> type, @Nullable MediaType mediaType, Object object) throws CodecException {
         return bodyFactory.copyOf(object instanceof CharSequence cs ? cs : object.toString(), MessageBodyWriter.getCharset(mediaType, response.getHeaders()));
     }
 }

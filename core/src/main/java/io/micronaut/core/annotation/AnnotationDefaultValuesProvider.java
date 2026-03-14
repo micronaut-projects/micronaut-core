@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.core.annotation;
-
 import java.util.Map;
 
 /**
@@ -29,7 +28,6 @@ public interface AnnotationDefaultValuesProvider {
      * @param annotationName The annotation name
      * @return The annotation default values
      */
-    @NonNull
     Map<CharSequence, Object> provide(String annotationName);
 
 }

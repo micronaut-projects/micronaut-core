@@ -19,7 +19,7 @@ import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.type.Argument;
@@ -72,6 +72,7 @@ public class TextStreamCodec implements MediaTypeCodec {
     private final ByteBufferFactory byteBufferFactory;
     private final List<MediaType> additionalTypes;
     private final Charset defaultCharset;
+    @Nullable
     private MediaTypeCodecRegistry codecRegistry;
 
     /**
@@ -207,7 +208,7 @@ public class TextStreamCodec implements MediaTypeCodec {
      * @param attribute The attribute
      * @param value     The value
      */
-    protected void writeAttribute(ByteBuffer eventData, byte[] attribute, String value) {
+    protected void writeAttribute(ByteBuffer eventData, byte[] attribute, @Nullable String value) {
         if (value != null) {
             eventData.write(attribute)
                 .write(value, defaultCharset)

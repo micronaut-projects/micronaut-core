@@ -16,7 +16,8 @@
 package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NullUnmarked;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.inject.ast.ClassElement;
@@ -41,6 +42,7 @@ import java.util.Objects;
  * @since 4.7
  */
 @Internal
+@NullUnmarked
 public final class MethodGenUtils {
 
     private static final TypeDef KOTLIN_CONSTRUCTOR_MARKER = TypeDef.of("kotlin.jvm.internal.DefaultConstructorMarker");

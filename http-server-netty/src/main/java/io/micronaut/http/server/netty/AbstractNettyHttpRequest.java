@@ -16,7 +16,6 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.HttpMethod;
@@ -34,6 +33,7 @@ import io.netty.handler.codec.http.HttpConstants;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.util.DefaultAttributeMap;
+import org.jspecify.annotations.Nullable;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -55,9 +55,13 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
     protected final String unvalidatedUrl;
     protected final String httpMethodName;
 
+    @Nullable
     private volatile URI uri;
+    @Nullable
     private volatile NettyHttpParameters httpParameters;
+    @Nullable
     private volatile Charset charset;
+    @Nullable
     private volatile String path;
 
     /**
@@ -80,13 +84,11 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
         this.httpMethod = HttpMethod.parse(httpMethodName);
     }
 
-    @NonNull
     @Override
     public io.netty.handler.codec.http.HttpRequest toHttpRequest() {
         return this.nettyRequest;
     }
 
-    @NonNull
     @Override
     public io.netty.handler.codec.http.FullHttpRequest toFullHttpRequest() {
         if (this.nettyRequest instanceof io.netty.handler.codec.http.FullHttpRequest request) {
@@ -101,7 +103,6 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
         return httpRequest;
     }
 
-    @NonNull
     @Override
     public StreamedHttpRequest toStreamHttpRequest() {
         if (isStream()) {

@@ -15,9 +15,9 @@
  */
 package io.micronaut.jackson.serialize;
 
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.databind.DeserializationContext;
-import com.fasterxml.jackson.databind.JsonDeserializer;
+import tools.jackson.core.JsonParser;
+import tools.jackson.databind.DeserializationContext;
+import tools.jackson.databind.ValueDeserializer;
 import io.micronaut.jackson.core.tree.JsonNodeTreeCodec;
 import io.micronaut.json.tree.JsonNode;
 import jakarta.inject.Singleton;
@@ -31,9 +31,13 @@ import java.io.IOException;
  * @since 3.1
  */
 @Singleton
-public final class JsonNodeDeserializer extends JsonDeserializer<JsonNode> {
+public final class JsonNodeDeserializer extends ValueDeserializer<JsonNode> {
     @Override
-    public JsonNode deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
-        return JsonNodeTreeCodec.getInstance().readTree(p);
+    public JsonNode deserialize(JsonParser p, DeserializationContext ctxt) {
+        try {
+            return JsonNodeTreeCodec.getInstance().readTree(p);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 }

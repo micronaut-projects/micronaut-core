@@ -35,6 +35,7 @@ import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.qualifiers.Qualifiers;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -71,7 +72,7 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
      * @param context The context object
      * @throws IOException If an error occurs
      */
-    protected void execute(InputStream input, OutputStream output, C context) throws IOException {
+    protected void execute(InputStream input, OutputStream output, @Nullable C context) throws IOException {
         final ApplicationContext applicationContext = buildApplicationContext(context);
         if (context == null) {
             context = (C) applicationContext;
@@ -216,6 +217,7 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
         throw new CodecException("Unable to decode argument from stream: " + arg);
     }
 
+    @Nullable
     private Object doConvertInput(ConversionService conversionService, Argument<?> arg, Object object) {
         ArgumentConversionContext<?> conversionContext = ConversionContext.of(arg);
         Optional<?> convert = conversionService.convert(object, conversionContext);

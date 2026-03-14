@@ -17,7 +17,6 @@ package io.micronaut.http.client.netty;
 
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
@@ -38,11 +37,13 @@ import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.DefaultLastHttpContent;
 import io.netty.handler.codec.http.FullHttpResponse;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -65,6 +66,7 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, NettyHtt
     private final ByteBuf unpooledContent;
     private final Map<Argument, Optional> convertedBodies = new ConcurrentHashMap<>();
     private final MessageBodyHandlerRegistry handlerRegistry;
+    @Nullable
     private final B body;
     private final ConversionService conversionService;
 
@@ -78,6 +80,7 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, NettyHtt
     FullNettyClientHttpResponse(
         FullHttpResponse fullHttpResponse,
         MessageBodyHandlerRegistry handlerRegistry,
+        @Nullable
         Argument<B> bodyType,
         boolean convertBody,
         ConversionService conversionService
@@ -93,6 +96,7 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, NettyHtt
         this.nettyCookies = new NettyCookies(fullHttpResponse.headers(), conversionService);
         Class<?> rawBodyType = bodyType != null ? bodyType.getType() : null;
         if (rawBodyType != null && !HttpStatus.class.isAssignableFrom(rawBodyType)) {
+            Objects.requireNonNull(bodyType);
             if (HttpResponse.class.isAssignableFrom(bodyType.getType())) {
                 Optional<Argument<?>> responseBodyType = bodyType.getFirstTypeVariable();
                 if (responseBodyType.isPresent()) {
@@ -119,7 +123,6 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, NettyHtt
         return this.nettyHttpResponse.status().code();
     }
 
-    @NonNull
     @Override
     public HttpHeaders getHeaders() {
         return headers;
@@ -135,21 +138,18 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, NettyHtt
         return nettyCookies.findCookie(name);
     }
 
-    @NonNull
     @Override
     public MutableConvertibleValues<Object> getAttributes() {
         return attributes;
     }
 
-    @NonNull
     @Override
     public Optional<B> getBody() {
         return Optional.ofNullable(body);
     }
 
-    @NonNull
     @Override
-    public <T> Optional<T> getBody(@NonNull Class<T> type) {
+    public <T> Optional<T> getBody(Class<T> type) {
         if (type == null) {
             return Optional.empty();
         }
@@ -157,9 +157,8 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, NettyHtt
     }
 
     @SuppressWarnings("unchecked")
-    @NonNull
     @Override
-    public <T> Optional<T> getBody(@NonNull Argument<T> type) {
+    public <T> Optional<T> getBody(Argument<T> type) {
         if (type == null) {
             return Optional.empty();
         }
@@ -223,7 +222,7 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, NettyHtt
                 MessageBodyReader<T> r = reader.get();
                 MediaType ct = contentType.get();
                 if (r.isReadable(type, ct)) {
-                    return Optional.of(r.read(type, ct, headers, NettyByteBufferFactory.DEFAULT.wrap(unpooledContent.slice())));
+                    return Optional.ofNullable(r.read(type, ct, headers, NettyByteBufferFactory.DEFAULT.wrap(unpooledContent.slice())));
                 }
             }
         } else if (LOG.isTraceEnabled()) {
@@ -233,7 +232,6 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, NettyHtt
         return conversionService.convert(unpooledContent.slice(), ByteBuf.class, type);
     }
 
-    @NonNull
     @Override
     public FullHttpResponse toFullHttpResponse() {
         var copy = new DefaultFullHttpResponse(
@@ -247,7 +245,6 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, NettyHtt
         return copy;
     }
 
-    @NonNull
     @Override
     public io.netty.handler.codec.http.HttpResponse toHttpResponse() {
         return nettyHttpResponse;

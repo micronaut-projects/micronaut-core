@@ -5,6 +5,37 @@ This section documents breaking changes between Micronaut versions
 
 === Core Changes
 
+==== Duplicate configuration resources now fail fast by default
+
+In Micronaut Framework 5, if a configuration file such as `application.properties` or `application.yml` is present more than once on the classpath, Micronaut now fails fast by default with a api:io.micronaut.context.exceptions.ConfigurationException[] describing the conflicting locations.
+
+See <<duplicateConfigurationResources, Duplicate Configuration Resources>> for more options (including merging duplicates).
+
+To restore the previous behavior (first match wins), configure the application context builder:
+
+snippet::io.micronaut.docs.context.env.ConfigurationLoadStrategySnippet[tags="restoreFirstMatch",indent=0,title="Restoring FIRST_MATCH behavior"]
+
+==== Adoption of the IANA standard for YAML media types
+
+Micronaut now uses official **application/yaml** media type for YAML format. Before it was **application/x-yaml**.
+See https://www.rfc-editor.org/rfc/rfc9512.html for details.
+
+==== Update to Jackson 3
+
+Micronaut Jackson Databind uses https://github.com/FasterXML/jackson/wiki/Jackson-Release-3.0[Jackson 3].
+If you use Micronaut Jackson Databind, check the https://github.com/FasterXML/jackson/blob/main/jackson3/MIGRATING_TO_JACKSON_3.md[Jackson 3 Migration Guide].
+
+Micronaut configuration properties for various Jackson features have been renamed. Please check the https://docs.micronaut.io/latest/guide/configurationreference.html#io.micronaut.jackson.JacksonConfiguration[configuration reference]. Also note that Jackson has renamed a few features upstream, and that various defaults have changed.
+
+==== Update to Apache Groovy 5
+
+Micronaut 5 uses http://groovy-lang.org/releasenotes/groovy-5.0.html[Apache Groovy 5].
+Check https://groovy-lang.org/releasenotes/groovy-5.0.html#Groovy5.0-breaking[Groovy 5 breaking changes].
+
+==== JSpecify Nullability Annotations
+
+The Micronaut APIs use <<jspecify, JSpecify Annotations>>, and we recommend users to embrace JSpecify nullability annotations.
+
 ==== Bean context changes
 
 The default implementations of api:context.BeanContext[BeanContext], api:context.ApplicationContext[ApplicationContext] and api:context.env.Environment[Environment] are no longer public and non-final.
@@ -60,6 +91,121 @@ context.registerBeanDefinition(
         .typeArguments(Resolver, Argument.of(String))
         .build()
 );
+----
+
+==== Runtime annotation processors changes
+
+The `@Executable` methods processor api:context.processor[ExecutableMethodProcessor] should be used only to process the executable methods that should be processed at startup. The annotation should be annotated with `@Executable(processOnStartup = true)`. For other use-cases (executable or not) api:context.processor[BeanDefinitionProcessor] should be used.
+
+The incorrect use will result in a warning and an error in the next major version.
+
+Both interfaces are revisited to have better generics and no longer have now deleted `AnnotationProcessor` superclass.
+
+Executable methods annotated with `@Parallel` will not trigger parallel execution of api:context.processor[ExecutableMethodProcessor]. Users who relied on that functionality should handle parallelism separately.
+
+`@Scheduled` is no longer processed in parallel, this reduced the complexity of the method processor and removed unnecessary overhead.
+
+==== Jackson Bean Introspection Module removed
+
+NOTE: This change only affects users using <<serializationUsingJacksonDatabind, Micronaut Jackson Databind>>
+
+Previous versions of Micronaut Core contained a so-called "bean introspection module". This Jackson module hooked into jackson-databind to replace reflective field and method access with Micronaut introspection-based calls. The performance difference is negligible, but the module allows serialization in native images without having to add reflection metadata.
+
+In version 5, we removed this module because it is difficult to maintain. Native image users now have a good alternative to <<serializationUsingJacksonDatabind, Micronaut Jackson Databind>> in https://micronaut-projects.github.io/micronaut-serialization/latest/guide[Micronaut Serialization].
+
+Users who do not wish to use Micronaut Serialization will have to add reflection metadata for the objects they serialize.
+
+If you want to keep using <<serializationUsingJacksonDatabind, Micronaut Jackson Databind>>, beware that deserialization of such class works in Micronaut 4:
+
+[source, java]
+----
+package example;
+
+import java.util.Objects;
+
+public class Person {
+    private final String name;
+    private final int age;
+
+    public Person(String name, int age) {
+        this.name = name;
+        this.age = age;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public int getAge() {
+        return age;
+    }
+}
+----
+
+In Micronaut 5, you will need to add `@JsonProperty` annotations to the constructor parameters. This is standard Jackson databind deserialization behavior.
+
+[source, java]
+----
+package example;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+import java.util.Objects;
+
+public class Person {
+    private final String name;
+    private final int age;
+
+    public Person(@JsonProperty("name") String name,
+                  @JsonProperty("age") int age) {
+        this.name = name;
+        this.age = age;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public int getAge() {
+        return age;
+    }
+}
+----
+
+To generate a GraalVM Native Image, where you need to de/serialize such as class, you can add the following dependency:
+
+dependency:micronaut-graal[scope="annotationProcessor",groupId="io.micronaut.graal"]
+
+and annotate it with api:core.annotation.ReflectiveAccess[]. Read <<graal, Graal>> section of the Micronaut core documentation.
+
+
+[source, java]
+----
+package example;
+
+import java.util.Objects;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.micronaut.core.annotation.ReflectiveAccess;
+
+@ReflectiveAccess
+public class Person {
+    private final String name;
+    private final int age;
+
+    public Person(@JsonProperty("name") String name,
+                  @JsonProperty("age") int age) {
+        this.name = name;
+        this.age = age;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public int getAge() {
+        return age;
+    }
+}
 ----
 
 == 4.0.0

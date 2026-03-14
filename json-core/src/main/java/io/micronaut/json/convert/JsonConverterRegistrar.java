@@ -18,7 +18,6 @@ package io.micronaut.json.convert;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.bind.BeanPropertyBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -35,6 +34,7 @@ import io.micronaut.json.JsonMapper;
 import io.micronaut.json.JsonSyntaxException;
 import io.micronaut.json.tree.JsonNode;
 import jakarta.inject.Inject;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -53,6 +53,7 @@ import java.util.Optional;
 @Prototype
 public final class JsonConverterRegistrar implements TypeConverterRegistrar {
     private final BeanProvider<JsonMapper> objectCodecProvider;
+    @Nullable
     private JsonMapper objectCodec;
     private final ConversionService conversionService;
     private final BeanProvider<BeanPropertyBinder> beanPropertyBinder;
@@ -232,7 +233,6 @@ public final class JsonConverterRegistrar implements TypeConverterRegistrar {
         };
     }
 
-    @NonNull
     private static <K> Argument<K> argument(Class<K> targetType, ConversionContext context) {
         if (context instanceof ArgumentConversionContext<?> argumentConversionContext) {
             Argument<?> argument = argumentConversionContext.getArgument();

@@ -85,7 +85,7 @@ class MalformedUriSpec extends Specification {
         def result = ((HttpURLConnection) connection).errorStream.text
 
         then:
-        result == '{"message":"Request Entity Too Large","_links":{"self":{"href":"/malformed-proxy/xyz","templated":false}},"_embedded":{"errors":[{"message":"Request Entity Too Large"}]}}'
+        result == '{"message":"Request Entity Too Large","_embedded":{"errors":[{"message":"Request Entity Too Large"}]},"_links":{"self":{"href":"/malformed-proxy/xyz","templated":false}}}'
         !filter.filterCalled
         !newFilter.preMatchingCalled
     }

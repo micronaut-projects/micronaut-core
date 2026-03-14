@@ -17,6 +17,7 @@ package io.micronaut.context.exceptions;
 
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.inject.BeanType;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Thrown when no such beans exists.
@@ -53,7 +54,7 @@ public class BeanInstantiationException extends BeanCreationException {
      * @param resolutionContext The resolution context
      * @param message           The message
      */
-    public BeanInstantiationException(BeanResolutionContext resolutionContext, String message) {
+    public BeanInstantiationException(BeanResolutionContext resolutionContext, @Nullable String message) {
         super(resolutionContext, MessageUtils.buildMessage(resolutionContext, message));
     }
 

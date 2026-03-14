@@ -1,6 +1,6 @@
 package io.micronaut.docs.netty
 
-import io.micronaut.core.annotation.NonNull
+import org.jspecify.annotations.NonNull
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.CompositeByteBuf
 import io.netty.channel.ChannelDuplexHandler
@@ -34,7 +34,7 @@ class EmbeddedTestUtil {
         csDir.readPending = true
     }
 
-    private static class ConnectionDirection {
+    private static final class ConnectionDirection {
         final EmbeddedChannel source
         final EmbeddedChannel dest
         CompositeByteBuf sourceQueue
@@ -155,4 +155,3 @@ class EmbeddedTestUtil {
         }
     }
 }
-

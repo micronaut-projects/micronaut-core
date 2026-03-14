@@ -18,9 +18,8 @@ package io.micronaut.core.beans;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.CollectionUtils;
-
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.ObjectUtils;
+import org.jspecify.annotations.Nullable;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -66,7 +65,7 @@ final class BeanIntrospectionMap<T> implements BeanMap<T> {
     }
 
     @Override
-    public @NonNull Class<T> getBeanType() {
+    public Class<T> getBeanType() {
         return beanIntrospection.getBeanType();
     }
 
@@ -81,7 +80,7 @@ final class BeanIntrospectionMap<T> implements BeanMap<T> {
     }
 
     @Override
-    public boolean containsKey(Object key) {
+    public boolean containsKey(@Nullable Object key) {
         if (key == null) {
             return false;
         }
@@ -94,7 +93,8 @@ final class BeanIntrospectionMap<T> implements BeanMap<T> {
     }
 
     @Override
-    public Object get(Object key) {
+    @Nullable
+    public Object get(@Nullable Object key) {
         if (key == null) {
             return null;
         }
@@ -102,7 +102,8 @@ final class BeanIntrospectionMap<T> implements BeanMap<T> {
     }
 
     @Override
-    public Object put(String key, Object value) {
+    @Nullable
+    public Object put(@Nullable String key, @Nullable Object value) {
         if (key == null) {
             return null;
         }
@@ -142,7 +143,7 @@ final class BeanIntrospectionMap<T> implements BeanMap<T> {
 
     @Override
     public Collection<Object> values() {
-        return keySet().stream().map(this::get).collect(Collectors.toList());
+        return keySet().stream().map(this::get).filter(Objects::nonNull).collect(Collectors.toList());
     }
 
     @Override
@@ -154,12 +155,14 @@ final class BeanIntrospectionMap<T> implements BeanMap<T> {
             }
 
             @Override
+            @Nullable
             public Object getValue() {
                 return get(key);
             }
 
             @Override
-            public Object setValue(Object value) {
+            @Nullable
+            public Object setValue(@Nullable Object value) {
                 return put(key, value);
             }
         }).collect(Collectors.toSet());

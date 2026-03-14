@@ -16,7 +16,7 @@
 package io.micronaut.context.propagation.instrument.execution;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.scheduling.instrument.InstrumentedExecutorService;
 
@@ -35,6 +35,7 @@ import java.util.concurrent.ExecutorService;
 public class ContextPropagatingExecutorService implements InstrumentedExecutorService {
     private final ExecutorService target;
 
+    @Nullable
     private final PropagatedContext propagatedContext;
 
     public ContextPropagatingExecutorService(ExecutorService target) {

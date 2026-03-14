@@ -10,8 +10,13 @@ jobs:
     if: github.repository != 'micronaut-projects/micronaut-project-template'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/cache@v4
+      - name: Remove system JDKs
+        run: |
+          sudo rm -rf /usr/lib/jvm/*
+          unset JAVA_HOME
+          export PATH=$(echo "$PATH" | tr ':' '\n' | grep -v '/usr/lib/jvm' | paste -sd:)
+      - uses: actions/checkout@v6
+      - uses: actions/cache@v5
         with:
           path: ~/.gradle/caches
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle') }}
@@ -22,8 +27,7 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: |
-            17
-            21
+            25
       - name: Publish to Sonatype Snapshots
         if: success()
         env:

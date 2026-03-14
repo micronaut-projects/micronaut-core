@@ -18,7 +18,7 @@ package test
 import com.fasterxml.jackson.annotation.JsonProperty
 import io.micronaut.context.annotation.Executable
 import io.micronaut.core.annotation.Introspected
-import io.micronaut.core.annotation.Nullable
+import org.jspecify.annotations.Nullable
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Produces
@@ -29,7 +29,7 @@ interface MyInterface {
 
     @Get
     @Produces(MediaType.TEXT_PLAIN)
-    fun index(@Nullable @QueryValue("channels") channels: Collection<Channel?>?)
+    fun index(@QueryValue("channels") channels: @Nullable Collection<Channel?>?)
 
     @Introspected
     enum class Channel {

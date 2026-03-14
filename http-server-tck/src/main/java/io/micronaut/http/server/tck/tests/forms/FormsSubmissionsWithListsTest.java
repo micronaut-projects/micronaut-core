@@ -17,6 +17,7 @@ package io.micronaut.http.server.tck.tests.forms;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
@@ -85,6 +86,7 @@ public class FormsSubmissionsWithListsTest {
     }
 
     @Introspected
+    @ReflectiveAccess
     public record QuestionSave(String question,
                                List<Long> usersId) {
     }

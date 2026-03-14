@@ -20,8 +20,7 @@ import com.github.javaparser.javadoc.Javadoc;
 import com.github.javaparser.javadoc.JavadocBlockTag;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.MethodElement;
@@ -45,7 +44,9 @@ final class JavaParameterElement extends AbstractTypeAwareJavaElement implements
 
     private final JavaClassElement owningType;
     private final JavaMethodElement methodElement;
+    @Nullable
     private ClassElement typeElement;
+    @Nullable
     private ClassElement genericTypeElement;
 
     /**
@@ -67,7 +68,6 @@ final class JavaParameterElement extends AbstractTypeAwareJavaElement implements
         this.methodElement = methodElement;
     }
 
-    @NonNull
     @Override
     public JavaNativeElement.Variable getNativeType() {
         return (JavaNativeElement.Variable) super.getNativeType();
@@ -104,7 +104,6 @@ final class JavaParameterElement extends AbstractTypeAwareJavaElement implements
     }
 
     @Override
-    @NonNull
     public ClassElement getType() {
         if (typeElement == null) {
             typeElement = newClassElement(getNativeType(), getNativeType().element().asType(), Collections.emptyMap());
@@ -112,7 +111,6 @@ final class JavaParameterElement extends AbstractTypeAwareJavaElement implements
         return typeElement;
     }
 
-    @NonNull
     @Override
     public ClassElement getGenericType() {
         if (genericTypeElement == null) {
@@ -132,7 +130,10 @@ final class JavaParameterElement extends AbstractTypeAwareJavaElement implements
     }
 
     @Override
-    public Optional<String> getDocumentation() {
+    public Optional<String> getDocumentation(boolean parse) {
+        if (!parse) {
+            return Optional.empty();
+        }
         try {
             String methodDocComment = visitorContext.getElements().getDocComment(methodElement.getNativeType().element());
             if (methodDocComment != null) {

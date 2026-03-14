@@ -15,9 +15,9 @@
  */
 package io.micronaut.jackson.serialize;
 
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.databind.JsonSerializer;
-import com.fasterxml.jackson.databind.SerializerProvider;
+import tools.jackson.core.JsonGenerator;
+import tools.jackson.databind.ValueSerializer;
+import tools.jackson.databind.SerializationContext;
 import io.micronaut.jackson.core.tree.JsonNodeTreeCodec;
 import io.micronaut.json.tree.JsonNode;
 import jakarta.inject.Singleton;
@@ -31,13 +31,17 @@ import java.io.IOException;
  * @since 3.1
  */
 @Singleton
-public final class JsonNodeSerializer extends JsonSerializer<JsonNode> {
+public final class JsonNodeSerializer extends ValueSerializer<JsonNode> {
     @Override
-    public void serialize(JsonNode value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+    public void serialize(JsonNode value, JsonGenerator gen, SerializationContext serializers) {
         if (value == null) {
             gen.writeNull();
         } else {
-            JsonNodeTreeCodec.getInstance().writeTree(gen, value);
+            try {
+                JsonNodeTreeCodec.getInstance().writeTree(gen, value);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
         }
     }
 }

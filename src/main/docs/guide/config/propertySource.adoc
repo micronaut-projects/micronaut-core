@@ -25,6 +25,30 @@ NOTE: 'micronaut.config.files' will be ignored in bootstrap.yml or application.y
 
 TIP: `.properties`, `.json`, `.yml` are supported out of the box. For Groovy users `.groovy` is supported as well.
 
+[[duplicateConfigurationResources]]
+=== Duplicate Configuration Resources
+
+If a configuration file (for example `application.properties` or `application.yml`) is present more than once on the classpath, Micronaut can be configured to:
+
+* fail fast with a clear error describing the conflicting locations,
+* take the first match (with optional warning), or
+* merge all matching resources.
+
+The behavior can be customized using the api:io.micronaut.context.ApplicationContextBuilder[] (including `Micronaut`).
+
+snippet::io.micronaut.docs.context.env.ConfigurationLoadStrategySnippet[tags="firstMatch",indent=0,title="Using FIRST_MATCH"]
+
+To merge duplicates, set the strategy type to `MERGE_ALL`:
+
+snippet::io.micronaut.docs.context.env.ConfigurationLoadStrategySnippet[tags="mergeAll",indent=0,title="Merging duplicates"]
+
+When using `MERGE_ALL`, you can optionally specify a merge order based on artifact (JAR) name patterns:
+
+snippet::io.micronaut.docs.context.env.ConfigurationLoadStrategySnippet[tags="mergeOrder",indent=0,title="MERGE_ALL with mergeOrder"]
+
+NOTE: `mergeOrder` is only supported when the strategy type is `MERGE_ALL`.
+When resources are merged, later resources override earlier ones when the same property key is present.
+
 Note that if you want full control of where your application loads configuration from you can disable the default `PropertySourceLoader` implementations listed above by calling the `enableDefaultPropertySources(false)` method of the api:context.ApplicationContextBuilder[] interface when starting your application.
 
 In this case only explicit api:context.env.PropertySource[] instances that you add via the `propertySources(..)` method of the api:context.ApplicationContextBuilder[] interface will be used.

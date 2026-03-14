@@ -19,7 +19,7 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.Order;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.discovery.ServiceInstance;
@@ -38,6 +38,7 @@ import jakarta.inject.Singleton;
 final class NettyServiceDiscovery {
     private final ApplicationEventPublisher<ServiceReadyEvent> serviceReadyEventApplicationEventPublisher;
     private final ApplicationEventPublisher<ServiceStoppedEvent> serviceStoppedEventApplicationEventPublisher;
+    @Nullable
     private NettyEmbeddedServerInstance createdInstance;
 
     NettyServiceDiscovery(ApplicationEventPublisher<ServiceReadyEvent> serviceReadyEventApplicationEventPublisher,

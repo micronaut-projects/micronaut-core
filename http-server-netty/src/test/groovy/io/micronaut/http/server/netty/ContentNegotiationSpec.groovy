@@ -75,8 +75,8 @@ class ContentNegotiationSpec extends Specification {
 
         where:
         contentType                     | expectedContentType             | expectedBody
-        null                            | MediaType.APPLICATION_JSON_TYPE | '{"name":"Fred","age":10}'
-        MediaType.APPLICATION_JSON_TYPE | MediaType.APPLICATION_JSON_TYPE | '{"name":"Fred","age":10}'
+        null                            | MediaType.APPLICATION_JSON_TYPE | '{"age":10,"name":"Fred"}'
+        MediaType.APPLICATION_JSON_TYPE | MediaType.APPLICATION_JSON_TYPE | '{"age":10,"name":"Fred"}'
 // Add Micronaut Jackson XML after v4 Migration
 //        MediaType.APPLICATION_XML_TYPE  | MediaType.APPLICATION_XML_TYPE  | '<Person><name>Fred</name><age>10</age></Person>'
     }

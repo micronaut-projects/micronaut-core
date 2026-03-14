@@ -23,8 +23,7 @@ import io.micronaut.annotation.processing.JavaElementAnnotationMetadataFactory;
 import io.micronaut.annotation.processing.JavaNativeElementsHelper;
 import io.micronaut.annotation.processing.ModelUtils;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -235,9 +234,8 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
         this.visitUnresolvedInterfaces = visitUnresolvedInterfaces;
     }
 
-    @NonNull
     @Override
-    public Iterable<URL> getClasspathResources(@NonNull String path) {
+    public Iterable<URL> getClasspathResources(String path) {
         // reflective hack required because no way to get the JavaFileManager
         // from public processor API
         info("EXPERIMENTAL: Compile time resource scanning is experimental", null);
@@ -280,7 +278,7 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
     }
 
     @Override
-    public @NonNull ClassElement[] getClassElements(@NonNull String aPackage, @NonNull String... stereotypes) {
+    public ClassElement[] getClassElements(String aPackage, String... stereotypes) {
         ArgumentUtils.requireNonNull("aPackage", aPackage);
         ArgumentUtils.requireNonNull("stereotypes", stereotypes);
         final PackageElement packageElement = elements.getPackageElement(aPackage);
@@ -292,32 +290,28 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
         return ClassElement.ZERO_CLASS_ELEMENTS;
     }
 
-    @NonNull
     @Override
     public JavaElementFactory getElementFactory() {
         return elementFactory;
     }
 
-    @NonNull
     @Override
     public JavaElementAnnotationMetadataFactory getElementAnnotationMetadataFactory() {
         return elementAnnotationMetadataFactory;
     }
 
-    @NonNull
     @Override
     public ExpressionCompilationContextFactory getExpressionCompilationContextFactory() {
         return expressionCompilationContextFactory;
     }
 
-    @NonNull
     @Override
     public JavaAnnotationMetadataBuilder getAnnotationMetadataBuilder() {
         return annotationMetadataBuilder;
     }
 
     @Override
-    public void info(String message, @Nullable io.micronaut.inject.ast.Element element) {
+    public void info(String message, io.micronaut.inject.ast.@Nullable Element element) {
         printMessage(message, Diagnostic.Kind.NOTE, element);
     }
 
@@ -329,12 +323,12 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
     }
 
     @Override
-    public void fail(String message, @Nullable io.micronaut.inject.ast.Element element) {
+    public void fail(String message, io.micronaut.inject.ast.@Nullable Element element) {
         printMessage(message, Diagnostic.Kind.ERROR, element);
     }
 
     @Override
-    public void warn(String message, @Nullable io.micronaut.inject.ast.Element element) {
+    public void warn(String message, io.micronaut.inject.ast.@Nullable Element element) {
         printMessage(message, Diagnostic.Kind.WARNING, element);
     }
 
@@ -353,7 +347,7 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
         }
     }
 
-    private void printMessage(String message, Diagnostic.Kind kind, @Nullable io.micronaut.inject.ast.Element element) {
+    private void printMessage(String message, Diagnostic.Kind kind, io.micronaut.inject.ast.@Nullable Element element) {
         if (StringUtils.isNotEmpty(message)) {
             if (element instanceof BeanElement beanElement) {
                 element = beanElement.getDeclaringClass();
@@ -367,13 +361,13 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
         }
     }
 
-    private void checkForPostponedOriginalElement(io.micronaut.inject.ast.Element originatingElement) {
+    private void checkForPostponedOriginalElement(io.micronaut.inject.ast. @Nullable Element originatingElement) {
         if (originatingElement != null && postponedTypes.contains(originatingElement.getName())) {
             throw new ElementPostponedToNextRoundException(originatingElement);
         }
     }
 
-    private void checkForPostponedOriginalElements(io.micronaut.inject.ast.Element[] originatingElements) {
+    private void checkForPostponedOriginalElements(io.micronaut.inject.ast.Element @Nullable [] originatingElements) {
         if (originatingElements != null) {
             for (io.micronaut.inject.ast.Element originatingElement : originatingElements) {
                 checkForPostponedOriginalElement(originatingElement);
@@ -382,9 +376,9 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
     }
 
     @Override
-    public OutputStream visitClass(String classname, @Nullable io.micronaut.inject.ast.Element originatingElement) throws IOException {
+    public OutputStream visitClass(String classname, io.micronaut.inject.ast.@Nullable Element originatingElement) throws IOException {
         checkForPostponedOriginalElement(originatingElement);
-        return outputVisitor.visitClass(classname, new io.micronaut.inject.ast.Element[] {originatingElement});
+        return outputVisitor.visitClass(classname, originatingElement == null ? new io.micronaut.inject.ast.Element[0] : new io.micronaut.inject.ast.Element[] {originatingElement});
     }
 
     @Override
@@ -551,7 +545,7 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
         return visitorAttributes.get(name, conversionContext);
     }
 
-    private void populateClassElements(@NonNull String[] stereotypes, PackageElement packageElement, List<ClassElement> classElements) {
+    private void populateClassElements(String[] stereotypes, PackageElement packageElement, List<ClassElement> classElements) {
         final List<? extends Element> enclosedElements = packageElement.getEnclosedElements();
         boolean includeAll = Arrays.equals(stereotypes, new String[] {"*"});
         for (Element enclosedElement : enclosedElements) {
@@ -559,7 +553,7 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
         }
     }
 
-    private void populateClassElements(@NonNull String[] stereotypes, boolean includeAll, Element enclosedElement, List<ClassElement> classElements) {
+    private void populateClassElements(String[] stereotypes, boolean includeAll, Element enclosedElement, List<ClassElement> classElements) {
         if (enclosedElement instanceof TypeElement element) {
             JavaClassElement classElement = elementFactory.newClassElement(element, elementAnnotationMetadataFactory);
             if ((includeAll || Arrays.stream(stereotypes).anyMatch(classElement::hasStereotype)) && !classElement.isAbstract()) {
@@ -601,7 +595,7 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
     }
 
     @Override
-    public void addGeneratedResource(@NonNull String resource) {
+    public void addGeneratedResource(String resource) {
         generatedResources.add(resource);
     }
 

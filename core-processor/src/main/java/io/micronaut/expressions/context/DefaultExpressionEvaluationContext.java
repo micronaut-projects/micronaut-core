@@ -24,6 +24,7 @@ import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.PropertyElementQuery;
+import org.jspecify.annotations.NullUnmarked;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -43,6 +44,7 @@ import static java.util.function.Predicate.not;
  * @author Sergey Gavrilov
  */
 @Internal
+@NullUnmarked
 public class DefaultExpressionEvaluationContext implements ExtensibleExpressionEvaluationContext {
 
     private final Collection<ClassElement> classElements;

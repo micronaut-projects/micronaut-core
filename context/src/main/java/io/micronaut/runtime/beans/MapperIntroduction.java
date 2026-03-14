@@ -27,8 +27,8 @@ import io.micronaut.context.expressions.ConfigurableExpressionEvaluationContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NullUnmarked;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanIntrospection.Builder;
 import io.micronaut.core.beans.BeanProperty;
@@ -61,6 +61,7 @@ import java.util.function.Function;
 /**
  * Introduction advice for {@link Mapper}.
  */
+@NullUnmarked
 @InterceptorBean(Mapper.class)
 @Internal
 @BootstrapContextCompatible
@@ -217,7 +218,7 @@ final class MapperIntroduction implements MethodInterceptor<Object, Object> {
     ) {
         Map<String, Function<Object, BiConsumer<Object, MappingBuilder<Object>>>> customMappers = new HashMap<>();
         BeanIntrospection.Builder<Object> builderMeta = toIntrospection.builder();
-        @NonNull Argument<?>[] builderArguments = builderMeta.getBuilderArguments();
+        Argument<?>[] builderArguments = builderMeta.getBuilderArguments();
         for (AnnotationValue<Mapper.Mapping> mapping : annotations) {
             String to = mapping.stringValue(Mapper.Mapping.MEMBER_TO).orElse(null);
             String format = mapping.stringValue(Mapper.Mapping.MEMBER_FORMAT).orElse(null);
@@ -327,7 +328,7 @@ final class MapperIntroduction implements MethodInterceptor<Object, Object> {
         } catch (IntrospectionException e) {
             throw new IllegalArgumentException("Invalid @Mapping(from=..) declaration. The source property must declared @Introspected: " + e.getMessage(), e);
         }
-        @NonNull Collection<BeanProperty<Object, Object>> propertyNames = nestedFrom.getBeanProperties();
+        Collection<BeanProperty<Object, Object>> propertyNames = nestedFrom.getBeanProperties();
         for (BeanProperty<Object, Object> property : propertyNames) {
             if (property.isWriteOnly()) {
                 continue;
@@ -478,7 +479,7 @@ final class MapperIntroduction implements MethodInterceptor<Object, Object> {
         private <I, O> void mapBean(I input, MapStrategy mapStrategy, BeanIntrospection<I> inputIntrospection, MappingBuilder<O> builder) {
             boolean isDefault = mapStrategy == MapStrategy.DEFAULT;
             Mapper.ConflictStrategy conflictStrategy = mapStrategy.conflictStrategy();
-            @SuppressWarnings("unchecked") @NonNull Argument<Object>[] arguments = (Argument<Object>[]) builder.getBuilderArguments();
+            @SuppressWarnings("unchecked") Argument<Object>[] arguments = (Argument<Object>[]) builder.getBuilderArguments();
 
             if (!isDefault) {
                 processCustomMappers(input, mapStrategy, builder);
@@ -507,7 +508,7 @@ final class MapperIntroduction implements MethodInterceptor<Object, Object> {
         }
 
         private <O> void mapMap(Map<String, Object> input, MapStrategy mapStrategy, MappingBuilder<O> builder) {
-            @NonNull Argument<Object>[] arguments = (Argument<Object>[]) builder.getBuilderArguments();
+            Argument<Object> [] arguments = (Argument<Object>[]) builder.getBuilderArguments();
             Mapper.ConflictStrategy conflictStrategy = mapStrategy.conflictStrategy();
             boolean isDefault = mapStrategy == MapStrategy.DEFAULT;
             if (!isDefault) {
@@ -560,7 +561,7 @@ final class MapperIntroduction implements MethodInterceptor<Object, Object> {
         /**
          * @return the arguments to build from.
          */
-        @NonNull Argument<?>[] getBuilderArguments();
+        Argument<?>[] getBuilderArguments();
 
         /**
          * Get the argument index based on its name.
@@ -582,7 +583,7 @@ final class MapperIntroduction implements MethodInterceptor<Object, Object> {
          * @return this
          * @param <A> The type of argument
          */
-        @NonNull <A> MappingBuilder<B> with(int index, Argument<A> argument, A value, String mappedPropertyName, Object owner);
+        <A> MappingBuilder<B> with(int index, Argument<A> argument, A value, String mappedPropertyName, Object owner);
 
         /**
          * Set the argument converting it at first.
@@ -616,7 +617,7 @@ final class MapperIntroduction implements MethodInterceptor<Object, Object> {
         }
 
         @Override
-        public @NonNull Argument<?>[] getBuilderArguments() {
+        public Argument<?>[] getBuilderArguments() {
             return builder.getBuilderArguments();
         }
 
@@ -671,7 +672,7 @@ final class MapperIntroduction implements MethodInterceptor<Object, Object> {
         }
 
         @Override
-        public @NonNull Argument<?>[] getBuilderArguments() {
+        public Argument<?>[] getBuilderArguments() {
             return arguments;
         }
 

@@ -15,84 +15,96 @@
  */
 package io.micronaut.jackson.serialize;
 
-import com.fasterxml.jackson.core.JacksonException;
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.JsonToken;
-import com.fasterxml.jackson.databind.BeanProperty;
-import com.fasterxml.jackson.databind.DeserializationContext;
-import com.fasterxml.jackson.databind.JavaType;
-import com.fasterxml.jackson.databind.JsonDeserializer;
-import com.fasterxml.jackson.databind.JsonMappingException;
-import com.fasterxml.jackson.databind.deser.ContextualDeserializer;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.JsonParser;
+import tools.jackson.core.JsonToken;
+import tools.jackson.databind.BeanProperty;
+import tools.jackson.databind.DeserializationContext;
+import tools.jackson.databind.JavaType;
+import tools.jackson.databind.ValueDeserializer;
+import tools.jackson.databind.DatabindException;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.json.convert.JsonNodeConvertibleValues;
 import io.micronaut.json.tree.JsonNode;
-
-import java.io.IOException;
+import tools.jackson.databind.jsontype.TypeDeserializer;
 
 @Internal
-final class ConvertibleValuesDeserializer<V> extends JsonDeserializer<ConvertibleValues<V>> implements ContextualDeserializer {
+final class ConvertibleValuesDeserializer<V> extends ValueDeserializer<ConvertibleValues<V>> {
     private static final JsonNodeDeserializer JSON_NODE_DESERIALIZER = new JsonNodeDeserializer();
     private final ConversionService conversionService;
     @Nullable
     private final JavaType valueType;
     @Nullable
-    private final JsonDeserializer<V> valueDeserializer;
+    private final ValueDeserializer<V> valueDeserializer;
+    @Nullable
+    private final TypeDeserializer typeDeserializer;
 
-    ConvertibleValuesDeserializer(@NonNull ConversionService conversionService, @Nullable JavaType valueType) {
-        this(conversionService, valueType, null);
+    ConvertibleValuesDeserializer(ConversionService conversionService, @Nullable JavaType valueType) {
+        this(conversionService, valueType, null, null);
     }
 
-    private ConvertibleValuesDeserializer(@NonNull ConversionService conversionService, @Nullable JavaType valueType, @Nullable JsonDeserializer<V> valueDeserializer) {
+    private ConvertibleValuesDeserializer(ConversionService conversionService, @Nullable JavaType valueType, @Nullable ValueDeserializer<V> valueDeserializer, @Nullable TypeDeserializer typeDeserializer) {
         this.conversionService = conversionService;
         this.valueType = valueType;
         this.valueDeserializer = valueDeserializer;
+        this.typeDeserializer = typeDeserializer;
     }
 
     @Override
-    public JsonDeserializer<?> createContextual(DeserializationContext ctxt, BeanProperty property) throws JsonMappingException {
+    public ValueDeserializer<?> createContextual(DeserializationContext ctxt, BeanProperty property) throws DatabindException {
         if (valueType == null) {
             // deserialize to JsonNodeConvertibleValues
             return this;
         }
-        JsonDeserializer<Object> valueDeserializer = ctxt.findContextualValueDeserializer(valueType, property);
-        return new ConvertibleValuesDeserializer<>(conversionService, valueType, valueDeserializer);
+        ValueDeserializer<Object> valueDeserializer = ctxt.findContextualValueDeserializer(valueType, property);
+
+        TypeDeserializer typeDeser = ctxt.findTypeDeserializer(valueType);
+        if (typeDeser != null) {
+            typeDeser = typeDeser.forProperty(property);
+        }
+
+        return new ConvertibleValuesDeserializer<>(conversionService, valueType, valueDeserializer, typeDeser);
     }
 
     @Override
-    public ConvertibleValues<V> deserialize(JsonParser p, DeserializationContext ctxt) throws IOException, JacksonException {
+    public ConvertibleValues<V> deserialize(JsonParser p, DeserializationContext ctxt) throws JacksonException {
         if (valueDeserializer == null) {
             if (!p.hasCurrentToken()) {
                 p.nextToken();
             }
-            if (p.getCurrentToken() != JsonToken.START_OBJECT) {
+            if (p.currentToken() != JsonToken.START_OBJECT) {
                 //noinspection unchecked
                 return (ConvertibleValues<V>) ctxt.handleUnexpectedToken(handledType(), p);
             }
             JsonNode node = JSON_NODE_DESERIALIZER.deserialize(p, ctxt);
             return new JsonNodeConvertibleValues<>(node, conversionService);
         } else {
-            JsonToken t = p.getCurrentToken();
+            JsonToken t = p.currentToken();
             if (t == JsonToken.START_OBJECT) { // If START_OBJECT, move to next; may also be END_OBJECT
                 t = p.nextToken();
             }
-            if (t != JsonToken.FIELD_NAME && t != JsonToken.END_OBJECT) {
+            if (t != JsonToken.PROPERTY_NAME && t != JsonToken.END_OBJECT) {
                 //noinspection unchecked
                 return (ConvertibleValues<V>) ctxt.handleUnexpectedToken(handledType(), p);
             }
 
             var map = new MutableConvertibleValuesMap<V>();
             map.setConversionService(conversionService);
-            for (; p.getCurrentToken() == JsonToken.FIELD_NAME; p.nextToken()) {
+            for (; p.currentToken() == JsonToken.PROPERTY_NAME; p.nextToken()) {
                 // Must point to field name now
                 String fieldName = p.currentName();
                 p.nextToken();
-                map.put(fieldName, valueDeserializer.deserialize(p, ctxt));
+                Object deserializedValue;
+                if (typeDeserializer == null) {
+                    deserializedValue = valueDeserializer.deserialize(p, ctxt);
+                } else {
+                    deserializedValue = valueDeserializer.deserializeWithType(p, ctxt, typeDeserializer);
+                }
+                map.put(fieldName, (V) deserializedValue);
             }
             return map;
         }

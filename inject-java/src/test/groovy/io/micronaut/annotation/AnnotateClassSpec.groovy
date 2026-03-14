@@ -90,7 +90,7 @@ class Foobar2 {
 package addann;
 
 import io.micronaut.context.annotation.Executable;
-import io.micronaut.core.annotation.Nullable;import io.micronaut.core.annotation.ReflectiveAccess;
+import org.jspecify.annotations.Nullable;import io.micronaut.core.annotation.ReflectiveAccess;
 
 class Foobar3 {
 

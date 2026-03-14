@@ -19,4 +19,7 @@
  * @author Sergio del Amo
  * @since 2.2.1
  */
+@NullMarked
 package io.micronaut.web.router.version.resolution;
+
+import org.jspecify.annotations.NullMarked;

@@ -23,7 +23,7 @@ import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Executable;
 
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.util.*;
 
 /**
@@ -104,6 +104,7 @@ public class DefaultExecutableBinder<S> implements ExecutableBinder<S> {
             }
 
             @Override
+            @Nullable
             public R invoke(T instance) {
                 return target.invoke(instance, getBoundArguments());
             }
@@ -118,8 +119,8 @@ public class DefaultExecutableBinder<S> implements ExecutableBinder<S> {
     @Override
     public <T, R> BoundExecutable<T, R> tryBind(Executable<T, R> target, ArgumentBinderRegistry<S> registry, S source) {
 
-        Argument[] arguments = target.getArguments();
-        Object[] boundArguments = new Object[arguments.length];
+        Argument<?>[] arguments = target.getArguments();
+        @Nullable Object[] boundArguments = new Object[arguments.length];
 
         List<Argument<?>> unbound = new ArrayList<>(arguments.length);
 
@@ -170,12 +171,13 @@ public class DefaultExecutableBinder<S> implements ExecutableBinder<S> {
             }
 
             @Override
+            @Nullable
             public R invoke(T instance) {
                 return target.invoke(instance, getBoundArguments());
             }
 
             @Override
-            public Object[] getBoundArguments() {
+            public @Nullable Object[] getBoundArguments() {
                 return boundArguments;
             }
         };

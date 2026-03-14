@@ -1,5 +1,6 @@
 plugins {
     id("io.micronaut.build.internal.convention-library")
+    id("io.micronaut.build.internal.kotlin-base")
     alias(libs.plugins.managed.kotlin.jvm)
 }
 
@@ -12,8 +13,10 @@ dependencies {
     implementation(libs.managed.reactor)
     compileOnly(libs.managed.kotlinx.coroutines.core)
     compileOnly(libs.managed.kotlinx.coroutines.reactor)
+    compileOnly(libs.managed.netty.pkitesting)
 
     compileOnly(libs.managed.jackson.annotations)
+    compileOnly(libs.managed.jspecify)
 
     testCompileOnly(projects.micronautInjectGroovy)
     testAnnotationProcessor(projects.micronautInjectJava)
@@ -26,12 +29,6 @@ dependencies {
     testImplementation(libs.junit.jupiter.params)
     testImplementation(libs.micronaut.test.junit5) {
         exclude(group= "io.micronaut")
-    }
-}
-
-tasks {
-    compileKotlin {
-        kotlinOptions.jvmTarget = "17"
     }
 }
 

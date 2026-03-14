@@ -17,8 +17,7 @@ package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
@@ -58,13 +57,13 @@ final class JavaGenericPlaceholderElement extends JavaClassElement implements Ge
 
     JavaGenericPlaceholderElement(JavaNativeElement.Placeholder genericNativeType,
                                   TypeVariable realTypeVariable,
-                                  @NonNull Element declaredElement,
+                                  Element declaredElement,
                                   @Nullable JavaClassElement resolved,
-                                  @NonNull List<JavaClassElement> bounds,
-                                  @NonNull ElementAnnotationMetadataFactory annotationMetadataFactory,
+                                  List<JavaClassElement> bounds,
+                                  ElementAnnotationMetadataFactory annotationMetadataFactory,
                                   int arrayDimensions,
                                   boolean isRawType,
-                                  String doc) {
+                                  @Nullable String doc) {
         this(genericNativeType,
             realTypeVariable,
             declaredElement,
@@ -79,14 +78,14 @@ final class JavaGenericPlaceholderElement extends JavaClassElement implements Ge
 
     JavaGenericPlaceholderElement(JavaNativeElement.Placeholder genericNativeType,
                                   TypeVariable realTypeVariable,
-                                  @NonNull Element declaredElement,
+                                  Element declaredElement,
                                   @Nullable JavaClassElement resolved,
-                                  @NonNull List<JavaClassElement> bounds,
+                                  List<JavaClassElement> bounds,
                                   JavaClassElement classElementRepresentingThisPlaceholder,
-                                  @NonNull ElementAnnotationMetadataFactory annotationMetadataFactory,
+                                  ElementAnnotationMetadataFactory annotationMetadataFactory,
                                   int arrayDimensions,
                                   boolean isRawType,
-                                  String doc) {
+                                  @Nullable String doc) {
         super(
             classElementRepresentingThisPlaceholder.getNativeType(),
             annotationMetadataFactory,
@@ -106,11 +105,11 @@ final class JavaGenericPlaceholderElement extends JavaClassElement implements Ge
     }
 
     private static JavaClassElement selectClassElementRepresentingThisPlaceholder(@Nullable JavaClassElement resolved,
-                                                                                  @NonNull List<JavaClassElement> bounds) {
+                                                                                  List<JavaClassElement> bounds) {
         if (resolved != null) {
             return resolved;
         }
-        return WildcardElement.findUpperType(bounds, bounds);
+        return Objects.requireNonNull(WildcardElement.findUpperType(bounds, bounds));
     }
 
     @Override
@@ -118,7 +117,6 @@ final class JavaGenericPlaceholderElement extends JavaClassElement implements Ge
         return getGenericTypeAnnotationMetadata();
     }
 
-    @NonNull
     @Override
     public MutableAnnotationMetadataDelegate<AnnotationMetadata> getGenericTypeAnnotationMetadata() {
         if (genericTypeAnnotationMetadata == null) {
@@ -127,19 +125,16 @@ final class JavaGenericPlaceholderElement extends JavaClassElement implements Ge
         return genericTypeAnnotationMetadata;
     }
 
-    @NonNull
     @Override
     public MutableAnnotationMetadataDelegate<AnnotationMetadata> getTypeAnnotationMetadata() {
         return typeAnnotationMetadata;
     }
 
-    @NonNull
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
         return new AnnotationMetadataHierarchy(true, super.getAnnotationMetadata(), getGenericTypeAnnotationMetadata());
     }
 
-    @NonNull
     @Override
     public JavaNativeElement.Placeholder getGenericNativeType() {
         return genericNativeType;
@@ -155,7 +150,6 @@ final class JavaGenericPlaceholderElement extends JavaClassElement implements Ge
         return isRawType;
     }
 
-    @NonNull
     @Override
     public List<JavaClassElement> getBounds() {
         return bounds;
@@ -166,7 +160,6 @@ final class JavaGenericPlaceholderElement extends JavaClassElement implements Ge
     }
 
     @Override
-    @NonNull
     public String getVariableName() {
         return getParameterElement().getSimpleName().toString();
     }
@@ -187,7 +180,7 @@ final class JavaGenericPlaceholderElement extends JavaClassElement implements Ge
     }
 
     @Override
-    public ClassElement foldBoundGenericTypes(@NonNull Function<ClassElement, ClassElement> fold) {
+    public ClassElement foldBoundGenericTypes(Function<ClassElement, ClassElement> fold) {
         Objects.requireNonNull(fold, "Function argument cannot be null");
         return fold.apply(this);
     }

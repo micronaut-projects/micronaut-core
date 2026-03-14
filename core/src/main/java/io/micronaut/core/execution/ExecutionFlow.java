@@ -16,8 +16,7 @@
 package io.micronaut.core.execution;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
@@ -28,6 +27,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -50,7 +50,6 @@ public interface ExecutionFlow<T> {
      * @param <K>   The value type
      * @return a new flow
      */
-    @NonNull
     static <K> ExecutionFlow<K> just(@Nullable K value) {
         return (ExecutionFlow<K>) new ImperativeExecutionFlowImpl(value, null);
     }
@@ -62,8 +61,7 @@ public interface ExecutionFlow<T> {
      * @param <K> The value type
      * @return a new flow
      */
-    @NonNull
-    static <K> ExecutionFlow<K> error(@NonNull Throwable e) {
+    static <K> ExecutionFlow<K> error(Throwable e) {
         return (ExecutionFlow<K>) new ImperativeExecutionFlowImpl(null, e);
     }
 
@@ -73,7 +71,6 @@ public interface ExecutionFlow<T> {
      * @param <T>      The flow value type
      * @return a new flow
      */
-    @NonNull
     static <T> ExecutionFlow<T> empty() {
         return (ExecutionFlow<T>) new ImperativeExecutionFlowImpl(null, null);
     }
@@ -86,8 +83,7 @@ public interface ExecutionFlow<T> {
      * @param <T>      The flow value type
      * @return a new flow
      */
-    @NonNull
-    static <T> ExecutionFlow<T> async(@NonNull Executor executor, @NonNull Supplier<? extends ExecutionFlow<T>> supplier) {
+    static <T> ExecutionFlow<T> async(Executor executor, Supplier<? extends ExecutionFlow<T>> supplier) {
         DelayedExecutionFlow<T> completableFuture = DelayedExecutionFlow.create();
         executor.execute(() -> supplier.get().onComplete(completableFuture::complete));
         return completableFuture;
@@ -100,8 +96,7 @@ public interface ExecutionFlow<T> {
      * @param <R>         New value Type
      * @return a new flow
      */
-    @NonNull
-    <R> ExecutionFlow<R> map(@NonNull Function<? super T, ? extends R> transformer);
+    <R> ExecutionFlow<R> map(Function<? super T, ? extends R> transformer);
 
     /**
      * Map a not-empty value to a new flow.
@@ -110,8 +105,7 @@ public interface ExecutionFlow<T> {
      * @param <R>         New value Type
      * @return a new flow
      */
-    @NonNull
-    <R> ExecutionFlow<R> flatMap(@NonNull Function<? super T, ? extends ExecutionFlow<? extends R>> transformer);
+    <R> ExecutionFlow<R> flatMap(Function<? super T, ? extends ExecutionFlow<? extends R>> transformer);
 
     /**
      * Supply a new flow after the existing flow value is resolved.
@@ -120,8 +114,7 @@ public interface ExecutionFlow<T> {
      * @param <R>      New value Type
      * @return a new flow
      */
-    @NonNull
-    <R> ExecutionFlow<R> then(@NonNull Supplier<? extends ExecutionFlow<? extends R>> supplier);
+    <R> ExecutionFlow<R> then(Supplier<? extends ExecutionFlow<? extends R>> supplier);
 
     /**
      * Supply a new flow if the existing flow is erroneous.
@@ -129,8 +122,7 @@ public interface ExecutionFlow<T> {
      * @param fallback The fallback
      * @return a new flow
      */
-    @NonNull
-    ExecutionFlow<T> onErrorResume(@NonNull Function<? super Throwable, ? extends ExecutionFlow<? extends T>> fallback);
+    ExecutionFlow<T> onErrorResume(Function<? super Throwable, ? extends ExecutionFlow<? extends T>> fallback);
 
     /**
      * Store a contextual value.
@@ -139,8 +131,7 @@ public interface ExecutionFlow<T> {
      * @param value The value
      * @return a new flow
      */
-    @NonNull
-    ExecutionFlow<T> putInContext(@NonNull String key, @NonNull Object value);
+    ExecutionFlow<T> putInContext(String key, Object value);
 
     /**
      * Store a contextual value if it is absent.
@@ -150,8 +141,7 @@ public interface ExecutionFlow<T> {
      * @return a new flow
      * @since 4.8.0
      */
-    @NonNull
-    default ExecutionFlow<T> putInContextIfAbsent(@NonNull String key, @NonNull Object value) {
+    default ExecutionFlow<T> putInContextIfAbsent(String key, Object value) {
         return this;
     }
 
@@ -160,7 +150,7 @@ public interface ExecutionFlow<T> {
      *
      * @param fn The function
      */
-    void onComplete(@NonNull BiConsumer<? super T, Throwable> fn);
+    void onComplete(BiConsumer<? super T, Throwable> fn);
 
     /**
      * Completes the flow to the completable future.
@@ -168,7 +158,7 @@ public interface ExecutionFlow<T> {
      * @param completableFuture The completable future
      * @since 4.8
      */
-    void completeTo(@NonNull CompletableFuture<T> completableFuture);
+    void completeTo(CompletableFuture<T> completableFuture);
 
     /**
      * Create a new {@link ExecutionFlow} that either returns the same result or, if the timeout
@@ -180,8 +170,7 @@ public interface ExecutionFlow<T> {
      *                  completes after the timeout has expired and thus the value is discarded
      * @return A new flow that will produce either the same value or a {@link java.util.concurrent.TimeoutException}
      */
-    @NonNull
-    default ExecutionFlow<T> timeout(@NonNull Duration timeout, @NonNull ScheduledExecutorService scheduler, @Nullable BiConsumer<T, Throwable> onDiscard) {
+    default ExecutionFlow<T> timeout(Duration timeout, ScheduledExecutorService scheduler, @Nullable BiConsumer<T, Throwable> onDiscard) {
         DelayedExecutionFlow<T> delayed = DelayedExecutionFlow.create();
         AtomicBoolean completed = new AtomicBoolean(false);
         // schedule the timeout
@@ -258,7 +247,6 @@ public interface ExecutionFlow<T> {
      *
      * @return a {@link CompletableFuture} that represents the state if this flow.
      */
-    @NonNull
     default CompletableFuture<T> toCompletableFuture() {
         CompletableFuture<T> completableFuture = new CompletableFuture<>();
         completeTo(completableFuture);
@@ -277,6 +265,17 @@ public interface ExecutionFlow<T> {
      * @since 4.8.0
      */
     default void cancel() {
+    }
+
+    /**
+     * Like {@link #cancel()}, but you can also provide a lambda to discard the content if it's
+     * already available.
+     *
+     * @param discard A function that will discard the content if necessary
+     * @since 5.0.0
+     */
+    default void cancel(Consumer<T> discard) {
+        cancel();
     }
 }
 

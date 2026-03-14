@@ -17,7 +17,6 @@ package io.micronaut.expressions.context;
 
 import io.micronaut.context.annotation.AnnotationExpressionContext;
 import io.micronaut.core.annotation.AnnotationClassValue;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.expressions.EvaluatedExpressionReference;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
@@ -25,6 +24,7 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.visitor.VisitorContext;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collection;
 import java.util.Optional;
@@ -48,34 +48,30 @@ public final class DefaultExpressionCompilationContextFactory implements Express
         this.visitorContext = visitorContext;
     }
 
-    @NonNull
     private DefaultExpressionEvaluationContext recreateContext() {
         return new DefaultExpressionEvaluationContext(CONTEXT_TYPES.toArray(ClassElement[]::new));
     }
 
     @Override
-    @NonNull
-    public ExpressionEvaluationContext buildContextForMethod(@NonNull EvaluatedExpressionReference expression,
-                                                             @NonNull MethodElement methodElement) {
+    public ExpressionEvaluationContext buildContextForMethod(EvaluatedExpressionReference expression,
+                                                             MethodElement methodElement) {
         return buildForExpression(expression, null)
                  .extendWith(methodElement);
     }
 
     @Override
-    @NonNull
-    public ExpressionEvaluationContext buildContext(EvaluatedExpressionReference expression, ClassElement thisElement) {
+    public ExpressionEvaluationContext buildContext(EvaluatedExpressionReference expression, @Nullable ClassElement thisElement) {
         return buildForExpression(expression, thisElement);
     }
 
-    @NonNull
     @Override
-    public ExpressionCompilationContextFactory registerContextClass(@NonNull ClassElement contextClass) {
+    public ExpressionCompilationContextFactory registerContextClass(ClassElement contextClass) {
         CONTEXT_TYPES.add(contextClass);
         this.sharedContext = recreateContext();
         return this;
     }
 
-    private ExtensibleExpressionEvaluationContext buildForExpression(EvaluatedExpressionReference expression, ClassElement thisElement) {
+    private ExtensibleExpressionEvaluationContext buildForExpression(EvaluatedExpressionReference expression, @Nullable ClassElement thisElement) {
         String annotationName = expression.annotationName();
         String memberName = expression.annotationMember();
 

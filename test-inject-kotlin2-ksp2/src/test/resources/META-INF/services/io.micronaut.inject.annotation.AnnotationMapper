@@ -1,3 +1,0 @@
-io.micronaut.kotlin.processing.elementapi.EntityAnnotationMapper
-io.micronaut.kotlin.processing.aop.compile.NamedTestAnnMapper
-io.micronaut.kotlin.processing.aop.introduction.ListenerAdviceMarkerMapper

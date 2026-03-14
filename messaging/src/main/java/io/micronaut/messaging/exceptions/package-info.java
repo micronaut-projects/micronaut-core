@@ -19,4 +19,7 @@
  * @author graemerocher
  * @since 1.0
  */
+@NullMarked
 package io.micronaut.messaging.exceptions;
+
+import org.jspecify.annotations.NullMarked;

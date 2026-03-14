@@ -15,9 +15,9 @@
  */
 package io.micronaut.jackson.serialize;
 
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.databind.JsonSerializer;
-import com.fasterxml.jackson.databind.SerializerProvider;
+import tools.jackson.core.JsonGenerator;
+import tools.jackson.databind.ValueSerializer;
+import tools.jackson.databind.SerializationContext;
 import io.micronaut.core.value.OptionalMultiValues;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.http.hateoas.JsonError;
@@ -25,7 +25,6 @@ import io.micronaut.jackson.JacksonConfiguration;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 
@@ -36,7 +35,7 @@ import java.util.Optional;
  * @since 1.0
  */
 @Singleton
-public class OptionalValuesSerializer extends JsonSerializer<OptionalValues<?>> {
+public class OptionalValuesSerializer extends ValueSerializer<OptionalValues<?>> {
 
     private final boolean alwaysSerializeErrorsAsList;
 
@@ -50,30 +49,30 @@ public class OptionalValuesSerializer extends JsonSerializer<OptionalValues<?>> 
     }
 
     @Override
-    public boolean isEmpty(SerializerProvider provider, OptionalValues<?> value) {
+    public boolean isEmpty(SerializationContext provider, OptionalValues<?> value) {
         return value.isEmpty();
     }
 
     @Override
-    public void serialize(OptionalValues<?> value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+    public void serialize(OptionalValues<?> value, JsonGenerator gen, SerializationContext serializers) {
         gen.writeStartObject();
 
         for (CharSequence key : value) {
             Optional<?> opt = value.get(key);
             if (opt.isPresent()) {
                 String fieldName = key.toString();
-                gen.writeFieldName(fieldName);
+                gen.writeName(fieldName);
                 Object v = opt.get();
                 if (value instanceof OptionalMultiValues) {
                     List<?> list = (List<?>) v;
 
                     if (list.size() == 1 && (list.get(0).getClass() != JsonError.class || !alwaysSerializeErrorsAsList)) {
-                        gen.writeObject(list.get(0));
+                        gen.writePOJO(list.get(0));
                     } else {
-                        gen.writeObject(list);
+                        gen.writePOJO(list);
                     }
                 } else {
-                    gen.writeObject(v);
+                    gen.writePOJO(v);
                 }
             }
         }

@@ -8,8 +8,11 @@ dependencies {
     testImplementation(projects.micronautHttpClient)
     testImplementation(projects.micronautHttpClientTck)
     testImplementation(libs.junit.platform.engine)
+    testRuntimeOnly(libs.junit.jupiter.engine)
+    testRuntimeOnly(libs.junit.platform.launcher)
 }
 
 tasks.named<Test>("test") {
     useJUnitPlatform()
+    systemProperty("junit.jupiter.extensions.autodetection.enabled", "true")
 }

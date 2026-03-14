@@ -20,4 +20,7 @@
  * @author graemerocher
  * @since 1.0
  */
+@NullMarked
 package io.micronaut.inject.qualifiers;
+
+import org.jspecify.annotations.NullMarked;

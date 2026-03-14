@@ -1,9 +1,8 @@
 package io.micronaut.http.client
 
-import com.fasterxml.jackson.databind.DeserializationFeature
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.databind.PropertyNamingStrategies
-import com.fasterxml.jackson.databind.module.SimpleModule
+import tools.jackson.databind.PropertyNamingStrategies
+import tools.jackson.databind.cfg.MapperBuilder
+import tools.jackson.databind.module.SimpleModule
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.ConfigurationProperties
 import io.micronaut.context.annotation.Requires
@@ -314,7 +313,7 @@ class ClientScopeSpec extends Specification {
 
     @Requires(property = 'spec.name', value = "ClientScopeSpec")
     @Client(id = 'other-service')
-    @JacksonFeatures(disabledDeserializationFeatures = DeserializationFeature.ADJUST_DATES_TO_CONTEXT_TIME_ZONE)
+    @JacksonFeatures()
     static interface MyServiceJacksonFeatures {
 
         @Get(consumes = MediaType.TEXT_PLAIN)
@@ -334,7 +333,7 @@ class ClientScopeSpec extends Specification {
         @Override
         void setupModule(SetupContext context) {
             super.setupModule(context)
-            ((ObjectMapper) context.getOwner()).propertyNamingStrategy = PropertyNamingStrategies.SNAKE_CASE
+            ((MapperBuilder) context.getOwner()).propertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
         }
     }
 

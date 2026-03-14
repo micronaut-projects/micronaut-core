@@ -22,9 +22,8 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Creator;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.NullMarked;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
@@ -71,6 +70,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
@@ -101,9 +101,13 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
     final List<? extends TypeMirror> typeArguments;
 
     private final boolean isTypeVariable;
+    @Nullable
     private List<PropertyElement> beanProperties;
+    @Nullable
     private String simpleName;
+    @Nullable
     private String name;
+    @Nullable
     private String packageName;
     @Nullable
     private Map<String, ClassElement> resolvedTypeArguments;
@@ -160,9 +164,11 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
     JavaClassElement(JavaNativeElement.Class nativeType,
                      ElementAnnotationMetadataFactory annotationMetadataFactory,
                      JavaVisitorContext visitorContext,
+                     @Nullable
                      List<? extends TypeMirror> typeArguments,
                      @Nullable
                      Map<String, ClassElement> resolvedTypeArguments,
+                     @Nullable
                      String doc) {
         this(nativeType, annotationMetadataFactory, visitorContext, typeArguments, resolvedTypeArguments, 0, false, doc);
     }
@@ -178,6 +184,7 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
     JavaClassElement(JavaNativeElement.Class nativeType,
                      ElementAnnotationMetadataFactory annotationMetadataFactory,
                      JavaVisitorContext visitorContext,
+                     @Nullable
                      List<? extends TypeMirror> typeArguments,
                      @Nullable
                      Map<String, ClassElement> resolvedTypeArguments,
@@ -197,11 +204,12 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
     JavaClassElement(JavaNativeElement.Class nativeType,
                      ElementAnnotationMetadataFactory annotationMetadataFactory,
                      JavaVisitorContext visitorContext,
+                     @Nullable
                      List<? extends TypeMirror> typeArguments,
                      @Nullable
                      Map<String, ClassElement> resolvedTypeArguments,
                      int arrayDimensions,
-                     String doc) {
+                     @Nullable String doc) {
         this(nativeType, annotationMetadataFactory, visitorContext, typeArguments, resolvedTypeArguments, arrayDimensions, false, doc);
     }
 
@@ -235,8 +243,8 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
     }
 
     @Override
-    public Optional<String> getDocumentation() {
-        return doc == null ? super.getDocumentation() : Optional.of(doc);
+    public Optional<String> getDocumentation(boolean parse) {
+        return !parse || doc == null ? super.getDocumentation(parse) : Optional.of(doc);
     }
 
     @Override
@@ -271,7 +279,7 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
     }
 
     @Override
-    public JavaNativeElement.@NonNull Class getNativeType() {
+    public JavaNativeElement.Class getNativeType() {
         return (JavaNativeElement.Class) super.getNativeType();
     }
 
@@ -280,7 +288,6 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
         return new JavaClassElement(getNativeType(), elementAnnotationMetadataFactory, visitorContext, typeArguments, resolvedTypeArguments, arrayDimensions);
     }
 
-    @NonNull
     @Override
     public ClassElement withTypeArguments(Map<String, ClassElement> newTypeArguments) {
         return new JavaClassElement(getNativeType(), elementAnnotationMetadataFactory, visitorContext, typeArguments, newTypeArguments, arrayDimensions);
@@ -299,7 +306,6 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
         return getTypeAnnotationMetadata();
     }
 
-    @NonNull
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
         if (presetAnnotationMetadata != null) {
@@ -320,7 +326,6 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
         return getPackage().hasStereotype(NullMarked.class) || hasStereotype(NullMarked.class);
     }
 
-    @NonNull
     @Override
     public MutableAnnotationMetadataDelegate<AnnotationMetadata> getTypeAnnotationMetadata() {
         if (elementTypeAnnotationMetadata == null) {
@@ -408,7 +413,7 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
     }
 
     @Override
-    public @NonNull List<PropertyElement> getBeanProperties() {
+    public List<PropertyElement> getBeanProperties() {
         if (beanProperties == null) {
             beanProperties = getBeanProperties(PropertyElementQuery.of(this));
         }
@@ -416,7 +421,7 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
     }
 
     @Override
-    public @NonNull List<PropertyElement> getBeanProperties(@NonNull PropertyElementQuery propertyElementQuery) {
+    public List<PropertyElement> getBeanProperties(PropertyElementQuery propertyElementQuery) {
         if (isRecord()) {
             return AstBeanPropertiesUtils.resolveBeanProperties(propertyElementQuery,
                 this,
@@ -467,12 +472,24 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
     }
 
     private JavaPropertyElement mapToPropertyElement(AstBeanPropertiesUtils.BeanPropertyData value) {
+        AnnotationMetadata propertyAnnotationMetadata = null;
+        if (isRecord()) {
+            for (Element enclosedElement : classElement.getEnclosedElements()) {
+                if (JavaModelUtils.isRecordComponent(enclosedElement) && enclosedElement instanceof RecordComponentElement recordComponentElement) {
+                    if (recordComponentElement.getSimpleName().toString().equals(value.propertyName)) {
+                        propertyAnnotationMetadata = visitorContext.getAnnotationMetadataBuilder().build(recordComponentElement);
+                        break;
+                    }
+                }
+            }
+        }
         return new JavaPropertyElement(
             JavaClassElement.this,
             value.type,
             value.readAccessKind == null ? null : value.getter,
             value.writeAccessKind == null ? null : value.setter,
             value.field,
+            propertyAnnotationMetadata,
             elementAnnotationMetadataFactory,
             value.propertyName,
             value.readAccessKind == null ? PropertyElement.AccessKind.METHOD : PropertyElement.AccessKind.valueOf(value.readAccessKind.name()),
@@ -549,9 +566,8 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
         return element.getAnnotationMirrors().stream().anyMatch(am -> am.getAnnotationType().asElement().toString().equals(KOTLIN_METADATA));
     }
 
-    @NonNull
     @Override
-    public <T extends io.micronaut.inject.ast.Element> List<T> getEnclosedElements(@NonNull ElementQuery<T> query) {
+    public <T extends io.micronaut.inject.ast.Element> List<T> getEnclosedElements(ElementQuery<T> query) {
         return enclosedElementsQuery.getEnclosedElements(this, query);
     }
 
@@ -564,7 +580,7 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
      * @param <T> The element type
      * @return The list of elements
      */
-    public final <T extends io.micronaut.inject.ast.Element> List<T> getSourceEnclosedElements(@NonNull ElementQuery<T> query) {
+    public final <T extends io.micronaut.inject.ast.Element> List<T> getSourceEnclosedElements(ElementQuery<T> query) {
         return sourceEnclosedElementsQuery.getEnclosedElements(this, query);
     }
 
@@ -591,7 +607,7 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
     }
 
     @Override
-    public @NonNull String getSimpleName() {
+    public String getSimpleName() {
         if (simpleName == null) {
             simpleName = JavaModelUtils.getClassNameWithoutPackage(classElement);
         }
@@ -599,7 +615,7 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
     }
 
     @Override
-    public @NonNull String getName() {
+    public String getName() {
         if (name == null) {
             name = JavaModelUtils.getClassName(classElement);
         }
@@ -681,7 +697,6 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
         return types.isAssignable(thisType, thatType);
     }
 
-    @NonNull
     @Override
     @SuppressWarnings("java:S1119")
     public Optional<MethodElement> getPrimaryConstructor() {
@@ -710,10 +725,11 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
                     for (int i = 0; i < parameters.length; i++) {
                         ParameterElement parameter = parameters[i];
                         RecordComponentElement rce = recordComponents.get(i);
-                        VariableElement ve = ((JavaNativeElement.Variable) parameter.getNativeType()).element();
-                        TypeMirror leftType = visitorContext.getTypes().erasure(ve.asType());
-                        TypeMirror rightType = visitorContext.getTypes().erasure(rce.asType());
-                        if (!leftType.equals(rightType)) {
+                        String parameterTypeString = parameter.getType().getName();
+                        TypeMirror recordType = rce.asType();
+                        Element element = visitorContext.getTypes().asElement(recordType);
+                        String recordTypeString = element == null ? recordType.toString() : element.toString();
+                        if (!parameterTypeString.equals(recordTypeString)) {
                             // types don't match, continue searching constructors
                             continue constructorSearch;
                         }
@@ -732,7 +748,7 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
     }
 
     @Override
-    public @NonNull List<MethodElement> getAccessibleStaticCreators() {
+    public List<MethodElement> getAccessibleStaticCreators() {
         var staticCreators = new ArrayList<>(ArrayableClassElement.super.getAccessibleStaticCreators());
         if (!staticCreators.isEmpty()) {
             return staticCreators;
@@ -760,7 +776,6 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
         return Optional.empty();
     }
 
-    @NonNull
     @Override
     public List<ClassElement> getBoundGenericTypes() {
         if (typeArguments == null) {
@@ -771,7 +786,6 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
             .toList();
     }
 
-    @NonNull
     @Override
     public List<? extends GenericPlaceholderElement> getDeclaredGenericPlaceholders() {
         return classElement.getTypeParameters().stream()
@@ -780,16 +794,14 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
             .toList();
     }
 
-    @NonNull
     @Override
     public ClassElement getRawClassElement() {
         return visitorContext.getElementFactory().newClassElement(classElement, elementAnnotationMetadataFactory)
             .withArrayDimensions(getArrayDimensions());
     }
 
-    @NonNull
     @Override
-    public ClassElement withTypeArguments(@NonNull Collection<ClassElement> typeArguments) {
+    public ClassElement withTypeArguments(Collection<ClassElement> typeArguments) {
         var boundByName = new LinkedHashMap<String, ClassElement>();
         Iterator<? extends TypeParameterElement> types = classElement.getTypeParameters().iterator();
         Iterator<? extends ClassElement> args = typeArguments.iterator();
@@ -805,7 +817,6 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
     }
 
     @Override
-    @NonNull
     public Map<String, ClassElement> getTypeArguments() {
         if (resolvedTypeArguments == null) {
             resolvedTypeArguments = resolveTypeArguments(classElement, typeArguments);
@@ -813,7 +824,6 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
         return resolvedTypeArguments;
     }
 
-    @NonNull
     @Override
     public Map<String, Map<String, ClassElement>> getAllTypeArguments() {
         if (resolvedAllTypeArguments == null) {
@@ -823,7 +833,7 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
     }
 
     @Override
-    public @NonNull ClassElement getType() {
+    public ClassElement getType() {
         if (theType == null) {
             if (getNativeType().typeMirror() == null) {
                 theType = this;
@@ -839,6 +849,7 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
     private final class JavaEnclosedElementsQuery extends EnclosedElementsQuery<TypeElement, Element> {
 
         private final boolean isSource;
+        @Nullable
         private List<? extends Element> enclosedElements;
 
         private JavaEnclosedElementsQuery(boolean isSource) {
@@ -857,7 +868,7 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
 
         @Override
         protected Element getNativeType(io.micronaut.inject.ast.Element element) {
-            return ((AbstractJavaElement) element).getNativeType().element();
+            return Objects.requireNonNull(((AbstractJavaElement) element).getNativeType().element());
         }
 
         @Override
@@ -866,7 +877,7 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
         }
 
         @Override
-        protected Set<Element> getExcludedNativeElements(ElementQuery.@NonNull Result<?> result) {
+        protected Set<Element> getExcludedNativeElements(ElementQuery.Result<?> result) {
             if (result.isExcludePropertyElements()) {
                 var excludeElements = new HashSet<Element>();
                 for (PropertyElement excludePropertyElement : getBeanProperties()) {
@@ -880,6 +891,7 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
         }
 
         @Override
+        @Nullable
         protected TypeElement getSuperClass(TypeElement classNode) {
             TypeMirror superclass = classNode.getSuperclass();
             if (superclass instanceof DeclaredType dt) {
@@ -891,7 +903,6 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
             return null;
         }
 
-        @NonNull
         @Override
         protected Collection<TypeElement> getInterfaces(TypeElement classNode) {
             List<? extends TypeMirror> interfaces = classNode.getInterfaces();
@@ -905,7 +916,6 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
             return result;
         }
 
-        @NonNull
         @Override
         protected List<Element> getEnclosedElements(TypeElement classNode, ElementQuery.Result<?> result, boolean includeAbstract) {
             List<? extends Element> ee;
@@ -954,7 +964,7 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
         }
 
         @Override
-        protected io.micronaut.inject.ast.@NonNull Element toAstElement(Element nativeType, Class<?> elementType) {
+        protected io.micronaut.inject.ast.Element toAstElement(Element nativeType, Class<?> elementType) {
             final JavaElementFactory elementFactory = visitorContext.getElementFactory();
             return switch (nativeType.getKind()) {
                 case METHOD -> {

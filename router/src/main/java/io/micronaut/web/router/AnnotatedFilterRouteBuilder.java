@@ -18,7 +18,7 @@ package io.micronaut.web.router;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.processor.BeanDefinitionProcessor;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
@@ -33,7 +33,7 @@ import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
 /**
- * An {@link io.micronaut.context.processor.ExecutableMethodProcessor} for the {@link Filter} annotation.
+ * An {@link io.micronaut.context.processor.BeanDefinitionProcessor} for the {@link Filter} annotation.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -41,7 +41,7 @@ import jakarta.inject.Singleton;
 @Singleton
 public class AnnotatedFilterRouteBuilder extends DefaultRouteBuilder implements BeanDefinitionProcessor<Filter> {
 
-    private final ServerContextPathProvider contextPathProvider;
+    private final @Nullable ServerContextPathProvider contextPathProvider;
 
     /**
      * Constructor.
@@ -53,10 +53,10 @@ public class AnnotatedFilterRouteBuilder extends DefaultRouteBuilder implements 
      */
     @Inject
     public AnnotatedFilterRouteBuilder(
-            ExecutionHandleLocator executionHandleLocator,
-            UriNamingStrategy uriNamingStrategy,
-            ConversionService conversionService,
-            @Nullable ServerContextPathProvider contextPathProvider) {
+        ExecutionHandleLocator executionHandleLocator,
+        UriNamingStrategy uriNamingStrategy,
+        ConversionService conversionService,
+        @Nullable ServerContextPathProvider contextPathProvider) {
         super(executionHandleLocator, uriNamingStrategy, conversionService);
         this.contextPathProvider = contextPathProvider;
     }

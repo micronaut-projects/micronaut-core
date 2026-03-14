@@ -1,5 +1,6 @@
 plugins {
     id("io.micronaut.build.internal.convention-core-library")
+
 }
 dependencies {
     annotationProcessor(projects.micronautInjectJava)
@@ -21,4 +22,5 @@ dependencies {
     api(libs.junit.jupiter.api)
     api(libs.junit.jupiter.params)
     api(libs.managed.reactor)
+    implementation(libs.micronaut.test.netty.leak)
 }

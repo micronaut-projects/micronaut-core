@@ -16,6 +16,7 @@
 package io.micronaut.core.type;
 
 import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A variation of {@link Executable} that exposes invoke method without arguments validation.
@@ -34,5 +35,6 @@ public interface UnsafeExecutable<T, R> extends Executable<T, R> {
      * @param arguments The arguments
      * @return The result
      */
-    R invokeUnsafe(T instance, Object... arguments);
+    @Nullable
+    R invokeUnsafe(T instance, @Nullable Object... arguments);
 }

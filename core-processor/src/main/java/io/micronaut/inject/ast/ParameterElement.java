@@ -19,9 +19,9 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.util.Objects;
@@ -47,10 +47,8 @@ public interface ParameterElement extends TypedElement {
      * @return The type of the parameter
      */
     @Override
-    @NonNull
     ClassElement getType();
 
-    @NonNull
     @Override
     default String getDescription(boolean simple) {
         if (simple) {
@@ -81,7 +79,7 @@ public interface ParameterElement extends TypedElement {
      * @param name The name
      * @return The parameter element
      */
-    static @NonNull ParameterElement of(@NonNull Class<?> type, @NonNull String name) {
+    static ParameterElement of(Class<?> type, String name) {
         return of(ClassElement.of(type), name);
     }
 
@@ -93,9 +91,9 @@ public interface ParameterElement extends TypedElement {
      * @return The parameter element
      * @since 2.4.0
      */
-    static @NonNull ParameterElement of(
-        @NonNull ClassElement type,
-        @NonNull String name) {
+    static ParameterElement of(
+        ClassElement type,
+        String name) {
         Objects.requireNonNull(name, "Name cannot be null");
         Objects.requireNonNull(type, "Type cannot be null");
         return new ReflectParameterElement(type, name);
@@ -111,15 +109,16 @@ public interface ParameterElement extends TypedElement {
      * @return The parameter element
      * @since 4.0.0
      */
-    static @NonNull ParameterElement of(
-        @NonNull ClassElement type,
-        @NonNull String name,
-        @NonNull AnnotationMetadataProvider annotationMetadataProvider,
-        @NonNull AbstractAnnotationMetadataBuilder<?, ?> metadataBuilder) {
+    static ParameterElement of(
+        ClassElement type,
+        String name,
+        AnnotationMetadataProvider annotationMetadataProvider,
+        AbstractAnnotationMetadataBuilder<?, ?> metadataBuilder) {
         Objects.requireNonNull(name, "Name cannot be null");
         Objects.requireNonNull(type, "Type cannot be null");
         return new ReflectParameterElement(type, name) {
 
+            @Nullable
             private AnnotationMetadata annotationMetadata;
 
             @Override
@@ -134,7 +133,7 @@ public interface ParameterElement extends TypedElement {
 
             @Override
             @SuppressWarnings("java:S1192")
-            public <T extends Annotation> Element annotate(@NonNull String annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
+            public <T extends Annotation> Element annotate(String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
                 ArgumentUtils.requireNonNull("annotationType", annotationType);
                 AnnotationValueBuilder<T> builder = AnnotationValue.builder(annotationType);
                 //noinspection ConstantConditions
@@ -163,14 +162,14 @@ public interface ParameterElement extends TypedElement {
             }
 
             @Override
-            public Element removeAnnotation(@NonNull String annotationType) {
+            public Element removeAnnotation(String annotationType) {
                 ArgumentUtils.requireNonNull("annotationType", annotationType);
                 annotationMetadata = metadataBuilder.removeAnnotation(getAnnotationMetadata(), annotationType);
                 return this;
             }
 
             @Override
-            public <T extends Annotation> Element removeAnnotationIf(@NonNull Predicate<AnnotationValue<T>> predicate) {
+            public <T extends Annotation> Element removeAnnotationIf(Predicate<AnnotationValue<T>> predicate) {
                 ArgumentUtils.requireNonNull("predicate", predicate);
                 annotationMetadata = metadataBuilder.removeAnnotationIf(getAnnotationMetadata(), predicate);
                 return this;
@@ -178,7 +177,7 @@ public interface ParameterElement extends TypedElement {
             }
 
             @Override
-            public Element removeStereotype(@NonNull String annotationType) {
+            public Element removeStereotype(String annotationType) {
                 ArgumentUtils.requireNonNull("annotationType", annotationType);
                 annotationMetadata = metadataBuilder.removeStereotype(getAnnotationMetadata(), annotationType);
                 return this;

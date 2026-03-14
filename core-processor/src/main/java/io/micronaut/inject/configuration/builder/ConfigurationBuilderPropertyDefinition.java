@@ -16,7 +16,7 @@
 package io.micronaut.inject.configuration.builder;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
@@ -27,6 +27,7 @@ import io.micronaut.inject.ast.ParameterElement;
  * @param name      The property name
  * @param method    The method
  * @param parameter The parameter
+ * @param type      The type
  * @param path      The property path
  * @author Denis Stepanov
  * @see io.micronaut.context.annotation.ConfigurationBuilder

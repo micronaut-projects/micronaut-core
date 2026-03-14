@@ -41,9 +41,9 @@ class TreeGeneratorSpec extends Specification {
 
         when:
         gen.writeStartObject()
-        gen.writeFieldName("foo")
+        gen.writeName("foo")
         gen.writeString("abc")
-        gen.writeFieldName("bar")
+        gen.writeName("bar")
         gen.writeNumber(123)
         gen.writeEndObject()
 
@@ -60,9 +60,9 @@ class TreeGeneratorSpec extends Specification {
 
         when:
         gen.writeStartObject()
-        gen.writeFieldName("2")
+        gen.writeName("2")
         gen.writeString('')
-        gen.writeFieldName("1")
+        gen.writeName("1")
         gen.writeString('')
         gen.writeEndObject()
 
@@ -78,9 +78,9 @@ class TreeGeneratorSpec extends Specification {
 
         when:
         gen.writeStartObject()
-        gen.writeFieldName("foo")
+        gen.writeName("foo")
         gen.writeStartObject()
-        gen.writeFieldName("bar")
+        gen.writeName("bar")
         gen.writeNumber(123)
         gen.writeEndObject()
         gen.writeEndObject()

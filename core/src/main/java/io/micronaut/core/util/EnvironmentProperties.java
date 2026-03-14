@@ -16,7 +16,7 @@
 package io.micronaut.core.util;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -35,11 +35,12 @@ import java.util.function.Function;
 @Internal
 public final class EnvironmentProperties {
     private static final char[] DOT_DASH = new char[] {'.', '-'};
+    @Nullable
     private final EnvironmentProperties delegate;
 
     private final Map<String, List<String>> cache = new HashMap<>();
 
-    private EnvironmentProperties(EnvironmentProperties delegate) {
+    private EnvironmentProperties(@Nullable EnvironmentProperties delegate) {
         this.delegate = delegate;
     }
 
@@ -49,7 +50,7 @@ public final class EnvironmentProperties {
      * @param preComputed a map from environment variable name to Micronaut property names
      * @return an environment properties cache
      */
-    public static EnvironmentProperties of(@NonNull Map<String, List<String>> preComputed) {
+    public static EnvironmentProperties of(Map<String, List<String>> preComputed) {
         EnvironmentProperties current = new EnvironmentProperties(null);
         current.cache.putAll(preComputed);
         return current;
@@ -60,7 +61,6 @@ public final class EnvironmentProperties {
      * to Micronaut property names cache.
      * @return the current state of the cache
      */
-    @NonNull
     public Map<String, List<String>> asMap() {
         return Collections.unmodifiableMap(cache);
     }

@@ -2,7 +2,7 @@ package io.micronaut.http.server.netty.http2
 
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
-import io.micronaut.core.annotation.NonNull
+import org.jspecify.annotations.NonNull
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.PushCapableHttpRequest
@@ -42,6 +42,7 @@ import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler
 import io.netty.handler.ssl.SslContextBuilder
 import io.netty.handler.ssl.SupportedCipherSuiteFilter
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory
+import io.netty.util.ReferenceCountUtil
 import jakarta.inject.Inject
 import org.intellij.lang.annotations.Language
 import spock.lang.Specification
@@ -196,6 +197,8 @@ class Http2ServerPushSpec extends Specification {
             completion.get()
 
             channel.closeFuture().await()
+
+            ReferenceCountUtil.release(sslContext)
         }
 
         class FrameListener extends Http2FrameListenerDecorator {

@@ -17,12 +17,12 @@ package io.micronaut.json;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.type.Argument;
 import io.micronaut.json.tree.JsonNode;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Processor;
 
 import java.io.IOException;
@@ -52,8 +52,7 @@ public interface JsonMapper {
      * @param type The type to read or write
      * @return The specialized {@link JsonMapper}.
      */
-    @NonNull
-    default JsonMapper createSpecific(@NonNull Argument<?> type) {
+    default JsonMapper createSpecific(Argument<?> type) {
         return this;
     }
 
@@ -66,7 +65,8 @@ public interface JsonMapper {
      * @return The deserialized value.
      * @throws IOException IOException
      */
-    <T> T readValueFromTree(@NonNull JsonNode tree, @NonNull Argument<T> type) throws IOException;
+    @Nullable
+    <T> T readValueFromTree(JsonNode tree, Argument<T> type) throws IOException;
 
     /**
      * Transform a {@link JsonNode} to a value of the given type.
@@ -77,7 +77,8 @@ public interface JsonMapper {
      * @return The deserialized value.
      * @throws IOException IOException
      */
-    default <T> T readValueFromTree(@NonNull JsonNode tree, @NonNull Class<T> type) throws IOException {
+    @Nullable
+    default <T> T readValueFromTree(JsonNode tree, Class<T> type) throws IOException {
         return readValueFromTree(tree, Argument.of(type));
     }
 
@@ -90,7 +91,8 @@ public interface JsonMapper {
      * @return The deserialized object.
      * @throws IOException IOException
      */
-    <T> T readValue(@NonNull InputStream inputStream, @NonNull Argument<T> type) throws IOException;
+    @Nullable
+    <T> T readValue(InputStream inputStream, Argument<T> type) throws IOException;
 
     /**
      * Read a value from the given input stream for the given type.
@@ -101,7 +103,7 @@ public interface JsonMapper {
      * @return The value or {@code null} if it decodes to null
      * @throws IOException If an unrecoverable error occurs
      */
-    default @Nullable <T> T readValue(@NonNull InputStream inputStream, @NonNull Class<T> type) throws IOException {
+    default @Nullable <T> T readValue(InputStream inputStream, Class<T> type) throws IOException {
         Objects.requireNonNull(type, "Type cannot be null");
         return readValue(inputStream, Argument.of(type));
     }
@@ -115,7 +117,8 @@ public interface JsonMapper {
      * @return The deserialized object.
      * @throws IOException IOException
      */
-    <T> T readValue(byte @NonNull [] byteArray, @NonNull Argument<T> type) throws IOException;
+    @Nullable
+    <T> T readValue(byte[] byteArray, Argument<T> type) throws IOException;
 
     /**
      * Parse and map json from the given byte buffer.
@@ -125,9 +128,27 @@ public interface JsonMapper {
      * @param <T> Type variable of the return type.
      * @return The deserialized object.
      * @throws IOException IOException
+     * @deprecated Prefer {@link #readValue(ReadBuffer, Argument)}
      */
-    default <T> T readValue(@NonNull ByteBuffer<?> byteBuffer, @NonNull Argument<T> type) throws IOException {
+    @Nullable
+    @Deprecated(since = "5.0.0")
+    default <T> T readValue(ByteBuffer<?> byteBuffer, Argument<T> type) throws IOException {
         return readValue(byteBuffer.toByteArray(), type);
+    }
+
+    /**
+     * Parse and map json from the given read buffer.
+     *
+     * @param readBuffer The input data.
+     * @param type       The type to deserialize to.
+     * @param <T>        Type variable of the return type.
+     * @return The deserialized object.
+     * @throws IOException IOException
+     * @since 5.0.0
+     */
+    @Nullable
+    default <T> T readValue(ReadBuffer readBuffer, Argument<T> type) throws IOException {
+        return readValue(readBuffer.toArray(), type);
     }
 
     /**
@@ -139,7 +160,8 @@ public interface JsonMapper {
      * @return The deserialized object.
      * @throws IOException IOException
      */
-    default <T> T readValue(@NonNull String string, @NonNull Argument<T> type) throws IOException {
+    @Nullable
+    default <T> T readValue(String string, Argument<T> type) throws IOException {
         return readValue(string.getBytes(StandardCharsets.UTF_8), type);
     }
 
@@ -153,7 +175,7 @@ public interface JsonMapper {
      * @throws IOException If an unrecoverable error occurs
      * @since 4.0.0
      */
-    default @Nullable <T> T readValue(byte @NonNull [] byteArray, @NonNull Class<T> type) throws IOException {
+    default @Nullable <T> T readValue(byte [] byteArray, Class<T> type) throws IOException {
         Objects.requireNonNull(type, "Type cannot be null");
         return readValue(byteArray, Argument.of(type));
     }
@@ -167,7 +189,7 @@ public interface JsonMapper {
      * @return The value or {@code null} if it decodes to null
      * @throws IOException If an unrecoverable error occurs
      */
-    default @Nullable <T> T readValue(@NonNull String string, @NonNull Class<T> type) throws IOException {
+    default @Nullable <T> T readValue(String string, Class<T> type) throws IOException {
         Objects.requireNonNull(type, "Type cannot be null");
         return readValue(string, Argument.of(type));
     }
@@ -179,9 +201,8 @@ public interface JsonMapper {
      * @param streamArray Whether to return a top-level json array as a stream of elements rather than a single array.
      * @return The reactive processor.
      */
-    @NonNull
     @Deprecated
-    default Processor<byte[], JsonNode> createReactiveParser(@NonNull Consumer<Processor<byte[], JsonNode>> onSubscribe, boolean streamArray) {
+    default Processor<byte[], JsonNode> createReactiveParser(Consumer<Processor<byte[], JsonNode>> onSubscribe, boolean streamArray) {
         throw new UnsupportedOperationException("Reactive parser not supported");
     }
 
@@ -192,7 +213,6 @@ public interface JsonMapper {
      * @return The json representation.
      * @throws IOException If there are any mapping exceptions (e.g. illegal values).
      */
-    @NonNull
     JsonNode writeValueToTree(@Nullable Object value) throws IOException;
 
     /**
@@ -204,8 +224,7 @@ public interface JsonMapper {
      * @return The json representation.
      * @throws IOException If there are any mapping exceptions (e.g. illegal values).
      */
-    @NonNull
-    <T> JsonNode writeValueToTree(@NonNull Argument<T> type, @Nullable T value) throws IOException;
+    <T> JsonNode writeValueToTree(Argument<T> type, @Nullable T value) throws IOException;
 
     /**
      * Write an object as json.
@@ -214,7 +233,7 @@ public interface JsonMapper {
      * @param object The object to serialize.
      * @throws IOException IOException
      */
-    void writeValue(@NonNull OutputStream outputStream, @Nullable Object object) throws IOException;
+    void writeValue(OutputStream outputStream, @Nullable Object object) throws IOException;
 
     /**
      * Write an object as json.
@@ -225,7 +244,7 @@ public interface JsonMapper {
      * @param <T> The generic type
      * @throws IOException IOException
      */
-    <T> void writeValue(@NonNull OutputStream outputStream, @NonNull Argument<T> type, @Nullable T object) throws IOException;
+    <T> void writeValue(OutputStream outputStream, Argument<T> type, @Nullable T object) throws IOException;
 
     /**
      * Write an object as json.
@@ -245,7 +264,7 @@ public interface JsonMapper {
      * @return The serialized encoded json.
      * @throws IOException IOException
      */
-    <T> byte[] writeValueAsBytes(@NonNull Argument<T> type, @Nullable T object) throws IOException;
+    <T> byte[] writeValueAsBytes(Argument<T> type, @Nullable T object) throws IOException;
 
     /**
      * Write the given value as a string.
@@ -255,8 +274,7 @@ public interface JsonMapper {
      * @throws IOException If an unrecoverable error occurs
      * @since 4.0.0
      */
-    default @NonNull String writeValueAsString(@NonNull Object object) throws IOException {
-        Objects.requireNonNull(object, "Object cannot be null");
+    default String writeValueAsString(@Nullable Object object) throws IOException {
         return new String(writeValueAsBytes(object), StandardCharsets.UTF_8);
     }
 
@@ -270,7 +288,7 @@ public interface JsonMapper {
      * @throws IOException If an unrecoverable error occurs
      * @since 4.0.0
      */
-    default @NonNull <T> String writeValueAsString(@NonNull Argument<T> type, @Nullable T object) throws IOException {
+    default <T> String writeValueAsString(Argument<T> type, @Nullable T object) throws IOException {
         return writeValueAsString(type, object, StandardCharsets.UTF_8);
     }
 
@@ -285,7 +303,7 @@ public interface JsonMapper {
      * @throws IOException If an unrecoverable error occurs
      * @since 4.0.0
      */
-    default @NonNull <T> String writeValueAsString(@NonNull Argument<T> type, @Nullable T object, Charset charset) throws IOException {
+    default <T> String writeValueAsString(Argument<T> type, @Nullable T object, Charset charset) throws IOException {
         Objects.requireNonNull(charset, "Charset cannot be null");
         byte[] bytes = writeValueAsBytes(type, object);
         return new String(bytes, charset);
@@ -300,7 +318,7 @@ public interface JsonMapper {
      * @throws UnsupportedOperationException If this operation is not supported.
      */
     @Experimental
-    default void updateValueFromTree(Object value, @NonNull JsonNode tree) throws IOException {
+    default void updateValueFromTree(Object value, JsonNode tree) throws IOException {
         throw new UnsupportedOperationException();
     }
 
@@ -310,8 +328,7 @@ public interface JsonMapper {
      * @param features The json features to configure.
      * @return A new mapper.
      */
-    @NonNull
-    default JsonMapper cloneWithFeatures(@NonNull JsonFeatures features) {
+    default JsonMapper cloneWithFeatures(JsonFeatures features) {
         throw new UnsupportedOperationException();
     }
 
@@ -322,8 +339,7 @@ public interface JsonMapper {
      * @return The json features for use in {@link #cloneWithFeatures}, or an empty optional if there were no feature
      * annotations detected (or feature annotations are not supported).
      */
-    @NonNull
-    default Optional<JsonFeatures> detectFeatures(@NonNull AnnotationMetadata annotations) {
+    default Optional<JsonFeatures> detectFeatures(AnnotationMetadata annotations) {
         return Optional.empty();
     }
 
@@ -334,15 +350,13 @@ public interface JsonMapper {
      * @return A new mapper.
      * @throws UnsupportedOperationException If views are not supported by this mapper.
      */
-    @NonNull
-    default JsonMapper cloneWithViewClass(@NonNull Class<?> viewClass) {
+    default JsonMapper cloneWithViewClass(Class<?> viewClass) {
         throw new UnsupportedOperationException();
     }
 
     /**
      * @return The configured stream config.
      */
-    @NonNull
     JsonStreamConfig getStreamConfig();
 
     /**
@@ -352,7 +366,7 @@ public interface JsonMapper {
      * @throws IllegalStateException If no {@link JsonMapper} implementation exists on the classpath.
      * @since 4.0.0
      */
-    static @NonNull JsonMapper createDefault() {
+    static JsonMapper createDefault() {
         AtomicReference<IllegalStateException> ex = new AtomicReference<>();
         return ServiceLoader.load(JsonMapperSupplier.class).stream()
             .flatMap(p -> {

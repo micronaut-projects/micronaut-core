@@ -18,11 +18,11 @@ package io.micronaut.context;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.DefaultArgument;
 import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
-
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * An argument that is aware of the environment to resolve property placeholders
@@ -36,13 +36,14 @@ import io.micronaut.core.annotation.Nullable;
 final class EnvironmentAwareArgument<T> extends DefaultArgument<T> implements EnvironmentConfigurable {
 
     private final AnnotationMetadata annotationMetadata;
+    @Nullable
     private Environment environment;
 
     /**
      * Default constructor.
      * @param argument The wrapped argument
      */
-    EnvironmentAwareArgument(DefaultArgument<T> argument) {
+    EnvironmentAwareArgument(Argument<T> argument) {
         super(argument.getType(), argument.getName(), argument.getAnnotationMetadata(), argument.getTypeVariables(), argument.getTypeParameters());
         this.annotationMetadata = initAnnotationMetadata(argument.getAnnotationMetadata());
     }

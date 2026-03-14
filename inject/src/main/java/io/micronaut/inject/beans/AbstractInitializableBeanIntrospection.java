@@ -19,8 +19,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.beans.BeanIntrospection;
@@ -86,16 +85,18 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
     private final List<BeanMethod<B, Object>> beanMethodsList;
     private final StringIntMap beanPropertyIndex;
 
+    @Nullable
     private BeanConstructor<B> beanConstructor;
 
+    @Nullable
     private IntrospectionBuilderData builderData;
 
     protected AbstractInitializableBeanIntrospection(Class<B> beanType,
-                                                  AnnotationMetadata annotationMetadata,
-                                                  AnnotationMetadata constructorAnnotationMetadata,
-                                                  Argument<?>[] constructorArguments,
-                                                  BeanPropertyRef<Object>[] propertiesRefs,
-                                                  BeanMethodRef<Object>[] methodsRefs) {
+                                                     @Nullable AnnotationMetadata annotationMetadata,
+                                                     @Nullable AnnotationMetadata constructorAnnotationMetadata,
+                                                     @Nullable Argument<?>[] constructorArguments,
+                                                     @Nullable BeanPropertyRef<Object>[] propertiesRefs,
+                                                     @Nullable BeanMethodRef<Object>[] methodsRefs) {
         this.beanType = beanType;
         this.annotationMetadata = annotationMetadata == null ? AnnotationMetadata.EMPTY_METADATA : EvaluatedAnnotationMetadata.wrapIfNecessary(annotationMetadata);
         this.constructorAnnotationMetadata = constructorAnnotationMetadata == null ? AnnotationMetadata.EMPTY_METADATA : EvaluatedAnnotationMetadata.wrapIfNecessary(constructorAnnotationMetadata);
@@ -181,23 +182,22 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
      * @param arguments The arguments
      * @return The bean
      */
-    @NonNull
     @Internal
     @UsedByGeneratedCode
-    protected B instantiateInternal(@Nullable Object[] arguments) {
+    protected B instantiateInternal(@Nullable Object @Nullable [] arguments) {
         if (hasBuilder() && arguments != null) {
             Builder<B> b = builder();
-            @NonNull Argument<?>[] args = b.getBuilderArguments();
+            Argument<?>[] args = b.getBuilderArguments();
             for (int i = 0; i < args.length; i++) {
                 Argument<Object> arg = (Argument<Object>) args[i];
                 Object val = arguments[i];
                 b.with(i, arg, val);
             }
-            @NonNull Argument<?>[] buildMethodArguments = b.getBuildMethodArguments();
+            Argument<?>[] buildMethodArguments = b.getBuildMethodArguments();
             if (buildMethodArguments.length == 0) {
                 return b.build();
             } else {
-                @Nullable Object[] buildParams = Arrays.copyOfRange(arguments, args.length, arguments.length);
+                Object @Nullable [] buildParams = Arrays.copyOfRange(arguments, args.length, arguments.length);
                 return b.build(buildParams);
             }
 
@@ -263,7 +263,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
      */
     @Nullable
     @UsedByGeneratedCode
-    protected <V> V dispatch(int index, @NonNull B target, @Nullable Object[] args) {
+    protected <V> V dispatch(int index, B target, @Nullable Object[] args) {
         throw unknownDispatchAtIndexException(index);
     }
 
@@ -279,7 +279,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
      */
     @Nullable
     @UsedByGeneratedCode
-    protected <V> V dispatchOne(int index, @NonNull Object target, @Nullable Object arg) {
+    protected <V> V dispatchOne(int index, Object target, @Nullable Object arg) {
         throw unknownDispatchAtIndexException(index);
     }
 
@@ -305,14 +305,13 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
      */
     @Nullable
     @UsedByGeneratedCode
-    public BeanProperty<B, Object> findIndexedProperty(@NonNull Class<? extends Annotation> annotationType, @NonNull String annotationValue) {
+    public BeanProperty<B, Object> findIndexedProperty(Class<? extends Annotation> annotationType, String annotationValue) {
         return null;
     }
 
-    @NonNull
     @Override
     @UsedByGeneratedCode
-    public Collection<BeanProperty<B, Object>> getIndexedProperties(@NonNull Class<? extends Annotation> annotationType) {
+    public Collection<BeanProperty<B, Object>> getIndexedProperties(Class<? extends Annotation> annotationType) {
         return Collections.emptyList();
     }
 
@@ -335,9 +334,8 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         throw new InstantiationException("No default constructor exists");
     }
 
-    @NonNull
     @Override
-    public B instantiate(boolean strictNullable, Object... arguments) throws InstantiationException {
+    public B instantiate(boolean strictNullable, @Nullable Object ... arguments) throws InstantiationException {
         ArgumentUtils.requireNonNull("arguments", arguments);
 
         if (arguments.length == 0) {
@@ -368,7 +366,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
     }
 
     @Override
-    public B instantiateUnsafe(@NonNull Object... arguments) {
+    public B instantiateUnsafe(@Nullable Object @Nullable ... arguments) {
         return instantiateInternal(arguments);
     }
 
@@ -409,15 +407,13 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         }
     }
 
-    @NonNull
     @Override
-    public Optional<BeanProperty<B, Object>> getIndexedProperty(@NonNull Class<? extends Annotation> annotationType, @NonNull String annotationValue) {
+    public Optional<BeanProperty<B, Object>> getIndexedProperty(Class<? extends Annotation> annotationType, String annotationValue) {
         return Optional.ofNullable(findIndexedProperty(annotationType, annotationValue));
     }
 
-    @NonNull
     @Override
-    public Optional<BeanProperty<B, Object>> getProperty(@NonNull String name) {
+    public Optional<BeanProperty<B, Object>> getProperty(String name) {
         ArgumentUtils.requireNonNull("name", name);
         int index = propertyIndexOf(name);
         return index == -1 ? Optional.empty() : Optional.of(beanProperties[index]);
@@ -428,7 +424,6 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         return annotationMetadata;
     }
 
-    @NonNull
     @Override
     public Collection<BeanProperty<B, Object>> getBeanProperties() {
         return beanPropertiesList;
@@ -444,13 +439,11 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         return beanWritePropertiesList;
     }
 
-    @NonNull
     @Override
     public Class<B> getBeanType() {
         return beanType;
     }
 
-    @NonNull
     @Override
     public Collection<BeanMethod<B, Object>> getBeanMethods() {
         return beanMethodsList;
@@ -479,7 +472,6 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
     }
 
     @SuppressWarnings("unchecked")
-    @NonNull
     private IntrospectionBuilderData getBuilderData() {
         if (this.builderData == null) {
 
@@ -511,7 +503,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
                         Set<BeanMethod<?, ?>> excludedMethods = new HashSet<>();
                         for (BeanMethod<Object, Object> builderMethod : builderMethods) {
                             Argument<?> argument;
-                            @NonNull Argument<?>[] methodArgs = builderMethod.getArguments();
+                            Argument<?> [] methodArgs = builderMethod.getArguments();
                             if (ArrayUtils.isNotEmpty(methodArgs)) {
                                 argument = toWrapperIfNecessary(methodArgs[0]);
                             } else {
@@ -538,7 +530,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
                 }
             } else {
                 int constructorLength = constructorArguments.length;
-                @NonNull UnsafeBeanProperty<B, Object>[] writeableProperties = resolveWriteableProperties(beanPropertiesList);
+                UnsafeBeanProperty<B, Object> [] writeableProperties = resolveWriteableProperties(beanPropertiesList);
 
                 this.builderData = new IntrospectionBuilderData(
                     constructorArguments,
@@ -550,7 +542,6 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         return builderData;
     }
 
-    @NonNull
     private static Argument<?> toWrapperIfNecessary(Argument<?> argument) {
         if (argument.isPrimitive()) {
             // alway use wrapper type
@@ -561,7 +552,6 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
     }
 
     @SuppressWarnings("unchecked")
-    @NonNull
     private <P> UnsafeBeanProperty<P, Object>[] resolveWriteableProperties(Collection<BeanProperty<P, Object>> beanProperties) {
         return beanProperties.stream()
             .filter(bp -> !bp.isReadOnly() && Arrays.stream(constructorArguments).noneMatch(a -> bp.getName().equals(a.getName())))
@@ -574,13 +564,11 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         Argument<?>[] arguments,
         Argument<?>[] constructorArguments,
         int constructorLength,
-        @Nullable
-        UnsafeBeanProperty<Object, Object>[] writeableProperties,
+        UnsafeBeanProperty<Object, Object> @Nullable [] writeableProperties,
         @Nullable
         BeanIntrospection<Object> builder,
         @Nullable
         BeanMethod<Object, Object> creator,
-        @Nullable
         BeanMethod<Object, Object>[] buildMethods,
         StringIntMap argumentIndex,
         Object[] defaultValues,
@@ -603,7 +591,6 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
             init(arguments);
         }
 
-        @NonNull
         private static boolean[] toRequires(int constructorLength, Argument<?>[] constructorArguments, UnsafeBeanProperty<Object, Object>[] writeableProperties) {
             boolean[] requires = new boolean[constructorLength + writeableProperties.length];
             for (int i = 0; i < constructorLength; i++) {
@@ -631,18 +618,16 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         public IntrospectionBuilderData(
             Argument<?>[] arguments,
             int constructorLength,
-            @Nullable
-            UnsafeBeanProperty<Object, Object>[] writeableProperties,
+            UnsafeBeanProperty<Object, Object> @Nullable [] writeableProperties,
             @Nullable
             BeanIntrospection<Object> builder,
             @Nullable
             BeanMethod<Object, Object> creator,
-            @Nullable
-            BeanMethod<Object, Object>[] buildMethods,
+            BeanMethod<Object, Object> @Nullable [] buildMethods,
             StringIntMap argumentIndex,
             Object[] defaultValues,
             boolean[] required) {
-            this(arguments, creator == null ? arguments : ArrayUtils.concat(arguments, creator.getArguments()), constructorLength, writeableProperties, builder, creator, buildMethods, argumentIndex, defaultValues, required);
+            this(arguments, creator == null ? arguments : ArrayUtils.concat(arguments, creator.getArguments()), constructorLength, writeableProperties, builder, creator, buildMethods == null ? new BeanMethod[0] : buildMethods, argumentIndex, defaultValues, required);
         }
 
         static Argument<?>[] toArguments(Argument<?>[] constructorArguments, int constructorLength, UnsafeBeanProperty<Object, Object>[] writeableProperties) {
@@ -662,7 +647,6 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
             return arguments;
         }
 
-        @NonNull
         private static Argument<?>[] toArguments(BeanProperty<?, ?>[] writeableProperties) {
             return Arrays.stream(writeableProperties)
                 .map(bp -> {
@@ -695,12 +679,15 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         }
 
         @Override
-        public @NonNull Argument<?>[] getBuilderArguments() {
+        public Argument<?>[] getBuilderArguments() {
             return builderData.arguments;
         }
 
         @Override
-        public @NonNull Argument<?>[] getBuildMethodArguments() {
+        public Argument<?>[] getBuildMethodArguments() {
+            if (builderData.creator == null) {
+                return new Argument[0];
+            }
             return builderData.creator.getArguments();
         }
 
@@ -710,7 +697,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         }
 
         @Override
-        public @NonNull Builder<B> with(String name, Object value) {
+        public Builder<B> with(String name, @Nullable Object value) {
             int i = indexOf(name);
             if (i != -1) {
                 @SuppressWarnings("unchecked")
@@ -721,7 +708,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         }
 
         @Override
-        public @NonNull <A> Builder<B> with(int index, Argument<A> argument, A value) {
+        public <A> Builder<B> with(int index, Argument<A> argument, @Nullable A value) {
             if (value != null) {
                 if (!argument.isInstance(value)) {
                     throw new IllegalArgumentException("Invalid value [" + value + "] specified for argument [" + argument + "]");
@@ -732,7 +719,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         }
 
         @Override
-        public @NonNull <A> Builder<B> convert(int index, ArgumentConversionContext<A> conversionContext, Object value, ConversionService conversionService) {
+        public <A> Builder<B> convert(int index, ArgumentConversionContext<A> conversionContext, @Nullable Object value, ConversionService conversionService) {
             Argument<A> argument = conversionContext.getArgument();
             if (value != null) {
                 if (!argument.isInstance(value)) {
@@ -774,7 +761,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
             BeanIntrospection<Object> builderIntrospection = builderData.builder;
             if (builderIntrospection != null) {
                 Object b = builderIntrospection.instantiate();
-                BeanMethod<Object, Object> creator = builderData.creator;
+                BeanMethod<Object, Object> creator = Objects.requireNonNull(builderData.creator);
                 for (int i = 0; i < params.length; i++) {
                     Object param = params[i];
                     BeanMethod<Object, Object> m = builderData.buildMethods[i];
@@ -810,7 +797,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
                 if (creator.getArguments().length != builderParams.length) {
                     throw new InstantiationException("Build method " + creator + " expects [" + creator.getArguments().length + "] arguments, but " + builderParams.length + " were provided");
                 } else {
-                    return (B) creator.invoke(b, builderParams);
+                    return (B) Objects.requireNonNull(creator.invoke(b, builderParams));
                 }
             } else {
                 int constructorLength = builderData.constructorLength;
@@ -895,25 +882,21 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
             this.annotationMetadata = EvaluatedAnnotationMetadata.wrapIfNecessary(ref.argument.getAnnotationMetadata());
         }
 
-        @NonNull
         @Override
         public String getName() {
             return ref.argument.getName();
         }
 
-        @NonNull
         @Override
         public Class<P> getType() {
             return ref.argument.getType();
         }
 
         @Override
-        @NonNull
         public Argument<P> asArgument() {
             return ref.argument;
         }
 
-        @NonNull
         @Override
         public BeanIntrospection<B> getDeclaringBean() {
             return AbstractInitializableBeanIntrospection.this;
@@ -926,7 +909,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
 
         @Nullable
         @Override
-        public P get(@NonNull B bean) {
+        public P get(B bean) {
             ArgumentUtils.requireNonNull("bean", bean);
             if (!beanType.isInstance(bean)) {
                 throw new IllegalArgumentException("Invalid bean [" + bean + "] for type: " + beanType);
@@ -938,12 +921,13 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         }
 
         @Override
+        @Nullable
         public P getUnsafe(B bean) {
             return dispatchOne(ref.getMethodIndex, bean, null);
         }
 
         @Override
-        public void set(@NonNull B bean, @Nullable P value) {
+        public void set(B bean, @Nullable P value) {
             ArgumentUtils.requireNonNull("bean", bean);
 
             if (!beanType.isInstance(bean)) {
@@ -959,12 +943,12 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         }
 
         @Override
-        public void setUnsafe(B bean, P value) {
+        public void setUnsafe(B bean, @Nullable P value) {
             dispatchOne(ref.setMethodIndex, bean, value);
         }
 
         @Override
-        public B withValue(@NonNull B bean, @Nullable P value) {
+        public B withValue(B bean, @Nullable P value) {
             ArgumentUtils.requireNonNull("bean", bean);
             if (!beanType.isInstance(bean)) {
                 throw new IllegalArgumentException("Invalid bean [" + bean + "] for type: " + beanType);
@@ -973,7 +957,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         }
 
         @Override
-        public B withValueUnsafe(B bean, P value) {
+        public B withValueUnsafe(B bean, @Nullable P value) {
             if (value == getUnsafe(bean)) {
                 return bean;
             } else if (ref.withMethodIndex == -1) {
@@ -983,7 +967,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
                 }
                 return UnsafeBeanProperty.super.withValue(bean, value);
             } else {
-                return dispatchOne(ref.withMethodIndex, bean, value);
+                return Objects.requireNonNull(dispatchOne(ref.withMethodIndex, bean, value));
             }
         }
 
@@ -1026,32 +1010,28 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         private final int withMethodIndex;
 
         private BeanWritePropertyImpl(BeanPropertyRef<P> ref) {
-            this.argument = ref.writeArgument;
+            this.argument = Objects.requireNonNull(ref.writeArgument);
             this.typeOrWrapperType = ReflectionUtils.getWrapperType(getType());
             this.annotationMetadata = EvaluatedAnnotationMetadata.wrapIfNecessary(argument.getAnnotationMetadata());
             this.setMethodIndex = ref.setMethodIndex;
             this.withMethodIndex = ref.withMethodIndex;
         }
 
-        @NonNull
         @Override
         public String getName() {
             return argument.getName();
         }
 
-        @NonNull
         @Override
         public Class<P> getType() {
             return argument.getType();
         }
 
         @Override
-        @NonNull
         public Argument<P> asArgument() {
             return argument;
         }
 
-        @NonNull
         @Override
         public BeanIntrospection<B> getDeclaringBean() {
             return AbstractInitializableBeanIntrospection.this;
@@ -1063,7 +1043,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         }
 
         @Override
-        public void set(@NonNull B bean, @Nullable P value) {
+        public void set(B bean, @Nullable P value) {
             ArgumentUtils.requireNonNull("bean", bean);
 
             if (!beanType.isInstance(bean)) {
@@ -1076,12 +1056,12 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         }
 
         @Override
-        public void setUnsafe(B bean, P value) {
+        public void setUnsafe(B bean, @Nullable P value) {
             dispatchOne(setMethodIndex, bean, value);
         }
 
         @Override
-        public B withValue(@NonNull B bean, @Nullable P value) {
+        public B withValue(B bean, @Nullable P value) {
             ArgumentUtils.requireNonNull("bean", bean);
             if (!beanType.isInstance(bean)) {
                 throw new IllegalArgumentException("Invalid bean [" + bean + "] for type: " + beanType);
@@ -1090,12 +1070,12 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         }
 
         @Override
-        public B withValueUnsafe(B bean, P value) {
+        public B withValueUnsafe(B bean, @Nullable P value) {
             if (withMethodIndex == -1) {
                 dispatchOne(setMethodIndex, bean, value);
                 return bean;
             } else {
-                return dispatchOne(withMethodIndex, bean, value);
+                return Objects.requireNonNull(dispatchOne(withMethodIndex, bean, value));
             }
         }
 
@@ -1121,30 +1101,26 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         private final int getMethodIndex;
 
         private BeanReadPropertyImpl(BeanPropertyRef<P> ref) {
-            this.argument = ref.readArgument;
+            this.argument = Objects.requireNonNull(ref.readArgument);
             this.annotationMetadata = EvaluatedAnnotationMetadata.wrapIfNecessary(argument.getAnnotationMetadata());
             this.getMethodIndex = ref.getMethodIndex;
         }
 
-        @NonNull
         @Override
         public String getName() {
             return argument.getName();
         }
 
-        @NonNull
         @Override
         public Class<P> getType() {
             return argument.getType();
         }
 
         @Override
-        @NonNull
         public Argument<P> asArgument() {
             return argument;
         }
 
-        @NonNull
         @Override
         public BeanIntrospection<B> getDeclaringBean() {
             return AbstractInitializableBeanIntrospection.this;
@@ -1157,17 +1133,18 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
 
         @Nullable
         @Override
-        public P get(@NonNull B bean) {
+        public P get(B bean) {
             ArgumentUtils.requireNonNull("bean", bean);
             if (!beanType.isInstance(bean)) {
                 throw new IllegalArgumentException("Invalid bean [" + bean + "] for type: " + beanType);
             }
-            return dispatchOne(getMethodIndex, bean, null);
+            return dispatchOne(getMethodIndex, bean, new Object[0]);
         }
 
         @Override
+        @Nullable
         public P getUnsafe(B bean) {
-            return dispatchOne(getMethodIndex, bean, null);
+            return dispatchOne(getMethodIndex, bean, new Object[0]);
         }
 
         @Override
@@ -1193,24 +1170,20 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
             this.ref = ref;
         }
 
-        @NonNull
         @Override
         public BeanIntrospection<B> getDeclaringBean() {
             return AbstractInitializableBeanIntrospection.this;
         }
 
         @Override
-        public @NonNull
-        ReturnType<P> getReturnType() {
-            //noinspection unchecked
-            return new ReturnType() {
+        public ReturnType<P> getReturnType() {
+            return new ReturnType<>() {
                 @Override
                 public Class<P> getType() {
                     return ref.returnType.getType();
                 }
 
                 @Override
-                @NonNull
                 public Argument<P> asArgument() {
                     return ref.returnType;
                 }
@@ -1220,7 +1193,6 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
                     return ref.returnType.getTypeVariables();
                 }
 
-                @NonNull
                 @Override
                 public AnnotationMetadata getAnnotationMetadata() {
                     return EvaluatedAnnotationMetadata.wrapIfNecessary(ref.returnType.getAnnotationMetadata());
@@ -1228,13 +1200,11 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
             };
         }
 
-        @NonNull
         @Override
         public AnnotationMetadata getAnnotationMetadata() {
             return ref.annotationMetadata == null ? AnnotationMetadata.EMPTY_METADATA : ref.annotationMetadata;
         }
 
-        @NonNull
         @Override
         public String getName() {
             return ref.name;
@@ -1246,7 +1216,8 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         }
 
         @Override
-        public P invoke(@NonNull B instance, Object... arguments) {
+        @Nullable
+        public P invoke(B instance, @Nullable Object... arguments) {
             return dispatch(ref.methodIndex, instance, arguments);
         }
 
@@ -1278,7 +1249,6 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
     @Internal
     @UsedByGeneratedCode
     public static final class BeanPropertyRef<P> {
-        @NonNull
         final Argument<P> argument;
 
         final int getMethodIndex;
@@ -1293,7 +1263,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         @Nullable
         final Argument<P> writeArgument;
 
-        public BeanPropertyRef(@NonNull Argument<P> argument,
+        public BeanPropertyRef(Argument<P> argument,
                                int getMethodIndex,
                                int setMethodIndex,
                                int withMethodIndex,
@@ -1302,7 +1272,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
             this(argument, null, null, getMethodIndex, setMethodIndex, withMethodIndex, readyOnly, mutable);
         }
 
-        public BeanPropertyRef(@NonNull Argument<P> argument,
+        public BeanPropertyRef(Argument<P> argument,
                                @Nullable Argument<P> readArgument,
                                @Nullable Argument<P> writeArgument,
                                int getMethodIndex,
@@ -1330,21 +1300,18 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
     @Internal
     @UsedByGeneratedCode
     public static final class BeanMethodRef<P> {
-        @NonNull
         final Argument<P> returnType;
-        @NonNull
         final String name;
         @Nullable
         final AnnotationMetadata annotationMetadata;
-        @Nullable
-        final Argument<?>[] arguments;
+        final Argument<?> @Nullable [] arguments;
 
         final int methodIndex;
 
-        public BeanMethodRef(@NonNull Argument<P> returnType,
-                             @NonNull String name,
+        public BeanMethodRef(Argument<P> returnType,
+                             String name,
                              @Nullable AnnotationMetadata annotationMetadata,
-                             @Nullable Argument<?>[] arguments,
+                             Argument<?> @Nullable [] arguments,
                              int methodIndex) {
             this.returnType = returnType;
             this.name = name;

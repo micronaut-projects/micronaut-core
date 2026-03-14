@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.handler.accesslog.element;
 
 import io.micronaut.core.order.Ordered;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Builder for not implemented tokens.
@@ -30,7 +31,8 @@ public class NotImplementedElementBuilder implements LogElementBuilder {
     }
 
     @Override
-    public LogElement build(String token, String param) {
+    @Nullable
+    public LogElement build(String token, @Nullable String param) {
         for (String element: NOT_IMPLEMENTED) {
             if (token.equals(element)) {
                 return ConstantElement.UNKNOWN;

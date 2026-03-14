@@ -16,8 +16,7 @@
 package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.value.ConvertibleValues;
@@ -57,9 +56,10 @@ sealed class DefaultMethodBasedRouteInfo<T, R> extends DefaultRouteInfo<R> imple
     private final boolean isVoid;
     private final Optional<Argument<?>> optionalBodyArgument;
     private final Optional<Argument<?>> optionalFullBodyArgument;
+    @Nullable
     private final MessageBodyReader<?> messageBodyReader;
 
-    private RequestArgumentBinder<Object>[] argumentBinders;
+    private RequestArgumentBinder<Object> @Nullable [] argumentBinders;
     private final boolean needsBody;
 
     public DefaultMethodBasedRouteInfo(MethodExecutionHandle<T, R> targetMethod,
@@ -118,6 +118,7 @@ sealed class DefaultMethodBasedRouteInfo<T, R> extends DefaultRouteInfo<R> imple
     }
 
     @Override
+    @Nullable
     public final MessageBodyReader<?> getMessageBodyReader() {
         return messageBodyReader;
     }
@@ -166,7 +167,7 @@ sealed class DefaultMethodBasedRouteInfo<T, R> extends DefaultRouteInfo<R> imple
      * @param argument the argument
      * @return the name
      */
-    private static @NonNull String resolveInputName(@NonNull Argument<?> argument) {
+    private static String resolveInputName(Argument<?> argument) {
         String inputName = argument.getAnnotationMetadata().stringValue(Bindable.NAME).orElse(null);
         if (StringUtils.isEmpty(inputName)) {
             inputName = argument.getName();

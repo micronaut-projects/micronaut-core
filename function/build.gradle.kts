@@ -10,4 +10,7 @@ dependencies {
 
     testAnnotationProcessor(projects.micronautInjectJava)
     testImplementation(projects.micronautJacksonDatabind)
+    testImplementation(libs.micronaut.test.junit5) {
+        exclude(group = "io.micronaut")
+    }
 }

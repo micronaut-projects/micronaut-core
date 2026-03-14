@@ -17,7 +17,7 @@ package io.micronaut.http.hateoas;
 
 import io.micronaut.http.MediaType;
 
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.net.URI;
 import java.util.Optional;
 
@@ -177,7 +177,6 @@ public interface Link {
          * @see Link#getDeprecation()
          */
         Builder deprecation(@Nullable URI deprecation);
-
 
         /**
          * @param deprecationURI The deprecation URI

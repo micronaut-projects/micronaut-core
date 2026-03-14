@@ -16,6 +16,7 @@
 package io.micronaut.discovery.cloud;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import org.jspecify.annotations.NullUnmarked;
 
 import java.util.Collections;
 import java.util.List;
@@ -27,6 +28,7 @@ import java.util.Map;
  * @author Alvaro Sanchez-Mariscal
  * @since 1.1
  */
+@NullUnmarked
 public abstract class AbstractComputeInstanceMetadata implements ComputeInstanceMetadata {
 
     protected String region;

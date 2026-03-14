@@ -14,6 +14,29 @@ import io.micronaut.inject.visitor.VisitorContext
 
 class ImportTypeElementSpec extends AbstractTypeElementSpec {
 
+    void "test bean introspection annotate interface"() {
+        given:
+            ApplicationContext context = buildContext('test.Test', '''
+package test;
+
+import io.micronaut.context.annotation.ClassImport;
+import io.micronaut.core.annotation.Introspected;
+
+@ClassImport(classes = io.micronaut.visitors.MySimpleInterface.class, annotate = Introspected.class)
+class Test {}
+''')
+
+        when:"the reference is loaded"
+            def clazz = context.classLoader.loadClass('test.$io_micronaut_visitors_MySimpleInterface$Introspection')
+            BeanIntrospectionReference reference = clazz.newInstance()
+
+        then:"The reference is generated"
+            reference != null
+
+        cleanup:
+            context?.close()
+    }
+
     void "test bean introspection annotate"() {
         given:
             ApplicationContext context = buildContext('test.Test', '''
@@ -55,6 +78,30 @@ class Test {}
 
         then:"The reference is generated"
             reference != null
+
+        cleanup:
+            context?.close()
+    }
+
+    void "test bean introspection annotate with repeated class import"() {
+        given:
+            ApplicationContext context = buildContext('test.Test', '''
+package test;
+
+import io.micronaut.context.annotation.ClassImport;
+import io.micronaut.core.annotation.Introspected;
+
+@ClassImport(classes = io.micronaut.visitors.MySimpleClass.class, annotate = Introspected.class)
+@ClassImport(classes = io.micronaut.visitors.MySimpleInterface.class, annotate = Introspected.class)
+class Test {}
+''')
+
+        when:"the context is built and a class import introspection is loaded"
+            def classIntrospection = context.classLoader.loadClass('test.$io_micronaut_visitors_MySimpleClass$Introspection')
+            BeanIntrospectionReference classReference = classIntrospection.newInstance()
+
+        then:"The repeated imports compile and generate introspection output"
+            classReference != null
 
         cleanup:
             context?.close()

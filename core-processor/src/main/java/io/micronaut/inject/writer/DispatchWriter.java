@@ -17,8 +17,8 @@ package io.micronaut.inject.writer;
 
 import io.micronaut.context.AbstractExecutableMethodsDefinition;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NullUnmarked;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
@@ -52,6 +52,7 @@ import java.util.stream.IntStream;
  * @since 4.7
  */
 @Internal
+@NullUnmarked
 public final class DispatchWriter implements ClassOutputWriter {
 
     private static final Method GET_ACCESSIBLE_TARGET_METHOD = ReflectionUtils.getRequiredInternalMethod(
@@ -497,7 +498,6 @@ public final class DispatchWriter implements ClassOutputWriter {
      */
     @Internal
     public static final class FieldGetDispatchTarget extends AbstractDispatchTarget {
-        @NonNull
         final FieldElement beanField;
 
         public FieldGetDispatchTarget(FieldElement beanField) {
@@ -531,7 +531,6 @@ public final class DispatchWriter implements ClassOutputWriter {
                 .cast(TypeDef.of(beanField.getType()));
         }
 
-        @NonNull
         public FieldElement getField() {
             return beanField;
         }
@@ -542,7 +541,6 @@ public final class DispatchWriter implements ClassOutputWriter {
      */
     @Internal
     public static final class FieldGetReflectionDispatchTarget extends AbstractDispatchTarget {
-        @NonNull
         final FieldElement beanField;
 
         public FieldGetReflectionDispatchTarget(FieldElement beanField) {
@@ -579,7 +577,6 @@ public final class DispatchWriter implements ClassOutputWriter {
             ).cast(TypeDef.of(beanField.getType()));
         }
 
-        @NonNull
         public FieldElement getField() {
             return beanField;
         }
@@ -590,7 +587,6 @@ public final class DispatchWriter implements ClassOutputWriter {
      */
     @Internal
     public static final class FieldSetDispatchTarget extends AbstractDispatchTarget {
-        @NonNull
         final FieldElement beanField;
 
         public FieldSetDispatchTarget(FieldElement beanField) {
@@ -625,7 +621,6 @@ public final class DispatchWriter implements ClassOutputWriter {
                 .after(ExpressionDef.nullValue().returning());
         }
 
-        @NonNull
         public FieldElement getField() {
             return beanField;
         }
@@ -636,7 +631,6 @@ public final class DispatchWriter implements ClassOutputWriter {
      */
     @Internal
     public static final class FieldSetReflectionDispatchTarget extends AbstractDispatchTarget {
-        @NonNull
         final FieldElement beanField;
 
         public FieldSetReflectionDispatchTarget(FieldElement beanField) {
@@ -673,7 +667,6 @@ public final class DispatchWriter implements ClassOutputWriter {
             ).after(ExpressionDef.nullValue().returning());
         }
 
-        @NonNull
         public FieldElement getField() {
             return beanField;
         }

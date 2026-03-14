@@ -20,6 +20,7 @@ import io.micronaut.core.util.AntPathMatcher;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.PathMatcher;
 import io.micronaut.core.util.StringUtils;
+import org.jspecify.annotations.Nullable;
 
 import java.net.URL;
 import java.util.Collections;
@@ -46,7 +47,7 @@ public class StaticResourceResolver {
     };
 
     private static final String INDEX_PAGE = "index.html";
-    private final AntPathMatcher pathMatcher;
+    private final @Nullable AntPathMatcher pathMatcher;
     private final Map<String, List<ResourceLoader>> resourceMappings;
 
     /**
@@ -81,7 +82,7 @@ public class StaticResourceResolver {
         for (Map.Entry<String, List<ResourceLoader>> entry : resourceMappings.entrySet()) {
             List<ResourceLoader> loaders = entry.getValue();
             String mapping = entry.getKey();
-            if (!loaders.isEmpty() && pathMatcher.matches(mapping, resourcePath)) {
+            if (!loaders.isEmpty() && pathMatcher != null && pathMatcher.matches(mapping, resourcePath)) {
                 String path = pathMatcher.extractPathWithinPattern(mapping, resourcePath);
                 //A request to the root of the mapping
                 if (StringUtils.isEmpty(path)) {

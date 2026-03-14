@@ -18,8 +18,8 @@ package io.micronaut.runtime;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Primary;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.naming.NameUtils;
+import org.jspecify.annotations.Nullable;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -54,13 +54,13 @@ public class ApplicationConfiguration {
     public static final String APPLICATION_NAME = PREFIX + ".name";
 
     private Charset defaultCharset = StandardCharsets.UTF_8;
+    @Nullable
     private String name;
     private InstanceConfiguration instance = new InstanceConfiguration();
 
     /**
      * @return The default charset to use.
      */
-    @NonNull
     public Charset getDefaultCharset() {
         return defaultCharset;
     }
@@ -102,7 +102,7 @@ public class ApplicationConfiguration {
     /**
      * @param instance The instance configuration
      */
-    public void setInstance(InstanceConfiguration instance) {
+    public void setInstance(@Nullable InstanceConfiguration instance) {
         if (instance != null) {
             this.instance = instance;
         }
@@ -124,8 +124,11 @@ public class ApplicationConfiguration {
          */
         public static final String INSTANCE_ID = ApplicationConfiguration.PREFIX + '.' + PREFIX + ".id";
 
+        @Nullable
         private String id;
+        @Nullable
         private String group;
+        @Nullable
         private String zone;
         private Map<String, String> metadata = Collections.emptyMap();
 

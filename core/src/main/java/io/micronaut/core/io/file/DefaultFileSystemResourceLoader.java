@@ -17,6 +17,7 @@ package io.micronaut.core.io.file;
 
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.util.SupplierUtil;
+import org.jspecify.annotations.Nullable;
 
 import java.io.File;
 import java.io.IOException;
@@ -125,7 +126,7 @@ public class DefaultFileSystemResourceLoader implements FileSystemResourceLoader
     @SuppressWarnings("MagicNumber")
     private static String normalize(String path) {
         if (path == null) {
-            return null;
+            return "";
         }
         if (path.startsWith("file:")) {
             path = path.substring(5);
@@ -150,9 +151,9 @@ public class DefaultFileSystemResourceLoader implements FileSystemResourceLoader
         return false;
     }
 
-    private static class BaseDir {
+    private static final class BaseDir {
         final boolean exists;
-        final Path dir;
+        final @Nullable Path dir;
 
         BaseDir() {
             exists = true;

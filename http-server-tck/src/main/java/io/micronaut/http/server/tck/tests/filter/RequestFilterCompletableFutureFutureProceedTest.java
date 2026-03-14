@@ -16,8 +16,7 @@
 package io.micronaut.http.server.tck.tests.filter;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -67,7 +66,7 @@ public class RequestFilterCompletableFutureFutureProceedTest {
     static class FooBarFilter {
     //tag::methods[]
         @RequestFilter
-        CompletableFuture<@Nullable HttpResponse<?>> filter(@NonNull HttpRequest<?> request) {
+        CompletableFuture<@Nullable HttpResponse<?>> filter(HttpRequest<?> request) {
             if (request.getHeaders().contains("X-FOOBAR")) {
                 // proceed
                 return CompletableFuture.completedFuture(null);

@@ -221,18 +221,34 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
     protected AnnotationMetadata writeAndLoadMetadata(String className, AnnotationMetadata toWrite) {
         byte[] bytecode = AnnotationMetadataWriter.write(className, toWrite)
         className = className + AnnotationMetadata.CLASS_NAME_SUFFIX
-        ClassLoader classLoader = new ClassLoader() {
-            @Override
-            protected Class<?> findClass(String name) throws ClassNotFoundException {
-                if (name == className) {
-                    byte[] bytes = bytecode
-                    return super.defineClass(name, bytes, 0, bytes.length)
-                }
-                return super.findClass(name)
-            }
+        ClassLoader classLoader = new DefiningClassLoader(className, bytecode)
+        return ((AnnotationMetadataProvider) classLoader.loadClass(className).newInstance()).getAnnotationMetadata()
+    }
+
+    // Workaround for Groovy 5 compiler bug
+    // java.lang.IllegalAccessException: class org.codehaus.groovy.reflection.CachedMethod cannot access a member of class java.lang.ClassLoader (in module java.base) with modifiers "protected final"
+    //	at io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec$2.findClass(AbstractBeanDefinitionSpec.groovy:229)
+    //	at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:593)
+    //	at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:526)
+    //	at io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec.writeAndLoadMetadata(AbstractBeanDefinitionSpec.groovy:235)
+    //	at io.micronaut.ast.groovy.annotation.router.GroovyAnnotationMetadataBuilderSpec.test enum value action annotation metadata(GroovyAnnotationMetadataBuilderSpec.groovy:51)
+    @CompileStatic
+    private static class DefiningClassLoader extends ClassLoader {
+        private final String className
+        private final byte[] bytecode
+
+        DefiningClassLoader(String className, byte[] bytecode) {
+            this.className = className
+            this.bytecode = bytecode
         }
 
-        return ((AnnotationMetadataProvider) classLoader.loadClass(className).newInstance()).getAnnotationMetadata()
+        @Override
+        protected Class<?> findClass(String name) throws ClassNotFoundException {
+            if (name == className) {
+                return super.defineClass(name, bytecode, 0, bytecode.length)
+            }
+            return super.findClass(name)
+        }
     }
 
     /**

@@ -49,7 +49,7 @@ interface MyRepo3 : io.micronaut.kotlin.processing.aop.introduction.CoroutineCru
                         element
                 ).ifPresent(sourceFile -> {
                     try {
-                        sourceFile.write(writer -> writer.write("data class HelloWorld"))
+                        sourceFile.write(writer -> writer.write("data class HelloWorld(val name: String)"))
                     } catch (Exception e) {
                         throw new ProcessingException(element, "Failed to generate a builder: " + e.getMessage(), e);
                     }

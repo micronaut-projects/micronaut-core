@@ -33,8 +33,8 @@ import io.micronaut.context.event.ApplicationEventPublisherFactory
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationMetadataProvider
 import io.micronaut.core.annotation.Experimental
-import io.micronaut.core.annotation.NonNull
-import io.micronaut.core.annotation.Nullable
+import org.jspecify.annotations.NonNull
+import org.jspecify.annotations.Nullable
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap
 import io.micronaut.core.graal.GraalReflectionConfigurer
@@ -108,13 +108,13 @@ abstract class AbstractTypeElementSpec extends Specification {
     }
 
     <T> T buildClassElement(@Language("java") String packageInfo, @Language("java") String cls, Closure<T> closure) {
-        return buildClassElement(new Files().add("Test", cls).add("package-info", packageInfo), closure)
+        return buildClassElement(new JavaFiles().add("Test", cls).add("package-info", packageInfo), closure)
     }
 
     <T> T buildClassElement(@Language("java") String cls, Closure<T> closure) {
-        return buildClassElement(new Files().add("", cls), closure)
+        return buildClassElement(new JavaFiles().add("", cls), closure)
     }
-    protected <T> T buildClassElement(Files files, Closure<T> closure) {
+    protected <T> T buildClassElement(JavaFiles files, Closure<T> closure) {
         buildTypeElementInfo(files) { TypeElementInfo typeElementInfo ->
             TypeElement typeElement = typeElementInfo.typeElement
             def lastTask = typeElementInfo.javaParser.lastTask.get()
@@ -280,7 +280,7 @@ class Test {
      * @return The context. Should be shutdown after use
      */
     ApplicationContext buildContext(@Nullable @Language("java") String packageJava, String className, @Language("java") String cls, boolean includeAllBeans = false, Map properties = [:]) {
-        Files files = new Files()
+        JavaFiles files = new JavaFiles()
         files.add(className, cls)
         if (packageJava != null) {
             files.add("package-info", packageJava)
@@ -295,7 +295,7 @@ class Test {
      * @param cls The class data
      * @return The context. Should be shutdown after use
      */
-    ApplicationContext buildContext(Files files, boolean includeAllBeans = false, Map properties = [:]) {
+    ApplicationContext buildContext(JavaFiles files, boolean includeAllBeans = false, Map properties = [:]) {
         try (def parser = newJavaParser()) {
             def javaFiles = parser.generate(
                     files.files.stream().map { JavaFileObjects.forSourceString(it.key, it.value) }.toArray(JavaFileObject[]::new)
@@ -416,7 +416,7 @@ class Test {
 
     }
 
-    protected <T> T buildTypeElementInfo(Files files, Closure<T> callable) {
+    protected <T> T buildTypeElementInfo(JavaFiles files, Closure<T> callable) {
         try (def parser = newJavaParser()) {
             JavaFileObject[] sources = files.files.stream()
                     .map { e -> JavaFileObjects.forSourceLines(e.key, e.value) }
@@ -572,17 +572,7 @@ class Test {
     protected AnnotationMetadata writeAndLoadMetadata(String className, AnnotationMetadata toWrite) {
         byte[] bytecode = AnnotationMetadataWriter.write(className, toWrite)
         className = className + AnnotationMetadata.CLASS_NAME_SUFFIX
-        ClassLoader classLoader = new ClassLoader() {
-            @Override
-            protected Class<?> findClass(String name) throws ClassNotFoundException {
-                if (name == className) {
-                    byte[] bytes = bytecode
-                    return defineClass(name, bytes, 0, bytes.length)
-                }
-                return super.findClass(name)
-            }
-        }
-
+        ClassLoader classLoader = new DefiningClassLoader(className, bytecode)
         return ((AnnotationMetadataProvider) classLoader.loadClass(className).newInstance()).getAnnotationMetadata()
     }
 
@@ -705,11 +695,11 @@ class Test {
     }
 
     @CompileStatic
-    static class Files {
+    static class JavaFiles {
 
         private List<Map.Entry<String, String>> files = new ArrayList<>()
 
-        Files add(String filename, @Language("java") String code) {
+        JavaFiles add(String filename, @Language("java") String code) {
             files.add(Map.entry(filename, code))
             return this
         }
@@ -718,5 +708,32 @@ class Test {
             return files
         }
 
+    }
+
+
+    // Workaround for Groovy 5 compiler bug
+    // java.lang.IllegalAccessException: class org.codehaus.groovy.reflection.CachedMethod cannot access a member of class java.lang.ClassLoader (in module java.base) with modifiers "protected final"
+    //	at io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec$2.findClass(AbstractBeanDefinitionSpec.groovy:229)
+    //	at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:593)
+    //	at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:526)
+    //	at io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec.writeAndLoadMetadata(AbstractBeanDefinitionSpec.groovy:235)
+    //	at io.micronaut.ast.groovy.annotation.router.GroovyAnnotationMetadataBuilderSpec.test enum value action annotation metadata(GroovyAnnotationMetadataBuilderSpec.groovy:51)
+    @CompileStatic
+    private static class DefiningClassLoader extends ClassLoader {
+        private final String className
+        private final byte[] bytecode
+
+        DefiningClassLoader(String className, byte[] bytecode) {
+            this.className = className
+            this.bytecode = bytecode
+        }
+
+        @Override
+        protected Class<?> findClass(String name) throws ClassNotFoundException {
+            if (name == className) {
+                return super.defineClass(name, bytecode, 0, bytecode.length)
+            }
+            return super.findClass(name)
+        }
     }
 }

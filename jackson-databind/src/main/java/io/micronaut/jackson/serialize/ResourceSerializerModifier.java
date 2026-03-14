@@ -15,15 +15,13 @@
  */
 package io.micronaut.jackson.serialize;
 
-import com.fasterxml.jackson.databind.BeanDescription;
-import com.fasterxml.jackson.databind.SerializationConfig;
-import com.fasterxml.jackson.databind.ser.BeanPropertyWriter;
-import com.fasterxml.jackson.databind.ser.BeanSerializerModifier;
-import com.fasterxml.jackson.databind.util.NameTransformer;
-import io.micronaut.context.annotation.Requires;
+import tools.jackson.databind.BeanDescription;
+import tools.jackson.databind.SerializationConfig;
+import tools.jackson.databind.ser.BeanPropertyWriter;
+import tools.jackson.databind.ser.ValueSerializerModifier;
+import tools.jackson.databind.util.NameTransformer;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.hateoas.Resource;
-import io.micronaut.jackson.modules.BeanIntrospectionModule;
 import jakarta.inject.Singleton;
 
 import java.util.Iterator;
@@ -37,12 +35,10 @@ import java.util.List;
  */
 @Internal
 @Singleton
-@Requires(missingBeans = BeanIntrospectionModule.class)
-class ResourceSerializerModifier extends BeanSerializerModifier {
-
+class ResourceSerializerModifier extends ValueSerializerModifier {
     @Override
-    public List<BeanPropertyWriter> changeProperties(SerializationConfig config, BeanDescription beanDesc, List<BeanPropertyWriter> beanProperties) {
-        if (Resource.class.isAssignableFrom(beanDesc.getBeanClass())) {
+    public List<BeanPropertyWriter> changeProperties(SerializationConfig config, BeanDescription.Supplier supplier, List<BeanPropertyWriter> beanProperties) {
+        if (Resource.class.isAssignableFrom(supplier.getBeanClass())) {
             Iterator<BeanPropertyWriter> i = beanProperties.iterator();
             BeanPropertyWriter links = null;
             BeanPropertyWriter embedded = null;
@@ -88,7 +84,7 @@ class ResourceSerializerModifier extends BeanSerializerModifier {
             }
             return beanProperties;
         } else {
-            return super.changeProperties(config, beanDesc, beanProperties);
+            return super.changeProperties(config, supplier, beanProperties);
         }
     }
 }

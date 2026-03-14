@@ -17,6 +17,7 @@ package io.micronaut.http.server.tck.tests;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
@@ -33,7 +34,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static io.micronaut.http.tck.TestScenario.asserts;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only
@@ -121,6 +122,7 @@ public class HeadersTest {
     }
 
     @Introspected
+    @ReflectiveAccess
     record ETags(List<String> headers) {
     }
 }

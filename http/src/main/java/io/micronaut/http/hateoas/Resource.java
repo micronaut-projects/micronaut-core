@@ -19,6 +19,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.core.value.OptionalMultiValues;
 
 /**
@@ -28,6 +29,7 @@ import io.micronaut.core.value.OptionalMultiValues;
  * @since 1.1
  */
 @Introspected
+@ReflectiveAccess // for jackson
 public interface Resource {
 
     /**

@@ -336,7 +336,7 @@ class Test {
 
     void "test jspecify annotations arrays"() {
         expect:
-            buildClassElement('''
+        buildClassElement('''
 package test;
 
 import org.jspecify.annotations.NonNull;

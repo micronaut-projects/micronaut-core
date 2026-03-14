@@ -19,5 +19,7 @@
  * @author graemerocher
  * @since 1.1.0
  */
-
+@NullMarked
 package io.micronaut.scheduling.io.watch.osx;
+
+import org.jspecify.annotations.NullMarked;

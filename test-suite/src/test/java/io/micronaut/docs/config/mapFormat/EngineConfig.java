@@ -17,12 +17,14 @@ package io.micronaut.docs.config.mapFormat;
 
 // tag::imports[]
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.convert.format.MapFormat;
 
 import jakarta.validation.constraints.Min;
 import java.util.Map;
 // end::imports[]
 
+@Requires(property = "spec.name", value = "VehicleMapFormatSpec")
 // tag::class[]
 @ConfigurationProperties("my.engine")
 public class EngineConfig {

@@ -12,17 +12,15 @@ import io.micronaut.runtime.server.EmbeddedServer
 import reactor.core.publisher.Flux
 import kotlin.test.fail
 
-class MessageEndpointSpec : StringSpec() {
+class MessageEndpointSpec: StringSpec() {
 
     val embeddedServer = autoClose(
-        ApplicationContext.run(
-            EmbeddedServer::class.java,
-            mapOf("spec.name" to MessageEndpointSpec::class.java.simpleName, "endpoints.message.enabled" to true)
-        )
+            ApplicationContext.run(EmbeddedServer::class.java,
+                    mapOf("spec.name" to MessageEndpointSpec::class.java.simpleName, "endpoints.message.enabled" to true))
     )
 
     val client = autoClose(
-        embeddedServer.applicationContext.createBean(HttpClient::class.java, embeddedServer.url)
+            embeddedServer.applicationContext.createBean(HttpClient::class.java, embeddedServer.url)
     )
 
     init {
@@ -34,12 +32,8 @@ class MessageEndpointSpec : StringSpec() {
         }
 
         "test write message endpoint" {
-            var response = Flux.from(
-                client.exchange(
-                    HttpRequest.POST<Map<String, Any>>("/message", mapOf("newMessage" to "A new message"))
-                        .contentType(MediaType.APPLICATION_FORM_URLENCODED), String::class.java
-                )
-            ).blockFirst()
+            var response = Flux.from(client.exchange(HttpRequest.POST<Map<String, Any>>("/message", mapOf("newMessage" to "A new message"))
+                    .contentType(MediaType.APPLICATION_FORM_URLENCODED), String::class.java)).blockFirst()
 
             response.code() shouldBe HttpStatus.OK.code
             response.body() shouldBe "Message updated"

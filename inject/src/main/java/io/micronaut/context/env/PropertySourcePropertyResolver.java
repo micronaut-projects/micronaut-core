@@ -17,8 +17,8 @@ package io.micronaut.context.env;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NullUnmarked;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
@@ -63,6 +63,7 @@ import java.util.regex.Pattern;
  * @author Graeme Rocher
  * @since 1.0
  */
+@NullUnmarked
 @Internal
 public class PropertySourcePropertyResolver implements PropertyResolver, AutoCloseable {
 
@@ -81,9 +82,9 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     // properties are stored in an array of maps organized by character in the alphabet
     // this allows optimization of searches by prefix
     @SuppressWarnings("MagicNumber")
-    private final Map<String, DefaultPropertyEntry>[] catalog = new Map[58];
-    private final Map<String, DefaultPropertyEntry>[] rawCatalog = new Map[58];
-    private final Map<String, DefaultPropertyEntry>[] nonGenerated = new Map[58];
+    private final @Nullable Map<String, DefaultPropertyEntry>[] catalog = new Map[58];
+    private final @Nullable Map<String, DefaultPropertyEntry>[] rawCatalog = new Map[58];
+    private final @Nullable Map<String, DefaultPropertyEntry>[] nonGenerated = new Map[58];
 
     private final Logger log;
 
@@ -132,7 +133,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      *
      * @param propertySources The {@link PropertySource} instances
      */
-    public PropertySourcePropertyResolver(PropertySource... propertySources) {
+    public PropertySourcePropertyResolver(PropertySource @Nullable ... propertySources) {
         this(ConversionService.SHARED);
         if (propertySources != null) {
             for (PropertySource propertySource : propertySources) {
@@ -143,6 +144,8 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
 
     void reset() {
         synchronized (catalog) {
+            Arrays.fill(nonGenerated, null);
+            Arrays.fill(rawCatalog, null);
             Arrays.fill(catalog, null);
             resetCaches();
         }
@@ -155,7 +158,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     }
 
 
-    private Map<String, Object> diffCatalog(Map<String, DefaultPropertyEntry>[] original, Map<String, DefaultPropertyEntry>[] newCatalog) {
+    private Map<String, Object> diffCatalog(@Nullable Map<String, DefaultPropertyEntry>[] original, @Nullable Map<String, DefaultPropertyEntry>[] newCatalog) {
         Map<String, Object> changes = new LinkedHashMap<>();
         for (int i = 0; i < original.length; i++) {
             Map<String, DefaultPropertyEntry> map = original[i];
@@ -226,7 +229,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         return !Objects.deepEquals(newValue, oldValue);
     }
 
-    private Map<String, DefaultPropertyEntry>[] copyCatalog(Map<String, DefaultPropertyEntry>[] catalog) {
+    private @Nullable Map<String, DefaultPropertyEntry>[] copyCatalog(@Nullable Map<String, DefaultPropertyEntry>[] catalog) {
         Map<String, DefaultPropertyEntry>[] newCatalog = new Map[catalog.length];
         for (int i = 0; i < catalog.length; i++) {
             Map<String, DefaultPropertyEntry> entry = catalog[i];
@@ -311,15 +314,13 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         return false;
     }
 
-    @NonNull
     @Override
-    public Collection<String> getPropertyEntries(@NonNull String name) {
+    public Collection<String> getPropertyEntries(String name) {
         return getPropertyEntries(name, PropertyCatalog.NORMALIZED);
     }
 
-    @NonNull
     @Override
-    public Collection<String> getPropertyEntries(@NonNull String name, @NonNull PropertyCatalog propertyCatalog) {
+    public Collection<String> getPropertyEntries(String name, PropertyCatalog propertyCatalog) {
         if (StringUtils.isEmpty(name)) {
             return Collections.emptySet();
         }
@@ -388,7 +389,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     }
 
     @Override
-    public @NonNull Map<String, Object> getProperties(String name, StringConvention keyFormat) {
+    public Map<String, Object> getProperties(@Nullable String name, @Nullable StringConvention keyFormat) {
         if (StringUtils.isEmpty(name)) {
             return Collections.emptyMap();
         }
@@ -423,7 +424,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     }
 
     @Override
-    public <T> Optional<T> getProperty(@NonNull String name, @NonNull ArgumentConversionContext<T> conversionContext) {
+    public <T> Optional<T> getProperty(String name, ArgumentConversionContext<T> conversionContext) {
         if (StringUtils.isEmpty(name)) {
             return Optional.empty();
         }
@@ -644,7 +645,6 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      * @param transformation The map transformation to apply
      * @return The resulting map
      */
-    @NonNull
     protected Map<String, Object> resolveSubMap(
             String name,
             Map<String, DefaultPropertyEntry> entries,
@@ -876,7 +876,8 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      * @return The map with the resolved entries for the name
      */
     @SuppressWarnings("MagicNumber")
-    protected Map<String, DefaultPropertyEntry> resolveEntriesForKey(String name, boolean allowCreate, @Nullable PropertyCatalog propertyCatalog) {
+    @Nullable
+    protected final Map<String, DefaultPropertyEntry> resolveEntriesForKey(String name, boolean allowCreate, @Nullable PropertyCatalog propertyCatalog) {
         if (name.isEmpty()) {
             return null;
         }
@@ -981,7 +982,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         );
     }
 
-    private void fill(List list, int toIndex, Object value) {
+    private void fill(List list, int toIndex, @Nullable Object value) {
         if (toIndex >= list.size()) {
             for (int i = list.size(); i <= toIndex; i++) {
                 list.add(i, value);
@@ -996,7 +997,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         }
     }
 
-    private record ConversionCacheKey(@NonNull String name, Class<?> requiredType) {
+    private record ConversionCacheKey(String name, Class<?> requiredType) {
 
         @Override
         public boolean equals(Object o) {

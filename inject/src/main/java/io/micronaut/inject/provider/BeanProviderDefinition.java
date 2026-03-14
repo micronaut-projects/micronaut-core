@@ -18,8 +18,7 @@ package io.micronaut.inject.provider;
 import io.micronaut.context.*;
 import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.qualifiers.AnyQualifier;
@@ -38,7 +37,7 @@ import java.util.stream.Stream;
 @Internal
 public final class BeanProviderDefinition extends AbstractProviderDefinition<BeanProvider<Object>> {
     @Override
-    public boolean isEnabled(BeanContext context, BeanResolutionContext resolutionContext) {
+    public boolean isEnabled(BeanContext context, @Nullable BeanResolutionContext resolutionContext) {
         return true;
     }
 
@@ -55,17 +54,19 @@ public final class BeanProviderDefinition extends AbstractProviderDefinition<Bea
 
     @Override
     protected BeanProvider<Object> buildProvider(
-            @NonNull BeanResolutionContext resolutionContext,
-            @NonNull BeanContext context,
-            @NonNull Argument<Object> argument,
+            BeanResolutionContext resolutionContext,
+            BeanContext context,
+            Argument<Object> argument,
             @Nullable Qualifier<Object> qualifier,
             boolean singleton) {
         return new BeanProvider<>() {
 
+            @Nullable
             private final Qualifier<Object> finalQualifier =
                     qualifier instanceof AnyQualifier ? null : qualifier;
 
-            private Qualifier<Object> qualify(Qualifier<Object> qualifier) {
+            @Nullable
+            private Qualifier<Object> qualify(@Nullable Qualifier<Object> qualifier) {
                 if (finalQualifier == null) {
                     return qualifier;
                 } else if (qualifier == null) {
@@ -82,7 +83,7 @@ public final class BeanProviderDefinition extends AbstractProviderDefinition<Bea
             }
 
             @Override
-            public Optional<Object> find(Qualifier<Object> qualifier) {
+            public Optional<Object> find(@Nullable Qualifier<Object> qualifier) {
                 return resolutionContext.copy().findBean(argument, qualify(qualifier));
             }
 
@@ -92,7 +93,7 @@ public final class BeanProviderDefinition extends AbstractProviderDefinition<Bea
             }
 
             @Override
-            public Object get(Qualifier<Object> qualifier) {
+            public Object get(@Nullable Qualifier<Object> qualifier) {
                 return resolutionContext.copy().getBean(argument, qualify(qualifier));
             }
 
@@ -110,7 +111,6 @@ public final class BeanProviderDefinition extends AbstractProviderDefinition<Bea
                 return context.containsBean(argument, finalQualifier);
             }
 
-            @NonNull
             @Override
             public Iterator<Object> iterator() {
                 return resolutionContext.copy().getBeansOfType(argument, finalQualifier).iterator();

@@ -3,6 +3,7 @@ package io.micronaut.docs.factories
 // tag::imports[]
 import io.micronaut.context.annotation.Bean
 import io.micronaut.context.annotation.Replaces
+import io.micronaut.test.annotation.MockBean
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
@@ -12,8 +13,7 @@ import jakarta.inject.Inject
 // tag::class[]
 @MicronautTest
 class VehicleMockSpec {
-    @get:Bean
-    @get:Replaces(Engine::class)
+    @MockBean(Engine::class)
     val mockEngine: Engine = object : Engine { // <1>
         override fun start(): String {
             return "Mock Started"

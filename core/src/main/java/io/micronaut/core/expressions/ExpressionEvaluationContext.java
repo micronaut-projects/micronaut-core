@@ -16,7 +16,7 @@
 package io.micronaut.core.expressions;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Context that can be used by evaluated expression to obtain objects required
@@ -43,6 +43,7 @@ public interface ExpressionEvaluationContext extends AutoCloseable {
      * @param index argument index
      * @return argument value
      */
+    @Nullable
     Object getArgument(int index);
 
     /**

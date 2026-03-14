@@ -18,7 +18,7 @@ package io.micronaut.inject.writer;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.BuildTimeInit;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.expressions.EvaluatedExpressionReference;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.expressions.EvaluatedExpressionWriter;
@@ -55,6 +55,7 @@ public final class EvaluatedExpressionProcessor {
     private final VisitorContext visitorContext;
     private final Element originatingElement;
 
+    @Nullable
     private List<EvaluatedExpressionWriter> writers;
 
     /**
@@ -142,8 +143,10 @@ public final class EvaluatedExpressionProcessor {
     }
 
     public void writeEvaluatedExpressions(ClassWriterOutputVisitor visitor) throws IOException {
-        for (EvaluatedExpressionWriter writer : writers) {
-            writer.accept(visitor);
+        if (writers != null) {
+            for (EvaluatedExpressionWriter writer : writers) {
+                writer.accept(visitor);
+            }
         }
         writers = null;
     }

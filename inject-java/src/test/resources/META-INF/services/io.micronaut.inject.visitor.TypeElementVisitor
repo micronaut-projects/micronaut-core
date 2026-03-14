@@ -1,4 +1,5 @@
 io.micronaut.visitors.InterfaceGenVisitor
+io.micronaut.visitors.ConstantGenVisitor
 io.micronaut.visitors.ControllerGetVisitor
 io.micronaut.visitors.IntroductionVisitor
 io.micronaut.visitors.AllElementsVisitor

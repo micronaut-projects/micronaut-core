@@ -18,8 +18,7 @@ package io.micronaut.core.io.service;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.BuildTimeInit;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.beans.BeanInfo;
 import io.micronaut.core.graal.GraalReflectionConfigurer;
 import io.micronaut.core.io.service.ServiceScanner.StaticServiceDefinitions;
@@ -28,6 +27,7 @@ import io.micronaut.core.util.ArrayUtils;
 import org.graalvm.nativeimage.ImageSingletons;
 import org.graalvm.nativeimage.hosted.Feature;
 import org.graalvm.nativeimage.hosted.RuntimeClassInitialization;
+import org.graalvm.nativeimage.hosted.RuntimeProxyCreation;
 import org.graalvm.nativeimage.hosted.RuntimeReflection;
 
 import java.io.IOException;
@@ -203,7 +203,6 @@ class ServiceLoaderFeature implements Feature {
      * @param access The access
      * @return The definitions
      */
-    @NonNull
     protected StaticServiceDefinitions buildStaticServiceDefinitions(BeforeAnalysisAccess access) {
         try {
             Map<String, Set<String>> services = MicronautMetaServiceLoaderUtils.findAllMicronautMetaServices(getClass().getClassLoader());
@@ -233,7 +232,7 @@ class ServiceLoaderFeature implements Feature {
 
         final GraalReflectionConfigurer.ReflectionConfigurationContext context = new GraalReflectionConfigurer.ReflectionConfigurationContext() {
             @Override
-            public Class<?> findClassByName(@NonNull String name) {
+            public Class<?> findClassByName(String name) {
                 return access.findClassByName(name);
             }
 
@@ -258,6 +257,11 @@ class ServiceLoaderFeature implements Feature {
             public void register(Constructor<?>... constructors) {
                 RuntimeReflection.register(constructors);
             }
+
+            @Override
+            public void registerDynamicProxy(Class<?> proxyClass) {
+                RuntimeProxyCreation.register(proxyClass);
+            }
         };
         for (GraalReflectionConfigurer configurer : configurers) {
             initializeAtBuildTime(configurer.getClass());
@@ -265,7 +269,6 @@ class ServiceLoaderFeature implements Feature {
         }
     }
 
-    @NonNull
     protected Collection<GraalReflectionConfigurer> loadReflectionConfigurers(BeforeAnalysisAccess access) {
         Collection<GraalReflectionConfigurer> configurers = new ArrayList<>();
         SoftServiceLoader.load(GraalReflectionConfigurer.class, access.getApplicationClassLoader())

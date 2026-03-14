@@ -21,12 +21,12 @@ import io.micronaut.context.annotation.DefaultImplementation;
 import io.micronaut.context.annotation.DefaultScope;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.EachProperty;
+import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
@@ -39,6 +39,7 @@ import jakarta.inject.Singleton;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Modifier;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -63,7 +64,7 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
      * @return The type information for the bean.
      * @since 4.8.0
      */
-    default @NonNull TypeInformation<T> getTypeInformation() {
+    default TypeInformation<T> getTypeInformation() {
         return new TypeInformation<>() {
             @Override
             public String getBeanTypeString(TypeFormat format) {
@@ -318,7 +319,6 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
      * @return The class name
      */
     @Override
-    @NonNull
     default String getName() {
         return getBeanType().getName();
     }
@@ -343,9 +343,9 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
      * @return Whether an {@link ExecutableMethod} exists which is annotated with the supplied annotation
      * @since 4.3.0
      */
-    default boolean hasAnnotatedMethod(@NonNull Class<? extends Annotation> annotationClass,
-                                       @NonNull String methodName,
-                                       @NonNull Class<?>... argumentTypes) {
+    default boolean hasAnnotatedMethod(Class<? extends Annotation> annotationClass,
+                                       String methodName,
+                                       Class<?>... argumentTypes) {
         return findMethod(methodName, argumentTypes).map(method -> method.hasAnnotation(annotationClass)).orElse(false);
     }
 
@@ -368,7 +368,6 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
     }
 
     @Override
-    @NonNull
     default Argument<T> asArgument() {
         return Argument.of(
                 getBeanType(),
@@ -391,7 +390,7 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
      *
      * @return The type arguments
      */
-    default @NonNull List<Argument<?>> getTypeArguments() {
+    default List<Argument<?>> getTypeArguments() {
         return getTypeArguments(getBeanType());
     }
 
@@ -401,7 +400,7 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
      * @param type The super class or interface type
      * @return The type arguments
      */
-    default @NonNull List<Argument<?>> getTypeArguments(Class<?> type) {
+    default List<Argument<?>> getTypeArguments(Class<?> type) {
         if (type == null) {
             return Collections.emptyList();
         }
@@ -413,7 +412,7 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
      * @param type The type
      * @return The type parameters
      */
-    default @NonNull Class<?>[] getTypeParameters(@Nullable Class<?> type) {
+    default Class<?>[] getTypeParameters(@Nullable Class<?> type) {
         if (type == null) {
             return ReflectionUtils.EMPTY_CLASS_ARRAY;
         } else {
@@ -436,7 +435,7 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
      *
      * @return The type parameters for the bean type as a class array.
      */
-    default @NonNull Class<?>[] getTypeParameters() {
+    default Class<?>[] getTypeParameters() {
         return getTypeParameters(getBeanType());
     }
 
@@ -446,7 +445,7 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
      * @param type The super class or interface type
      * @return The type arguments
      */
-    default @NonNull List<Argument<?>> getTypeArguments(String type) {
+    default List<Argument<?>> getTypeArguments(String type) {
         return Collections.emptyList();
     }
 
@@ -483,7 +482,7 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
      * @return The bean description.
      * @since 4.8.0
      */
-    default @NonNull String getBeanDescription(@NonNull TypeFormat typeFormat, boolean includeArguments) {
+    default String getBeanDescription(TypeFormat typeFormat, boolean includeArguments) {
         ConstructorInjectionPoint<T> constructor = getConstructor();
         StringBuilder beanDescription = new StringBuilder();
         Argument<?>[] arguments = constructor.getArguments();
@@ -548,12 +547,12 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
                     beanDescription.append(beanTypeString)
                         .append(".")
                         .append(beanMethod);
-                    @NonNull Argument<?>[] methodArguments = method.getArguments();
+                    Argument<?> [] methodArguments = method.getArguments();
                     List<Argument<?>> typeArguments = getTypeArguments(adaptedType);
                     if (typeArguments.size() == methodArguments.length) {
                         arguments = new Argument[methodArguments.length];
                         for (int i = 0; i < methodArguments.length; i++) {
-                            @NonNull Argument<?> methodArgument = methodArguments[i];
+ Argument<?> methodArgument = methodArguments[i];
                             Argument<?> t = typeArguments.get(i);
                             arguments[i] = Argument.of(
                                 t.getType(),
@@ -630,7 +629,7 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
      * @return The bean description.
      * @since 4.8.0
      */
-    default @NonNull String getBeanDescription(@NonNull TypeFormat typeFormat) {
+    default String getBeanDescription(TypeFormat typeFormat) {
         return getBeanDescription(typeFormat, true);
     }
 
@@ -667,5 +666,27 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
             return new DefaultReplacesDefinition<T>(getBeanType(), annotation);
         }
         return null;
+    }
+
+    /**
+     * When {@link #requiresMethodProcessing()} is true, this method returns the methods that require processing.
+     * Executable methods with {@link io.micronaut.context.annotation.Executable#processOnStartup()} set to true.
+     *
+     * @return The methods that require processing.
+     * @see io.micronaut.context.annotation.Executable#processOnStartup()
+     * @since 5.0
+     */
+    default Iterable<ExecutableMethod<T, ?>> getExecutableMethodsForProcessing() {
+        if (!requiresMethodProcessing()) {
+            return List.of();
+        }
+        Collection<ExecutableMethod<T, ?>> executableMethods = getExecutableMethods();
+        List<ExecutableMethod<T, ?>> methodsToProcess = new ArrayList<>(executableMethods.size());
+        for (ExecutableMethod<T, ?> executableMethod : executableMethods) {
+            if (executableMethod.booleanValue(Executable.class, Executable.MEMBER_PROCESS_ON_STARTUP).orElse(false)) {
+                methodsToProcess.add(executableMethod);
+            }
+        }
+        return methodsToProcess;
     }
 }

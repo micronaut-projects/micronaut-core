@@ -16,7 +16,6 @@
 package io.micronaut.expressions.parser.ast.access;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.expressions.ExpressionEvaluationContext;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
@@ -27,6 +26,7 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.sourcegen.model.ExpressionDef;
 import io.micronaut.sourcegen.model.TypeDef;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Expression AST node used for context method parameter access.
@@ -42,6 +42,7 @@ final class ContextMethodParameterAccess extends ExpressionNode {
 
     private final ParameterElement parameterElement;
 
+    @Nullable
     private Integer parameterIndex;
 
     public ContextMethodParameterAccess(ParameterElement parameterElement) {
@@ -79,7 +80,7 @@ final class ContextMethodParameterAccess extends ExpressionNode {
     }
 
     @Override
-    protected TypeDef doResolveType(@NonNull ExpressionVisitorContext ctx) {
+    protected TypeDef doResolveType(ExpressionVisitorContext ctx) {
         doResolveClassElement(ctx);
         return TypeDef.erasure(parameterElement.getType());
     }

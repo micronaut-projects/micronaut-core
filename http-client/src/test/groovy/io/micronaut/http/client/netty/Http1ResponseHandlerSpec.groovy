@@ -293,7 +293,7 @@ class Http1ResponseHandlerSpec extends Specification {
         channel.checkException()
     }
 
-    private static class ReadCounter extends ChannelOutboundHandlerAdapter {
+    private static final class ReadCounter extends ChannelOutboundHandlerAdapter {
         int reads = 0
 
         @Override

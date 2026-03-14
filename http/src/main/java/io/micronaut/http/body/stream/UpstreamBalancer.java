@@ -136,6 +136,13 @@ public final class UpstreamBalancer {
         }
     }
 
+    /**
+     * Atomically set a flag and check whether the given mask was enabled.
+     *
+     * @param flag The flag to set (binary OR)
+     * @param mask The mask to check
+     * @return {@code true} iff the mask was not set before this call and is now set, {@code false otherwise}
+     */
     private boolean setFlagAndCheckMask(int flag, int mask) {
         int old = getAndSetFlag(flag);
         return (old & mask) != mask && ((old | flag) & mask) == mask;
@@ -263,7 +270,10 @@ public final class UpstreamBalancer {
 
         @Override
         public void start() {
-            upstream.start();
+            // avoid double .start()
+            if (setFlagAndCheckMask(FLAG_START_A, FLAG_START_A)) {
+                upstream.start();
+            }
         }
 
         @Override

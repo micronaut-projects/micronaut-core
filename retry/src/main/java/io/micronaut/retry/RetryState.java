@@ -15,7 +15,7 @@
  */
 package io.micronaut.retry;
 
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.retry.annotation.RetryPredicate;
 
 import java.time.Duration;
@@ -85,6 +85,7 @@ public interface RetryState {
     /**
      * @return The captured exception type (default to {@link Exception}
      */
+    @Nullable
     Class<? extends Throwable> getCapturedException();
 
     /**

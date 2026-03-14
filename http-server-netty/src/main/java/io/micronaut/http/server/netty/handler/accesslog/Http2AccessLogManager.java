@@ -22,6 +22,7 @@ import io.micronaut.http.server.netty.handler.accesslog.element.ConnectionMetada
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http2.Http2Connection;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,8 +41,10 @@ public final class Http2AccessLogManager {
     final Http2Connection.PropertyKey accessLogKey;
     final AccessLogFormatParser formatParser;
     final Logger logger;
+    @Nullable
     final Predicate<String> uriInclusion;
 
+    @Nullable
     AccessLog logForReuse;
 
     public Http2AccessLogManager(Factory factory, Http2Connection connection) {
@@ -79,8 +82,11 @@ public final class Http2AccessLogManager {
      * @param uriInclusion the uri inclusion
      */
     public record Factory(
+        @Nullable
         Logger logger,
+        @Nullable
         String spec,
+        @Nullable
         Predicate<String> uriInclusion
     ) {
     }

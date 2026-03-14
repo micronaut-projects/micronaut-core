@@ -33,6 +33,7 @@ import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.runtime.ApplicationConfiguration;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -64,7 +65,7 @@ final class ConversionTextPlainHandler<T> implements MessageBodyHandler<T> {
     }
 
     @Override
-    public T read(Argument<T> type, MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
+    public T read(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
         String text;
         try {
             text = new String(inputStream.readAllBytes(), configuration.getDefaultCharset());
@@ -75,7 +76,7 @@ final class ConversionTextPlainHandler<T> implements MessageBodyHandler<T> {
     }
 
     @Override
-    public T read(Argument<T> type, MediaType mediaType, Headers httpHeaders, ByteBuffer<?> byteBuffer) throws CodecException {
+    public T read(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, ByteBuffer<?> byteBuffer) throws CodecException {
         T r = convert(type, byteBuffer.toString(configuration.getDefaultCharset()));
         if (byteBuffer instanceof ReferenceCounted rc) {
             rc.release();

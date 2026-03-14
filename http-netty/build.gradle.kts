@@ -1,5 +1,6 @@
 plugins {
     id("io.micronaut.build.internal.convention-library")
+
 }
 
 micronautBuild {
@@ -11,10 +12,11 @@ micronautBuild {
 dependencies {
     annotationProcessor(projects.micronautInjectJava)
     annotationProcessor(projects.micronautGraal)
-    compileOnly(libs.graal)
+    compileOnly(libs.managed.graalvm.nativeimage)
     compileOnly(libs.managed.netty.transport.native.epoll)
     compileOnly(libs.managed.netty.transport.native.kqueue)
     compileOnly(libs.managed.netty.transport.native.iouring)
+    compileOnly(libs.managed.netty.codec.http3)
     compileOnly(projects.micronautWebsocket)
     api(projects.micronautHttp)
     api(projects.micronautBufferNetty)

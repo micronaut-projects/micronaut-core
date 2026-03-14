@@ -4,7 +4,7 @@ import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import io.micronaut.context.ApplicationContext
 
-class PreDestroyBeanSpec : StringSpec() {
+class PreDestroyBeanSpec: StringSpec() {
 
     init {
         "test bean closing on context close" {

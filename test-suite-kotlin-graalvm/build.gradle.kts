@@ -1,5 +1,7 @@
 plugins {
+    id("io.micronaut.build.internal.convention-test-library")
     id("org.graalvm.buildtools.native")
+    id("io.micronaut.build.internal.kotlin-base")
     alias(libs.plugins.managed.kotlin.jvm)
     alias(libs.plugins.managed.ksp)
 }
@@ -30,6 +32,8 @@ dependencies {
     testImplementation(libs.micronaut.kotlin.runtime) {
         exclude(group = "io.micronaut")
     }
+    testRuntimeOnly(libs.junit.jupiter.engine)
+    testRuntimeOnly(libs.junit.platform.launcher)
 }
 
 graalvmNative {
@@ -40,14 +44,26 @@ graalvmNative {
     binaries {
         configureEach {
             resources.autodetect()
+            if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_21)) {
+                buildArgs.add("--initialize-at-build-time=org.junit.platform.commons.logging.LoggerFactory\$DelegatingLogger")
+                buildArgs.add("--initialize-at-build-time=org.junit.platform.suite.engine.IsSuiteClass")
+                buildArgs.add("--initialize-at-build-time=org.junit.platform.suite.engine.IsPotentialTestContainer")
+                buildArgs.add("-H:+SharedArenaSupport")
+            }
         }
     }
 }
 
-configurations.testRuntimeClasspath {
-    resolutionStrategy.eachDependency {
-        if (requested.group == "org.jetbrains.kotlin") {
-            useVersion(libs.versions.managed.kotlin.asProvider().get())
+configurations {
+    testRuntimeClasspath {
+        resolutionStrategy.eachDependency {
+            if (requested.group == "org.jetbrains.kotlin") {
+                useVersion(libs.versions.managed.kotlin.asProvider().get())
+            }
         }
+    }
+    nativeImageTestClasspath {
+        exclude(group = "org.apache.groovy")
+        exclude(group = "org.spockframework")
     }
 }

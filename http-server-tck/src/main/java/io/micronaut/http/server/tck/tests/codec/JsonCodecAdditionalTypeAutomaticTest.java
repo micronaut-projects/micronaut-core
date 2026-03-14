@@ -18,6 +18,7 @@ package io.micronaut.http.server.tck.tests.codec;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
@@ -87,6 +88,7 @@ public class JsonCodecAdditionalTypeAutomaticTest {
     }
 
     @Introspected
+    @ReflectiveAccess
     static class JsonFeed {
         private final String version;
         private final String title;

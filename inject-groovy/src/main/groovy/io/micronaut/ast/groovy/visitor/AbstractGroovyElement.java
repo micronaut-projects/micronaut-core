@@ -15,11 +15,12 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
+import groovy.lang.groovydoc.Groovydoc;
 import groovy.transform.PackageScope;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
@@ -443,13 +444,17 @@ public abstract class AbstractGroovyElement extends AbstractAnnotationElement {
     }
 
     @Override
-    public Optional<String> getDocumentation() {
+    public Optional<String> getDocumentation(boolean parse) {
         GroovyNativeElement nativeType = getNativeType();
         AnnotatedNode annotatedNode = nativeType.annotatedNode();
-        if (annotatedNode.getGroovydoc() == null || annotatedNode.getGroovydoc().getContent() == null) {
+        Groovydoc groovydoc = annotatedNode.getGroovydoc();
+        if (groovydoc == null || groovydoc.getContent() == null) {
             return Optional.empty();
         }
-        return Optional.of(JAVADOC_PATTERN.matcher(annotatedNode.getGroovydoc().getContent()).replaceAll(StringUtils.EMPTY_STRING).trim());
+        if (parse) {
+            return Optional.of(JAVADOC_PATTERN.matcher(annotatedNode.getGroovydoc().getContent()).replaceAll(StringUtils.EMPTY_STRING).trim());
+        }
+        return Optional.of(annotatedNode.getGroovydoc().getContent());
     }
 
     @Override

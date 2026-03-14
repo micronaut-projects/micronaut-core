@@ -8,4 +8,5 @@ import java.lang.annotation.RetentionPolicy;
 @Introduction
 @Retention(RetentionPolicy.RUNTIME)
 public @interface IntroductionTest {
+    String value() default "";
 }

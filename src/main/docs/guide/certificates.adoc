@@ -1,0 +1,100 @@
+[[certificates]]
+== Certificate providers
+
+Certificate providers let you externalize how TLS key and trust material is supplied to the framework. Each provider is a named bean and can be referenced from server and client SSL configuration using:
+
+- `micronaut.server.ssl.key-name` / `micronaut.server.ssl.trust-name`
+- `micronaut.http.client.ssl.key-name` / `micronaut.http.client.ssl.trust-name`
+
+Micronaut ships three provider types:
+- File-based: load from files on disk with optional auto-reload
+- Resource-based: load from Micronaut resources (classpath:, file:, string:, base64:)
+- Self-signed: generate ephemeral certificates (testing/dev)
+
+== File-based provider (PEM with separate key and cert, auto-refresh)
+
+The file provider loads a private key and certificate chain from disk and can automatically reload when files change.
+
+[configuration]
+----
+micronaut:
+  ssl:
+    enabled: true
+  server:
+    ssl:
+      # Use the named provider "cert-a" for the server's key/cert
+      key-name: cert-a
+      key:
+        password: ""
+  http:
+    client:
+      ssl:
+        # Trust the same material for the client
+        trust-name: cert-a
+
+  certificate:
+    file:
+      cert-a:
+        format: pem
+        path: /path/to/server.key.pem
+        certificate-path: /path/to/server.crt.pem
+----
+
+== Resource-based provider (inline PEM and cert-only trust store)
+
+The resource provider loads the material from any Micronaut resource location.
+
+[configuration]
+----
+micronaut:
+  ssl:
+    enabled: true
+  server:
+    ssl:
+      key-name: cert-a
+  http:
+    client:
+      ssl:
+        trust-name: trust-a
+  certificate:
+    resource:
+      cert-a:
+        resource: "string:-----BEGIN PRIVATE KEY-----\n...base64...\n-----END PRIVATE KEY-----\n-----BEGIN CERTIFICATE-----\n...base64...\n-----END CERTIFICATE-----\n"
+      trust-a:
+        resource: "string:-----BEGIN CERTIFICATE-----\n...base64...\n-----END CERTIFICATE-----\n"
+----
+
+For JKS/PKCS12, you can embed binary content via base64:.... For example: resource: "base64:<base64-encoded .p12/.jks bytes>" and set password if required.
+
+== Self-signed provider
+
+The self-signed provider generates temporary certificates. It requires the netty-pkitesting dependency:
+
+dependency:io.netty:netty-pkitesting[scope="runtimeOnly"]
+
+[configuration]
+----
+micronaut:
+  ssl:
+    enabled: true
+  server:
+    ssl:
+      key-name: cert-server
+      trust-name: cert-client
+      client-authentication: need
+  http:
+    client:
+      ssl:
+        key-name: cert-client
+        trust-name: cert-server
+
+  certificate:
+    self-signed:
+      cert-server: {}
+      # Second provider with a custom subject
+      cert-client:
+        subject: "CN=foo"
+----
+
+For per-listener SSL in Netty server, you can also set `key-name` and `trust-name` under `micronaut.server.netty.listeners.<listener>.ssl`.
+

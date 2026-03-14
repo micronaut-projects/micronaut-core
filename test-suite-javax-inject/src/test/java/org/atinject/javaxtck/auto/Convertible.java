@@ -16,10 +16,10 @@
 package org.atinject.javaxtck.auto;
 
 import io.micronaut.context.ApplicationContext;
-import junit.framework.TestCase;
 import org.atinject.javaxtck.auto.accessories.Cupholder;
 import org.atinject.javaxtck.auto.accessories.RoundThing;
 import org.atinject.javaxtck.auto.accessories.SpareTire;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
@@ -27,7 +27,11 @@ import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Provider;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class Convertible implements Car {
 
@@ -183,6 +187,7 @@ public class Convertible implements Car {
 
 
     @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+    @Nested
     public static class Tests {
 
         private final ApplicationContext context = ApplicationContext.run();
@@ -493,7 +498,8 @@ public class Convertible implements Car {
 
     }
 
-    public static class PrivateTests extends TestCase {
+    @Nested
+    public static class PrivateTests {
         private final ApplicationContext context = ApplicationContext.run();
         private final Convertible car = context.getBean(Convertible.class);
         private final Engine engine = car.engineProvider.get();

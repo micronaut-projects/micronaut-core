@@ -15,9 +15,10 @@
  */
 package io.micronaut.http.server.tck.tests;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Introspected;
-import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -187,34 +188,34 @@ public class MiscTest {
     }
 
     @Introspected
+    @ReflectiveAccess
     static class MessageCreate {
 
-        @NonNull
         @NotBlank
         private final String message;
 
-        MessageCreate(@NonNull String message) {
+        MessageCreate(
+            @JsonProperty("message") String message  // @JsonProperty annotation for Jackson Databind
+        ) {
             this.message = message;
         }
 
-        @NonNull
         String getMessage() {
             return message;
         }
     }
 
     @Introspected
+    @ReflectiveAccess
     static class MyResponse {
 
-        @NonNull
         @NotBlank
         private final String greeting;
 
-        public MyResponse(@NonNull String greeting) {
+        public MyResponse(String greeting) {
             this.greeting = greeting;
         }
 
-        @NonNull
         public String getGreeting() {
             return greeting;
         }

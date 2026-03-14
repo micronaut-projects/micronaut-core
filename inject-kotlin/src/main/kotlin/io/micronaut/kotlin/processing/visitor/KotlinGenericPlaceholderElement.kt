@@ -54,7 +54,7 @@ internal class KotlinGenericPlaceholderElement(
         visitorContext: KotlinVisitorContext
     ) : this(
         genericNativeType,
-        selectClassElementRepresentingThisPlaceholder(resolved, bounds),
+        selectClassElementRepresentingThisPlaceholder(resolved, bounds)!!,
         resolved,
         bounds,
         declaringElement,
@@ -67,7 +67,7 @@ internal class KotlinGenericPlaceholderElement(
     }
     private val resolvedAnnotationMetadata: AnnotationMetadata by lazy {
         if (presetAnnotationMetadata != null) {
-            presetAnnotationMetadata
+            presetAnnotationMetadata!!
         } else {
             AnnotationMetadataHierarchy(
                 true,
@@ -125,7 +125,7 @@ internal class KotlinGenericPlaceholderElement(
 
     override fun getDeclaringElement(): Optional<Element> = Optional.ofNullable(declaringElement)
 
-    override fun foldBoundGenericTypes(fold: Function<ClassElement?, ClassElement?>) =
+    override fun foldBoundGenericTypes(fold: Function<ClassElement, ClassElement?>) =
         fold.apply(this)
 
     companion object {

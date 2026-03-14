@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.client.stream
 
-import io.micronaut.core.annotation.Nullable
+import org.jspecify.annotations.Nullable
 import io.micronaut.core.async.annotation.SingleResult
 import groovy.transform.EqualsAndHashCode
 import io.micronaut.context.ApplicationContext

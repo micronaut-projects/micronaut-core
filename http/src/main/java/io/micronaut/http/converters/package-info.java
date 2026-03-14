@@ -19,4 +19,7 @@
  * @author Graeme Rocher
  * @since 2.0
  */
+@NullMarked
 package io.micronaut.http.converters;
+
+import org.jspecify.annotations.NullMarked;

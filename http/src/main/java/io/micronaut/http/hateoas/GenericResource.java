@@ -19,6 +19,7 @@ import com.fasterxml.jackson.annotation.JsonAnyGetter;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.core.util.ObjectUtils;
 
 import java.util.LinkedHashMap;
@@ -32,6 +33,7 @@ import java.util.Map;
  * @author yawkat
  */
 @Introspected
+@ReflectiveAccess // for jackson
 public final class GenericResource extends AbstractResource<GenericResource> {
     private final Map<String, Object> additionalProperties = new LinkedHashMap<>();
 

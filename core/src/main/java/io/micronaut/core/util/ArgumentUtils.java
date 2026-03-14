@@ -14,11 +14,10 @@
  * limitations under the License.
  */
 package io.micronaut.core.util;
-
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.naming.Described;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Executable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Utility methods for checking method argument values.
@@ -38,7 +37,7 @@ public class ArgumentUtils {
      * @throws IllegalArgumentException if the argument is not positive
      * @return The value
      */
-    public static @NonNull Number requirePositive(String name, Number value) {
+    public static Number requirePositive(String name, Number value) {
         requireNonNull(name, value);
         requirePositive(name, value.intValue());
         return value;
@@ -104,9 +103,9 @@ public class ArgumentUtils {
      * @param values The values
      */
     public static void validateArguments(
-            @NonNull Described described,
-            @NonNull Argument<?>[] arguments,
-            @NonNull Object[] values) {
+            Described described,
+            Argument<?>[] arguments,
+            @Nullable Object[] values) {
         int requiredCount = arguments.length;
         @SuppressWarnings("ConstantConditions") int actualCount = ArrayUtils.isEmpty(values) ? 0 : values.length;
         if (requiredCount != actualCount) {
@@ -118,7 +117,7 @@ public class ArgumentUtils {
                 Class<?> type = argument.getWrapperType();
                 Object value = values[i];
                 if (value != null && !type.isInstance(value)) {
-                    throw new IllegalArgumentException("Invalid type [" + values[i].getClass().getName() + "] for argument [" + argument + "] of " + (described instanceof Executable ? "method" : "constructor") + ": " + described.getDescription());
+                    throw new IllegalArgumentException("Invalid type [" + value.getClass().getName() + "] for argument [" + argument + "] of " + (described instanceof Executable ? "method" : "constructor") + ": " + described.getDescription());
                 }
             }
         }
@@ -130,8 +129,11 @@ public class ArgumentUtils {
      * @param <T> The type
      */
     public static class ArgumentCheck<T> {
+        @Nullable
         private final Check check;
+        @Nullable
         private final String name;
+        @Nullable
         private final T value;
 
         /**
@@ -147,7 +149,7 @@ public class ArgumentUtils {
          * @param name  The name
          * @param value The value
          */
-        public ArgumentCheck(String name, T value) {
+        public ArgumentCheck(String name, @Nullable T value) {
             this.check = null;
             this.name = name;
             this.value = value;

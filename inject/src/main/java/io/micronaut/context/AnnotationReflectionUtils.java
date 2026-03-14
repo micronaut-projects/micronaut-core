@@ -17,13 +17,12 @@ package io.micronaut.context;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedArrayType;
@@ -63,13 +62,13 @@ public final class AnnotationReflectionUtils {
      *
      * @param runtimeGenericType The implementation class of the interface
      * @param rawSuperType       The implementedType type - interface or an abstract class
-     * @param <T> T
+     * @param <T>                T
      * @return The argument of the interface with types and annotations
      * @since 4.6
      */
     @Nullable
-    public static <T> Argument<T> resolveGenericToArgument(@NonNull Class<?> runtimeGenericType,
-                                                           @NonNull Class<T> rawSuperType) {
+    public static <T> Argument<T> resolveGenericToArgument(Class<?> runtimeGenericType,
+                                                           Class<T> rawSuperType) {
         if (ClassUtils.REFLECTION_LOGGER.isDebugEnabled()) {
             ClassUtils.REFLECTION_LOGGER.debug("Reflectively finding a generic argument of '{}' from the implementation '{}'",
                 rawSuperType, runtimeGenericType);
@@ -399,6 +398,7 @@ public final class AnnotationReflectionUtils {
         }
 
         @Override
+        @Nullable
         public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
             return null;
         }
@@ -431,6 +431,7 @@ public final class AnnotationReflectionUtils {
         }
 
         @Override
+        @Nullable
         public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
             return annotationSources.stream()
                 .map(s -> s.getAnnotation(annotationClass))

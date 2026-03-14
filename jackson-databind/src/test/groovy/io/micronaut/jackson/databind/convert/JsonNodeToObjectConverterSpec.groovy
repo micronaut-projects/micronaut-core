@@ -16,7 +16,7 @@
 package io.micronaut.jackson.databind.convert
 
 import com.fasterxml.jackson.annotation.JsonCreator
-import com.fasterxml.jackson.databind.node.NullNode
+import tools.jackson.databind.node.NullNode
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.convert.ArgumentConversionContext
 import io.micronaut.core.convert.ConversionService

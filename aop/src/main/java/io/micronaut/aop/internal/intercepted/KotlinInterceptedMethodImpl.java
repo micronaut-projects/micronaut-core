@@ -22,13 +22,13 @@ import io.micronaut.aop.util.DelegatingContextContinuation;
 import io.micronaut.aop.util.KotlinInterceptedMethodHelper;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.async.propagation.KotlinCoroutinePropagation;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.KotlinUtils;
 import kotlin.coroutines.Continuation;
 import kotlin.coroutines.CoroutineContext;
+import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -68,11 +68,12 @@ final class KotlinInterceptedMethodImpl implements io.micronaut.aop.kotlin.Kotli
      * @param context {@link MethodInvocationContext}
      * @return new intercepted method if Kotlin coroutine or null if it's not
      */
+    @Nullable
     public static KotlinInterceptedMethodImpl of(MethodInvocationContext<?, ?> context) {
         if (!KotlinUtils.KOTLIN_COROUTINES_SUPPORTED || !context.getExecutableMethod().isSuspend()) {
             return null;
         }
-        Object[] parameterValues = context.getParameterValues();
+        @Nullable Object[] parameterValues = context.getParameterValues();
         if (parameterValues.length == 0) {
             return null;
         }
@@ -101,6 +102,7 @@ final class KotlinInterceptedMethodImpl implements io.micronaut.aop.kotlin.Kotli
     }
 
     @Override
+    @SuppressWarnings("NullAway")
     public CompletableFuture<Object> interceptResultAsCompletionStage() {
         if (PropagatedContext.exists()) {
             updateCoroutineContext(
@@ -122,6 +124,7 @@ final class KotlinInterceptedMethodImpl implements io.micronaut.aop.kotlin.Kotli
     }
 
     @Override
+    @SuppressWarnings("NullAway")
     public CompletableFuture<Object> interceptResultAsCompletionStage(Interceptor<?, ?> from) {
         if (PropagatedContext.exists()) {
             updateCoroutineContext(
@@ -153,7 +156,8 @@ final class KotlinInterceptedMethodImpl implements io.micronaut.aop.kotlin.Kotli
     }
 
     @Override
-    public Object handleResult(Object result) {
+    @Nullable
+    public Object handleResult(@Nullable Object result) {
         CompletionStage<?> completionStageResult;
         if (result instanceof CompletionStage<?> stage) {
             completionStageResult = stage;
@@ -176,7 +180,6 @@ final class KotlinInterceptedMethodImpl implements io.micronaut.aop.kotlin.Kotli
         throw (E) exception;
     }
 
-    @NonNull
     @Override
     public CoroutineContext getCoroutineContext() {
         return continuation.getContext();
@@ -184,7 +187,7 @@ final class KotlinInterceptedMethodImpl implements io.micronaut.aop.kotlin.Kotli
 
     @SuppressWarnings("unchecked")
     @Override
-    public void updateCoroutineContext(@NonNull CoroutineContext coroutineContext) {
+    public void updateCoroutineContext(CoroutineContext coroutineContext) {
         continuation = new DelegatingContextContinuation((Continuation<Object>) continuation, coroutineContext);
     }
 }

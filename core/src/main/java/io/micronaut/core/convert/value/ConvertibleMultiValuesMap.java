@@ -19,6 +19,7 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.ConversionServiceAware;
 import io.micronaut.core.type.Argument;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -118,6 +119,7 @@ public class ConvertibleMultiValuesMap<V> implements ConvertibleMultiValues<V>, 
     }
 
     @Override
+    @Nullable
     public V get(CharSequence name) {
         List<V> all = getAll(name);
         if (all.isEmpty()) {

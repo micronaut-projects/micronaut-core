@@ -16,8 +16,7 @@
 package io.micronaut.core.execution;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Duration;
 import java.util.Map;
@@ -49,10 +48,8 @@ public interface ImperativeExecutionFlow<T> extends ExecutionFlow<T> {
     /**
      * @return The context if present
      */
-    @NonNull
     Map<String, Object> getContext();
 
-    @NonNull
     @Override
     default ImperativeExecutionFlow<T> tryComplete() {
         return this;
@@ -65,9 +62,8 @@ public interface ImperativeExecutionFlow<T> extends ExecutionFlow<T> {
      * to use it
      */
     @Override
-    @NonNull
     @Deprecated
-    default ExecutionFlow<T> timeout(@NonNull Duration timeout, @NonNull ScheduledExecutorService scheduler, @Nullable BiConsumer<T, Throwable> onDiscard) {
+    default ExecutionFlow<T> timeout(Duration timeout, ScheduledExecutorService scheduler, @Nullable BiConsumer<T, Throwable> onDiscard) {
         return this;
     }
 }

@@ -17,9 +17,9 @@ package io.micronaut.annotation.processing;
 
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.core.annotation.AnnotationClassValue;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -35,6 +35,7 @@ import javax.lang.model.element.AnnotationValue;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.RecordComponentElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.ArrayType;
@@ -114,12 +115,12 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     }
 
     @Override
-    protected void addError(@NonNull Element originatingElement, @NonNull String error) {
+    protected void addError(Element originatingElement, String error) {
         messager.printMessage(Diagnostic.Kind.ERROR, error, originatingElement);
     }
 
     @Override
-    protected void addWarning(@NonNull Element originatingElement, @NonNull String warning) {
+    protected void addWarning(Element originatingElement, String warning) {
         messager.printMessage(Diagnostic.Kind.WARNING, warning, originatingElement);
     }
 
@@ -173,9 +174,8 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
         return visitorContext;
     }
 
-    @NonNull
     @Override
-    protected RetentionPolicy getRetentionPolicy(@NonNull Element annotation) {
+    protected RetentionPolicy getRetentionPolicy(Element annotation) {
         final List<? extends AnnotationMirror> annotationMirrors = annotation.getAnnotationMirrors();
         for (AnnotationMirror annotationMirror : annotationMirrors) {
             final String annotationTypeName = getAnnotationTypeName(annotationMirror);
@@ -233,12 +233,22 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     }
 
     @Override
-    protected boolean isExcludedAnnotation(@NonNull Element element, @NonNull String annotationName) {
+    protected boolean isExcludedAnnotation(Element element, String annotationName) {
         if (annotationName.startsWith("java.lang.annotation") && element.getKind() == ElementKind.ANNOTATION_TYPE) {
             return false;
         } else {
             return super.isExcludedAnnotation(element, annotationName);
         }
+    }
+
+    /**
+     * Build the record component annotation metadata.
+     * @param recordComponentElement The element
+     * @return The annotation metadata
+     * @since 4.10
+     */
+    public final AnnotationMetadata build(RecordComponentElement recordComponentElement) {
+        return buildInternal(recordComponentElement);
     }
 
     @Override
@@ -309,7 +319,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     }
 
     @Override
-    protected String getOriginatingClassName(@NonNull Element orginatingElement) {
+    protected String getOriginatingClassName(Element orginatingElement) {
         TypeElement typeElement = getOriginatingTypeElement(orginatingElement);
         if (typeElement != null) {
             return JavaModelUtils.getClassName(typeElement);

@@ -16,9 +16,9 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.BeanProvider;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
@@ -26,12 +26,15 @@ import io.micronaut.http.netty.channel.EventLoopGroupRegistry;
 import io.micronaut.http.netty.channel.NettyChannelType;
 import io.micronaut.http.netty.channel.converters.ChannelOptionFactory;
 import io.micronaut.http.server.RouteExecutor;
+import io.micronaut.http.server.netty.ssl.NettyServerSslFactory;
 import io.micronaut.http.server.netty.ssl.ServerSslBuilder;
 import io.micronaut.http.server.netty.websocket.NettyServerWebSocketUpgradeHandler;
+import io.micronaut.http.ssl.CertificateProvider;
 import io.micronaut.web.router.resource.StaticResourceResolver;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelOutboundHandler;
 import io.netty.channel.EventLoopGroup;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.Optional;
@@ -48,7 +51,6 @@ interface DelegateNettyEmbeddedServices extends NettyEmbeddedServices {
     /**
      * @return The instance to delegate to.
      */
-    @NonNull
     NettyEmbeddedServices getDelegate();
 
     @Override
@@ -82,6 +84,7 @@ interface DelegateNettyEmbeddedServices extends NettyEmbeddedServices {
     }
 
     @Override
+    @Nullable
     default ServerSslBuilder getServerSslBuilder() {
         return getDelegate().getServerSslBuilder();
     }
@@ -112,7 +115,7 @@ interface DelegateNettyEmbeddedServices extends NettyEmbeddedServices {
     }
 
     @Override
-    default EventLoopGroup createEventLoopGroup(int numThreads, ExecutorService executorService, Integer ioRatio) {
+    default EventLoopGroup createEventLoopGroup(int numThreads, ExecutorService executorService, @Nullable Integer ioRatio) {
         return getDelegate().createEventLoopGroup(numThreads, executorService, ioRatio);
     }
 
@@ -122,13 +125,22 @@ interface DelegateNettyEmbeddedServices extends NettyEmbeddedServices {
     }
 
     @Override
-    default @NonNull Channel getChannelInstance(NettyChannelType type, @NonNull EventLoopGroupConfiguration workerConfig, Channel parent, int fd) {
+    default Channel getChannelInstance(NettyChannelType type, @Nullable EventLoopGroupConfiguration workerConfig, @Nullable Channel parent, int fd) {
         return getDelegate().getChannelInstance(type, workerConfig, parent, fd);
     }
 
     @Override
-    @NonNull
-    default Channel getChannelInstance(NettyChannelType type, @NonNull EventLoopGroupConfiguration workerConfig) {
+    default Channel getChannelInstance(NettyChannelType type, @Nullable EventLoopGroupConfiguration workerConfig) {
         return getDelegate().getChannelInstance(type, workerConfig);
+    }
+
+    @Override
+    default NettyServerSslFactory getSslFactory() {
+        return getDelegate().getSslFactory();
+    }
+
+    @Override
+    default BeanProvider<CertificateProvider> getCertificateProviders() {
+        return getDelegate().getCertificateProviders();
     }
 }

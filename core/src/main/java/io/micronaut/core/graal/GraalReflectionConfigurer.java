@@ -19,8 +19,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.ReflectionConfig;
 import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.util.CollectionUtils;
@@ -68,6 +67,9 @@ public interface GraalReflectionConfigurer extends AnnotationMetadataProvider {
                 final Set<TypeHint.AccessType> accessType = CollectionUtils.setOf(
                     accessTypes
                 );
+                if (accessType.contains(TypeHint.AccessType.DYNAMIC_PROXY)) {
+                    context.registerDynamicProxy(t);
+                }
                 if (accessType.contains(TypeHint.AccessType.ALL_PUBLIC_METHODS)) {
                     final Method[] methods = t.getMethods();
                     for (Method method : methods) {
@@ -171,7 +173,7 @@ public interface GraalReflectionConfigurer extends AnnotationMetadataProvider {
          * @return The class or null
          */
         @Nullable
-        Class<?> findClassByName(@NonNull String name);
+        Class<?> findClassByName(String name);
 
         /**
          * Register the given types for reflection.
@@ -196,5 +198,11 @@ public interface GraalReflectionConfigurer extends AnnotationMetadataProvider {
          * @param constructors The constructors
          */
         void register(Constructor<?>... constructors);
+
+        /**
+         * Register a dynamic proxy.
+         * @param proxyClass The proxy class
+         */
+        void registerDynamicProxy(Class<?> proxyClass);
     }
 }

@@ -17,7 +17,7 @@ package io.micronaut.management.endpoint.refresh;
 
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.event.ApplicationEventPublisher;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.annotation.Write;
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent;

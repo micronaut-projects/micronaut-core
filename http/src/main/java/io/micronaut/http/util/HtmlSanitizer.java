@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.http.util;
-
-import io.micronaut.core.annotation.NonNull;
 import jakarta.annotation.Nullable;
 
 /**
@@ -30,6 +28,5 @@ public interface HtmlSanitizer {
      * @param html the String of HTML to Sanitize
      * @return a sanitized version of the supplied HTML String.
      */
-    @NonNull
     String sanitize(@Nullable String html);
 }

@@ -91,7 +91,7 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
         element.presetAnnotationMetadata = presetAnnotationMetadata
     }
 
-    override fun withAnnotationMetadata(annotationMetadata: AnnotationMetadata): Element? {
+    override fun withAnnotationMetadata(annotationMetadata: AnnotationMetadata): Element {
         val kotlinElement: AbstractKotlinElement<T> = makeCopy()
         kotlinElement.presetAnnotationMetadata = annotationMetadata
         return kotlinElement
@@ -180,7 +180,7 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
         return super.getModifiers()
     }
 
-    override fun getDocumentation(): Optional<String> {
+    override fun getDocumentation(parse: Boolean): Optional<String> {
         return if (annotatedInfo is KSDeclaration) {
             Optional.ofNullable(annotatedInfo.docString)
         } else {
@@ -553,13 +553,15 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
     protected fun newClassElement(
         owner: KotlinNativeElement?,
         type: KSType,
-        parentTypeArguments: Map<String, ClassElement> = emptyMap()
+        parentTypeArguments: Map<String, ClassElement> = emptyMap(),
+        allowPrimitive: Boolean = true
     ) = newClassElement(
         owner,
         type,
         type.declaration.getClassDeclaration(visitorContext),
         parentTypeArguments,
-        HashSet()
+        HashSet(),
+        allowPrimitive
     )
 
     private fun newTypeArgument(

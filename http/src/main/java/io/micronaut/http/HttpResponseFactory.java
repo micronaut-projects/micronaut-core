@@ -15,6 +15,8 @@
  */
 package io.micronaut.http;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * A factory interface for creating {@link MutableHttpResponse} instances.
  *
@@ -35,7 +37,7 @@ public interface HttpResponseFactory {
      * @param <T>  The body type
      * @return The ok response with the given body
      */
-    <T> MutableHttpResponse<T> ok(T body);
+    <T> MutableHttpResponse<T> ok(@Nullable T body);
 
     /**
      * Return a response for the given status.
@@ -45,7 +47,7 @@ public interface HttpResponseFactory {
      * @param <T>    The response type
      * @return The response
      */
-    <T> MutableHttpResponse<T> status(HttpStatus status, String reason);
+    <T> MutableHttpResponse<T> status(HttpStatus status, @Nullable String reason);
 
     /**
      * Return a response for the given status.
@@ -55,7 +57,7 @@ public interface HttpResponseFactory {
      * @param <T>    The response type
      * @return The response
      */
-    <T> MutableHttpResponse<T> status(int status, String reason);
+    <T> MutableHttpResponse<T> status(int status, @Nullable String reason);
 
     /**
      * Return a response for the given status.

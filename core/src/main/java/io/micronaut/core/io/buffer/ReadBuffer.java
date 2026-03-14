@@ -16,13 +16,14 @@
 package io.micronaut.core.io.buffer;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.Charset;
+import java.util.function.Function;
 
 /**
  * A buffer of bytes. Can be read from exactly once. Must be either consumed fully, or
@@ -60,7 +61,6 @@ public abstract class ReadBuffer implements AutoCloseable {
      * @return A new, independent buffer
      * @throws IllegalStateException If this buffer is already closed or consumed
      */
-    @NonNull
     public abstract ReadBuffer duplicate();
 
     /**
@@ -73,7 +73,6 @@ public abstract class ReadBuffer implements AutoCloseable {
      * @throws IllegalStateException     If this buffer is already closed or consumed
      * @throws IndexOutOfBoundsException If {@code n > readable()}
      */
-    @NonNull
     public abstract ReadBuffer split(int splitPosition) throws IndexOutOfBoundsException;
 
     /**
@@ -85,7 +84,6 @@ public abstract class ReadBuffer implements AutoCloseable {
      * @return a new ReadBuffer containing all the bytes that were previously in this ReadBuffer
      * @throws IllegalStateException If this buffer is already closed or consumed
      */
-    @NonNull
     public abstract ReadBuffer move();
 
     /**
@@ -102,7 +100,7 @@ public abstract class ReadBuffer implements AutoCloseable {
      *                                   offset is negative or exceeds the destination array's
      *                                   length
      */
-    public abstract void toArray(byte @NonNull [] destination, int offset) throws IndexOutOfBoundsException;
+    public abstract void toArray(byte[] destination, int offset) throws IndexOutOfBoundsException;
 
     /**
      * Returns the contents of this ReadBuffer as a byte array. Some implementations may share the
@@ -113,7 +111,7 @@ public abstract class ReadBuffer implements AutoCloseable {
      * @return a byte array containing the contents of this ReadBuffer
      * @throws IllegalStateException If this buffer is already closed or consumed
      */
-    public byte @NonNull [] toArray() {
+    public byte[] toArray() {
         byte[] bytes = new byte[readable()];
         toArray(bytes, 0);
         return bytes;
@@ -129,7 +127,6 @@ public abstract class ReadBuffer implements AutoCloseable {
      * @return a string representation of the contents of this ReadBuffer
      * @throws IllegalStateException If this buffer is already closed or consumed
      */
-    @NonNull
     public String toString(Charset charset) {
         return new String(this.toArray(), charset);
     }
@@ -143,7 +140,6 @@ public abstract class ReadBuffer implements AutoCloseable {
      * @return a {@link ByteBuffer} containing the contents of this {@link ReadBuffer}
      * @throws IllegalStateException If this buffer is already closed or consumed
      */
-    @NonNull
     public ByteBuffer<?> toByteBuffer() {
         return new ByteArrayByteBuffer(toArray());
     }
@@ -157,9 +153,32 @@ public abstract class ReadBuffer implements AutoCloseable {
      * @return A stream reading from this buffer
      * @throws IllegalStateException If this buffer is already closed or consumed
      */
-    @NonNull
     public InputStream toInputStream() {
         return new ByteArrayInputStream(toArray());
+    }
+
+    /**
+     * Access the contents of this buffer as a {@link java.nio.ByteBuffer} with
+     * {@link java.nio.ByteBuffer#hasArray()}, if doing so is possible without copying the data.
+     * The lifetime of the buffer is limited to the function scope, user code must not keep it
+     * around. User code must also never modify the backing array of the buffer.
+     *
+     * <p>This is useful for performing operations on the data that can take a (array, offset,
+     * length) parameter, such as {@link OutputStream#write(byte[], int, int)} or serialization.
+     *
+     * <p>This is a <a href="#consuming">consuming operation</a> if the function is called.
+     *
+     * @param function A function to call with a nio buffer view of this {@link ReadBuffer}, if
+     *                 possible
+     * @return The return value of the function, or {@code null} if this buffer cannot be accessed
+     * using a nio buffer
+     * @param <R> The return type of the function
+     * @throws IllegalStateException If this buffer is already closed or consumed
+     * @since 5.0.0
+     */
+    @Nullable
+    public <R> R useFastHeapBuffer(Function<java.nio. ByteBuffer, R> function) {
+        return null;
     }
 
     /**
@@ -171,8 +190,23 @@ public abstract class ReadBuffer implements AutoCloseable {
      * @throws IllegalStateException If this buffer is already closed or consumed
      * @throws IOException           If the {@link OutputStream} throws an exception
      */
-    public void transferTo(@NonNull OutputStream stream) throws IOException {
-        stream.write(toArray());
+    public void transferTo(OutputStream stream) throws IOException {
+        // if possible, write using array directly
+        if (useFastHeapBuffer(bb -> {
+            try {
+                stream.write(bb.array(), bb.arrayOffset() + bb.position(), bb.remaining());
+            } catch (IOException e) {
+                sneakyThrow(e);
+            }
+            return true;
+        }) == null) {
+            // fall back to copying
+            stream.write(toArray());
+        }
+    }
+
+    private static <T extends Throwable, R> R sneakyThrow(Throwable t) throws T {
+        throw (T) t;
     }
 
     /**

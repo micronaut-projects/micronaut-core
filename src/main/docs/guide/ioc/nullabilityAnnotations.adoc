@@ -1,5 +1,7 @@
 In Java, you can use annotations showing whether a variable can or cannot be null. Such annotations aren't part of the standard library.
 
+NOTE: Since Micronaut Framework 5, we recommend you use <<jspecify, JSpecify Annotations>> instead of the Micronaut Nullability Annotations for better [Kotlin interoperability](https://kotlinlang.org/docs/whatsnew21.html#change-of-jspecify-nullability-mismatch-diagnostics-severity-to-strict) and [IDE](https://www.jetbrains.com/idea/whatsnew/#page__content-jspecify-support)/Tooling support. Indeed, since 5.0 Micronaut's APIs use JSpecify annotations.
+
 == Micronaut’s Nullability Annotations
 
 Micronaut framework provides first-class nullability annotations:
@@ -17,7 +19,7 @@ NOTE: Micronaut will default to the non-null policy in most of the places if not
 ----
 package example;
 
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.QueryValue;
@@ -33,7 +35,7 @@ class GreetingController {
 ----
 <1> Defines a controller mapped to the /greet path.
 <2> Exposes an HTTP GET endpoint.
-<3> Marks the query parameter as optional with ann:core.annotation.Nullable[]; requests may omit it.
+<3> Marks the query parameter as optional with `org.jspecify.annotations.Nullable[]` requests may omit it.
 <4> Null-safe handling when the parameter is not provided.
 
 .Optional dependency in a factory-produced bean
@@ -42,7 +44,7 @@ class GreetingController {
 package example;
 
 import io.micronaut.context.annotation.Factory;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import jakarta.inject.Singleton;
 
 @Factory // <1>
@@ -70,7 +72,7 @@ interface OptionalDependency {}
 ----
 <1> Declares a factory class that produces beans.
 <2> Defines a bean-producing method with singleton scope.
-<3> The dependency is optional and annotated with ann:core.annotation.Nullable[]; if no bean of that type exists, injection does not fail and null is injected.
+<3> The dependency is optional and annotated with `org.jspecify.annotations.Nullable`; if no bean of that type exists, injection does not fail and null is injected.
 <4> The produced bean is created regardless of whether the optional dependency is present.
 <5> The consumer explicitly declares the constructor parameter as nullable and handles a potential null value.
 

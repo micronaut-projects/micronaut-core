@@ -18,9 +18,9 @@ package io.micronaut.context;
 import io.micronaut.context.exceptions.BeanContextException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.Set;
@@ -49,7 +49,9 @@ public abstract class AbstractInitializableBeanDefinitionReference<T> extends Ab
     private final boolean isProxiedBean;
     private final boolean isProxyTarget;
 
+    @Nullable
     private Boolean present;
+    @Nullable
     private Set<Class<?>> exposedTypes;
 
     /**
@@ -162,7 +164,6 @@ public abstract class AbstractInitializableBeanDefinitionReference<T> extends Ab
     }
 
     @Override
-    @NonNull
     public final Set<Class<?>> getExposedTypes() {
         if (!hasExposedTypes) {
             return Collections.EMPTY_SET;
@@ -216,7 +217,7 @@ public abstract class AbstractInitializableBeanDefinitionReference<T> extends Ab
     }
 
     @Override
-    public boolean isEnabled(BeanContext context, BeanResolutionContext resolutionContext) {
+    public boolean isEnabled(BeanContext context, @Nullable BeanResolutionContext resolutionContext) {
         return isPresent() && (!isConditional || super.isEnabled(context, resolutionContext));
     }
 

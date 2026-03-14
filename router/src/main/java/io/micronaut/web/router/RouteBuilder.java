@@ -17,8 +17,7 @@ package io.micronaut.web.router;
 
 import io.micronaut.context.BeanLocator;
 import io.micronaut.core.annotation.Indexed;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.conventions.MethodConvention;
 import io.micronaut.core.naming.conventions.PropertyConvention;
@@ -1173,8 +1172,7 @@ public interface RouteBuilder {
          * @param beanDefinition The type
          * @return The URI to use
          */
-        default @NonNull
-        String resolveUri(BeanDefinition<?> beanDefinition) {
+        default String resolveUri(BeanDefinition<?> beanDefinition) {
             String uri = beanDefinition.stringValue(UriMapping.class).orElseGet(() ->
                     beanDefinition.stringValue(Controller.class).orElse(UriMapping.DEFAULT_URI)
             );
@@ -1197,8 +1195,7 @@ public interface RouteBuilder {
          * @param property The property
          * @return The URI to use
          */
-        default @NonNull
-        String resolveUri(String property) {
+        default String resolveUri(String property) {
             if (StringUtils.isEmpty(property)) {
                 return "/";
             }
@@ -1215,7 +1212,7 @@ public interface RouteBuilder {
          * @param id   the route id
          * @return The URI to use
          */
-        default @NonNull String resolveUri(Class<?> type, PropertyConvention id) {
+        default String resolveUri(Class<?> type, PropertyConvention id) {
             return resolveUri(type) + "/{" + id.lowerCaseName() + "}";
         }
 
@@ -1229,7 +1226,7 @@ public interface RouteBuilder {
          * @param uri The URI
          * @return The normalized URI or null
          */
-        default String normalizeUri(@Nullable String uri) {
+         default @Nullable String normalizeUri(@Nullable String uri) {
             if (uri != null) {
                 int len = uri.length();
                 if (len > 0 && uri.charAt(0) != '/') {

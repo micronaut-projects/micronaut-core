@@ -23,6 +23,20 @@ import jakarta.validation.constraints.NotBlank
 
 class PropertyElementSpec extends AbstractTypeElementSpec {
 
+    void 'test record component annotation'() {
+        given:
+            ClassElement classElement = buildClassElement('''
+package test;
+
+record Book(@io.micronaut.visitors.MyRecordComponentAnn(name = "test123") String title, int pages) {}
+''')
+            def beanProperties = classElement.getBeanProperties()
+            def titleProp = beanProperties.find { it.name == 'title' }
+        expect:
+            titleProp.hasAnnotation(MyRecordComponentAnn)
+            titleProp.stringValue(MyRecordComponentAnn, "name").get() == "test123"
+    }
+
     void 'test field annotation and records'() {
         given:
             ClassElement classElement = buildClassElement('''

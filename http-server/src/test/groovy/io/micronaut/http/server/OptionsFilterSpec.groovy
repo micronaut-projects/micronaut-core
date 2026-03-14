@@ -4,6 +4,8 @@ import io.micronaut.core.order.OrderUtil
 import io.micronaut.core.order.Ordered
 import io.micronaut.http.server.cors.CorsFilter
 import io.micronaut.http.server.util.HttpHostResolver
+import io.micronaut.web.router.Router
+import io.micronaut.web.router.resource.StaticResourceResolver
 import spock.lang.Specification
 
 class OptionsFilterSpec extends Specification {
@@ -11,7 +13,7 @@ class OptionsFilterSpec extends Specification {
     void "OptionsFilter after CorsFilter"() {
         given:
         OptionsFilter optionsFilter = new OptionsFilter()
-        CorsFilter corsFilter = new CorsFilter(Mock(HttpServerConfiguration.CorsConfiguration), Mock(HttpHostResolver))
+        CorsFilter corsFilter = new CorsFilter(Mock(HttpServerConfiguration.CorsConfiguration), Mock(StaticResourceResolver), Mock(Router), Mock(HttpHostResolver))
 
         when:
         List<Ordered> filters = [optionsFilter, corsFilter]

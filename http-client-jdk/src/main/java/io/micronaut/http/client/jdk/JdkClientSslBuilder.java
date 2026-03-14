@@ -18,11 +18,11 @@ package io.micronaut.http.client.jdk;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.client.HttpVersionSelection;
-import io.micronaut.http.ssl.ClientSslConfiguration;
+import io.micronaut.http.ssl.AbstractClientSslConfiguration;
 import io.micronaut.http.ssl.SslBuilder;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.http.ssl.SslConfigurationException;
@@ -39,6 +39,7 @@ import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -79,14 +80,14 @@ public final class JdkClientSslBuilder extends SslBuilder<SSLContext> {
             return null;
         }
         TrustManagerFactory trustManagerFactory = getTrustManagerFactory(ssl);
-        KeyManagerFactory keyManagerFactory = getKeyManagerFactory(ssl);
+        KeyManagerFactory keyManagerFactory = Objects.requireNonNull(getKeyManagerFactory(ssl), "KeyManagerFactory cannot be null");
         try {
             SSLContext tls = SSLContext.getInstance(ssl.getProtocol().orElse("TLS"));
             if (trustManagerFactory == null) {
                 trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
             }
             TrustManager[] trustManagers = trustManagerFactory.getTrustManagers();
-            if (ssl instanceof ClientSslConfiguration clientSslConfiguration && clientSslConfiguration.isInsecureTrustAllCertificates()) {
+            if (ssl instanceof AbstractClientSslConfiguration clientSslConfiguration && clientSslConfiguration.isInsecureTrustAllCertificates()) {
                 if (LOG.isWarnEnabled()) {
                     LOG.warn("Trust all certificates is enabled. This is insecure and should not be used in production");
                 }
@@ -100,7 +101,7 @@ public final class JdkClientSslBuilder extends SslBuilder<SSLContext> {
     }
 
     @SuppressWarnings("java:S4830") // This is explicitly to turn security off when isInsecureTrustAllCertificates
-    private static class TrustAllTrustManager implements X509TrustManager {
+    private static final class TrustAllTrustManager implements X509TrustManager {
 
         @Override
         public void checkClientTrusted(X509Certificate[] chain, String authType) throws CertificateException {

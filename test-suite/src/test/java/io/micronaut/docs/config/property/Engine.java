@@ -18,10 +18,12 @@ package io.micronaut.docs.config.property;
 // tag::imports[]
 import io.micronaut.context.annotation.Property;
 
+import io.micronaut.context.annotation.Requires;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 // end::imports[]
 
+@Requires(property = "spec.name", value = "VehicleConfigPropertySpec")
 // tag::class[]
 @Singleton
 public class Engine {

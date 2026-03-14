@@ -17,12 +17,12 @@ package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.processing.JavaModelUtils;
+import org.jspecify.annotations.Nullable;
 
 import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
@@ -41,22 +41,13 @@ import java.util.Map;
 class JavaFieldElement extends AbstractJavaMemberElement implements FieldElement {
 
     private final VariableElement variableElement;
-    private JavaClassElement owningType;
+    private final JavaClassElement owningType;
+    @Nullable
     private ClassElement type;
+    @Nullable
     private ClassElement genericType;
+    @Nullable
     private ClassElement resolvedDeclaringClass;
-
-    /**
-     * @param nativeElement The native element
-     * @param annotationMetadataFactory The annotation metadata factory
-     * @param visitorContext The visitor context
-     */
-    JavaFieldElement(JavaNativeElement.Variable nativeElement,
-                     ElementAnnotationMetadataFactory annotationMetadataFactory,
-                     JavaVisitorContext visitorContext) {
-        super(nativeElement, annotationMetadataFactory, visitorContext);
-        this.variableElement = nativeElement.element();
-    }
 
     /**
      * @param owningType The declaring element
@@ -68,7 +59,8 @@ class JavaFieldElement extends AbstractJavaMemberElement implements FieldElement
                      JavaNativeElement.Variable nativeElement,
                      ElementAnnotationMetadataFactory annotationMetadataFactory,
                      JavaVisitorContext visitorContext) {
-        this(nativeElement, annotationMetadataFactory, visitorContext);
+        super(nativeElement, annotationMetadataFactory, visitorContext);
+        this.variableElement = nativeElement.element();
         this.owningType = owningType;
     }
 
@@ -77,7 +69,6 @@ class JavaFieldElement extends AbstractJavaMemberElement implements FieldElement
         return getType().getTypeAnnotationMetadata();
     }
 
-    @NonNull
     @Override
     public JavaNativeElement.Variable getNativeType() {
         return (JavaNativeElement.Variable) super.getNativeType();
@@ -94,29 +85,28 @@ class JavaFieldElement extends AbstractJavaMemberElement implements FieldElement
     }
 
     @Override
+    @Nullable
     public Object getConstantValue() {
         return variableElement.getConstantValue();
     }
 
-    @NonNull
     @Override
     public ClassElement getType() {
         if (type == null) {
             type = newClassElement(getNativeType(), variableElement.asType(), Collections.emptyMap());
             if (canBeMarkedWithNonNull(type)) {
-                type.getTypeAnnotationMetadata().annotate(NonNull.class);
+                type.getTypeAnnotationMetadata().annotate(org.jspecify.annotations.NonNull.class);
             }
         }
         return type;
     }
 
-    @NonNull
     @Override
     public ClassElement getGenericType() {
         if (genericType == null) {
             genericType = newClassElement(getNativeType(), variableElement.asType(), getDeclaringType().getTypeArguments());
             if (canBeMarkedWithNonNull(genericType)) {
-                genericType.getTypeAnnotationMetadata().annotate(NonNull.class);
+                genericType.getTypeAnnotationMetadata().annotate(org.jspecify.annotations.NonNull.class);
             }
         }
         return this.genericType;
@@ -158,7 +148,7 @@ class JavaFieldElement extends AbstractJavaMemberElement implements FieldElement
     }
 
     @Override
-    public boolean hides(@NonNull MemberElement hidden) {
+    public boolean hides(MemberElement hidden) {
         if (isStatic() && getDeclaringType().isInterface()) {
             return false;
         }

@@ -15,14 +15,15 @@
  */
 package io.micronaut.jackson
 
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.databind.PropertyNamingStrategies
-import com.fasterxml.jackson.databind.SerializationFeature
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.MapPropertySource
 import io.micronaut.context.env.PropertySource
 import spock.lang.Specification
 import spock.lang.Unroll
+import tools.jackson.databind.DefaultTyping
+import tools.jackson.databind.ObjectMapper
+import tools.jackson.databind.PropertyNamingStrategies
+import tools.jackson.databind.SerializationFeature
 
 /**
  * Created by graemerocher on 31/08/2017.
@@ -63,7 +64,7 @@ class JacksonSetupSpec extends Specification {
         ApplicationContext applicationContext = ApplicationContext.builder("test").build()
         applicationContext.environment.addPropertySource((MapPropertySource) PropertySource.of(
                 'jackson.dateFormat': 'yyMMdd',
-                'jackson.serialization.indentOutput': true,
+                'jackson.serialization-features.indentOutput': true,
                 'jackson.json-view.enabled': true
         ))
         applicationContext.start()
@@ -74,7 +75,7 @@ class JacksonSetupSpec extends Specification {
 
         applicationContext.containsBean(JacksonConfiguration)
         applicationContext.getBean(JacksonConfiguration).dateFormat == 'yyMMdd'
-        applicationContext.getBean(JacksonConfiguration).serializationSettings.get(SerializationFeature.INDENT_OUTPUT)
+        applicationContext.getBean(JacksonConfiguration).serializationFeatures.get(SerializationFeature.INDENT_OUTPUT)
 
         cleanup:
         applicationContext?.close()
@@ -91,10 +92,10 @@ class JacksonSetupSpec extends Specification {
 
         expect:
         applicationContext.containsBean(ObjectMapper.class)
-        ((ObjectMapper.DefaultTypeResolverBuilder) applicationContext.getBean(ObjectMapper.class).deserializationConfig.getDefaultTyper(null))._appliesFor == ObjectMapper.DefaultTyping.NON_FINAL
+        applicationContext.getBean(ObjectMapper.class).rebuild().baseSettings().getDefaultTyper() != null
 
         applicationContext.containsBean(JacksonConfiguration)
-        applicationContext.getBean(JacksonConfiguration).defaultTyping == ObjectMapper.DefaultTyping.NON_FINAL
+        applicationContext.getBean(JacksonConfiguration).defaultTyping == DefaultTyping.NON_FINAL
 
         cleanup:
         applicationContext?.close()
@@ -112,7 +113,7 @@ class JacksonSetupSpec extends Specification {
         applicationContext.getBean(JacksonConfiguration).propertyNamingStrategy == expectedPropertyNamingStrategy
 
         applicationContext.containsBean(ObjectMapper.class)
-        applicationContext.getBean(ObjectMapper.class).getPropertyNamingStrategy() == expectedPropertyNamingStrategy
+        applicationContext.getBean(ObjectMapper.class).rebuild().baseSettings().getPropertyNamingStrategy() == expectedPropertyNamingStrategy
 
         cleanup:
         applicationContext?.close()

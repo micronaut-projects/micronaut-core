@@ -18,8 +18,7 @@ package io.micronaut.inject.annotation;
 import io.micronaut.context.expressions.ConfigurableExpressionEvaluationContext;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.expressions.EvaluatedExpression;
 
 import java.lang.annotation.Annotation;
@@ -79,7 +78,7 @@ public final class EvaluatedAnnotationValue<A extends Annotation> extends Annota
     }
 
     @Override
-    public <T extends Annotation> Optional<AnnotationValue<T>> getAnnotation(@NonNull String member) {
+    public <T extends Annotation> Optional<AnnotationValue<T>> getAnnotation(String member) {
         return super.<T>getAnnotation(member).map(av -> new EvaluatedAnnotationValue<>(av, evaluationContext));
     }
 
@@ -90,7 +89,7 @@ public final class EvaluatedAnnotationValue<A extends Annotation> extends Annota
      * @param args arguments passed to method
      * @return copy of annotation metadata
      */
-    public EvaluatedAnnotationValue<A> withArguments(@Nullable Object thisObject, Object[] args) {
+    public EvaluatedAnnotationValue<A> withArguments(@Nullable Object thisObject, Object @Nullable [] args) {
         return new EvaluatedAnnotationValue<>(
             annotationValue,
             evaluationContext.withArguments(thisObject, args));

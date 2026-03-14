@@ -14,11 +14,10 @@
  * limitations under the License.
  */
 package io.micronaut.http.simple.cookies;
-
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.SameSite;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Optional;
 
@@ -32,12 +31,12 @@ public class SimpleCookie implements Cookie {
 
     private final String name;
     private String value;
-    private String domain;
-    private String path;
+    private @Nullable String domain;
+    private @Nullable String path;
     private boolean httpOnly;
     private boolean secure;
     private long maxAge;
-    private SameSite sameSite;
+    private @Nullable SameSite sameSite;
 
     /**
      * Constructor.
@@ -51,22 +50,22 @@ public class SimpleCookie implements Cookie {
     }
 
     @Override
-    public @NonNull String getName() {
+    public String getName() {
         return name;
     }
 
     @Override
-    public @NonNull String getValue() {
+    public String getValue() {
         return value;
     }
 
     @Override
-    public String getDomain() {
+    public @Nullable String getDomain() {
         return domain;
     }
 
     @Override
-    public String getPath() {
+    public @Nullable String getPath() {
         return path;
     }
 
@@ -91,43 +90,43 @@ public class SimpleCookie implements Cookie {
     }
 
     @Override
-    public @NonNull Cookie sameSite(SameSite sameSite) {
+    public Cookie sameSite(@Nullable SameSite sameSite) {
         this.sameSite = sameSite;
         return this;
     }
 
     @Override
-    public @NonNull Cookie maxAge(long maxAge) {
+    public Cookie maxAge(long maxAge) {
         this.maxAge = maxAge;
         return this;
     }
 
     @Override
-    public @NonNull Cookie value(@NonNull String value) {
+    public Cookie value(String value) {
         this.value = value;
         return this;
     }
 
     @Override
-    public @NonNull Cookie domain(String domain) {
+    public Cookie domain(@Nullable String domain) {
         this.domain = domain;
         return this;
     }
 
     @Override
-    public @NonNull Cookie path(String path) {
+    public Cookie path(@Nullable String path) {
         this.path = path;
         return this;
     }
 
     @Override
-    public @NonNull Cookie secure(boolean secure) {
+    public Cookie secure(boolean secure) {
         this.secure = secure;
         return this;
     }
 
     @Override
-    public @NonNull Cookie httpOnly(boolean httpOnly) {
+    public Cookie httpOnly(boolean httpOnly) {
         this.httpOnly = httpOnly;
         return this;
     }

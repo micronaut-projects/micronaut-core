@@ -15,13 +15,11 @@
  */
 package io.micronaut.context;
 
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.context.condition.Failure;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.Internal;
-
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.value.PropertyResolver;
@@ -42,7 +40,7 @@ final class DefaultConditionContext<B extends AnnotationMetadataProvider> implem
 
     private final B component;
     private final List<Failure> failures = new ArrayList<>(0);
-    private final BeanResolutionContext originalResolutionContext;
+    private final @Nullable BeanResolutionContext originalResolutionContext;
     private final BeanResolutionContext resolutionContext;
 
     /**
@@ -50,7 +48,7 @@ final class DefaultConditionContext<B extends AnnotationMetadataProvider> implem
      * @param component   The component type
      * @param resolutionContext The resolution context
      */
-    DefaultConditionContext(@NonNull BeanContext beanContext, @NonNull B component, @Nullable BeanResolutionContext resolutionContext) {
+    DefaultConditionContext(BeanContext beanContext, B component, @Nullable BeanResolutionContext resolutionContext) {
         this.component = component;
         this.originalResolutionContext = resolutionContext;
         this.resolutionContext = resolutionContext == null ? new DefaultBeanResolutionContext(beanContext, null) : resolutionContext;
@@ -69,12 +67,12 @@ final class DefaultConditionContext<B extends AnnotationMetadataProvider> implem
     }
 
     @Override
-    public BeanResolutionContext getBeanResolutionContext() {
+    public @Nullable BeanResolutionContext getBeanResolutionContext() {
         return originalResolutionContext;
     }
 
     @Override
-    public ConditionContext<B> fail(@NonNull Failure failure) {
+    public ConditionContext<B> fail(Failure failure) {
         failures.add(failure);
         return this;
     }
@@ -100,73 +98,63 @@ final class DefaultConditionContext<B extends AnnotationMetadataProvider> implem
         return List.of();
     }
 
-    @NonNull
     @Override
-    public <T> T getBean(@NonNull BeanDefinition<T> definition) {
+    public <T> T getBean(BeanDefinition<T> definition) {
         return resolutionContext.getBean(definition);
     }
 
-    @NonNull
     @Override
-    public <T> T getBean(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier) {
+    public <T> T getBean(Class<T> beanType, @Nullable Qualifier<T> qualifier) {
         return resolutionContext.getBean(beanType, qualifier);
     }
 
-    @NonNull
     @Override
-    public <T> T getBean(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+    public <T> T getBean(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         return resolutionContext.getBean(beanType, qualifier);
     }
 
-    @NonNull
     @Override
-    public <T> Optional<T> findBean(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier) {
+    public <T> Optional<T> findBean(Class<T> beanType, @Nullable Qualifier<T> qualifier) {
         return resolutionContext.findBean(Argument.of(beanType), qualifier);
     }
 
-    @NonNull
     @Override
-    public <T> Collection<T> getBeansOfType(@NonNull Class<T> beanType) {
+    public <T> Collection<T> getBeansOfType(Class<T> beanType) {
         return resolutionContext.getBeansOfType(beanType);
     }
 
-    @NonNull
     @Override
-    public <T> Collection<T> getBeansOfType(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier) {
+    public <T> Collection<T> getBeansOfType(Class<T> beanType, @Nullable Qualifier<T> qualifier) {
         return resolutionContext.getBeansOfType(Argument.of(beanType), qualifier);
     }
 
-    @NonNull
     @Override
-    public <T> Collection<T> getBeansOfType(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+    public <T> Collection<T> getBeansOfType(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         return resolutionContext.getBeansOfType(beanType, qualifier);
     }
 
-    @NonNull
     @Override
-    public <T> Stream<T> streamOfType(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier) {
+    public <T> Stream<T> streamOfType(Class<T> beanType, @Nullable Qualifier<T> qualifier) {
         return resolutionContext.streamOfType(Argument.of(beanType), qualifier);
     }
 
-    @NonNull
     @Override
-    public <T> Stream<T> streamOfType(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+    public <T> Stream<T> streamOfType(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         return resolutionContext.streamOfType(beanType, qualifier);
     }
 
-    @NonNull
     @Override
-    public <T> T getProxyTargetBean(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier) {
+    public <T> T getProxyTargetBean(Class<T> beanType, @Nullable Qualifier<T> qualifier) {
         return resolutionContext.getProxyTargetBean(beanType, qualifier);
     }
 
     @Override
-    public <T> Optional<T> findBean(Argument<T> beanType, Qualifier<T> qualifier) {
+    public <T> Optional<T> findBean(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         return resolutionContext.findBean(beanType, qualifier);
     }
 
     @Override
-    public boolean containsProperty(@NonNull String name) {
+    public boolean containsProperty(String name) {
         PropertyResolver propertyResolver = resolutionContext.getPropertyResolver();
         if (propertyResolver != null) {
             return propertyResolver.containsProperty(name);
@@ -174,7 +162,7 @@ final class DefaultConditionContext<B extends AnnotationMetadataProvider> implem
         return false;    }
 
     @Override
-    public boolean containsProperties(@NonNull String name) {
+    public boolean containsProperties(String name) {
         PropertyResolver propertyResolver = resolutionContext.getPropertyResolver();
         if (propertyResolver != null) {
             return propertyResolver.containsProperties(name);
@@ -182,9 +170,8 @@ final class DefaultConditionContext<B extends AnnotationMetadataProvider> implem
         return false;
     }
 
-    @NonNull
     @Override
-    public <T> Optional<T> getProperty(@NonNull String name, @NonNull ArgumentConversionContext<T> conversionContext) {
+    public <T> Optional<T> getProperty(String name, ArgumentConversionContext<T> conversionContext) {
         PropertyResolver propertyResolver = resolutionContext.getPropertyResolver();
         if (propertyResolver != null) {
             return propertyResolver.getProperty(name, conversionContext);

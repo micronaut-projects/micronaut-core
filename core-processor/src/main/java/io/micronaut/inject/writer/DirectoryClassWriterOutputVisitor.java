@@ -16,8 +16,7 @@
 package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.ast.Element;
 
 import java.io.File;
@@ -90,7 +89,6 @@ public class DirectoryClassWriterOutputVisitor extends AbstractClassWriterOutput
         return getGeneratedFile(path);
     }
 
-    @NonNull
     private Optional<GeneratedFile> getGeneratedFile(String path) {
         File parentFile = targetDir.getParentFile();
         File generatedDir = new File(parentFile, "generated");

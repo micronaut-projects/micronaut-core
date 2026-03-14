@@ -1,0 +1,1 @@
+The Micronaut HTTP server includes support for forms, both using `multipart/form-data` and using `application/x-www-form-urlencoded` format.

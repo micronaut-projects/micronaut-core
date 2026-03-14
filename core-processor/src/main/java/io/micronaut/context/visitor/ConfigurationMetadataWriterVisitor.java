@@ -27,7 +27,6 @@ import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.type.DefaultArgument;
 import io.micronaut.inject.ast.ClassElement;
@@ -47,6 +46,7 @@ import io.micronaut.inject.validation.RequiresValidation;
 import io.micronaut.inject.visitor.TypeElementQuery;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -73,16 +73,19 @@ public class ConfigurationMetadataWriterVisitor implements TypeElementVisitor<Co
 
     private ConfigurationMetadataBuilder metadataBuilder = new ConfigurationMetadataBuilder();
 
-    @NonNull
     @Override
     public VisitorKind getVisitorKind() {
         return VisitorKind.AGGREGATING;
     }
 
     @Override
+    public Set<String> getSupportedAnnotationNames() {
+        return Set.of(ConfigurationProperties.class.getName(), EachProperty.class.getName(), ConfigurationReader.class.getName(), "io.micronaut.management.endpoint.annotation.Endpoint");
+    }
+
+    @Override
     public void finish(VisitorContext visitorContext) {
         if (metadataBuilder.hasMetadata()) {
-            metadataBuilder.finish();
             ServiceLoader<ConfigurationMetadataWriter> writers = ServiceLoader.load(ConfigurationMetadataWriter.class, getClass().getClassLoader());
             try {
                 for (ConfigurationMetadataWriter writer : writers) {
@@ -135,17 +138,16 @@ public class ConfigurationMetadataWriterVisitor implements TypeElementVisitor<Co
                     Optional<FieldElement> field = propertyElement.getField();
                     // Exclude / ignore shouldn't affect builders
                     if (readMethod.isPresent()) {
-                        MethodElement methodElement = readMethod.get();
                         visitConfigurationBuilder(
                             prefix,
-                            ConfigurationBuilderDefinition.of(classElement, methodElement.withAnnotationMetadata(propertyElement.getAnnotationMetadata()), context)
+                            ConfigurationBuilderDefinition.of(classElement, propertyElement, context)
                         );
                     } else if (field.isPresent()) {
                         FieldElement fieldElement = field.get();
                         if (fieldElement.isAccessible(classElement)) {
                             visitConfigurationBuilder(
                                 prefix,
-                                ConfigurationBuilderDefinition.of(classElement, fieldElement, context)
+                                ConfigurationBuilderDefinition.of(classElement, propertyElement, context)
                             );
                         }
                         processed.add(fieldElement);
@@ -174,8 +176,8 @@ public class ConfigurationMetadataWriterVisitor implements TypeElementVisitor<Co
                                     getPropertyDocs(propertyElement),
                                     propertyElement.getAnnotationMetadata().stringValue(Bindable.class, "defaultValue").orElse(null)
                                 );
-                                if (memberElement instanceof MethodElement) {
-                                    annotateProperty(memberElement, metadata.getPath());
+                                if (memberElement instanceof MethodElement methodElement) {
+                                    annotateProperty(methodElement, metadata.getPath());
                                 }
                                 processed.add(memberElement);
                                 propertyElement.getField().ifPresent(processed::add);
@@ -217,11 +219,12 @@ public class ConfigurationMetadataWriterVisitor implements TypeElementVisitor<Co
         });
     }
 
+    @Nullable
     private String getPropertyDocs(PropertyElement propertyElement) {
-        String doc = propertyElement.getDocumentation().orElse(null);
+        String doc = propertyElement.getDocumentation(true).orElse(null);
         Optional<MethodElement> writeMethod = propertyElement.getWriteMethod();
         if (writeMethod.isPresent()) {
-            Optional<String> documentation = writeMethod.get().getDocumentation();
+            Optional<String> documentation = writeMethod.get().getDocumentation(true);
             if (documentation.isPresent()) {
                 doc = documentation.get();
             }
@@ -231,6 +234,10 @@ public class ConfigurationMetadataWriterVisitor implements TypeElementVisitor<Co
 
     private void annotateProperty(Element memberElement, String path) {
         memberElement.annotate(Property.class, (builder) -> builder.member("name", path));
+    }
+
+    private void annotateProperty(MethodElement methodElement, String path) {
+        methodElement.getMethodAnnotationMetadata().annotate(Property.class, (builder) -> builder.member("name", path));
     }
 
     private boolean notProcessed(String prop, ClassElement declaringType) {
@@ -305,7 +312,7 @@ public class ConfigurationMetadataWriterVisitor implements TypeElementVisitor<Co
                     parameter.getMethodElement().getDeclaringType(),
                     parameter.getGenericType(),
                     parameter.getName(),
-                    parameter.getDocumentation().orElse(null),
+                    parameter.getDocumentation(true).orElse(null),
                     parameter.stringValue(Bindable.class, "defaultValue").orElse(null)
                 );
             }
@@ -355,7 +362,7 @@ public class ConfigurationMetadataWriterVisitor implements TypeElementVisitor<Co
                     method.getOwningType(), // interface methods don't inherit the prefix
                     method.getReturnType(),
                     propertyName,
-                    method.getDocumentation().orElse(method.getReturnType().getDocumentation().orElse(null)),
+                    method.getDocumentation(true).orElse(method.getReturnType().getDocumentation(true).orElse(null)),
                     method.getAnnotationMetadata().stringValue(Bindable.class, "defaultValue").orElse(null)
                 );
             }

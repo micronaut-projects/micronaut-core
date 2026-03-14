@@ -20,10 +20,12 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.CompositeByteBuf;
+import org.jspecify.annotations.Nullable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 
 import java.io.IOException;
+import java.util.Objects;
 
 /**
  * Adapted from JsonContentProcessor. This class takes input data and splits it up according to the
@@ -35,7 +37,9 @@ import java.io.IOException;
 @Internal
 final class JsonChunkedProcessor {
     final JsonCounter counter = new JsonCounter();
+    @Nullable
     private ByteBuf singleBuffer;
+    @Nullable
     private CompositeByteBuf compositeBuffer;
 
     public Flux<ByteBuffer<?>> process(Flux<ByteBuf> input) {
@@ -108,7 +112,7 @@ final class JsonChunkedProcessor {
 
     private void flush(FluxSink<? super ByteBuffer<?>> out) {
         ByteBuf completedNode = compositeBuffer == null ? singleBuffer : compositeBuffer;
-        ByteBuffer<ByteBuf> wrapped = NettyByteBufferFactory.DEFAULT.wrap(completedNode);
+        ByteBuffer<ByteBuf> wrapped = NettyByteBufferFactory.DEFAULT.wrap(Objects.requireNonNull(completedNode));
         out.next(wrapped);
         compositeBuffer = null;
         singleBuffer = null;

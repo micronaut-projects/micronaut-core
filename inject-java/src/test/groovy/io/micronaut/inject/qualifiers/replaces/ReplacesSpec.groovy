@@ -15,12 +15,14 @@
  */
 package io.micronaut.inject.qualifiers.replaces
 
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
 import spock.lang.Specification
+import io.micronaut.context.env.PropertySource
 /**
  * Created by graemerocher on 26/05/2017.
  */
-class ReplacesSpec extends Specification {
+class ReplacesSpec extends AbstractTypeElementSpec {
 
     void "test that a bean can be marked to replace another bean"() {
         given:
@@ -34,6 +36,105 @@ class ReplacesSpec extends Specification {
         !b.all.any() { it instanceof A1 }
         b.all.any() { it instanceof A2 }
         b.a instanceof A2
+
+        cleanup:
+        context.close()
+    }
+
+    void "test that a configuration bean can be marked to replace another bean x"() {
+
+        given:
+        ApplicationContext context = buildContext("""
+package test;
+
+import io.micronaut.context.annotation.ConfigurationBuilder;
+import io.micronaut.context.annotation.ConfigurationProperties;
+import jakarta.inject.Singleton;
+import io.micronaut.context.annotation.Replaces;
+
+import java.util.HashSet;
+import java.util.Set;
+
+@ConfigurationProperties("test.props")
+class A1ConfigProperties {
+    @ConfigurationBuilder(prefixes = "set")
+    Something builder = new Something();
+
+    class Something {
+        Set<Foo> foos = new HashSet<>();
+
+        public Set<Foo> getFoos() {
+            return foos;
+        }
+
+        public void setFoos(Set<Foo> foos) {
+            this.foos = foos;
+        }
+    }
+
+    public Something getBuilder() {
+        builder.foos.add(Foo.AUTO_ADDED_A1);
+        return builder;
+    }
+
+    enum Foo {
+        BAR,
+        BAZ,
+        AUTO_ADDED_A1,
+        AUTO_ADDED_A2
+    }
+}
+
+@Replaces(A1ConfigProperties.class)
+@Singleton
+@ConfigurationProperties("test.props")
+class A2ConfigProperties extends A1ConfigProperties {
+
+    @Override
+    public Something getBuilder() {
+        Something builderParent = super.getBuilder();
+        builderParent.foos.add(Foo.AUTO_ADDED_A2);
+        return builderParent;
+    }
+
+}
+
+""")
+        context.getEnvironment().addPropertySource(PropertySource.of(["test.props.foos": "BAR"]))
+
+
+        when:"A bean has a dependency on an interface with multiple impls"
+        def a1ConfigProperties = context.getBean(context.getClassLoader().loadClass("test.A2ConfigProperties"))
+
+        then:
+        noExceptionThrown()
+        // It should contain the AUTO_ADDED_A1, AUTO_ADDED_A2 and the BAR.
+        // when you comment out the //@Replaces(A1ConfigProperties.class) on the A2ConfigProperties you get AUTO_ADDED_A1 and BAR.
+        a1ConfigProperties.builder.foos.size() == 3
+//        a1ConfigProperties instanceof A2ConfigProperties
+        a1ConfigProperties.builder.foos.first() instanceof Enum
+
+        cleanup:
+        context.close()
+    }
+
+    void "test that a configuration bean can be marked to replace another bean"() {
+
+        given:
+        ApplicationContext context = ApplicationContext.run()
+        context.getEnvironment().addPropertySource(PropertySource.of(["test.props.foos": "BAR"]))
+
+
+        when:"A bean has a dependency on an interface with multiple impls"
+        A1ConfigProperties a1ConfigProperties = context.getBean(A1ConfigProperties)
+
+        then:
+        noExceptionThrown()
+        // It should contain the AUTO_ADDED_A1, AUTO_ADDED_A2 and the BAR.
+        // when you comment out the //@Replaces(A1ConfigProperties.class) on the A2ConfigProperties you get AUTO_ADDED_A1 and BAR.
+        a1ConfigProperties.builder.foos.size() == 3
+        a1ConfigProperties instanceof A2ConfigProperties
+        a1ConfigProperties.builder.foos.first() instanceof Enum
 
         cleanup:
         context.close()

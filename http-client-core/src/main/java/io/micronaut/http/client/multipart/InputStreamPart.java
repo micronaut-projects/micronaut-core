@@ -16,6 +16,7 @@
 package io.micronaut.http.client.multipart;
 
 import io.micronaut.http.MediaType;
+import org.jspecify.annotations.Nullable;
 
 import java.io.InputStream;
 
@@ -46,7 +47,7 @@ class InputStreamPart extends AbstractFilePart<InputStream> {
      * @param data          The {@link InputStream} to copy the content from
      * @param contentLength The size of the content
      */
-    InputStreamPart(String name, String filename, MediaType contentType, InputStream data, long contentLength) {
+    InputStreamPart(String name, String filename, @Nullable MediaType contentType, InputStream data, long contentLength) {
         super(name, filename, contentType);
         this.data = data;
         this.contentLength = contentLength;

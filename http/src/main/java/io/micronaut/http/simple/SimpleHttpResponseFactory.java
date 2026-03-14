@@ -18,6 +18,7 @@ package io.micronaut.http.simple;
 import io.micronaut.http.HttpResponseFactory;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpResponse;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Simple {@link HttpResponseFactory} implementation.
@@ -30,17 +31,17 @@ import io.micronaut.http.MutableHttpResponse;
 public class SimpleHttpResponseFactory implements HttpResponseFactory {
 
     @Override
-    public <T> MutableHttpResponse<T> ok(T body) {
+    public <T> MutableHttpResponse<T> ok(@Nullable T body) {
         return new SimpleHttpResponse<T>().body(body);
     }
 
     @Override
-    public <T> MutableHttpResponse<T> status(HttpStatus status, String reason) {
+    public <T> MutableHttpResponse<T> status(HttpStatus status, @Nullable String reason) {
         return new SimpleHttpResponse<T>().status(status, reason);
     }
 
     @Override
-    public <T> MutableHttpResponse<T> status(int status, String reason) {
+    public <T> MutableHttpResponse<T> status(int status, @Nullable String reason) {
         return new SimpleHttpResponse<T>().status(status, reason);
     }
 

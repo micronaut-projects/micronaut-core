@@ -35,8 +35,11 @@ public class QueryParameterFormattingSpec extends AbstractMicronautSpec {
         uri                                                           | result
         // List
         '/formatted/csv?param=a,b,c'                                  | ["a", "b", "c"].inspect()
+        '/formatted/csv?param=a'                                      | ["a"].inspect()
         '/formatted/ssv?v=a b d'                                      | ["a", "b", "d"].inspect()
+        '/formatted/ssv?v=a'                                          | ["a"].inspect()
         '/formatted/pipes?param=what|is|life'                         | ["what", "is", "life"].inspect()
+        '/formatted/pipes?param=what'                                 | ["what"].inspect()
         '/formatted/multi?value=one&value=two&value=3'                | ["one", "two", "3"].inspect()
         '/formatted/deep?param[0]=a&param[1]=b'                       | ["a", "b"].inspect()
         '/formatted/csv'                                              | [].inspect()

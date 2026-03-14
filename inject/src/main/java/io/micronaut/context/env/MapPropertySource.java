@@ -15,6 +15,8 @@
  */
 package io.micronaut.context.env;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.Map;
@@ -47,6 +49,7 @@ public class MapPropertySource implements PropertySource {
     }
 
     @Override
+    @Nullable
     public Object get(String key) {
         return map.get(key);
     }

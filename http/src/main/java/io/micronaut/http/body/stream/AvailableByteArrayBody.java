@@ -17,7 +17,6 @@ package io.micronaut.http.body.stream;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
@@ -26,6 +25,7 @@ import io.micronaut.core.io.buffer.ReadBufferFactory;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.http.body.CloseableAvailableByteBody;
 import io.micronaut.http.body.InternalByteBody;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 
 import java.util.Objects;
@@ -38,7 +38,7 @@ import java.util.Objects;
  */
 @Experimental
 public final class AvailableByteArrayBody extends InternalByteBody implements CloseableAvailableByteBody {
-    private ReadBuffer readBuffer;
+    private @Nullable ReadBuffer readBuffer;
 
     private AvailableByteArrayBody(ReadBuffer readBuffer) {
         this.readBuffer = Objects.requireNonNull(readBuffer, "readBuffer");
@@ -53,22 +53,20 @@ public final class AvailableByteArrayBody extends InternalByteBody implements Cl
      * @deprecated Construct through {@link io.micronaut.http.body.ByteBodyFactory} instead
      */
     @Deprecated
-    @NonNull
-    public static AvailableByteArrayBody create(@NonNull ByteBufferFactory<?, ?> bufferFactory, byte @NonNull [] array) {
+    public static AvailableByteArrayBody create(ByteBufferFactory<?, ?> bufferFactory, byte [] array) {
         ArgumentUtils.requireNonNull("bufferFactory", bufferFactory);
         ArgumentUtils.requireNonNull("array", array);
         return new AvailableByteArrayBody(ReadBufferFactory.getJdkFactory().adapt(array));
     }
 
-    @NonNull
-    public static AvailableByteArrayBody create(@NonNull ReadBuffer readBuffer) {
+    public static AvailableByteArrayBody create(ReadBuffer readBuffer) {
         return new AvailableByteArrayBody(readBuffer);
     }
 
     @Override
-    public @NonNull CloseableAvailableByteBody split() {
+    public CloseableAvailableByteBody split() {
         if (readBuffer == null) {
-            BaseSharedBuffer.failClaim();
+            failClaim();
         }
         return new AvailableByteArrayBody(readBuffer.duplicate());
     }
@@ -76,24 +74,25 @@ public final class AvailableByteArrayBody extends InternalByteBody implements Cl
     @Override
     public long length() {
         if (readBuffer == null) {
-            BaseSharedBuffer.failClaim();
+            failClaim();
         }
         return readBuffer.readable();
     }
 
     @Override
-    public byte @NonNull [] toByteArray() {
+    public byte [] toByteArray() {
         try (ReadBuffer rb = toReadBuffer()) {
             return rb.toArray();
         }
     }
 
     @Override
-    public @NonNull ReadBuffer toReadBuffer() {
+    public ReadBuffer toReadBuffer() {
         ReadBuffer a = readBuffer;
         if (a == null) {
-            BaseSharedBuffer.failClaim();
+            failClaim();
         }
+        recordPrimaryOp();
         readBuffer = null;
         BaseSharedBuffer.logClaim();
         return a;
@@ -101,12 +100,12 @@ public final class AvailableByteArrayBody extends InternalByteBody implements Cl
 
     @SuppressWarnings("deprecation")
     @Override
-    public @NonNull Publisher<ReadBuffer> toReadBufferPublisher() {
+    public Publisher<ReadBuffer> toReadBufferPublisher() {
         return Publishers.just(toReadBuffer());
     }
 
     @Override
-    public @NonNull CloseableAvailableByteBody move() {
+    public CloseableAvailableByteBody move() {
         return new AvailableByteArrayBody(toReadBuffer());
     }
 
@@ -114,13 +113,14 @@ public final class AvailableByteArrayBody extends InternalByteBody implements Cl
     public void close() {
         ReadBuffer rb = readBuffer;
         if (rb != null) {
+            recordClosed();
             rb.close();
             readBuffer = null;
         }
     }
 
     @Override
-    public @NonNull ExecutionFlow<? extends CloseableAvailableByteBody> bufferFlow() {
+    public ExecutionFlow<? extends CloseableAvailableByteBody> bufferFlow() {
         return ExecutionFlow.just(move());
     }
 
@@ -128,7 +128,7 @@ public final class AvailableByteArrayBody extends InternalByteBody implements Cl
     public ReadBuffer peek() {
         ReadBuffer b = readBuffer;
         if (b == null) {
-            BaseSharedBuffer.failClaim();
+            failClaim();
         }
         return b;
     }

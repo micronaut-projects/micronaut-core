@@ -16,7 +16,7 @@
 package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Stores data about an element that references a field.
@@ -46,6 +46,7 @@ public interface FieldElement extends TypedElement, MemberElement {
      *
      * @since 4.5.0
      */
+    @Nullable
     default Object getConstantValue() {
         return null;
     }
@@ -59,7 +60,6 @@ public interface FieldElement extends TypedElement, MemberElement {
         return getGenericType();
     }
 
-    @NonNull
     @Override
     default String getDescription(boolean simple) {
         if (simple) {
@@ -75,7 +75,7 @@ public interface FieldElement extends TypedElement, MemberElement {
     }
 
     @Override
-    default boolean hides(@NonNull MemberElement memberElement) {
+    default boolean hides(MemberElement memberElement) {
         if (memberElement instanceof FieldElement hidden) {
             if (equals(hidden) || isStatic() && getDeclaringType().isInterface() || hidden.isPrivate()) {
                 return false;

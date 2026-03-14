@@ -17,6 +17,7 @@ package io.micronaut.context.exceptions;
 
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.inject.BeanType;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Optional;
 
@@ -28,7 +29,7 @@ import java.util.Optional;
  */
 public abstract class BeanCreationException extends BeanContextException {
 
-    private final BeanType rootBeanType;
+    private final @Nullable BeanType rootBeanType;
 
     /**
      * @param message The message
@@ -87,7 +88,7 @@ public abstract class BeanCreationException extends BeanContextException {
         rootBeanType = beanDefinition;
     }
 
-    private BeanType resolveRootBeanDefinition(BeanResolutionContext resolutionContext) {
+    private @Nullable BeanType resolveRootBeanDefinition(@Nullable BeanResolutionContext resolutionContext) {
         BeanType rootBeanType = null;
         if (resolutionContext != null) {
             BeanResolutionContext.Path path = resolutionContext.getPath();

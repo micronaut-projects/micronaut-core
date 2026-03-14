@@ -21,9 +21,8 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Executable;
 import io.micronaut.core.util.ArrayUtils;
-
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.ObjectUtils;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.reflect.Method;
 import java.util.Arrays;
@@ -42,7 +41,8 @@ abstract class AbstractExecutable implements Executable {
     protected final String methodName;
     protected final Class<?>[] argTypes;
 
-    private Argument[] arguments;
+    private final Argument<?>[] arguments;
+    @Nullable
     private Method method;
 
     /**
@@ -50,7 +50,7 @@ abstract class AbstractExecutable implements Executable {
      * @param methodName    The method name
      * @param arguments     The arguments
      */
-    AbstractExecutable(Class declaringType, String methodName, Argument[] arguments) {
+    AbstractExecutable(Class declaringType, String methodName, Argument<?> @Nullable [] arguments) {
         Objects.requireNonNull(declaringType, "Declaring type cannot be null");
         Objects.requireNonNull(methodName, "Method name cannot be null");
 
@@ -110,7 +110,6 @@ abstract class AbstractExecutable implements Executable {
      * Resolves the target method.
      * @return The target method
      */
-    @NonNull
     @UsedByGeneratedCode
     protected Method resolveTargetMethod() {
         return ReflectionUtils.getRequiredMethod(declaringType, methodName, argTypes);

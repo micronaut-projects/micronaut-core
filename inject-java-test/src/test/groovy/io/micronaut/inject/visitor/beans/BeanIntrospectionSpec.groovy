@@ -9,12 +9,11 @@ import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.annotation.processing.test.JavaParser
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Executable
-import io.micronaut.context.annotation.Replaces
 import io.micronaut.context.visitor.ConfigurationReaderVisitor
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.annotation.NextMajorVersion
-import io.micronaut.core.annotation.NonNull
-import io.micronaut.core.annotation.Nullable
+import org.jspecify.annotations.NonNull
+import org.jspecify.annotations.Nullable
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.BeanIntrospectionReference
 import io.micronaut.core.beans.BeanIntrospector
@@ -33,10 +32,7 @@ import io.micronaut.inject.annotation.EvaluatedAnnotationMetadata
 import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
 import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.visitor.beans.outer.MuxedEvent2
-import io.micronaut.jackson.modules.BeanIntrospectionModule
-import io.micronaut.json.JsonMapper
 import io.micronaut.validation.visitor.ValidationVisitor
-import jakarta.inject.Singleton
 import jakarta.validation.Constraint
 import jakarta.validation.constraints.DecimalMin
 import jakarta.validation.constraints.Min
@@ -55,6 +51,44 @@ import java.util.stream.Collectors
 import java.util.stream.IntStream
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
+
+    void "test record with multiple constructors"() {
+        when:
+        def introspection = buildBeanIntrospection('test.MyRecord', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import org.jspecify.annotations.Nullable;
+
+import java.time.Instant;
+import java.util.Date;
+
+@Introspected
+record MyRecord(String fooBar, int abcXyz, @Nullable Date theDate, @Nullable String otherStr) {
+
+    MyRecord {
+        if (theDate == null) {
+            theDate = Date.from(Instant.now());
+        }
+    }
+
+    public MyRecord(String fooBar, int abcXyz, Date theDate) {
+        this(fooBar, abcXyz, theDate, "random");
+    }
+
+    public MyRecord(String fooBar, int abcXyz) {
+        this(fooBar, abcXyz, Date.from(Instant.now()), "random");
+    }
+
+}
+
+
+    ''' )
+
+        then:
+        introspection != null
+        introspection.getConstructorArguments().length == 4
+    }
 
     void "test import field introspection"() {
         when:
@@ -443,7 +477,7 @@ package test;
 
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.context.annotation.Executable;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.util.Optional;
 
 import java.util.Collections;
@@ -492,7 +526,7 @@ package test;
 
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.context.annotation.Executable;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.util.Optional;
 
 import java.util.Collections;
@@ -541,7 +575,7 @@ package mixed;
 
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.context.annotation.Value;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.util.Optional;
 import java.lang.annotation.*;
 import static java.lang.annotation.ElementType.*;
@@ -585,7 +619,7 @@ package mixed;
 
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.context.annotation.Value;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.util.Optional;
 import java.lang.annotation.*;
 
@@ -617,7 +651,7 @@ package mixed;
 
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.context.annotation.Value;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.util.Optional;
 import java.lang.annotation.*;
 
@@ -657,7 +691,7 @@ package mixed;
 
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.context.annotation.Executable;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.util.Optional;
 
 @Introspected
@@ -705,7 +739,7 @@ package mixed;
 
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.context.annotation.Executable;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.util.Optional;
 
 @Introspected
@@ -737,7 +771,7 @@ class Test {
 package mixed;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.context.annotation.Executable;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.util.Optional;
 @Introspected
 class Test {
@@ -869,7 +903,7 @@ package test;
 
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.context.annotation.Executable;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.util.Optional;
 
 @Introspected(accessKind = {Introspected.AccessKind.METHOD, Introspected.AccessKind.FIELD})
@@ -894,7 +928,7 @@ package test;
 
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.context.annotation.Executable;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.util.Optional;
 
 @Introspected(accessKind = {Introspected.AccessKind.METHOD, Introspected.AccessKind.FIELD})
@@ -921,7 +955,7 @@ package test;
 
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.context.annotation.Executable;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.util.Optional;
 
 @Introspected(accessKind = {Introspected.AccessKind.METHOD, Introspected.AccessKind.FIELD})
@@ -947,7 +981,7 @@ package test;
 
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.context.annotation.Executable;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.util.*;
 
 @Introspected
@@ -1015,7 +1049,7 @@ package test;
 
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.context.annotation.Executable;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.util.Optional;
 
 @Introspected(accessKind = {Introspected.AccessKind.METHOD, Introspected.AccessKind.FIELD})
@@ -1199,7 +1233,7 @@ class Test {
         def one = introspection.getRequiredProperty("one", String)
         one.isReadWrite()
 
-        def two = introspection.getRequiredProperty("two", int.class)
+        def two = introspection.getRequiredProperty("two", Integer.class)
         two.isReadOnly()
 
         def three = introspection.getRequiredProperty("three", String)
@@ -1267,7 +1301,7 @@ class Test {
         def one = introspection.getRequiredProperty("one", String)
         one.isReadWrite()
 
-        def two = introspection.getRequiredProperty("two", int.class)
+        def two = introspection.getRequiredProperty("two", Integer.class)
         two.isReadOnly()
 
     }
@@ -1624,31 +1658,6 @@ public record Foo(int x, int y) {
         introspection.getConstructorArguments().length == 2
         obj.x() == 5
         obj.y() == 10
-    }
-
-    void "test serializing records respects json annotations"() {
-        given:
-        BeanIntrospection introspection = buildBeanIntrospection('json.test.Foo', '''
-package json.test;
-
-import io.micronaut.core.annotation.Creator;
-import java.util.List;
-import jakarta.validation.constraints.Min;
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonProperty;
-
-@io.micronaut.core.annotation.Introspected
-public record Foo(@JsonProperty("other") String name, @JsonIgnore int y) {
-}
-''')
-        when:
-        def obj = introspection.instantiate("test", 10)
-        String result = ApplicationContext.run('bean.introspection.test':'true').withCloseable {
-            it.getBean(StaticBeanIntrospectionModule).introspectionMap[introspection.beanType] = introspection
-            it.getBean(JsonMapper).writeValueAsString(obj)
-        }
-        then:
-        result == '{"other":"test"}'
     }
 
     void "test secondary constructor with @Creator for Java 14+ records"() {
@@ -2824,8 +2833,8 @@ public class Test {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('test.Test','''\
 package test;
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import com.fasterxml.jackson.databind.ser.std.BooleanSerializer;
+import tools.jackson.databind.annotation.JsonSerialize;
+import tools.jackson.databind.ser.jdk.BooleanSerializer;
 
 @io.micronaut.core.annotation.Introspected
 class Test {
@@ -3783,8 +3792,8 @@ class ParentBean {
 
         when:
         BeanProperty nameProp = introspection.getProperty("name", String).get()
-        BeanProperty boolProp = introspection.getProperty("flag", boolean.class).get()
-        BeanProperty ageProp = introspection.getProperty("age", int.class).get()
+        BeanProperty boolProp = introspection.getProperty("flag", Boolean.class).get()
+        BeanProperty ageProp = introspection.getProperty("age", Integer.class).get()
         BeanProperty listProp = introspection.getProperty("list").get()
         BeanProperty primitiveArrayProp = introspection.getProperty("primitiveArray").get()
         BeanProperty stringArrayProp = introspection.getProperty("stringArray").get()
@@ -3972,8 +3981,8 @@ class ParentBean {
 
         when:
         BeanProperty nameProp = introspection.getProperty("name", String).get()
-        BeanProperty boolProp = introspection.getProperty("flag", boolean.class).get()
-        BeanProperty ageProp = introspection.getProperty("age", int.class).get()
+        BeanProperty boolProp = introspection.getProperty("flag", Boolean.class).get()
+        BeanProperty ageProp = introspection.getProperty("age", Integer.class).get()
         BeanProperty listProp = introspection.getProperty("list").get()
         BeanProperty primitiveArrayProp = introspection.getProperty("primitiveArray").get()
         BeanProperty stringArrayProp = introspection.getProperty("stringArray").get()
@@ -4372,7 +4381,7 @@ public enum Test {
 
         then:
         instance.name() == "A"
-        introspection.getRequiredProperty("number", int).get(instance) == 0
+        introspection.getRequiredProperty("number", Integer).get(instance) == 0
 
         when:
         introspection.instantiate()
@@ -4423,7 +4432,7 @@ public enum Test {
 
         then:
         instance.name() == "A"
-        introspection.getRequiredProperty("number", int).get(instance) == 0
+        introspection.getRequiredProperty("number", Integer).get(instance) == 0
 
         when:
         def annotationMetadata = enumIntrospection.constants.find { it.value == instance }.annotationMetadata
@@ -4472,7 +4481,7 @@ public enum Test {
 
         then:
         instance.name() == "A"
-        introspection.getRequiredProperty("number", int).get(instance) == 0
+        introspection.getRequiredProperty("number", Integer).get(instance) == 0
 
         when:
         introspection.instantiate()
@@ -5866,7 +5875,7 @@ class FoobarPerson {
     void "test sub package"() {
         given:
             ApplicationContext applicationContext = buildContext(
-                    new Files()
+                    new JavaFiles()
 .add("package-info", '''
 @Introspected
 @AccessorsStyle(readPrefixes = "", writePrefixes = "")
@@ -5971,17 +5980,6 @@ class AbcPerson {
         @Override
         protected Collection<TypeElementVisitor> findTypeElementVisitors() {
             return [new ValidationVisitor(), new ConfigurationReaderVisitor(), new io.micronaut.validation.visitor.IntrospectedValidationIndexesVisitor(), new IntrospectedTypeElementVisitor()]
-        }
-    }
-
-    @Singleton
-    @Replaces(BeanIntrospectionModule)
-    @io.micronaut.context.annotation.Requires(property = "bean.introspection.test")
-    static class StaticBeanIntrospectionModule extends BeanIntrospectionModule {
-        Map<Class<?>, BeanIntrospection> introspectionMap = [:]
-        @Override
-        protected BeanIntrospection<Object> findIntrospection(Class<?> beanClass) {
-            return introspectionMap.get(beanClass)
         }
     }
 }

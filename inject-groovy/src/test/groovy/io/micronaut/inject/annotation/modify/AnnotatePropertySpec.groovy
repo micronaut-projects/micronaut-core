@@ -2,7 +2,7 @@ package io.micronaut.inject.annotation.modify
 
 import io.micronaut.ast.groovy.TypeElementVisitorStart
 import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
-import io.micronaut.core.annotation.NonNull
+import org.jspecify.annotations.NonNull
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.MethodElement

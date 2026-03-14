@@ -17,11 +17,10 @@ package io.micronaut.web.router;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.ExecutionHandleLocator;
-import io.micronaut.context.processor.ExecutableMethodProcessor;
+import io.micronaut.context.processor.BeanDefinitionProcessor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpMethod;
@@ -30,7 +29,6 @@ import io.micronaut.http.context.ServerContextPathProvider;
 import io.micronaut.http.filter.BaseFilterProcessor;
 import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.inject.BeanDefinition;
-import io.micronaut.inject.ExecutableMethod;
 import jakarta.inject.Singleton;
 
 import java.util.List;
@@ -44,7 +42,7 @@ import java.util.function.Supplier;
  */
 @Singleton
 @Experimental
-public class ServerFilterRouteBuilder extends DefaultRouteBuilder implements ExecutableMethodProcessor<ServerFilter> {
+public class ServerFilterRouteBuilder extends DefaultRouteBuilder implements BeanDefinitionProcessor<ServerFilter> {
     private final BaseFilterProcessor<ServerFilter> delegate;
 
     /**
@@ -63,9 +61,8 @@ public class ServerFilterRouteBuilder extends DefaultRouteBuilder implements Exe
     ) {
         super(executionHandleLocator, uriNamingStrategy, conversionService);
         delegate = new BaseFilterProcessor<>(beanContext, ServerFilter.class) {
-            @NonNull
             @Override
-            protected List<String> prependContextPath(@NonNull List<String> patterns) {
+            protected List<String> prependContextPath(List<String> patterns) {
                 String contextPath = contextPathProvider != null ? contextPathProvider.getContextPath() : null;
                 if (contextPath != null) {
                     patterns = patterns.stream()
@@ -106,7 +103,7 @@ public class ServerFilterRouteBuilder extends DefaultRouteBuilder implements Exe
     }
 
     @Override
-    public void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
-        delegate.process(beanDefinition, method);
+    public void process(BeanDefinition<?> beanDefinition, BeanContext beanContext) {
+        delegate.process(beanDefinition, beanContext);
     }
 }

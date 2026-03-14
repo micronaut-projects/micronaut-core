@@ -15,10 +15,12 @@
  */
 package io.micronaut.http.client.netty;
 
+import io.micronaut.context.BeanProvider;
+import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.reflect.InstantiationUtils;
@@ -29,7 +31,15 @@ import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.HttpClientExceptionUtils;
 import io.micronaut.http.client.netty.ssl.ClientSslBuilder;
+import io.micronaut.http.client.netty.ssl.NettyClientSslBuilder;
+import io.micronaut.http.client.netty.ssl.NettyClientSslFactory;
+import io.micronaut.http.netty.NettySslContextBuilder;
+import io.micronaut.http.netty.SslContextAutoLoader;
+import io.micronaut.http.netty.SslContextHolder;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
+import io.micronaut.http.ssl.AbstractClientSslConfiguration;
+import io.micronaut.http.ssl.CertificateProvider;
+import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.websocket.exceptions.WebSocketSessionException;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBufAllocator;
@@ -48,16 +58,8 @@ import io.netty.channel.ChannelPromise;
 import io.netty.channel.EventLoop;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.MultiThreadIoEventLoopGroup;
+import io.netty.channel.MultithreadEventLoopGroup;
 import io.netty.channel.nio.NioIoHandler;
-import io.netty.handler.codec.http3.Http3;
-import io.netty.handler.codec.http3.Http3ClientConnectionHandler;
-import io.netty.handler.codec.http3.Http3FrameToHttpObjectCodec;
-import io.netty.handler.codec.http3.Http3HeadersFrame;
-import io.netty.handler.codec.http3.Http3RequestStreamInitializer;
-import io.netty.handler.codec.http3.Http3SettingsFrame;
-import io.netty.handler.codec.quic.QuicChannel;
-import io.netty.handler.codec.quic.QuicSslContext;
-import io.netty.handler.codec.quic.QuicStreamChannel;
 import io.netty.handler.codec.DecoderException;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.HttpClientCodec;
@@ -78,11 +80,21 @@ import io.netty.handler.codec.http2.Http2HeadersFrame;
 import io.netty.handler.codec.http2.Http2MultiplexActiveStreamsException;
 import io.netty.handler.codec.http2.Http2MultiplexHandler;
 import io.netty.handler.codec.http2.Http2PingFrame;
+import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.codec.http2.Http2SettingsAckFrame;
 import io.netty.handler.codec.http2.Http2SettingsFrame;
 import io.netty.handler.codec.http2.Http2StreamChannel;
 import io.netty.handler.codec.http2.Http2StreamChannelBootstrap;
 import io.netty.handler.codec.http2.Http2StreamFrameToHttpObjectCodec;
+import io.netty.handler.codec.http3.Http3;
+import io.netty.handler.codec.http3.Http3ClientConnectionHandler;
+import io.netty.handler.codec.http3.Http3FrameToHttpObjectCodec;
+import io.netty.handler.codec.http3.Http3HeadersFrame;
+import io.netty.handler.codec.http3.Http3RequestStreamInitializer;
+import io.netty.handler.codec.http3.Http3SettingsFrame;
+import io.netty.handler.codec.quic.QuicChannel;
+import io.netty.handler.codec.quic.QuicSslContext;
+import io.netty.handler.codec.quic.QuicStreamChannel;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.pcap.PcapWriteHandler;
@@ -108,6 +120,7 @@ import io.netty.util.ReferenceCountUtil;
 import io.netty.util.ResourceLeakDetector;
 import io.netty.util.ResourceLeakDetectorFactory;
 import io.netty.util.ResourceLeakTracker;
+import io.netty.util.concurrent.DefaultThreadFactory;
 import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
@@ -131,6 +144,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledExecutorService;
@@ -156,6 +170,8 @@ public class ConnectionManager {
     private final Logger log;
     private final Map<DefaultHttpClient.RequestKey, PoolHolder> pools = new ConcurrentHashMap<>();
     private final ClientSslBuilder nettyClientSslBuilder;
+    private final NettyClientSslFactory sslFactory;
+    private final BeanProvider<CertificateProvider> certificateProviders;
 
     private EventLoopGroup group;
     private final boolean shutdownGroup;
@@ -166,12 +182,15 @@ public class ConnectionManager {
     private final ThreadFactory threadFactory;
     private final ChannelFactory<? extends Channel> socketChannelFactory;
     private final ChannelFactory<? extends Channel> udpChannelFactory;
+    @Nullable
     private Bootstrap bootstrap;
+    @Nullable
     private Bootstrap udpBootstrap;
     private final HttpClientConfiguration configuration;
-    private volatile SslContext sslContext;
-    private volatile /* QuicSslContext */ Object http3SslContext;
-    private volatile SslContext websocketSslContext;
+    private final SslContextAutoLoader sslContextWrapper;
+    private final SslContextAutoLoader sslContextWrapperWs;
+    private volatile boolean wsContextLoaded;
+    @Nullable
     private final String informationalServiceId;
 
     /**
@@ -191,76 +210,71 @@ public class ConnectionManager {
         this.bootstrap = from.bootstrap;
         this.udpBootstrap = from.udpBootstrap;
         this.configuration = from.configuration;
-        this.sslContext = from.sslContext;
-        this.http3SslContext = from.http3SslContext;
-        this.websocketSslContext = from.websocketSslContext;
         this.clientCustomizer = from.clientCustomizer;
         this.informationalServiceId = from.informationalServiceId;
         this.nettyClientSslBuilder = from.nettyClientSslBuilder;
+        this.sslFactory = from.sslFactory;
+        this.certificateProviders = from.certificateProviders;
+        this.sslContextWrapper = from.sslContextWrapper;
+        this.sslContextWrapperWs = from.sslContextWrapperWs;
         this.running.set(from.running.get());
     }
 
     ConnectionManager(
         Logger log,
-        @Nullable EventLoopGroup eventLoopGroup,
-        @Nullable ThreadFactory threadFactory,
         HttpClientConfiguration configuration,
-        @Nullable HttpVersionSelection httpVersion,
-        ChannelFactory<? extends Channel> socketChannelFactory,
-        ChannelFactory<? extends Channel> udpChannelFactory,
-        ClientSslBuilder nettyClientSslBuilder,
-        NettyClientCustomizer clientCustomizer,
-        String informationalServiceId,
-        @Nullable AddressResolverGroup<?> resolverGroup) {
+        DefaultHttpClientBuilder builder) {
 
-        if (httpVersion == null) {
-            httpVersion = HttpVersionSelection.forClientConfiguration(configuration);
-        }
-
+        this.httpVersion = builder.explicitHttpVersion == null ? HttpVersionSelection.forClientConfiguration(configuration) : builder.explicitHttpVersion;
         this.log = log;
-        this.httpVersion = httpVersion;
-        this.threadFactory = threadFactory;
-        this.socketChannelFactory = socketChannelFactory;
-        this.udpChannelFactory = udpChannelFactory;
+        this.threadFactory = builder.threadFactory == null ? new DefaultThreadFactory(MultithreadEventLoopGroup.class) : builder.threadFactory;
+        this.socketChannelFactory = builder.socketChannelFactory;
+        this.udpChannelFactory = builder.udpChannelFactory;
         this.configuration = configuration;
-        this.clientCustomizer = clientCustomizer;
-        this.informationalServiceId = informationalServiceId;
-        this.nettyClientSslBuilder = nettyClientSslBuilder;
+        this.clientCustomizer = builder.clientCustomizer;
+        this.informationalServiceId = builder.informationalServiceId;
+        this.nettyClientSslBuilder = builder.nettyClientSslBuilder == null ? new NettyClientSslBuilder(new ResourceResolver()) : builder.nettyClientSslBuilder;
+        this.sslFactory = builder.sslFactory == null ? new NettyClientSslFactory() : builder.sslFactory;
+        this.certificateProviders = builder.certificateProviders == null ? new BeanProvider<>() {
+            @Override
+            public CertificateProvider get() {
+                throw new NoSuchBeanException(CertificateProvider.class);
+            }
 
-        if (eventLoopGroup != null) {
-            group = eventLoopGroup;
+            @Override
+            public boolean isPresent() {
+                return false;
+            }
+        } : builder.certificateProviders;
+        this.sslContextWrapper = new ClientContextWrapper(false);
+        this.sslContextWrapperWs = new ClientContextWrapper(true);
+
+        if (builder.eventLoopGroup != null) {
+            group = builder.eventLoopGroup;
             shutdownGroup = false;
         } else {
             group = createEventLoopGroup(configuration, threadFactory);
             shutdownGroup = true;
         }
 
-        this.resolverGroup = resolverGroup == null ? getResolver(configuration.getDnsResolutionMode()) : resolverGroup;
+        this.resolverGroup = builder.resolverGroup == null ? getResolver(configuration.getDnsResolutionMode()) : builder.resolverGroup;
 
         refresh();
     }
 
     final void refresh() {
-        SslContext oldSslContext = sslContext;
-        SslContext oldWebsocketSslContext = websocketSslContext;
-        websocketSslContext = null;
-        if (configuration.getSslConfiguration().isEnabled()) {
-            sslContext = nettyClientSslBuilder.build(configuration.getSslConfiguration(), httpVersion);
+        if (httpVersion.isHttp3() || configuration.getSslConfiguration().isEnabled()) {
+            sslContextWrapper.autoLoad();
         } else {
-            sslContext = null;
+            sslContextWrapper.clear();
         }
-        if (httpVersion.isHttp3()) {
-            http3SslContext = nettyClientSslBuilder.buildHttp3(configuration.getSslConfiguration());
-        } else {
-            http3SslContext = null;
-        }
+        sslContextWrapperWs.clear();
+        wsContextLoaded = false;
         initBootstrap();
         running.set(true);
         for (PoolHolder pool : pools.values()) {
             pool.pool.forEachConnection(c -> ((PoolHolder.ConnectionHolder) c).windDownConnection());
         }
-        ReferenceCountUtil.release(oldSslContext);
-        ReferenceCountUtil.release(oldWebsocketSslContext);
     }
 
     /**
@@ -287,7 +301,7 @@ public class ConnectionManager {
      * @return The configured allocator
      */
     public final ByteBufAllocator alloc() {
-        return (ByteBufAllocator) bootstrap.config().options().getOrDefault(ChannelOption.ALLOCATOR, ByteBufAllocator.DEFAULT);
+        return (ByteBufAllocator) Objects.requireNonNull(bootstrap).config().options().getOrDefault(ChannelOption.ALLOCATOR, ByteBufAllocator.DEFAULT);
     }
 
     /**
@@ -305,7 +319,6 @@ public class ConnectionManager {
      * @return Connected channels in all pools
      * @since 4.0.0
      */
-    @NonNull
     @SuppressWarnings("unused")
     final List<Channel> getChannels() {
         List<Channel> channels = new ArrayList<>();
@@ -352,16 +365,17 @@ public class ConnectionManager {
     }
 
     private void initBootstrap() {
-        this.bootstrap = new Bootstrap()
+        Bootstrap newBootstrap = new Bootstrap()
             .channelFactory(socketChannelFactory)
             .option(ChannelOption.SO_KEEPALIVE, true);
+        this.bootstrap = newBootstrap;
         if (httpVersion.isHttp3()) {
             this.udpBootstrap = new Bootstrap()
                 .channelFactory(udpChannelFactory);
         }
 
         Optional<Duration> connectTimeout = configuration.getConnectTimeout();
-        connectTimeout.ifPresent(duration -> bootstrap.option(
+        connectTimeout.ifPresent(duration -> newBootstrap.option(
             ChannelOption.CONNECT_TIMEOUT_MILLIS,
             (int) duration.toMillis()
         ));
@@ -370,14 +384,14 @@ public class ConnectionManager {
             Object v = entry.getValue();
             if (v != null) {
                 String channelOption = entry.getKey();
-                bootstrap.option(ChannelOption.valueOf(NameUtils.underscoreSeparate(channelOption).toUpperCase(Locale.ENGLISH)), v);
+                newBootstrap.option(ChannelOption.valueOf(NameUtils.underscoreSeparate(channelOption).toUpperCase(Locale.ENGLISH)), v);
             }
         }
 
-        bootstrap.resolver(resolverGroup);
+        newBootstrap.resolver(resolverGroup);
     }
 
-    static @NonNull AddressResolverGroup<? extends SocketAddress> getResolver(HttpClientConfiguration.@NonNull DnsResolutionMode mode) {
+    static AddressResolverGroup<? extends SocketAddress> getResolver(HttpClientConfiguration.DnsResolutionMode mode) {
         return switch (mode) {
             case DEFAULT -> DefaultAddressResolverGroup.INSTANCE;
             case NOOP -> NoopAddressResolverGroup.INSTANCE;
@@ -418,11 +432,9 @@ public class ConnectionManager {
                     Thread.currentThread().interrupt();
                 }
             }
-            ReferenceCountUtil.release(sslContext);
-            ReferenceCountUtil.release(websocketSslContext);
+            sslContextWrapper.clear();
+            sslContextWrapperWs.clear();
             resolverGroup.close();
-            sslContext = null;
-            websocketSslContext = null;
         }
     }
 
@@ -444,10 +456,10 @@ public class ConnectionManager {
      * @param eventLoop          Event loop this connection should be created on
      * @return Future that terminates when the TCP connection is established.
      */
-    ChannelFuture doConnect(DefaultHttpClient.RequestKey requestKey, CustomizerAwareInitializer channelInitializer, @NonNull EventLoopGroup eventLoop) {
+    ChannelFuture doConnect(DefaultHttpClient.RequestKey requestKey, CustomizerAwareInitializer channelInitializer, EventLoopGroup eventLoop) {
         String host = requestKey.getHost();
         int port = requestKey.getPort();
-        Bootstrap localBootstrap = bootstrap.clone();
+        Bootstrap localBootstrap = Objects.requireNonNull(bootstrap).clone();
         Proxy proxy = configuration.resolveProxy(requestKey.isSecure(), host, port);
         if (proxy.type() != Proxy.Type.DIRECT) {
             localBootstrap.resolver(NoopAddressResolverGroup.INSTANCE);
@@ -468,9 +480,10 @@ public class ConnectionManager {
     private SslContext buildSslContext(DefaultHttpClient.RequestKey requestKey) {
         final SslContext sslCtx;
         if (requestKey.isSecure()) {
-            sslCtx = sslContext;
+            SslContextHolder holder = sslContextWrapper.takeRetained();
+            sslCtx = holder == null ? null : holder.sslContext();
             //Allow https requests to be sent if SSL is disabled but a proxy is present
-            if (sslCtx == null && !configuration.getProxyAddress().isPresent()) {
+            if (sslCtx == null && configuration.getProxyAddress().isEmpty()) {
                 throw decorate(new HttpClientException("Cannot send HTTPS request. SSL is disabled"));
             }
         } else {
@@ -512,23 +525,19 @@ public class ConnectionManager {
      */
     @Nullable
     private SslContext buildWebsocketSslContext(DefaultHttpClient.RequestKey requestKey) {
-        SslContext sslCtx = websocketSslContext;
         if (requestKey.isSecure()) {
             if (configuration.getSslConfiguration().isEnabled()) {
-                if (sslCtx == null) {
-                    synchronized (this) {
-                        sslCtx = websocketSslContext;
-                        if (sslCtx == null) {
-                            sslCtx = nettyClientSslBuilder.build(configuration.getSslConfiguration(), HttpVersionSelection.forWebsocket());
-                            websocketSslContext = sslCtx;
-                        }
-                    }
+                if (!wsContextLoaded) {
+                    sslContextWrapperWs.autoLoad();
+                    wsContextLoaded = true;
                 }
+                SslContextHolder holder = sslContextWrapperWs.takeRetained();
+                return holder == null ? null : holder.sslContext();
             } else if (configuration.getProxyAddress().isEmpty()) {
                 throw decorate(new HttpClientException("Cannot send WSS request. SSL is disabled"));
             }
         }
-        return sslCtx;
+        return null;
     }
 
     /**
@@ -544,12 +553,16 @@ public class ConnectionManager {
 
         ChannelFuture connectFuture = doConnect(requestKey, new CustomizerAwareInitializer() {
             @Override
-            protected void initChannel(@NonNull Channel ch) {
+            protected void initChannel(Channel ch) {
                 addLogHandler(ch);
 
                 SslContext sslContext = buildWebsocketSslContext(requestKey);
                 if (sslContext != null) {
-                    ch.pipeline().addLast(configureSslHandler(sslContext.newHandler(ch.alloc(), requestKey.getHost(), requestKey.getPort())));
+                    try {
+                        ch.pipeline().addLast(configureSslHandler(sslContext.newHandler(ch.alloc(), requestKey.getHost(), requestKey.getPort())));
+                    } finally {
+                        ReferenceCountUtil.release(sslContext);
+                    }
                 }
 
                 ch.pipeline()
@@ -573,7 +586,7 @@ public class ConnectionManager {
                         ch.pipeline().addLast(WebSocketClientCompressionHandler.INSTANCE);
                     }
                     ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_WEBSOCKET_CLIENT, handler);
-                    bootstrappedCustomizer.specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION).onInitialPipelineBuilt();
+                    Objects.requireNonNull(bootstrappedCustomizer).specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION).onInitialPipelineBuilt();
                     if (initial.tryEmitEmpty().isSuccess()) {
                         return;
                     }
@@ -645,7 +658,13 @@ public class ConnectionManager {
     }
 
     private Http2FrameCodec makeFrameCodec() {
-        Http2FrameCodecBuilder builder = Http2FrameCodecBuilder.forClient();
+        Http2Settings defaultSettings = Http2Settings.defaultSettings();
+
+        defaultSettings.maxHeaderListSize(Objects.requireNonNull(configuration.getHttp2Configuration()).getMaxHeaderListSize());
+
+        Http2FrameCodecBuilder builder = Http2FrameCodecBuilder.forClient()
+            .initialSettings(defaultSettings);
+
         configuration.getLogLevel().ifPresent(logLevel -> {
             try {
                 final LogLevel nettyLevel =
@@ -792,13 +811,13 @@ public class ConnectionManager {
     private void initHttp2(PoolHolder pool, Channel ch, NettyClientCustomizer connectionCustomizer) {
         Http2MultiplexHandler multiplexHandler = new Http2MultiplexHandler(new ChannelInitializer<Http2StreamChannel>() {
             @Override
-            protected void initChannel(@NonNull Http2StreamChannel ch) throws Exception {
+            protected void initChannel(Http2StreamChannel ch) throws Exception {
                 log.warn("Server opened HTTP2 stream {}, closing immediately", ch.stream().id());
                 ch.close();
             }
         }, new ChannelInitializer<Http2StreamChannel>() {
             @Override
-            protected void initChannel(@NonNull Http2StreamChannel ch) throws Exception {
+            protected void initChannel(Http2StreamChannel ch) throws Exception {
                 // discard any response data for the upgrade request
                 ch.close();
             }
@@ -807,7 +826,7 @@ public class ConnectionManager {
         ch.pipeline().addLast(multiplexHandler);
         ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS, new ChannelInboundHandlerAdapter() {
             @Override
-            public void channelRead(@NonNull ChannelHandlerContext ctx, @NonNull Object msg) throws Exception {
+            public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
                 if (msg instanceof Http2SettingsFrame) {
                     ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS);
                     ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR);
@@ -828,7 +847,7 @@ public class ConnectionManager {
             }
 
             @Override
-            public void channelRead(@NonNull ChannelHandlerContext ctx, @NonNull Object msg) throws Exception {
+            public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
                 if (msg instanceof Http2SettingsAckFrame || msg instanceof Http2PingFrame) {
                     // this is fine
                     return;
@@ -868,6 +887,7 @@ public class ConnectionManager {
     }
 
     abstract static class CustomizerAwareInitializer extends ChannelInitializer<Channel> {
+        @Nullable
         NettyClientCustomizer bootstrappedCustomizer;
     }
 
@@ -878,12 +898,12 @@ public class ConnectionManager {
     private final class AdaptiveAlpnChannelInitializer extends CustomizerAwareInitializer {
         private final PoolHolder pool;
 
-        private final SslContext sslContext;
+        private final Supplier<@Nullable SslContext> sslContext;
         private final String host;
         private final int port;
 
         AdaptiveAlpnChannelInitializer(PoolHolder pool,
-                                       SslContext sslContext,
+                                       Supplier<@Nullable SslContext> sslContext,
                                        String host,
                                        int port) {
             this.pool = pool;
@@ -896,14 +916,21 @@ public class ConnectionManager {
          * @param ch The channel
          */
         @Override
-        protected void initChannel(@NonNull Channel ch) {
-            NettyClientCustomizer channelCustomizer = bootstrappedCustomizer.specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION);
+        protected void initChannel(Channel ch) {
+            NettyClientCustomizer channelCustomizer = Objects.requireNonNull(bootstrappedCustomizer).specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION);
 
             insertPcapLoggingHandlerLazy(ch, "outer");
 
             configureProxy(ch.pipeline(), true, host, port);
 
-            ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_SSL, configureSslHandler(sslContext.newHandler(ch.alloc(), host, port)));
+            SslContext sslContext = this.sslContext.get();
+            if (sslContext != null) {
+                try {
+                    ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_SSL, configureSslHandler(sslContext.newHandler(ch.alloc(), host, port)));
+                } finally {
+                    ReferenceCountUtil.release(sslContext);
+                }
+            }
 
             insertPcapLoggingHandlerLazy(ch, "tls-unwrapped");
 
@@ -965,8 +992,8 @@ public class ConnectionManager {
         }
 
         @Override
-        protected void initChannel(@NonNull Channel ch) throws Exception {
-            NettyClientCustomizer connectionCustomizer = bootstrappedCustomizer.specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION);
+        protected void initChannel(Channel ch) throws Exception {
+            NettyClientCustomizer connectionCustomizer = Objects.requireNonNull(bootstrappedCustomizer).specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION);
 
             insertPcapLoggingHandlerLazy(ch, "outer");
 
@@ -979,7 +1006,7 @@ public class ConnectionManager {
             Http2ClientUpgradeCodec upgradeCodec = new Http2ClientUpgradeCodec(frameCodec,
                 new ChannelInitializer<Channel>() {
                     @Override
-                    protected void initChannel(@NonNull Channel ch) throws Exception {
+                    protected void initChannel(Channel ch) throws Exception {
                         ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION, frameCodec);
                         initHttp2(pool, ch, connectionCustomizer);
                     }
@@ -991,7 +1018,7 @@ public class ConnectionManager {
 
             ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_UPGRADE_REQUEST, new ActivityHandler() {
                 @Override
-                public void channelActive0(@NonNull ChannelHandlerContext ctx) throws Exception {
+                public void channelActive0(ChannelHandlerContext ctx) throws Exception {
                     DefaultFullHttpRequest upgradeRequest =
                         new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/", Unpooled.EMPTY_BUFFER);
 
@@ -1015,6 +1042,7 @@ public class ConnectionManager {
         private final String host;
         private final int port;
 
+        @Nullable
         private NettyClientCustomizer bootstrappedCustomizer;
 
         Http3ChannelInitializer(PoolHolder pool, String host, int port) {
@@ -1045,17 +1073,22 @@ public class ConnectionManager {
         }
 
         private void initChannel(Channel ch) {
-            NettyClientCustomizer channelCustomizer = bootstrappedCustomizer.specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION);
+            NettyClientCustomizer channelCustomizer = Objects.requireNonNull(bootstrappedCustomizer).specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION);
 
             insertPcapLoggingHandlerLazy(ch, "outer");
 
-            ch.pipeline()
-                .addLast(Http3.newQuicClientCodecBuilder()
-                    .sslEngineProvider(c -> ((QuicSslContext) http3SslContext).newEngine(c.alloc(), host, port))
-                    .initialMaxData(10000000)
-                    .initialMaxStreamDataBidirectionalLocal(1000000)
-                    .build())
-                .addLast(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR, pool.initialErrorHandler);
+            QuicSslContext quicSslContext = Objects.requireNonNull(sslContextWrapper.takeRetained()).quicSslContext();
+            try {
+                ch.pipeline()
+                    .addLast(Http3.newQuicClientCodecBuilder()
+                        .sslEngineProvider(c -> quicSslContext.newEngine(c.alloc(), host, port))
+                        .initialMaxData(10000000)
+                        .initialMaxStreamDataBidirectionalLocal(1000000)
+                        .build())
+                    .addLast(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR, pool.initialErrorHandler);
+            } finally {
+                ReferenceCountUtil.release(quicSslContext);
+            }
 
             channelCustomizer.onInitialPipelineBuilt();
 
@@ -1189,7 +1222,7 @@ public class ConnectionManager {
          */
         private final InitialConnectionErrorHandler initialErrorHandler = new InitialConnectionErrorHandler() {
             @Override
-            protected void onNewConnectionFailure(@NonNull EventLoop eventLoop, @Nullable Throwable cause) throws Exception {
+            protected void onNewConnectionFailure(EventLoop eventLoop, @Nullable Throwable cause) throws Exception {
                 pool.onNewConnectionFailure(eventLoop, cause);
             }
         };
@@ -1237,7 +1270,7 @@ public class ConnectionManager {
         }
 
         @Override
-        public void openNewConnection(@NonNull EventLoop eventLoop) {
+        public void openNewConnection(EventLoop eventLoop) {
             ChannelFuture channelFuture = openConnectionFuture(eventLoop);
             withPropagation(channelFuture, future -> {
                 if (!future.isSuccess()) {
@@ -1246,12 +1279,12 @@ public class ConnectionManager {
             });
         }
 
-        private ChannelFuture openConnectionFuture(@NonNull EventLoop eventLoop) {
+        private ChannelFuture openConnectionFuture(EventLoop eventLoop) {
             CustomizerAwareInitializer initializer;
             if (requestKey.isSecure()) {
                 if (httpVersion.isHttp3()) {
                     Http3ChannelInitializer channelInitializer = new Http3ChannelInitializer(this, requestKey.getHost(), requestKey.getPort());
-                    Bootstrap localBootstrap = udpBootstrap.clone()
+                    Bootstrap localBootstrap = Objects.requireNonNull(udpBootstrap).clone()
                         .handler(channelInitializer)
                         .localAddress(0)
                         .group(eventLoop);
@@ -1261,7 +1294,7 @@ public class ConnectionManager {
 
                 initializer = new AdaptiveAlpnChannelInitializer(
                     this,
-                    buildSslContext(requestKey),
+                    () -> buildSslContext(requestKey),
                     requestKey.getHost(),
                     requestKey.getPort()
                 );
@@ -1269,15 +1302,15 @@ public class ConnectionManager {
                 initializer = switch (httpVersion.getPlaintextMode()) {
                     case HTTP_1 -> new CustomizerAwareInitializer() {
                         @Override
-                        protected void initChannel(@NonNull Channel ch) throws Exception {
+                        protected void initChannel(Channel ch) throws Exception {
                             insertPcapLoggingHandlerLazy(ch, "outer");
                             configureProxy(ch.pipeline(), false, requestKey.getHost(), requestKey.getPort());
                             initHttp1(ch);
                             ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_ACTIVITY_LISTENER, new ActivityHandler() {
                                 @Override
-                                public void channelActive0(@NonNull ChannelHandlerContext ctx) throws Exception {
+                                public void channelActive0(ChannelHandlerContext ctx) throws Exception {
                                     ctx.pipeline().remove(this);
-                                    NettyClientCustomizer channelCustomizer = bootstrappedCustomizer.specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION);
+                                    NettyClientCustomizer channelCustomizer = Objects.requireNonNull(bootstrappedCustomizer).specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION);
                                     new Http1ConnectionHolder(ch, channelCustomizer).init(true);
                                 }
                             });
@@ -1307,6 +1340,7 @@ public class ConnectionManager {
             ScheduledFuture<?> ttlFuture;
             volatile boolean windDownConnection = false;
 
+            @Nullable
             private ReadTimeoutHandler readTimeoutHandler;
 
             ConnectionHolder(Channel channel, NettyClientCustomizer connectionCustomizer) {
@@ -1364,7 +1398,7 @@ public class ConnectionManager {
                     boolean inactiveCalled = false;
 
                     @Override
-                    public void channelInactive(@NonNull ChannelHandlerContext ctx) throws Exception {
+                    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
                         super.channelInactive(ctx);
                         if (!inactiveCalled) {
                             inactiveCalled = true;
@@ -1679,7 +1713,6 @@ public class ConnectionManager {
                 });
             }
 
-            @NonNull
             ChannelHandler createFrameToHttpObjectCodec() {
                 return new Http2StreamFrameToHttpObjectCodec(false);
             }
@@ -1789,6 +1822,59 @@ public class ConnectionManager {
             if (ctx.channel().isActive()) {
                 channelActive0(ctx);
             }
+        }
+    }
+
+    private final class ClientContextWrapper extends SslContextAutoLoader {
+        private final boolean ws;
+
+        ClientContextWrapper(boolean ws) {
+            super(log);
+            this.ws = ws;
+        }
+
+        @Override
+        protected BeanProvider<CertificateProvider> certificateProviders() {
+            return certificateProviders;
+        }
+
+        @Override
+        protected SslConfiguration sslConfiguration() {
+            return configuration.getSslConfiguration();
+        }
+
+        @Override
+        protected boolean quic() {
+            return !ws && httpVersion.isHttp3();
+        }
+
+        @Override
+        protected SslContextHolder createLegacy() {
+            if (quic()) {
+                return new SslContextHolder(null, nettyClientSslBuilder.buildHttp3(configuration.getSslConfiguration()));
+            } else {
+                return new SslContextHolder(nettyClientSslBuilder.build(configuration.getSslConfiguration(), ws ? HttpVersionSelection.forLegacyVersion(io.micronaut.http.HttpVersion.HTTP_1_1) : httpVersion), null);
+            }
+        }
+
+        @Override
+        protected NettySslContextBuilder builder() {
+            NettySslContextBuilder builder = sslFactory.builder(configuration);
+            if (httpVersion.isHttp2CipherSuites()) {
+                builder.http2();
+            }
+            if (httpVersion.isAlpn()) {
+                builder.alpnProtocols(List.of(httpVersion.getAlpnSupportedProtocols()));
+            } else {
+                builder.alpnProtocols(null);
+            }
+            if (sslConfiguration() instanceof AbstractClientSslConfiguration acsc && acsc.isInsecureTrustAllCertificates()) {
+                if (log.isWarnEnabled()) {
+                    log.warn("HTTP Client is configured to trust all certificates ('insecure-trust-all-certificates' is set to true). Trusting all certificates is not secure and should not be used in production.");
+                }
+                builder.trustAll(true);
+            }
+            return builder;
         }
     }
 }

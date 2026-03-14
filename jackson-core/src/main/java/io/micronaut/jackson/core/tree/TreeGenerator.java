@@ -15,22 +15,28 @@
  */
 package io.micronaut.jackson.core.tree;
 
-import com.fasterxml.jackson.core.Base64Variant;
-import com.fasterxml.jackson.core.JsonGenerationException;
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.core.JsonStreamContext;
-import com.fasterxml.jackson.core.JsonToken;
-import com.fasterxml.jackson.core.ObjectCodec;
-import com.fasterxml.jackson.core.SerializableString;
-import com.fasterxml.jackson.core.TreeNode;
-import com.fasterxml.jackson.core.Version;
+import org.jspecify.annotations.Nullable;
+import tools.jackson.core.Base64Variant;
+import tools.jackson.core.exc.StreamWriteException;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.JsonGenerator;
+import tools.jackson.core.TokenStreamContext;
+import tools.jackson.core.JsonToken;
+import tools.jackson.core.ObjectReadContext;
+import tools.jackson.core.ObjectWriteContext;
+import tools.jackson.core.SerializableString;
+import tools.jackson.core.StreamWriteCapability;
+import tools.jackson.core.StreamWriteFeature;
+import tools.jackson.core.TreeNode;
+import tools.jackson.core.Version;
+import tools.jackson.core.util.JacksonFeatureSet;
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.json.JsonStreamConfig;
 import io.micronaut.json.tree.JsonNode;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.Reader;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayDeque;
@@ -39,6 +45,7 @@ import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * A {@link JsonGenerator} that returns tokens as a {@link JsonNode}.
@@ -49,24 +56,46 @@ import java.util.Map;
 @Experimental
 public final class TreeGenerator extends JsonGenerator {
 
-    private ObjectCodec codec;
-    private int generatorFeatures;
-
     private final Deque<StructureBuilder> structureStack = new ArrayDeque<>();
+    @Nullable
     private JsonNode completed = null;
+    @Nullable
+    private Object currentValue;
 
     TreeGenerator() {
     }
 
     @Override
-    public JsonGenerator setCodec(ObjectCodec oc) {
-        this.codec = oc;
-        return this;
+    @Nullable
+    public ObjectWriteContext objectWriteContext() {
+        return null;
     }
 
     @Override
-    public ObjectCodec getCodec() {
-        return codec;
+    @Nullable
+    public Object streamWriteOutputTarget() {
+        return null;
+    }
+
+    @Override
+    public int streamWriteOutputBuffered() {
+        return -1;
+    }
+
+    @Override
+    @Nullable
+    public Object currentValue() {
+        return currentValue;
+    }
+
+    @Override
+    public void assignCurrentValue(Object v) {
+        currentValue = v;
+    }
+
+    @Override
+    public JsonGenerator configure(StreamWriteFeature f, boolean state) {
+        return this;
     }
 
     @Override
@@ -75,53 +104,41 @@ public final class TreeGenerator extends JsonGenerator {
     }
 
     @Override
-    public JsonStreamContext getOutputContext() {
+    @Nullable
+    public TokenStreamContext streamWriteContext() {
         return null;
     }
 
     @Override
-    public JsonGenerator enable(Feature f) {
-        generatorFeatures |= f.getMask();
-        return this;
+    public boolean isEnabled(StreamWriteFeature f) {
+        return false;
     }
 
     @Override
-    public JsonGenerator disable(Feature f) {
-        generatorFeatures &= ~f.getMask();
-        return this;
+    public int streamWriteFeatures() {
+        return 0;
     }
 
     @Override
-    public boolean isEnabled(Feature f) {
-        return (generatorFeatures & f.getMask()) != 0;
+    public boolean has(StreamWriteCapability capability) {
+        return false;
     }
 
     @Override
-    public int getFeatureMask() {
-        return generatorFeatures;
+    public JacksonFeatureSet<StreamWriteCapability> streamWriteCapabilities() {
+        return JacksonFeatureSet.fromDefaults(StreamWriteCapability.values());
     }
 
-    @Override
-    public JsonGenerator setFeatureMask(int values) {
-        generatorFeatures = values;
-        return this;
-    }
-
-    @Override
-    public JsonGenerator useDefaultPrettyPrinter() {
-        return this;
-    }
-
-    private void checkEmptyNodeStack(JsonToken token) throws JsonGenerationException {
+    private void checkEmptyNodeStack(JsonToken token) throws StreamWriteException {
         if (structureStack.isEmpty()) {
-            throw new JsonGenerationException("Unexpected " + tokenType(token) + " literal", this);
+            throw new StreamWriteException(this, "Unexpected " + tokenType(token) + " literal");
         }
     }
 
     private static String tokenType(JsonToken token) {
         return switch (token) {
             case END_OBJECT, END_ARRAY -> "container end";
-            case FIELD_NAME -> "field";
+            case PROPERTY_NAME -> "field";
             case VALUE_NUMBER_INT -> "integer";
             case VALUE_STRING -> "string";
             case VALUE_NUMBER_FLOAT -> "float";
@@ -131,9 +148,9 @@ public final class TreeGenerator extends JsonGenerator {
         };
     }
 
-    private void complete(JsonNode value) throws JsonGenerationException {
+    private void complete(JsonNode value) throws StreamWriteException {
         if (completed != null) {
-            throw new JsonGenerationException("Tree generator has already completed", this);
+            throw new StreamWriteException(this, "Tree generator has already completed");
         }
         completed = value;
     }
@@ -149,20 +166,31 @@ public final class TreeGenerator extends JsonGenerator {
      * @return The completed node.
      * @throws IllegalStateException If there is still data missing. Check with {@link #isComplete()}.
      */
-    @NonNull
     public JsonNode getCompletedValue() {
         if (!isComplete()) {
             throw new IllegalStateException("Not completed");
         }
-        return completed;
+        return Objects.requireNonNull(completed);
     }
 
     @Override
-    public void writeStartArray() {
+    public JsonGenerator writeStartArray() {
         structureStack.push(new ArrayBuilder());
+        return this;
     }
 
-    private void writeEndStructure(JsonToken token) throws JsonGenerationException {
+    @Override
+    public JsonGenerator writeStartArray(Object currentValue) throws JacksonException {
+        return writeStartArray();
+    }
+
+    @Override
+    public JsonGenerator writeStartArray(Object currentValue, int size) throws JacksonException {
+        return writeStartArray();
+    }
+
+    @Nullable
+    private JsonGenerator writeEndStructure(JsonToken token) throws StreamWriteException {
         checkEmptyNodeStack(token);
         final StructureBuilder current = structureStack.pop();
         if (structureStack.isEmpty()) {
@@ -170,105 +198,131 @@ public final class TreeGenerator extends JsonGenerator {
         } else {
             structureStack.peekFirst().addValue(current.build());
         }
+        return null;
     }
 
     @Override
-    public void writeEndArray() throws IOException {
-        writeEndStructure(JsonToken.END_ARRAY);
+    @Nullable
+    public JsonGenerator writeEndArray() {
+        return writeEndStructure(JsonToken.END_ARRAY);
     }
 
     @Override
-    public void writeStartObject() {
+    public JsonGenerator writeStartObject() {
         structureStack.push(new ObjectBuilder());
+        return this;
     }
 
     @Override
-    public void writeEndObject() throws IOException {
-        writeEndStructure(JsonToken.END_OBJECT);
+    public JsonGenerator writeStartObject(Object currentValue) throws JacksonException {
+        return writeStartObject();
     }
 
     @Override
-    public void writeFieldName(String name) throws IOException {
-        checkEmptyNodeStack(JsonToken.FIELD_NAME);
-        structureStack.peekFirst().setCurrentFieldName(name);
+    public JsonGenerator writeStartObject(Object forValue, int size) throws JacksonException {
+        return writeStartObject();
     }
 
     @Override
-    public void writeFieldName(SerializableString name) throws IOException {
-        writeFieldName(name.getValue());
+    @Nullable
+    public JsonGenerator writeEndObject() {
+        return writeEndStructure(JsonToken.END_OBJECT);
     }
 
-    private void writeScalar(JsonToken token, JsonNode value) throws JsonGenerationException {
+    @Override
+    public JsonGenerator writeName(String name) {
+        checkEmptyNodeStack(JsonToken.PROPERTY_NAME);
+        Objects.requireNonNull(structureStack.peekFirst()).setCurrentFieldName(name);
+        return this;
+    }
+
+    @Override
+    public JsonGenerator writeName(SerializableString name) {
+        return writeName(name.getValue());
+    }
+
+    @Override
+    public JsonGenerator writePropertyId(long id) throws JacksonException {
+        return writeName(Long.toString(id));
+    }
+
+    private JsonGenerator writeScalar(JsonToken token, JsonNode value) throws StreamWriteException {
         if (structureStack.isEmpty()) {
             complete(value);
         } else {
             structureStack.peekFirst().addValue(value);
         }
+        return this;
     }
 
     @Override
-    public void writeString(String text) throws IOException {
-        writeScalar(JsonToken.VALUE_STRING, JsonNode.createStringNode(text));
+    public JsonGenerator writeString(String text) {
+        return writeScalar(JsonToken.VALUE_STRING, JsonNode.createStringNode(text));
     }
 
     @Override
-    public void writeString(char[] buffer, int offset, int len) throws IOException {
-        writeString(new String(buffer, offset, len));
+    public JsonGenerator writeString(Reader reader, int len) throws JacksonException {
+        return _reportUnsupportedOperation();
     }
 
     @Override
-    public void writeString(SerializableString text) throws IOException {
-        writeString(text.getValue());
+    public JsonGenerator writeString(char[] buffer, int offset, int len) {
+        return writeString(new String(buffer, offset, len));
     }
 
     @Override
-    public void writeRawUTF8String(byte[] buffer, int offset, int len) {
-        _reportUnsupportedOperation();
+    public JsonGenerator writeString(SerializableString text) {
+        return writeString(text.getValue());
     }
 
     @Override
-    public void writeUTF8String(byte[] buffer, int offset, int len) {
-        _reportUnsupportedOperation();
+    public JsonGenerator writeRawUTF8String(byte[] buffer, int offset, int len) {
+        return _reportUnsupportedOperation();
     }
 
     @Override
-    public void writeRaw(String text) {
-        _reportUnsupportedOperation();
+    public JsonGenerator writeUTF8String(byte[] buffer, int offset, int len) {
+        return _reportUnsupportedOperation();
     }
 
     @Override
-    public void writeRaw(String text, int offset, int len) {
-        _reportUnsupportedOperation();
+    public JsonGenerator writeRaw(String text) {
+        return _reportUnsupportedOperation();
     }
 
     @Override
-    public void writeRaw(char[] text, int offset, int len) {
-        _reportUnsupportedOperation();
+    public JsonGenerator writeRaw(String text, int offset, int len) {
+        return _reportUnsupportedOperation();
     }
 
     @Override
-    public void writeRaw(char c) {
-        _reportUnsupportedOperation();
+    public JsonGenerator writeRaw(char[] text, int offset, int len) {
+        return _reportUnsupportedOperation();
     }
 
     @Override
-    public void writeRawValue(String text) throws IOException {
-        writeObject(text);
+    public JsonGenerator writeRaw(char c) {
+        return _reportUnsupportedOperation();
     }
 
     @Override
-    public void writeRawValue(String text, int offset, int len) throws IOException {
-        writeRawValue(text.substring(offset, len));
+    public JsonGenerator writeRawValue(String text) {
+        return writePOJO(text);
     }
 
     @Override
-    public void writeRawValue(char[] text, int offset, int len) throws IOException {
-        writeRawValue(new String(text, offset, len));
+    public JsonGenerator writeRawValue(String text, int offset, int len) {
+        return writeRawValue(text.substring(offset, len));
     }
 
     @Override
-    public void writeBinary(Base64Variant bv, byte[] data, int offset, int len) {
-        _reportUnsupportedOperation();
+    public JsonGenerator writeRawValue(char[] text, int offset, int len) {
+        return writeRawValue(new String(text, offset, len));
+    }
+
+    @Override
+    public JsonGenerator writeBinary(Base64Variant bv, byte[] data, int offset, int len) {
+        return _reportUnsupportedOperation();
     }
 
     @Override
@@ -278,69 +332,80 @@ public final class TreeGenerator extends JsonGenerator {
     }
 
     @Override
-    public void writeNumber(int v) throws IOException {
-        writeScalar(JsonToken.VALUE_NUMBER_INT, JsonNode.createNumberNode(v));
+    public JsonGenerator writeNumber(short v) throws JacksonException {
+        return writeScalar(JsonToken.VALUE_NUMBER_INT, JsonNode.createNumberNode(v));
     }
 
     @Override
-    public void writeNumber(long v) throws IOException {
-        writeScalar(JsonToken.VALUE_NUMBER_INT, JsonNode.createNumberNode(v));
+    public JsonGenerator writeNumber(int v) {
+        return writeScalar(JsonToken.VALUE_NUMBER_INT, JsonNode.createNumberNode(v));
     }
 
     @Override
-    public void writeNumber(BigInteger v) throws IOException {
+    public JsonGenerator writeNumber(long v) {
+        return writeScalar(JsonToken.VALUE_NUMBER_INT, JsonNode.createNumberNode(v));
+    }
+
+    @Override
+    public JsonGenerator writeNumber(BigInteger v) {
         // the tree codec could normalize
-        writeScalar(JsonToken.VALUE_NUMBER_INT, JsonNode.createNumberNode(v));
+        return writeScalar(JsonToken.VALUE_NUMBER_INT, JsonNode.createNumberNode(v));
     }
 
     @Override
-    public void writeNumber(double v) throws IOException {
-        writeScalar(JsonToken.VALUE_NUMBER_FLOAT, JsonNode.createNumberNode(v));
+    public JsonGenerator writeNumber(double v) {
+        return writeScalar(JsonToken.VALUE_NUMBER_FLOAT, JsonNode.createNumberNode(v));
     }
 
     @Override
-    public void writeNumber(float v) throws IOException {
-        writeScalar(JsonToken.VALUE_NUMBER_FLOAT, JsonNode.createNumberNode(v));
+    public JsonGenerator writeNumber(float v) {
+        return writeScalar(JsonToken.VALUE_NUMBER_FLOAT, JsonNode.createNumberNode(v));
     }
 
     @Override
-    public void writeNumber(BigDecimal v) throws IOException {
-        writeScalar(JsonToken.VALUE_NUMBER_FLOAT, JsonNode.createNumberNode(v));
+    public JsonGenerator writeNumber(BigDecimal v) {
+        return writeScalar(JsonToken.VALUE_NUMBER_FLOAT, JsonNode.createNumberNode(v));
     }
 
     @Override
-    public void writeNumber(String encodedValue) {
-        _reportUnsupportedOperation();
+    public JsonGenerator writeNumber(String encodedValue) {
+        return _reportUnsupportedOperation();
     }
 
     @Override
-    public void writeBoolean(boolean state) throws IOException {
-        writeScalar(state ? JsonToken.VALUE_TRUE : JsonToken.VALUE_FALSE, JsonNode.createBooleanNode(state));
+    public JsonGenerator writeBoolean(boolean state) {
+        return writeScalar(state ? JsonToken.VALUE_TRUE : JsonToken.VALUE_FALSE, JsonNode.createBooleanNode(state));
     }
 
     @Override
-    public void writeNull() throws IOException {
-        writeScalar(JsonToken.VALUE_NULL, JsonNode.nullNode());
+    public JsonGenerator writeNull() {
+        return writeScalar(JsonToken.VALUE_NULL, JsonNode.nullNode());
     }
 
     @Override
-    public void writeObject(Object pojo) throws IOException {
-        getCodec().writeValue(this, pojo);
+    public JsonGenerator writePOJO(Object pojo) {
+        Objects.requireNonNull(objectWriteContext()).writeValue(this, pojo);
+        return this;
     }
 
     @Override
-    public void writeTree(TreeNode rootNode) throws IOException {
+    public JsonGenerator writeTree(@Nullable TreeNode rootNode) {
         if (rootNode == null) {
-            writeNull();
+            return writeNull();
         } else if (rootNode instanceof JsonNode node) {
-            writeScalar(JsonToken.VALUE_EMBEDDED_OBJECT, node);
+            return writeScalar(JsonToken.VALUE_EMBEDDED_OBJECT, node);
         } else {
-            JsonStreamTransfer.transferNext(rootNode.traverse(), this, JsonStreamConfig.DEFAULT);
+            try {
+                JsonStreamTransfer.transferNext(rootNode.traverse(ObjectReadContext.empty()), this, JsonStreamConfig.DEFAULT);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
         }
+        return this;
     }
 
     @Override
-    public void flush() throws IOException {
+    public void flush() {
     }
 
     @Override
@@ -349,18 +414,18 @@ public final class TreeGenerator extends JsonGenerator {
     }
 
     @Override
-    public void close() throws IOException {
+    public void close() {
     }
 
     private interface StructureBuilder {
-        void addValue(JsonNode value) throws JsonGenerationException;
+        void addValue(JsonNode value) throws StreamWriteException;
 
-        void setCurrentFieldName(String currentFieldName) throws JsonGenerationException;
+        void setCurrentFieldName(String currentFieldName) throws StreamWriteException;
 
         JsonNode build();
     }
 
-    private class ArrayBuilder implements StructureBuilder {
+    private final class ArrayBuilder implements StructureBuilder {
 
         final List<JsonNode> values = new ArrayList<>();
 
@@ -370,8 +435,8 @@ public final class TreeGenerator extends JsonGenerator {
         }
 
         @Override
-        public void setCurrentFieldName(String currentFieldName) throws JsonGenerationException {
-            throw new JsonGenerationException("Expected array value, got field name", TreeGenerator.this);
+        public void setCurrentFieldName(String currentFieldName) throws StreamWriteException {
+            throw new StreamWriteException(TreeGenerator.this, "Expected array value, got field name");
         }
 
         @Override
@@ -380,15 +445,16 @@ public final class TreeGenerator extends JsonGenerator {
         }
     }
 
-    private class ObjectBuilder implements StructureBuilder {
+    private final class ObjectBuilder implements StructureBuilder {
 
         final Map<String, JsonNode> values = new LinkedHashMap<>();
+        @Nullable
         String currentFieldName = null;
 
         @Override
-        public void addValue(JsonNode value) throws JsonGenerationException {
+        public void addValue(JsonNode value) throws StreamWriteException {
             if (currentFieldName == null) {
-                throw new JsonGenerationException("Expected field name, got value", TreeGenerator.this);
+                throw new StreamWriteException(TreeGenerator.this, "Expected field name, got value");
             }
             values.put(currentFieldName, value);
             currentFieldName = null;

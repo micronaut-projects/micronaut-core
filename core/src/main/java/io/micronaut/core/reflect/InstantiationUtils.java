@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.core.reflect;
-
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanIntrospector;
@@ -27,6 +25,7 @@ import io.micronaut.core.reflect.exception.InstantiationException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.CollectionUtils;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -77,7 +76,7 @@ public class InstantiationUtils {
      * @return The instantiated instance or {@link Optional#empty()}
      * @throws InstantiationException When an error occurs
      */
-    public static @NonNull <T> Optional<T> tryInstantiate(@NonNull Class<T> type, Map propertiesMap, ConversionContext context) {
+    public static <T> Optional<T> tryInstantiate(Class<T> type, Map propertiesMap, ConversionContext context) {
         ArgumentUtils.requireNonNull("type", type);
         if (propertiesMap.isEmpty()) {
             return tryInstantiate(type);
@@ -140,7 +139,7 @@ public class InstantiationUtils {
      * @param <T>  The generic type
      * @return The instantiated instance or {@link Optional#empty()}
      */
-    public static @NonNull <T> Optional<T> tryInstantiate(@NonNull Class<T> type) {
+    public static <T> Optional<T> tryInstantiate(Class<T> type) {
         ArgumentUtils.requireNonNull("type", type);
         final Supplier<T> reflectionFallback = () -> {
             final Logger logger = ClassUtils.REFLECTION_LOGGER;
@@ -186,7 +185,7 @@ public class InstantiationUtils {
      * @param <T>  The generic type
      * @return The instantiated instance or {@link Optional#empty()}
      */
-    public static @NonNull <T> Optional<T> tryInstantiate(@NonNull Constructor<T> type, Object... args) {
+    public static <T> Optional<T> tryInstantiate(Constructor<T> type, @Nullable Object... args) {
         try {
             return Optional.of(type.newInstance(args));
         } catch (Throwable e) {
@@ -257,7 +256,6 @@ public class InstantiationUtils {
      * @throws InstantiationException When an error occurs
      * @since 4.8.0
      */
-    @NonNull
     @UsedByGeneratedCode
     public static <T> T instantiateReflectively(Class<T> type, Class<?>[] argTypes, Object[] args) {
         try {

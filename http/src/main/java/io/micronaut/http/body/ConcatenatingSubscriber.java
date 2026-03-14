@@ -16,14 +16,14 @@
 package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.io.buffer.LeakTracker;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.io.buffer.ReadBufferFactory;
 import io.micronaut.http.body.stream.BaseSharedBuffer;
 import io.micronaut.http.body.stream.BaseStreamingByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
 import reactor.core.CoreSubscriber;
@@ -48,11 +48,11 @@ public class ConcatenatingSubscriber implements BufferConsumer.Upstream, CoreSub
     private long forwarded;
     private long consumed;
 
-    private Subscription subscription;
+    private @Nullable Subscription subscription;
     private boolean cancelled;
     private volatile boolean disregardBackpressure;
     private boolean first = true;
-    private BufferConsumer.Upstream currentComponent;
+    private BufferConsumer.@Nullable Upstream currentComponent;
     private boolean start = false;
     private boolean delayedSubscriberCompletion = false;
     private boolean currentComponentDone = false;
@@ -137,8 +137,7 @@ public class ConcatenatingSubscriber implements BufferConsumer.Upstream, CoreSub
      * component backpressure, or {@code null} if all bytes were written immediately (as is the
      * case for an {@link AvailableByteBody})
      */
-    @Nullable
-    protected final BufferConsumer.Upstream forward(ByteBody body) {
+    protected final BufferConsumer.@Nullable Upstream forward(ByteBody body) {
         if (body instanceof AvailableByteBody abb) {
             add(abb.toReadBuffer());
             complete();
@@ -189,6 +188,9 @@ public class ConcatenatingSubscriber implements BufferConsumer.Upstream, CoreSub
     public final void start() {
         Subscription initialDemand;
         synchronized (this) {
+            if (start) {
+                throw new IllegalStateException("Already started");
+            }
             initialDemand = subscription;
             start = true;
         }
@@ -218,7 +220,9 @@ public class ConcatenatingSubscriber implements BufferConsumer.Upstream, CoreSub
             currentComponent.onBytesConsumed(bytesConsumed);
         } else if (requestNewComponent) {
             // Previous component is now fully consumed, request a new one.
-            subscription.request(1);
+            if (subscription != null) {
+                subscription.request(1);
+            }
         }
     }
 
@@ -252,7 +256,7 @@ public class ConcatenatingSubscriber implements BufferConsumer.Upstream, CoreSub
     }
 
     @Override
-    public void add(@NonNull ReadBuffer buffer) {
+    public void add(ReadBuffer buffer) {
         int n = buffer.readable();
         onForward(n);
         sharedBuffer.add(buffer);
@@ -273,14 +277,19 @@ public class ConcatenatingSubscriber implements BufferConsumer.Upstream, CoreSub
             onComplete();
         } else if (requestNextComponent) {
             // current component completed. request the next ByteBody
-            subscription.request(1);
+            if (subscription != null) {
+                subscription.request(1);
+            }
         }
         // if requestNextComponent is false, then the last component has not been fully consumed yet. we'll request the next later.
     }
 
     @Override
     public final void error(Throwable e) {
-        subscription.cancel();
+        Subscription s = subscription;
+        if (s != null) {
+            s.cancel();
+        }
         forwardError(e);
     }
 
@@ -321,7 +330,7 @@ public class ConcatenatingSubscriber implements BufferConsumer.Upstream, CoreSub
         /**
          * {@link #jsonSeparators(ReadBufferFactory)} using {@link ReadBufferFactory#getJdkFactory()}.
          */
-        public static final Separators JDK_JSON = jsonSeparators(ReadBufferFactory.getJdkFactory());
+        public static final Separators JDK_JSON = LeakTracker.Factory.staticInitializer(() -> jsonSeparators(ReadBufferFactory.getJdkFactory()));
 
         /**
          * Create the appropriate separators for JSON using the given buffer factory.
@@ -329,8 +338,7 @@ public class ConcatenatingSubscriber implements BufferConsumer.Upstream, CoreSub
          * @param factory The factory to use
          * @return The separators
          */
-        @NonNull
-        public static Separators jsonSeparators(@NonNull ReadBufferFactory factory) {
+        public static Separators jsonSeparators(ReadBufferFactory factory) {
             return new Separators(
                 factory.copyOf("[", StandardCharsets.UTF_8),
                 factory.copyOf("]", StandardCharsets.UTF_8),

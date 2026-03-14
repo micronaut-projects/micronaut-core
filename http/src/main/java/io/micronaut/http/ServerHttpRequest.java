@@ -16,8 +16,9 @@
 package io.micronaut.http;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
 import io.micronaut.http.body.ByteBody;
+import io.micronaut.http.body.ByteBodyFactory;
 
 /**
  * This interface extends {@link HttpRequest} with methods that are specific to a request received
@@ -35,6 +36,15 @@ public interface ServerHttpRequest<B> extends HttpRequest<B> {
      *
      * @return The body bytes of this request
      */
-    @NonNull
     ByteBody byteBody();
+
+    /**
+     * Get a {@link ByteBodyFactory} that can be used to construct an efficient response to this
+     * request.
+     *
+     * @return The body factory
+     */
+    default ByteBodyFactory byteBodyFactory() {
+        return ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE);
+    }
 }

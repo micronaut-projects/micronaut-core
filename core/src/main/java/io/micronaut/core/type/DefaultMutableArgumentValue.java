@@ -17,6 +17,7 @@ package io.micronaut.core.type;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Default implementation of {@link MutableArgumentValue}.
@@ -26,22 +27,25 @@ import io.micronaut.core.convert.ConversionService;
  * @since 1.0
  */
 @Internal
-class DefaultMutableArgumentValue<V> extends DefaultArgumentValue<V> implements MutableArgumentValue<V> {
+final class DefaultMutableArgumentValue<V> extends DefaultArgumentValue<V> implements MutableArgumentValue<V> {
 
+    @Nullable
     private V value;
 
     /**
      * @param argument The argument
      * @param value    The value
      */
-    DefaultMutableArgumentValue(Argument<V> argument, V value) {
+    DefaultMutableArgumentValue(Argument<V> argument, @Nullable V value) {
         super(argument, value);
         this.value = value;
     }
 
     @Override
-    public void setValue(V value) {
-        if (!getType().isInstance(value)) {
+    public void setValue(@Nullable V value) {
+        if (value == null) {
+            this.value = null;
+        } else if (!getType().isInstance(value)) {
             this.value = value;
         } else {
             this.value = ConversionService.SHARED.convert(value, getType()).orElseThrow(() ->
@@ -51,6 +55,7 @@ class DefaultMutableArgumentValue<V> extends DefaultArgumentValue<V> implements 
     }
 
     @Override
+    @Nullable
     public V getValue() {
         return value;
     }

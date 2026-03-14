@@ -17,11 +17,11 @@ package io.micronaut.http.hateoas;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
-
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.util.Optional;
 
 /**
@@ -31,6 +31,7 @@ import java.util.Optional;
  * @since 1.1
  */
 @Produces(MediaType.APPLICATION_JSON)
+@ReflectiveAccess // for jackson
 public class JsonError extends AbstractResource<JsonError> {
 
     /**
@@ -41,8 +42,8 @@ public class JsonError extends AbstractResource<JsonError> {
     public static final Argument<JsonError> TYPE = Argument.of(JsonError.class);
 
     private String message;
-    private String logref;
-    private String path;
+    private @Nullable String logref;
+    private @Nullable String path;
 
     /**
      * @param message The message
@@ -56,6 +57,7 @@ public class JsonError extends AbstractResource<JsonError> {
      */
     @Internal
     JsonError() {
+        this.message = "";
     }
 
     /**

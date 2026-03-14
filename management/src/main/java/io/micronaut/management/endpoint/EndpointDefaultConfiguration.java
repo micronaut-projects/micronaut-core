@@ -16,7 +16,7 @@
 package io.micronaut.management.endpoint;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.StringUtils;
 
 import java.util.Optional;
@@ -58,12 +58,17 @@ public class EndpointDefaultConfiguration {
     /**
      * The default context path.
      */
+    @Nullable
     public static final String DEFAULT_ENDPOINT_CONTEXT_PATH = null;
 
+    @Nullable
     private Boolean enabled;
+    @Nullable
     private Boolean sensitive;
+    @Nullable
     private Integer port;
     private String path = DEFAULT_ENDPOINT_BASE_PATH;
+    @Nullable
     private String contextPath = DEFAULT_ENDPOINT_CONTEXT_PATH;
 
     /**

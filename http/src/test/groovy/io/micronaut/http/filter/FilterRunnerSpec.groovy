@@ -1,6 +1,6 @@
 package io.micronaut.http.filter
 
-import io.micronaut.core.annotation.Nullable
+import org.jspecify.annotations.Nullable
 import io.micronaut.core.convert.ConversionService
 import io.micronaut.core.execution.CompletableFutureExecutionFlow
 import io.micronaut.core.execution.ExecutionFlow
@@ -13,13 +13,11 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.MutableHttpResponse
 import io.micronaut.http.bind.DefaultRequestBinderRegistry
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow
-import io.micronaut.inject.ExecutableMethod
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import spock.lang.Specification
 
-import java.lang.reflect.Method
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ExecutionException
 import java.util.function.Supplier
@@ -650,45 +648,4 @@ class FilterRunnerSpec extends Specification {
         return CompletableFutureExecutionFlow.just(future).tryComplete()
     }
 
-    private static class LambdaExecutable implements ExecutableMethod<Object, Object> {
-        private final Closure<?> closure
-        private final Argument<?>[] arguments
-        private final ReturnType<?> returnType
-
-        LambdaExecutable(Closure<?> closure, Argument<?>[] arguments, ReturnType<?> returnType) {
-            this.closure = closure
-            this.arguments = arguments
-            this.returnType = returnType
-        }
-
-        @Override
-        Class<Object> getDeclaringType() {
-            return Object
-        }
-
-        @Override
-        String getMethodName() {
-            throw new UnsupportedOperationException()
-        }
-
-        @Override
-        Argument<?>[] getArguments() {
-            return arguments
-        }
-
-        @Override
-        Method getTargetMethod() {
-            throw new UnsupportedOperationException()
-        }
-
-        @Override
-        ReturnType<Object> getReturnType() {
-            return returnType
-        }
-
-        @Override
-        Object invoke(@Nullable Object instance, Object... arguments) {
-            return closure.curry(arguments)()
-        }
-    }
 }

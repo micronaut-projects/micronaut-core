@@ -17,8 +17,7 @@ package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
@@ -49,6 +48,8 @@ final class JavaPropertyElement extends AbstractJavaMemberElement implements Pro
     private final MethodElement setter;
     @Nullable
     private final FieldElement field;
+    @Nullable
+    private final AnnotationMetadata propertyComponentAnnotationMetadata;
     private final boolean excluded;
     private final PropertyElementAnnotationMetadata annotationMetadata;
     @Nullable
@@ -59,6 +60,7 @@ final class JavaPropertyElement extends AbstractJavaMemberElement implements Pro
                         @Nullable MethodElement getter,
                         @Nullable MethodElement setter,
                         @Nullable FieldElement field,
+                        @Nullable AnnotationMetadata propertyComponentAnnotationMetadata,
                         ElementAnnotationMetadataFactory annotationMetadataFactory,
                         String name,
                         AccessKind readAccessKind,
@@ -71,12 +73,13 @@ final class JavaPropertyElement extends AbstractJavaMemberElement implements Pro
         this.getter = getter;
         this.setter = setter;
         this.field = field;
+        this.propertyComponentAnnotationMetadata = propertyComponentAnnotationMetadata;
         this.name = name;
         this.readAccessKind = readAccessKind;
         this.writeAccessKind = writeAccessKind;
         this.owningElement = owningElement;
         this.excluded = excluded;
-        this.annotationMetadata = new PropertyElementAnnotationMetadata(this, getter, setter, field, null, false);
+        this.annotationMetadata = new PropertyElementAnnotationMetadata(this, getter, setter, field, null, propertyComponentAnnotationMetadata, false);
         this.doc = doc;
     }
 
@@ -99,7 +102,7 @@ final class JavaPropertyElement extends AbstractJavaMemberElement implements Pro
 
     @Override
     protected AbstractJavaElement copyThis() {
-        return new JavaPropertyElement(owningElement, type, getter, setter, field, elementAnnotationMetadataFactory, name, readAccessKind, writeAccessKind, excluded, visitorContext, doc);
+        return new JavaPropertyElement(owningElement, type, getter, setter, field, propertyComponentAnnotationMetadata, elementAnnotationMetadataFactory, name, readAccessKind, writeAccessKind, excluded, visitorContext, doc);
     }
 
     @Override
@@ -107,9 +110,9 @@ final class JavaPropertyElement extends AbstractJavaMemberElement implements Pro
         return (PropertyElement) super.withAnnotationMetadata(annotationMetadata);
     }
 
-    private static JavaNativeElement selectNativeType(MethodElement getter,
-                                                      MethodElement setter,
-                                                      FieldElement field) {
+    private static JavaNativeElement selectNativeType(@Nullable MethodElement getter,
+                                                      @Nullable MethodElement setter,
+                                                      @Nullable FieldElement field) {
         if (getter != null) {
             return (JavaNativeElement) getter.getNativeType();
         }
@@ -133,12 +136,12 @@ final class JavaPropertyElement extends AbstractJavaMemberElement implements Pro
     }
 
     @Override
-    public @NonNull ClassElement getType() {
+    public ClassElement getType() {
         return type;
     }
 
     @Override
-    public @NonNull ClassElement getGenericType() {
+    public ClassElement getGenericType() {
         return type; // Already generic
     }
 
@@ -173,7 +176,7 @@ final class JavaPropertyElement extends AbstractJavaMemberElement implements Pro
     }
 
     @Override
-    public @NonNull String getName() {
+    public String getName() {
         return name;
     }
 
@@ -228,7 +231,10 @@ final class JavaPropertyElement extends AbstractJavaMemberElement implements Pro
     }
 
     @Override
-    public Optional<String> getDocumentation() {
-        return doc == null ? PropertyElement.super.getDocumentation() : Optional.of(doc);
+    public Optional<String> getDocumentation(boolean parse) {
+        if (!parse) {
+            return JavaPropertyElement.super.getDocumentation(parse);
+        }
+        return doc == null ? PropertyElement.super.getDocumentation(parse) : Optional.of(doc);
     }
 }

@@ -12,8 +12,8 @@ class KotlinReconstructionSpec extends AbstractKotlinCompilerSpec {
 
     @Unroll("field type is #fieldType")
     def 'field type'() {
-        given:
-            def element = buildClassElement("test.Test", """
+        when:
+            def value = buildClassElementMapped("test.Test", """
 package test;
 
 import java.util.*;
@@ -24,11 +24,10 @@ class Test<T> {
 
 class Lst<in E> {
 }
-""")
-            def field = element.getFields()[0]
+""") {reconstructTypeSignature(it.getFields()[0].genericType) }
 
-        expect:
-            reconstructTypeSignature(field.genericType) == fieldType
+        then:
+            value == fieldType
 
         where:
             fieldType << [
@@ -85,18 +84,18 @@ class Lst<in E> {
 
     @Unroll("super type is #superType")
     def 'super type'() {
-        given:
-            def element = buildClassElement("test.Test", """
+        when:
+            def value = buildClassElementMapped("test.Test", """
 package test;
 
 import java.util.*;
 
 abstract class Test<T> : $superType() {
 }
-""")
+""") { reconstructTypeSignature(it.superType.get())}
 
-        expect:
-            reconstructTypeSignature(element.superType.get()) == superType
+        then:
+            value == superType
 
         where:
             superType << [
@@ -112,18 +111,18 @@ abstract class Test<T> : $superType() {
 
     @Unroll("super interface is #superType")
     def 'super interface'() {
-        given:
-            def element = buildClassElement("test.Test", """
+        when:
+            def value = buildClassElementMapped("test.Test", """
 package test;
 
 import java.util.*;
 
 abstract class Test<T> : $superType {
 }
-""")
+""") {reconstructTypeSignature(it.interfaces[0])}
 
-        expect:
-            reconstructTypeSignature(element.interfaces[0]) == superType
+        then:
+            value == superType
 
         where:
             superType << [
@@ -211,8 +210,8 @@ class Lst<in E> {
 
     @Unroll("field type is #fieldType")
     def 'bound field type'() {
-        given:
-            def element = buildClassElement("test.Wrapper", """
+        when:
+            def value = buildClassElementMapped("test.Wrapper", """
 package test;
 
 import java.util.*;
@@ -225,11 +224,10 @@ class Test<T> {
 }
 class Lst<in E> {
 }
-""")
-            def field = element.getFields()[0].genericType.getFields()[0]
+""") { reconstructTypeSignature(it.getFields()[0].genericType.getFields()[0].genericType)}
 
-        expect:
-            reconstructTypeSignature(field.genericType) == expectedType
+        then:
+            value == expectedType
 
         where:
             fieldType                             | expectedType
@@ -248,8 +246,8 @@ class Lst<in E> {
 
     @Unroll("field type is #fieldType")
     def 'bound field type to other variable'() {
-        given:
-            def element = buildClassElement("test.Wrapper", """
+        when:
+            def value = buildClassElementMapped("test.Wrapper", """
 package test;
 
 import java.util.*;
@@ -262,11 +260,10 @@ class Test<T> {
 }
 class Lst<in E> {
 }
-""")
-            def field = element.getFields()[0].genericType.getFields()[0]
+""") {reconstructTypeSignature(it.getFields()[0].genericType.getFields()[0].genericType) }
 
-        expect:
-            reconstructTypeSignature(field.genericType) == expectedType
+        then:
+            value == expectedType
 
         where:
             fieldType                             | expectedType
@@ -283,8 +280,8 @@ class Lst<in E> {
     }
 
     def 'unbound super type'() {
-        given:
-            def superElement = buildClassElement("test.Sub", """
+        when:
+            def superElementValue = buildClassElementMapped("test.Sub", """
 package test;
 
 import java.util.*;
@@ -295,8 +292,8 @@ open class Sup<$decl> {
 }
 class Lst<in E> {
 }
-""")
-            def interfaceElement = buildClassElement("test.Sub", """
+""") {reconstructTypeSignature(it.getSuperType().get()) }
+            def interfaceElementValue = buildClassElementMapped("test.Sub", """
 package test;
 
 import java.util.*;
@@ -307,11 +304,11 @@ interface Sup<$decl> {
 }
 class Lst<in E> {
 }
-""")
+""") { reconstructTypeSignature(it.getInterfaces()[0]) }
 
-        expect:
-            reconstructTypeSignature(superElement.getSuperType().get()) == expected
-            reconstructTypeSignature(interfaceElement.getInterfaces()[0]) == expected
+        then:
+            superElementValue == expected
+            interfaceElementValue == expected
 
         where:
             decl | params        | expected
@@ -322,8 +319,8 @@ class Lst<in E> {
     }
 
     def 'bound super type'() {
-        given:
-            def superElement = buildClassElementTransformed("test.Sub", """
+        when:
+            def superElementValue = buildClassElementMapped("test.Sub", """
 package test;
 
 class Sub<U> : Sup<$params>() {
@@ -336,9 +333,9 @@ class Str
 """, { ce ->
                 ce = ce.withTypeArguments([ClassElement.of("test.Str")])
                 initializeAllTypeArguments(ce)
-                return ce
+                return reconstructTypeSignature(ce.getSuperType().get())
             })
-            def interfaceElement = buildClassElementTransformed("test.Sub", """
+            def interfaceElementValue = buildClassElementMapped("test.Sub", """
 package test;
 
 class Sub<U> : Sup<$params> {
@@ -351,12 +348,12 @@ class Str
 """, { ce ->
                 ce = ce.withTypeArguments([ClassElement.of("test.Str")])
                 initializeAllTypeArguments(ce)
-                return ce
+                return reconstructTypeSignature(ce.getInterfaces()[0])
             })
 
-        expect:
-            reconstructTypeSignature(superElement.getSuperType().get()) == expected
-            reconstructTypeSignature(interfaceElement.getInterfaces()[0]) == expected
+        then:
+            superElementValue == expected
+            interfaceElementValue == expected
 
         where:
             decl | params          | expected
@@ -444,8 +441,8 @@ class Test {
     }
 
     def 'distinguish list types 2'() {
-        given:
-            def classElement = buildClassElement("test.Test", """
+        expect:
+            buildClassElement("test.Test", """
 package test;
 
 import java.util.*;
@@ -458,38 +455,38 @@ class Test {
     var field4: List<String>? = null
     var field5: List<out Number>? = null
 }
-""")
-            def rawType = classElement.fields[0].type
-            def wildcardType = classElement.fields[1].type
-            def objectType = classElement.fields[2].type
-            def stringType = classElement.fields[3].type
-            def numberType = classElement.fields[4].type
+""") { classElement ->
+                def rawType = classElement.fields[0].type
+                def wildcardType = classElement.fields[1].type
+                def objectType = classElement.fields[2].type
+                def stringType = classElement.fields[3].type
+                def numberType = classElement.fields[4].type
 
-        expect:
-            rawType.typeArguments["E"].type.name == "java.lang.Object"
-            rawType.typeArguments["E"].isRawType()
-            rawType.typeArguments["E"].isWildcard()
-            !rawType.typeArguments["E"].isGenericPlaceholder()
+                assert rawType.typeArguments["E"].type.name == "java.lang.Object"
+                assert rawType.typeArguments["E"].isRawType()
+                assert rawType.typeArguments["E"].isWildcard()
+                assert !rawType.typeArguments["E"].isGenericPlaceholder()
 
 //            wildcardType.typeArguments["E"].type.name == "java.lang.Object"
 //            wildcardType.typeArguments["E"].isWildcard()
 //            !((WildcardElement)wildcardType.typeArguments["E"]).isBounded()
 //            !wildcardType.typeArguments["E"].isRawType()
 
-            objectType.typeArguments["E"].type.name == "java.lang.Object"
-            !objectType.typeArguments["E"].isWildcard()
-            !objectType.typeArguments["E"].isRawType()
-            !objectType.typeArguments["E"].isGenericPlaceholder()
+                assert objectType.typeArguments["E"].type.name == "java.lang.Object"
+                assert !objectType.typeArguments["E"].isWildcard()
+                assert !objectType.typeArguments["E"].isRawType()
+                assert !objectType.typeArguments["E"].isGenericPlaceholder()
 
-            stringType.typeArguments["E"].type.name == "java.lang.String"
-            !stringType.typeArguments["E"].isWildcard()
-            !stringType.typeArguments["E"].isRawType()
-            !stringType.typeArguments["E"].isGenericPlaceholder()
+                assert stringType.typeArguments["E"].type.name == "java.lang.String"
+                assert !stringType.typeArguments["E"].isWildcard()
+                assert !stringType.typeArguments["E"].isRawType()
+                assert !stringType.typeArguments["E"].isGenericPlaceholder()
 
-            numberType.typeArguments["E"].type.name == "java.lang.Number"
-            numberType.typeArguments["E"].isWildcard()
-            ((WildcardElement) numberType.typeArguments["E"]).isBounded()
-            !numberType.typeArguments["E"].isRawType()
+                assert numberType.typeArguments["E"].type.name == "java.lang.Number"
+                assert numberType.typeArguments["E"].isWildcard()
+                assert ((WildcardElement) numberType.typeArguments["E"]).isBounded()
+                assert !numberType.typeArguments["E"].isRawType()
+            }
     }
 
     def 'distinguish base list type'() {
@@ -540,8 +537,8 @@ abstract class Base<T> {
     }
 
     def 'distinguish base list generic type'() {
-        given:
-            def classElement = buildClassElement("test.Test", """
+        expect:
+            buildClassElement("test.Test", """
 package test;
 
 import java.util.*;
@@ -557,38 +554,39 @@ abstract class Base<T> {
     var field4: List<T>? = null
 }
 
-""")
-            def rawType = classElement.fields[0].genericType
-            def wildcardType = classElement.fields[1].genericType
-            def objectType = classElement.fields[2].genericType
-            def genericType = classElement.fields[3].genericType
+""") { classElement ->
+                def rawType = classElement.fields[0].genericType
+                def wildcardType = classElement.fields[1].genericType
+                def objectType = classElement.fields[2].genericType
+                def genericType = classElement.fields[3].genericType
 
-        expect:
-            rawType.typeArguments["E"].type.name == "java.lang.Object"
-            rawType.typeArguments["E"].isRawType()
-            rawType.typeArguments["E"].isWildcard()
-            !rawType.typeArguments["E"].isGenericPlaceholder()
+                assert rawType.typeArguments["E"].type.name == "java.lang.Object"
+                assert rawType.typeArguments["E"].isRawType()
+                assert rawType.typeArguments["E"].isWildcard()
+                assert !rawType.typeArguments["E"].isGenericPlaceholder()
 
 //            wildcardType.typeArguments["E"].type.name == "java.lang.Object"
 //            wildcardType.typeArguments["E"].isWildcard()
 //            !((WildcardElement)wildcardType.typeArguments["E"]).isBounded()
 //            !wildcardType.typeArguments["E"].isRawType()
 
-            objectType.typeArguments["E"].type.name == "java.lang.Object"
-            !objectType.typeArguments["E"].isWildcard()
-            !objectType.typeArguments["E"].isRawType()
-            !objectType.typeArguments["E"].isGenericPlaceholder()
+                assert objectType.typeArguments["E"].type.name == "java.lang.Object"
+                assert !objectType.typeArguments["E"].isWildcard()
+                assert !objectType.typeArguments["E"].isRawType()
+                assert !objectType.typeArguments["E"].isGenericPlaceholder()
 
-            genericType.typeArguments["E"].type.name == "java.lang.String"
-            !genericType.typeArguments["E"].isWildcard()
-            !genericType.typeArguments["E"].isRawType()
-            genericType.typeArguments["E"].isGenericPlaceholder()
-            def resolved = (genericType.typeArguments["E"] as GenericPlaceholderElement).getResolved().get()
-            resolved.name == "java.lang.String"
-            !resolved.isWildcard()
-            !resolved.isRawType()
-            resolved.isGenericPlaceholder()
-            (resolved as GenericPlaceholderElement).declaringElement.get().name == "test.Base"
+                assert genericType.typeArguments["E"].type.name == "java.lang.String"
+                assert !genericType.typeArguments["E"].isWildcard()
+                assert !genericType.typeArguments["E"].isRawType()
+                assert genericType.typeArguments["E"].isGenericPlaceholder()
+
+                def resolved = (genericType.typeArguments["E"] as GenericPlaceholderElement).getResolved().get()
+                assert resolved.name == "java.lang.String"
+                assert !resolved.isWildcard()
+                assert !resolved.isRawType()
+                assert resolved.isGenericPlaceholder()
+                assert (resolved as GenericPlaceholderElement).declaringElement.get().name == "test.Base"
+            }
     }
 
     private void initializeAllTypeArguments(ClassElement type) {

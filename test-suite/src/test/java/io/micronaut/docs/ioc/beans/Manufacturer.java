@@ -16,7 +16,7 @@
 package io.micronaut.docs.ioc.beans;
 
 import io.micronaut.core.annotation.Introspected;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 @Introspected
 public class Manufacturer {

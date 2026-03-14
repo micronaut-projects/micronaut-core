@@ -17,14 +17,17 @@ package io.micronaut.context.condition;
 
 import io.micronaut.context.annotation.Requires.Family;
 import io.micronaut.context.env.CachedEnvironment;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Locale;
+import java.util.Objects;
 
 /**
  * Details of the current operating system.
  */
 public final class OperatingSystem {
 
+    @Nullable
     private static volatile OperatingSystem instance;
     private final Family family;
 
@@ -41,7 +44,7 @@ public final class OperatingSystem {
         if (instance == null) {
             synchronized (OperatingSystem.class) {
                 if (instance == null) {
-                    String osName = CachedEnvironment.getProperty("os.name").toLowerCase(Locale.ENGLISH);
+                    String osName = Objects.requireNonNull(CachedEnvironment.getProperty("os.name"), "unknown").toLowerCase(Locale.ENGLISH);
                     Family osFamily;
                     if (osName.contains("linux")) {
                         osFamily = Family.LINUX;

@@ -1,0 +1,94 @@
+For a typical web application, the low-level form API is unnecessary. Instead, you will _bind_ individual form fields to controller parameters of different types.
+
+When you bind at least one form field to a controller parameter, the framework will take over the FormCapableHttpRequest, making the body only available through controller argument binding.
+
+There are various buffered and streaming types you can bind form fields to.
+
+=== Standard Types
+
+The simplest binding is a `String`. The framework will wait for the form field to arrive, and then call your controller with the full value of the form field.
+
+snippet::io.micronaut.docs.server.form.FormController[tags="imports,class,String,endclass", title="String controller example"]
+
+It is also possible to bind to other simple types, such as `int` or `byte[]`.
+
+Note that if there are multiple form fields of the same name, only the first one is bound. Any later fields are discarded.
+
+=== CompletedFileUpload
+
+A api:io.micronaut.http.multipart.CompletedFileUpload[] is similar to a `byte[]` parameter, except that the upload can be buffered to disk instead of memory. This allows you to receive even large files without consuming a lot of memory. This behavior needs to be configured, though.
+
+[configuration]
+----
+micronaut:
+  server:
+    multipart:
+      mixed: true
+      # Default threshold to transfer data to disk is 10MB
+      threshold: 10MB
+----
+
+If you don't configure this value, the file will be kept in memory. The controller is called once the entire file has been uploaded.
+
+NOTE: The uploaded file is automatically deleted when the controller terminates, so if you want to keep it around, you need to move or copy it elsewhere beforehand. You can also call `CompletedFileUpload.moveResource()` to get a new `CompletedFileUpload` instance that sticks around after the controller lifetime.
+
+snippet::io.micronaut.docs.server.form.FormController[tags="imports,class,CompletedFileUpload,endclass", title="CompletedFileUpload controller example"]
+
+<1> `transferTo` may block, so we need to run this controller on an IO thread
+<2> Transfer the upload to the temp file. If this upload is already on disk (depending on configuration), this is a simple move operation. If the upload is still in memory, this will write the data to disk
+
+=== StreamingFileUpload
+
+A api:io.micronaut.http.multipart.StreamingFileUpload[] _lazily_ streams a form field. Your controller can be called before the full content is received. Similar to `RawFormField`, you must consume the input data so that the upload does not stall.
+
+The advantage of `StreamingFileUpload` over `CompletedFileUpload` is that you do not need any disk space, and that you can start streaming the data immediately to e.g. e.g. forward it to a backend service. If the backend is slow to receive the uploaded data, this backpressure will also apply to the browser upload, and that upload will slow down – there is no (significant) buffering in the Micronaut service, unlike with `CompletedFileUpload`.
+
+snippet::io.micronaut.docs.server.form.FormController[tags="imports,class,StreamingFileUpload,endclass", title="StreamingFileUpload controller example"]
+
+<1> Reading from the `InputStream` may block, so we need to run on the IO thread. `StreamingFileUpload` also provides methods for asynchronous operation
+<2> The `InputStream` must be closed properly, here we use a try-with-resources for that purpose
+<3> This is just an example, in real applications you should not read all bytes all at once
+
+Note that using `StreamingFileUpload` in combination with other form fields can be tricky. To run your controller, all "normal" form field parameters must have been received, but a `StreamingFileUpload` will pause the request until you consume it in your controller. If the normal parameters actually come _after_ the file upload in the request, this creates a "deadlock". The Micronaut HTTP server will produce an error in this scenario. One possible solution is to replace the "normal" form parameters with publisher-based parameters so that the controller can be executed before those fields are received.
+
+=== Publishers
+
+Publisher parameters let you handle various special scenarios, such as asynchronous binding or handling multiple form fields of the same name.
+
+==== … of completed parts
+
+A publisher of api:io.micronaut.http.multipart.CompletedPart[], api:io.micronaut.http.multipart.CompletedAttribute[] or api:io.micronaut.http.multipart.CompletedFileUpload[] contains the buffered content of the form field. The publisher can produce multiple items if there are multiple values for the same field name.
+
+Note that there is _no backpressure_ on this publisher. To avoid deadlocks with other parameters, the fields will be read in their entirety immediately, even if you haven't subscribed to the publisher yet. Configured form field count and size limits still apply.
+
+snippet::io.micronaut.docs.server.form.FormController[tags="imports,class,PublisherCompletedFileUpload,endclass", title="Publisher<CompletedFileUpload> controller example"]
+
+<1> If you expect multiple form fields of the same name, you can use `Flux` instead of `Mono` here
+
+==== … of StreamingFileUpload
+
+Similar to the `StreamingFileUpload` parameter described above, except that the controller can be called before the `StreamingFileUpload` is received, and that the publisher can contain multiple uploads of the same name.
+
+Once again, the `StreamingFileUpload` instances exert backpressure on the request, so you must consume them in their entirety before other fields can be processed.
+
+snippet::io.micronaut.docs.server.form.FormController[tags="imports,class,PublisherStreamingFileUpload,endclass", title="Publisher<StreamingFileUpload> controller example"]
+
+<1> Calls to `Files` are blocking operations and you should do them asynchronously. They are done synchronously here for simplicity
+
+==== … of Publisher
+
+A `Publisher<Publisher<…>>>` behaves similar to `Publisher<StreamingFileUpload>` as described above, allowing you to stream individual fields.
+
+snippet::io.micronaut.docs.server.form.FormController[tags="imports,class,PublisherPublisherBytes,endclass", title="Publisher<Publisher<byte[]>> controller example"]
+
+==== … of PartData
+
+A api:io.micronaut.http.multipart.PartData[] object represents a _piece_ of a form field, containing the field metadata and a piece of the field value buffered in memory. For large fields and file uploads, a single field may produce multiple `PartData` objects. If there are multiple fields of the same name, they will also produce multiple `PartData` instances.
+
+This publisher exerts backpressure as described for `StreamingFileUpload`.
+
+snippet::io.micronaut.docs.server.form.FormController[tags="imports,class,PublisherPartData,endclass", title="Publisher<PartData> controller example"]
+
+==== … of anything else
+
+A publisher of any other type will be created by taking a publisher of completed parts as described above, and converting the parts to the target type. For file uploads where a media type is given, this may include conversion from e.g. JSON.

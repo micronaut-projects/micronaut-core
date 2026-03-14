@@ -16,7 +16,7 @@
 package io.micronaut.http.server.netty.java;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.http.HttpParameters;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;

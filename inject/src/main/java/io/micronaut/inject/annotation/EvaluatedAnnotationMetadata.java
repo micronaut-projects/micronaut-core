@@ -23,8 +23,7 @@ import io.micronaut.context.expressions.DefaultExpressionEvaluationContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.BeanDefinition;
 
 import java.lang.annotation.Annotation;
@@ -53,7 +52,7 @@ public final class EvaluatedAnnotationMetadata extends MappingAnnotationMetadata
      * @return The evaluation context.
      * @since 4.1.0
      */
-    public @NonNull ConfigurableExpressionEvaluationContext getEvaluationContext() {
+    public ConfigurableExpressionEvaluationContext getEvaluationContext() {
         return evaluationContext;
     }
 
@@ -64,7 +63,7 @@ public final class EvaluatedAnnotationMetadata extends MappingAnnotationMetadata
      * @param args arguments passed to method
      * @return copy of annotation metadata
      */
-    public EvaluatedAnnotationMetadata withArguments(@Nullable Object thisObject, Object[] args) {
+    public EvaluatedAnnotationMetadata withArguments(@Nullable Object thisObject, @Nullable Object @Nullable [] args) {
         return new EvaluatedAnnotationMetadata(
             delegateAnnotationMetadata,
             evaluationContext.withArguments(thisObject, args)
@@ -81,9 +80,9 @@ public final class EvaluatedAnnotationMetadata extends MappingAnnotationMetadata
         evaluationContext = evaluationContext.withOwningBean(beanDefinition);
     }
 
-    public static AnnotationMetadata wrapIfNecessary(AnnotationMetadata targetMetadata) {
+    public static AnnotationMetadata wrapIfNecessary(@Nullable AnnotationMetadata targetMetadata) {
         if (targetMetadata == null) {
-            return null;
+            return AnnotationMetadata.EMPTY_METADATA;
         } else if (targetMetadata instanceof EvaluatedAnnotationMetadata) {
             return targetMetadata;
         } else if (targetMetadata.hasEvaluatedExpressions()) {

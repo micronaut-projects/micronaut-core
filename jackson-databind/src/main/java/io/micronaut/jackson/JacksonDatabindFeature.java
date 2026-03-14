@@ -15,11 +15,15 @@
  */
 package io.micronaut.jackson;
 
-import com.fasterxml.jackson.databind.PropertyNamingStrategies;
-import com.fasterxml.jackson.databind.PropertyNamingStrategy;
 import io.micronaut.core.annotation.Internal;
 import org.graalvm.nativeimage.hosted.Feature;
+import org.graalvm.nativeimage.hosted.RuntimeProxyCreation;
 import org.graalvm.nativeimage.hosted.RuntimeReflection;
+import tools.jackson.databind.PropertyNamingStrategies;
+import tools.jackson.databind.annotation.JsonAppend;
+import tools.jackson.databind.annotation.JsonDeserialize;
+import tools.jackson.databind.annotation.JsonPOJOBuilder;
+import tools.jackson.databind.annotation.JsonSerialize;
 
 import java.util.stream.Stream;
 
@@ -41,13 +45,25 @@ final class JacksonDatabindFeature implements Feature {
             PropertyNamingStrategies.UpperSnakeCaseStrategy.class,
             PropertyNamingStrategies.LowerCaseStrategy.class,
             PropertyNamingStrategies.KebabCaseStrategy.class,
-            PropertyNamingStrategies.LowerDotCaseStrategy.class,
-
-            PropertyNamingStrategy.UpperCamelCaseStrategy.class,
-            PropertyNamingStrategy.SnakeCaseStrategy.class,
-            PropertyNamingStrategy.LowerCaseStrategy.class,
-            PropertyNamingStrategy.KebabCaseStrategy.class,
-            PropertyNamingStrategy.LowerDotCaseStrategy.class
+            PropertyNamingStrategies.LowerDotCaseStrategy.class
         ).forEach(RuntimeReflection::registerForReflectiveInstantiation);
+
+        try {
+            RuntimeReflection.register(com.fasterxml.jackson.databind.annotation.JsonDeserialize.class);
+            RuntimeReflection.register(com.fasterxml.jackson.databind.annotation.JsonSerialize.class);
+            RuntimeReflection.register(com.fasterxml.jackson.databind.annotation.JsonSerialize.Typing.class);
+            RuntimeReflection.register(com.fasterxml.jackson.databind.annotation.JsonSerialize.Inclusion.class);
+            RuntimeReflection.register(com.fasterxml.jackson.databind.annotation.JsonAppend.class);
+            RuntimeReflection.register(com.fasterxml.jackson.databind.annotation.JsonAppend.Attr.class);
+            RuntimeReflection.register(com.fasterxml.jackson.databind.annotation.JsonAppend.Prop.class);
+            RuntimeReflection.register(com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder.class);
+            RuntimeProxyCreation.register(JsonDeserialize.class);
+            RuntimeProxyCreation.register(JsonSerialize.class);
+            RuntimeProxyCreation.register(JsonAppend.class);
+            RuntimeProxyCreation.register(JsonAppend.Attr.class);
+            RuntimeProxyCreation.register(JsonAppend.Prop.class);
+            RuntimeProxyCreation.register(JsonPOJOBuilder.class);
+        } catch (LinkageError ignored) {
+        }
     }
 }

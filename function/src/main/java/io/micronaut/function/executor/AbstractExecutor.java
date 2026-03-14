@@ -20,14 +20,14 @@ import io.micronaut.context.ApplicationContextBuilder;
 import io.micronaut.context.ApplicationContextProvider;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.function.LocalFunctionRegistry;
 import io.micronaut.inject.ExecutableMethod;
 import jakarta.annotation.PreDestroy;
 
 import java.io.Closeable;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -42,6 +42,7 @@ public class AbstractExecutor<C> implements ApplicationContextProvider, Closeabl
     /**
      * The current {@link ApplicationContext}.
      */
+    @Nullable
     protected ApplicationContext applicationContext;
 
     /**
@@ -51,7 +52,7 @@ public class AbstractExecutor<C> implements ApplicationContextProvider, Closeabl
      * @param functionName The function name
      * @return The method
      */
-    protected ExecutableMethod<Object, Object> resolveFunction(LocalFunctionRegistry localFunctionRegistry, String functionName) {
+    protected ExecutableMethod<Object, Object> resolveFunction(LocalFunctionRegistry localFunctionRegistry, @Nullable String functionName) {
         Optional<? extends ExecutableMethod<Object, Object>> registeredMethod;
         if (functionName == null) {
             registeredMethod = localFunctionRegistry.findFirst();
@@ -68,8 +69,9 @@ public class AbstractExecutor<C> implements ApplicationContextProvider, Closeabl
      * @param env The environment
      * @return The function name
      */
+    @Nullable
     protected String resolveFunctionName(Environment env) {
-        return env.getProperty(LocalFunctionRegistry.FUNCTION_NAME, String.class, (String) null);
+        return env.getProperty(LocalFunctionRegistry.FUNCTION_NAME, String.class).orElse(null);
     }
 
     /**
@@ -103,7 +105,7 @@ public class AbstractExecutor<C> implements ApplicationContextProvider, Closeabl
      *
      * @return The {@link ApplicationContextBuilder}
      */
-    protected @NonNull ApplicationContextBuilder newApplicationContextBuilder() {
+    protected ApplicationContextBuilder newApplicationContextBuilder() {
         return ApplicationContext.builder(Environment.FUNCTION);
     }
 
@@ -128,15 +130,17 @@ public class AbstractExecutor<C> implements ApplicationContextProvider, Closeabl
     }
 
     @Override
-    public @NonNull ApplicationContext getApplicationContext() {
-        return this.applicationContext;
+    public ApplicationContext getApplicationContext() {
+        return Objects.requireNonNull(applicationContext);
     }
 
     @Override
     @PreDestroy
     public void close() {
         try {
-            applicationContext.close();
+            if (applicationContext != null) {
+                applicationContext.close();
+            }
         } catch (Exception e) {
             // ignore
         }

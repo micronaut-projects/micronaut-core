@@ -17,7 +17,6 @@ package io.micronaut.http.body;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.Writable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ReferenceCounted;
@@ -31,6 +30,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.runtime.ApplicationConfiguration;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
@@ -87,17 +87,17 @@ public final class WritableBodyWriter implements TypedMessageBodyHandler<Writabl
     }
 
     @Override
-    public Publisher<? extends Writable> readChunked(Argument<Writable> type, MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
+    public Publisher<? extends Writable> readChunked(Argument<Writable> type, @Nullable MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
         return Flux.from(input).map(this::read0);
     }
 
     @Override
-    public Writable read(Argument<Writable> type, MediaType mediaType, Headers httpHeaders, ByteBuffer<?> byteBuffer) throws CodecException {
+    public Writable read(Argument<Writable> type, @Nullable MediaType mediaType, Headers httpHeaders, ByteBuffer<?> byteBuffer) throws CodecException {
         return read0(byteBuffer);
     }
 
     @Override
-    public Writable read(Argument<Writable> type, MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
+    public Writable read(Argument<Writable> type, @Nullable MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
         String s;
         try {
             s = new String(inputStream.readAllBytes(), applicationConfiguration.getDefaultCharset());
@@ -108,7 +108,7 @@ public final class WritableBodyWriter implements TypedMessageBodyHandler<Writabl
     }
 
     @Override
-    public @NonNull CloseableByteBody writePiece(@NonNull ByteBodyFactory bodyFactory, @NonNull HttpRequest<?> request, @NonNull HttpResponse<?> response, @NonNull Argument<Writable> type, @NonNull MediaType mediaType, Writable object) throws CodecException {
+    public CloseableByteBody writePiece(ByteBodyFactory bodyFactory, HttpRequest<?> request, HttpResponse<?> response, Argument<Writable> type, MediaType mediaType, Writable object) throws CodecException {
         try {
             return bodyFactory.buffer(o -> object.writeTo(o, MessageBodyWriter.getCharset(mediaType, response.getHeaders())));
         } catch (IOException e) {

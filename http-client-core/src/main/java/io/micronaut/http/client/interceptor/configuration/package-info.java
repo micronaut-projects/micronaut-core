@@ -19,4 +19,7 @@
  * @author Bogdan Oros
  * @since 1.1.0
  */
+@NullMarked
 package io.micronaut.http.client.interceptor.configuration;
+
+import org.jspecify.annotations.NullMarked;

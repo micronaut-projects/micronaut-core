@@ -16,8 +16,7 @@
 package io.micronaut.expressions.parser.ast.operator.binary;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
@@ -53,6 +52,7 @@ public final class ComparablesComparisonOperation extends ExpressionNode {
     private final ExpressionNode leftOperand;
     private final ExpressionNode rightOperand;
     private final ExpressionDef.ComparisonOperation.OpType type;
+    @Nullable
     private ComparisonType comparisonType;
 
     public ComparablesComparisonOperation(ExpressionNode leftOperand,
@@ -64,7 +64,7 @@ public final class ComparablesComparisonOperation extends ExpressionNode {
     }
 
     @Override
-    protected TypeDef doResolveType(@NonNull ExpressionVisitorContext ctx) {
+    protected TypeDef doResolveType(ExpressionVisitorContext ctx) {
         // resolving non-primitive class elements is necessary to handle cases
         // when one of expression nodes is of primitive type, but other expression node
         // is comparable to respective boxed type

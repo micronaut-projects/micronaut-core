@@ -1,6 +1,7 @@
 package io.micronaut.jackson.core.tree
 
-import com.fasterxml.jackson.core.JsonFactory
+import tools.jackson.core.ObjectReadContext
+import tools.jackson.core.json.JsonFactory
 import io.micronaut.json.JsonStreamConfig
 import io.micronaut.json.tree.JsonArray
 import io.micronaut.json.tree.JsonBoolean
@@ -15,11 +16,12 @@ class TraversalSpec extends Specification {
         given:
         def factory = new JsonFactory()
         def codec = JsonNodeTreeCodec.getInstance()
+        def readCtx = ObjectReadContext.empty()
 
         when:
         def stringWriter = new StringWriter()
         try (def generator = factory.createGenerator(stringWriter)) {
-            JsonStreamTransfer.transferNext(codec.treeAsTokens(node), generator, JsonStreamConfig.DEFAULT)
+            JsonStreamTransfer.transferNext(codec.treeAsTokens(node, readCtx), generator, JsonStreamConfig.DEFAULT)
         }
         def json = stringWriter.toString()
 

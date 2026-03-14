@@ -20,6 +20,7 @@ import io.micronaut.core.beans.BeanMap;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
+import org.jspecify.annotations.Nullable;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -214,7 +215,7 @@ final class UriTemplateExpander implements UriTemplateParser.PartVisitor {
         return '?';
     }
 
-    private String applyModifier(String value, String modifier) {
+    private String applyModifier(String value, @Nullable String modifier) {
         if (modifier == null) {
             return value;
         }

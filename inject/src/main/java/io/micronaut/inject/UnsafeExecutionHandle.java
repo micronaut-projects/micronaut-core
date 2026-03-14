@@ -16,6 +16,7 @@
 package io.micronaut.inject;
 
 import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A variation of {@link ExecutionHandle} that invokes without arguments validation.
@@ -34,6 +35,7 @@ public interface UnsafeExecutionHandle<T, R> extends ExecutionHandle<T, R> {
      * @param arguments The arguments
      * @return The result
      */
-    R invokeUnsafe(Object... arguments);
+    @Nullable
+    R invokeUnsafe(@Nullable Object... arguments);
 
 }

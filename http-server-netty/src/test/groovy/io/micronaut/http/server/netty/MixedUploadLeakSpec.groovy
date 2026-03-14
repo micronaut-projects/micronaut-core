@@ -77,7 +77,7 @@ class MixedUploadLeakSpec extends Specification {
             try {
                 return foo + " " + file.size
             } finally {
-                file.discard()
+                file.close()
             }
         }
     }

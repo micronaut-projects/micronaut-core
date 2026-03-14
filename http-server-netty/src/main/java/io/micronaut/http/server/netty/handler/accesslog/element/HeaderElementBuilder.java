@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.server.netty.handler.accesslog.element;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * Builder for Headerlement and HeadersElement.
  *
@@ -24,7 +26,8 @@ package io.micronaut.http.server.netty.handler.accesslog.element;
 public final class HeaderElementBuilder implements LogElementBuilder {
 
     @Override
-    public LogElement build(String token, String param) {
+    @Nullable
+    public LogElement build(String token, @Nullable String param) {
         if (HeaderElement.REQUEST_HEADER.equals(token)) {
             return param == null ? HeadersElement.forRequest() : new HeaderElement(true, param);
         } else if (HeaderElement.RESPONSE_HEADER.equals(token)) {

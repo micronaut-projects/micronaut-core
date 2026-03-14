@@ -16,6 +16,7 @@
 package io.micronaut.http.bind.binders;
 
 import io.micronaut.core.bind.annotation.AbstractArgumentBinder;
+import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
@@ -106,6 +107,20 @@ public class DefaultBodyAnnotationBinder<T> extends AbstractArgumentBinder<T> im
      */
     public BindingResult<T> bindFullBody(ArgumentConversionContext<T> context, HttpRequest<?> source) {
         Optional<?> body = source.getBody();
-        return body.isPresent() ? doConvert(body.get(), context) : BindingResult.empty();
+        if (body.isPresent()) {
+            return doConvert(body.get(), context);
+        }
+        return bindDefaultValue(context);
+    }
+
+    /**
+     * Try to bind the <i>defaultValue</i>, if any specified.
+     *
+     * @param context The conversion context
+     * @return The binding result
+     */
+    protected BindingResult<T> bindDefaultValue(ArgumentConversionContext<T> context) {
+        Optional<String> defaultValue = context.getAnnotationMetadata().stringValue(Bindable.class, "defaultValue");
+        return defaultValue.isPresent() ? doConvert(defaultValue.get(), context) : BindingResult.empty();
     }
 }

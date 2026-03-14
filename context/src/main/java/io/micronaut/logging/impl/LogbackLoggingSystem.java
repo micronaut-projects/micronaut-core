@@ -20,7 +20,7 @@ import ch.qos.logback.classic.LoggerContext;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.logging.LogLevel;
 import io.micronaut.logging.LoggingSystem;
 import jakarta.inject.Singleton;
@@ -82,6 +82,7 @@ public final class LogbackLoggingSystem implements LoggingSystem {
      * @param logLevel The micronaut {@link LogLevel} to convert
      * @return The converted logback {@link Level}
      */
+    @Nullable
     private static Level toLevel(LogLevel logLevel) {
         if (logLevel == LogLevel.NOT_SPECIFIED) {
             return null;

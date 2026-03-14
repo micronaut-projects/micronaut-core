@@ -14,9 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.context.env;
-
-import io.micronaut.core.annotation.NonNull;
-
 import java.util.List;
 
 /**
@@ -48,7 +45,6 @@ public interface EnvironmentPackagesDeducer {
      * @return a non-null list of strings representing the deduced package names. The list may
      *         be empty if no relevant packages are identified.
      */
-    @NonNull
     List<String> deducePackages();
 
 }

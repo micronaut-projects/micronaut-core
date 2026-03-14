@@ -26,6 +26,8 @@ import spock.lang.Issue
 import spock.lang.Specification
 import spock.util.environment.RestoreSystemProperties
 
+import java.nio.file.Files
+import java.nio.file.Path
 import java.util.function.Function
 
 /**
@@ -81,7 +83,6 @@ class DefaultEnvironmentSpec extends Specification {
         env.getProperty("test.foo", Map.class).get() == [bar: "10", baz: "20"]
     }
 
-    @RestoreSystemProperties
     void "test environment refresh and diff"() {
         given:
         System.setProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY, StringUtils.TRUE)
@@ -94,6 +95,42 @@ class DefaultEnvironmentSpec extends Specification {
 
         then:
         diff.isEmpty()
+
+        cleanup:
+        System.clearProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY)
+    }
+
+    void "test environment refresh and diff when bootstrap property changed"() {
+        given:
+        System.setProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY, StringUtils.TRUE)
+        System.setProperty(Environment.ENVIRONMENTS_PROPERTY, "ms")
+        Path tempConfigDir = Files.createTempDirectory("micronaut-data-config-")
+        Path tempConfigFile = tempConfigDir.resolve("bootstrap-ms.yml")
+        tempConfigFile.toFile().text = "prop-key: prop-value-1"
+
+        when:
+        ApplicationContext applicationContext = ApplicationContext.builder()
+                .overrideConfigLocations("file:" + tempConfigDir)
+                .build()
+                .start()
+
+        then:
+        applicationContext.getRequiredProperty("prop-key", String.class) == "prop-value-1"
+
+        when:
+        Files.deleteIfExists(tempConfigFile)
+        def diff = applicationContext.getEnvironment().refreshAndDiff()
+
+        then:
+        diff.get("prop-key") == "prop-value-1"
+        applicationContext.getProperty("prop-key", String.class).isEmpty()
+
+        cleanup:
+        if (tempConfigDir) {
+            Files.deleteIfExists(tempConfigDir)
+        }
+        System.clearProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY)
+        System.clearProperty(Environment.ENVIRONMENTS_PROPERTY)
     }
 
     void "test environment system property refresh"() {
@@ -135,6 +172,25 @@ class DefaultEnvironmentSpec extends Specification {
         !env.activeNames.contains("foo")
         !env.activeNames.contains("x")
         !env.containsProperty("foo")
+    }
+
+    void "test getting environment name from a system property in bootstrap context"() {
+        given:
+        System.setProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY, StringUtils.TRUE)
+        System.setProperty(Environment.ENVIRONMENTS_PROPERTY, "k8s")
+
+        when:
+        ApplicationContext applicationContext = ApplicationContext.builder()
+                .build()
+                .start()
+
+        then:
+        applicationContext.getRequiredProperty("test1", String.class) == "test2"
+
+        cleanup:
+        applicationContext.stop()
+        System.clearProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY)
+        System.clearProperty(Environment.ENVIRONMENTS_PROPERTY)
     }
 
     void "test system property source loader"() {
@@ -315,7 +371,6 @@ class DefaultEnvironmentSpec extends Specification {
         System.clearProperty("micronaut.config.files")
     }
 
-    @RestoreSystemProperties
     void "test invalid config file location"() {
         when: "loading properties sources from both system properties and environment variables"
         System.setProperty("micronaut.config.files", "/does/not/exist.yaml")
@@ -340,7 +395,6 @@ class DefaultEnvironmentSpec extends Specification {
         envNames == ["test", "cloud", "ec2", "foo", "bar", "baz", "x", "y"]
     }
 
-    @RestoreSystemProperties
     void "test environments supplied should be a higher priority than deduced and system property"() {
         when:
         def env = new DefaultEnvironment({ [] })
@@ -382,7 +436,6 @@ class DefaultEnvironmentSpec extends Specification {
     }
     // end::disableEnvDeduction[]
 
-    @RestoreSystemProperties
     void "test disable environment deduction via system property"() {
         when:
         System.setProperty(Environment.CLOUD_PLATFORM_PROPERTY, "GOOGLE_COMPUTE")
@@ -458,7 +511,6 @@ class DefaultEnvironmentSpec extends Specification {
         env.close()
     }
 
-    @RestoreSystemProperties
     void "test property source order"() {
         when:
         System.setProperty("micronaut.config.files", "classpath:config-files.yml,classpath:config-files2.yml")
@@ -530,7 +582,6 @@ class DefaultEnvironmentSpec extends Specification {
             applicationContext.stop()
     }
 
-    @RestoreSystemProperties
     void "test custom config locations used in bootstrap environment"() {
         given:
         System.setProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY, StringUtils.TRUE)
@@ -551,6 +602,7 @@ class DefaultEnvironmentSpec extends Specification {
 
         cleanup:
         applicationContext.stop()
+        System.clearProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY)
     }
 
     void "test custom config locations respect environment order"() {

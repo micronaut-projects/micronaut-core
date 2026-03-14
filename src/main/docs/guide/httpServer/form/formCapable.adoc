@@ -1,0 +1,15 @@
+The lowest-level form API in the Micronaut HTTP server is the api:io.micronaut.http.form.FormCapableHttpRequest[]. It provides a reactive Publisher of the form fields. This publisher can be subscribed to at most once. Each field is represented by a api:io.micronaut.http.multipart.RawFormField[] containing the field metadata and field body as a api:io.micronaut.http.body.ByteBody[].
+
+=== Field Metadata
+
+The most important information in the field metadata is the field name. This corresponds to the `name` attribute on a form `input` element.
+
+File uploads contain additional metadata: The file name, and optionally, the file content type.
+
+Note that there is no restriction on this metadata. Multiple fields may have the same name (browsers will do this when uploading multiple files), and any of the metadata fields may be missing entirely.
+
+=== Field Body
+
+The field body is represented by a api:io.micronaut.http.body.ByteBody[], which is an asynchronous, streaming API. Large form fields may be processed lazily: As long as you do not consume the data from the `ByteBody`, the form data will not be read from the client, and e.g. an upload may stall. You will also not see any other fields on the main publisher, since they can only be received once all data for the current form field has arrived.
+
+For short form fields, the `ByteBody` may be fully buffered internally, but you should not rely on this.

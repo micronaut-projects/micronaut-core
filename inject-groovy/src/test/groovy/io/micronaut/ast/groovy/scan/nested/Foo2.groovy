@@ -15,12 +15,12 @@
  */
 package io.micronaut.ast.groovy.scan.nested
 
-import groovy.transform.AutoClone
 
+import groovy.transform.KnownImmutable
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
-@AutoClone
+@KnownImmutable
 class Foo2 {
 }

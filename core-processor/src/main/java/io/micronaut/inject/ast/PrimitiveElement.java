@@ -14,10 +14,8 @@
  * limitations under the License.
  */
 package io.micronaut.inject.ast;
-
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -61,7 +59,7 @@ public final class PrimitiveElement implements ArrayableClassElement {
      * @param annotationMetadata The annotation metadata
      * @param doc                The optional documentation
      */
-    private PrimitiveElement(String name, String boxedTypeName, int arrayDimensions, AnnotationMetadata annotationMetadata, String doc) {
+    private PrimitiveElement(String name, String boxedTypeName, int arrayDimensions, AnnotationMetadata annotationMetadata, @Nullable String doc) {
         this.typeName = name;
         this.arrayDimensions = arrayDimensions;
         this.boxedTypeName = boxedTypeName;
@@ -70,7 +68,7 @@ public final class PrimitiveElement implements ArrayableClassElement {
     }
 
     @Override
-    public Optional<String> getDocumentation() {
+    public Optional<String> getDocumentation(boolean parse) {
         return Optional.ofNullable(doc);
     }
 
@@ -103,7 +101,6 @@ public final class PrimitiveElement implements ArrayableClassElement {
     }
 
     @Override
-    @NonNull
     public String getName() {
         return typeName;
     }
@@ -118,7 +115,6 @@ public final class PrimitiveElement implements ArrayableClassElement {
         return true;
     }
 
-    @NonNull
     @Override
     public Object getNativeType() {
         throw new UnsupportedOperationException("There is no native types for primitives");
@@ -168,7 +164,7 @@ public final class PrimitiveElement implements ArrayableClassElement {
         return valueOf(name, null);
     }
 
-    public static PrimitiveElement valueOf(String name, String doc) {
+    public static PrimitiveElement valueOf(String name, @Nullable String doc) {
         for (PrimitiveElement element: PRIMITIVES) {
             if (element.getName().equalsIgnoreCase(name)) {
                 if (doc != null) {
