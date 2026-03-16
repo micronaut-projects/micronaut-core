@@ -20,7 +20,6 @@ import io.micronaut.context.event.BeanCreatedEvent;
 import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.propagation.PropagatedContext;
-import io.micronaut.scheduling.instrument.InstrumentedExecutorService;
 
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
