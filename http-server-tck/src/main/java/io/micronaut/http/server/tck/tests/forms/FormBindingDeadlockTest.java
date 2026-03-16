@@ -90,7 +90,9 @@ public class FormBindingDeadlockTest {
                     .assertResponse(httpResponse -> {
                         Optional<String> bodyOptional = httpResponse.getBody(String.class);
                         assertTrue(bodyOptional.isPresent());
-                        assertTrue(bodyOptional.get().contains(HALF_ASYNC_FAIL_MESSAGE), "error response should contain the deadlock message");
+                        String normalizedBody = bodyOptional.get().replace("\\n", "").replace("\n", "");
+                        String normalizedMessage = HALF_ASYNC_FAIL_MESSAGE.replace("\n", "");
+                        assertTrue(normalizedBody.contains(normalizedMessage), "error response should contain the deadlock message");
                     })
                     .build()))
             .run();
