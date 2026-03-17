@@ -22,15 +22,18 @@ import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpMethod;
-import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
+import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.context.ServerHttpRequestContext;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.netty.NettyHttpHeaders;
+import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
 import io.micronaut.http.server.RequestLifecycle;
@@ -56,6 +59,7 @@ import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
+import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpHeaders;
@@ -137,7 +141,37 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
     @Override
     public void accept(ChannelHandlerContext ctx, io.netty.handler.codec.http.HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
         if (isWebSocketUpgrade(request)) {
-            NettyHttpRequest<?> msg = new NettyHttpRequest<>(request, body, ctx, conversionService, serverConfiguration);
+            final NettyHttpRequest<?> msg;
+            try {
+                msg = new NettyHttpRequest<>(request, body, ctx, conversionService, serverConfiguration);
+            } catch (IllegalArgumentException e) {
+                body.close();
+
+                NettyHttpRequest<Object> errorRequest = new NettyHttpRequest<>(
+                    new DefaultHttpRequest(request.protocolVersion(), request.method(), "/"),
+                    NettyByteBodyFactory.empty(),
+                    ctx,
+                    conversionService,
+                    serverConfiguration
+                );
+                outboundAccess.attachment(errorRequest);
+                outboundAccess.closeAfterWrite();
+                try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(errorRequest)).propagate()) {
+                    Throwable cause = e.getCause() == null ? e : e.getCause();
+                    MutableHttpResponse<?> response = routeExecutor.getErrorResponseProcessor().processResponse(
+                        ErrorContext.builder(errorRequest)
+                            .cause(cause)
+                            .errorMessage("Malformed URI")
+                            .build(),
+                        io.micronaut.http.HttpResponse.badRequest()
+                    );
+                    if (response.getContentType().isEmpty() && errorRequest.getMethod() != HttpMethod.HEAD) {
+                        response.contentType(MediaType.APPLICATION_JSON_TYPE);
+                    }
+                    Objects.requireNonNull(next).writeResponse(outboundAccess, errorRequest, response, null);
+                }
+                return;
+            }
 
             Optional<UriRouteMatch<Object, Object>> optionalRoute = router.find(HttpMethod.GET, msg.getPath(), msg)
                 .filter(rm -> rm.isAnnotationPresent(OnMessage.class) || rm.isAnnotationPresent(OnOpen.class))
