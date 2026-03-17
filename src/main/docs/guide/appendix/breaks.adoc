@@ -36,6 +36,14 @@ Check https://groovy-lang.org/releasenotes/groovy-5.0.html#Groovy5.0-breaking[Gr
 
 The Micronaut APIs use <<jspecify, JSpecify Annotations>>, and we recommend users to embrace JSpecify nullability annotations.
 
+==== Invalid `deep-object` query members now fail conversion instead of binding as absent
+
+When binding `@QueryValue @Format("deep-object")` objects, Micronaut now treats a provided but invalid nested value as a conversion error.
+
+For example, if a request contains `filter[id]=blah` and `id` is declared as `UUID`, Micronaut now returns a conversion error instead of binding `id` as `null` and proceeding as though the field had been omitted.
+
+This change preserves the distinction between missing optional query fields and malformed provided values.
+
 ==== Bean context changes
 
 The default implementations of api:context.BeanContext[BeanContext], api:context.ApplicationContext[ApplicationContext] and api:context.env.Environment[Environment] are no longer public and non-final.

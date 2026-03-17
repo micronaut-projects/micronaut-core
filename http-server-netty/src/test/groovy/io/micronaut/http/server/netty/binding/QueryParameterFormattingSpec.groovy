@@ -6,15 +6,19 @@ import io.micronaut.core.convert.format.Format
 import io.micronaut.http.HttpMethod
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
+import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.QueryValue
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.netty.AbstractMicronautSpec
+import jakarta.annotation.Nullable
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import spock.lang.Unroll
+
+import java.util.UUID
 
 public class QueryParameterFormattingSpec extends AbstractMicronautSpec {
     private static String PIPE = "%7C";
@@ -68,6 +72,18 @@ public class QueryParameterFormattingSpec extends AbstractMicronautSpec {
         Flux.from(exchange).blockFirst()
         then:
         var e = thrown(HttpClientResponseException)
+    }
+
+    void "test deep-object object conversion error returns bad request"() {
+        when:
+        HttpRequest<?> req = HttpRequest.create(HttpMethod.GET, '/formatted/o/deep-error?filter[id]=blah')
+        Publisher<HttpResponse<?>> exchange = httpClient.exchange(req, String)
+        Flux.from(exchange).blockFirst()
+
+        then:
+        def e = thrown(HttpClientResponseException)
+        e.response.status == HttpStatus.BAD_REQUEST
+        e.response.getBody(String).orElse('').contains('Failed to convert argument [filter]')
     }
 
     @Requires(property = 'spec.name', value = 'QueryParameterFormattingSpec')
@@ -146,6 +162,20 @@ public class QueryParameterFormattingSpec extends AbstractMicronautSpec {
         @Get("o/deep")
         String deepObject(@QueryValue("v") @Format("DEEP_OBJECT") Dog param) {
             return param.inspect()
+        }
+
+        @Get("o/deep-error")
+        String deepObjectError(@QueryValue("filter") @Format("DEEP_OBJECT") RequestFilter filter) {
+            return String.valueOf(filter.id)
+        }
+    }
+
+    @Introspected
+    static class RequestFilter {
+        final UUID id
+
+        RequestFilter(@Nullable UUID id) {
+            this.id = id
         }
     }
 
