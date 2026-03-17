@@ -118,8 +118,8 @@ class ThreadSelectionSpec extends Specification {
 
         where:
         strategy                 | controller                              | handler                              | scheduledHandler
-        ThreadSelection.AUTO     | "controller: ${jdkSwitch(IO, VIRTUAL)}" | "handler: ${jdkSwitch(IO, VIRTUAL)}" | "handler: ${jdkSwitch(IO, VIRTUAL)}"
-        ThreadSelection.BLOCKING | "controller: ${jdkSwitch(IO, VIRTUAL)}" | "handler: ${jdkSwitch(IO, VIRTUAL)}" | "handler: ${jdkSwitch(IO, VIRTUAL)}"
+        ThreadSelection.AUTO     | "controller: ${jdkSwitch(IO, VIRTUAL)}" | "handler: ${jdkSwitch(IO, VIRTUAL)}" | "handler: $IO"
+        ThreadSelection.BLOCKING | "controller: ${jdkSwitch(IO, VIRTUAL)}" | "handler: ${jdkSwitch(IO, VIRTUAL)}" | "handler: $IO"
         ThreadSelection.IO       | "controller: $IO"                       | "handler: $IO"                       | "handler: $IO"
         ThreadSelection.MANUAL   | "controller: $LOOP"                     | "handler: $LOOP"                     | "handler: $IO"
     }
@@ -174,7 +174,7 @@ class ThreadSelectionSpec extends Specification {
 
         where:
         strategy                 | listenerThread          | controllerThread
-        ThreadSelection.AUTO     | jdkSwitch(IO, VIRTUAL) | jdkSwitch(IO, VIRTUAL)
+        ThreadSelection.AUTO     | LOOP                   | jdkSwitch(IO, VIRTUAL)
         ThreadSelection.BLOCKING | jdkSwitch(IO, VIRTUAL) | jdkSwitch(IO, VIRTUAL)
         ThreadSelection.IO       | IO                     | IO
         ThreadSelection.MANUAL   | LOOP                   | LOOP
@@ -200,7 +200,7 @@ class ThreadSelectionSpec extends Specification {
 
         where:
         strategy                 | listenerThread
-        ThreadSelection.AUTO     | jdkSwitch(IO, VIRTUAL)
+        ThreadSelection.AUTO     | LOOP
         ThreadSelection.BLOCKING | jdkSwitch(IO, VIRTUAL)
         ThreadSelection.IO       | IO
         ThreadSelection.MANUAL   | LOOP
