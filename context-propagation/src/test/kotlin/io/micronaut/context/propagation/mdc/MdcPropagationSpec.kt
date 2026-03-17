@@ -35,8 +35,19 @@ import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import java.net.URI
 import java.util.*
+import org.junit.jupiter.api.Assertions.assertEquals
 
 class MdcPropagationSpec {
+
+    @Test
+    fun constructorSnapshotsProvidedState() {
+        val state = mutableMapOf(TRACKING_ID to "initial")
+        val context = MdcPropagationContext(state)
+
+        state[TRACKING_ID] = "updated"
+
+        assertEquals("initial", context.state()[TRACKING_ID])
+    }
 
     @Test
     fun testKotlinPropagation() {

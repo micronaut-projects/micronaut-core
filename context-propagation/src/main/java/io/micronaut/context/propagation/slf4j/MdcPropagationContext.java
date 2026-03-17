@@ -32,13 +32,17 @@ import java.util.Map;
 @Experimental
 public record MdcPropagationContext(Map<String, String> state) implements ThreadPropagatedContextElement<Map<String, String>> {
 
+    public MdcPropagationContext {
+        state = snapshot(state);
+    }
+
     public MdcPropagationContext() {
         this(MDC.getCopyOfContextMap());
     }
 
     @Override
-    public Map<String, String> updateThreadContext() {
-        Map<String, String> oldState = MDC.getCopyOfContextMap();
+    public @Nullable Map<String, String> updateThreadContext() {
+        Map<String, String> oldState = snapshot(MDC.getCopyOfContextMap());
         setCurrent(state);
         return oldState;
     }
@@ -54,5 +58,9 @@ public record MdcPropagationContext(Map<String, String> state) implements Thread
         } else {
             MDC.setContextMap(contextMap);
         }
+    }
+
+    private static @Nullable Map<String, String> snapshot(@Nullable Map<String, String> contextMap) {
+        return contextMap == null ? null : Map.copyOf(contextMap);
     }
 }
