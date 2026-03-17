@@ -18,6 +18,7 @@ package io.micronaut.inject.qualifiers;
 import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanType;
+import io.micronaut.inject.QualifiedBeanType;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -50,7 +51,32 @@ public abstract class FilteringQualifier<T> implements Qualifier<T> {
     }
 
     @Override
+    public boolean doesQualifyQualified(Class<T> beanType, Collection<? extends QualifiedBeanType<T>> candidates) {
+        for (QualifiedBeanType<T> candidate : candidates) {
+            if (doesQualify(beanType, candidate)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
     public <BT extends BeanType<T>> Collection<BT> filter(Class<T> beanType, Collection<BT> candidates) {
+        int size = candidates.size();
+        if (size == 1) {
+            return doesQualify(beanType, candidates.iterator().next()) ? candidates : Collections.emptyList();
+        }
+        Collection<BT> result = new ArrayList<>(size);
+        for (BT candidate : candidates) {
+            if (doesQualify(beanType, candidate)) {
+                result.add(candidate);
+            }
+        }
+        return result;
+    }
+
+    @Override
+    public <BT extends QualifiedBeanType<T>> Collection<BT> filterQualified(Class<T> beanType, Collection<BT> candidates) {
         int size = candidates.size();
         if (size == 1) {
             return doesQualify(beanType, candidates.iterator().next()) ? candidates : Collections.emptyList();

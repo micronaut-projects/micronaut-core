@@ -66,6 +66,10 @@ class Http3Spec extends Specification {
         def resp = client.toBlocking().exchange("/h3/stream", String)
         then:
         resp.body() == '["foo","bar"]'
+
+        cleanup:
+        server.close()
+        ctx.close()
     }
 
     @Controller

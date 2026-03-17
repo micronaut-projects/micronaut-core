@@ -19,5 +19,8 @@
  * @author Graeme Rocher
  * @since 1.0
  */
+@NullMarked
 
 package io.micronaut.function;
+
+import org.jspecify.annotations.NullMarked;

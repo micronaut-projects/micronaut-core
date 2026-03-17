@@ -1,10 +1,12 @@
 package io.micronaut.docs.ioc.builders;
 
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.ReflectiveAccess;
 
 import java.util.Objects;
 
 // tag::class[]
+@ReflectiveAccess
 @Introspected(builder = @Introspected.IntrospectionBuilder(
     builderClass = Person.Builder.class
 ))

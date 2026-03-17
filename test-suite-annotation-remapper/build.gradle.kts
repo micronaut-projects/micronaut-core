@@ -10,15 +10,19 @@ tasks.withType<Test>().configureEach {
 }
 
 dependencies {
+    testAnnotationProcessor(projects.micronautGraal)
     testAnnotationProcessor(projects.testSuiteAnnotationRemapperVisitor)
     testAnnotationProcessor(projects.micronautInjectJava)
+    testAnnotationProcessor(projects.micronautGraal)
     testImplementation(projects.micronautHttpServerNetty)
-    implementation(projects.micronautJacksonDatabind)
+    testImplementation(projects.micronautJacksonDatabind)
     testImplementation(projects.micronautHttpClient)
     testImplementation(libs.logback.classic)
     testImplementation(libs.micronaut.test.junit5) {
         exclude(group = "io.micronaut")
     }
+    testRuntimeOnly(libs.junit.jupiter.engine)
+    testRuntimeOnly(libs.junit.platform.launcher)
 }
 
 graalvmNative {
@@ -28,6 +32,12 @@ graalvmNative {
     }
     binaries {
         configureEach {
+            if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_21)) {
+                buildArgs.add("--initialize-at-build-time=org.junit.platform.commons.logging.LoggerFactory\$DelegatingLogger")
+                buildArgs.add("--initialize-at-build-time=org.junit.platform.suite.engine.IsSuiteClass")
+                buildArgs.add("--initialize-at-build-time=org.junit.platform.suite.engine.IsPotentialTestContainer")
+                buildArgs.add("-H:+SharedArenaSupport")
+            }
             resources.autodetect()
         }
     }

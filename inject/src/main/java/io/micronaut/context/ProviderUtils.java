@@ -14,9 +14,8 @@
  * limitations under the License.
  */
 package io.micronaut.context;
-
-import io.micronaut.core.annotation.NonNull;
 import jakarta.inject.Provider;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Helper methods for dealing with {@link jakarta.inject.Provider}.
@@ -47,11 +46,12 @@ public class ProviderUtils {
      */
     private static final class MemoizingProvider<T> implements Provider<T> {
 
+        @Nullable
         private Provider<T> actual;
         private Provider<T> delegate = this::initialize;
         private boolean initialized;
 
-        MemoizingProvider(@NonNull Provider<T> actual) {
+        MemoizingProvider(Provider<T> actual) {
             this.actual = actual;
         }
 
@@ -61,7 +61,7 @@ public class ProviderUtils {
         }
 
         private synchronized T initialize() {
-            if (!initialized) {
+            if (!initialized && actual != null) {
                 T value = actual.get();
                 delegate = () -> value;
                 initialized = true;

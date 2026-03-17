@@ -21,6 +21,7 @@ import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequestFactory;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.uri.UriTemplate;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Map;
 
@@ -65,7 +66,7 @@ public class NettyClientHttpRequestFactory implements HttpRequestFactory {
     }
 
     @Override
-    public <T> MutableHttpRequest<T> delete(String uri, T body) {
+    public <T> MutableHttpRequest<T> delete(String uri, @Nullable T body) {
         return buildRequest(uri, body, HttpMethod.DELETE);
     }
 
@@ -80,7 +81,7 @@ public class NettyClientHttpRequestFactory implements HttpRequestFactory {
     }
 
     @SuppressWarnings("unchecked")
-    private <T> MutableHttpRequest<T> buildRequest(String uri, T body, HttpMethod method) {
+    private <T> MutableHttpRequest<T> buildRequest(String uri, @Nullable T body, HttpMethod method) {
         if (uri.indexOf('{') > -1 && body != null) {
             if (body instanceof Map) {
                 uri = UriTemplate.of(uri).expand((Map<String, Object>) body);

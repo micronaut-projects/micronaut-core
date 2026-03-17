@@ -14,12 +14,11 @@
  * limitations under the License.
  */
 package io.micronaut.inject.ast;
-
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * A {@link ClassElement} of primitive types.
@@ -41,13 +40,15 @@ public final class PrimitiveElement implements ArrayableClassElement {
     private final int arrayDimensions;
     private final String boxedTypeName;
     private final AnnotationMetadata annotationMetadata;
+    @Nullable
+    private final String doc;
 
     /**
      * Default constructor.
      * @param name The type name
      */
     private PrimitiveElement(String name, @Nullable Class<?> boxedType) {
-        this(name, boxedType == null ? "<>" : boxedType.getName(), 0, AnnotationMetadata.EMPTY_METADATA);
+        this(name, boxedType == null ? "<>" : boxedType.getName(), 0, AnnotationMetadata.EMPTY_METADATA, null);
     }
 
     /**
@@ -56,12 +57,19 @@ public final class PrimitiveElement implements ArrayableClassElement {
      * @param name               The type name
      * @param arrayDimensions    The number of array dimensions
      * @param annotationMetadata The annotation metadata
+     * @param doc                The optional documentation
      */
-    private PrimitiveElement(String name, String boxedTypeName, int arrayDimensions, AnnotationMetadata annotationMetadata) {
+    private PrimitiveElement(String name, String boxedTypeName, int arrayDimensions, AnnotationMetadata annotationMetadata, @Nullable String doc) {
         this.typeName = name;
         this.arrayDimensions = arrayDimensions;
         this.boxedTypeName = boxedTypeName;
         this.annotationMetadata = annotationMetadata;
+        this.doc = doc;
+    }
+
+    @Override
+    public Optional<String> getDocumentation(boolean parse) {
+        return Optional.ofNullable(doc);
     }
 
     @Override
@@ -93,7 +101,6 @@ public final class PrimitiveElement implements ArrayableClassElement {
     }
 
     @Override
-    @NonNull
     public String getName() {
         return typeName;
     }
@@ -108,7 +115,6 @@ public final class PrimitiveElement implements ArrayableClassElement {
         return true;
     }
 
-    @NonNull
     @Override
     public Object getNativeType() {
         throw new UnsupportedOperationException("There is no native types for primitives");
@@ -120,13 +126,17 @@ public final class PrimitiveElement implements ArrayableClassElement {
     }
 
     @Override
-    public ClassElement withArrayDimensions(int arrayDimensions) {
-        return new PrimitiveElement(typeName, boxedTypeName, arrayDimensions, annotationMetadata);
+    public PrimitiveElement withArrayDimensions(int arrayDimensions) {
+        return new PrimitiveElement(typeName, boxedTypeName, arrayDimensions, annotationMetadata, doc);
     }
 
     @Override
-    public ClassElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
-        return new PrimitiveElement(typeName, boxedTypeName, arrayDimensions, annotationMetadata);
+    public PrimitiveElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
+        return new PrimitiveElement(typeName, boxedTypeName, arrayDimensions, annotationMetadata, doc);
+    }
+
+    private PrimitiveElement withDoc(String doc) {
+        return new PrimitiveElement(typeName, boxedTypeName, arrayDimensions, annotationMetadata, doc);
     }
 
     @Override
@@ -151,8 +161,15 @@ public final class PrimitiveElement implements ArrayableClassElement {
     }
 
     public static PrimitiveElement valueOf(String name) {
+        return valueOf(name, null);
+    }
+
+    public static PrimitiveElement valueOf(String name, @Nullable String doc) {
         for (PrimitiveElement element: PRIMITIVES) {
             if (element.getName().equalsIgnoreCase(name)) {
+                if (doc != null) {
+                    return element.withDoc(doc);
+                }
                 return element;
             }
         }

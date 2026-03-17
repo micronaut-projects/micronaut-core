@@ -18,6 +18,8 @@ package io.micronaut.core.convert.exceptions;
 import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.type.Argument;
 
+import java.util.Objects;
+
 /**
  * An exception thrown in the case of a {@link io.micronaut.core.convert.ConversionError}.
  *
@@ -47,6 +49,11 @@ public class ConversionErrorException extends RuntimeException {
         super(cause.getMessage(), cause);
         this.argument = argument;
         this.conversionError = () -> cause;
+    }
+
+    @Override
+    public String getMessage() {
+        return Objects.requireNonNull(super.getMessage(), "Conversion error");
     }
 
     /**

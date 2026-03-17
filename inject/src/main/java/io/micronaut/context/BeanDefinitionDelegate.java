@@ -21,8 +21,7 @@ import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.env.ConfigurationPath;
 import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.naming.NameResolver;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ObjectUtils;
@@ -66,13 +65,19 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
 
     private final Map<String, List<Argument<?>>> typeArgumentsMap;
 
-    private BeanDefinitionDelegate(BeanDefinition<T> definition, @Nullable Qualifier<T> qualifier,
+    private BeanDefinitionDelegate(BeanDefinition<T> definition,
+                                   @Nullable Qualifier<T> qualifier,
                                    @Nullable ConfigurationPath configurationPath,
-                                   @NonNull Map<String, List<Argument<?>>> typeArgumentsMap) {
+                                   Map<String, List<Argument<?>>> typeArgumentsMap) {
         this.definition = definition;
         this.qualifier = qualifier;
         this.configurationPath = configurationPath;
         this.typeArgumentsMap = typeArgumentsMap;
+    }
+
+    @Override
+    public int getOrder() {
+        return definition.getOrder();
     }
 
     public Optional<ConfigurationPath> getConfigurationPath() {
@@ -86,6 +91,7 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
     }
 
     @Override
+    @Nullable
     public Qualifier<T> getDeclaredQualifier() {
         return qualifier;
     }
@@ -126,7 +132,7 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
         return isQualifiedAsPrimary(qualifier) || definition.isPrimary() || isPrimaryThroughAttribute();
     }
 
-    private boolean isQualifiedAsPrimary(Qualifier<?> q) {
+    private boolean isQualifiedAsPrimary(@Nullable Qualifier<?> q) {
         return q != null && (q == PrimaryQualifier.INSTANCE || q.contains(PrimaryQualifier.INSTANCE));
     }
 
@@ -176,7 +182,7 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
         try {
             if (this.definition instanceof ParametrizedInstantiatableBeanDefinition<T> parametrizedInstantiatableBeanDefinition) {
                 Argument<Object>[] requiredArguments = parametrizedInstantiatableBeanDefinition.getRequiredArguments();
-                Map<String, Object> fulfilled = getParametersValues(resolutionContext, (DefaultBeanContext) context, definition, requiredArguments);
+                Map<String, Object> fulfilled = getParametersValues(resolutionContext, definition, requiredArguments);
                 return parametrizedInstantiatableBeanDefinition.instantiate(resolutionContext, context, fulfilled);
             }
             if (this.definition instanceof InstantiatableBeanDefinition<T> instantiatableBeanDefinition) {
@@ -188,9 +194,7 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
         }
     }
 
-    @Nullable
     private Map<String, Object> getParametersValues(BeanResolutionContext resolutionContext,
-                                                    DefaultBeanContext context,
                                                     BeanDefinition<T> definition,
                                                     Argument<Object>[] requiredArguments) {
         if (requiredArguments.length == 0) {
@@ -206,17 +210,17 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
                 if (CharSequence.class.isAssignableFrom(type) || isEnum) {
                     String simpleName = configurationPath.simpleName();
                     if (simpleName != null) {
-                        Object value = isEnum ? context.getConversionService().convertRequired(simpleName, type) : simpleName;
+                        Object value = isEnum ? resolutionContext.getConversionService().convertRequired(simpleName, type) : simpleName;
                         fulfilled.put(argumentName, value);
                     } else {
                         String name = findName(resolutionContext.getCurrentQualifier());
                         if (name != null) {
-                            Object value = isEnum ? context.getConversionService().convertRequired(name, type) : name;
+                            Object value = isEnum ? resolutionContext.getConversionService().convertRequired(name, type) : name;
                             fulfilled.put(argumentName, value);
                         }
                     }
                 } else if (Number.class.isAssignableFrom(type)) {
-                    fulfilled.put(argumentName, context.getConversionService().convertRequired(configurationPath.index(), argument));
+                    fulfilled.put(argumentName, resolutionContext.getConversionService().convertRequired(configurationPath.index(), argument));
                 } else if (qualifier != null && hasDeclaredAnnotation(EachBean.class) && String.class.equals(type) && "name".equals(argumentName)) {
                     String name = findName(qualifier);
                     if (name != null) {
@@ -232,13 +236,13 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
 
                     try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushConstructorResolve(definition, argument)) {
                         if (type.equals(configurationPath.configurationType())) {
-                            Object bean = context.findBean(resolutionContext, argument, configurationPath.beanQualifier()).orElse(null);
+                            Object bean = resolutionContext.findBean(argument, configurationPath.beanQualifier()).orElse(null);
                             fulfilled.put(argumentName, bean);
                         } else {
                             ConfigurationPath old = resolutionContext.setConfigurationPath(null);// reset
                             try {
                                 Qualifier<Object> q = qualifier != null ? (Qualifier<Object>) qualifier : configurationPath.beanQualifier();
-                                Object bean = context.findBean(resolutionContext, argument, q).orElse(null);
+                                Object bean = resolutionContext.findBean(argument, q).orElse(null);
                                 fulfilled.put(argumentName, bean);
                             } finally {
                                 resolutionContext.setConfigurationPath(old);
@@ -317,7 +321,7 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
      * @param <T>        The type
      * @return The new bean definition
      */
-    static <T> BeanDefinitionDelegate<T> create(BeanDefinition<T> definition, Qualifier<T> qualifier) {
+    static <T> BeanDefinitionDelegate<T> create(BeanDefinition<T> definition, @Nullable Qualifier<T> qualifier) {
         return create(definition, qualifier, null, Map.of());
     }
 
@@ -330,8 +334,9 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
      * @since 4.6
      */
     static <T> BeanDefinitionDelegate<T> create(BeanDefinition<T> definition,
+                                                @Nullable
                                                 Qualifier<T> qualifier,
-                                                @NonNull Map<String, List<Argument<?>>> typeArgumentsMap) {
+                                                Map<String, List<Argument<?>>> typeArgumentsMap) {
         return create(definition, qualifier, null, typeArgumentsMap);
     }
 
@@ -344,9 +349,11 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
      * @return The new bean definition
      */
     static <T> BeanDefinitionDelegate<T> create(BeanDefinition<T> definition,
+                                                @Nullable
                                                 Qualifier<T> qualifier,
+                                                @Nullable
                                                 ConfigurationPath path,
-                                                @NonNull Map<String, List<Argument<?>>> typeArgumentsMap) {
+                                                Map<String, List<Argument<?>>> typeArgumentsMap) {
         if (definition instanceof InitializingBeanDefinition || definition instanceof DisposableBeanDefinition) {
             if (definition instanceof ValidatedBeanDefinition) {
                 return new LifeCycleValidatingDelegate<>(definition, qualifier, path, typeArgumentsMap);
@@ -361,8 +368,8 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
 
     /**
      * @param definition The bean definition type
-     * @param qualifier The bean qualifier
-     * @param path The configuration path.
+     * @param qualifier  The bean qualifier
+     * @param path       The configuration path.
      * @param <T>        The type
      * @return The new bean definition
      */
@@ -373,7 +380,6 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
     }
 
     @Override
-    @NonNull
     public String getName() {
         return definition.getName();
     }
@@ -420,7 +426,7 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
         }
 
         @Override
-        default <V> void validateBeanArgument(@NonNull BeanResolutionContext resolutionContext, @NonNull InjectionPoint injectionPoint, @NonNull Argument<V> argument, int index, @Nullable V value) {
+        default <V> void validateBeanArgument(BeanResolutionContext resolutionContext, InjectionPoint injectionPoint, Argument<V> argument, int index, @Nullable V value) {
             BeanDefinition<T> definition = getTarget();
             if (definition instanceof ValidatedBeanDefinition) {
                 ((ValidatedBeanDefinition<T>) definition).validateBeanArgument(
@@ -438,7 +444,7 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
      * @param <T> The bean definition type
      */
     private static final class LifeCycleDelegate<T> extends BeanDefinitionDelegate<T> implements ProxyInitializingBeanDefinition<T>, ProxyDisposableBeanDefinition<T> {
-        private LifeCycleDelegate(BeanDefinition<T> definition, Qualifier qualifier, ConfigurationPath path, @NonNull Map<String, List<Argument<?>>> typeArgumentsMap) {
+        private LifeCycleDelegate(BeanDefinition<T> definition, @Nullable Qualifier qualifier, @Nullable ConfigurationPath path, Map<String, List<Argument<?>>> typeArgumentsMap) {
             super(definition, qualifier, path, typeArgumentsMap);
         }
     }
@@ -447,7 +453,7 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
      * @param <T> The bean definition type
      */
     private static final class ValidatingDelegate<T> extends BeanDefinitionDelegate<T> implements ProxyValidatingBeanDefinition<T> {
-        private ValidatingDelegate(BeanDefinition<T> definition, Qualifier qualifier, ConfigurationPath path, @NonNull Map<String, List<Argument<?>>> typeArgumentsMap) {
+        private ValidatingDelegate(BeanDefinition<T> definition, @Nullable Qualifier qualifier, @Nullable ConfigurationPath path, Map<String, List<Argument<?>>> typeArgumentsMap) {
             super(definition, qualifier, path, typeArgumentsMap);
         }
     }
@@ -456,7 +462,7 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
      * @param <T> The bean definition type
      */
     private static final class LifeCycleValidatingDelegate<T> extends BeanDefinitionDelegate<T> implements ProxyValidatingBeanDefinition<T>, ProxyInitializingBeanDefinition<T>, ProxyDisposableBeanDefinition<T> {
-        private LifeCycleValidatingDelegate(BeanDefinition<T> definition, Qualifier qualifier, ConfigurationPath path, @NonNull Map<String, List<Argument<?>>> typeArgumentsMap) {
+        private LifeCycleValidatingDelegate(BeanDefinition<T> definition, @Nullable Qualifier qualifier, @Nullable ConfigurationPath path, Map<String, List<Argument<?>>> typeArgumentsMap) {
             super(definition, qualifier, path, typeArgumentsMap);
         }
     }

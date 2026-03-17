@@ -2,7 +2,7 @@ package io.micronaut.inject.records;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.convert.ConversionService;
 import jakarta.inject.Inject;
 

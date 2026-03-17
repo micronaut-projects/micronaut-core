@@ -20,6 +20,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.annotation.*;
 
 import java.lang.annotation.Annotation;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -81,5 +82,10 @@ public class UnsatisfiedRouteException extends RoutingException {
      */
     public Argument<?> getArgument() {
         return argument;
+    }
+
+    @Override
+    public String getMessage() {
+        return Objects.requireNonNull(super.getMessage(), "Unsatisfied route");
     }
 }

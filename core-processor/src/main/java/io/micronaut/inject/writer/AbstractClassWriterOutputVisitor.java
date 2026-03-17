@@ -18,6 +18,7 @@ package io.micronaut.inject.writer;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.Element;
+import org.jspecify.annotations.Nullable;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -131,11 +132,14 @@ public abstract class AbstractClassWriterOutputVisitor implements ClassWriterOut
         }
     }
 
-    private boolean isNotEclipseNotFound(Throwable e) {
-        if (isWriteOnFinish) {
+    private boolean isNotEclipseNotFound(@Nullable Throwable e) {
+        if (isWriteOnFinish || e == null) {
             return false;
         }
         String message = e.getMessage();
+        if (message == null) {
+            return false;
+        }
         return !message.contains("does not exist") || !e.getClass().getName().startsWith("org.eclipse");
     }
 }

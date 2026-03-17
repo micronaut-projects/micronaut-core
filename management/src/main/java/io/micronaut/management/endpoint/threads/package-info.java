@@ -19,4 +19,7 @@
  * @author James Kleeh
  * @since 1.2.0
  */
+@NullMarked
 package io.micronaut.management.endpoint.threads;
+
+import org.jspecify.annotations.NullMarked;

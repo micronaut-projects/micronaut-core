@@ -26,8 +26,7 @@ import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Indexes;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ArgumentCoercible;
@@ -42,6 +41,7 @@ import io.micronaut.inject.qualifiers.Qualifiers;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Abstract bean definition for other providers to extend from.
@@ -73,17 +73,47 @@ public abstract class AbstractProviderDefinition<T> implements InstantiatableBea
     }
 
     @Override
+    public int getOrder() {
+        return 0;
+    }
+
+    @Override
+    public Class<?>[] getIndexes() {
+        try {
+            return new Class<?>[]{getBeanType()};
+        } catch (NoClassDefFoundError e) {
+            // ignore, might happen if jakarta.inject is not the classpath
+        }
+        return new Class<?>[]{};
+    }
+
+    @Override
+    public boolean isPrimary() {
+        return false;
+    }
+
+    @Override
+    public Set<Class<?>> getExposedTypes() {
+        return Set.of(getBeanType());
+    }
+
+    @Override
+    public boolean isParallel() {
+        return false;
+    }
+
+    @Override
     public boolean isContainerType() {
         return false;
     }
 
     @Override
-    public boolean isCandidateBean(Argument<?> beanType) {
-        return beanType.isAssignableFrom(getBeanType());
+    public boolean isCandidateBean(@Nullable Argument<?> beanType) {
+        return beanType != null && beanType.isAssignableFrom(getBeanType());
     }
 
     @Override
-    public boolean isEnabled(@NonNull BeanContext context, @Nullable BeanResolutionContext resolutionContext) {
+    public boolean isEnabled(BeanContext context, @Nullable BeanResolutionContext resolutionContext) {
         return isPresent();
     }
 
@@ -112,12 +142,12 @@ public abstract class AbstractProviderDefinition<T> implements InstantiatableBea
      * @param singleton Whether the bean is a singleton
      * @return The provider
      */
-    protected abstract @NonNull T buildProvider(
-            @NonNull BeanResolutionContext resolutionContext,
-            @NonNull BeanContext context,
-            @NonNull Argument<Object> argument,
-            @Nullable Qualifier<Object> qualifier,
-            boolean singleton);
+    protected abstract T buildProvider(
+        BeanResolutionContext resolutionContext,
+        BeanContext context,
+        Argument<Object> argument,
+        @Nullable Qualifier<Object> qualifier,
+        boolean singleton);
 
     @Override
     public T instantiate(BeanResolutionContext resolutionContext, BeanContext context) throws BeanInstantiationException {
@@ -198,7 +228,6 @@ public abstract class AbstractProviderDefinition<T> implements InstantiatableBea
     }
 
     @Override
-    @NonNull
     public final List<Argument<?>> getTypeArguments(Class<?> type) {
         if (type == getBeanType()) {
             return getTypeArguments();
@@ -207,7 +236,6 @@ public abstract class AbstractProviderDefinition<T> implements InstantiatableBea
     }
 
     @Override
-    @NonNull
     public final List<Argument<?>> getTypeArguments() {
         return Collections.singletonList(TYPE_VARIABLE);
     }
@@ -219,7 +247,7 @@ public abstract class AbstractProviderDefinition<T> implements InstantiatableBea
 
     @Override
     public Qualifier<T> getDeclaredQualifier() {
-        return null;
+        return AnyQualifier.INSTANCE;
     }
 
     @Override

@@ -15,11 +15,6 @@
  */
 package io.micronaut.jackson.codec;
 
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.databind.JavaType;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.type.TypeFactory;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
@@ -31,8 +26,12 @@ import io.micronaut.json.JsonFeatures;
 import io.micronaut.json.JsonMapper;
 import io.micronaut.json.codec.MapperMediaTypeCodec;
 import io.micronaut.runtime.ApplicationConfiguration;
-
-import java.io.IOException;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.JsonParser;
+import tools.jackson.databind.JavaType;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.type.TypeFactory;
 
 /**
  * A {@link io.micronaut.http.codec.MediaTypeCodec} for JSON and Jackson.
@@ -127,7 +126,7 @@ public abstract class JacksonMediaTypeCodec extends MapperMediaTypeCodec {
             } else {
                 return objectMapper.treeToValue(node, type.getType());
             }
-        } catch (IOException e) {
+        } catch (JacksonException e) {
             throw new CodecException("Error decoding JSON stream for type [" + type.getName() + "]: " + e.getMessage(), e);
         }
     }

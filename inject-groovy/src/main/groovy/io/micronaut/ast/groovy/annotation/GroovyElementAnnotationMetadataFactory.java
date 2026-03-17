@@ -17,7 +17,7 @@ package io.micronaut.ast.groovy.annotation;
 
 import io.micronaut.ast.groovy.visitor.AbstractGroovyElement;
 import io.micronaut.ast.groovy.visitor.GroovyNativeElement;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.ClassElement;

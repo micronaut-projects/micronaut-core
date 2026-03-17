@@ -15,7 +15,7 @@
  */
 package io.micronaut.aop.compile
 
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.ObjectMapper
 import io.micronaut.aop.Intercepted
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.qualifiers.Qualifiers
@@ -32,7 +32,7 @@ package test;
 
 import io.micronaut.aop.simple.*;
 import io.micronaut.context.annotation.*;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 @Factory
 class MyBeanFactory {
     @Mutating("someVal")
@@ -68,13 +68,13 @@ abstract class BaseRepositoryImpl {
     }
 }
 
-interface CountryRepository {    
+interface CountryRepository {
 }
 
 @jakarta.inject.Singleton
 @Mutating("someVal")
 class CountryRepositoryImpl extends BaseRepositoryImpl implements CountryRepository {
-    
+
     public String someMethod() {
         return "test";
     }
@@ -100,13 +100,13 @@ abstract class BaseRepositoryImpl {
     }
 }
 
-interface CountryRepository {    
+interface CountryRepository {
 }
 
 @jakarta.inject.Singleton
 @Mutating("someVal")
 class CountryRepositoryImpl extends BaseRepositoryImpl implements CountryRepository {
-    
+
     public String someMethod() {
         return "test";
     }
@@ -132,14 +132,14 @@ abstract class BaseRepositoryImpl {
     }
 }
 
-interface CountryRepository {  
-    @Mutating("someVal") 
-    public String someMethod();  
+interface CountryRepository {
+    @Mutating("someVal")
+    public String someMethod();
 }
 
 @jakarta.inject.Singleton
 class CountryRepositoryImpl extends BaseRepositoryImpl implements CountryRepository {
-    
+
     @Override
     public String someMethod() {
         return "test";
@@ -192,11 +192,11 @@ import io.micronaut.context.annotation.*;
 final class MyBean {
 
     private String myValue;
-    
+
     MyBean(@Value("${foo.bar}") String val) {
         this.myValue = val;
     }
-    
+
     public String someMethod() {
         return myValue;
     }
@@ -221,11 +221,11 @@ import io.micronaut.context.annotation.*;
 class MyBean {
 
     private String myValue;
-    
+
     MyBean(@Value("${foo.bar}") String val) {
         this.myValue = val;
     }
-    
+
     public final String someMethod() {
         return myValue;
     }
@@ -249,11 +249,11 @@ import io.micronaut.context.annotation.*;
 class MyBean {
 
     private String myValue;
-    
+
     MyBean(@Value("${foo.bar}") String val) {
         this.myValue = val;
     }
-    
+
     @Mutating("someVal")
     public final String someMethod() {
         return myValue;

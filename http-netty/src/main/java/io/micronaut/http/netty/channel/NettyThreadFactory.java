@@ -17,9 +17,10 @@ package io.micronaut.http.netty.channel;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Factory;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.TypeHint;
+import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.netty.configuration.NettyGlobalConfiguration;
-import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.util.NettyRuntime;
@@ -32,6 +33,7 @@ import jakarta.inject.Singleton;
 import reactor.core.scheduler.NonBlocking;
 
 import java.util.concurrent.ThreadFactory;
+import java.util.function.Supplier;
 
 /**
  * The Default thread factory the Netty {@link io.netty.channel.nio.NioEventLoopGroup} will use within Micronaut to
@@ -106,17 +108,58 @@ public class NettyThreadFactory {
     @Named(NAME)
     @BootstrapContextCompatible
     protected ThreadFactory nettyThreadFactory() {
-        String poolName = "default-" + DefaultThreadFactory.toPoolName(NioEventLoopGroup.class);
-        if (configuration.isDefaultThreadFactoryReactorNonBlocking()) {
-            return new DefaultThreadFactory(poolName, configuration.isDefaultThreadFactoryDaemon(), configuration.getDefaultThreadFactoryPriority()) {
-                @SuppressWarnings("InstantiatingAThreadWithDefaultRunMethod")
-                @Override
-                protected Thread newThread(Runnable r, String name) {
-                    return new NonBlockingFastThreadLocalThread(threadGroup, r, name);
-                }
-            };
-        } else {
-            return new DefaultThreadFactory(poolName, configuration.isDefaultThreadFactoryDaemon(), configuration.getDefaultThreadFactoryPriority());
+        return new EventLoopCustomizableThreadFactory(
+            configuration.isDefaultThreadFactoryDaemon(),
+            configuration.getDefaultThreadFactoryPriority(),
+            configuration.isDefaultThreadFactoryReactorNonBlocking());
+    }
+
+    /**
+     * We only create one ThreadFactory singleton, but in order to get different names for
+     * different event loops, we need one {@link DefaultThreadFactory} for each event loop. When
+     * the event loop factory sees this class, it uses it as a template to create an individual
+     * ThreadFactory for each event loop group.
+     */
+    @Internal
+    public static final class EventLoopCustomizableThreadFactory implements ThreadFactory {
+        private final boolean daemon;
+        private final int priority;
+        private final boolean nonBlocking;
+
+        private final Supplier<ThreadFactory> fallbackDelegate = SupplierUtil.memoized(this::customizeForEventLoop);
+
+        public EventLoopCustomizableThreadFactory(boolean daemon, int priority, boolean nonBlocking) {
+            this.daemon = daemon;
+            this.priority = priority;
+            this.nonBlocking = nonBlocking;
+        }
+
+        public ThreadFactory customizeForEventLoop() {
+            return new CustomizedThreadFactory(daemon, priority, nonBlocking);
+        }
+
+        @Override
+        public Thread newThread(Runnable r) {
+            return fallbackDelegate.get().newThread(r);
+        }
+    }
+
+    private static final class CustomizedThreadFactory extends DefaultThreadFactory {
+        private final boolean nonBlocking;
+
+        public CustomizedThreadFactory(boolean daemon, int priority, boolean nonBlocking) {
+            super("default-eventLoopGroup", daemon, priority);
+            this.nonBlocking = nonBlocking;
+        }
+
+        @Override
+        @SuppressWarnings("InstantiatingAThreadWithDefaultRunMethod")
+        protected Thread newThread(Runnable r, String name) {
+            if (nonBlocking) {
+                return new NonBlockingFastThreadLocalThread(threadGroup, r, name);
+            } else {
+                return super.newThread(r, name);
+            }
         }
     }
 

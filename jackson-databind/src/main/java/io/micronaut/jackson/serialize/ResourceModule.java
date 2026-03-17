@@ -15,7 +15,7 @@
  */
 package io.micronaut.jackson.serialize;
 
-import com.fasterxml.jackson.databind.module.SimpleModule;
+import tools.jackson.databind.module.SimpleModule;
 import jakarta.inject.Singleton;
 
 /**

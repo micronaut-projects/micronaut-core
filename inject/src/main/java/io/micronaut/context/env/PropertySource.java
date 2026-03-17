@@ -16,10 +16,9 @@
 package io.micronaut.context.env;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.order.Ordered;
+import org.jspecify.annotations.Nullable;
 
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
@@ -48,13 +47,14 @@ public interface PropertySource extends Iterable<String>, Ordered {
      * @param key The key
      * @return The value
      */
+    @Nullable
     Object get(String key);
 
     /**
      * @return The origin of the property source.
      * @since 4.8.0
      */
-    default @NonNull Origin getOrigin() {
+    default Origin getOrigin() {
         return Origin.of(getName());
     }
 
@@ -145,44 +145,6 @@ public interface PropertySource extends Iterable<String>, Ordered {
     /**
      * Create a {@link PropertySource} from the given map.
      *
-     * @param name The name of the property source
-     * @param values The values as an array of alternating key/value entries
-     * @return The {@link PropertySource}
-     * @since 2.0
-     * @deprecated Use {@link #of(String, Map, Origin)}
-     */
-    @Deprecated(forRemoval = true)
-    static PropertySource of(String name, Object... values) {
-        return new MapPropertySource(name, mapOf(values));
-    }
-
-    /**
-     * Create a {@link LinkedHashMap} of configuration from an array of values.
-     *
-     * @param values The values
-     * @return The created map
-     * @since 2.0
-     */
-    static Map<String, Object> mapOf(Object... values) {
-        int len = values.length;
-        if (len % 2 != 0) {
-            throw new IllegalArgumentException("Number of arguments should be an even number representing the keys and values");
-        }
-
-        Map<String, Object> answer = new LinkedHashMap<>(len / 2);
-        int i = 0;
-        while (i < values.length - 1) {
-            Object k = values[i++];
-            if (k != null) {
-                answer.put(k.toString(), values[i++]);
-            }
-        }
-        return answer;
-    }
-
-    /**
-     * Create a {@link PropertySource} from the given map.
-     *
      * @param name     The name of the property source
      * @param map      The map
      * @param priority The priority to order by
@@ -263,7 +225,7 @@ public interface PropertySource extends Iterable<String>, Ordered {
          * @param location The location
          * @return The origin
          */
-        static @NonNull Origin of(@NonNull String location) {
+        static Origin of(String location) {
             Objects.requireNonNull(location, "Location cannot be null");
             return new DefaultOrigin(location);
         }

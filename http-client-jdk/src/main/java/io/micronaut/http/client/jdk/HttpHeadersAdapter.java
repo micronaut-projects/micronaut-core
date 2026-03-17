@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.HttpHeaders;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collection;
 import java.util.List;
@@ -54,6 +55,7 @@ public class HttpHeadersAdapter implements HttpHeaders {
     }
 
     @Override
+    @Nullable
     public String get(CharSequence name) {
         return httpHeaders.firstValue(name.toString()).orElse(null);
     }

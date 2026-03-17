@@ -17,8 +17,7 @@ package io.micronaut.core.type;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
@@ -67,12 +66,15 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
     );
 
     private final Class<T> type;
+    @Nullable
     private final String name;
     private final Map<String, Argument<?>> typeParameters;
-    private final Argument<?>[] typeParameterArray;
+    private final Argument<?> @Nullable [] typeParameterArray;
     private final AnnotationMetadata annotationMetadata;
     private final boolean isTypeVar;
+    @Nullable
     private String namePrecalculated;
+    @Nullable
     private Boolean reactive;
 
     /**
@@ -81,7 +83,7 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
      * @param annotationMetadata The annotation metadata
      * @param genericTypes       The generic types
      */
-    public DefaultArgument(Class<T> type, String name, AnnotationMetadata annotationMetadata, Argument<?>... genericTypes) {
+    public DefaultArgument(Class<T> type, @Nullable String name, @Nullable AnnotationMetadata annotationMetadata, Argument<?> @Nullable ... genericTypes) {
         this(type,
              name,
              annotationMetadata,
@@ -95,7 +97,7 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
      * @param annotationMetadata The annotation metadata
      * @param genericTypes       The generic types
      */
-    public DefaultArgument(Class<T> type, AnnotationMetadata annotationMetadata, Argument<?>... genericTypes) {
+    public DefaultArgument(Class<T> type, @Nullable AnnotationMetadata annotationMetadata, Argument<?> @Nullable ... genericTypes) {
         this(type,
                 null,
                 annotationMetadata,
@@ -111,7 +113,7 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
      * @param typeParameters     The map of parameters
      * @param typeParameterArray The array of arguments
      */
-    public DefaultArgument(Class<T> type, String name, AnnotationMetadata annotationMetadata, Map<String, Argument<?>> typeParameters, Argument<?>[] typeParameterArray) {
+    public DefaultArgument(Class<T> type, @Nullable String name, @Nullable AnnotationMetadata annotationMetadata, Map<String, Argument<?>> typeParameters, Argument<?> @Nullable [] typeParameterArray) {
         this(type, name, annotationMetadata, typeParameters, typeParameterArray, false);
     }
 
@@ -122,7 +124,7 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
      * @param isTypeVariable     Is this argument a type variable
      * @param genericTypes       The generic types
      */
-    public DefaultArgument(Class<T> type, String name, AnnotationMetadata annotationMetadata, boolean isTypeVariable, Argument<?>... genericTypes) {
+    public DefaultArgument(Class<T> type, @Nullable String name, @Nullable AnnotationMetadata annotationMetadata, boolean isTypeVariable, Argument<?> @Nullable ... genericTypes) {
         this(type,
                 name,
                 annotationMetadata,
@@ -140,7 +142,11 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
      * @param typeParameterArray The array of arguments
      * @param isTypeVariable     Is the argument a type variable
      */
-    protected DefaultArgument(Class<T> type, String name, AnnotationMetadata annotationMetadata, Map<String, Argument<?>> typeParameters, Argument<?>[] typeParameterArray, boolean isTypeVariable) {
+    protected DefaultArgument(Class<T> type,
+                              @Nullable String name,
+                              @Nullable AnnotationMetadata annotationMetadata,
+                              Map<String, Argument<?>> typeParameters,
+                              Argument<?> @Nullable [] typeParameterArray, boolean isTypeVariable) {
         this.type = Objects.requireNonNull(type, "Type cannot be null");
         this.name = name;
         this.annotationMetadata = annotationMetadata != null ? annotationMetadata : AnnotationMetadata.EMPTY_METADATA;
@@ -154,7 +160,7 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
      * @param name               The name
      * @param annotationMetadata The annotation metadata
      */
-    public DefaultArgument(Type type, String name, AnnotationMetadata annotationMetadata) {
+    public DefaultArgument(@Nullable Type type, @Nullable String name, @Nullable AnnotationMetadata annotationMetadata) {
         this.annotationMetadata = annotationMetadata != null ? annotationMetadata : AnnotationMetadata.EMPTY_METADATA;
         if (type == null) {
             type = getClass().getGenericSuperclass();
@@ -175,9 +181,9 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
             Type[] paramValues = parameterizedType.getActualTypeArguments();
             typeParameterArray = new Argument[params.length];
             for (int i = 0; i < params.length; i++) {
-                TypeVariable param = params[i];
+                TypeVariable<?> param = params[i];
                 Type value = paramValues[i];
-                typeParameterArray[i] = new DefaultArgument(value, param.getName(), AnnotationMetadata.EMPTY_METADATA);
+                typeParameterArray[i] = new DefaultArgument<>(value, param.getName(), AnnotationMetadata.EMPTY_METADATA);
             }
         } else {
             throw new IllegalArgumentException(type.getClass().getSimpleName() + " types are not supported");
@@ -188,7 +194,7 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
     }
 
     @Override
-    public Argument<T> withName(String name) {
+    public Argument<T> withName(@Nullable String name) {
         return new DefaultArgument<>(type, name, annotationMetadata, typeParameters, typeParameterArray, isTypeVar);
     }
 
@@ -216,7 +222,7 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
     }
 
     @Override
-    public Argument[] getTypeParameters() {
+    public Argument<?>[] getTypeParameters() {
         if (typeParameterArray == null) {
             return Argument.ZERO_ARGUMENTS;
         }
@@ -229,7 +235,6 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
     }
 
     @Override
-    @NonNull
     public Class<T> getType() {
         return type;
     }
@@ -245,7 +250,6 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
     }
 
     @Override
-    @NonNull
     public String getName() {
         if (name != null) {
             return name;
@@ -312,12 +316,15 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
         return ObjectUtils.hash(type, getName(), typeParameters);
     }
 
-    private static Map<String, Argument<?>> initializeTypeParameters(Argument<?>[] genericTypes) {
+    private static Map<String, Argument<?>> initializeTypeParameters(Argument<?> @Nullable [] genericTypes) {
         Map<String, Argument<?>> typeParameters;
         if (genericTypes != null && genericTypes.length > 0) {
             typeParameters = CollectionUtils.newLinkedHashMap(genericTypes.length);
             for (Argument<?> genericType : genericTypes) {
-                typeParameters.put(genericType.getName(), genericType);
+                String genericTypeName = genericType.getName();
+                if (genericTypeName != null) {
+                    typeParameters.put(genericTypeName, genericType);
+                }
             }
         } else {
             typeParameters = Collections.emptyMap();
@@ -326,7 +333,7 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
     }
 
     @Override
-    public @NonNull Argument<T> asArgument() {
+    public Argument<T> asArgument() {
         return this;
     }
 }

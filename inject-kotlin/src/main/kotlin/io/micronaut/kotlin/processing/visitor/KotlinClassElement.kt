@@ -44,7 +44,6 @@ import io.micronaut.context.annotation.ConfigurationBuilder
 import io.micronaut.context.annotation.ConfigurationReader
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.Creator
-import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
 import io.micronaut.inject.ast.ArrayableClassElement
@@ -256,7 +255,7 @@ internal open class KotlinClassElement(
 
     private val resolvedAnnotationMetadata: AnnotationMetadata by lazy {
         if (presetAnnotationMetadata != null) {
-            presetAnnotationMetadata
+            presetAnnotationMetadata!!
         } else {
             if (definedType != null) {
                 AnnotationMetadataHierarchy(
@@ -378,7 +377,7 @@ internal open class KotlinClassElement(
 
     override fun getMethods() = internalMethods
 
-    override fun findMethod(name: String?) = Optional.ofNullable(
+    override fun findMethod(name: String) = Optional.ofNullable(
         internalMethods.firstOrNull { it.name == name }
     )
 
@@ -611,8 +610,7 @@ internal open class KotlinClassElement(
         typeVariable
     )
 
-    @NonNull
-    override fun withTypeArguments(@NonNull typeArguments: Collection<ClassElement>): ClassElement? {
+    override fun withTypeArguments(typeArguments: Collection<ClassElement>): ClassElement {
         if (getTypeArguments() == typeArguments) {
             return this
         }

@@ -1,8 +1,12 @@
 plugins {
-    id "io.micronaut.build.internal.docs"
+    id "io.micronaut.build.internal.parent"
     id "io.micronaut.build.internal.dependency-updates"
     id "io.micronaut.build.internal.version-catalog-updates"
     id "io.micronaut.build.internal.convention-quality"
+}
+
+repositories {
+    mavenCentral()
 }
 
 tasks.named("updateVersionCatalogs") {

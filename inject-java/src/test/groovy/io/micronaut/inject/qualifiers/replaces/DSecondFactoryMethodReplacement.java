@@ -20,6 +20,7 @@ import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
 import jakarta.inject.Singleton;
 
+@Requires(property = "spec.name", value = "ReplacesSpec")
 @Factory
 @Requires(env = "factory-replacement-chain")
 public class DSecondFactoryMethodReplacement {

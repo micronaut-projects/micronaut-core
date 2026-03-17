@@ -19,7 +19,7 @@ import io.micronaut.context.annotation.Bean;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -33,15 +33,21 @@ import java.util.function.Predicate;
 final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, ElementQuery.Result<T> {
     private static final ClassElement ONLY_ACCESSIBLE_MARKER = ClassElement.of(DefaultElementQuery.class);
     private final Class<T> elementType;
+    @Nullable
     private final ClassElement onlyAccessibleType;
     private final boolean onlyDeclared;
     private final boolean onlyAbstract;
     private final boolean onlyConcrete;
     private final boolean onlyInjected;
+    @Nullable
     private final List<Predicate<String>> namePredicates;
+    @Nullable
     private final List<Predicate<AnnotationMetadata>> annotationPredicates;
+    @Nullable
     private final List<Predicate<Set<ElementModifier>>> modifiersPredicates;
+    @Nullable
     private final List<Predicate<T>> elementPredicates;
+    @Nullable
     private final List<Predicate<ClassElement>> typePredicates;
     private final boolean onlyInstance;
     private final boolean onlyStatic;
@@ -58,6 +64,7 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
     @SuppressWarnings("checkstyle:ParameterNumber")
     DefaultElementQuery(
         Class<T> elementType,
+        @Nullable
         ClassElement onlyAccessibleType,
         boolean onlyDeclared,
         boolean onlyAbstract,
@@ -69,10 +76,15 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
         boolean includeOverriddenMethods,
         boolean includeHiddenElements,
         boolean excludePropertyElements,
+        @Nullable
         List<Predicate<AnnotationMetadata>> annotationPredicates,
+        @Nullable
         List<Predicate<Set<ElementModifier>>> modifiersPredicates,
+        @Nullable
         List<Predicate<T>> elementPredicates,
-        List<Predicate<String>> namePredicates, List<Predicate<ClassElement>> typePredicates) {
+        @Nullable
+        List<Predicate<String>> namePredicates,
+        @Nullable List<Predicate<ClassElement>> typePredicates) {
         this.elementType = elementType;
         this.onlyAccessibleType = onlyAccessibleType;
         this.onlyDeclared = onlyDeclared;
@@ -169,7 +181,6 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
         return Collections.unmodifiableList(namePredicates);
     }
 
-    @NonNull
     @Override
     public List<Predicate<ClassElement>> getTypePredicates() {
         if (typePredicates == null) {
@@ -202,7 +213,6 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
         return Collections.unmodifiableList(elementPredicates);
     }
 
-    @NonNull
     @Override
     public ElementQuery<T> onlyDeclared() {
         return new DefaultElementQuery<>(
@@ -244,7 +254,6 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
             typePredicates);
     }
 
-    @NonNull
     @Override
     public ElementQuery<T> onlyConcrete() {
         return new DefaultElementQuery<>(
@@ -262,7 +271,6 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
             typePredicates);
     }
 
-    @NonNull
     @Override
     public ElementQuery<T> onlyAbstract() {
         return new DefaultElementQuery<>(
@@ -280,7 +288,6 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
             typePredicates);
     }
 
-    @NonNull
     @Override
     public ElementQuery<T> onlyAccessible() {
         return new DefaultElementQuery<>(
@@ -299,7 +306,6 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
             typePredicates);
     }
 
-    @NonNull
     @Override
     public ElementQuery<T> onlyAccessible(ClassElement fromType) {
         return new DefaultElementQuery<>(
@@ -420,9 +426,8 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
             typePredicates);
     }
 
-    @NonNull
     @Override
-    public ElementQuery<T> named(@NonNull Predicate<String> predicate) {
+    public ElementQuery<T> named(Predicate<String> predicate) {
         Objects.requireNonNull(predicate, "Predicate cannot be null");
         List<Predicate<String>> namePredicates;
         if (this.namePredicates != null) {
@@ -451,9 +456,8 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
             typePredicates);
     }
 
-    @NonNull
     @Override
-    public ElementQuery<T> typed(@NonNull Predicate<ClassElement> predicate) {
+    public ElementQuery<T> typed(Predicate<ClassElement> predicate) {
         Objects.requireNonNull(predicate, "Predicate cannot be null");
         List<Predicate<ClassElement>> typePredicates;
         if (this.typePredicates != null) {
@@ -482,9 +486,8 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
             typePredicates);
     }
 
-    @NonNull
     @Override
-    public ElementQuery<T> annotated(@NonNull Predicate<AnnotationMetadata> predicate) {
+    public ElementQuery<T> annotated(Predicate<AnnotationMetadata> predicate) {
         Objects.requireNonNull(predicate, "Predicate cannot be null");
         List<Predicate<AnnotationMetadata>> annotationPredicates;
         if (this.annotationPredicates != null) {
@@ -508,9 +511,8 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
             typePredicates);
     }
 
-    @NonNull
     @Override
-    public ElementQuery<T> modifiers(@NonNull Predicate<Set<ElementModifier>> predicate) {
+    public ElementQuery<T> modifiers(Predicate<Set<ElementModifier>> predicate) {
         Objects.requireNonNull(predicate, "Predicate cannot be null");
         List<Predicate<Set<ElementModifier>>> modifierPredicates;
         if (this.modifiersPredicates != null) {
@@ -533,9 +535,8 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
             typePredicates);
     }
 
-    @NonNull
     @Override
-    public ElementQuery<T> filter(@NonNull Predicate<T> predicate) {
+    public ElementQuery<T> filter(Predicate<T> predicate) {
         Objects.requireNonNull(predicate, "Predicate cannot be null");
         List<Predicate<T>> elementPredicates;
         if (this.elementPredicates != null) {
@@ -580,7 +581,6 @@ final class DefaultElementQuery<T extends Element> implements ElementQuery<T>, E
             null);
     }
 
-    @NonNull
     @Override
     public Result<T> result() {
         return this;

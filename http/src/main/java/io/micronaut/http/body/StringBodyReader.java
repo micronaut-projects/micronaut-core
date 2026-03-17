@@ -25,6 +25,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.runtime.ApplicationConfiguration;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
@@ -54,7 +55,7 @@ public final class StringBodyReader implements TypedMessageBodyReader<String>, C
     }
 
     @Override
-    public String read(Argument<String> type, MediaType mediaType, Headers httpHeaders, ByteBuffer<?> byteBuffer) throws CodecException {
+    public String read(Argument<String> type, @Nullable MediaType mediaType, Headers httpHeaders, ByteBuffer<?> byteBuffer) throws CodecException {
         return read0(byteBuffer, getCharset(mediaType, httpHeaders));
     }
 
@@ -67,7 +68,7 @@ public final class StringBodyReader implements TypedMessageBodyReader<String>, C
     }
 
     @Override
-    public String read(Argument<String> type, MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
+    public String read(Argument<String> type, @Nullable MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
         try {
             return new String(inputStream.readAllBytes(), getCharset(mediaType, httpHeaders));
         } catch (IOException e) {
@@ -76,11 +77,11 @@ public final class StringBodyReader implements TypedMessageBodyReader<String>, C
     }
 
     @Override
-    public Publisher<String> readChunked(Argument<String> type, MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
+    public Publisher<String> readChunked(Argument<String> type, @Nullable MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
         return Flux.from(input).map(byteBuffer -> read0(byteBuffer, getCharset(mediaType, httpHeaders)));
     }
 
-    private Charset getCharset(MediaType mediaType, Headers httpHeaders) {
+    private Charset getCharset(@Nullable MediaType mediaType, Headers httpHeaders) {
         return MessageBodyWriter.findCharset(mediaType, httpHeaders).orElse(defaultCharset);
     }
 }

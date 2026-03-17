@@ -23,8 +23,8 @@ class DefaultJsonErrorHandlingSpec extends AbstractMicronautSpec {
 
         then:
         HttpClientResponseException e = thrown()
-        e.response.getBody(Map).get()._embedded.errors[0].message == """Invalid JSON: Unexpected end-of-input: expected close marker for Object (start marker at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION` disabled); line: 1, column: 1])
- at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION` disabled); line: 1, column: 21]"""
+        e.response.getBody(Map).get()._embedded.errors[0].message == """Invalid JSON: Unexpected end-of-input: expected close marker for Object (start marker at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION` disabled); byte offset: #UNKNOWN])
+ at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION` disabled); byte offset: #20]"""
         e.response.status == HttpStatus.BAD_REQUEST
 
         when:

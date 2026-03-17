@@ -19,8 +19,8 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.micronaut.core.annotation.Introspected;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 
@@ -145,17 +145,15 @@ public interface Pageable extends Sort {
         return Pageable.from(getNumber(), getSize(), newSort);
     }
 
-    @NonNull
     @Override
-    default Pageable order(@NonNull String propertyName, @NonNull Order.Direction direction) {
+    default @NonNull Pageable order(@NonNull String propertyName, Order.@NonNull Direction direction) {
         Sort newSort = getSort().order(propertyName, direction);
         return Pageable.from(getNumber(), getSize(), newSort);
     }
 
-    @NonNull
     @Override
     @JsonIgnore
-    default List<Order> getOrderBy() {
+    default @NonNull List<Order> getOrderBy() {
         return getSort().getOrderBy();
     }
 

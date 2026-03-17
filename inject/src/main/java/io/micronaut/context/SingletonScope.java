@@ -16,8 +16,7 @@
 package io.micronaut.context;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ObjectUtils;
@@ -55,11 +54,10 @@ final class SingletonScope {
      */
     private final Map<DefaultBeanContext.BeanKey, BeanRegistration> singletonByArgumentAndQualifier = new ConcurrentHashMap<>(100);
 
-    @NonNull
-    <T> BeanRegistration<T> getOrCreate(@NonNull DefaultBeanContext beanContext,
+    <T> BeanRegistration<T> getOrCreate(DefaultBeanContext beanContext,
                                         @Nullable BeanResolutionContext resolutionContext,
-                                        @NonNull BeanDefinition<T> definition,
-                                        @NonNull Argument<T> beanType,
+                                        BeanDefinition<T> definition,
+                                        Argument<T> beanType,
                                         @Nullable Qualifier<T> qualifier) {
         BeanRegistration<T> beanRegistration = findBeanRegistration(definition, beanType, qualifier);
         if (beanRegistration != null) {
@@ -94,8 +92,7 @@ final class SingletonScope {
      * @param <T>          The singleton type
      * @return The new registration
      */
-    @NonNull
-    <T> BeanRegistration<T> registerSingletonBean(@NonNull BeanRegistration<T> registration, Qualifier qualifier) {
+    <T> BeanRegistration<T> registerSingletonBean(BeanRegistration<T> registration, @Nullable Qualifier qualifier) {
 
         BeanDefinition<T> beanDefinition = registration.beanDefinition;
         singletonByBeanDefinition.put(BeanDefinitionIdentity.of(beanDefinition), registration);
@@ -123,7 +120,7 @@ final class SingletonScope {
      * @param <T>       The singleton type
      * @return true if contains, false doesn't mean the singleton is not present.
      */
-    <T> boolean containsBean(Argument<T> beanType, Qualifier<T> qualifier) {
+    <T> boolean containsBean(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         ArgumentUtils.requireNonNull("beanType", beanType);
         DefaultBeanContext.BeanKey<T> beanKey = new DefaultBeanContext.BeanKey<>(beanType, qualifier);
         return singletonByArgumentAndQualifier.containsKey(beanKey);
@@ -132,7 +129,6 @@ final class SingletonScope {
     /**
      * @return Active singleton registrations
      */
-    @NonNull
     Collection<BeanRegistration> getBeanRegistrations() {
         return singletonByBeanDefinition.values();
     }
@@ -141,8 +137,7 @@ final class SingletonScope {
      * @param qualifier The qualifier
      * @return Active singleton registrations by qualifier
      */
-    @NonNull
-    Collection<BeanRegistration<?>> getBeanRegistrations(@NonNull Qualifier<?> qualifier) {
+    Collection<BeanRegistration<?>> getBeanRegistrations(Qualifier<?> qualifier) {
         List<BeanRegistration<?>> beanRegistrations = new ArrayList<>();
         for (BeanRegistration<?> beanRegistration : singletonByBeanDefinition.values()) {
             BeanDefinition<Object> beanDefinition = (BeanDefinition<Object>) beanRegistration.beanDefinition;
@@ -159,8 +154,7 @@ final class SingletonScope {
      * @return Active singleton registrations by beanType
      */
     @SuppressWarnings("unchecked")
-    @NonNull
-    <T> Collection<BeanRegistration<T>> getBeanRegistrations(@NonNull Class<T> beanType) {
+    <T> Collection<BeanRegistration<T>> getBeanRegistrations(Class<T> beanType) {
         List<BeanRegistration<T>> beanRegistrations = new ArrayList<>();
         for (BeanRegistration<?> beanRegistration : singletonByBeanDefinition.values()) {
             BeanDefinition beanDefinition = beanRegistration.beanDefinition;
@@ -180,7 +174,7 @@ final class SingletonScope {
      * @return found registration or null
      */
     @Nullable
-    <T> BeanRegistration<T> findBeanRegistration(@NonNull BeanDefinition<T> beanDefinition, @Nullable Qualifier<T> qualifier) {
+    <T> BeanRegistration<T> findBeanRegistration(BeanDefinition<T> beanDefinition, @Nullable Qualifier<T> qualifier) {
         return findBeanRegistration(beanDefinition, beanDefinition.asArgument(), qualifier);
     }
 
@@ -192,7 +186,7 @@ final class SingletonScope {
      * @return found registration or null
      */
     @Nullable
-    <T> BeanRegistration<T> findBeanRegistration(@NonNull BeanIdentifier identifier) {
+    <T> BeanRegistration<T> findBeanRegistration(BeanIdentifier identifier) {
         for (BeanRegistration registration : singletonByBeanDefinition.values()) {
             if (registration.identifier.equals(identifier)) {
                 return registration;
@@ -229,7 +223,7 @@ final class SingletonScope {
      * @return found registration or null
      */
     @Nullable
-    <T> BeanRegistration<T> findBeanRegistration(@NonNull BeanDefinition<T> definition) {
+    <T> BeanRegistration<T> findBeanRegistration(BeanDefinition<T> definition) {
         return singletonByBeanDefinition.get(BeanDefinitionIdentity.of(definition));
     }
 
@@ -243,8 +237,8 @@ final class SingletonScope {
      * @return found registration or null
      */
     @Nullable
-    <T> BeanRegistration<T> findBeanRegistration(@NonNull BeanDefinition<T> beanDefinition,
-                                                 @NonNull Argument<T> beanType,
+    <T> BeanRegistration<T> findBeanRegistration(BeanDefinition<T> beanDefinition,
+                                                 Argument<T> beanType,
                                                  @Nullable Qualifier<T> qualifier) {
         BeanRegistration<T> beanRegistration = singletonByBeanDefinition.get(BeanDefinitionIdentity.of(beanDefinition));
         if (beanRegistration == null) {
@@ -264,7 +258,7 @@ final class SingletonScope {
      * @return found registration.
      */
     @Nullable
-    <T> BeanRegistration<T> findCachedSingletonBeanRegistration(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+    <T> BeanRegistration<T> findCachedSingletonBeanRegistration(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         DefaultBeanContext.BeanKey<T> beanKey = new DefaultBeanContext.BeanKey<>(beanType, qualifier);
         BeanRegistration<T> beanRegistration = singletonByArgumentAndQualifier.get(beanKey);
         if (beanRegistration != null && beanRegistration.bean != null) {
@@ -284,7 +278,7 @@ final class SingletonScope {
      * @return found registration's bean definition.
      */
     @Nullable
-    <T> BeanDefinition<T> findCachedSingletonBeanDefinition(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+    <T> BeanDefinition<T> findCachedSingletonBeanDefinition(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         BeanRegistration<T> reg = findCachedSingletonBeanRegistration(beanType, qualifier);
         if (reg != null) {
             return reg.getBeanDefinition();
@@ -318,7 +312,7 @@ final class SingletonScope {
      * @author Denis Stepanov
      * @since 3.5.0
      */
-    interface BeanDefinitionIdentity {
+    private interface BeanDefinitionIdentity {
 
         static BeanDefinitionIdentity of(BeanDefinition<?> beanDefinition) {
             if (beanDefinition instanceof BeanDefinitionDelegate<?> definitionDelegate) {
@@ -336,7 +330,7 @@ final class SingletonScope {
      *
      * @since 3.5.0
      */
-    static final class BeanDefinitionDelegatedIdentity implements BeanDefinitionIdentity {
+    private static final class BeanDefinitionDelegatedIdentity implements BeanDefinitionIdentity {
 
         private final BeanDefinitionDelegate<?> beanDefinitionDelegate;
 
@@ -370,7 +364,7 @@ final class SingletonScope {
      *
      * @since 3.5.0
      */
-    static final class RuntimeBeanDefinitionIdentity implements BeanDefinitionIdentity {
+    private static final class RuntimeBeanDefinitionIdentity implements BeanDefinitionIdentity {
 
         private final RuntimeBeanDefinition<?> beanDefinition;
 
@@ -405,7 +399,7 @@ final class SingletonScope {
      *
      * @since 3.5.0
      */
-    static final class SimpleBeanDefinitionIdentity implements BeanDefinitionIdentity {
+    private static final class SimpleBeanDefinitionIdentity implements BeanDefinitionIdentity {
 
         private final Class<?> beanDefinitionClass;
 

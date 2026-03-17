@@ -24,11 +24,11 @@ import io.micronaut.context.exceptions.DependencyInjectionException;
 import io.micronaut.context.scope.CustomScope;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.type.Argument;
@@ -37,6 +37,7 @@ import io.micronaut.core.type.TypeInformation;
 import io.micronaut.core.type.TypeInformation.TypeFormat;
 import io.micronaut.core.util.AnsiColour;
 import io.micronaut.core.util.ObjectUtils;
+import io.micronaut.core.value.PropertyResolver;
 import io.micronaut.inject.*;
 
 import io.micronaut.inject.proxy.InterceptedBean;
@@ -55,15 +56,23 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
     private static final String CONSTRUCTOR_METHOD_NAME = "<init>";
     protected final DefaultBeanContext context;
+    @Nullable
     protected final BeanDefinition<?> rootDefinition;
     protected final Path path;
-    private final @NonNull BeanResolutionTraceMode traceMode;
-    private final boolean traceEnabled;
+    @Nullable
+    private final BeanResolutionTracer tracer;
+    @Nullable
     private Map<CharSequence, Object> attributes;
+    @Nullable
     private Qualifier<?> qualifier;
+    @Nullable
     private List<BeanRegistration<?>> dependentBeans;
+    @Nullable
     private BeanRegistration<?> dependentFactory;
+    @Nullable
+    private final PropertyResolver propertyResolver;
 
+    @Nullable
     private ConfigurationPath configurationPath;
 
     /**
@@ -71,12 +80,34 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
      * @param rootDefinition The bean root definition
      */
     @Internal
-    protected AbstractBeanResolutionContext(DefaultBeanContext context, BeanDefinition<?> rootDefinition) {
+    protected AbstractBeanResolutionContext(DefaultBeanContext context, @Nullable BeanDefinition<?> rootDefinition) {
         this.context = context;
         this.rootDefinition = rootDefinition;
         this.path = new DefaultPath();
-        this.traceMode = context.traceMode;
-        this.traceEnabled = rootDefinition != null && isTraceEnabled(rootDefinition.getBeanType().getTypeName(), context.tracePatterns);
+        if (context.traceMode != BeanResolutionTraceMode.NONE && rootDefinition != null && isTraceEnabled(rootDefinition.getBeanType().getTypeName(), context.tracePatterns)) {
+            this.tracer = context.traceMode.getTracer().orElse(null);
+        } else {
+            this.tracer = null;
+        }
+        this.propertyResolver = context instanceof DefaultApplicationContext applicationContext ?  unwrap(applicationContext) : null;
+    }
+
+    private static PropertyResolver unwrap(PropertyResolver propertyResolver) {
+        if (propertyResolver instanceof PropertyResolverDelegate delegate) {
+            return unwrap(delegate.delegate());
+        }
+        return propertyResolver;
+    }
+
+    @Override
+    public ConversionService getConversionService() {
+        return context.getConversionService();
+    }
+
+    @Override
+    @Nullable
+    public PropertyResolver getPropertyResolver() {
+        return propertyResolver;
     }
 
     @Override
@@ -90,33 +121,32 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     }
 
     @Override
-    public ConfigurationPath setConfigurationPath(ConfigurationPath configurationPath) {
+    @Nullable
+    public ConfigurationPath setConfigurationPath(@Nullable ConfigurationPath configurationPath) {
         ConfigurationPath old = this.configurationPath;
         this.configurationPath = configurationPath;
         return old;
     }
 
     @Override
-    public void valueResolved(Argument<?> argument, Qualifier<?> qualifier, String property, Object value) {
-        if (traceEnabled) {
-            traceMode.getTracer().ifPresent(tracer ->
-                tracer.traceValueResolved(
-                    this,
-                    (Argument<Object>) argument,
-                    property,
-                    value
-                )
+    public void valueResolved(Argument<?> argument, @Nullable Qualifier<?> qualifier, String property, @Nullable Object value) {
+        if (tracer != null) {
+            tracer.traceValueResolved(
+                this,
+                (Argument<Object>) argument,
+                property,
+                value
             );
         }
     }
 
-    private boolean isTraceEnabled(@NonNull String typeName, @NonNull Set<String> tracePatterns) {
-        return traceMode != BeanResolutionTraceMode.NONE &&
-            (tracePatterns.isEmpty() || tracePatterns.stream().anyMatch(typeName::matches));
+    private boolean isTraceEnabled(String typeName, Set<String> tracePatterns) {
+        return (tracePatterns.isEmpty() || tracePatterns.stream().anyMatch(typeName::matches));
     }
 
     @Override
-    public Object resolvePropertyValue(Argument<?> argument, String stringValue, String cliProperty, boolean isPlaceholder) {
+    @Nullable
+    public Object resolvePropertyValue(Argument<?> argument, String stringValue, @Nullable String cliProperty, boolean isPlaceholder) {
         ApplicationContext applicationContext = (ApplicationContext) context;
 
         Argument<?> argumentType = argument;
@@ -149,16 +179,13 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             }
         }
 
-        if (traceEnabled) {
-            String propertyName = stringValue;
-            Object propertyValue = value.orElse(null);
-            traceMode.getTracer().ifPresent(tracer ->
-                tracer.traceValueResolved(
-                    this,
-                    (Argument<? super Object>) argument,
-                    propertyName,
-                    propertyValue
-                ));
+        if (tracer != null) {
+            tracer.traceValueResolved(
+                this,
+                (Argument<? super Object>) argument,
+                stringValue,
+                value.orElse(null)
+            );
         }
 
         if (argument.isOptional()) {
@@ -204,51 +231,16 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         return valString;
     }
 
-    @NonNull
     @Override
-    public <T> T getBean(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+    public <T> T getBean(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         T bean = context.getBean(this, beanType, qualifier);
-        if (traceEnabled) {
-            traceMode.getTracer().ifPresent(tracer -> {
-                tracer.traceBeanResolved(
-                    this,
-                    beanType,
-                    qualifier,
-                    bean
-                );
-                String disabledBeanMessage = context.resolveDisabledBeanMessage(
-                    this,
-                    beanType,
-                    qualifier
-                );
-                if (disabledBeanMessage != null) {
-                    tracer.traceBeanDisabled(
-                        AbstractBeanResolutionContext.this,
-                        beanType,
-                        qualifier,
-                        disabledBeanMessage
-                    );
-                }
-            });
-        }
-        return bean;
-    }
-
-    @NonNull
-    @Override
-    public <T> Collection<T> getBeansOfType(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
-        Collection<T> beans = context.getBeansOfType(this, beanType, qualifier);
-        if (traceEnabled) {
-            traceBeanCollection(beanType, qualifier, beans);
-        }
-        return beans;
-    }
-
-    private <T> void traceBeanCollection(Argument<T> beanType, Qualifier<T> qualifier, Collection<T> beans) {
-        traceMode.getTracer().ifPresent(tracer -> {
-            for (T bean : beans) {
-                tracer.traceBeanResolved(this, beanType, qualifier, bean);
-            }
+        if (tracer != null) {
+            tracer.traceBeanResolved(
+                this,
+                beanType,
+                qualifier,
+                bean
+            );
             String disabledBeanMessage = context.resolveDisabledBeanMessage(
                 this,
                 beanType,
@@ -262,59 +254,124 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                     disabledBeanMessage
                 );
             }
-        });
+        }
+        return bean;
     }
 
-    @NonNull
     @Override
-    public <T> Stream<T> streamOfType(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+    public <T> T getBean(Class<T> beanType, @Nullable Qualifier<T> qualifier) {
+        return getBean(Argument.of(beanType), qualifier);
+    }
+
+    @Override
+    public <T> T getBean(BeanDefinition<T> definition) {
+        return context.getBean(definition);
+    }
+
+    @Override
+    public <T> Collection<T> getBeansOfType(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+        Collection<T> beans = context.getBeansOfType(this, beanType, qualifier);
+        if (tracer != null) {
+            traceBeanCollection(beanType, qualifier, beans);
+        }
+        return beans;
+    }
+
+    @Override
+    public <T> Collection<T> getBeansOfType(Class<T> beanType) {
+        return getBeansOfType(Argument.of(beanType));
+    }
+
+    @Override
+    public <T> Collection<T> getBeansOfType(Class<T> beanType, @Nullable Qualifier<T> qualifier) {
+        return getBeansOfType(Argument.of(beanType), qualifier);
+    }
+
+    private <T> void traceBeanCollection(Argument<T> beanType, @Nullable Qualifier<T> qualifier, Collection<T> beans) {
+        Objects.requireNonNull(tracer);
+        for (T bean : beans) {
+            tracer.traceBeanResolved(this, beanType, qualifier, bean);
+        }
+        String disabledBeanMessage = context.resolveDisabledBeanMessage(
+            this,
+            beanType,
+            qualifier
+        );
+        if (disabledBeanMessage != null) {
+            tracer.traceBeanDisabled(
+                AbstractBeanResolutionContext.this,
+                beanType,
+                qualifier,
+                disabledBeanMessage
+            );
+        }
+    }
+
+    @Override
+    public <T> Stream<T> streamOfType(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         return context.streamOfType(this, beanType, qualifier);
     }
 
     @Override
-    public <V> Map<String, V> mapOfType(Argument<V> beanType, Qualifier<V> qualifier) {
+    public <T> Stream<T> streamOfType(Class<T> beanType, @Nullable Qualifier<T> qualifier) {
+        return streamOfType(Argument.of(beanType), qualifier);
+    }
+
+    @Override
+    public <V> Map<String, V> mapOfType(Argument<V> beanType, @Nullable Qualifier<V> qualifier) {
         Map<String, V> beanMap = context.mapOfType(this, beanType, qualifier);
-        if (traceEnabled) {
+        if (tracer != null) {
             traceBeanCollection(beanType, qualifier, beanMap.values());
         }
         return beanMap;
     }
 
-    @NonNull
     @Override
-    public <T> Optional<T> findBean(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+    public <T> Optional<T> findBean(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         Optional<T> resolved = context.findBean(this, beanType, qualifier);
-        if (traceEnabled) {
-            traceMode.getTracer().ifPresent(tracer -> {
-                tracer.traceBeanResolved(
-                    this,
+        if (tracer != null) {
+            tracer.traceBeanResolved(
+                this,
+                beanType,
+                qualifier,
+                resolved.orElse(null)
+            );
+            String disabledBeanMessage = context.resolveDisabledBeanMessage(
+                this,
+                beanType,
+                qualifier
+            );
+            if (disabledBeanMessage != null) {
+                tracer.traceBeanDisabled(
+                    AbstractBeanResolutionContext.this,
                     beanType,
                     qualifier,
-                    resolved.orElse(null)
+                    disabledBeanMessage
                 );
-                String disabledBeanMessage = context.resolveDisabledBeanMessage(
-                    this,
-                    beanType,
-                    qualifier
-                );
-                if (disabledBeanMessage != null) {
-                    tracer.traceBeanDisabled(
-                        AbstractBeanResolutionContext.this,
-                        beanType,
-                        qualifier,
-                        disabledBeanMessage
-                    );
-                }
-            });
+            }
         }
         return resolved;
     }
 
-    @NonNull
     @Override
-    public <T> Collection<BeanRegistration<T>> getBeanRegistrations(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+    public <T> Optional<T> findBean(Class<T> beanType, @Nullable Qualifier<T> qualifier) {
+        return findBean(Argument.of(beanType), qualifier);
+    }
+
+    @Override
+    public <T> Collection<T> getBeansOfType(Argument<T> beanType) {
+        return context.getBeansOfType(this, beanType);
+    }
+
+    @Override
+    public <T> T getProxyTargetBean(Class<T> beanType, @Nullable Qualifier<T> qualifier) {
+        return context.getProxyTargetBean(this, Argument.of(beanType), qualifier);
+    }
+
+    @Override
+    public <T> Collection<BeanRegistration<T>> getBeanRegistrations(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         Collection<BeanRegistration<T>> registrations = context.getBeanRegistrations(this, beanType, qualifier);
-        if (traceEnabled) {
+        if (tracer != null) {
             traceBeanCollection(
                 beanType,
                 qualifier,
@@ -329,7 +386,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
      *
      * @param context The previous context
      */
-    public void copyStateFrom(@NonNull AbstractBeanResolutionContext context) {
+    public void copyStateFrom(AbstractBeanResolutionContext context) {
         path.addAll(context.path);
         qualifier = context.qualifier;
         if (context.attributes != null) {
@@ -359,7 +416,6 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         }
     }
 
-    @NonNull
     @Override
     public List<BeanRegistration<?>> getAndResetDependentBeans() {
         if (dependentBeans == null) {
@@ -379,11 +435,12 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             if (dependentBeans.size() != 1) {
                 throw new IllegalStateException("Expected only one bean dependent!");
             }
-            dependentFactory = dependentBeans.remove(0);
+            dependentFactory = dependentBeans.removeFirst();
         }
     }
 
     @Override
+    @Nullable
     public BeanRegistration<?> getAndResetDependentFactoryBean() {
         BeanRegistration<?> result = this.dependentFactory;
         this.dependentFactory = null;
@@ -391,6 +448,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     }
 
     @Override
+    @Nullable
     public List<BeanRegistration<?>> popDependentBeans() {
         List<BeanRegistration<?>> result = this.dependentBeans;
         this.dependentBeans = null;
@@ -398,7 +456,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     }
 
     @Override
-    public void pushDependentBeans(List<BeanRegistration<?>> dependentBeans) {
+    public void pushDependentBeans(@Nullable List<BeanRegistration<?>> dependentBeans) {
         if (this.dependentBeans != null && !this.dependentBeans.isEmpty()) {
             throw new IllegalStateException("Found existing dependent beans!");
         }
@@ -411,6 +469,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     }
 
     @Override
+    @Nullable
     public final BeanDefinition getRootDefinition() {
         return rootDefinition;
     }
@@ -421,7 +480,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     }
 
     @Override
-    public final Object setAttribute(CharSequence key, Object value) {
+    public final Object setAttribute(CharSequence key, @Nullable Object value) {
         return getAttributesOrCreate().put(key, value);
     }
 
@@ -430,6 +489,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
      * @return The attribute value
      */
     @Override
+    @Nullable
     public final Object getAttribute(CharSequence key) {
         if (attributes == null) {
             return null;
@@ -438,6 +498,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     }
 
     @Override
+    @Nullable
     public final Object removeAttribute(CharSequence key) {
         if (attributes != null && key != null) {
             return attributes.remove(key);
@@ -446,12 +507,13 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     }
 
     @Override
+    @Nullable
     public Map<CharSequence, Object> getAttributes() {
         return attributes;
     }
 
     @Override
-    public void setAttributes(Map<CharSequence, Object> attributes) {
+    public void setAttributes(@Nullable Map<CharSequence, Object> attributes) {
         this.attributes = attributes;
     }
 
@@ -490,16 +552,24 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         return Optional.empty();
     }
 
-    protected void onNewSegment(Segment<?, ?> segment) {
-        //no-op
-    }
-
-    @NonNull
     private Map<CharSequence, Object> getAttributesOrCreate() {
         if (attributes == null) {
             attributes = new LinkedHashMap<>(2);
         }
         return attributes;
+    }
+
+    public final <T> Collection<BeanDefinition<T>> findBeanDefinitions(Argument<T> argument, @Nullable BeanDefinition<?> bd) {
+        return context.findBeanCandidates(this, argument, bd);
+    }
+
+    public final <T> BeanRegistration<T> getBeanRegistration(Argument<T> argument, @Nullable Qualifier<T> qualifier) {
+        return context.getBeanRegistration(this, argument, qualifier);
+    }
+
+    @Override
+    public <T> T getProxyTargetBean(BeanDefinition<T> definition, Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+        return context.getProxyTargetBean(this, definition, beanType, qualifier);
     }
 
     /**
@@ -522,7 +592,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
             String spaces = "";
             while (i.hasNext()) {
-                pathString.append(i.next().toString());
+                pathString.append(i.next());
                 if (i.hasNext()) {
                     pathString
                         .append(ls)
@@ -627,26 +697,22 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
         @Override
         public Path pushBeanCreate(BeanDefinition<?> declaringType, Argument<?> beanType) {
-            if (traceEnabled) {
-                traceMode.getTracer().ifPresent(tracer -> {
-                    tracer.traceBeanCreation(
-                        AbstractBeanResolutionContext.this,
-                        declaringType,
-                        beanType
-                    );
-                });
+            if (tracer != null) {
+                tracer.traceBeanCreation(
+                    AbstractBeanResolutionContext.this,
+                    declaringType,
+                    beanType
+                );
             }
             return pushConstructorResolve(declaringType, beanType);
         }
 
         private void traceResolution() {
-            if (traceEnabled) {
-                getPath().currentSegment().ifPresent(segment -> traceMode.getTracer().ifPresent(tracer -> {
-                    tracer.traceInjectBean(
-                        AbstractBeanResolutionContext.this,
-                        segment
-                    );
-                }));
+            if (tracer != null) {
+                getPath().currentSegment().ifPresent(segment -> tracer.traceInjectBean(
+                    AbstractBeanResolutionContext.this,
+                    segment
+                ));
             }
         }
 
@@ -801,30 +867,22 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         }
 
         @Override
-        public void push(Segment<?, ?> segment) {
-            super.push(segment);
-            AbstractBeanResolutionContext.this.onNewSegment(segment);
-        }
-
-        @Override
         public void close() {
-            if (traceEnabled) {
-                traceMode.getTracer().ifPresent(tracer -> {
-                    if (isEmpty()) {
-                        tracer.traceBeanCreated(
+            if (tracer != null && rootDefinition != null) {
+                if (isEmpty()) {
+                    tracer.traceBeanCreated(
+                        AbstractBeanResolutionContext.this,
+                        rootDefinition
+                    );
+                } else {
+                    Segment<?, ?> segment = peek();
+                    if (segment != null) {
+                        tracer.traceInjectComplete(
                             AbstractBeanResolutionContext.this,
-                            rootDefinition
+                            segment
                         );
-                    } else {
-                        Segment<?, ?> segment = peek();
-                        if (segment != null) {
-                            tracer.traceInjectComplete(
-                                AbstractBeanResolutionContext.this,
-                                segment
-                            );
-                        }
                     }
-                });
+                }
             }
             Path.super.close();
         }
@@ -834,7 +892,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
      * A segment that represents a method argument.
      */
     public static final class ConstructorArgumentSegment extends ConstructorSegment implements ArgumentInjectionPoint<Object, Object> {
-        public ConstructorArgumentSegment(BeanDefinition<Object> declaringType, Qualifier<Object> qualifier, String methodName, Argument<Object> argument, Argument<Object>[] arguments) {
+        public ConstructorArgumentSegment(BeanDefinition<Object> declaringType, @Nullable Qualifier<Object> qualifier, String methodName, Argument<Object> argument, Argument<Object>[] arguments) {
             super(declaringType, qualifier, methodName, argument, arguments);
         }
 
@@ -844,6 +902,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         }
 
         @Override
+        @Nullable
         public Qualifier<Object> getDeclaringBeanQualifier() {
             return getDeclaringTypeQualifier();
         }
@@ -866,7 +925,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
          * @param argument                The argument
          * @param arguments               The arguments
          */
-        ConstructorSegment(BeanDefinition<Object> declaringBeanDefinition, Qualifier<Object> qualifier, String methodName, Argument<Object> argument, Argument<Object>[] arguments) {
+        ConstructorSegment(BeanDefinition<Object> declaringBeanDefinition, @Nullable Qualifier<Object> qualifier, String methodName, Argument<Object> argument, Argument<Object>[] arguments) {
             super(declaringBeanDefinition, qualifier, declaringBeanDefinition.getBeanType().getName(), argument);
             this.methodName = methodName;
             this.arguments = arguments;
@@ -877,7 +936,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             return toConsoleString(false);
         }
 
-        @NonNull
+        @Override
         public String toConsoleString(boolean ansiSupported) {
             StringBuilder baseString;
             BeanDefinition<Object> declaringType = getDeclaringType();
@@ -916,7 +975,6 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             return this;
         }
 
-        @NonNull
         @Override
         public CallableInjectionPoint<Object> getOuterInjectionPoint() {
             return getDeclaringType().getConstructor();
@@ -928,6 +986,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         }
 
         @Override
+        @Nullable
         public Qualifier<Object> getDeclaringBeanQualifier() {
             return ConstructorSegment.this.getDeclaringTypeQualifier();
         }
@@ -943,14 +1002,15 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
      * A segment that represents a method argument.
      */
     public static final class MethodArgumentSegment extends MethodSegment<Object, Object> implements ArgumentInjectionPoint<Object, Object> {
+        @Nullable
         private final MethodSegment<Object, Object> outer;
 
         public MethodArgumentSegment(BeanDefinition<Object> declaringType,
-                                     Qualifier<Object> qualifier,
+                                     @Nullable Qualifier<Object> qualifier,
                                      String methodName,
                                      Argument<Object> argument,
                                      Argument<Object>[] arguments,
-                                     MethodSegment<Object, Object> outer) {
+                                     @Nullable MethodSegment<Object, Object> outer) {
             super(declaringType, qualifier, methodName, argument, arguments);
             this.outer = outer;
         }
@@ -1053,7 +1113,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
          * @param argument      The argument
          * @param arguments     The arguments
          */
-        MethodSegment(BeanDefinition<B> declaringType, Qualifier<B> qualifier, String methodName, Argument<T> argument, Argument<Object>[] arguments) {
+        MethodSegment(BeanDefinition<B> declaringType, @Nullable Qualifier<B> qualifier, String methodName, Argument<T> argument, Argument<Object>[] arguments) {
             super(declaringType, qualifier, methodName, argument);
             this.arguments = arguments;
         }
@@ -1098,6 +1158,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         }
 
         @Override
+        @Nullable
         public Qualifier<B> getDeclaringBeanQualifier() {
             return getDeclaringTypeQualifier();
         }
@@ -1113,7 +1174,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
          * @param qualifier      The qualifier
          * @param argument       The argument
          */
-        FieldSegment(BeanDefinition<B> declaringClass, Qualifier<B> qualifier, Argument<T> argument) {
+        FieldSegment(BeanDefinition<B> declaringClass, @Nullable Qualifier<B> qualifier, Argument<T> argument) {
             super(declaringClass, qualifier, argument.getName(), argument);
         }
 
@@ -1162,6 +1223,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         }
 
         @Override
+        @Nullable
         public Qualifier<B> getDeclaringBeanQualifier() {
             return getDeclaringTypeQualifier();
         }
@@ -1179,7 +1241,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
          * @param qualifier      The qualifier
          * @param argument       The argument
          */
-        AnnotationSegment(BeanDefinition<B> beanDefinition, Qualifier<B> qualifier, Argument<B> argument) {
+        AnnotationSegment(BeanDefinition<B> beanDefinition, @Nullable Qualifier<B> qualifier, Argument<B> argument) {
             super(beanDefinition, qualifier, argument.getName(), argument);
         }
 
@@ -1204,6 +1266,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         }
 
         @Override
+        @Nullable
         public Qualifier<B> getDeclaringBeanQualifier() {
             return getDeclaringTypeQualifier();
         }
@@ -1231,7 +1294,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
          * @param name           The name
          * @param argument       The argument
          */
-        AbstractSegment(BeanDefinition<B> declaringClass, Qualifier<B> qualifier, String name, Argument<T> argument) {
+        AbstractSegment(BeanDefinition<B> declaringClass, @Nullable Qualifier<B> qualifier, String name, Argument<T> argument) {
             this.declaringComponent = declaringClass;
             this.qualifier = qualifier;
             this.name = name;
@@ -1275,6 +1338,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         }
 
         @Override
+        @Nullable
         public Qualifier<B> getDeclaringTypeQualifier() {
             return qualifier == null ? declaringComponent.getDeclaredQualifier() : qualifier;
         }

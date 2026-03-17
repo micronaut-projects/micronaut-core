@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.binding
 
+import com.fasterxml.jackson.annotation.JsonProperty
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.convert.format.Format
@@ -47,10 +48,7 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
             throw t
         }).blockFirst()
         HttpStatus status = response.status
-        String body = null
-        if (status == HttpStatus.OK) {
-            body = response.body()
-        }
+        String body = response.body()
 
         expect:
         body == result
@@ -58,16 +56,12 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
 
         where:
         httpMethod      | uri                                             | result                      | httpStatus
-        // you can't populate post request data from query parameters without explicit @QueryValue
-        HttpMethod.POST | '/parameter/save?max=30'                        | null                        | HttpStatus.BAD_REQUEST
         HttpMethod.GET  | '/parameter/path/20/foo/10'                     | "Parameter Values: 20 10"   | HttpStatus.OK
         HttpMethod.GET  | '/parameter/path/20/bar/10'                     | "Parameter Values: 20 10"   | HttpStatus.OK
         HttpMethod.GET  | '/parameter/path/20/bar'                        | "Parameter Values: 20 "     | HttpStatus.OK
         HttpMethod.GET  | '/parameter/named?maximum=20'                   | "Parameter Value: 20"       | HttpStatus.OK
         HttpMethod.POST | '/parameter/save-again?max=30'                  | "Parameter Value: 30"       | HttpStatus.OK
         HttpMethod.GET  | '/parameter/path/20'                            | "Parameter Value: 20"       | HttpStatus.OK
-        HttpMethod.GET  | '/parameter/simple'                             | null                        | HttpStatus.BAD_REQUEST
-        HttpMethod.GET  | '/parameter/named'                              | null                        | HttpStatus.BAD_REQUEST
         HttpMethod.GET  | '/parameter/overlap/30'                         | "Parameter Value: 30"       | HttpStatus.OK
         HttpMethod.GET  | '/parameter/overlap/30?max=50'                  | "Parameter Value: 30"       | HttpStatus.OK
         HttpMethod.GET  | '/parameter/map?values.max=20&values.offset=30' | "Parameter Value: 20 30"    | HttpStatus.OK
@@ -90,6 +84,26 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
         HttpMethod.GET  | '/parameter/queryName/Fr%20ed'                  | "Parameter Value: Fr ed"    | HttpStatus.OK
         HttpMethod.POST | '/parameter/query?name=Fr%20ed'                 | "Parameter Value: Fr ed"    | HttpStatus.OK
         HttpMethod.GET  | '/parameter/arrayStyle?param[]=a&param[]=b&param[]=c' | "Parameter Value: [a, b, c]"    | HttpStatus.OK
+
+        HttpMethod.GET  | '/parameter/query-object?age=30&title=JavaBook&author=JavaAuthor' | "Parameter Value: 30 JavaBook" | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/query-record?page=1&size=123' | "Parameter Value: 1 123" | HttpStatus.OK
+    }
+
+    // you can't populate post request data from query parameters without explicit @QueryValue
+    void "test post request without explicit QueryValue"() {
+        given:
+        HttpRequest req = HttpRequest.POST('/parameter/save?max=30', '{}')
+        Flux exchange = Flux.from(httpClient.exchange(req, String))
+        HttpResponse response = exchange.onErrorResume(t -> {
+            if (t instanceof HttpClientResponseException) {
+                return Flux.just(((HttpClientResponseException) t).response)
+            }
+            throw t
+        }).blockFirst()
+
+        expect:
+        response.status() == HttpStatus.BAD_REQUEST
+        response.body().contains("Required argument [Integer max] not specified")
     }
 
     void "test list to single error"() {
@@ -105,7 +119,70 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
 
         expect:
         response.status() == HttpStatus.BAD_REQUEST
-        response.body().contains('Unexpected token (VALUE_STRING), expected END_ARRAY')
+    }
+
+    void "test conversion error for simple binding"() {
+        given:
+        HttpRequest req = HttpRequest.GET('/parameter/simple?max=a')
+        Flux exchange = Flux.from(httpClient.exchange(req, String))
+        HttpResponse response = exchange.onErrorResume(t -> {
+            if (t instanceof HttpClientResponseException) {
+                return Flux.just(((HttpClientResponseException) t).response)
+            }
+            throw t
+        }).blockFirst()
+
+        expect:
+        response.status() == HttpStatus.BAD_REQUEST
+        response.body().contains("Failed to convert argument [max] for value [a]")
+    }
+
+    void "test conversion error for object binding"() {
+        given:
+        HttpRequest req = HttpRequest.GET('/parameter/query-object?age=abc&title=JavaBook&author=JavaAuthor')
+        Flux exchange = Flux.from(httpClient.exchange(req, String))
+        HttpResponse response = exchange.onErrorResume(t -> {
+            if (t instanceof HttpClientResponseException) {
+                return Flux.just(((HttpClientResponseException) t).response)
+            }
+            throw t
+        }).blockFirst()
+
+        expect:
+        response.status() == HttpStatus.BAD_REQUEST
+        response.body().contains("Failed to convert argument [book] for value [Integer age]")
+    }
+
+    void "test simple binding without argument specified"() {
+        given:
+        HttpRequest req = HttpRequest.GET('/parameter/simple')
+        Flux exchange = Flux.from(httpClient.exchange(req, String))
+        HttpResponse response = exchange.onErrorResume(t -> {
+            if (t instanceof HttpClientResponseException) {
+                return Flux.just(((HttpClientResponseException) t).response)
+            }
+            throw t
+        }).blockFirst()
+
+        expect:
+        response.status() == HttpStatus.BAD_REQUEST
+        response.body().contains("Required QueryValue [max] not specified")
+    }
+
+    void "test named binding without argument specified"() {
+        given:
+        HttpRequest req = HttpRequest.GET('/parameter/named')
+        Flux exchange = Flux.from(httpClient.exchange(req, String))
+        HttpResponse response = exchange.onErrorResume(t -> {
+            if (t instanceof HttpClientResponseException) {
+                return Flux.just(((HttpClientResponseException) t).response)
+            }
+            throw t
+        }).blockFirst()
+
+        expect:
+        response.status() == HttpStatus.BAD_REQUEST
+        response.body().contains("Required QueryValue [maximum] not specified")
     }
 
     @Requires(property = 'spec.name', value = 'ParameterBindingSpec')
@@ -229,6 +306,16 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
             "Parameter Value: $params"
         }
 
+        @Get('/query-object')
+        String queryObject(@QueryValue Book book) {
+            "Parameter Value: $book.age $book.title"
+        }
+
+        @Get('/query-record')
+        String queryRecord(@QueryValue PaginationRequest paginationRequest) {
+            "Parameter Value: $paginationRequest.page $paginationRequest.size"
+        }
+
 
         @Introspected
         static class Book {
@@ -237,7 +324,9 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
             private String author
             private int age
 
-            Book(String title, Integer age, @Nullable String author) {
+            Book(@JsonProperty("title") String title,
+                 @JsonProperty("age") Integer age,
+                 @JsonProperty("author") @Nullable String author) {
                 this.age = age
                 this.title = title
                 this.author = author
@@ -250,7 +339,7 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
             int getAge() {
                 return age
             }
-
         }
+
     }
 }

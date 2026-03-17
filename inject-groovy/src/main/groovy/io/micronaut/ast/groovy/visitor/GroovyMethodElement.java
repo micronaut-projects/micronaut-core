@@ -17,8 +17,8 @@ package io.micronaut.ast.groovy.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementModifier;
@@ -157,7 +157,7 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
 
     @Override
     public boolean isAbstract() {
-        return methodNode.isAbstract();
+        return methodNode.isDefault() ? false : methodNode.isAbstract();
     }
 
     @Override

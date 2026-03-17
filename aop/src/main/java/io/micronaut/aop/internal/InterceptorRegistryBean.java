@@ -23,13 +23,14 @@ import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
 import io.micronaut.inject.InstantiatableBeanDefinition;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
+import java.util.Set;
 
 /**
  * Registers the {@link InterceptorRegistry} instance.
@@ -48,11 +49,38 @@ public final class InterceptorRegistryBean implements InstantiatableBeanDefiniti
     }
 
     @Override
-    public boolean isEnabled(@NonNull BeanContext context, BeanResolutionContext resolutionContext) {
+    public Class<?>[] getIndexes() {
+        return new Class[]{InterceptorRegistry.class};
+    }
+
+    @Override
+    public Set<Class<?>> getExposedTypes() {
+        return Set.of(
+            InterceptorRegistry.class,
+            DefaultInterceptorRegistry.class
+        );
+    }
+
+    @Override
+    public int getOrder() {
+        return 0;
+    }
+
+    @Override
+    public boolean isPrimary() {
+        return false;
+    }
+
+    @Override
+    public boolean isParallel() {
+        return false;
+    }
+
+    @Override
+    public boolean isEnabled(BeanContext context, @Nullable BeanResolutionContext resolutionContext) {
         return true;
     }
 
-    @NonNull
     @Override
     public Class<InterceptorRegistry> getBeanType() {
         return InterceptorRegistry.class;
@@ -88,13 +116,11 @@ public final class InterceptorRegistryBean implements InstantiatableBeanDefiniti
         return false;
     }
 
-    @NonNull
     @Override
-    public InterceptorRegistry instantiate(@NonNull BeanResolutionContext resolutionContext, @NonNull BeanContext context) throws BeanInstantiationException {
+    public InterceptorRegistry instantiate(BeanResolutionContext resolutionContext, BeanContext context) throws BeanInstantiationException {
         return new DefaultInterceptorRegistry(context);
     }
 
-    @NonNull
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
         return ANNOTATION_METADATA;

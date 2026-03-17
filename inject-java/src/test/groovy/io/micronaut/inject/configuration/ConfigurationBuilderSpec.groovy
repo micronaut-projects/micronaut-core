@@ -6,6 +6,54 @@ import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 
 class ConfigurationBuilderSpec extends AbstractTypeElementSpec {
 
+    void "test enums"() {
+        given:
+        ApplicationContext ctx = buildContext("test.TestProps", '''
+package test;
+
+import io.micronaut.context.annotation.*;
+import io.micronaut.inject.configuration.Engine;
+import java.util.Set;
+
+@ConfigurationProperties("test.props")
+final class TestProps {
+    @ConfigurationBuilder(prefixes = "set")
+    Something builder = new Something();
+
+    class Something {
+        private Set<Foo> foos = Set.of();
+
+        public Set<Foo> getFoos() {
+            return foos;
+        }
+
+        public void setFoos(Set<Foo> foos) {
+            this.foos = foos;
+        }
+    }
+
+
+    enum Foo {
+        BAR,
+        BAZ
+    }
+}
+''')
+        ctx.getEnvironment().addPropertySource(PropertySource.of(["test.props.foos": "BAR"]))
+
+        when:
+        Class<?> testProps = ctx.classLoader.loadClass("test.TestProps")
+        def testPropBean = ctx.getBean(testProps)
+
+        then:
+        noExceptionThrown()
+        testPropBean.builder.foos.size() == 1
+        testPropBean.builder.foos.first() instanceof Enum
+
+        cleanup:
+        ctx.close()
+    }
+
     void "test duplicate"() {
         when:
         ApplicationContext ctx = buildContext("test.MySQLClientConfiguration", '''
@@ -221,7 +269,7 @@ class DefaultConnectionPool implements ConnectionPool {
         return maxConcurrency;
     }
 
-    private static class DefaultBuilder implements ConnectionPool.Builder {
+    private static final class DefaultBuilder implements ConnectionPool.Builder {
 
         private int maxConcurrency;
 
@@ -355,7 +403,7 @@ class NestedConfig {
 package test;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.core.annotation.Nullable;import jakarta.inject.Inject;
+import org.jspecify.annotations.Nullable;import jakarta.inject.Inject;
 
 @ConfigurationProperties("product-aggregator")
 class NestedConfig {

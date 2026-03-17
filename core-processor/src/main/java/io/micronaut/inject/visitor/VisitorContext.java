@@ -17,14 +17,14 @@ package io.micronaut.inject.visitor;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.expressions.context.ExpressionCompilationContextFactory;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementFactory;
+import io.micronaut.inject.ast.PackageElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import io.micronaut.inject.writer.GeneratedFile;
@@ -32,9 +32,9 @@ import io.micronaut.inject.writer.GeneratedFile;
 import java.net.URI;
 import java.net.URL;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -51,6 +51,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     String MICRONAUT_PROCESSING_PROJECT_DIR = "micronaut.processing.project.dir";
     String MICRONAUT_PROCESSING_GROUP = "micronaut.processing.group";
     String MICRONAUT_PROCESSING_MODULE = "micronaut.processing.module";
+    String MICRONAUT_PROCESSING_USE_CONTEXT_CLASSLOADER = "micronaut.processing.use.context.classloader";
 
     /**
      * @return The visitor context's language.
@@ -64,7 +65,6 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * @return The element factory
      * @since 2.3.0
      */
-    @NonNull
     ElementFactory<?, ?, ?, ?> getElementFactory();
 
     /**
@@ -73,7 +73,6 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * @return The element annotation metadata factory
      * @since 4.0.0
      */
-    @NonNull
     ElementAnnotationMetadataFactory getElementAnnotationMetadataFactory();
 
     /**
@@ -81,7 +80,6 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * @since 4.0.0
      */
     @Experimental
-    @NonNull
     ExpressionCompilationContextFactory getExpressionCompilationContextFactory();
 
     /**
@@ -89,10 +87,9 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      *
      * @return The annotation metadata builder
      *
-     * @since  4.0.0
+     * @since 4.0.0
      */
     @Internal
-    @NonNull
     AbstractAnnotationMetadataBuilder<?, ?> getAnnotationMetadataBuilder();
 
     /**
@@ -129,7 +126,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     /**
      * @return The visitor configuration
      */
-    default @NonNull VisitorConfiguration getConfiguration() {
+    default VisitorConfiguration getConfiguration() {
         return VisitorConfiguration.DEFAULT;
     }
 
@@ -161,7 +158,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * @return An iterable of resources
      */
     @Experimental
-    default @NonNull Iterable<URL> getClasspathResources(@NonNull String path) {
+    default Iterable<URL> getClasspathResources(String path) {
         return Collections.emptyList();
     }
 
@@ -176,13 +173,13 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
             return projectDir;
         }
         // let's find the projectDir
-        Optional<GeneratedFile> dummyFile = visitGeneratedFile("dummy" + System.nanoTime());
+        Optional<GeneratedFile> dummyFile = visitGeneratedFile("dummy");
         if (dummyFile.isPresent()) {
             URI uri = dummyFile.get().toURI();
             // happens in tests 'mem:///CLASS_OUTPUT/dummy'
             if (uri.getScheme() != null && !uri.getScheme().equals("mem")) {
                 // assume files are generated in 'build' or 'target' directories
-                Path dummy = Paths.get(uri).normalize();
+                Path dummy = Path.of(uri).normalize();
                 while (dummy != null) {
                     Path dummyFileName = dummy.getFileName();
                     if (dummyFileName != null && ("build".equals(dummyFileName.toString()) || "target".equals(dummyFileName.toString()))) {
@@ -216,8 +213,12 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
         Optional<GeneratedFile> dummy = visitMetaInfFile("dummy", Element.EMPTY_ELEMENT_ARRAY);
         if (dummy.isPresent()) {
             // we want the parent directory of META-INF/dummy
-            Path classesOutputDir = Paths.get(dummy.get().toURI()).getParent().getParent();
-            return Optional.of(classesOutputDir);
+            Path parent = Path.of(dummy.get().toURI()).getParent();
+            if (parent == null) {
+                return Optional.empty();
+            }
+            Path classesOutputDir = parent.getParent();
+            return Optional.ofNullable(classesOutputDir);
         }
         return Optional.empty();
     }
@@ -276,8 +277,19 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * @param stereotypes The stereotypes
      * @return The class elements
      */
-    default @NonNull ClassElement[] getClassElements(@NonNull String aPackage, @NonNull String... stereotypes) {
+    default ClassElement[] getClassElements(String aPackage, String... stereotypes) {
         return ClassElement.ZERO_CLASS_ELEMENTS;
+    }
+
+    /**
+     * Find all the classes within the given package.
+     *
+     * @param packageElement    The package
+     * @return The class elements
+     * @see 4.10
+     */
+    default List<ClassElement> getClassElements(PackageElement packageElement) {
+        return List.of(getClassElements(packageElement.getName(), "*"));
     }
 
     /**
@@ -297,7 +309,9 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * The generated resources are intended to be strings paths relative to the classpath root.
      *
      * @return a possibly empty collection of resource paths
+     * @deprecated No longer used
      */
+    @Deprecated(forRemoval = true, since = "4.10")
     @Experimental
     default Collection<String> getGeneratedResources() {
         info("EXPERIMENTAL: Compile time resource contribution to the context is experimental", null);
@@ -309,7 +323,9 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * The generated resources are intended to be strings paths relative to the classpath root
      *
      * @param resource the relative path to add
+     * @deprecated No longer used
      */
+    @Deprecated(forRemoval = true, since = "4.10")
     @Experimental
     default void addGeneratedResource(String resource) {
         info("EXPERIMENTAL: Compile time resource contribution to the context is experimental", null);

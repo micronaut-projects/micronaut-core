@@ -1,3 +1,4 @@
+package io.micronaut.kotlin.processing.inject.configproperties
 //package io.micronaut.kotlin.processing.inject.configproperties
 //
 //

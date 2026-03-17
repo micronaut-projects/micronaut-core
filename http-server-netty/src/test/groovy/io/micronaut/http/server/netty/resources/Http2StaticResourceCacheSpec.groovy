@@ -1,7 +1,7 @@
 package io.micronaut.http.server.netty.resources
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.core.annotation.NonNull
+import org.jspecify.annotations.NonNull
 import io.micronaut.http.HttpHeaders
 import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.bootstrap.Bootstrap
@@ -29,6 +29,7 @@ import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler
 import io.netty.handler.ssl.SslContextBuilder
 import io.netty.handler.ssl.SupportedCipherSuiteFilter
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory
+import io.netty.util.ReferenceCountUtil
 import spock.lang.Specification
 
 import java.time.Instant
@@ -120,5 +121,6 @@ class Http2StaticResourceCacheSpec extends Specification {
         tempFile.delete()
         channel.close()
         embeddedServer.close()
+        ReferenceCountUtil.release(sslContext)
     }
 }

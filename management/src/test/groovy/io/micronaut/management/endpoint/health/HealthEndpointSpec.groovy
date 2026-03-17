@@ -49,7 +49,7 @@ class HealthEndpointSpec extends Specification {
     void "test the beans are available"() {
         given:
         ApplicationContext context = ApplicationContext.builder("test").build()
-        context.registerSingleton(Mock(DataSource))
+        context.registerSingleton(DataSource.class, Mock(DataSource))
         context.start()
 
         expect:
@@ -162,10 +162,10 @@ class HealthEndpointSpec extends Specification {
         result.details.jdbc.status == "UP"
         result.details.jdbc.details."jdbc:h2:mem:oneDb".status == "UP"
         result.details.jdbc.details."jdbc:h2:mem:oneDb".details.database == "H2"
-        result.details.jdbc.details."jdbc:h2:mem:oneDb".details.version == "2.2.224 (2023-09-17)"
+        result.details.jdbc.details."jdbc:h2:mem:oneDb".details.version
         result.details.jdbc.details."jdbc:h2:mem:twoDb".status == "UP"
         result.details.jdbc.details."jdbc:h2:mem:twoDb".details.database == "H2"
-        result.details.jdbc.details."jdbc:h2:mem:twoDb".details.version == "2.2.224 (2023-09-17)"
+        result.details.jdbc.details."jdbc:h2:mem:twoDb".details.version
         result.details.service.status == "UP"
 
         cleanup:

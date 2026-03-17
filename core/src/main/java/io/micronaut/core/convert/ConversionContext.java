@@ -21,7 +21,7 @@ import io.micronaut.core.type.TypeVariableResolver;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
 
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.lang.annotation.Annotation;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -111,6 +111,7 @@ public interface ConversionContext extends AnnotationMetadataProvider, TypeVaria
         ConversionContext thisContext = this;
         return new DefaultArgumentConversionContext(argument, thisContext.getLocale(), thisContext.getCharset()) {
             @Override
+            @Nullable
             public <T extends Annotation> T synthesize(Class<T> annotationClass) {
                 T annotation = childContext.synthesize(annotationClass);
                 if (annotation == null) {

@@ -16,7 +16,7 @@
 package io.micronaut.management.health.indicator.jdbc;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.async.publisher.AsyncSingleResultPublisher;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.health.HealthStatus;

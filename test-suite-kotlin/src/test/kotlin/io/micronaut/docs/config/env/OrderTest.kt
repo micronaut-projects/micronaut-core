@@ -1,19 +1,23 @@
 package io.micronaut.docs.config.env
 
-import io.kotest.core.spec.style.AnnotationSpec
-import io.kotest.matchers.shouldBe
 import io.micronaut.context.ApplicationContext
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Test
+import java.util.stream.Collectors
 
-class OrderTest: AnnotationSpec(){
+class OrderTest {
 
     @Test
     fun testOrderOnFactories() {
         val applicationContext = ApplicationContext.run()
         val rateLimits = applicationContext.streamOfType(RateLimit::class.java)
-            .toList()
-        rateLimits.size.toLong() shouldBe 2
-        rateLimits[0].limit.toLong() shouldBe 1000L
-        rateLimits[1].limit.toLong() shouldBe 100L
+                .collect(Collectors.toList())
+        assertEquals(
+                2,
+                rateLimits.size
+                        .toLong())
+        assertEquals(1000L, rateLimits[0].limit.toLong())
+        assertEquals(100L, rateLimits[1].limit.toLong())
         applicationContext.close()
     }
 }

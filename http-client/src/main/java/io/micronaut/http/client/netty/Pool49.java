@@ -16,15 +16,13 @@
 package io.micronaut.http.client.netty;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NullUnmarked;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.netty.channel.loom.EventLoopVirtualThreadScheduler;
-import io.micronaut.http.netty.channel.loom.PrivateLoomSupport;
-import io.micronaut.scheduling.LoomSupport;
 import io.netty.channel.EventLoop;
 import io.netty.channel.SingleThreadIoEventLoop;
 import io.netty.util.concurrent.EventExecutor;
@@ -52,6 +50,7 @@ import java.util.function.Function;
 /**
  * This class handles the concurrent aspects of pooling for {@link ConnectionManager}.
  */
+@NullUnmarked
 @Internal
 final class Pool49 implements Pool {
     private final Listener listener;
@@ -130,7 +129,7 @@ final class Pool49 implements Pool {
      * @param error The optional error
      */
     @Override
-    public void onNewConnectionFailure(@NonNull EventLoop eventLoop, @Nullable Throwable error) throws Exception {
+    public void onNewConnectionFailure(EventLoop eventLoop, @Nullable Throwable error) throws Exception {
         // todo: implement a circuit breaker here? right now, we just fail one connection in the
         //  subclass implementation, but maybe we should do more.
         LocalPoolPair poolPair = localPoolsByLoop.get(eventLoop);
@@ -144,12 +143,12 @@ final class Pool49 implements Pool {
     }
 
     @Override
-    public Pool.Http1PoolEntry createHttp1PoolEntry(@NonNull EventLoop eventLoop, @NonNull ResizerConnection connection) {
+    public Pool.Http1PoolEntry createHttp1PoolEntry(EventLoop eventLoop, ResizerConnection connection) {
         return new Http1PoolEntry(eventLoop, connection);
     }
 
     @Override
-    public Pool.Http2PoolEntry createHttp2PoolEntry(@NonNull EventLoop eventLoop, @NonNull ResizerConnection connection) {
+    public Pool.Http2PoolEntry createHttp2PoolEntry(EventLoop eventLoop, ResizerConnection connection) {
         return new Http2PoolEntry(eventLoop, connection);
     }
 
@@ -189,10 +188,9 @@ final class Pool49 implements Pool {
 
             EventExecutor currentExecutor = null;
 
-            if (PrivateLoomSupport.isSupported() &&
-                LoomSupport.isVirtual(Thread.currentThread()) &&
-                PrivateLoomSupport.getScheduler(Thread.currentThread()) instanceof EventLoopVirtualThreadScheduler el) {
-                currentExecutor = el.eventLoop();
+            EventLoopVirtualThreadScheduler elvts = EventLoopVirtualThreadScheduler.current();
+            if (elvts != null) {
+                currentExecutor = elvts.eventLoop();
             }
 
             if (currentExecutor == null) {
@@ -962,7 +960,7 @@ final class Pool49 implements Pool {
          * @return The flow
          */
         @Override
-        public @NonNull ExecutionFlow<ConnectionManager.PoolHandle> flow() {
+        public ExecutionFlow<ConnectionManager.PoolHandle> flow() {
             return sink;
         }
 

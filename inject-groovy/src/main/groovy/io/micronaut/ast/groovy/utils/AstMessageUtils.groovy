@@ -40,7 +40,7 @@ class AstMessageUtils {
      * @param node The AST node
      * @param message The message
      */
-    static void warning(SourceUnit sourceUnit, @Nullable ASTNode node, String message) {
+    static void warning(SourceUnit sourceUnit, @Nullable org.codehaus.groovy.ast.ASTNode node, String message) {
         final String sample = node ? sourceUnit.getSample(node.getLineNumber(), node.getColumnNumber(), new Janitor()) : null
         if (sample) {
             System.err.println("""WARNING: $message

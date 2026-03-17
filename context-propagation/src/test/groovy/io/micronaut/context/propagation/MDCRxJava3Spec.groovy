@@ -44,7 +44,7 @@ import java.time.Duration
 import java.util.concurrent.TimeUnit
 
 import static io.micronaut.http.annotation.Filter.MATCH_ALL_PATTERN
-import static io.micronaut.scheduling.TaskExecutors.IO
+import io.micronaut.scheduling.TaskExecutors
 
 class MDCRxJava3Spec extends Specification {
 
@@ -95,7 +95,7 @@ class MDCRxJava3Spec extends Specification {
         private MDCClient mdcClient
 
         @Post("/enter")
-        @ExecuteOn(IO)
+        @ExecuteOn(TaskExecutors.IO)
         String test(@Header("X-TrackingId") String tracingId, @Body SomeBody body) {
             LOG.debug("test1")
             checkTracing(tracingId)
@@ -103,7 +103,7 @@ class MDCRxJava3Spec extends Specification {
             return mdcClient.test2(tracingId)
         }
 
-        @ExecuteOn(IO)
+        @ExecuteOn(TaskExecutors.IO)
         @Get("/test2")
         Mono<String> test2(@Header("X-TrackingId") String tracingId) {
             LOG.debug("test2")
@@ -130,7 +130,7 @@ class MDCRxJava3Spec extends Specification {
             }
         }
 
-        @ExecuteOn(IO)
+        @ExecuteOn(TaskExecutors.IO)
         @Post("/test4")
         String test4(@Header("X-TrackingId") String tracingId, @Body SomeBody body) {
             LOG.debug("test4")

@@ -17,6 +17,8 @@ package io.micronaut.core.bind.exceptions;
 
 import io.micronaut.core.type.Argument;
 
+import java.util.Objects;
+
 /**
  * An exception thrown when an {@link io.micronaut.core.type.Argument} could not be satisfied
  * by a {@link io.micronaut.core.bind.ExecutableBinder}.
@@ -51,6 +53,11 @@ public class UnsatisfiedArgumentException extends RuntimeException {
      */
     public Argument<?> getArgument() {
         return argument;
+    }
+
+    @Override
+    public String getMessage() {
+        return Objects.requireNonNull(super.getMessage(), "Unsatisfied argument");
     }
 
     private static String buildMessage(Argument<?> argument) {

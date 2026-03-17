@@ -17,13 +17,11 @@ package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.annotation.processing.PostponeToNextRoundException;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementFactory;
 import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
-import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
@@ -51,16 +49,16 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
         this.visitorContext = Objects.requireNonNull(visitorContext, "Visitor context cannot be null");
     }
 
-    @NonNull
     @Override
-    public JavaClassElement newClassElement(@NonNull TypeElement type,
-                                            @NonNull ElementAnnotationMetadataFactory annotationMetadataFactory) {
+    public JavaClassElement newClassElement(TypeElement type,
+                                            ElementAnnotationMetadataFactory annotationMetadataFactory) {
         ElementKind kind = type.getKind();
         return switch (kind) {
             case ENUM -> new JavaEnumElement(
                 new JavaNativeElement.Class(type),
                 annotationMetadataFactory,
-                visitorContext
+                visitorContext,
+                null
             );
             case ANNOTATION_TYPE -> new JavaAnnotationElement(
                 new JavaNativeElement.Class(type),
@@ -75,34 +73,31 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
         };
     }
 
-    @NonNull
     @Override
-    public ClassElement newClassElement(@NonNull TypeElement type,
-                                        @NonNull ElementAnnotationMetadataFactory annotationMetadataFactory,
-                                        @NonNull Map<String, ClassElement> resolvedGenerics) {
+    public ClassElement newClassElement(TypeElement type,
+                                        ElementAnnotationMetadataFactory annotationMetadataFactory,
+                                        Map<String, ClassElement> resolvedGenerics) {
         if (resolvedGenerics.isEmpty()) {
             return newClassElement(type, annotationMetadataFactory);
         }
         return newClassElement(type, annotationMetadataFactory).withTypeArguments(resolvedGenerics);
     }
 
-    @NonNull
     @Override
-    public JavaClassElement newSourceClassElement(@NonNull TypeElement type, @NonNull ElementAnnotationMetadataFactory annotationMetadataFactory) {
+    public JavaClassElement newSourceClassElement(TypeElement type, ElementAnnotationMetadataFactory annotationMetadataFactory) {
         ElementKind kind = type.getKind();
         if (kind == ElementKind.ENUM) {
             return new JavaEnumElement(
                 new JavaNativeElement.Class(type),
                 annotationMetadataFactory,
-                visitorContext
+                visitorContext,
+                null
             ) {
-                @NonNull
                 @Override
-                public BeanElementBuilder addAssociatedBean(@NonNull ClassElement type) {
+                public BeanElementBuilder addAssociatedBean(ClassElement type) {
                     return new JavaBeanDefinitionBuilder(
                         this,
                         type,
-                        ConfigurationMetadataBuilder.INSTANCE,
                         annotationMetadataFactory,
                         visitorContext
                     );
@@ -114,13 +109,11 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
                 annotationMetadataFactory,
                 visitorContext
             ) {
-                @NonNull
                 @Override
-                public BeanElementBuilder addAssociatedBean(@NonNull ClassElement type) {
+                public BeanElementBuilder addAssociatedBean(ClassElement type) {
                     return new JavaBeanDefinitionBuilder(
                         this,
                         type,
-                        ConfigurationMetadataBuilder.INSTANCE,
                         annotationMetadataFactory,
                         visitorContext
                     );
@@ -129,11 +122,10 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
         }
     }
 
-    @NonNull
     @Override
-    public JavaMethodElement newSourceMethodElement(@NonNull ClassElement declaringClass,
-                                                    @NonNull ExecutableElement method,
-                                                    @NonNull ElementAnnotationMetadataFactory annotationMetadataFactory) {
+    public JavaMethodElement newSourceMethodElement(ClassElement declaringClass,
+                                                    ExecutableElement method,
+                                                    ElementAnnotationMetadataFactory annotationMetadataFactory) {
         validateOwningClass(declaringClass);
         failIfPostponeIsNeeded(declaringClass, method);
         return new JavaMethodElement(
@@ -142,13 +134,11 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
             annotationMetadataFactory,
             visitorContext
         ) {
-            @NonNull
             @Override
-            public BeanElementBuilder addAssociatedBean(@NonNull ClassElement type) {
+            public BeanElementBuilder addAssociatedBean(ClassElement type) {
                 return new JavaBeanDefinitionBuilder(
                     this,
                     type,
-                    ConfigurationMetadataBuilder.INSTANCE,
                     annotationMetadataFactory,
                     visitorContext
                 );
@@ -156,11 +146,10 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
         };
     }
 
-    @NonNull
     @Override
-    public JavaMethodElement newMethodElement(@NonNull ClassElement owningType,
-                                              @NonNull ExecutableElement method,
-                                              @NonNull ElementAnnotationMetadataFactory annotationMetadataFactory) {
+    public JavaMethodElement newMethodElement(ClassElement owningType,
+                                              ExecutableElement method,
+                                              ElementAnnotationMetadataFactory annotationMetadataFactory) {
         validateOwningClass(owningType);
         failIfPostponeIsNeeded(owningType, method);
         return new JavaMethodElement(
@@ -171,11 +160,10 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
         );
     }
 
-    @NonNull
     @Override
-    public JavaConstructorElement newConstructorElement(@NonNull ClassElement owningType,
-                                                        @NonNull ExecutableElement constructor,
-                                                        @NonNull ElementAnnotationMetadataFactory annotationMetadataFactory) {
+    public JavaConstructorElement newConstructorElement(ClassElement owningType,
+                                                        ExecutableElement constructor,
+                                                        ElementAnnotationMetadataFactory annotationMetadataFactory) {
         validateOwningClass(owningType);
         failIfPostponeIsNeeded(owningType, constructor);
         return new JavaConstructorElement(
@@ -186,11 +174,10 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
         );
     }
 
-    @NonNull
     @Override
-    public JavaEnumConstantElement newEnumConstantElement(@NonNull ClassElement owningType,
-                                                          @NonNull VariableElement enumConstant,
-                                                          @NonNull ElementAnnotationMetadataFactory annotationMetadataFactory) {
+    public JavaEnumConstantElement newEnumConstantElement(ClassElement owningType,
+                                                          VariableElement enumConstant,
+                                                          ElementAnnotationMetadataFactory annotationMetadataFactory) {
         if (!(owningType instanceof JavaEnumElement)) {
             throw new IllegalArgumentException("Declaring class must be a JavaEnumElement");
         }
@@ -203,11 +190,10 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
         );
     }
 
-    @NonNull
     @Override
-    public JavaFieldElement newFieldElement(@NonNull ClassElement owningType,
-                                            @NonNull VariableElement field,
-                                            @NonNull ElementAnnotationMetadataFactory annotationMetadataFactory) {
+    public JavaFieldElement newFieldElement(ClassElement owningType,
+                                            VariableElement field,
+                                            ElementAnnotationMetadataFactory annotationMetadataFactory) {
         failIfPostponeIsNeeded(owningType, field);
         return new JavaFieldElement(
             (JavaClassElement) owningType,

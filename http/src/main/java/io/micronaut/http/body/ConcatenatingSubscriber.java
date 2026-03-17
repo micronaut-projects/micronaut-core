@@ -16,17 +16,18 @@
 package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.io.buffer.LeakTracker;
+import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.core.io.buffer.ReadBufferFactory;
 import io.micronaut.http.body.stream.BaseSharedBuffer;
+import io.micronaut.http.body.stream.BaseStreamingByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
 import reactor.core.CoreSubscriber;
-import reactor.core.publisher.Flux;
 
-import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
 /**
@@ -37,18 +38,38 @@ import java.nio.charset.StandardCharsets;
  * @author Jonas Konrad
  */
 @Internal
-public abstract class ConcatenatingSubscriber implements BufferConsumer.Upstream, CoreSubscriber<ByteBody>, BufferConsumer {
+public class ConcatenatingSubscriber implements BufferConsumer.Upstream, CoreSubscriber<ByteBody>, BufferConsumer {
+    protected final BaseSharedBuffer sharedBuffer;
+    protected final BaseStreamingByteBody<?> rootBody;
+
+    private final ByteBodyFactory byteBodyFactory;
+    private final Separators separators;
+
     private long forwarded;
     private long consumed;
 
-    private Subscription subscription;
+    private @Nullable Subscription subscription;
     private boolean cancelled;
     private volatile boolean disregardBackpressure;
     private boolean first = true;
-    private BufferConsumer.Upstream currentComponent;
+    private BufferConsumer.@Nullable Upstream currentComponent;
     private boolean start = false;
     private boolean delayedSubscriberCompletion = false;
     private boolean currentComponentDone = false;
+
+    public ConcatenatingSubscriber(ByteBodyFactory byteBodyFactory, Separators separators) {
+        this.byteBodyFactory = byteBodyFactory;
+        this.separators = separators;
+        ByteBodyFactory.StreamingBody sb = byteBodyFactory.createStreamingBody(BodySizeLimits.UNLIMITED, this);
+        this.sharedBuffer = sb.sharedBuffer();
+        this.rootBody = sb.rootBody();
+    }
+
+    public static CloseableByteBody concatenate(ByteBodyFactory byteBodyFactory, Publisher<ByteBody> publisher, Separators separators) {
+        ConcatenatingSubscriber subscriber = new ConcatenatingSubscriber(byteBodyFactory, separators);
+        publisher.subscribe(subscriber);
+        return subscriber.rootBody;
+    }
 
     @Override
     public final void onSubscribe(Subscription s) {
@@ -70,20 +91,24 @@ public abstract class ConcatenatingSubscriber implements BufferConsumer.Upstream
      * Called before any new {@link ByteBody} component to emit an additional separator.
      *
      * @param first {@code true} iff this is the first element (i.e. the start of the output)
-     * @return The number of bytes written for {@link #onBytesConsumed} accounting
      */
-    protected long emitLeadingSeparator(boolean first) {
-        return 0;
+    private void emitLeadingSeparator(boolean first) {
+        ReadBuffer rb = first ? separators.beforeFirst : separators.between;
+        if (rb != null) {
+            add(rb.duplicate());
+        }
     }
 
     /**
      * Called before after all {@link ByteBody} components to emit additional trailing bytes.
      *
      * @param first {@code true} iff this is the first element, i.e. there were no component {@link ByteBody}s
-     * @return The number of bytes written for {@link #onBytesConsumed} accounting
      */
-    protected long emitFinalSeparator(boolean first) {
-        return 0;
+    private void emitFinalSeparator(boolean first) {
+        ReadBuffer rb = first ? separators.empty : separators.afterLast;
+        if (rb != null) {
+            add(rb.duplicate());
+        }
     }
 
     @Override
@@ -95,12 +120,7 @@ public abstract class ConcatenatingSubscriber implements BufferConsumer.Upstream
             }
         }
 
-        long emitted = emitFinalSeparator(first);
-        if (emitted != 0) {
-            synchronized (this) {
-                forwarded += emitted;
-            }
-        }
+        emitFinalSeparator(first);
         forwardComplete();
     }
 
@@ -117,8 +137,16 @@ public abstract class ConcatenatingSubscriber implements BufferConsumer.Upstream
      * component backpressure, or {@code null} if all bytes were written immediately (as is the
      * case for an {@link AvailableByteBody})
      */
-    @Nullable
-    protected abstract BufferConsumer.Upstream forward(ByteBody body);
+    protected final BufferConsumer.@Nullable Upstream forward(ByteBody body) {
+        if (body instanceof AvailableByteBody abb) {
+            add(abb.toReadBuffer());
+            complete();
+            return null;
+        }
+        try (BaseStreamingByteBody<?> s = byteBodyFactory.toStreaming(body)) {
+            return s.primary(this);
+        }
+    }
 
     /**
      * Should be called by the subclass when bytes are sent to the sharedBuffer, for
@@ -134,7 +162,7 @@ public abstract class ConcatenatingSubscriber implements BufferConsumer.Upstream
 
     @Override
     public final void onNext(ByteBody body) {
-        onForward(emitLeadingSeparator(first));
+        emitLeadingSeparator(first);
         first = false;
 
         BufferConsumer.Upstream component = forward(body);
@@ -160,6 +188,9 @@ public abstract class ConcatenatingSubscriber implements BufferConsumer.Upstream
     public final void start() {
         Subscription initialDemand;
         synchronized (this) {
+            if (start) {
+                throw new IllegalStateException("Already started");
+            }
             initialDemand = subscription;
             start = true;
         }
@@ -189,7 +220,9 @@ public abstract class ConcatenatingSubscriber implements BufferConsumer.Upstream
             currentComponent.onBytesConsumed(bytesConsumed);
         } else if (requestNewComponent) {
             // Previous component is now fully consumed, request a new one.
-            subscription.request(1);
+            if (subscription != null) {
+                subscription.request(1);
+            }
         }
     }
 
@@ -223,6 +256,13 @@ public abstract class ConcatenatingSubscriber implements BufferConsumer.Upstream
     }
 
     @Override
+    public void add(ReadBuffer buffer) {
+        int n = buffer.readable();
+        onForward(n);
+        sharedBuffer.add(buffer);
+    }
+
+    @Override
     public final void complete() {
         boolean delayedSubscriberCompletion;
         boolean requestNextComponent;
@@ -237,96 +277,74 @@ public abstract class ConcatenatingSubscriber implements BufferConsumer.Upstream
             onComplete();
         } else if (requestNextComponent) {
             // current component completed. request the next ByteBody
-            subscription.request(1);
+            if (subscription != null) {
+                subscription.request(1);
+            }
         }
         // if requestNextComponent is false, then the last component has not been fully consumed yet. we'll request the next later.
     }
 
     @Override
     public final void error(Throwable e) {
-        subscription.cancel();
+        Subscription s = subscription;
+        if (s != null) {
+            s.cancel();
+        }
         forwardError(e);
     }
 
     /**
      * Forward completion to the shared buffer.
      */
-    protected abstract void forwardComplete();
+    protected void forwardComplete() {
+        sharedBuffer.complete();
+    }
 
     /**
      * Forward an error to the shared buffer.
      *
      * @param t The error
      */
-    protected abstract void forwardError(Throwable t);
-
-    /**
-     * Concatenating implementation that writes to a {@link ReactiveByteBufferByteBody}.
-     */
-    public static class ByteBufferConcatenatingSubscriber extends ConcatenatingSubscriber implements ReactiveByteBufferByteBody.ByteBufferConsumer {
-        final ReactiveByteBufferByteBody.SharedBuffer sharedBuffer = new ReactiveByteBufferByteBody.SharedBuffer(BodySizeLimits.UNLIMITED, this);
-
-        private ByteBufferConcatenatingSubscriber() {
-        }
-
-        public static CloseableByteBody concatenate(Publisher<ByteBody> publisher) {
-            ByteBufferConcatenatingSubscriber subscriber = new ByteBufferConcatenatingSubscriber();
-            publisher.subscribe(subscriber);
-            return new ReactiveByteBufferByteBody(subscriber.sharedBuffer);
-        }
-
-        @Override
-        protected Upstream forward(ByteBody body) {
-            return ByteBufferBodyAdapter.adapt(Flux.from(body.toByteArrayPublisher()).map(ByteBuffer::wrap)).primary(this);
-        }
-
-        @Override
-        public void add(@NonNull ByteBuffer buffer) {
-            int n = buffer.remaining();
-            onForward(n);
-            sharedBuffer.add(buffer);
-        }
-
-        @Override
-        protected void forwardComplete() {
-            sharedBuffer.complete();
-        }
-
-        @Override
-        protected void forwardError(Throwable t) {
-            sharedBuffer.error(t);
-        }
+    protected void forwardError(Throwable t) {
+        sharedBuffer.error(t);
     }
 
     /**
-     * Concatenating implementation that writes to a {@link ReactiveByteBufferByteBody}, with
-     * JSON-style separators.
+     * Fixed buffers to insert before, after and between items.
+     *
+     * @param beforeFirst If there are any items, the buffer to insert before the first one
+     * @param afterLast If there are any items, the buffer to insert after the last one
+     * @param between Buffer to insert between any items
+     * @param empty Buffer to insert if there are no items
      */
-    public static final class JsonByteBufferConcatenatingSubscriber extends ByteBufferConcatenatingSubscriber {
-        private static final ByteBuffer START_ARRAY = ByteBuffer.wrap("[".getBytes(StandardCharsets.UTF_8));
-        private static final ByteBuffer END_ARRAY = ByteBuffer.wrap("]".getBytes(StandardCharsets.UTF_8));
-        private static final ByteBuffer SEPARATOR = ByteBuffer.wrap(",".getBytes(StandardCharsets.UTF_8));
-        private static final ByteBuffer EMPTY_ARRAY = ByteBuffer.wrap("[]".getBytes(StandardCharsets.UTF_8));
+    public record Separators(
+        @Nullable ReadBuffer beforeFirst,
+        @Nullable ReadBuffer afterLast,
+        @Nullable ReadBuffer between,
+        @Nullable ReadBuffer empty
+    ) {
+        /**
+         * No separators.
+         */
+        public static final Separators NONE = new Separators(null, null, null, null);
+        /**
+         * {@link #jsonSeparators(ReadBufferFactory)} using {@link ReadBufferFactory#getJdkFactory()}.
+         */
+        public static final Separators JDK_JSON = LeakTracker.Factory.staticInitializer(() -> jsonSeparators(ReadBufferFactory.getJdkFactory()));
 
-        private JsonByteBufferConcatenatingSubscriber() {
-        }
-
-        public static CloseableByteBody concatenateJson(Publisher<ByteBody> publisher) {
-            JsonByteBufferConcatenatingSubscriber subscriber = new JsonByteBufferConcatenatingSubscriber();
-            publisher.subscribe(subscriber);
-            return new ReactiveByteBufferByteBody(subscriber.sharedBuffer);
-        }
-
-        @Override
-        protected long emitLeadingSeparator(boolean first) {
-            sharedBuffer.add((first ? START_ARRAY : SEPARATOR).asReadOnlyBuffer());
-            return 1;
-        }
-
-        @Override
-        protected long emitFinalSeparator(boolean first) {
-            sharedBuffer.add((first ? EMPTY_ARRAY : END_ARRAY).asReadOnlyBuffer());
-            return first ? 2 : 1;
+        /**
+         * Create the appropriate separators for JSON using the given buffer factory.
+         *
+         * @param factory The factory to use
+         * @return The separators
+         */
+        public static Separators jsonSeparators(ReadBufferFactory factory) {
+            return new Separators(
+                factory.copyOf("[", StandardCharsets.UTF_8),
+                factory.copyOf("]", StandardCharsets.UTF_8),
+                factory.copyOf(",", StandardCharsets.UTF_8),
+                factory.copyOf("[]", StandardCharsets.UTF_8)
+            );
         }
     }
 }

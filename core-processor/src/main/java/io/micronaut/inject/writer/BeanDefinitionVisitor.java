@@ -16,8 +16,7 @@
 package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ast.ClassElement;
@@ -26,13 +25,14 @@ import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.TypedElement;
-import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
+import io.micronaut.inject.configuration.builder.ConfigurationBuilderDefinition;
 import io.micronaut.inject.visitor.VisitorContext;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Interface for {@link BeanDefinitionVisitor} implementations such as {@link BeanDefinitionWriter}.
@@ -52,7 +52,6 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
      */
     @Nullable
     Element getOriginatingElement();
-
 
     /**
      * <p>In the case where the produced class is produced by a factory method annotated with
@@ -111,24 +110,17 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
     /**
      * @return A map of the type arguments for the bean.
      */
-    @NonNull
     Map<String, ClassElement> getTypeArgumentMap();
 
     /**
      * @return The name of the bean definition reference class.
      */
-    @NonNull
     String getBeanDefinitionReferenceClassName();
 
     /**
      * @return Whether the provided type an interface
      */
     boolean isInterface();
-
-    /**
-     * @return Is the bean singleton
-     */
-    boolean isSingleton();
 
     /**
      * Visit a marker interface on the generated bean definition.
@@ -172,6 +164,12 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
     void setInterceptedType(String typeName);
 
     /**
+     * @param exposes The exposed types
+     * @since 5.0
+     */
+    void setExposes(Set<ClassElement> exposes);
+
+    /**
      * @return The intercepted type
      */
     Optional<String> getInterceptedType();
@@ -185,7 +183,6 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
      * @return The name of the bean definition class
      */
     String getBeanDefinitionName();
-
 
     /**
      * Finalize the bean definition to the given output stream.
@@ -337,7 +334,6 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
      * @param type               The type of the builder
      * @param field              The name of the field that represents the builder
      * @param annotationMetadata The annotation metadata associated with the field
-     * @param metadataBuilder    The {@link ConfigurationMetadataBuilder}
      * @param isInterface        Whether the builder type is an interface or not
      * @see io.micronaut.context.annotation.ConfigurationBuilder
      */
@@ -345,7 +341,6 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
             ClassElement type,
             String field,
             AnnotationMetadata annotationMetadata,
-            ConfigurationMetadataBuilder metadataBuilder,
             boolean isInterface);
 
     /**
@@ -354,7 +349,6 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
      * @param type               The type of the builder
      * @param methodName         The name of the method that returns the builder
      * @param annotationMetadata The annotation metadata associated with the field
-     * @param metadataBuilder    The {@link ConfigurationMetadataBuilder}
      * @param isInterface        Whether the builder type is an interface or not
      * @see io.micronaut.context.annotation.ConfigurationBuilder
      */
@@ -362,8 +356,17 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
             ClassElement type,
             String methodName,
             AnnotationMetadata annotationMetadata,
-            ConfigurationMetadataBuilder metadataBuilder,
             boolean isInterface);
+
+    /**
+     * Visit a configuration builder definition.
+     *
+     * @param builderDefinition The builder definition.
+     * @see io.micronaut.context.annotation.ConfigurationBuilder
+     * @since 4.10
+     */
+    default void visitConfigBuilder(ConfigurationBuilderDefinition builderDefinition) {
+    }
 
     /**
      * Visit a configuration builder method.
@@ -434,7 +437,7 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
      * @return The generic type arguments for the bean type.
      * @since 3.0.0
      */
-    default @NonNull ClassElement[] getTypeArguments() {
+    default ClassElement[] getTypeArguments() {
         return ClassElement.ZERO_CLASS_ELEMENTS;
     }
 

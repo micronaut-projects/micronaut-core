@@ -16,8 +16,7 @@
 package io.micronaut.json.convert;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.type.Argument;
@@ -46,7 +45,7 @@ public final class LazyJsonNode implements ReferenceCounted {
     @Nullable
     private JsonSyntaxException syntaxException;
 
-    public LazyJsonNode(@NonNull ByteBuffer<?> buffer) {
+    public LazyJsonNode(ByteBuffer<?> buffer) {
         this.buffer = Objects.requireNonNull(buffer, "buffer");
     }
 
@@ -59,6 +58,7 @@ public final class LazyJsonNode implements ReferenceCounted {
      * @return The parsed value
      * @throws IOException A {@link JsonSyntaxException} or framework data binding exception
      */
+    @Nullable
     public <T> T parse(JsonMapper mapper, Argument<T> type) throws IOException {
         lock.lock();
         try {
@@ -139,7 +139,7 @@ public final class LazyJsonNode implements ReferenceCounted {
                 lock.unlock();
             }
         }
-        return asNode;
+        return Objects.requireNonNull(asNode);
     }
 
     @Override

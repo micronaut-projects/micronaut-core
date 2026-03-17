@@ -15,7 +15,8 @@
  */
 package io.micronaut.http.hateoas;
 
-import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.annotation.ReflectiveAccess;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.MediaType;
@@ -30,16 +31,17 @@ import java.util.Optional;
  * @since 1.1
  */
 @Introspected
+@ReflectiveAccess // for Jackson
 public class DefaultLink implements Link, Link.Builder {
 
     final String href;
     private boolean templated;
-    private String profile;
-    private String deprecation;
-    private String title;
-    private String hreflang;
-    private MediaType type;
-    private String name;
+    private @Nullable String profile;
+    private @Nullable String deprecation;
+    private @Nullable String title;
+    private @Nullable String hreflang;
+    private @Nullable MediaType type;
+    private @Nullable String name;
 
     /**
      * @param uri The URI
@@ -63,7 +65,7 @@ public class DefaultLink implements Link, Link.Builder {
     }
 
     @Override
-    public Builder profile(URI profile) {
+    public Builder profile(@Nullable URI profile) {
         if (profile != null) {
             this.profile = profile.toString();
         }
@@ -71,7 +73,7 @@ public class DefaultLink implements Link, Link.Builder {
     }
 
     @Override
-    public Builder deprecation(URI deprecation) {
+    public Builder deprecation(@Nullable URI deprecation) {
         if (deprecation != null) {
             this.deprecation = deprecation.toString();
         }
@@ -91,25 +93,25 @@ public class DefaultLink implements Link, Link.Builder {
     }
 
     @Override
-    public Builder title(String title) {
+    public Builder title(@Nullable String title) {
         this.title = title;
         return this;
     }
 
     @Override
-    public Builder name(String name) {
+    public Builder name(@Nullable String name) {
         this.name = name;
         return this;
     }
 
     @Override
-    public Builder hreflang(String hreflang) {
+    public Builder hreflang(@Nullable String hreflang) {
         this.hreflang = hreflang;
         return this;
     }
 
     @Override
-    public Builder type(MediaType mediaType) {
+    public Builder type(@Nullable MediaType mediaType) {
         this.type = mediaType;
         return this;
     }

@@ -15,14 +15,15 @@
  */
 package io.micronaut.core.execution;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jetbrains.annotations.Contract;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -36,11 +37,14 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
     /**
      * The head of the linked list of steps in this flow.
      */
+    @Nullable
     private volatile Head head = new Head();
     /**
      * The tail of the linked list of steps in this flow.
      */
+    @Nullable
     private Step tail = head;
+    @Nullable
     private Runnable onCancel;
     private volatile boolean cancelled;
 
@@ -61,7 +65,7 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
     }
 
     @Override
-    public void completeFrom(@NonNull ExecutionFlow<T> flow) {
+    public void completeFrom(ExecutionFlow<T> flow) {
         flow.onComplete(this::complete);
     }
 
@@ -71,10 +75,8 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
      *
      * @param executionFlow The execution flow
      */
-    private void completeLazy(@NonNull ExecutionFlow<Object> executionFlow) {
-        if (head == null) {
-            throw new IllegalStateException("Delayed flow has been completed");
-        }
+    private void completeLazy(ExecutionFlow<Object> executionFlow) {
+        validateStepExists(head);
         Step immediateStep = head.atomicSetOutput(executionFlow);
         if (immediateStep != null) {
             work(immediateStep, executionFlow);
@@ -82,7 +84,7 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
         head = null;
     }
 
-    private boolean completeAtomic(@NonNull ExecutionFlow<Object> executionFlow) {
+    private boolean completeAtomic(ExecutionFlow<Object> executionFlow) {
         Head head = HEAD_UPDATER.getAndSet(this, null);
         if (head == null) {
             return false;
@@ -95,7 +97,7 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
     }
 
     @Override
-    public void complete(T result) {
+    public void complete(@Nullable T result) {
         completeLazy(result == null ? ExecutionFlow.empty() : ExecutionFlow.just(result));
     }
 
@@ -123,6 +125,7 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
      */
     @SuppressWarnings("unchecked")
     private <R> ExecutionFlow<R> next(Step next) {
+        validateStepExists(tail);
         Step oldTail = tail;
         if (oldTail instanceof DelayedExecutionFlowImpl.Cancel<?>) {
             // because the Cancel step can only cancel flows upstream of it, we can't allow adding
@@ -135,6 +138,13 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
             work(next, output);
         }
         return (ExecutionFlow<R>) this;
+    }
+
+    @Contract("null -> fail")
+    private void validateStepExists(@Nullable Object tail) {
+        if (tail == null) {
+            throw new IllegalStateException("Delayed flow has been completed");
+        }
     }
 
     @Override
@@ -176,6 +186,7 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
     @Nullable
     @Override
     public ImperativeExecutionFlow<T> tryComplete() {
+        validateStepExists(tail);
         ExecutionFlow tailOutput = tail.output;
         if (tailOutput != null) {
             return tailOutput.tryComplete();
@@ -191,10 +202,15 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
 
     @Override
     public void cancel() {
+        cancel(null);
+    }
+
+    @Override
+    public void cancel(@Nullable Consumer<T> discard) {
         if (cancelled) {
             return;
         }
-        next(new Cancel());
+        next(new Cancel(discard));
         cancelled = true;
         Runnable hook = this.onCancel;
         if (hook != null) {
@@ -216,13 +232,17 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
     }
 
     private abstract static sealed class Step<I, O> {
+
         /**
          * The next step to take, or {@code null} if there is no next step yet.
          */
+        @Nullable
         private volatile Step next;
+
         /**
          * The output of this step, or {@code null} if this step has not completed yet.
          */
+        @Nullable
         private volatile ExecutionFlow<Object> output;
 
         /**
@@ -312,7 +332,7 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
          * @param e The exception to return
          * @return The value to return from {@link #work}
          */
-        final <O> ExecutionFlow<O> returnError(Throwable e) {
+        final ExecutionFlow<O> returnError(Throwable e) {
             return ExecutionFlow.error(e);
         }
     }
@@ -435,10 +455,20 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
 
     private static final class Cancel<E> extends Step<E, E> {
         private static final ExecutionFlow ERR = ExecutionFlow.error(new AssertionError("Should never be hit, no further steps are allowed after cancel"));
+        @Nullable
+        private final Consumer<E> discard;
+
+        public Cancel(@Nullable Consumer<E> discard) {
+            this.discard = discard;
+        }
 
         @Override
         ExecutionFlow<E> apply(ExecutionFlow<E> input) {
-            input.cancel();
+            if (discard == null) {
+                input.cancel();
+            } else {
+                input.cancel(discard);
+            }
             return ERR;
         }
     }

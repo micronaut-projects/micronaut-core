@@ -18,7 +18,7 @@ package io.micronaut.http.body;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.io.buffer.ReferenceCounted;
@@ -59,12 +59,12 @@ final class ByteBufferBodyHandler implements TypedMessageBodyHandler<ByteBuffer<
     }
 
     @Override
-    public ByteBuffer<?> read(Argument<ByteBuffer<?>> type, MediaType mediaType, Headers httpHeaders, ByteBuffer<?> byteBuffer) throws CodecException {
+    public ByteBuffer<?> read(Argument<ByteBuffer<?>> type, @Nullable MediaType mediaType, Headers httpHeaders, ByteBuffer<?> byteBuffer) throws CodecException {
         return byteBuffer;
     }
 
     @Override
-    public ByteBuffer<?> read(Argument<ByteBuffer<?>> type, MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
+    public ByteBuffer<?> read(Argument<ByteBuffer<?>> type, @Nullable MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
         try {
             return byteBufferFactory.wrap(inputStream.readAllBytes());
         } catch (IOException e) {
@@ -98,7 +98,7 @@ final class ByteBufferBodyHandler implements TypedMessageBodyHandler<ByteBuffer<
     }
 
     @Override
-    public Publisher<ByteBuffer<?>> readChunked(Argument<ByteBuffer<?>> type, MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
+    public Publisher<ByteBuffer<?>> readChunked(Argument<ByteBuffer<?>> type, @Nullable MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
         return input;
     }
 

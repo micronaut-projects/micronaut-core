@@ -16,11 +16,13 @@
 package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.core.io.buffer.ReadBufferFactory;
 import org.reactivestreams.Publisher;
 
+import java.io.InputStream;
 import java.nio.charset.Charset;
 import java.util.OptionalLong;
 
@@ -33,7 +35,7 @@ import java.util.OptionalLong;
  * @since 4.5.0
  */
 @Experimental
-public interface AvailableByteBody extends ByteBody {
+public sealed interface AvailableByteBody extends ByteBody permits CloseableAvailableByteBody {
     /**
      * For immediate buffers, backpressure is not relevant, so the backpressure modes passed to
      * {@link #split(SplitBackpressureMode)} are ignored. You can use this method always.
@@ -41,7 +43,7 @@ public interface AvailableByteBody extends ByteBody {
      * @see ByteBody#split()
      * @return A body with the same content as this one
      */
-    @NonNull
+    @Override
     CloseableAvailableByteBody split();
 
     /**
@@ -54,7 +56,7 @@ public interface AvailableByteBody extends ByteBody {
      */
     @Override
     @Deprecated
-    default @NonNull CloseableAvailableByteBody split(@NonNull SplitBackpressureMode backpressureMode) {
+    default CloseableAvailableByteBody split(SplitBackpressureMode backpressureMode) {
         return split();
     }
 
@@ -64,7 +66,6 @@ public interface AvailableByteBody extends ByteBody {
      * @deprecated This method is unnecessary for {@link AvailableByteBody}, it does nothing.
      */
     @Override
-    @NonNull
     @Deprecated
     default AvailableByteBody allowDiscard() {
         return this;
@@ -87,7 +88,6 @@ public interface AvailableByteBody extends ByteBody {
      * {@link #length()} directly.
      */
     @Override
-    @NonNull
     @Deprecated
     default OptionalLong expectedLength() {
         return OptionalLong.of(length());
@@ -100,7 +100,18 @@ public interface AvailableByteBody extends ByteBody {
      *
      * @return The bytes
      */
-    byte @NonNull [] toByteArray();
+    byte [] toByteArray();
+
+    /**
+     * Get this body as a {@link ReadBuffer}.
+     * <p>This is a primary operation. After this operation, no other primary operation or
+     * {@link #split()} may be done.
+     *
+     * @return The bytes
+     */
+    default ReadBuffer toReadBuffer() {
+        return ReadBufferFactory.getJdkFactory().adapt(toByteArray());
+    }
 
     /**
      * Get this body as a {@link ByteBuffer}. Note that the buffer may be
@@ -111,8 +122,18 @@ public interface AvailableByteBody extends ByteBody {
      *
      * @return The bytes
      */
-    @NonNull
-    ByteBuffer<?> toByteBuffer();
+    default ByteBuffer<?> toByteBuffer() {
+        try (ReadBuffer rb = toReadBuffer()) {
+            return rb.toByteBuffer();
+        }
+    }
+
+    @Override
+    default InputStream toInputStream() {
+        try (ReadBuffer rb = toReadBuffer()) {
+            return rb.toInputStream();
+        }
+    }
 
     /**
      * Convert this body to a string with the given charset.
@@ -122,9 +143,10 @@ public interface AvailableByteBody extends ByteBody {
      * @param charset The charset to convert the body
      * @return The body as a string
      */
-    @NonNull
-    default String toString(@NonNull Charset charset) {
-        return new String(toByteArray(), charset);
+    default String toString(Charset charset) {
+        try (ReadBuffer rb = toReadBuffer()) {
+            return rb.toString(charset);
+        }
     }
 
     /**
@@ -134,7 +156,6 @@ public interface AvailableByteBody extends ByteBody {
      * {@link #toByteBuffer()} directly.
      */
     @Override
-    @NonNull
     @Deprecated
     default Publisher<ByteBuffer<?>> toByteBufferPublisher() {
         return Publishers.just(toByteBuffer());
@@ -147,9 +168,20 @@ public interface AvailableByteBody extends ByteBody {
      * {@link #toByteArray()} directly.
      */
     @Override
-    @NonNull
     @Deprecated
     default Publisher<byte[]> toByteArrayPublisher() {
         return Publishers.just(toByteArray());
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @deprecated This method is unnecessary for {@link AvailableByteBody}. Use
+     * {@link #toReadBuffer()} directly.
+     */
+    @Override
+    @Deprecated
+    default Publisher<ReadBuffer> toReadBufferPublisher() {
+        return Publishers.just(toReadBuffer());
     }
 }

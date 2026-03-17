@@ -54,8 +54,8 @@ import io.micronaut.core.annotation.Indexed;
 import io.micronaut.core.annotation.Indexes;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.Order;
 import io.micronaut.core.annotation.ReflectionConfig;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
@@ -89,6 +89,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -126,6 +127,7 @@ public final class AnnotationMetadataSupport {
 
     static {
         // some common ones for startup optimization
+        //noinspection removal
         Arrays.asList(
                 Any.class,
                 jakarta.annotation.Nullable.class,
@@ -180,7 +182,7 @@ public final class AnnotationMetadataSupport {
         );
         coreAnnotationsDefaults.put(
             Executable.class.getName(),
-            Map.of("processOnStartup", false)
+            Map.of(Executable.MEMBER_PROCESS_ON_STARTUP, false)
         );
         coreAnnotationsDefaults.put(
             ConfigurationProperties.class.getName(),
@@ -310,7 +312,6 @@ public final class AnnotationMetadataSupport {
      * @return The default values for the annotation
      */
     @UsedByGeneratedCode
-    @NonNull
     public static Map<CharSequence, Object> getDefaultValues(String annotation) {
         return ANNOTATION_DEFAULTS.getOrDefault(annotation, Collections.emptyMap());
     }
@@ -329,6 +330,7 @@ public final class AnnotationMetadataSupport {
      * @return The repeatable annotation container.
      */
     @Internal
+    @Nullable
     public static String getRepeatableAnnotation(String annotation) {
         return REPEATABLE_ANNOTATIONS_CONTAINERS.get(annotation);
     }
@@ -460,7 +462,7 @@ public final class AnnotationMetadataSupport {
      * @since 4.0.0
      */
     @Internal
-    static void registerRepeatableAnnotation(@NonNull String repeatable, @NonNull String repeatableContainer) {
+    static void registerRepeatableAnnotation(String repeatable, String repeatableContainer) {
         REPEATABLE_ANNOTATIONS_CONTAINERS.put(repeatable, repeatableContainer);
     }
 
@@ -507,9 +509,11 @@ public final class AnnotationMetadataSupport {
      *
      * @param <A> The annotation type
      */
+
     private static class AnnotationProxyHandler<A extends Annotation> implements InvocationHandler, AnnotationValueProvider<A> {
         private final int hashCode;
         private final Class<A> annotationClass;
+        @Nullable
         private final AnnotationValue<A> annotationValue;
 
         AnnotationProxyHandler(int hashCode, Class<A> annotationClass, @Nullable AnnotationValue<A> annotationValue) {
@@ -548,6 +552,7 @@ public final class AnnotationMetadataSupport {
             }
         }
 
+        @Nullable
         private AnnotationValue<?> getAnnotationValues(Annotation other) {
             if (other instanceof AnnotationProxyHandler<?> handler) {
                 return handler.annotationValue;
@@ -556,25 +561,24 @@ public final class AnnotationMetadataSupport {
         }
 
         @Override
-        public Object invoke(Object proxy, Method method, Object[] args) {
+        public Object invoke(Object proxy, Method method, @Nullable Object @Nullable [] args) {
             String name = method.getName();
             if ((args == null || args.length == 0) && "hashCode".equals(name)) {
                 return hashCode;
             } else if ((args != null && args.length == 1) && "equals".equals(name)) {
                 return equals(args[0]);
             } else if ("toString".equals(name)) {
-                return annotationValue.toString();
+                return Objects.requireNonNull(annotationValue).toString();
             } else if ("annotationType".equals(name)) {
                 return annotationClass;
             } else if (method.getReturnType() == AnnotationValue.class) {
-                return annotationValue;
+                return Objects.requireNonNull(annotationValue);
             } else if (annotationValue != null && annotationValue.contains(name)) {
                 return annotationValue.getRequiredValue(name, method.getReturnType());
             }
             return method.getDefaultValue();
         }
 
-        @NonNull
         @Override
         public AnnotationValue<A> annotationValue() {
             if (annotationValue != null) {

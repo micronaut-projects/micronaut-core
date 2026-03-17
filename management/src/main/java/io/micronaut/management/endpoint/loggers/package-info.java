@@ -19,4 +19,7 @@
  * @author Matthew Moss
  * @since 1.0
  */
+@NullMarked
 package io.micronaut.management.endpoint.loggers;
+
+import org.jspecify.annotations.NullMarked;

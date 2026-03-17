@@ -17,10 +17,10 @@ package io.micronaut.inject.provider;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
-import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
+import org.jspecify.annotations.Nullable;
 
 import javax.inject.Provider;
 
@@ -34,7 +34,7 @@ import javax.inject.Provider;
 public final class JavaxProviderBeanDefinition extends AbstractProviderDefinition<Provider<Object>> {
 
     @Override
-    public boolean isEnabled(BeanContext context, BeanResolutionContext resolutionContext) {
+    public boolean isEnabled(BeanContext context, @Nullable BeanResolutionContext resolutionContext) {
         return isTypePresent();
     }
 
@@ -50,22 +50,22 @@ public final class JavaxProviderBeanDefinition extends AbstractProviderDefinitio
     }
 
     @Override
-    protected Provider<Object> buildProvider(BeanResolutionContext resolutionContext, BeanContext context, Argument<Object> argument, Qualifier<Object> qualifier, boolean singleton) {
-        DefaultBeanContext defaultBeanContext = (DefaultBeanContext) context;
+    protected Provider<Object> buildProvider(BeanResolutionContext resolutionContext, BeanContext context, Argument<Object> argument, @Nullable Qualifier<Object> qualifier, boolean singleton) {
         if (singleton) {
             return new Provider<>() {
+                @Nullable
                 Object bean;
 
                 @Override
                 public Object get() {
                     if (bean == null) {
-                        bean = defaultBeanContext.getBean(resolutionContext.copy(), argument, qualifier);
+                        bean = resolutionContext.copy().getBean(argument, qualifier);
                     }
                     return bean;
                 }
             };
         }
-        return () -> defaultBeanContext.getBean(resolutionContext.copy(), argument, qualifier);
+        return () -> resolutionContext.copy().getBean(argument, qualifier);
     }
 
     private static boolean isTypePresent() {

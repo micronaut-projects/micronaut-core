@@ -15,6 +15,10 @@
  */
 package io.micronaut.inject.writer;
 
+import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.TypedElement;
+
 /**
  * Extends {@link BeanDefinitionVisitor} and adds access to the proxied type name.
  *
@@ -24,12 +28,27 @@ package io.micronaut.inject.writer;
 public interface ProxyingBeanDefinitionVisitor extends BeanDefinitionVisitor {
 
     /**
-     * @return The fully qualified name of the class being proxied
+     * visitInterceptorTypes.
+     *
+     * @param interceptorBinding the interceptor binding
      */
-    String getProxiedTypeName();
+    void visitInterceptorBinding(AnnotationValue<?>... interceptorBinding);
 
     /**
-     * @return The bean definition that is proxied
+     * The visitor for introduction methods.
+     *
+     * @param beanType      The bean type
+     * @param methodElement The method element
+     * @since 5.0
      */
-    String getProxiedBeanDefinitionName();
+    void visitIntroductionMethod(TypedElement beanType, MethodElement methodElement);
+
+    /**
+     * The visitor for around methods.
+     *
+     * @param beanType      The bean type
+     * @param methodElement The method element
+     * @since 5.0
+     */
+    void visitAroundMethod(TypedElement beanType, MethodElement methodElement);
 }

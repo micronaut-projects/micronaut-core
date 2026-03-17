@@ -1,5 +1,6 @@
 package example.micronaut.jacksondatabind
 
+import com.fasterxml.jackson.annotation.JsonProperty
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.annotation.ReflectiveAccess
@@ -8,5 +9,5 @@ import io.micronaut.core.annotation.ReflectiveAccess
 //tag::clazz[]
 @ReflectiveAccess
 @Introspected
-data class Greeting(val message: String)
+data class Greeting(@JsonProperty("message") val message: String)
 //end::clazz[]

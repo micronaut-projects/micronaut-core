@@ -23,8 +23,8 @@ import io.micronaut.context.annotation.BeanProperties;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.ArrayUtils;
@@ -855,7 +855,9 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
 
         private boolean isNonAbstract(ClassNode classNode, MethodNode methodNode) {
             if (methodNode.isDefault()) {
-                return false;
+                // Groovy 4.x used to implement default methods via traits, which caused
+                // MethodNode for default methods on interfaces to have default = false
+                return true;
             }
             if (methodNode.isPrivate() && classNode.isInterface()) {
                 return true;

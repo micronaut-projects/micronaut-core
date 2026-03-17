@@ -16,7 +16,7 @@
 package io.micronaut.ast.groovy.visitor;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
@@ -25,7 +25,6 @@ import io.micronaut.inject.ast.EnumConstantElement;
 import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
-import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
@@ -116,7 +115,6 @@ public class GroovyElementFactory implements ElementFactory<AnnotatedNode, Class
                     return new GroovyBeanDefinitionBuilder(
                         this,
                         type,
-                        ConfigurationMetadataBuilder.INSTANCE,
                         annotationMetadataFactory,
                         visitorContext
                     );
@@ -130,7 +128,6 @@ public class GroovyElementFactory implements ElementFactory<AnnotatedNode, Class
                     return new GroovyBeanDefinitionBuilder(
                         this,
                         type,
-                        ConfigurationMetadataBuilder.INSTANCE,
                         annotationMetadataFactory,
                         visitorContext
                     );
@@ -159,7 +156,6 @@ public class GroovyElementFactory implements ElementFactory<AnnotatedNode, Class
                 return new GroovyBeanDefinitionBuilder(
                     this,
                     type,
-                    ConfigurationMetadataBuilder.INSTANCE,
                     elementAnnotationMetadataFactory,
                     visitorContext
                 );

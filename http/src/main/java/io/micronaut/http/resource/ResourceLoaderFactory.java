@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.resource;
 
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.env.Environment;
@@ -26,6 +25,8 @@ import io.micronaut.core.io.file.DefaultFileSystemResourceLoader;
 import io.micronaut.core.io.file.FileSystemResourceLoader;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.io.scan.DefaultClassPathResourceLoader;
+import io.micronaut.core.io.value.Base64ResourceLoader;
+import io.micronaut.core.io.value.StringResourceLoader;
 import jakarta.inject.Singleton;
 
 import java.util.List;
@@ -58,7 +59,7 @@ public class ResourceLoaderFactory {
      */
     @Singleton
     @BootstrapContextCompatible
-    protected @NonNull ClassPathResourceLoader getClassPathResourceLoader() {
+    protected ClassPathResourceLoader getClassPathResourceLoader() {
         return new DefaultClassPathResourceLoader(classLoader);
     }
 
@@ -67,8 +68,26 @@ public class ResourceLoaderFactory {
      */
     @Singleton
     @BootstrapContextCompatible
-    protected @NonNull FileSystemResourceLoader fileSystemResourceLoader() {
+    protected FileSystemResourceLoader fileSystemResourceLoader() {
         return new DefaultFileSystemResourceLoader();
+    }
+
+    /**
+     * @return The string resource loader
+     */
+    @Singleton
+    @BootstrapContextCompatible
+    protected ResourceLoader getStringResourceLoader() {
+        return StringResourceLoader.getInstance();
+    }
+
+    /**
+     * @return The base64 resource loader
+     */
+    @Singleton
+    @BootstrapContextCompatible
+    protected ResourceLoader getBase64ResourceLoader() {
+        return Base64ResourceLoader.getInstance();
     }
 
     /**
@@ -78,7 +97,7 @@ public class ResourceLoaderFactory {
     @Singleton
     @BootstrapContextCompatible
     @Indexed(ResourceResolver.class)
-    protected @NonNull ResourceResolver resourceResolver(@NonNull List<ResourceLoader> resourceLoaders) {
+    protected ResourceResolver resourceResolver(List<ResourceLoader> resourceLoaders) {
         return new ResourceResolver(resourceLoaders);
     }
 }

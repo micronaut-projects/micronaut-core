@@ -25,12 +25,10 @@ import io.micronaut.aop.exceptions.UnimplementedAdviceException;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
-import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArrayUtils;
@@ -98,19 +96,19 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
      * @param originalParameters originalParameters
      */
     @UsedByGeneratedCode
-    public MethodInterceptorChain(Interceptor<T, R>[] interceptors, T target, ExecutableMethod<T, R> executionHandle, Object... originalParameters) {
+    public MethodInterceptorChain(Interceptor<T, R>[] interceptors, T target, ExecutableMethod<T, R> executionHandle, @Nullable Object... originalParameters) {
         super(interceptors, target, executionHandle, originalParameters);
         this.kind = null;
     }
 
     @Override
-    @NonNull
     public InterceptorKind getKind() {
         return this.kind != null ? kind : target instanceof Introduced ? InterceptorKind.INTRODUCTION : InterceptorKind.AROUND;
     }
 
     @Override
-    public R invoke(T instance, Object... arguments) {
+    @Nullable
+    public R invoke(T instance, @Nullable Object... arguments) {
         return new MethodInterceptorChain<>(interceptors, instance, executionHandle, originalParameters).proceed();
     }
 
@@ -125,6 +123,7 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
     }
 
     @Override
+    @Nullable
     public R proceed() throws RuntimeException {
         Interceptor<T, R> interceptor;
         if (interceptorCount == 0 || index == interceptorCount) {
@@ -139,8 +138,8 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
                 LOG.trace("Proceeded to next interceptor [{}] in chain for method invocation: {}", interceptor, executionHandle);
             }
 
-            if (interceptor instanceof MethodInterceptor) {
-                return ((MethodInterceptor<T, R>) interceptor).intercept(this);
+            if (interceptor instanceof MethodInterceptor<T, R> methodInterceptor) {
+                return methodInterceptor.intercept(this);
             } else {
                 return interceptor.intercept(this);
             }
@@ -167,7 +166,6 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         return executionHandle.getReturnType();
     }
 
-    @NonNull
     @Override
     public Class<T> getDeclaringType() {
         return executionHandle.getDeclaringType();
@@ -178,7 +176,6 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         return executionHandle.toString();
     }
 
-    @NonNull
     @Override
     public ExecutableMethod<T, R> getExecutableMethod() {
         return executionHandle;
@@ -198,13 +195,13 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
      */
     @Internal
     @UsedByGeneratedCode
-    @NonNull
+    @Nullable
     public static <T1> T1 initialize(
-        @NonNull BeanResolutionContext resolutionContext,
-        @NonNull BeanContext beanContext,
-        @NonNull BeanDefinition<T1> definition,
-        @NonNull ExecutableMethod<T1, T1> postConstructMethod,
-        @NonNull T1 bean) {
+        BeanResolutionContext resolutionContext,
+        BeanContext beanContext,
+        BeanDefinition<T1> definition,
+        ExecutableMethod<T1, T1> postConstructMethod,
+        T1 bean) {
         return doIntercept(
             resolutionContext,
             beanContext,
@@ -229,13 +226,13 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
      */
     @Internal
     @UsedByGeneratedCode
-    @NonNull
+    @Nullable
     public static <T1> T1 dispose(
-        @NonNull BeanResolutionContext resolutionContext,
-        @NonNull BeanContext beanContext,
-        @NonNull BeanDefinition<T1> definition,
-        @NonNull ExecutableMethod<T1, T1> preDestroyMethod,
-        @NonNull T1 bean) {
+        BeanResolutionContext resolutionContext,
+        BeanContext beanContext,
+        BeanDefinition<T1> definition,
+        ExecutableMethod<T1, T1> preDestroyMethod,
+        T1 bean) {
         return doIntercept(
             resolutionContext,
             beanContext,
@@ -247,6 +244,7 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
+    @Nullable
     private static <T1> T1 doIntercept(
         BeanResolutionContext resolutionContext,
         BeanContext beanContext,
@@ -257,8 +255,7 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         final AnnotationMetadata annotationMetadata = interceptedMethod.getAnnotationMetadata();
         final Collection<AnnotationValue<?>> binding = resolveInterceptorValues(annotationMetadata, kind);
 
-        final Collection<BeanRegistration<Interceptor<?, ?>>> resolved = ((DefaultBeanContext) beanContext).getBeanRegistrations(
-            resolutionContext,
+        final Collection<BeanRegistration<Interceptor<?, ?>>> resolved = resolutionContext.getBeanRegistrations(
             Interceptor.ARGUMENT,
             Qualifiers.byInterceptorBindingValues(binding)
         );

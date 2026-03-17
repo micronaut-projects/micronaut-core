@@ -12,7 +12,7 @@ class BasicAuthFilterSpec: StringSpec() {
 
     val context = autoClose(
             ApplicationContext.run(EmbeddedServer::class.java,
-                    mapOf("spec.name" to BasicAuthFilterSpec::class.simpleName)).applicationContext
+                    mapOf("spec.name" to BasicAuthFilterSpec::class.simpleName as Any)).applicationContext
     )
 
     init {

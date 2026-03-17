@@ -6,15 +6,15 @@ import io.kotest.matchers.shouldBe
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.PropertySource
 
-class EnvironmentSpec : StringSpec({
+class EnvironmentSpec :  StringSpec({
 
     "test run environment" {
         // tag::env[]
         val applicationContext = ApplicationContext.run("test", "android")
         val environment = applicationContext.environment
 
-        environment.activeNames shouldContain "test"
-        environment.activeNames shouldContain "android"
+        environment.activeNames.shouldContain("test")
+        environment.activeNames.shouldContain("android")
         // end::env[]
         applicationContext.close()
     }

@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 package io.micronaut.core.io.service;
-
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.optim.StaticOptimizations;
 import io.micronaut.core.reflect.ClassUtils;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InaccessibleObjectException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -54,7 +54,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
     private static final MethodType VOID_TYPE = MethodType.methodType(void.class);
     private final Class<S> serviceType;
     private final ClassLoader classLoader;
-    private Collection<ServiceDefinition<S>> servicesForIterator;
+    private @Nullable Collection<ServiceDefinition<S>> servicesForIterator;
     private final Predicate<String> condition;
     private boolean allowFork = true;
 
@@ -62,7 +62,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
         this(serviceType, classLoader, (String name) -> true);
     }
 
-    private SoftServiceLoader(Class<S> serviceType, @Nullable ClassLoader classLoader, Predicate<String> condition) {
+    private SoftServiceLoader(Class<S> serviceType, @Nullable ClassLoader classLoader, @Nullable Predicate<String> condition) {
         this.serviceType = serviceType;
         this.classLoader = classLoader == null ? ClassLoader.getSystemClassLoader() : classLoader;
         this.condition = condition == null ? (String name) -> true : condition;
@@ -88,7 +88,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
      * @return A new service loader
      */
     public static <S> SoftServiceLoader<S> load(Class<S> service,
-                                                ClassLoader loader) {
+                                                @Nullable ClassLoader loader) {
         return new SoftServiceLoader<>(service, loader);
     }
 
@@ -102,8 +102,8 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
      * @return A new service loader
      */
     public static <S> SoftServiceLoader<S> load(Class<S> service,
-                                                ClassLoader loader,
-                                                Predicate<String> condition) {
+                                                @Nullable ClassLoader loader,
+                                                @Nullable Predicate<String> condition) {
         return new SoftServiceLoader<>(service, loader, condition);
     }
 
@@ -165,7 +165,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
      * @param predicate The predicated to filter the instances or null if not needed.
      */
     @SuppressWarnings("unchecked")
-    public void collectAll(@NonNull Collection<S> values, @Nullable Predicate<S> predicate) {
+    public void collectAll(Collection<S> values, @Nullable Predicate<S> predicate) {
         String name = serviceType.getName();
         SoftServiceLoader.StaticServiceLoader<?> serviceLoader = STATIC_SERVICES.get(name);
         if (serviceLoader != null) {
@@ -177,14 +177,13 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
 
     private void collectDynamicServices(
             Collection<S> values,
-            Predicate<S> predicate,
+            @Nullable Predicate<S> predicate,
             String name) {
         ServiceCollector<S> collector = newCollector(name, condition, classLoader, className -> {
             try {
                 @SuppressWarnings("unchecked") final Class<S> loadedClass =
                         (Class<S>) Class.forName(className, false, classLoader);
-                // MethodHandler should more performant than the basic reflection
-                S result = (S) LOOKUP.findConstructor(loadedClass, VOID_TYPE).invoke();
+                S result = instantiate(loadedClass);
                 if (predicate != null && !predicate.test(result)) {
                     return null;
                 }
@@ -199,7 +198,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
         collector.collect(values, allowFork);
     }
 
-    private void collectStaticServices(Collection<S> values, Predicate<S> predicate, StaticServiceLoader<S> loader) {
+    private void collectStaticServices(Collection<S> values, @Nullable Predicate<S> predicate, StaticServiceLoader<S> loader) {
         values.addAll(loader.load(predicate));
     }
 
@@ -208,7 +207,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
      *
      * @param values The collection to be populated.
      */
-    public void collectAll(@NonNull Collection<S> values) {
+    public void collectAll(Collection<S> values) {
         collectAll(values, null);
     }
 
@@ -227,7 +226,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
      * @param predicate The predicated to filter the instances or null if not needed.
      * @return The instances of this service.
      */
-    public List<S> collectAll(Predicate<S> predicate) {
+    public List<S> collectAll(@Nullable Predicate<S> predicate) {
         List<S> values = new ArrayList<>();
         collectAll(values, predicate);
         return values;
@@ -237,7 +236,6 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
      * @return The iterator
      */
     @Override
-    @NonNull
     public Iterator<ServiceDefinition<S>> iterator() {
         if (servicesForIterator == null) {
             if (STATIC_SERVICES.containsKey(serviceType.getName())) {
@@ -268,7 +266,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
      * @param loadedClass The loaded class
      * @return The service definition
      */
-    private ServiceDefinition<S> createService(String name, Class<S> loadedClass) {
+    private ServiceDefinition<S> createService(String name, @Nullable Class<S> loadedClass) {
         return new DefaultServiceDefinition<>(name, loadedClass);
     }
 
@@ -276,11 +274,45 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
                                                        Predicate<String> lineCondition,
                                                        ClassLoader classLoader,
                                                        Function<String, S> transformer) {
-        return new ServiceScanner<>(classLoader, serviceName, lineCondition, transformer).new DefaultServiceCollector();
+        return new ServiceScanner<>(classLoader, serviceName, lineCondition, transformer).createCollector();
+    }
+
+    private static <S> S instantiate(Class<S> clazz) throws Throwable {
+        try {
+            return instantiateUsingMethodHandle(clazz);
+        } catch (NoSuchMethodException | IllegalAccessException | IllegalAccessError e) {
+            return instantiateUsingReflection(clazz);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <S> S instantiateUsingMethodHandle(Class<S> clazz) throws Throwable {
+        return (S) LOOKUP.findConstructor(clazz, VOID_TYPE).invoke();
+    }
+
+    private static <S> S instantiateUsingReflection(Class<S> clazz) throws ReflectiveOperationException {
+        Constructor<S> constructor = clazz.getDeclaredConstructor();
+        if (!constructor.canAccess(null)) {
+            try {
+                constructor.setAccessible(true);
+            } catch (InaccessibleObjectException | SecurityException e) {
+                // Module system or security policy denies reflective access; treat as illegal access
+                // so dynamic service scanning can skip this class gracefully
+                IllegalAccessException iae = new IllegalAccessException("Cannot access constructor of " + clazz.getName() + ": " + e.getMessage());
+                iae.initCause(e);
+                throw iae;
+            }
+        }
+        return constructor.newInstance();
     }
 
     /**
-     * A {@link ServiceDefinition} implementation that uses a {@link MethodHandles.Lookup} object to find a public constructor.
+     * A {@link ServiceDefinition} implementation that creates instances using the same instantiation
+     * strategy as {@link SoftServiceLoader#instantiate(Class)}: it first attempts to invoke a no-argument
+     * constructor via a {@link MethodHandles.Lookup} method handle, and if that fails due to access
+     * restrictions or similar conditions, it falls back to reflective instantiation using
+     * {@link java.lang.Class#getDeclaredConstructor()}. Depending on module and security configuration,
+     * this may allow invoking non-public no-argument constructors.
      *
      * @param <S> The service type
      */
@@ -320,7 +352,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
         @SuppressWarnings({"unchecked"})
         private static <S> S doCreate(Class<S> clazz) {
             try {
-                return (S) LOOKUP.findConstructor(clazz, VOID_TYPE).invoke();
+                return instantiate(clazz);
             } catch (Throwable e) {
                 throw new ServiceLoadingException(e);
             }
@@ -342,11 +374,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
         default void collect(Consumer<? super S> consumer) {
             List<S> values = new ArrayList<>();
             collect(values);
-            values.forEach(e -> {
-                if (e != null) {
-                    consumer.accept(e);
-                }
-            });
+            values.forEach(consumer);
         }
     }
 
@@ -358,12 +386,12 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
     public interface StaticServiceLoader<S> {
         Stream<StaticDefinition<S>> findAll(Predicate<String> predicate);
 
-        default List<S> load(Predicate<S> predicate) {
+        default List<S> load(@Nullable Predicate<S> predicate) {
             return load(n -> true, predicate);
         }
 
-        default List<S> load(Predicate<String> condition, Predicate<S> predicate) {
-            return findAll(condition)
+        default List<S> load(@Nullable Predicate<String> condition, @Nullable Predicate<S> predicate) {
+            return findAll(condition == null ? n -> true : condition)
                     .map(ServiceDefinition::load)
                     .filter(s -> predicate == null || predicate.test(s))
                     .toList();

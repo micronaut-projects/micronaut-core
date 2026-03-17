@@ -14,9 +14,7 @@
  * limitations under the License.
  */
 package io.micronaut.core.bind.annotation;
-
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.bind.ArgumentBinder.BindingResult;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionError;
@@ -41,8 +39,11 @@ public abstract class AbstractArgumentBinder<T> {
     private static final String DEFAULT_VALUE_MEMBER = "defaultValue";
     protected final ConversionService conversionService;
 
+    @Nullable
     private final String parameterName;
+    @Nullable
     private final String fallbackParameterName;
+    @Nullable
     private final String defaultValue;
 
     /**
@@ -138,8 +139,7 @@ public abstract class AbstractArgumentBinder<T> {
      * @return The name
      * @since 4.8
      */
-    @NonNull
-    protected String getParameterName(@NonNull Argument<T> argument) {
+    protected String getParameterName(Argument<T> argument) {
         throw new IllegalStateException("Parameter resolved method must be implemented!");
     }
 
@@ -215,10 +215,14 @@ public abstract class AbstractArgumentBinder<T> {
         return NameUtils.hyphenate(argument.getName());
     }
 
+    @Nullable
     private Object resolveValue(ArgumentConversionContext<T> context, ConvertibleValues<?> values, String annotationValue) {
         Argument<T> argument = context.getArgument();
         if (StringUtils.isEmpty(annotationValue)) {
             annotationValue = argument.getName();
+            if (annotationValue == null) {
+                return null;
+            }
         }
         return values.get(annotationValue, context).orElseGet(() ->
             conversionService.convert(
@@ -228,6 +232,7 @@ public abstract class AbstractArgumentBinder<T> {
         );
     }
 
+    @Nullable
     private String resolveDefaultValue(Argument<T> argument) {
         if (defaultValue == null) {
             return argument.getAnnotationMetadata().stringValue(Bindable.class, DEFAULT_VALUE_MEMBER).orElse(null);
@@ -247,14 +252,14 @@ public abstract class AbstractArgumentBinder<T> {
     }
 
     /**
-     * Convert the value and return a binding result.
+     * Convert value and return a binding result.
      *
      * @param value         The value to convert
      * @param context       The conversion context
-     * @param defaultResult The binding result if the value is null
+     * @param defaultResult The binding result if value is null
      * @return The binding result
      */
-    protected BindingResult<T> doConvert(Object value, ArgumentConversionContext<T> context, BindingResult<T> defaultResult) {
+    protected BindingResult<T> doConvert(@Nullable Object value, ArgumentConversionContext<T> context, BindingResult<T> defaultResult) {
         if (value == null) {
             Optional<ConversionError> lastError = context.getLastError();
             if (lastError.isPresent()) {

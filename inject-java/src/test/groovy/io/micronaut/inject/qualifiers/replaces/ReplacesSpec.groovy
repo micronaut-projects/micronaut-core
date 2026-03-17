@@ -15,18 +15,18 @@
  */
 package io.micronaut.inject.qualifiers.replaces
 
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
 import spock.lang.Specification
-
+import io.micronaut.context.env.PropertySource
 /**
  * Created by graemerocher on 26/05/2017.
  */
-class ReplacesSpec extends Specification {
+class ReplacesSpec extends AbstractTypeElementSpec {
 
-//    @Ignore
     void "test that a bean can be marked to replace another bean"() {
         given:
-        ApplicationContext context = ApplicationContext.run()
+        ApplicationContext context = ApplicationContext.run(['spec.name':'ReplacesSpec'])
 
         when:"A bean has a dependency on an interface with multiple impls"
         B b = context.getBean(B)
@@ -41,9 +41,108 @@ class ReplacesSpec extends Specification {
         context.close()
     }
 
-    void "test that a bean that has AOP advice applied can be replaced"() {
+    void "test that a configuration bean can be marked to replace another bean x"() {
+
+        given:
+        ApplicationContext context = buildContext("""
+package test;
+
+import io.micronaut.context.annotation.ConfigurationBuilder;
+import io.micronaut.context.annotation.ConfigurationProperties;
+import jakarta.inject.Singleton;
+import io.micronaut.context.annotation.Replaces;
+
+import java.util.HashSet;
+import java.util.Set;
+
+@ConfigurationProperties("test.props")
+class A1ConfigProperties {
+    @ConfigurationBuilder(prefixes = "set")
+    Something builder = new Something();
+
+    class Something {
+        Set<Foo> foos = new HashSet<>();
+
+        public Set<Foo> getFoos() {
+            return foos;
+        }
+
+        public void setFoos(Set<Foo> foos) {
+            this.foos = foos;
+        }
+    }
+
+    public Something getBuilder() {
+        builder.foos.add(Foo.AUTO_ADDED_A1);
+        return builder;
+    }
+
+    enum Foo {
+        BAR,
+        BAZ,
+        AUTO_ADDED_A1,
+        AUTO_ADDED_A2
+    }
+}
+
+@Replaces(A1ConfigProperties.class)
+@Singleton
+@ConfigurationProperties("test.props")
+class A2ConfigProperties extends A1ConfigProperties {
+
+    @Override
+    public Something getBuilder() {
+        Something builderParent = super.getBuilder();
+        builderParent.foos.add(Foo.AUTO_ADDED_A2);
+        return builderParent;
+    }
+
+}
+
+""")
+        context.getEnvironment().addPropertySource(PropertySource.of(["test.props.foos": "BAR"]))
+
+
+        when:"A bean has a dependency on an interface with multiple impls"
+        def a1ConfigProperties = context.getBean(context.getClassLoader().loadClass("test.A2ConfigProperties"))
+
+        then:
+        noExceptionThrown()
+        // It should contain the AUTO_ADDED_A1, AUTO_ADDED_A2 and the BAR.
+        // when you comment out the //@Replaces(A1ConfigProperties.class) on the A2ConfigProperties you get AUTO_ADDED_A1 and BAR.
+        a1ConfigProperties.builder.foos.size() == 3
+//        a1ConfigProperties instanceof A2ConfigProperties
+        a1ConfigProperties.builder.foos.first() instanceof Enum
+
+        cleanup:
+        context.close()
+    }
+
+    void "test that a configuration bean can be marked to replace another bean"() {
+
         given:
         ApplicationContext context = ApplicationContext.run()
+        context.getEnvironment().addPropertySource(PropertySource.of(["test.props.foos": "BAR"]))
+
+
+        when:"A bean has a dependency on an interface with multiple impls"
+        A1ConfigProperties a1ConfigProperties = context.getBean(A1ConfigProperties)
+
+        then:
+        noExceptionThrown()
+        // It should contain the AUTO_ADDED_A1, AUTO_ADDED_A2 and the BAR.
+        // when you comment out the //@Replaces(A1ConfigProperties.class) on the A2ConfigProperties you get AUTO_ADDED_A1 and BAR.
+        a1ConfigProperties.builder.foos.size() == 3
+        a1ConfigProperties instanceof A2ConfigProperties
+        a1ConfigProperties.builder.foos.first() instanceof Enum
+
+        cleanup:
+        context.close()
+    }
+
+    void "test that a bean that has AOP advice applied can be replaced"() {
+        given:
+        ApplicationContext context = ApplicationContext.run(['spec.name':'ReplacesSpec'])
 
         expect:
         context.getBeansOfType(H).size() == 1
@@ -55,7 +154,7 @@ class ReplacesSpec extends Specification {
 
     void "test that named beans can be replaced"() {
         given:
-        ApplicationContext context = ApplicationContext.run()
+        ApplicationContext context = ApplicationContext.run(['spec.name':'ReplacesSpec'])
 
         expect:
         context.containsBean(E1Replacement)
@@ -73,7 +172,7 @@ class ReplacesSpec extends Specification {
 
     void "test that qualified beans can be replaced"() {
         given:
-        ApplicationContext context = ApplicationContext.run()
+        ApplicationContext context = ApplicationContext.run(['spec.name':'ReplacesSpec'])
 
         expect:
         context.containsBean(G1QualifierReplacement)
@@ -92,7 +191,7 @@ class ReplacesSpec extends Specification {
 
     void "test that introduction advice can be replaced with inheritance"() {
         given:
-        def ctx = ApplicationContext.run()
+        def ctx = ApplicationContext.run(['spec.name':'ReplacesSpec'])
 
         when:
         IntroductionOperations ops = ctx.getBean(IntroductionOperations)
@@ -108,7 +207,7 @@ class ReplacesSpec extends Specification {
 
     void "test that introduction advice can be replaced"() {
         given:
-        def ctx = ApplicationContext.run()
+        def ctx = ApplicationContext.run(['spec.name':'ReplacesSpec'])
 
         when:
         IntroductionB ops = ctx.getBean(IntroductionB)
@@ -124,7 +223,7 @@ class ReplacesSpec extends Specification {
 
     void "test that classes with around advice can be replaced"() {
         given:
-        def ctx = ApplicationContext.run()
+        def ctx = ApplicationContext.run(['spec.name':'ReplacesSpec'])
 
         when:
         AroundOps ops = ctx.getBean(AroundOps)
@@ -140,7 +239,7 @@ class ReplacesSpec extends Specification {
 
     void "test replacing an entire factory"() {
         given:
-        def ctx = ApplicationContext.run()
+        def ctx = ApplicationContext.run(['spec.name':'ReplacesSpec'])
 
         when:
         C c = ctx.getBean(C)
@@ -154,7 +253,7 @@ class ReplacesSpec extends Specification {
 
     void "test replacing a factory method"() {
         given:
-        def ctx = ApplicationContext.run()
+        def ctx = ApplicationContext.run(['spec.name':'ReplacesSpec'])
 
         when:
         D d = ctx.getBean(D)
@@ -168,7 +267,7 @@ class ReplacesSpec extends Specification {
 
     void "test replacing a bean with AOP bean of the same type"() {
         given:
-        def ctx = ApplicationContext.run()
+        def ctx = ApplicationContext.run(['spec.name':'ReplacesSpec'])
 
         when:
         F f = ctx.getBean(F)
@@ -182,7 +281,7 @@ class ReplacesSpec extends Specification {
 
     void "test replacing a chain of factory methods"() {
         given:
-        def ctx = ApplicationContext.run("factory-replacement-chain")
+        def ctx = ApplicationContext.run(['spec.name':'ReplacesSpec'], "factory-replacement-chain")
 
         when:
         D d = ctx.getBean(D)

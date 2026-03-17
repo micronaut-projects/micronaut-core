@@ -18,11 +18,13 @@ package io.micronaut.docs.config.properties;
 // tag::imports[]
 import io.micronaut.context.annotation.ConfigurationProperties;
 
+import io.micronaut.context.annotation.Requires;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import java.util.Optional;
 // end::imports[]
 
+@Requires(property = "spec.name", value = "VehiclePropertiesSpec")
 // tag::class[]
 @ConfigurationProperties("my.engine") // <1>
 public class EngineConfig {

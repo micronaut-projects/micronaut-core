@@ -96,7 +96,7 @@ import io.micronaut.context.annotation.*
 
 @ConfigurationProperties(value = "foo", includes = ["property", "parentProperty"])
 class MyProperties extends Parent {
-    @io.micronaut.core.annotation.Nullable
+    @org.jspecify.annotations.Nullable
     String property
     String anotherProperty
 }
@@ -174,7 +174,7 @@ import io.micronaut.context.annotation.*
 @ConfigurationProperties(value = "foo", excludes = ["anotherProperty", "anotherParentProperty"])
 class MyProperties extends Parent {
 
-    @io.micronaut.core.annotation.Nullable
+    @org.jspecify.annotations.Nullable
     String property
     String anotherProperty
 }

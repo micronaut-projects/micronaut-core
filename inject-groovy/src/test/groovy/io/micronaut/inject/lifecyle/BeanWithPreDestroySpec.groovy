@@ -18,12 +18,10 @@ package io.micronaut.inject.lifecyle
 import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.LifeCycle
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.DisposableBeanDefinition
 import jakarta.annotation.PreDestroy
-import spock.lang.Specification
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
 

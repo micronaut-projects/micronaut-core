@@ -18,7 +18,7 @@ package io.micronaut.http.netty.channel;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.Order;
 import io.netty.channel.Channel;
 import io.netty.channel.IoHandlerFactory;
@@ -39,11 +39,12 @@ import jakarta.inject.Singleton;
 @Singleton
 @Requires(classes = IoUring.class, condition = IoUringAvailabilityCondition.class)
 @Internal
-@Named(EventLoopGroupFactory.NATIVE)
+@Named(IoUringEventLoopGroupFactory.NAME)
 @BootstrapContextCompatible
 // avoid collision with epoll. we prefer epoll because it supports more features (domain socket).
 @Order(200)
 public class IoUringEventLoopGroupFactory implements EventLoopGroupFactory {
+    public static final String NAME = "io_uring";
 
     @Override
     public IoHandlerFactory createIoHandlerFactory() {

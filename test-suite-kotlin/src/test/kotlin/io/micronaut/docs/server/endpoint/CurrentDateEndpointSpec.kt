@@ -10,6 +10,7 @@ import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import reactor.core.publisher.Flux
+import java.time.Instant
 
 import java.util.Date
 
@@ -49,7 +50,7 @@ class CurrentDateEndpointSpec: StringSpec() {
             val resetDate: Date
 
             var response = client.toBlocking().exchange("/date", String::class.java)
-            originalDate = Date(java.lang.Long.parseLong(response.body()!!))
+            originalDate = Date(Instant.parse((response.body() as String).trim('"')).toEpochMilli())
 
             response =  client.toBlocking().exchange(HttpRequest.POST<Map<String, Any>>("/date", mapOf()), String::class.java)
 
@@ -57,7 +58,7 @@ class CurrentDateEndpointSpec: StringSpec() {
             response.body() shouldBe "Current date reset"
 
             response =  client.toBlocking().exchange("/date", String::class.java)
-            resetDate = Date(java.lang.Long.parseLong(response.body()!!))
+            resetDate = Date(Instant.parse((response.body() as String).trim('"')).toEpochMilli())
 
             assert(resetDate.time > originalDate.time)
         }

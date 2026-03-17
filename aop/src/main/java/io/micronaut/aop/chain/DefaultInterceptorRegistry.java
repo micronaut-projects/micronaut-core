@@ -29,7 +29,7 @@ import io.micronaut.context.EnvironmentConfigurable;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.naming.Described;
 import io.micronaut.core.order.OrderUtil;
@@ -37,6 +37,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Executable;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.qualifiers.InterceptorBindingQualifier;
+import org.jspecify.annotations.NullMarked;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,8 +52,10 @@ import java.util.List;
  * @author graemerocher
  * @since 3.0.0
  */
-public class DefaultInterceptorRegistry implements InterceptorRegistry {
-    protected static final Logger LOG = LoggerFactory.getLogger(InterceptorChain.class);
+@Internal
+@NullMarked
+public final class DefaultInterceptorRegistry implements InterceptorRegistry {
+    private static final Logger LOG = LoggerFactory.getLogger(InterceptorChain.class);
     private static final MethodInterceptor<?, ?>[] ZERO_METHOD_INTERCEPTORS = new MethodInterceptor[0];
     private static final Interceptor[] ZERO_INTERCEPTORS = new Interceptor[0];
     private final BeanContext beanContext;
@@ -62,11 +65,10 @@ public class DefaultInterceptorRegistry implements InterceptorRegistry {
     }
 
     @Override
-    @NonNull
     public <T> Interceptor<T, ?>[] resolveInterceptors(
-        @NonNull Executable<T, ?> method,
-        @NonNull Collection<BeanRegistration<Interceptor<T, ?>>> interceptors,
-        @NonNull InterceptorKind interceptorKind) {
+        Executable<T, ?> method,
+        Collection<BeanRegistration<Interceptor<T, ?>>> interceptors,
+        InterceptorKind interceptorKind) {
         final AnnotationMetadata annotationMetadata = method.getAnnotationMetadata();
         if (interceptors.isEmpty()) {
             return resolveToNone((ExecutableMethod<?, ?>) method, interceptorKind, annotationMetadata);
@@ -197,7 +199,7 @@ public class DefaultInterceptorRegistry implements InterceptorRegistry {
             }
             AnnotationValue<Annotation> otherMembers =
                 applicableValue.getAnnotation(InterceptorBindingQualifier.META_BINDING_VALUES).orElse(null);
-            if (!memberBinding.equals(otherMembers)) {
+            if (otherMembers != null && !memberBinding.equals(otherMembers)) {
                 continue;
             }
             return true;
@@ -219,10 +221,9 @@ public class DefaultInterceptorRegistry implements InterceptorRegistry {
     }
 
     @Override
-    @NonNull
     public <T> Interceptor<T, T>[] resolveConstructorInterceptors(
-        @NonNull BeanConstructor<T> constructor,
-        @NonNull Collection<BeanRegistration<Interceptor<T, T>>> interceptors) {
+        BeanConstructor<T> constructor,
+        Collection<BeanRegistration<Interceptor<T, T>>> interceptors) {
         instrumentAnnotationMetadata(beanContext, constructor);
         final Collection<AnnotationValue<?>> applicableBindings
             = AbstractInterceptorChain.resolveInterceptorValues(

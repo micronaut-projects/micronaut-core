@@ -16,7 +16,6 @@
 package io.micronaut.http.netty;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.order.OrderUtil;
 import io.netty.channel.Channel;
 import org.slf4j.Logger;
@@ -63,7 +62,7 @@ public abstract class AbstractCompositeCustomizer<C, R> {
         assert members instanceof CopyOnWriteArrayList : "only allow adding to root customizer";
         // do the insertion in one operation, so that concurrent readers don't see an inconsistent
         // (unsorted) state
-        int insertionIndex = Collections.binarySearch(members, customizer, OrderUtil.COMPARATOR);
+        int insertionIndex = Collections.binarySearch(members, customizer, OrderUtil.COMPARATOR_ZERO);
         if (insertionIndex < 0) {
             insertionIndex = ~insertionIndex;
         }
@@ -74,8 +73,7 @@ public abstract class AbstractCompositeCustomizer<C, R> {
 
     protected abstract C makeNewComposite(List<C> members);
 
-    @NonNull
-    public final C specializeForChannel(@NonNull Channel channel, @NonNull R role) {
+    public final C specializeForChannel(Channel channel, R role) {
         return specialize(c -> specializeForChannel(c, channel, role));
     }
 

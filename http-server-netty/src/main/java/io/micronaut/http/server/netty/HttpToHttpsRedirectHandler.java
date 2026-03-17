@@ -20,7 +20,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
-import io.micronaut.http.netty.body.AvailableNettyByteBody;
+import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.handler.OutboundAccess;
 import io.micronaut.http.server.netty.handler.RequestHandler;
@@ -66,7 +66,7 @@ record HttpToHttpsRedirectHandler(
         outboundAccess.closeAfterWrite();
         outboundAccess.write(
             NettyHttpResponseBuilder.toHttpResponse(HttpResponse.permanentRedirect(uriBuilder.build())),
-            AvailableNettyByteBody.empty()
+                NettyByteBodyFactory.empty()
         );
     }
 

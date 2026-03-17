@@ -15,10 +15,11 @@
  */
 package io.micronaut.http.server.tck.tests.constraintshandler;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Introspected;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
+import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
@@ -197,6 +198,7 @@ public class ControllerConstraintHandlerTest {
     }
 
     @Introspected
+    @ReflectiveAccess
     static class CredentialsWithoutNullabilityAnnotation {
         @NotBlank
         @Email
@@ -205,7 +207,9 @@ public class ControllerConstraintHandlerTest {
         @NotBlank
         private final String password;
 
-        CredentialsWithoutNullabilityAnnotation(String username, String password) {
+        CredentialsWithoutNullabilityAnnotation(@JsonProperty("username") String username, // @JsonProperty for JacksonDatabind
+                                                @JsonProperty("password") String password // @JsonProperty for JacksonDatabind
+        ) {
             this.username = username;
             this.password = password;
         }
@@ -220,6 +224,7 @@ public class ControllerConstraintHandlerTest {
     }
 
     @Introspected
+    @ReflectiveAccess
     static class CredentialsWithNullable {
         @NotBlank
         @Email
@@ -230,7 +235,9 @@ public class ControllerConstraintHandlerTest {
         @Nullable
         private final String password;
 
-        CredentialsWithNullable(@Nullable String username, @Nullable String password) {
+        CredentialsWithNullable(@JsonProperty("username") @Nullable String username, // @JsonProperty for JacksonDatabind
+                                @JsonProperty("password") @Nullable String password // @JsonProperty for JacksonDatabind
+        ) {
             this.username = username;
             this.password = password;
         }
@@ -247,27 +254,26 @@ public class ControllerConstraintHandlerTest {
     }
 
     @Introspected
+    @ReflectiveAccess
     static class CredentialsWithNonNull {
         @NotBlank
         @Email
-        @NonNull
         private final String username;
 
         @NotBlank
-        @NonNull
         private final String password;
 
-        CredentialsWithNonNull(@NonNull String username, @NonNull String password) {
+        CredentialsWithNonNull(@JsonProperty("username") String username, // @JsonProperty for JacksonDatabind
+                               @JsonProperty("password") String password // @JsonProperty for JacksonDatabind
+        ) {
             this.username = username;
             this.password = password;
         }
 
-        @NonNull
         public String getUsername() {
             return username;
         }
 
-        @NonNull
         public String getPassword() {
             return password;
         }

@@ -18,8 +18,7 @@ package io.micronaut.context.scope;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.LifeCycle;
 import io.micronaut.context.exceptions.BeanDestructionException;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
@@ -63,7 +62,7 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
      * @return Obtains the scope map, never null
      * @throws java.lang.IllegalStateException if the scope map cannot be obtained in the current context
      */
-    @NonNull
+    @Nullable
     protected abstract Map<BeanIdentifier, CreatedBean<?>> getScopeMap(boolean forCreation);
 
     @Override
@@ -77,7 +76,6 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
     @Override
     public abstract void close();
 
-    @NonNull
     @Override
     public final AbstractConcurrentCustomScope<A> stop() {
         w.lock();
@@ -124,7 +122,7 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
     public final <T> T getOrCreate(BeanCreationContext<T> creationContext) {
         r.lock();
         try {
-            final Map<BeanIdentifier, CreatedBean<?>> scopeMap = getScopeMap(true);
+            final Map<BeanIdentifier, CreatedBean<?>> scopeMap = Objects.requireNonNull(getScopeMap(true));
             final BeanIdentifier id = creationContext.id();
             CreatedBean<?> createdBean = scopeMap.get(id);
             if (createdBean != null) {
@@ -162,8 +160,7 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
      * @param <T> The generic type
      * @return Created bean
      */
-    @NonNull
-    protected <T> CreatedBean<T> doCreate(@NonNull BeanCreationContext<T> creationContext) {
+    protected <T> CreatedBean<T> doCreate(BeanCreationContext<T> creationContext) {
         return creationContext.create();
     }
 
@@ -219,6 +216,9 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
             try {
                 scopeMap = getScopeMap(false);
             } catch (Exception e) {
+                return Optional.empty();
+            }
+            if (scopeMap == null) {
                 return Optional.empty();
             }
             for (CreatedBean<?> createdBean : scopeMap.values()) {

@@ -1,4 +1,9 @@
-Micronaut Framework provides support for loading resources from files into memory, rooted at the api:core.io.ResourceLoader[] API. Two built-in implementations include api:core.io.file.DefaultFileSystemResourceLoader[] and api:core.io.scan.DefaultClassPathResourceLoader[].
+Micronaut Framework provides support for loading resources from files into memory, rooted at the api:core.io.ResourceLoader[] API. Built-in implementations include
+
+* api:core.io.file.DefaultFileSystemResourceLoader[]
+* api:core.io.scan.DefaultClassPathResourceLoader[]
+* api:core.io.value.StringResourceLoader[]
+* api:core.io.value.Base64ResourceLoader[]
 
 A convenience class api:core.io.ResourceResolver[] is provided that leverages both of these  implementations. The following example illustrates using the API to read a text file from the classpath.
 
@@ -7,3 +12,13 @@ snippet::io.micronaut.docs.resources.MyResourceLoader[tags="class",indent=0,titl
 <1> Injects an instance of `ResourceResolver`
 <2> Uses the `ResourceResolver` API to get a `URL` to a file in the classpath, if it exists.
 <3> api:core.io.IOUtils[] provides further support for I/O operations, in this case reading the file contents into a String.
+
+Areas of the framework that load resources using `ResourceResolver` include:
+
+* Static HTTP resources
+* SSL key and trust stores
+* Dynamic configuration
+
+To use a fixed value for a resource instead of loading it from the file system or classpath, the `string:` and
+`base64:` prefixes. While `string:` returns the value as is (decoded as UTF-8), `base64:` first decodes the value from
+Base64. This allows you to serve e.g. a small binary as a static HTTP file.

@@ -17,7 +17,6 @@ package io.micronaut.http.client.netty.ssl;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Secondary;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.client.HttpVersionSelection;
@@ -27,10 +26,10 @@ import io.micronaut.http.ssl.ClientAuthentication;
 import io.micronaut.http.ssl.SslBuilder;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.http.ssl.SslConfigurationException;
+import io.netty.handler.codec.http2.Http2SecurityUtil;
 import io.netty.handler.codec.http3.Http3;
 import io.netty.handler.codec.quic.QuicSslContext;
 import io.netty.handler.codec.quic.QuicSslContextBuilder;
-import io.netty.handler.codec.http2.Http2SecurityUtil;
 import io.netty.handler.ssl.ApplicationProtocolConfig;
 import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.SslContext;
@@ -39,6 +38,7 @@ import io.netty.handler.ssl.SslProvider;
 import io.netty.handler.ssl.SupportedCipherSuiteFilter;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -85,7 +85,6 @@ public class NettyClientSslBuilder extends SslBuilder<SslContext> implements Cli
         return Optional.of(build(ssl, HttpVersionSelection.forLegacyVersion(httpVersion)));
     }
 
-    @NonNull
     @Override
     public final SslContext build(SslConfiguration ssl, HttpVersionSelection versionSelection) {
         try {
@@ -95,6 +94,13 @@ public class NettyClientSslBuilder extends SslBuilder<SslContext> implements Cli
         }
     }
 
+    /**
+     * Create a new client context builder.
+     *
+     * @param ssl The ssl configuration
+     * @param versionSelection The allowed HTTP versions
+     * @return The builder
+     */
     protected SslContextBuilder createSslContextBuilder(SslConfiguration ssl, HttpVersionSelection versionSelection) {
         SslContextBuilder sslBuilder = SslContextBuilder
             .forClient()
@@ -121,7 +127,7 @@ public class NettyClientSslBuilder extends SslBuilder<SslContext> implements Cli
             }
         }
         if (versionSelection.isAlpn()) {
-            SslProvider provider = SslProvider.isAlpnSupported(SslProvider.OPENSSL) ? SslProvider.OPENSSL : SslProvider.JDK;
+            SslProvider provider = ssl.isPreferOpenssl() && SslProvider.isAlpnSupported(SslProvider.OPENSSL) ? SslProvider.OPENSSL : SslProvider.JDK;
             sslBuilder.sslProvider(provider);
             sslBuilder.applicationProtocolConfig(new ApplicationProtocolConfig(
                 ApplicationProtocolConfig.Protocol.ALPN,
@@ -153,6 +159,7 @@ public class NettyClientSslBuilder extends SslBuilder<SslContext> implements Cli
     }
 
     @Override
+    @Nullable
     protected KeyManagerFactory getKeyManagerFactory(SslConfiguration ssl) {
         try {
             Optional<KeyStore> ks = this.getKeyStore(ssl);
@@ -167,6 +174,7 @@ public class NettyClientSslBuilder extends SslBuilder<SslContext> implements Cli
     }
 
     @Override
+    @Nullable
     protected TrustManagerFactory getTrustManagerFactory(SslConfiguration ssl) {
         try {
             Optional<KeyStore> trustStore = getTrustStore(ssl);

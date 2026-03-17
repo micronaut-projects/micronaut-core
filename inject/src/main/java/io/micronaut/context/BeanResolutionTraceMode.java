@@ -15,13 +15,15 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.naming.NameUtils;
-import java.util.Optional;
-import java.util.Set;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.Optional;
+import java.util.Set;
 
 /**
  * Allows enabling more verbose debugging on bean resolution.
@@ -49,9 +51,9 @@ public enum BeanResolutionTraceMode {
     private static final String CLASSES_SYS_PROP = "micronaut.inject.trace";
     private static final String CLASSES_ENV_VAR = "MICRONAUT_INJECT_TRACE";
 
-    private final BeanResolutionTracer resolutionTracer;
+    private final @Nullable BeanResolutionTracer resolutionTracer;
 
-    BeanResolutionTraceMode(BeanResolutionTracer resolutionTracer) {
+    BeanResolutionTraceMode(@Nullable BeanResolutionTracer resolutionTracer) {
         this.resolutionTracer = resolutionTracer;
     }
 
@@ -71,8 +73,8 @@ public enum BeanResolutionTraceMode {
     @Internal
     static BeanResolutionTraceMode getDefaultMode(Set<String> traceClasses) {
         String mode = Optional
-            .ofNullable(System.getProperty(MODE_SYS_PROP))
-            .orElseGet(() -> System.getenv(MODE_ENV_VAR));
+            .ofNullable(CachedEnvironment.getProperty(MODE_SYS_PROP))
+            .orElseGet(() -> CachedEnvironment.getenv(MODE_ENV_VAR));
         if (mode != null) {
             return BeanResolutionTraceMode
                 .valueOf(NameUtils.environmentName(mode));
@@ -89,7 +91,7 @@ public enum BeanResolutionTraceMode {
      * @return The class names
      */
     @Internal
-    static @NonNull Set<String> getDefaultTraceClasses() {
+    static Set<String> getDefaultTraceClasses() {
         String classes = Optional
             .ofNullable(System.getProperty(CLASSES_SYS_PROP))
             .orElseGet(() -> System.getenv(CLASSES_ENV_VAR));

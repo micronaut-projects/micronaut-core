@@ -56,7 +56,6 @@ ioc:
     introspectedAnnotationOnAConfigurationClass: Use the @Introspected Annotation on a Configuration Class
     introspectExistingAnnotations: Write an AnnotationMapper to Introspect Existing Annotations
     beanWrapperApi: The BeanWrapper API
-    jacksonAndBeanIntrospection: Jackson and Bean Introspection
     kotlinAndBeanIntrospection: Kotlin and Bean Introspection
   beanMappers:
     title: Bean Mappers
@@ -68,7 +67,9 @@ ioc:
   beanImport: Importing Beans from Libraries
   classImport: Importing Classes from Libraries
   mixin: Modifying Class Annotations With A Mixin
-  nullabilityAnnotations: Nullability Annotations
+  nullabilityAnnotations:
+    title: Nullability Annotations
+    jspecify: JSpecify Nullability Annotations
   springBeans: Micronaut Beans And Spring
   android: Android Support
 config:
@@ -158,6 +159,9 @@ httpServer:
     errorFormatting: Error Formatting
   apiVersioning: API Versioning
   formData: Handling Form Data
+  form:
+    title: Forms
+    formCapable: Detailed Form API
   serverIO: Writing Response Data
   uploads: File Uploads
   transfers: File Transfers
@@ -252,6 +256,7 @@ httpClient:
   clientHttp3: HTTP/3 Support
   clientSample: HTTP Client Sample
   nettyPooling: Connection pooling in the netty client
+certificates: Certificate providers
 contextPropagation:
   title: Context propagation
   reactorContextPropagation: Reactor context propagation
@@ -300,8 +305,6 @@ configurations:
     title: Configurations for Reactive Programming
     reactor: Reactor Support
     rxjava3: RxJava 3 Support
-    rxjava2: RxJava 2 Support
-    rxjava1: RxJava 1 Support
   dataAccess:
     title: Configurations for Data Access
     sqlSupport: Configuring a SQL Data Source

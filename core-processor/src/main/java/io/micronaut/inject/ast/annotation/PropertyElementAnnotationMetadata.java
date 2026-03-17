@@ -18,8 +18,7 @@ package io.micronaut.inject.ast.annotation;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
@@ -43,13 +42,12 @@ import java.util.function.Predicate;
 public final class PropertyElementAnnotationMetadata implements ElementAnnotationMetadata {
 
     private final io.micronaut.inject.ast.Element thisElement;
-    private final List<MutableAnnotationMetadataDelegate<?>> elements;
-    private final AnnotationMetadata propertyAnnotationMetadata;
+    private final List<MutableAnnotationMetadataDelegate<?>> writeElements;
     private final AnnotationMetadata propertyReadAnnotationMetadata;
     private final AnnotationMetadata propertyWriteAnnotationMetadata;
 
-    public PropertyElementAnnotationMetadata(@NonNull
-                                             io.micronaut.inject.ast.Element thisElement,
+    public PropertyElementAnnotationMetadata(
+                                             io.micronaut.inject.ast. Element thisElement,
                                              @Nullable
                                              MethodElement getter,
                                              @Nullable
@@ -58,31 +56,35 @@ public final class PropertyElementAnnotationMetadata implements ElementAnnotatio
                                              FieldElement field,
                                              @Nullable
                                              ParameterElement constructorParameter,
+                                             @Nullable AnnotationMetadata propertyComponentAnnotationMetadata,
                                              boolean includeSynthetic) {
 
         this.thisElement = thisElement;
-        List<MutableAnnotationMetadataDelegate<?>> elements = new ArrayList<>(3);
-        List<MutableAnnotationMetadataDelegate<?>> readElements = new ArrayList<>(3);
         List<MutableAnnotationMetadataDelegate<?>> writeElements = new ArrayList<>(3);
+        List<AnnotationMetadata> readElements = new ArrayList<>(3);
+        if (propertyComponentAnnotationMetadata != null) {
+            readElements.add(propertyComponentAnnotationMetadata);
+        }
         if (setter != null && (!setter.isSynthetic() || includeSynthetic)) {
-            elements.add(setter.getMethodAnnotationMetadata());
             writeElements.add(setter.getMethodAnnotationMetadata());
+            readElements.add(setter.getMethodAnnotationMetadata());
             ParameterElement[] parameters = setter.getParameters();
             if (parameters.length > 0) {
                 ParameterElement parameter = parameters[0];
                 MutableAnnotationMetadataDelegate<?> typeAnnotationMetadata = parameter.getType().getTypeAnnotationMetadata();
                 if (!typeAnnotationMetadata.isEmpty()) {
-                    elements.add(typeAnnotationMetadata);
                     writeElements.add(typeAnnotationMetadata);
+                    readElements.add(typeAnnotationMetadata);
                 }
             }
         }
         if (constructorParameter != null) {
-            elements.add(constructorParameter);
+            writeElements.add(constructorParameter);
+            readElements.add(constructorParameter);
             MutableAnnotationMetadataDelegate<?> typeAnnotationMetadata = constructorParameter.getType().getTypeAnnotationMetadata();
             if (!typeAnnotationMetadata.isEmpty()) {
-                elements.add(typeAnnotationMetadata);
                 writeElements.add(typeAnnotationMetadata);
+                readElements.add(typeAnnotationMetadata);
             }
         }
         if (field != null && (!field.isSynthetic() || includeSynthetic)) {
@@ -101,12 +103,10 @@ public final class PropertyElementAnnotationMetadata implements ElementAnnotatio
                     }
                 }
             } else {
-                elements.add(field);
                 writeElements.add(field);
                 readElements.add(field);
                 MutableAnnotationMetadataDelegate<?> typeAnnotationMetadata = field.getType().getTypeAnnotationMetadata();
                 if (!typeAnnotationMetadata.isEmpty()) {
-                    elements.add(typeAnnotationMetadata);
                     writeElements.add(typeAnnotationMetadata);
                     readElements.add(typeAnnotationMetadata);
                 }
@@ -114,32 +114,29 @@ public final class PropertyElementAnnotationMetadata implements ElementAnnotatio
         }
 
         if (getter != null && (!getter.isSynthetic() || includeSynthetic)) {
-            elements.add(getter.getMethodAnnotationMetadata());
+            writeElements.add(getter.getMethodAnnotationMetadata());
             readElements.add(getter.getMethodAnnotationMetadata());
             MutableAnnotationMetadataDelegate<?> typeAnnotationMetadata = getter.getReturnType().getTypeAnnotationMetadata();
             if (!typeAnnotationMetadata.isEmpty()) {
-                elements.add(typeAnnotationMetadata);
+                writeElements.add(typeAnnotationMetadata);
                 readElements.add(typeAnnotationMetadata);
             }
         }
 
         // The instance AnnotationMetadata of each element can change after a modification
         // Set annotation metadata as actual elements so the changes are reflected
-        AnnotationMetadata[] hierarchy = elements.toArray(AnnotationMetadata[]::new);
-        this.propertyAnnotationMetadata =
-            hierarchy.length == 1 ? hierarchy[0] : new AnnotationMetadataHierarchy(true, hierarchy);
-        AnnotationMetadata[] readHierarchy = readElements.toArray(AnnotationMetadata[]::new);
+        AnnotationMetadata[] hierarchy = readElements.toArray(AnnotationMetadata[]::new);
         this.propertyReadAnnotationMetadata =
-            readHierarchy.length == 1 ? readHierarchy[0] : new AnnotationMetadataHierarchy(true, readHierarchy);
+            hierarchy.length == 1 ? hierarchy[0] : new AnnotationMetadataHierarchy(true, hierarchy);
         AnnotationMetadata[] writeHierarchy = writeElements.toArray(AnnotationMetadata[]::new);
         this.propertyWriteAnnotationMetadata =
             writeHierarchy.length == 1 ? writeHierarchy[0] : new AnnotationMetadataHierarchy(true, writeHierarchy);
-        this.elements = elements;
+        this.writeElements = writeElements;
     }
 
     @Override
     public <T extends Annotation> io.micronaut.inject.ast.Element annotate(AnnotationValue<T> annotationValue) {
-        for (MutableAnnotationMetadataDelegate<?> am : elements) {
+        for (MutableAnnotationMetadataDelegate<?> am : writeElements) {
             am.annotate(annotationValue);
         }
         return thisElement;
@@ -147,7 +144,7 @@ public final class PropertyElementAnnotationMetadata implements ElementAnnotatio
 
     @Override
     public <T extends Annotation> io.micronaut.inject.ast.Element annotate(String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
-        for (MutableAnnotationMetadataDelegate<?> am : elements) {
+        for (MutableAnnotationMetadataDelegate<?> am : writeElements) {
             am.annotate(annotationType, consumer);
         }
         return thisElement;
@@ -155,7 +152,7 @@ public final class PropertyElementAnnotationMetadata implements ElementAnnotatio
 
     @Override
     public <T extends Annotation> io.micronaut.inject.ast.Element annotate(Class<T> annotationType) {
-        for (MutableAnnotationMetadataDelegate<?> am : elements) {
+        for (MutableAnnotationMetadataDelegate<?> am : writeElements) {
             am.annotate(annotationType);
         }
         return thisElement;
@@ -163,7 +160,7 @@ public final class PropertyElementAnnotationMetadata implements ElementAnnotatio
 
     @Override
     public io.micronaut.inject.ast.Element annotate(String annotationType) {
-        for (MutableAnnotationMetadataDelegate<?> am : elements) {
+        for (MutableAnnotationMetadataDelegate<?> am : writeElements) {
             am.annotate(annotationType);
         }
         return thisElement;
@@ -171,7 +168,7 @@ public final class PropertyElementAnnotationMetadata implements ElementAnnotatio
 
     @Override
     public <T extends Annotation> io.micronaut.inject.ast.Element annotate(Class<T> annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
-        for (MutableAnnotationMetadataDelegate<?> am : elements) {
+        for (MutableAnnotationMetadataDelegate<?> am : writeElements) {
             am.annotate(annotationType, consumer);
         }
         return thisElement;
@@ -179,7 +176,7 @@ public final class PropertyElementAnnotationMetadata implements ElementAnnotatio
 
     @Override
     public io.micronaut.inject.ast.Element removeAnnotation(String annotationType) {
-        for (MutableAnnotationMetadataDelegate<?> am : elements) {
+        for (MutableAnnotationMetadataDelegate<?> am : writeElements) {
             am.removeAnnotation(annotationType);
         }
         return thisElement;
@@ -187,7 +184,7 @@ public final class PropertyElementAnnotationMetadata implements ElementAnnotatio
 
     @Override
     public <T extends Annotation> io.micronaut.inject.ast.Element removeAnnotationIf(Predicate<AnnotationValue<T>> predicate) {
-        for (MutableAnnotationMetadataDelegate<?> am : elements) {
+        for (MutableAnnotationMetadataDelegate<?> am : writeElements) {
             am.removeAnnotationIf(predicate);
         }
         return thisElement;
@@ -195,7 +192,7 @@ public final class PropertyElementAnnotationMetadata implements ElementAnnotatio
 
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
-        return propertyAnnotationMetadata;
+        return propertyReadAnnotationMetadata;
     }
 
     /**

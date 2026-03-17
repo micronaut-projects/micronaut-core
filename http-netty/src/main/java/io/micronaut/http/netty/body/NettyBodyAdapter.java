@@ -16,17 +16,12 @@
 package io.micronaut.http.netty.body;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
+import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.body.AbstractBodyAdapter;
-import io.micronaut.http.body.AvailableByteBody;
 import io.micronaut.http.body.ByteBody;
-import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.netty.EventLoopFlow;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import io.netty.channel.EventLoop;
-import io.netty.handler.codec.http.HttpHeaders;
 import org.reactivestreams.Publisher;
 
 /**
@@ -36,60 +31,18 @@ import org.reactivestreams.Publisher;
  * @since 4.6.0
  */
 @Internal
-public final class NettyBodyAdapter extends AbstractBodyAdapter<ByteBuf, StreamingNettyByteBody.SharedBuffer> {
+final class NettyBodyAdapter extends AbstractBodyAdapter {
     private final EventLoopFlow eventLoopFlow;
 
-    private NettyBodyAdapter(EventLoop eventLoop, Publisher<ByteBuf> source, @Nullable Runnable onDiscard) {
+    NettyBodyAdapter(EventLoop eventLoop, Publisher<ReadBuffer> source, @Nullable Runnable onDiscard) {
         super(source, onDiscard);
         this.eventLoopFlow = new EventLoopFlow(eventLoop);
     }
 
-    /**
-     * Transform the given body to a {@link NettyByteBody}.
-     *
-     * @param body The generic body
-     * @param eventLoop The event loop for task serialization
-     * @return The adapted body
-     */
-    @NonNull
-    public static NettyByteBody adapt(@NonNull ByteBody body, @NonNull EventLoop eventLoop) {
-        if (body instanceof NettyByteBody nbb) {
-            return nbb;
-        }
-        if (body instanceof AvailableByteBody available) {
-            return new AvailableNettyByteBody(Unpooled.wrappedBuffer(available.toByteArray()));
-        }
-        NettyBodyAdapter adapter = new NettyBodyAdapter(eventLoop, NettyByteBody.toByteBufs(body), null);
-        adapter.sharedBuffer = new StreamingNettyByteBody.SharedBuffer(eventLoop, BodySizeLimits.UNLIMITED, adapter);
-        body.expectedLength().ifPresent(adapter.sharedBuffer::setExpectedLength);
-        return new StreamingNettyByteBody(adapter.sharedBuffer);
-    }
-
-    public static StreamingNettyByteBody adapt(Publisher<ByteBuf> publisher, EventLoop eventLoop) {
-        return adapt(publisher, eventLoop, null, null);
-    }
-
-    public static StreamingNettyByteBody adapt(Publisher<ByteBuf> publisher, EventLoop eventLoop, @Nullable HttpHeaders headersForLength, @Nullable Runnable onDiscard) {
-        NettyBodyAdapter adapter = new NettyBodyAdapter(eventLoop, publisher, onDiscard);
-        adapter.sharedBuffer = new StreamingNettyByteBody.SharedBuffer(eventLoop, BodySizeLimits.UNLIMITED, adapter);
-        if (headersForLength != null) {
-            adapter.sharedBuffer.setExpectedLengthFrom(headersForLength);
-        }
-        return new StreamingNettyByteBody(adapter.sharedBuffer);
-    }
-
     @Override
-    public void onNext(ByteBuf bytes) {
-        if (eventLoopFlow.executeNow(() -> onNext0(bytes))) {
-            onNext0(bytes);
-        }
-    }
-
-    private void onNext0(ByteBuf bytes) {
-        long newDemand = demand.addAndGet(-bytes.readableBytes());
-        sharedBuffer.add(bytes);
-        if (newDemand > 0) {
-            subscription.request(1);
+    public void onNext(ReadBuffer bytes) {
+        if (eventLoopFlow.executeNow(() -> super.onNext(bytes))) {
+            super.onNext(bytes);
         }
     }
 

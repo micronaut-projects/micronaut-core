@@ -16,8 +16,8 @@
 package io.micronaut.http.filter;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NullUnmarked;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.order.Ordered;
@@ -28,6 +28,7 @@ import io.micronaut.http.HttpResponse;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.Objects;
 import java.util.function.BiFunction;
 
 /**
@@ -76,7 +77,9 @@ public class FilterRunner {
      * @since 4.6
      */
     public FilterRunner(List<GenericHttpFilter> filters) {
-        this(null, filters, null);
+        this(null, filters, (httpRequest, propagatedContext) -> {
+            throw new IllegalStateException("No response provider defined!");
+        });
     }
 
     /**
@@ -108,7 +111,7 @@ public class FilterRunner {
      *
      * @param filters The list of filters to sort in place
      */
-    public static void sort(@NonNull List<GenericHttpFilter> filters) {
+    public static void sort(List<GenericHttpFilter> filters) {
         if (filters.isEmpty()) {
             return;
         }
@@ -122,7 +125,7 @@ public class FilterRunner {
      *
      * @param filters The list of filters to sort in place
      */
-    public static void sortReverse(@NonNull List<GenericHttpFilter> filters) {
+    public static void sortReverse(List<GenericHttpFilter> filters) {
         if (filters.isEmpty()) {
             return;
         }
@@ -136,7 +139,7 @@ public class FilterRunner {
      * @param request The request
      * @since 4.6
      */
-    protected void doRouteMatch(@NonNull HttpRequest<?> request) {
+    protected void doRouteMatch(HttpRequest<?> request) {
         throw new IllegalStateException("Route match not supported");
     }
 
@@ -163,8 +166,8 @@ public class FilterRunner {
      * @param propagatedContext The propagated context
      * @return A flow that will be passed on to the next filter, or null if exception is not remapped
      */
-    @Nullable
     @SuppressWarnings("java:S1452")
+    @NullUnmarked // Fix
     protected ExecutionFlow<HttpResponse<?>> processFailure(HttpRequest<?> request, Throwable failure, PropagatedContext propagatedContext) {
         return null;
     }
@@ -176,8 +179,7 @@ public class FilterRunner {
      * @param propagatedContext The propagatedContext
      * @return The flow
      */
-    @NonNull
-    protected ExecutionFlow<HttpResponse<?>> provideResponse(@NonNull HttpRequest<?> request, @NonNull PropagatedContext propagatedContext) {
+    protected ExecutionFlow<HttpResponse<?>> provideResponse(HttpRequest<?> request, PropagatedContext propagatedContext) {
         return responseProvider.apply(request, propagatedContext);
     }
 
@@ -187,13 +189,11 @@ public class FilterRunner {
      * @return The filters
      * @since 4.6
      */
-    @NonNull
-    protected List<GenericHttpFilter> findFiltersAfterRouteMatch(@NonNull HttpRequest<?> request) {
+    protected List<GenericHttpFilter> findFiltersAfterRouteMatch(HttpRequest<?> request) {
         throw new IllegalStateException("Find filters not supported");
     }
 
-    @NonNull
-    private List<InternalHttpFilter> findInternalFiltersAfterRouteMatch(@NonNull HttpRequest<?> request) {
+    private List<InternalHttpFilter> findInternalFiltersAfterRouteMatch(HttpRequest<?> request) {
         return filters == null ? (List) findFiltersAfterRouteMatch(request) : filters;
     }
 
@@ -204,8 +204,7 @@ public class FilterRunner {
      * @return The flow that completes after all filters and the terminal operation, with the final
      * response
      */
-    @NonNull
-    public final ExecutionFlow<HttpResponse<?>> run(@NonNull HttpRequest<?> request) {
+    public final ExecutionFlow<HttpResponse<?>> run(HttpRequest<?> request) {
         return run(request, PropagatedContext.getOrEmpty());
     }
 
@@ -239,7 +238,7 @@ public class FilterRunner {
                 f.filterIterator = iterator;
             }
         } else {
-            iterator = filterFilters(filters, request).listIterator();
+            iterator = filters == null ? List.<InternalHttpFilter>of().listIterator() : filterFilters(filters, request).listIterator();
         }
         if (!iterator.hasNext()) {
             return provideResponse(request, propagatedContext);
@@ -323,7 +322,7 @@ public class FilterRunner {
                 // Imperative flow: Unwrap the context and continue the loop
                 if (context != flowContext) {
                     // Response modified by the filter
-                    flow = processResponse(flowContext.request(), flowContext.response(), flowContext.propagatedContext()).map(flowContext::withResponse);
+                    flow = processResponse(flowContext.request(), Objects.requireNonNull(flowContext.response()), flowContext.propagatedContext()).map(flowContext::withResponse);
                     exception = null;
                     flowContext = flow.tryCompleteValue();
                     if (flowContext != null) {
@@ -341,7 +340,7 @@ public class FilterRunner {
                 .flatMap(newContext -> {
                     if (finalContext != newContext) {
                         // Response modified by the filter
-                        return processResponse(newContext.request(), newContext.response(), newContext.propagatedContext()).map(newContext::withResponse);
+                        return processResponse(newContext.request(), Objects.requireNonNull(newContext.response()), newContext.propagatedContext()).map(newContext::withResponse);
                     }
                     return ExecutionFlow.just(newContext);
                 })
@@ -395,7 +394,7 @@ public class FilterRunner {
      */
     final class RouteMatchResolverHttpFilter implements InternalHttpFilter {
 
-        private ListIterator<InternalHttpFilter> filterIterator;
+        private ListIterator<InternalHttpFilter> filterIterator = List.<InternalHttpFilter>of().listIterator();
 
         @Override
         public boolean isFiltersRequest() {

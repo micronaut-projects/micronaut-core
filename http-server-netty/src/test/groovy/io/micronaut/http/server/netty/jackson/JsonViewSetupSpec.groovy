@@ -15,9 +15,7 @@
  */
 package io.micronaut.http.server.netty.jackson
 
-
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.MapPropertySource
 import io.micronaut.context.env.PropertySource
 import io.micronaut.jackson.JacksonConfiguration
@@ -29,7 +27,7 @@ class JsonViewSetupSpec extends Specification {
     void "verify default jackson setup with @JsonView disabled"() {
 
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test").start()
+        ApplicationContext applicationContext = ApplicationContext.builder("test").start()
 
         expect:
         applicationContext.containsBean(JacksonConfiguration)
@@ -43,7 +41,7 @@ class JsonViewSetupSpec extends Specification {
     void "verify jackson setup with @JsonView enabled"() {
 
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build()
         applicationContext.environment.addPropertySource((MapPropertySource) PropertySource.of(
                 'jackson.json-view.enabled': true
         ))

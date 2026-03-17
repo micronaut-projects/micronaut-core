@@ -6,6 +6,7 @@ import io.micronaut.core.annotation.Introspected
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.inject.BeanDefinition
+import io.micronaut.inject.ProxyBeanDefinition
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.UnresolvedTypeKind
@@ -17,13 +18,35 @@ import org.intellij.lang.annotations.Language
 import spock.lang.PendingFeature
 
 class PostponedVisitorsSpec extends AbstractTypeElementSpec {
+
+    void 'test postpone generation of annotation metadata on introduction'() {
+        when:
+        def definition = buildBeanDefinition('test.SomeInterface' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
+package test;
+
+import io.micronaut.visitors.*;
+import test.SomeInterfaceConstants;
+
+@IntroductionTest(SomeInterfaceConstants.PATH)
+interface SomeInterface {
+
+}
+
+@ConstantGen
+interface GenConstants {}
+''')
+        then:
+        definition != null
+        definition.stringValue(IntroductionTest).get() == 'generated'
+    }
+
     void 'test postpone introspection generation implementing generated interface'() {
         when:
             def definition = buildBeanIntrospection('test.Walrus', '''
 package test;
 
 import io.micronaut.core.annotation.Introspected;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.annotation.Vetoed;
 import io.micronaut.visitors.Wither;
 import io.micronaut.visitors.Builder;
@@ -57,7 +80,7 @@ public record Walrus (
 package test;
 
 import io.micronaut.core.annotation.Introspected;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.visitors.IntroductionTest;
 import io.micronaut.visitors.IntroductionTestGen;
 import io.micronaut.aop.InterceptorBean;
@@ -96,7 +119,7 @@ class IntroductionTestInterceptor
 package test;
 
 import io.micronaut.core.annotation.Introspected;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.visitors.InterfaceGen;
 import io.micronaut.visitors.IntroductionTestGen;
 import io.micronaut.aop.InterceptorBean;

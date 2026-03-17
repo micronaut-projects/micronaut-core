@@ -15,6 +15,7 @@
  */
 package io.micronaut.core.async.subscriber;
 
+import org.jspecify.annotations.NullUnmarked;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
@@ -29,6 +30,7 @@ import java.util.Queue;
  * @author Graeme Rocher
  * @since 1.0
  */
+@NullUnmarked
 public abstract class SingleThreadedBufferingSubscriber<T> implements Subscriber<T>, Emitter<T> {
 
     protected final Queue<T> upstreamBuffer = new LinkedList<>();

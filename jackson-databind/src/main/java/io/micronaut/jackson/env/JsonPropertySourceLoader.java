@@ -15,11 +15,11 @@
  */
 package io.micronaut.jackson.env;
 
-import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.type.MapType;
-import com.fasterxml.jackson.databind.type.TypeFactory;
 import io.micronaut.context.env.AbstractPropertySourceLoader;
+import tools.jackson.core.json.JsonFactory;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.type.MapType;
+import tools.jackson.databind.type.TypeFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -66,7 +66,7 @@ public class JsonPropertySourceLoader extends AbstractPropertySourceLoader {
      */
     protected Map<String, Object> readJsonAsMap(InputStream input) throws IOException {
         var objectMapper = new ObjectMapper(new JsonFactory());
-        TypeFactory factory = TypeFactory.defaultInstance();
+        TypeFactory factory = objectMapper.getTypeFactory();
         MapType mapType = factory.constructMapType(LinkedHashMap.class, String.class, Object.class);
 
         return objectMapper.readValue(input, mapType);

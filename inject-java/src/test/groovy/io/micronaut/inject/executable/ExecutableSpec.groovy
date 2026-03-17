@@ -17,7 +17,6 @@ package io.micronaut.inject.executable
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ExecutableMethod
@@ -182,7 +181,7 @@ class MyBean {
 
     void "test executable metadata"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test").start()
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build().start()
 
         when:
         Optional<MethodExecutionHandle> method = applicationContext.findExecutionHandle(BookController, "show", Long)
@@ -209,7 +208,7 @@ class MyBean {
 
     void "test executable responses"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test").start()
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build().start()
 
         expect:
         applicationContext.findExecutionHandle(BookController, methodName, argTypes as Class[]).isPresent()
@@ -242,7 +241,7 @@ class MyBean {
 
     void "test executable missing methods"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test").start()
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build().start()
 
         expect:
         !applicationContext.findExecutionHandle(BookController, methodName, argTypes as Class[]).isPresent()

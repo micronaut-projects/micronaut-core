@@ -19,15 +19,16 @@ import io.micronaut.aop.InterceptedMethod
 import io.micronaut.aop.InterceptorBean
 import io.micronaut.aop.MethodInterceptor
 import io.micronaut.aop.MethodInvocationContext
+import io.micronaut.core.convert.ConversionService
 import jakarta.inject.Singleton
 import java.io.IOException
 import java.util.concurrent.CompletableFuture
 
 @InterceptorBean(Repository::class)
 @Singleton
-class SuspendRepositoryInterceptor : MethodInterceptor<Any, Any> {
-    override fun intercept(context: MethodInvocationContext<Any, Any>?): Any? {
-        val interceptedMethod = InterceptedMethod.of(context)
+class SuspendRepositoryInterceptor(val conversionService: ConversionService) : MethodInterceptor<Any, Any> {
+    override fun intercept(context: MethodInvocationContext<Any, Any>): Any? {
+        val interceptedMethod = InterceptedMethod.of(context, conversionService)
         return try {
             if (interceptedMethod.resultType() == InterceptedMethod.ResultType.COMPLETION_STAGE) {
                 var cf  = CompletableFuture<String>()
@@ -37,7 +38,7 @@ class SuspendRepositoryInterceptor : MethodInterceptor<Any, Any> {
                 }
                 interceptedMethod.handleResult(cf)
             } else {
-                context?.proceed()
+                context.proceed()
             }
         } catch (e: Exception) {
             interceptedMethod.handleException<Exception>(e)

@@ -15,7 +15,6 @@
  */
 package io.micronaut.function.web
 
-import groovy.test.NotYetImplemented
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -24,6 +23,7 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Ignore
+import spock.lang.PendingFeature
 import spock.lang.Specification
 
 @Ignore
@@ -95,7 +95,7 @@ class JavaLambdaFunctionSpec extends Specification {
         embeddedServer.stop()
     }
 
-    @NotYetImplemented // Not sure if support for BiFunctions makes sense for Java
+    @PendingFeature // Not sure if support for BiFunctions makes sense for Java
     void "test bi func pojo"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)

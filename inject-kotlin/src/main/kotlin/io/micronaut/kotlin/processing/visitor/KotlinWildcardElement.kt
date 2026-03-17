@@ -16,7 +16,6 @@
 package io.micronaut.kotlin.processing.visitor
 
 import io.micronaut.core.annotation.AnnotationMetadata
-import io.micronaut.core.annotation.NonNull
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
 import io.micronaut.inject.ast.ArrayableClassElement
 import io.micronaut.inject.ast.ClassElement
@@ -30,8 +29,8 @@ import java.util.function.Function
 internal class KotlinWildcardElement(
     private val internalGenericNativeType: KotlinTypeArgumentNativeElement,
     private var upper: KotlinClassElement,
-    private val upperBounds: List<KotlinClassElement?>,
-    private val lowerBounds: List<KotlinClassElement?>,
+    private val upperBounds: List<KotlinClassElement>,
+    private val lowerBounds: List<KotlinClassElement>,
     elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
     visitorContext: KotlinVisitorContext,
     private val isRawType: Boolean,
@@ -51,7 +50,7 @@ internal class KotlinWildcardElement(
 
     private val resolvedAnnotationMetadata: AnnotationMetadata by lazy {
         if (presetAnnotationMetadata != null) {
-            presetAnnotationMetadata
+            presetAnnotationMetadata!!
         } else {
             AnnotationMetadataHierarchy(
                 true,
@@ -79,25 +78,25 @@ internal class KotlinWildcardElement(
 
     override fun getGenericNativeType() = internalGenericNativeType
 
-    override fun foldBoundGenericTypes(@NonNull fold: Function<ClassElement?, ClassElement?>): ClassElement? {
+    override fun foldBoundGenericTypes(fold: Function<ClassElement, ClassElement?>): ClassElement? {
         val upperBounds: List<KotlinClassElement?> = this.upperBounds
             .map { ele ->
                 toKotlinClassElement(
-                    ele?.foldBoundGenericTypes(fold)
+                    ele.foldBoundGenericTypes(fold)
                 )
             }.toList()
         val lowerBounds: List<KotlinClassElement?> = this.lowerBounds
             .map { ele ->
                 toKotlinClassElement(
-                    ele?.foldBoundGenericTypes(fold)
+                    ele.foldBoundGenericTypes(fold)
                 )
             }.toList()
-        return fold.apply(
-            if (upperBounds.contains(null) || lowerBounds.contains(null)) null else KotlinWildcardElement(
+        return if (upperBounds.contains(null) || lowerBounds.contains(null)) null else fold.apply(
+            KotlinWildcardElement(
                 genericNativeType,
                 upper,
-                upperBounds,
-                lowerBounds,
+                upperBounds.filterNotNull(),
+                lowerBounds.filterNotNull(),
                 elementAnnotationMetadataFactory,
                 visitorContext,
                 isRawType,
@@ -106,14 +105,14 @@ internal class KotlinWildcardElement(
         )
     }
 
-    override fun getUpperBounds(): MutableList<out ClassElement?> {
-        val list = mutableListOf<ClassElement?>()
+    override fun getUpperBounds(): MutableList<out ClassElement> {
+        val list = mutableListOf<ClassElement>()
         list.addAll(upperBounds)
         return list
     }
 
-    override fun getLowerBounds(): MutableList<out ClassElement?> {
-        val list = mutableListOf<ClassElement?>()
+    override fun getLowerBounds(): MutableList<out ClassElement> {
+        val list = mutableListOf<ClassElement>()
         list.addAll(lowerBounds)
         return list
     }

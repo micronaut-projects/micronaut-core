@@ -13,8 +13,8 @@ import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.StreamingHttpClient
 import io.micronaut.http.client.exceptions.ReadTimeoutException
 import io.micronaut.http.client.multipart.MultipartBody
+import io.micronaut.http.netty.NettyTlsUtils
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer
-import io.micronaut.http.server.netty.ssl.CertificateProvidedSslBuilder
 import io.micronaut.http.ssl.SslConfiguration
 import io.micronaut.websocket.WebSocketSession
 import io.micronaut.websocket.annotation.ClientWebSocket
@@ -407,6 +407,30 @@ class ConnectionManagerSpec extends Specification {
 
         conn1.testExchangeResponse(conn1.testExchangeRequest(client))
         client.connectionManager().refresh()
+        conn2.testExchangeResponse(conn2.testExchangeRequest(client))
+
+        assertPoolConnections(client, 1)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    def 'http1 tls works after client refresh'() {
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+                'spec.name': ConnectionManagerSpec.simpleName,
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn1 = new EmbeddedTestConnectionHttp1()
+        conn1.setupHttp1Tls()
+        def conn2 = new EmbeddedTestConnectionHttp1()
+        conn2.setupHttp1Tls()
+        patch(client, conn1, conn2)
+
+        conn1.testExchangeResponse(conn1.testExchangeRequest(client))
+        client.refresh()
         conn2.testExchangeResponse(conn2.testExchangeRequest(client))
 
         assertPoolConnections(client, 1)
@@ -1017,6 +1041,43 @@ class ConnectionManagerSpec extends Specification {
         ctx.close()
     }
 
+    def 'http2 goaway before next request opens a new connection'() {
+        given:
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+                'spec.name': ConnectionManagerSpec.simpleName,
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn1 = new EmbeddedTestConnectionHttp2()
+        conn1.setupHttp2Tls()
+        def conn2 = new EmbeddedTestConnectionHttp2()
+        conn2.setupHttp2Tls()
+        patch(client, conn1, conn2)
+
+        when:
+        def first = conn1.testExchangeRequest(client)
+        conn1.exchangeSettings()
+        conn1.testExchangeResponse(first)
+
+        and:
+        conn1.serverChannel.writeOutbound(new DefaultHttp2GoAwayFrame(Http2Error.NO_ERROR, Unpooled.EMPTY_BUFFER))
+        conn1.advance()
+
+        def second = conn2.testExchangeRequest(client)
+        conn2.exchangeSettings()
+
+        then:
+        conn1.serverChannel.readInbound() instanceof DefaultHttp2GoAwayFrame
+        conn1.serverChannel.readInbound() == null
+        conn2.testExchangeResponse(second)
+        assertPoolConnections(client, 1)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
     @Ignore("EmbeddedChannel.close cancels the scheduled task that runs the timeout")
     def 'http2 channel inactive but fire inactive channel scheduled after acquire'() {
         def ctx = ApplicationContext.run([
@@ -1270,7 +1331,7 @@ class ConnectionManagerSpec extends Specification {
         void setupHttp1Tls() {
             def certificate = new SelfSignedCertificate()
             def builder = SslContextBuilder.forServer(certificate.key(), certificate.cert())
-            CertificateProvidedSslBuilder.setupSslBuilder(builder, new SslConfiguration(), HttpVersion.HTTP_1_1);
+            NettyTlsUtils.setupServerBuilder(builder, new SslConfiguration(), HttpVersion.HTTP_1_1);
             def tlsHandler = builder.build().newHandler(ByteBufAllocator.DEFAULT)
 
             scheme = 'https'
@@ -1355,7 +1416,7 @@ class ConnectionManagerSpec extends Specification {
 
             def certificate = new SelfSignedCertificate()
             def builder = SslContextBuilder.forServer(certificate.key(), certificate.cert())
-            CertificateProvidedSslBuilder.setupSslBuilder(builder, new SslConfiguration(), HttpVersion.HTTP_2_0);
+            NettyTlsUtils.setupServerBuilder(builder, new SslConfiguration(), HttpVersion.HTTP_2_0);
             def tlsHandler = builder.build().newHandler(ByteBufAllocator.DEFAULT)
 
             serverChannel.pipeline()

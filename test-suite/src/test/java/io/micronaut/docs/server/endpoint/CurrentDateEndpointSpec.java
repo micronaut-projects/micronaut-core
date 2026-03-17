@@ -25,6 +25,7 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -79,16 +80,16 @@ class CurrentDateEndpointSpec {
         Date originalDate, resetDate;
         Map<String, Object> map = new HashMap<>();
 
-        HttpResponse<String> response = rxClient.toBlocking().exchange("/date", String.class);
-        originalDate = new Date(Long.parseLong(response.body()));
+        HttpResponse<Instant> response = rxClient.toBlocking().exchange("/date", Instant.class);
+        originalDate = Date.from(response.body());
 
-        response = rxClient.toBlocking().exchange(HttpRequest.POST("/date", map), String.class);
+        HttpResponse<String> postResponse = rxClient.toBlocking().exchange(HttpRequest.POST("/date", map), String.class);
 
-        assertEquals(HttpStatus.OK.getCode(), response.code());
-        assertEquals("Current date reset", response.body());
+        assertEquals(HttpStatus.OK.getCode(), postResponse.code());
+        assertEquals("Current date reset", postResponse.body());
 
-        response = rxClient.toBlocking().exchange("/date", String.class);
-        resetDate = new Date(Long.parseLong(response.body()));
+        response = rxClient.toBlocking().exchange("/date", Instant.class);
+        resetDate = Date.from(response.body());
 
         assert resetDate.getTime() > originalDate.getTime();
 

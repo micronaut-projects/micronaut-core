@@ -25,7 +25,7 @@ public class PropertySourceTest {
 
     @Test
     void testPropertySourceMapOf() {
-        Map<String, Object> map = PropertySource.mapOf(
+        Map<String, Object> map = Map.of(
                 "foo.bar", 10
         );
 
@@ -35,7 +35,7 @@ public class PropertySourceTest {
         );
 
         PropertySource propertySource = PropertySource.of("test",
-                "foo.bar", 10
+                Map.of("foo.bar", 10), PropertySource.PropertyConvention.JAVA_PROPERTIES, PropertySource.Origin.of("ss")
         );
 
 

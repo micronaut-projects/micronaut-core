@@ -16,12 +16,12 @@
 package io.micronaut.management.endpoint.processors;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.BeanContext;
 import io.micronaut.context.LifeCycle;
-import io.micronaut.context.processor.ExecutableMethodProcessor;
+import io.micronaut.context.processor.BeanDefinitionProcessor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
@@ -49,11 +49,11 @@ import java.util.regex.Pattern;
  * @since 1.0
  */
 @Internal
-abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implements ExecutableMethodProcessor<Endpoint>, LifeCycle<AbstractEndpointRouteBuilder> {
+abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implements BeanDefinitionProcessor<Endpoint>, LifeCycle<AbstractEndpointRouteBuilder> {
 
     private static final Pattern ENDPOINT_ID_PATTERN = Pattern.compile("[\\w-]+");
 
-    private Map<Class<?>, Optional<String>> endpointIds = new ConcurrentHashMap<>();
+    private final Map<Class<?>, Optional<String>> endpointIds = new ConcurrentHashMap<>();
 
     private final ApplicationContext beanContext;
 
@@ -88,7 +88,6 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
      */
     protected abstract void registerRoute(ExecutableMethod<?, ?> method, String id, @Nullable Integer port);
 
-    @NonNull
     @Override
     public AbstractEndpointRouteBuilder start() {
         return this;
@@ -97,7 +96,6 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
     /**
      * Clears endpoint ids information.
      */
-    @NonNull
     @Override
     public AbstractEndpointRouteBuilder stop() {
         endpointIds.clear();
@@ -109,17 +107,14 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
         return true;
     }
 
-    /**
-     * @param beanDefinition The bean definition to process
-     * @param method The executable method
-     */
     @Override
-    public void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
-        Class<?> declaringType = method.getDeclaringType();
-        if (method.hasStereotype(getSupportedAnnotation())) {
-            Optional<String> endPointId = resolveActiveEndPointId(declaringType);
-            final Integer port = endpointDefaultConfiguration.getPort().orElse(null);
-            endPointId.ifPresent(id -> registerRoute(method, id, port));
+    public void process(BeanDefinition<?> beanDefinition, BeanContext beanContext) {
+        for (ExecutableMethod<?, ?> method : beanDefinition.getExecutableMethods()) {
+            if (method.hasStereotype(getSupportedAnnotation())) {
+                Optional<String> endPointId = resolveActiveEndPointId(method.getDeclaringType());
+                final Integer port = endpointDefaultConfiguration.getPort().orElse(null);
+                endPointId.ifPresent(id -> registerRoute(method, id, port));
+            }
         }
     }
 
@@ -134,7 +129,7 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
                 BeanDefinition<?> beanDefinition = opt.get();
                 if (beanDefinition.hasStereotype(Endpoint.class)) {
                     String id = beanDefinition.stringValue(Endpoint.class).orElse(null);
-                    final EndpointConfiguration endpointConfiguration = beanContext.getProvider(EndpointConfiguration.class, Qualifiers.byName(id))
+                    final EndpointConfiguration endpointConfiguration = id == null ? null : beanContext.getProvider(EndpointConfiguration.class, Qualifiers.byName(id))
                         .orElse(null);
                     if (endpointConfiguration != null && StringUtils.isNotEmpty(endpointConfiguration.getPath())) {
                         return Optional.of(endpointConfiguration.getPath());

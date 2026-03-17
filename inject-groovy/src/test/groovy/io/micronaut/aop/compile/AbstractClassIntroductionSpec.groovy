@@ -17,7 +17,6 @@ package io.micronaut.aop.compile
 
 import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultBeanContext
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.InstantiatableBeanDefinition
 import io.micronaut.inject.writer.BeanDefinitionVisitor

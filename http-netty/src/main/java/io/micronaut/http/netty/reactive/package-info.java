@@ -224,4 +224,7 @@
  * @author graemerocher
  * @since 1.0
  */
+@NullMarked
 package io.micronaut.http.netty.reactive;
+
+import org.jspecify.annotations.NullMarked;

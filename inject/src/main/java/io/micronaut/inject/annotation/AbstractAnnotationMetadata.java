@@ -22,9 +22,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.CollectionUtils;
-
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.lang.annotation.Annotation;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -40,10 +38,12 @@ import static io.micronaut.core.annotation.AnnotationUtil.ZERO_ANNOTATIONS;
 @Internal
 abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
 
+    @Nullable
     private volatile Map<String, Annotation> annotationMap;
+    @Nullable
     private volatile Map<String, Annotation> declaredAnnotationMap;
-    private volatile Annotation[] allAnnotationArray;
-    private volatile Annotation[] declaredAnnotationArray;
+    private volatile Annotation @Nullable [] allAnnotationArray;
+    private volatile Annotation @Nullable [] declaredAnnotationArray;
 
     /**
      * Constructs a default metadata.
@@ -62,7 +62,7 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
                 }
             }
         }
-        return annotationMap;
+        return Objects.requireNonNull(annotationMap);
     }
 
     private Map<String, Annotation> getDeclaredAnnotationMap() {
@@ -76,12 +76,12 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
                 }
             }
         }
-        return declaredAnnotationMap;
+        return Objects.requireNonNull(declaredAnnotationMap);
     }
 
     @SuppressWarnings("unchecked")
     @Override
-    public @Nullable <T extends Annotation> T synthesize(@NonNull Class<T> annotationClass) {
+    public @Nullable <T extends Annotation> T synthesize(Class<T> annotationClass) {
         ArgumentUtils.requireNonNull("annotationClass", annotationClass);
         if (hasAnnotation(annotationClass) || hasStereotype(annotationClass)) {
             String annotationName = annotationClass.getName();
@@ -97,7 +97,7 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
     @SuppressWarnings("unchecked")
     @Nullable
     @Override
-    public <T extends Annotation> T synthesize(@NonNull Class<T> annotationClass, @NonNull String sourceAnnotation) {
+    public <T extends Annotation> T synthesize(Class<T> annotationClass, String sourceAnnotation) {
         ArgumentUtils.requireNonNull("annotationClass", annotationClass);
         ArgumentUtils.requireNonNull("sourceAnnotation", sourceAnnotation);
         if (hasAnnotation(sourceAnnotation) || hasStereotype(sourceAnnotation)) {
@@ -114,7 +114,7 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
     @SuppressWarnings("unchecked")
     @Nullable
     @Override
-    public <T extends Annotation> T synthesizeDeclared(@NonNull Class<T> annotationClass, @NonNull String sourceAnnotation) {
+    public <T extends Annotation> T synthesizeDeclared(Class<T> annotationClass, String sourceAnnotation) {
         ArgumentUtils.requireNonNull("annotationClass", annotationClass);
         ArgumentUtils.requireNonNull("sourceAnnotation", sourceAnnotation);
         String annotationName = annotationClass.getName();
@@ -130,7 +130,7 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
 
     @SuppressWarnings("unchecked")
     @Override
-    public @Nullable <T extends Annotation> T synthesizeDeclared(@NonNull Class<T> annotationClass) {
+    public @Nullable <T extends Annotation> T synthesizeDeclared(Class<T> annotationClass) {
         ArgumentUtils.requireNonNull("annotationClass", annotationClass);
         String annotationName = annotationClass.getName();
         if (hasDeclaredAnnotation(annotationName) || hasDeclaredStereotype(annotationName)) {
@@ -144,7 +144,7 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
     }
 
     @Override
-    public @NonNull Annotation[] synthesizeAll() {
+    public Annotation[] synthesizeAll() {
         Annotation[] annotations = this.allAnnotationArray;
         if (annotations == null) {
             synchronized (this) { // double check
@@ -159,7 +159,7 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
     }
 
     @Override
-    public @NonNull Annotation[] synthesizeDeclared() {
+    public Annotation[] synthesizeDeclared() {
         Annotation[] annotations = this.declaredAnnotationArray;
         if (annotations == null) {
             synchronized (this) { // double check

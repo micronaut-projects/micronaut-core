@@ -18,32 +18,48 @@ package io.micronaut.context.env
 import com.github.stefanbirkner.systemlambda.SystemLambda
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.ApplicationContextConfiguration
-import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.exceptions.ConfigurationException
 import io.micronaut.core.naming.NameUtils
+import io.micronaut.core.order.OrderUtil
 import io.micronaut.core.util.StringUtils
-import io.micronaut.core.version.SemanticVersion
 import spock.lang.Issue
-import spock.lang.Requires
 import spock.lang.Specification
-import spock.util.environment.Jvm
 import spock.util.environment.RestoreSystemProperties
+
+import java.nio.file.Files
+import java.nio.file.Path
+import java.util.function.Function
 
 /**
  * Created by graemerocher on 12/06/2017.
  */
 @RestoreSystemProperties
-// fails due to https://issues.apache.org/jira/browse/GROOVY-10145
-@Requires({
-    SemanticVersion.isAtLeastMajorMinor(GroovySystem.version, 4, 0) ||
-            !Jvm.current.isJava16Compatible()
-})
 class DefaultEnvironmentSpec extends Specification {
 
-    private static final String GOOGLE_APPENGINE_ENVIRONMENT = "GAE_ENV";
-    private static final String PCF_ENV = "VCAP_SERVICES";
-    private static final String HEROKU_DYNO = "DYNO";
-    private static final String K8S_ENV = "KUBERNETES_SERVICE_HOST";
+    private static final String GOOGLE_APPENGINE_ENVIRONMENT = "GAE_ENV"
+    private static final String PCF_ENV = "VCAP_SERVICES"
+    private static final String HEROKU_DYNO = "DYNO"
+    private static final String K8S_ENV = "KUBERNETES_SERVICE_HOST"
+
+    void "mapper not reset on refresh"() {
+        given:
+        Environment environment = new DefaultEnvironment({ ["test"] })
+        environment.getConversionService().addConverter(Foo.class, Bar.class, new Function<Foo, Bar>() {
+            @Override
+            Bar apply(Foo foo) {
+                return new Bar(foo.val())
+            }
+        })
+        when:
+        environment.start()
+        then:
+        environment.getConversionService().convert(new Foo("abc"), Bar.class).get().val() == "abc"
+
+        when:
+        environment.refresh()
+        then:
+        environment.getConversionService().convert(new Foo("abc"), Bar.class).get().val() == "abc"
+    }
 
     void "test environment system property resolve"() {
         given:
@@ -67,12 +83,11 @@ class DefaultEnvironmentSpec extends Specification {
         env.getProperty("test.foo", Map.class).get() == [bar: "10", baz: "20"]
     }
 
-    @RestoreSystemProperties
     void "test environment refresh and diff"() {
         given:
         System.setProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY, StringUtils.TRUE)
         System.setProperty("micronaut.bootstrap.name", "custom-bootstrap")
-        DefaultApplicationContext context = new DefaultApplicationContext("test")
+        ApplicationContext context = ApplicationContext.builder("test").build()
         context.start()
 
         when:
@@ -80,6 +95,42 @@ class DefaultEnvironmentSpec extends Specification {
 
         then:
         diff.isEmpty()
+
+        cleanup:
+        System.clearProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY)
+    }
+
+    void "test environment refresh and diff when bootstrap property changed"() {
+        given:
+        System.setProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY, StringUtils.TRUE)
+        System.setProperty(Environment.ENVIRONMENTS_PROPERTY, "ms")
+        Path tempConfigDir = Files.createTempDirectory("micronaut-data-config-")
+        Path tempConfigFile = tempConfigDir.resolve("bootstrap-ms.yml")
+        tempConfigFile.toFile().text = "prop-key: prop-value-1"
+
+        when:
+        ApplicationContext applicationContext = ApplicationContext.builder()
+                .overrideConfigLocations("file:" + tempConfigDir)
+                .build()
+                .start()
+
+        then:
+        applicationContext.getRequiredProperty("prop-key", String.class) == "prop-value-1"
+
+        when:
+        Files.deleteIfExists(tempConfigFile)
+        def diff = applicationContext.getEnvironment().refreshAndDiff()
+
+        then:
+        diff.get("prop-key") == "prop-value-1"
+        applicationContext.getProperty("prop-key", String.class).isEmpty()
+
+        cleanup:
+        if (tempConfigDir) {
+            Files.deleteIfExists(tempConfigDir)
+        }
+        System.clearProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY)
+        System.clearProperty(Environment.ENVIRONMENTS_PROPERTY)
     }
 
     void "test environment system property refresh"() {
@@ -121,6 +172,25 @@ class DefaultEnvironmentSpec extends Specification {
         !env.activeNames.contains("foo")
         !env.activeNames.contains("x")
         !env.containsProperty("foo")
+    }
+
+    void "test getting environment name from a system property in bootstrap context"() {
+        given:
+        System.setProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY, StringUtils.TRUE)
+        System.setProperty(Environment.ENVIRONMENTS_PROPERTY, "k8s")
+
+        when:
+        ApplicationContext applicationContext = ApplicationContext.builder()
+                .build()
+                .start()
+
+        then:
+        applicationContext.getRequiredProperty("test1", String.class) == "test2"
+
+        cleanup:
+        applicationContext.stop()
+        System.clearProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY)
+        System.clearProperty(Environment.ENVIRONMENTS_PROPERTY)
     }
 
     void "test system property source loader"() {
@@ -229,8 +299,8 @@ class DefaultEnvironmentSpec extends Specification {
 
         then: "should throw exception"
         def e = thrown(ConfigurationException)
-        String extension = NameUtils.extension(unsupportedFile.absolutePath);
-        String fileName = NameUtils.filename(unsupportedFile.absolutePath);
+        String extension = NameUtils.extension(unsupportedFile.absolutePath)
+        String fileName = NameUtils.filename(unsupportedFile.absolutePath)
         e.message == "Unsupported properties file format while reading " + fileName + "." + extension + " from " + unsupportedFile.absolutePath
 
         when: "file from system property source loader does not override the key"
@@ -301,7 +371,6 @@ class DefaultEnvironmentSpec extends Specification {
         System.clearProperty("micronaut.config.files")
     }
 
-    @RestoreSystemProperties
     void "test invalid config file location"() {
         when: "loading properties sources from both system properties and environment variables"
         System.setProperty("micronaut.config.files", "/does/not/exist.yaml")
@@ -326,7 +395,6 @@ class DefaultEnvironmentSpec extends Specification {
         envNames == ["test", "cloud", "ec2", "foo", "bar", "baz", "x", "y"]
     }
 
-    @RestoreSystemProperties
     void "test environments supplied should be a higher priority than deduced and system property"() {
         when:
         def env = new DefaultEnvironment({ [] })
@@ -368,7 +436,6 @@ class DefaultEnvironmentSpec extends Specification {
     }
     // end::disableEnvDeduction[]
 
-    @RestoreSystemProperties
     void "test disable environment deduction via system property"() {
         when:
         System.setProperty(Environment.CLOUD_PLATFORM_PROPERTY, "GOOGLE_COMPUTE")
@@ -444,7 +511,6 @@ class DefaultEnvironmentSpec extends Specification {
         env.close()
     }
 
-    @RestoreSystemProperties
     void "test property source order"() {
         when:
         System.setProperty("micronaut.config.files", "classpath:config-files.yml,classpath:config-files2.yml")
@@ -516,7 +582,6 @@ class DefaultEnvironmentSpec extends Specification {
             applicationContext.stop()
     }
 
-    @RestoreSystemProperties
     void "test custom config locations used in bootstrap environment"() {
         given:
         System.setProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY, StringUtils.TRUE)
@@ -527,11 +592,17 @@ class DefaultEnvironmentSpec extends Specification {
                 .build()
                 .start()
 
+        List<PropertySource> sources = new ArrayList(applicationContext.getEnvironment().getPropertySources())
+        OrderUtil.sort(sources)
         then:
         applicationContext.getRequiredProperty("custom-bootstrap-value", String.class) == "test"
+        sources.collect { [it.name, it.order] } == [
+                ['application', -300], ['bootstrap', -290], ['env', -190], ['system', -90]
+        ]
 
         cleanup:
         applicationContext.stop()
+        System.clearProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY)
     }
 
     void "test custom config locations respect environment order"() {
@@ -886,12 +957,15 @@ class DefaultEnvironmentSpec extends Specification {
         then: 'the environment is deduced'
         env.activeNames == ["test", Environment.KUBERNETES, Environment.CLOUD] as Set
     }
+
+    static record Foo(String val) {}
+
+    static record Bar(String val) {}
+
     private static Environment startEnv(String files) {
-        new DefaultEnvironment({["test"]}) {
-            @Override
-            protected String readPropertySourceListKeyFromEnvironment() {
-                files
-            }
-        }.start()
+        return SystemLambda.withEnvironmentVariable(StringUtils.convertDotToUnderscore(Environment.PROPERTY_SOURCES_KEY), files)
+                .execute(() -> {
+                    new DefaultEnvironment({ ["test"] }).start()
+                })
     }
 }

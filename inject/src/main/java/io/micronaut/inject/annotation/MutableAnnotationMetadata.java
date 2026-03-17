@@ -20,8 +20,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.expressions.EvaluatedExpressionReference;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 
@@ -153,9 +152,8 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
         return cloned;
     }
 
-    @NonNull
     @Override
-    public Map<CharSequence, Object> getDefaultValues(@NonNull String annotation) {
+    public Map<CharSequence, Object> getDefaultValues(String annotation) {
         Map<CharSequence, Object> values = super.getDefaultValues(annotation);
         if (!values.isEmpty() || annotationDefaultValues == null) {
             return values;
@@ -564,7 +562,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     @SuppressWarnings("java:S2259") // false positive
     private void addAnnotation(String annotation,
                                Map<CharSequence, Object> values,
-                               Map<String, Map<CharSequence, Object>> declaredAnnotations,
+                               @Nullable Map<String, Map<CharSequence, Object>> declaredAnnotations,
                                Map<String, Map<CharSequence, Object>> allAnnotations,
                                boolean isDeclared,
                                RetentionPolicy retentionPolicy) {
@@ -959,12 +957,12 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
      * @param predicate The predicate
      * @param <A>       The annotation
      */
-    public <A extends Annotation> void removeAnnotationIf(@NonNull Predicate<AnnotationValue<A>> predicate) {
+    public <A extends Annotation> void removeAnnotationIf(Predicate<AnnotationValue<A>> predicate) {
         removeAnnotationsIf(predicate, this.declaredAnnotations);
         removeAnnotationsIf(predicate, this.allAnnotations);
     }
 
-    private <A extends Annotation> void removeAnnotationsIf(@NonNull Predicate<AnnotationValue<A>> predicate, Map<String, Map<CharSequence, Object>> annotations) {
+    private <A extends Annotation> void removeAnnotationsIf(Predicate<AnnotationValue<A>> predicate, @Nullable Map<String, Map<CharSequence, Object>> annotations) {
         if (annotations == null) {
             return;
         }
@@ -1069,6 +1067,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     }
 
     @Override
+    @Nullable
     protected String findRepeatableAnnotationContainerInternal(String annotation) {
         if (annotationRepeatableContainer != null) {
             String repeatedName = annotationRepeatableContainer.get(annotation);

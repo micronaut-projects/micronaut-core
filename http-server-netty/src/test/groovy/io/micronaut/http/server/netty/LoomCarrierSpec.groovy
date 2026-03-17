@@ -2,11 +2,13 @@ package io.micronaut.http.server.netty
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
-import io.micronaut.core.annotation.NonNull
+import org.jspecify.annotations.NonNull
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
+import io.micronaut.http.netty.channel.loom.EventLoopVirtualThreadScheduler
+import io.micronaut.http.netty.channel.loom.LoomBranchSupport
 import io.micronaut.http.netty.channel.loom.PrivateLoomSupport
 import io.micronaut.json.JsonMapper
 import io.micronaut.runtime.server.EmbeddedServer
@@ -15,6 +17,7 @@ import io.micronaut.scheduling.TaskExecutors
 import io.micronaut.scheduling.annotation.ExecuteOn
 import io.netty.util.concurrent.ThreadPerTaskExecutor
 import jakarta.inject.Inject
+import spock.lang.IgnoreIf
 import spock.lang.Specification
 
 import java.net.http.HttpRequest
@@ -67,7 +70,7 @@ class LoomCarrierSpec extends Specification {
         ctx.close()
     }
 
-    @spock.lang.Requires({ jvm.isJava23Compatible() && !jvm.isJava23() }) // jdk 24 introduced sub pollers on the FJP
+    @spock.lang.Requires({ jvm.isJava23Compatible() && !jvm.isJava23() && !os.macOs }) // jdk 24 introduced sub pollers on the FJP
     def 'sticky on poller thread'() {
         given:
         def ctx = ApplicationContext.run([
@@ -116,12 +119,18 @@ class LoomCarrierSpec extends Specification {
         @ExecuteOn(TaskExecutors.BLOCKING)
         @Get("/loop-jdk")
         String loopJdk() {
-            def scheduler = PrivateLoomSupport.getScheduler(Thread.currentThread())
+            def scheduler = EventLoopVirtualThreadScheduler.current()
             try (java.net.http.HttpClient c = java.net.http.HttpClient.newBuilder()
                     .executor(new ThreadPerTaskExecutor(new ThreadFactory() {
                         @Override
                         Thread newThread(@NonNull Runnable r) {
-                            return LoomSupport.unstarted("jdkclient", (b) -> PrivateLoomSupport.setScheduler(b, scheduler), r)
+                            return LoomSupport.unstarted("jdkclient", (b) -> {
+                                if (LoomBranchSupport.isSupported()) {
+                                    LoomBranchSupport.setScheduler(b, scheduler)
+                                } else {
+                                    PrivateLoomSupport.setScheduler(b, scheduler)
+                                }
+                            }, r)
                         }
                     }))
                     .build()) {

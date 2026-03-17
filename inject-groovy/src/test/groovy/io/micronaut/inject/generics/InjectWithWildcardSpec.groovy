@@ -16,7 +16,6 @@
 package io.micronaut.inject.generics
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.core.convert.ConversionService
 import spock.lang.Specification
 
@@ -31,7 +30,7 @@ class InjectWithWildcardSpec extends Specification {
 
     void "test that wild card injection doesn't produce a ClassNotFoundException"() {
         given:
-        ApplicationContext context = new DefaultApplicationContext("test").start()
+        ApplicationContext context = ApplicationContext.builder("test").build().start()
 
         expect:
         context.getBean(WildCardInject) instanceof WildCardInject

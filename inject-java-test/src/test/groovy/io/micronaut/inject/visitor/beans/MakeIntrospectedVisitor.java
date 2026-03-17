@@ -16,7 +16,7 @@
 package io.micronaut.inject.visitor.beans;
 
 import io.micronaut.core.annotation.Introspected;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;

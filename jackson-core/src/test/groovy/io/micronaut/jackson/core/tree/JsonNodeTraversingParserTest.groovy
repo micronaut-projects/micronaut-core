@@ -1,7 +1,6 @@
 package io.micronaut.jackson.core.tree
 
-import com.fasterxml.jackson.core.Base64Variant
-import com.fasterxml.jackson.core.Base64Variants
+import tools.jackson.core.Base64Variants
 import io.micronaut.json.tree.JsonNode
 import spock.lang.Specification
 

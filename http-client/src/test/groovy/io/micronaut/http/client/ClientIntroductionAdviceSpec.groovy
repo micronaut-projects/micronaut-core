@@ -65,7 +65,7 @@ class ClientIntroductionAdviceSpec extends Specification {
 
     void "service id appears in exceptions"() {
         given:
-        server.applicationContext.registerSingleton(new TestServiceInstanceList(server.getURI()))
+        server.applicationContext.registerSingleton(ServiceInstanceList.class, new TestServiceInstanceList(server.getURI()))
         PolicyClient myService = server.applicationContext.getBean(PolicyClient)
 
         when:
@@ -79,7 +79,7 @@ class ClientIntroductionAdviceSpec extends Specification {
 
     void "test multiple clients with the same id and different paths"() {
         given:
-        server.applicationContext.registerSingleton(new TestServiceInstanceList(server.getURI()))
+        server.applicationContext.registerSingleton(ServiceInstanceList.class, new TestServiceInstanceList(server.getURI()))
 
         expect:
         server.applicationContext.getBean(PolicyClient).index() == 'policy'
@@ -88,7 +88,7 @@ class ClientIntroductionAdviceSpec extends Specification {
 
     void "test a client with a body and header"() {
         given:
-        server.applicationContext.registerSingleton(new TestServiceInstanceList(server.getURI()))
+        server.applicationContext.registerSingleton(ServiceInstanceList.class, new TestServiceInstanceList(server.getURI()))
 
         when:
         OfferClient client = server.applicationContext.getBean(OfferClient)
@@ -99,7 +99,7 @@ class ClientIntroductionAdviceSpec extends Specification {
 
     void "test a client that auto encodes basic auth header"() {
         given:
-        server.applicationContext.registerSingleton(new TestServiceInstanceList(server.getURI()))
+        server.applicationContext.registerSingleton(ServiceInstanceList.class, new TestServiceInstanceList(server.getURI()))
 
         when:
         BasicAuthHeaderAutoEncodingClient client = server.applicationContext.getBean(BasicAuthHeaderAutoEncodingClient)
@@ -158,7 +158,7 @@ class ClientIntroductionAdviceSpec extends Specification {
 
     void "test client interface definition type"() {
         given:
-        server.applicationContext.registerSingleton(new TestServiceInstanceList(server.getURI()))
+        server.applicationContext.registerSingleton(ServiceInstanceList.class, new TestServiceInstanceList(server.getURI()))
 
         when:
         var inverseClient = server.applicationContext.getBean(SingleInterfaceClient)

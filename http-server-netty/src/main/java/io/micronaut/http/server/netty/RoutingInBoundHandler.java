@@ -29,10 +29,9 @@ import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.context.ServerHttpRequestContext;
 import io.micronaut.http.context.event.HttpRequestReceivedEvent;
-import io.micronaut.http.context.event.HttpRequestReceivedEvent;
 import io.micronaut.http.context.event.HttpRequestTerminatedEvent;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
-import io.micronaut.http.netty.body.AvailableNettyByteBody;
+import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.server.RouteExecutor;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
@@ -49,6 +48,7 @@ import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.util.AttributeKey;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -84,6 +84,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
     final Supplier<ExecutorService> ioExecutorSupplier;
     final boolean multipartEnabled;
     final MessageBodyHandlerRegistry messageBodyHandlerRegistry;
+    @Nullable
     ExecutorService ioExecutor;
     final ApplicationEventPublisher<HttpRequestTerminatedEvent> terminateEventPublisher;
     final ApplicationEventPublisher<HttpRequestReceivedEvent> receivedPublisher;
@@ -139,7 +140,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
     }
 
     @Override
-    public void responseWritten(Object attachment) {
+    public void responseWritten(@Nullable Object attachment) {
         if (attachment != null) {
             cleanupRequest((NettyHttpRequest<?>) attachment);
         }
@@ -178,7 +179,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
             // invalid URI
             NettyHttpRequest<Object> errorRequest = new NettyHttpRequest<>(
                 new DefaultHttpRequest(request.protocolVersion(), request.method(), "/"),
-                AvailableNettyByteBody.empty(),
+                    NettyByteBodyFactory.empty(),
                 ctx,
                 conversionService,
                 serverConfiguration
@@ -208,7 +209,9 @@ public final class RoutingInBoundHandler implements RequestHandler {
 
     public void writeResponse(OutboundAccess outboundAccess,
                               NettyHttpRequest<?> nettyHttpRequest,
+                              @Nullable
                               HttpResponse<?> response,
+                              @Nullable
                               Throwable throwable) {
         if (throwable != null) {
             response = routeExecutor.createDefaultErrorResponse(nettyHttpRequest, throwable);
@@ -220,7 +223,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
                 ByteBodyHttpResponse<?> encodedResponse;
                 if (t != null) {
                     // fallback of the fallback...
-                    encodedResponse = ByteBodyHttpResponseWrapper.wrap(HttpResponse.serverError(), AvailableNettyByteBody.empty());
+                    encodedResponse = ByteBodyHttpResponseWrapper.wrap(HttpResponse.serverError(), NettyByteBodyFactory.empty());
                     try {
                         outboundAccess.closeAfterWrite();
                     } catch (Throwable g) {
@@ -262,7 +265,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
             // this happens when the connection is already closed, but let's write a fake response
             // anyway to ensure the request is closed
             outboundAccess.closeAfterWrite();
-            outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.SERVICE_UNAVAILABLE), AvailableNettyByteBody.empty());
+            outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.SERVICE_UNAVAILABLE), NettyByteBodyFactory.empty());
         }
     }
 

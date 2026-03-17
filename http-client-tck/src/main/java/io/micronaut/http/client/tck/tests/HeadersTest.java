@@ -53,17 +53,20 @@ public class HeadersTest {
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class ProduceController implements API {
         @Get(value = "/ok", produces = MediaType.APPLICATION_JSON)
+        @Override
         public String getOkAsJson() {
             return "{\"status\":\"ok\"}";
         }
 
         @Get(value = "/bar", produces = MediaType.APPLICATION_JSON)
+        @Override
         public  String getFooAsJson(@Header("Foo") String header1, @Header("fOo") String header2) {
             return "{\"status\":\"" + header1 + header2 + "\"}";
         }
 
         @Get(value = "/bar2", produces = MediaType.APPLICATION_JSON)
-        public  String getFooAsJson2(@Header(name = "Foo") String header1, @Header(name = "fOo") String header2) {
+        @Override
+        public String getFooAsJson2(@Header(name = "Foo") String header1, @Header(name = "fOo") String header2) {
             return "{\"status\":\"" + header1 + header2 + "\"}";
         }
     }

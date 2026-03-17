@@ -19,9 +19,7 @@ import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.validation.BeanDefinitionValidator;
-
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A bean definition that is validated with jakarta.validation.
@@ -57,11 +55,11 @@ public interface ValidatedBeanDefinition<T> extends BeanDefinition<T> {
      * @throws BeanInstantiationException if the bean is invalid
      */
     default <V> void validateBeanArgument(
-            @NonNull BeanResolutionContext resolutionContext,
-            @NonNull InjectionPoint injectionPoint,
-            @NonNull Argument<V> argument,
-            int index,
-            @Nullable V value) throws BeanInstantiationException {
+        BeanResolutionContext resolutionContext,
+        InjectionPoint injectionPoint,
+        Argument<V> argument,
+        int index,
+        @Nullable V value) throws BeanInstantiationException {
         BeanDefinitionValidator validator = resolutionContext.getContext().getBeanValidator();
         validator.validateBeanArgument(resolutionContext, injectionPoint, argument, index, value);
     }

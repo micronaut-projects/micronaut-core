@@ -18,19 +18,27 @@ package io.micronaut.http.body;
 import io.micronaut.core.annotation.Blocking;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
+import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.core.io.buffer.ReadBufferFactory;
 import io.micronaut.core.io.buffer.ReferenceCounted;
-import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.functional.ThrowingConsumer;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.body.stream.AvailableByteArrayBody;
+import io.micronaut.http.body.stream.BaseSharedBuffer;
+import io.micronaut.http.body.stream.BaseStreamingByteBody;
+import io.micronaut.http.body.stream.BodySizeLimits;
+import io.micronaut.http.body.stream.BufferConsumer;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
+import org.reactivestreams.Publisher;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.Charset;
+import java.util.OptionalLong;
 
 /**
  * Factory methods for {@link ByteBody}s.
@@ -42,15 +50,18 @@ import java.nio.charset.Charset;
 @Experimental
 public class ByteBodyFactory {
     private final ByteBufferFactory<?, ?> byteBufferFactory;
+    private final ReadBufferFactory readBufferFactory;
 
     /**
      * Internal constructor.
      *
      * @param byteBufferFactory The buffer factory
+     * @param readBufferFactory The read buffer factory
      */
     @Internal
-    protected ByteBodyFactory(@NonNull ByteBufferFactory<?, ?> byteBufferFactory) {
+    protected ByteBodyFactory(ByteBufferFactory<?, ?> byteBufferFactory, ReadBufferFactory readBufferFactory) {
         this.byteBufferFactory = byteBufferFactory;
+        this.readBufferFactory = readBufferFactory;
     }
 
     /**
@@ -61,9 +72,8 @@ public class ByteBodyFactory {
      * @param byteBufferFactory The base buffer factory
      * @return The body factory
      */
-    @NonNull
-    public static ByteBodyFactory createDefault(@NonNull ByteBufferFactory<?, ?> byteBufferFactory) {
-        return new ByteBodyFactory(byteBufferFactory);
+    public static ByteBodyFactory createDefault(ByteBufferFactory<?, ?> byteBufferFactory) {
+        return new ByteBodyFactory(byteBufferFactory, ReadBufferFactory.getJdkFactory());
     }
 
     /**
@@ -71,10 +81,21 @@ public class ByteBodyFactory {
      * body factory directly.
      *
      * @return The buffer factory
+     * @deprecated Use {@link #readBufferFactory()}
      */
-    @NonNull
+    @Deprecated
     public final ByteBufferFactory<?, ?> byteBufferFactory() {
         return byteBufferFactory;
+    }
+
+    /**
+     * Get the underlying {@link ReadBufferFactory}.
+     *
+     * @return The factory
+     * @since 4.10.0
+     */
+    public ReadBufferFactory readBufferFactory() {
+        return readBufferFactory;
     }
 
     /**
@@ -86,13 +107,8 @@ public class ByteBodyFactory {
      * @param buffer The buffer
      * @return A {@link ByteBody} with the same content as the buffer
      */
-    @NonNull
-    public CloseableAvailableByteBody adapt(@NonNull ByteBuffer<?> buffer) {
-        byte[] byteArray = buffer.toByteArray();
-        if (buffer instanceof ReferenceCounted rc) {
-            rc.release();
-        }
-        return adapt(byteArray);
+    public CloseableAvailableByteBody adapt(ByteBuffer<?> buffer) {
+        return adapt(readBufferFactory.adapt(buffer));
     }
 
     /**
@@ -103,9 +119,20 @@ public class ByteBodyFactory {
      * @param array The array
      * @return A {@link ByteBody} with the same content as the array
      */
-    @NonNull
-    public CloseableAvailableByteBody adapt(byte @NonNull [] array) {
-        return AvailableByteArrayBody.create(byteBufferFactory(), array);
+    public CloseableAvailableByteBody adapt(byte [] array) {
+        return adapt(readBufferFactory().adapt(array));
+    }
+
+    /**
+     * Create a new {@link CloseableAvailableByteBody} from the given buffer. Ownership of the
+     * buffer is transferred to this method.
+     *
+     * @param readBuffer The buffer
+     * @return A {@link ByteBody} with the same content as the buffer
+     * @since 4.10.0
+     */
+    public CloseableAvailableByteBody adapt(ReadBuffer readBuffer) {
+        return AvailableByteArrayBody.create(readBuffer);
     }
 
     /**
@@ -116,11 +143,8 @@ public class ByteBodyFactory {
      * @param <T> Exception type thrown by the consumer
      * @throws T Exception thrown by the consumer
      */
-    @NonNull
-    public <T extends Throwable> CloseableAvailableByteBody buffer(@NonNull ThrowingConsumer<? super OutputStream, T> writer) throws T {
-        ByteArrayOutputStream s = new ByteArrayOutputStream();
-        writer.accept(s);
-        return AvailableByteArrayBody.create(byteBufferFactory(), s.toByteArray());
+    public <T extends Throwable> CloseableAvailableByteBody buffer(ThrowingConsumer<? super OutputStream, T> writer) throws T {
+        return adapt(readBufferFactory().buffer(writer));
     }
 
     /**
@@ -128,9 +152,8 @@ public class ByteBodyFactory {
      *
      * @return The empty body
      */
-    @NonNull
     public CloseableAvailableByteBody createEmpty() {
-        return adapt(ArrayUtils.EMPTY_BYTE_ARRAY);
+        return adapt(readBufferFactory().createEmpty());
     }
 
     /**
@@ -140,9 +163,8 @@ public class ByteBodyFactory {
      * @param charset The charset to use for encoding
      * @return The encoded body
      */
-    @NonNull
-    public CloseableAvailableByteBody copyOf(@NonNull CharSequence cs, @NonNull Charset charset) {
-        return adapt(cs.toString().getBytes(charset));
+    public CloseableAvailableByteBody copyOf(CharSequence cs, Charset charset) {
+        return adapt(readBufferFactory().copyOf(cs, charset));
     }
 
     /**
@@ -153,9 +175,135 @@ public class ByteBodyFactory {
      * @return A body containing the data read from the input
      * @throws IOException Any exception thrown by the {@link InputStream} read methods
      */
-    @NonNull
     @Blocking
-    public CloseableAvailableByteBody copyOf(@NonNull InputStream stream) throws IOException {
-        return adapt(stream.readAllBytes());
+    public CloseableAvailableByteBody copyOf(InputStream stream) throws IOException {
+        return adapt(readBufferFactory().copyOf(stream));
+    }
+
+    /**
+     * Create a new streaming body to push data into. <b>Internal API.</b>
+     *
+     * @param limits   The input limits
+     * @param upstream The upstream for backpressure
+     * @return The streaming body tuple
+     */
+    @Internal
+    public StreamingBody createStreamingBody(BodySizeLimits limits, BufferConsumer. Upstream upstream) {
+        ReactiveByteBufferByteBody.SharedBuffer sb = new ReactiveByteBufferByteBody.SharedBuffer(this.readBufferFactory(), limits, upstream);
+        return new StreamingBody(sb, new ReactiveByteBufferByteBody(sb));
+    }
+
+    /**
+     * Create a new body adapter for transforming a publisher into a {@link ByteBody}. <b>Internal
+     * API.</b>
+     *
+     * @param publisher The publisher to transform
+     * @param onDiscard Optional runnable to run on {@link BufferConsumer.Upstream#allowDiscard()}
+     * @return The adapter
+     */
+    @Internal
+    protected AbstractBodyAdapter createBodyAdapter(Publisher<ReadBuffer> publisher, @Nullable Runnable onDiscard) {
+        return new AbstractBodyAdapter(publisher, onDiscard);
+    }
+
+    /**
+     * Create a new {@link ByteBody} that wraps the given buffer, but also check the buffer size
+     * against the given size limits. If the buffer is too large, this will return a streaming body
+     * with an error. If that is not the case, this will return a normal available body.
+     *
+     * @param bodySizeLimits The size limits
+     * @param buf            The buffer
+     * @return The body that wraps the buffer
+     */
+    @NonNull
+    public final CloseableByteBody createChecked(@NonNull BodySizeLimits bodySizeLimits, @NonNull ReadBuffer buf) {
+        // AvailableNettyByteBody does not support exceptions, so if we hit one of the configured
+        // limits, we return a StreamingNettyByteBody instead.
+        int readable = buf.readable();
+        if (readable > bodySizeLimits.maxBodySize() || readable > bodySizeLimits.maxBufferSize()) {
+            BufferConsumer.Upstream upstream = bytesConsumed -> {
+            };
+            StreamingBody streamingBody = createStreamingBody(bodySizeLimits, upstream);
+            streamingBody.sharedBuffer.add(buf); // this will trigger the exception for exceeded body or buffer size
+            return streamingBody.rootBody;
+        } else {
+            return adapt(buf);
+        }
+    }
+
+    /**
+     * Create a new {@link ByteBody} that streams the given input buffers.
+     *
+     * @param publisher The input buffer publisher
+     * @return The combined {@link ByteBody}
+     */
+    public CloseableByteBody adapt(Publisher<ReadBuffer> publisher) {
+        return adapt(publisher, BodySizeLimits.UNLIMITED, null, null);
+    }
+
+    /**
+     * Create a new {@link ByteBody} that streams the given input buffers.
+     *
+     * @param publisher        The input buffer publisher
+     * @param sizeLimits       The input size limit
+     * @param headersForLength A {@link HttpHeaders} object to introspect for determining the
+     *                         {@link ByteBody#expectedLength()}
+     * @param onDiscard        An optional {@link Runnable} to run when the body is
+     *                         {@link ByteBody#allowDiscard() discarded}
+     * @return The combined {@link ByteBody}
+     */
+    public CloseableByteBody adapt(Publisher<ReadBuffer> publisher, BodySizeLimits sizeLimits, @Nullable HttpHeaders headersForLength, @Nullable Runnable onDiscard) {
+        AbstractBodyAdapter adapter = createBodyAdapter(publisher, onDiscard);
+        StreamingBody sb = createStreamingBody(sizeLimits, adapter);
+        adapter.setSharedBuffer(sb.sharedBuffer);
+        if (headersForLength != null) {
+            sb.sharedBuffer.setExpectedLengthFrom(headersForLength.get(HttpHeaders.CONTENT_LENGTH));
+        }
+        return sb.rootBody;
+    }
+
+    /**
+     * Create a new {@link ByteBody} that streams the given input buffers.
+     *
+     * @param publisher     The input buffer publisher
+     * @param contentLength The optional content length for {@link ByteBody#expectedLength()}
+     * @return The combined {@link ByteBody}
+     */
+    public CloseableByteBody adapt(Publisher<ReadBuffer> publisher, OptionalLong contentLength) {
+        AbstractBodyAdapter adapter = createBodyAdapter(publisher, null);
+        StreamingBody sb = createStreamingBody(BodySizeLimits.UNLIMITED, adapter);
+        adapter.setSharedBuffer(sb.sharedBuffer);
+        contentLength.ifPresent(sb.sharedBuffer::setExpectedLength);
+        return sb.rootBody;
+    }
+
+    /**
+     * Convert a {@link ByteBody} into a {@link BaseStreamingByteBody} with the same content.
+     * <b>Internal API.</b>
+     *
+     * @param body The body to convert
+     * @return A streaming body with the same content
+     */
+    @Internal
+    public BaseStreamingByteBody<?> toStreaming(ByteBody body) {
+        if (body instanceof BaseStreamingByteBody<?> bsbb) {
+            return bsbb;
+        }
+        AbstractBodyAdapter adapter = createBodyAdapter(body.toReadBufferPublisher(), null);
+        StreamingBody sb = createStreamingBody(BodySizeLimits.UNLIMITED, adapter);
+        adapter.setSharedBuffer(sb.sharedBuffer);
+        body.expectedLength().ifPresent(sb.sharedBuffer::setExpectedLength);
+        return sb.rootBody;
+    }
+
+    /**
+     * Return type for {@link #createStreamingBody(BodySizeLimits, BufferConsumer.Upstream)}.
+     * <b>Internal API.</b>
+     *
+     * @param sharedBuffer The shared buffer to write data to
+     * @param rootBody     The root body to read data from
+     */
+    @Internal
+    public record StreamingBody(BaseSharedBuffer sharedBuffer, BaseStreamingByteBody<?> rootBody) {
     }
 }

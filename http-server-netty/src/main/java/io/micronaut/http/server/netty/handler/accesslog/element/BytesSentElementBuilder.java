@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.server.netty.handler.accesslog.element;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * Builder for BytesSentElement.
  *
@@ -24,7 +26,8 @@ package io.micronaut.http.server.netty.handler.accesslog.element;
 public final class BytesSentElementBuilder implements LogElementBuilder {
 
     @Override
-    public LogElement build(String token, String param) {
+    @Nullable
+    public LogElement build(String token, @Nullable String param) {
         if (BytesSentElement.BYTES_SENT_DASH.equals(token)) {
             return new BytesSentElement(true);
         } else if (BytesSentElement.BYTES_SENT.equals(token)) {

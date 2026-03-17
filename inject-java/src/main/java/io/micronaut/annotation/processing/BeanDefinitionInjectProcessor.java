@@ -52,6 +52,7 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -149,30 +150,36 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         return Stream.of(typeElement);
                     })
                     .forEach(typeElement -> {
-                        if (typeElement.getKind() == ENUM) {
-                            final AnnotationMetadata am = annotationMetadataBuilder.lookupOrBuildForType(typeElement);
-                            if (BeanDefinitionCreatorFactory.isDeclaredBeanInMetadata(am)) {
-                                error(typeElement, "Enum types cannot be defined as beans");
-                            }
-                            return;
-                        }
-                        // skip Groovy code, handled by InjectTransform. Required for GroovyEclipse compiler
-                        if ((groovyObjectType != null && typeUtils.isAssignable(typeElement.asType(), groovyObjectType))) {
-                            return;
-                        }
-
                         String name = typeElement.getQualifiedName().toString();
-                        if (beanDefinitions.contains(name) || processed.contains(name) || name.endsWith(BeanDefinitionVisitor.PROXY_SUFFIX)) {
-                            return;
-                        }
-                        boolean isInterface = JavaModelUtils.resolveKind(typeElement, ElementKind.INTERFACE).isPresent();
-                        if (!isInterface) {
-                            beanDefinitions.add(name);
-                        } else {
-                            AnnotationMetadata annotationMetadata = annotationMetadataBuilder.lookupOrBuildForType(typeElement);
-                            if (BeanDefinitionCreatorFactory.isIntroduction(annotationMetadata) || annotationMetadata.hasStereotype(ConfigurationReader.class)) {
-                                beanDefinitions.add(name);
+                        try {
+                            if (typeElement.getKind() == ENUM) {
+                                final AnnotationMetadata am = annotationMetadataBuilder.lookupOrBuildForType(typeElement);
+                                if (BeanDefinitionCreatorFactory.isDeclaredBeanInMetadata(am)) {
+                                    error(typeElement, "Enum types cannot be defined as beans");
+                                }
+                                return;
                             }
+                            // skip Groovy code, handled by InjectTransform. Required for GroovyEclipse compiler
+                            if ((groovyObjectType != null && typeUtils.isAssignable(typeElement.asType(), groovyObjectType))) {
+                                return;
+                            }
+
+
+                            if (beanDefinitions.contains(name) || processed.contains(name) || name.endsWith(BeanDefinitionVisitor.PROXY_SUFFIX)) {
+                                return;
+                            }
+                            boolean isInterface = JavaModelUtils.resolveKind(typeElement, ElementKind.INTERFACE).isPresent();
+                            if (!isInterface) {
+                                beanDefinitions.add(name);
+                            } else {
+                                AnnotationMetadata annotationMetadata = annotationMetadataBuilder.lookupOrBuildForType(typeElement);
+                                if (BeanDefinitionCreatorFactory.isIntroduction(annotationMetadata) || annotationMetadata.hasStereotype(ConfigurationReader.class)) {
+                                    beanDefinitions.add(name);
+                                }
+                            }
+                        } catch (PostponeToNextRoundException e) {
+                            processed.remove(name);
+                            postponed.put(name, e);
                         }
                     }));
             }
@@ -181,6 +188,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             for (String name : processed) {
                 beanDefinitions.remove(name);
                 postponed.remove(name);
+            }
+
+            if (!postponed.isEmpty()) {
+                beanDefinitions.addAll(postponed.keySet());
+                postponed.clear();
             }
 
             // process remaining
@@ -229,10 +241,13 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             }
                         } catch (ProcessingException ex) {
                             JavaNativeElement javaNativeElement = (JavaNativeElement) ex.getOriginatingElement();
-                            error(javaNativeElement != null ? javaNativeElement.element() : null, ex.getMessage());
+                            error(javaNativeElement != null ? javaNativeElement.element() : typeElement, Objects.requireNonNullElse(ex.getMessage(), "Error"));
                         } catch (PostponeToNextRoundException e) {
                             processed.remove(className);
                             postponed.put(className, e);
+                        } catch (Exception e) {
+                            error(typeElement, Objects.requireNonNullElse(e.getMessage(), "Error"));
+                            throw e;
                         }
                     }
                 }
@@ -252,7 +267,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             }
 
             try {
-                writeBeanDefinitionsToMetaInf();
                 for (BeanElementVisitor<?> visitor : BeanElementVisitor.VISITORS) {
                     if (visitor.isEnabled()) {
                         try {
@@ -272,25 +286,13 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         error("Unexpected error: %s", message != null ? message : e.getClass().getSimpleName());
                     }
                 }
+                javaVisitorContext.finish();
             } finally {
                 BeanDefinitionWriter.finish();
             }
         }
 
         return false;
-    }
-
-    /**
-     * Writes {@link io.micronaut.inject.BeanDefinitionReference} into /META-INF/services/io
-     * .micronaut.inject.BeanDefinitionReference.
-     */
-    private void writeBeanDefinitionsToMetaInf() {
-        try {
-            classWriterOutputVisitor.finish();
-        } catch (Exception e) {
-            String message = e.getMessage();
-            error("Error occurred writing META-INF files: %s", message != null ? message : e);
-        }
     }
 
     private void processBeanDefinitions(BeanDefinitionVisitor beanDefinitionWriter) {

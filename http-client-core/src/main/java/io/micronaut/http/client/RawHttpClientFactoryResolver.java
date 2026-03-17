@@ -16,12 +16,15 @@
 package io.micronaut.http.client;
 
 import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Iterator;
+import java.util.Objects;
 import java.util.ServiceLoader;
 
 @Internal
 final class RawHttpClientFactoryResolver {
+    @Nullable
     private static volatile RawHttpClientFactory factory;
 
     static RawHttpClientFactory getFactory() {
@@ -32,7 +35,7 @@ final class RawHttpClientFactoryResolver {
                 }
             }
         }
-        return factory;
+        return Objects.requireNonNull(factory);
     }
 
     private static RawHttpClientFactory resolveClientFactory() {

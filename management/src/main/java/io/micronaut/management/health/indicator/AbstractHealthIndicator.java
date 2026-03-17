@@ -20,6 +20,7 @@ import io.micronaut.health.HealthStatus;
 import io.micronaut.scheduling.TaskExecutors;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 
 import java.util.concurrent.ExecutorService;
@@ -34,7 +35,9 @@ import java.util.concurrent.ExecutorService;
  */
 public abstract class AbstractHealthIndicator<T> implements HealthIndicator {
 
+    @Nullable
     protected ExecutorService executorService;
+    @Nullable
     protected HealthStatus healthStatus;
 
     /**
@@ -59,6 +62,7 @@ public abstract class AbstractHealthIndicator<T> implements HealthIndicator {
      *
      * @return Any details to be included in the response.
      */
+    @Nullable
     protected abstract T getHealthInformation();
 
     /**

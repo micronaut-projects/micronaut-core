@@ -18,6 +18,7 @@ package io.micronaut.inject.qualifiers;
 import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanType;
+import io.micronaut.inject.QualifiedBeanType;
 
 import java.util.Collection;
 import java.util.Optional;
@@ -39,6 +40,11 @@ public final class AnyQualifier<T> extends FilteringQualifier<T> {
 
     @Override
     public boolean doesQualify(Class<T> beanType, BeanType<T> candidate) {
+        return true;
+    }
+
+    @Override
+    public boolean doesQualify(Class<T> beanType, QualifiedBeanType<T> candidate) {
         return true;
     }
 

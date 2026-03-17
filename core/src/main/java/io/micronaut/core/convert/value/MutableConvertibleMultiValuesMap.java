@@ -16,6 +16,7 @@
 package io.micronaut.core.convert.value;
 
 import io.micronaut.core.convert.ConversionService;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -59,7 +60,7 @@ public class MutableConvertibleMultiValuesMap<V> extends ConvertibleMultiValuesM
     }
 
     @Override
-    public MutableConvertibleValues<List<V>> put(CharSequence key, List<V> value) {
+    public MutableConvertibleValues<List<V>> put(CharSequence key, @Nullable List<V> value) {
         if (value != null) {
             this.values.put(key, value);
         }

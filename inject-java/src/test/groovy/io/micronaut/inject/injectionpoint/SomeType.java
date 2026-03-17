@@ -16,8 +16,10 @@
 package io.micronaut.inject.injectionpoint;
 
 import io.micronaut.context.annotation.Prototype;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.inject.InjectionPoint;
 
+@Requires(property = "spec.name", value = "InjectionPointSpec")
 @Prototype
 public class SomeType {
 

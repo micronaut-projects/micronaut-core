@@ -8,7 +8,7 @@ import io.micronaut.context.env.Environment
 class DefaultEnvironmentSpec : StringSpec({
 
     // tag::disableEnvDeduction[]
-    "test disable environment deduction via builder"() {
+    "test disable environment deduction via builder" {
         val ctx = ApplicationContext.builder().deduceEnvironment(false).start()
         ctx.environment.activeNames.shouldNotContain(Environment.TEST)
         ctx.close()

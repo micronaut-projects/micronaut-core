@@ -16,8 +16,6 @@
 package io.micronaut.inject.factory.parameterizedfactory
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.exceptions.BeanInstantiationException
 import spock.lang.Specification
 

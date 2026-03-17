@@ -15,8 +15,10 @@
  */
 package io.micronaut.docs.lifecycle;
 
+import io.micronaut.context.annotation.Requires;
 import jakarta.inject.Singleton;
 
+@Requires(property = "spec.name", value = "VehicleLifecycleSpec")
 // tag::class[]
 @Singleton
 public class Vehicle {

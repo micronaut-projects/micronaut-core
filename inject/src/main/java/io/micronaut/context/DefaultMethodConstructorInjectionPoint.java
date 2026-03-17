@@ -21,7 +21,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ConstructorInjectionPoint;
 
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A {@link ConstructorInjectionPoint} that invokes a method without relying on reflection.
@@ -44,7 +44,7 @@ class DefaultMethodConstructorInjectionPoint<T> extends DefaultMethodInjectionPo
         BeanDefinition<T> declaringBean,
         Class<?> declaringType,
         String methodName,
-        @Nullable Argument<?>[] arguments,
+        Argument<?> @Nullable [] arguments,
         @Nullable AnnotationMetadata annotationMetadata) {
         super(declaringBean, declaringType, methodName, arguments, annotationMetadata);
     }

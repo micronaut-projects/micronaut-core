@@ -15,13 +15,12 @@
  */
 package io.micronaut.http.server.netty.jackson
 
-import com.fasterxml.jackson.core.JsonFactory
-import com.fasterxml.jackson.databind.ObjectMapper
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.MapPropertySource
 import io.micronaut.context.env.PropertySource
 import spock.lang.Specification
+import tools.jackson.core.json.JsonFactory
+import tools.jackson.databind.ObjectMapper
 
 /**
  * @author Vladislav Chernogorov
@@ -31,7 +30,7 @@ class JsonFactorySetupSpec extends Specification {
 
     void "verify default jackson setup with JsonFactory bean"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test").start()
+        ApplicationContext applicationContext = ApplicationContext.builder("test").start()
 
         expect:
         applicationContext.containsBean(JsonFactory)
@@ -43,9 +42,9 @@ class JsonFactorySetupSpec extends Specification {
 
     void "verify JsonFactory properties are injected into the bean"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build()
         applicationContext.environment.addPropertySource((MapPropertySource) PropertySource.of(
-                'jackson.factory.use-thread-local-for-buffer-recycling': false
+                'jackson.json-factory-features.fail-on-symbol-hash-overflow': false
         ))
         applicationContext.start()
 
@@ -56,7 +55,7 @@ class JsonFactorySetupSpec extends Specification {
         ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper)
 
         then:
-        !objectMapper.getFactory().isEnabled(JsonFactory.Feature.USE_THREAD_LOCAL_FOR_BUFFER_RECYCLING)
+        !objectMapper.tokenStreamFactory().isEnabled(JsonFactory.Feature.FAIL_ON_SYMBOL_HASH_OVERFLOW)
 
     }
 }

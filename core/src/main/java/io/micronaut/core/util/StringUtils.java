@@ -15,7 +15,8 @@
  */
 package io.micronaut.core.util;
 
-import io.micronaut.core.annotation.Nullable;
+import org.jetbrains.annotations.Contract;
+import org.jspecify.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -70,8 +71,9 @@ public final class StringUtils {
      * @param str The string
      * @return True if str is empty or null
      */
+    @Contract("null -> true")
     public static boolean isEmpty(@Nullable CharSequence str) {
-        return str == null || str.length() == 0;
+        return str == null || str.isEmpty();
     }
 
     /**
@@ -80,6 +82,7 @@ public final class StringUtils {
      * @param str The string
      * @return True if str is not null and not empty
      */
+    @Contract("null -> false")
     public static boolean isNotEmpty(@Nullable CharSequence str) {
         return !isEmpty(str);
     }
@@ -90,6 +93,7 @@ public final class StringUtils {
      * @param str The string
      * @return True if str contains any non whitespace characters
      */
+    @Contract("null -> false")
     public static boolean hasText(@Nullable CharSequence str) {
         if (isEmpty(str)) {
             return false;
@@ -310,7 +314,7 @@ public final class StringUtils {
             String str, String delimiters, boolean trimTokens, boolean ignoreEmptyTokens) {
 
         if (str == null) {
-            return null;
+            return EMPTY_STRING_ARRAY;
         }
         StringTokenizer st = new StringTokenizer(str, delimiters);
         List<String> tokens = new ArrayList<>();

@@ -19,5 +19,7 @@
  * @author Sergio del Amo
  * @since 1.0
  */
+@NullMarked
 package io.micronaut.health;
 
+import org.jspecify.annotations.NullMarked;

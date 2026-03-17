@@ -1,6 +1,6 @@
 package io.micronaut.http.netty
 
-import io.micronaut.core.annotation.NonNull
+import org.jspecify.annotations.NonNull
 import io.netty.util.concurrent.AbstractEventExecutor
 import io.netty.util.concurrent.Future
 import io.netty.util.concurrent.OrderedEventExecutor
@@ -82,7 +82,7 @@ class EventLoopFlowSpec extends Specification {
         mock.submitted.size() == 2
     }
 
-    private static class MockEventExecutor extends AbstractEventExecutor implements OrderedEventExecutor {
+    private static final class MockEventExecutor extends AbstractEventExecutor implements OrderedEventExecutor {
         boolean inEventLoop = false
         List<Runnable> submitted = []
 

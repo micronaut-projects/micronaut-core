@@ -16,10 +16,10 @@
 package io.micronaut.context;
 
 import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
 
-import io.micronaut.core.annotation.Nullable;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -37,7 +37,7 @@ public final class DefaultBeanResolutionContext extends AbstractBeanResolutionCo
      * @param context        The bean context
      * @param rootDefinition The bean root definition
      */
-    public DefaultBeanResolutionContext(BeanContext context, BeanDefinition<?> rootDefinition) {
+    public DefaultBeanResolutionContext(BeanContext context, @Nullable BeanDefinition<?> rootDefinition) {
         super((DefaultBeanContext) context, rootDefinition);
     }
 

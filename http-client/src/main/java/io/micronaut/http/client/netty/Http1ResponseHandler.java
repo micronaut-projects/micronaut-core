@@ -15,13 +15,14 @@
  */
 package io.micronaut.http.client.netty;
 
+import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
 import io.micronaut.http.client.exceptions.ResponseClosedException;
-import io.micronaut.http.netty.body.AvailableNettyByteBody;
+import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.netty.body.StreamingNettyByteBody;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.CompositeByteBuf;
@@ -32,6 +33,7 @@ import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.util.ReferenceCountUtil;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -84,7 +86,7 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
     }
 
     @Override
-    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
         state.exceptionCaught(ctx, cause);
     }
 
@@ -153,12 +155,13 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
     /**
      * After the {@link HttpResponse}, but before the first {@link #channelReadComplete}. We
      * optimistically buffer data until {@link #channelReadComplete} so that we may return it as a
-     * more efficient {@link AvailableNettyByteBody}. If there's too much data, fall back to
-     * streaming.
+     * more efficient {@link io.micronaut.http.body.AvailableByteBody}. If there's too much data,
+     * fall back to streaming.
      */
     private final class BufferedContent extends ReaderState<HttpContent> {
         private final ResponseListener listener;
         private final HttpResponse response;
+        @Nullable
         private List<ByteBuf> buffered;
 
         BufferedContent(ResponseListener listener, HttpResponse response) {
@@ -182,13 +185,13 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
                 transitionToState(ctx, this, AfterContent.INSTANCE);
                 BodySizeLimits limits = listener.sizeLimits();
                 if (buffered == null) {
-                    complete(AvailableNettyByteBody.empty());
+                    complete(NettyByteBodyFactory.empty());
                 } else if (buffered.size() == 1) {
-                    complete(AvailableNettyByteBody.createChecked(ctx.channel().eventLoop(), limits, buffered.get(0)));
+                    complete(new NettyByteBodyFactory(ctx.channel()).createChecked(limits, buffered.get(0)));
                 } else {
                     CompositeByteBuf composite = ctx.alloc().compositeBuffer();
                     composite.addComponents(true, buffered);
-                    complete(AvailableNettyByteBody.createChecked(ctx.channel().eventLoop(), limits, composite));
+                    complete(new NettyByteBodyFactory(ctx.channel()).createChecked(limits, composite));
                 }
                 listener.finish(ctx);
             }
@@ -212,7 +215,7 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
             UnbufferedContent unbufferedContent = new UnbufferedContent(listener, ctx, response);
             if (buffered != null) {
                 for (ByteBuf buf : buffered) {
-                    unbufferedContent.add(buf);
+                    unbufferedContent.add(NettyReadBufferFactory.of(ctx.alloc()).adapt(buf));
                 }
             }
             transitionToState(ctx, this, unbufferedContent);
@@ -237,7 +240,7 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
 
         UnbufferedContent(ResponseListener listener, ChannelHandlerContext ctx, HttpResponse response) {
             this.listener = listener;
-            streaming = new StreamingNettyByteBody.SharedBuffer(ctx.channel().eventLoop(), listener.sizeLimits(), this);
+            streaming = new NettyByteBodyFactory(ctx.channel()).createStreamingBuffer(listener.sizeLimits(), this);
             if (!listener.isHeadResponse()) {
                 streaming.setExpectedLengthFrom(response.headers());
             }
@@ -251,18 +254,19 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
             ctx.channel().config().setAutoRead(wasAutoRead);
         }
 
-        void add(ByteBuf buf) {
-            if (buf.isReadable()) {
-                demand -= buf.readableBytes();
+        void add(ReadBuffer buf) {
+            int n = buf.readable();
+            if (n != 0) {
+                demand -= n;
                 streaming.add(buf);
             } else {
-                buf.release();
+                buf.close();
             }
         }
 
         @Override
         void read(ChannelHandlerContext ctx, HttpContent msg) {
-            add(msg.content());
+            add(NettyReadBufferFactory.of(ctx.alloc()).adapt(msg.content()));
             if (msg instanceof LastHttpContent) {
                 transitionToState(ctx, this, AfterContent.INSTANCE);
                 streaming.complete();
@@ -446,7 +450,6 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
          *
          * @return The size limits
          */
-        @NonNull
         default BodySizeLimits sizeLimits() {
             return BodySizeLimits.UNLIMITED;
         }
@@ -467,7 +470,7 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
          *
          * @param ctx The handler context
          */
-        default void continueReceived(@NonNull ChannelHandlerContext ctx) {
+        default void continueReceived(ChannelHandlerContext ctx) {
         }
 
         /**
@@ -478,7 +481,7 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
          * @param ctx The handler context
          * @param t The failure
          */
-        void fail(@NonNull ChannelHandlerContext ctx, @NonNull Throwable t);
+        void fail(ChannelHandlerContext ctx, Throwable t);
 
         /**
          * Called when the headers (and potentially some or all of the body) are fully received.
@@ -486,7 +489,7 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
          * @param response The response status, headers...
          * @param body The response body, potentially streaming
          */
-        void complete(@NonNull HttpResponse response, @NonNull CloseableByteBody body);
+        void complete(HttpResponse response, CloseableByteBody body);
 
         /**
          * Called when the last piece of the body is received. This handler can be removed and the
@@ -494,7 +497,7 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
          *
          * @param ctx The handler context
          */
-        void finish(@NonNull ChannelHandlerContext ctx);
+        void finish(ChannelHandlerContext ctx);
 
         /**
          * Called when the body passed to {@link #complete(HttpResponse, CloseableByteBody)} has

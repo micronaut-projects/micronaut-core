@@ -15,7 +15,8 @@
  */
 package io.micronaut.jackson.core.env;
 
-import com.fasterxml.jackson.core.JsonParseException;
+import org.jspecify.annotations.Nullable;
+import tools.jackson.core.exc.StreamReadException;
 import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.context.env.MapPropertySource;
 import io.micronaut.context.env.PropertySource;
@@ -62,6 +63,7 @@ public class CloudFoundryVcapServicesPropertySourceLoader extends EnvJsonPropert
         return POSITION;
     }
 
+    @Nullable
     @Override
     protected String getEnvValue() {
         return CachedEnvironment.getenv(VCAP_SERVICES);
@@ -85,7 +87,7 @@ public class CloudFoundryVcapServicesPropertySourceLoader extends EnvJsonPropert
         try {
             Map<String, Object> map = readJsonAsMap(input);
             processVcapServices(finalMap, map);
-        } catch (JsonParseException e) {
+        } catch (StreamReadException e) {
             throw new ConfigurationException("Could not parse '" + VCAP_SERVICES + "': " + e.getMessage(), e);
         }
     }

@@ -18,6 +18,7 @@ package io.micronaut.inject.qualifiers;
 import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanType;
+import io.micronaut.inject.QualifiedBeanType;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -56,6 +57,14 @@ final class CompositeQualifier<T> implements Qualifier<T> {
     public <BT extends BeanType<T>> Collection<BT> filter(Class<T> beanType, Collection<BT> candidates) {
         for (Qualifier<T> qualifier : qualifiers) {
             candidates = qualifier.filter(beanType, candidates);
+        }
+        return candidates;
+    }
+
+    @Override
+    public <BT extends QualifiedBeanType<T>> Collection<BT> filterQualified(Class<T> beanType, Collection<BT> candidates) {
+        for (Qualifier<T> qualifier : qualifiers) {
+            candidates = qualifier.filterQualified(beanType, candidates);
         }
         return candidates;
     }

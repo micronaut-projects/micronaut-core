@@ -15,14 +15,13 @@
  */
 package io.micronaut.inject;
 
-import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.Primary;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.beans.BeanInfo;
 import io.micronaut.core.naming.NameResolver;
 import io.micronaut.core.type.Argument;
@@ -56,7 +55,7 @@ public interface BeanType<T> extends AnnotationMetadataProvider, BeanContextCond
      * @return The underlying bean type
      */
     @Override
-    @NonNull Class<T> getBeanType();
+    Class<T> getBeanType();
 
     /**
      * Returns the name of the bean usually resolved via the {@link jakarta.inject.Named} annotation.
@@ -90,7 +89,7 @@ public interface BeanType<T> extends AnnotationMetadataProvider, BeanContextCond
      * @return The exposed types
      * @since 3.0.0
      */
-    default @NonNull Set<Class<?>> getExposedTypes() {
+    default Set<Class<?>> getExposedTypes() {
         final AnnotationMetadata annotationMetadata = getAnnotationMetadata();
         final String beanAnn = Bean.class.getName();
         if (annotationMetadata.hasDeclaredAnnotation(beanAnn)) {

@@ -15,6 +15,13 @@
  */
 package io.micronaut.core.beans;
 
+import io.micronaut.core.beans.exceptions.IntrospectionException;
+import io.micronaut.core.io.service.SoftServiceLoader;
+import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.core.util.ArgumentUtils;
+import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -24,13 +31,6 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
-
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.beans.exceptions.IntrospectionException;
-import io.micronaut.core.io.service.SoftServiceLoader;
-import io.micronaut.core.reflect.ClassUtils;
-import io.micronaut.core.util.ArgumentUtils;
-import org.slf4j.Logger;
 
 /**
  * Default implementation of the {@link BeanIntrospector} interface that uses service loader to discovery introspections.
@@ -44,6 +44,7 @@ class DefaultBeanIntrospector implements BeanIntrospector {
 
     private static final Logger LOG = ClassUtils.getLogger(DefaultBeanIntrospector.class);
 
+    @Nullable
     private Map<String, BeanIntrospectionReference<Object>> introspectionMap;
     private final ClassLoader classLoader;
 
@@ -55,9 +56,8 @@ class DefaultBeanIntrospector implements BeanIntrospector {
         this.classLoader = classLoader;
     }
 
-    @NonNull
     @Override
-    public Collection<BeanIntrospection<Object>> findIntrospections(@NonNull Predicate<? super BeanIntrospectionReference<?>> filter) {
+    public Collection<BeanIntrospection<Object>> findIntrospections(Predicate<? super BeanIntrospectionReference<?>> filter) {
         ArgumentUtils.requireNonNull("filter", filter);
         return getIntrospections()
                 .values()
@@ -67,9 +67,8 @@ class DefaultBeanIntrospector implements BeanIntrospector {
                 .collect(Collectors.toList());
     }
 
-    @NonNull
     @Override
-    public Collection<Class<?>> findIntrospectedTypes(@NonNull Predicate<? super BeanIntrospectionReference<?>> filter) {
+    public Collection<Class<?>> findIntrospectedTypes(Predicate<? super BeanIntrospectionReference<?>> filter) {
         ArgumentUtils.requireNonNull("filter", filter);
         return getIntrospections()
                 .values()
@@ -79,10 +78,9 @@ class DefaultBeanIntrospector implements BeanIntrospector {
                 .collect(Collectors.toSet());
     }
 
-    @NonNull
     @Override
     @SuppressWarnings("java:S1181")
-    public <T> Optional<BeanIntrospection<T>> findIntrospection(@NonNull Class<T> beanType) {
+    public <T> Optional<BeanIntrospection<T>> findIntrospection(Class<T> beanType) {
         ArgumentUtils.requireNonNull("beanType", beanType);
         @SuppressWarnings("unchecked") final BeanIntrospectionReference<T> reference =
                 (BeanIntrospectionReference<T>) getIntrospections().get(beanType.getName());

@@ -16,8 +16,7 @@
 package io.micronaut.inject.utils;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -68,7 +67,6 @@ public abstract class NativeElementsHelper<C, M> {
      * @param element The element
      * @return The name
      */
-    @NonNull
     protected abstract String getMethodName(M element);
 
     /**
@@ -86,7 +84,6 @@ public abstract class NativeElementsHelper<C, M> {
      * @param classNode The class
      * @return The interfaces
      */
-    @NonNull
     protected abstract Collection<C> getInterfaces(C classNode);
 
     /**
@@ -95,7 +92,6 @@ public abstract class NativeElementsHelper<C, M> {
      * @param classNode The class
      * @return The enclosed elements
      */
-    @NonNull
     protected abstract List<M> getMethods(C classNode);
 
     /**

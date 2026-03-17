@@ -157,7 +157,7 @@ class Http2AccessLoggerSpec extends Specification {
         server.close()
     }
 
-    private static class MemoryAppender extends AppenderBase<ILoggingEvent> {
+    private static final class MemoryAppender extends AppenderBase<ILoggingEvent> {
         private final BlockingQueue<String> events = new LinkedBlockingQueue<>()
 
         @Override

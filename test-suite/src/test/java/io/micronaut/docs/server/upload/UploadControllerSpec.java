@@ -154,8 +154,7 @@ class UploadControllerSpec {
         Map<String, Object> embedded = (Map<String, Object>) ex.getResponse().getBody(Map.class).get().get("_embedded");
         Object message = ((Map<String, Object>) ((List) embedded.get("errors")).get(0)).get("message");
 
-        // a part without a filename is an attribute, which cannot be bound to CompletedFileUpload
-        assertEquals("Cannot convert type [class io.micronaut.http.server.netty.MicronautHttpData$AttributeImpl] to target type: interface io.micronaut.http.multipart.CompletedFileUpload. Considering defining a TypeConverter bean to handle this case.", message);
+        assertEquals("Field [file] was expected to be a file upload, but is missing a file name", message);
     }
 
     @Test
@@ -176,7 +175,7 @@ class UploadControllerSpec {
         Object message = ((Map<String, Object>) ((List) embedded.get("errors")).get(0)).get("message");
 
         // a part without a filename is an attribute, which cannot be bound to CompletedFileUpload
-        assertEquals("Cannot convert type [class io.micronaut.http.server.netty.MicronautHttpData$AttributeImpl] to target type: interface io.micronaut.http.multipart.CompletedFileUpload. Considering defining a TypeConverter bean to handle this case.", message);
+        assertEquals("Field [file] was expected to be a file upload, but is missing a file name", message);
     }
 
     @Test

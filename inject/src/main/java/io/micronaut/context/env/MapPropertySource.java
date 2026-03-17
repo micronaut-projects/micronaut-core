@@ -15,6 +15,8 @@
  */
 package io.micronaut.context.env;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.Map;
@@ -28,7 +30,7 @@ import java.util.Map;
 public class MapPropertySource implements PropertySource {
 
     private final String name;
-    private final Map map;
+    private final Map<String, ?> map;
 
     /**
      * Creates a map property source.
@@ -36,7 +38,7 @@ public class MapPropertySource implements PropertySource {
      * @param name The name of the property source
      * @param map  The map
      */
-    public MapPropertySource(String name, Map map) {
+    public MapPropertySource(String name, Map<String, ?> map) {
         this.name = name;
         this.map = map;
     }
@@ -47,13 +49,14 @@ public class MapPropertySource implements PropertySource {
     }
 
     @Override
+    @Nullable
     public Object get(String key) {
         return map.get(key);
     }
 
     @Override
     public Iterator<String> iterator() {
-        Iterator i = map.keySet().iterator();
+        Iterator<String> i = map.keySet().iterator();
 
         return new Iterator<>() {
             @Override
@@ -63,7 +66,7 @@ public class MapPropertySource implements PropertySource {
 
             @Override
             public String next() {
-                return i.next().toString();
+                return i.next();
             }
         };
     }

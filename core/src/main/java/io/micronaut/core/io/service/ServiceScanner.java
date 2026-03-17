@@ -16,14 +16,17 @@
 package io.micronaut.core.io.service;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.graalvm.nativeimage.ImageSingletons;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
 import java.net.URL;
+import java.net.URLConnection;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Enumeration;
@@ -35,6 +38,7 @@ import java.util.ServiceConfigurationError;
 import java.util.Set;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.RecursiveAction;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
@@ -77,156 +81,228 @@ final class ServiceScanner<S> {
         }
     }
 
-    @SuppressWarnings("java:S3398")
-    private Set<String> computeStandardServiceTypeNames(URL url) {
-        Set<String> typeNames = new HashSet<>();
-        try {
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(url.openStream()))) {
-                while (true) {
-                    String line = reader.readLine();
-                    if (line == null) {
-                        break;
-                    }
-                    if (line.isEmpty() || line.charAt(0) == '#') {
-                        continue;
-                    }
-                    if (!lineCondition.test(line)) {
-                        continue;
-                    }
-                    int i = line.indexOf('#');
-                    if (i > -1) {
-                        line = line.substring(0, i);
-                    }
-                    typeNames.add(line);
-                }
-            }
-        } catch (IOException | UncheckedIOException e) {
-            // ignore, can't do anything here and can't log because class used in compiler
-        }
-        return typeNames;
-    }
+    SoftServiceLoader.ServiceCollector<S> createCollector() {
+        return new SoftServiceLoader.ServiceCollector<>() {
 
-    private Enumeration<URL> findStandardServiceConfigs() throws IOException {
-        return classLoader.getResources(SoftServiceLoader.META_INF_SERVICES + '/' + serviceName);
+            @Override
+            public void collect(Collection<S> values) {
+                collect(values::add, true);
+            }
+
+            @Override
+            public void collect(Collection<S> values, boolean allowFork) {
+                collect(values::add, allowFork);
+            }
+
+            @Override
+            public void collect(Consumer<? super S> consumer) {
+                collect(consumer, true);
+            }
+
+            private void collect(Consumer<? super S> consumer, boolean allowFork) {
+                boolean fork = allowFork && ForkJoinPool.getCommonPoolParallelism() > 1;
+                ServiceEntriesLoader<S> task = new ServiceEntriesLoader<>(serviceName, classLoader, lineCondition, transformer, fork);
+                if (fork) {
+                    ForkJoinPool.commonPool().invoke(task);
+                } else {
+                    task.compute();
+                }
+                task.consume(consumer);
+            }
+        };
     }
 
     /**
      * Fork-join recursive services loader.
+     *
+     * @param <S> The type
      */
     @SuppressWarnings("java:S1948")
-    final class DefaultServiceCollector extends RecursiveActionValuesCollector<S> implements SoftServiceLoader.ServiceCollector<S> {
+    private static final class ServiceEntriesLoader<S> extends RecursiveActionValuesCollector<S> {
 
         private final List<RecursiveActionValuesCollector<S>> tasks = new ArrayList<>();
+
+        private final String serviceName;
+        private final ClassLoader classLoader;
+        private final Predicate<String> lineCondition;
+        private final Function<String, S> transformer;
+        private final boolean fork;
+        @Nullable
+        private final Set<String> serviceEntries;
+
+        private ServiceEntriesLoader(String serviceName, ClassLoader classLoader, Predicate<String> lineCondition, Function<String, S> transformer, boolean fork) {
+            this.serviceName = serviceName;
+            this.classLoader = classLoader;
+            this.lineCondition = lineCondition;
+            this.transformer = transformer;
+            final ServiceScanner.StaticServiceDefinitions ssd = ServiceScanner.findStaticServiceDefinitions();
+            if (ssd != null) {
+                Map<String, Set<String>> stringSetMap = ssd.serviceTypeMap();
+                serviceEntries = stringSetMap.get(serviceName);
+                if (serviceEntries == null) {
+                    this.fork = fork;
+                } else {
+                    this.fork = false;
+                }
+            } else {
+                serviceEntries = null;
+                this.fork = fork;
+            }
+        }
 
         @Override
         protected void compute() {
             try {
+                if (serviceEntries != null) {
+                    for (String serviceEntry : serviceEntries) {
+                        final ServiceInstanceLoader<S> task = new ServiceInstanceLoader<>(serviceEntry, transformer);
+                        tasks.add(task);
+                        if (fork) {
+                            task.fork();
+                        } else {
+                            task.compute();
+                        }
+                    }
+                    return;
+                }
                 Enumeration<URL> serviceConfigs = findStandardServiceConfigs();
                 while (serviceConfigs.hasMoreElements()) {
                     URL url = serviceConfigs.nextElement();
-                    UrlServicesLoader task = new UrlServicesLoader(url);
+                    UrlServicesLoader<S> task = new UrlServicesLoader<>(url, lineCondition, transformer, fork);
                     tasks.add(task);
-                    task.fork();
+                    if (fork) {
+                        task.fork();
+                    } else {
+                        task.compute();
+                    }
                 }
                 Set<String> serviceEntries = MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(classLoader, serviceName);
                 for (String serviceEntry : serviceEntries) {
-                    final ServiceInstanceLoader task = new ServiceInstanceLoader(serviceEntry);
+                    final ServiceInstanceLoader<S> task = new ServiceInstanceLoader<>(serviceEntry, transformer);
                     tasks.add(task);
-                    task.fork();
+                    if (fork) {
+                        task.fork();
+                    } else {
+                        task.compute();
+                    }
                 }
             } catch (IOException e) {
                 throw new ServiceConfigurationError("Failed to load resources for service: " + serviceName, e);
             }
         }
 
-        @Override
-        public void collect(Collection<S> values) {
-            ForkJoinPool.commonPool().invoke(this);
-            for (RecursiveActionValuesCollector<S> task : tasks) {
-                task.join();
-                task.collect(values);
-            }
+        private Enumeration<URL> findStandardServiceConfigs() throws IOException {
+            return classLoader.getResources(SoftServiceLoader.META_INF_SERVICES + '/' + serviceName);
         }
 
         @Override
-        public void collect(Collection<S> values, boolean allowFork) {
-            if (allowFork && ForkJoinPool.getCommonPoolParallelism() > 1) {
-                ForkJoinPool.commonPool().invoke(this);
-                for (RecursiveActionValuesCollector<S> task : tasks) {
+        public void consume(Consumer<? super S> consumer) {
+            for (RecursiveActionValuesCollector<S> task : tasks) {
+                if (fork) {
                     task.join();
-                    task.collect(values);
                 }
-            } else {
-                try {
-                    Enumeration<URL> serviceConfigs = findStandardServiceConfigs();
-                    while (serviceConfigs.hasMoreElements()) {
-                        URL url = serviceConfigs.nextElement();
-                        for (String typeName : computeStandardServiceTypeNames(url)) {
-                            S val = transformer.apply(typeName);
-                            if (val != null) {
-                                values.add(val);
-                            }
-                        }
-                    }
-                    Set<String> serviceEntries = MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(classLoader, serviceName);
-                    for (String serviceEntry : serviceEntries) {
-                        S val = transformer.apply(serviceEntry);
-                        if (val != null) {
-                            values.add(val);
-                        }
-                    }
-                } catch (IOException e) {
-                    throw new ServiceConfigurationError("Failed to load resources for service: " + serviceName, e);
-                }
+                task.consume(consumer);
             }
         }
+
     }
 
     /**
      * Reads URL, parses the file and produces sub-tasks to initialize the entry.
+     *
+     * @param <S> The type
      */
     @SuppressWarnings("java:S1948")
-    private final class UrlServicesLoader extends RecursiveActionValuesCollector<S> {
+    private static final class UrlServicesLoader<S> extends RecursiveActionValuesCollector<S> {
 
         private final URL url;
-        private final List<ServiceInstanceLoader> tasks = new ArrayList<>();
+        private final List<ServiceInstanceLoader<S>> tasks = new ArrayList<>();
+        private final Predicate<String> lineCondition;
+        private final Function<String, S> transformer;
+        private final boolean fork;
 
-        public UrlServicesLoader(URL url) {
+        public UrlServicesLoader(URL url, Predicate<String> lineCondition, Function<String, S> transformer, boolean fork) {
             this.url = url;
+            this.lineCondition = lineCondition;
+            this.transformer = transformer;
+            this.fork = fork;
         }
 
         @Override
         @SuppressWarnings({"java:S3776", "java:S135"})
         protected void compute() {
             for (String typeName : computeStandardServiceTypeNames(url)) {
-                ServiceInstanceLoader task = new ServiceInstanceLoader(typeName);
+                ServiceInstanceLoader<S> task = new ServiceInstanceLoader<>(typeName, transformer);
                 tasks.add(task);
-                task.fork();
+                if (fork) {
+                    task.fork();
+                } else {
+                    task.compute();
+                }
             }
         }
 
         @Override
-        public void collect(Collection<S> values) {
-            for (ServiceInstanceLoader task : tasks) {
-                task.join();
-                task.collect(values);
+        public void consume(Consumer<? super S> consumer) {
+            for (ServiceInstanceLoader<S> task : tasks) {
+                if (fork) {
+                    task.join();
+                }
+                task.consume(consumer);
             }
+        }
+
+        @SuppressWarnings("java:S3398")
+        private Set<String> computeStandardServiceTypeNames(URL url) {
+            Set<String> typeNames = new HashSet<>();
+            try {
+                URLConnection uc = url.openConnection();
+                uc.setUseCaches(false);
+                try (InputStream is = uc.getInputStream(); BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
+                    while (true) {
+                        String line = reader.readLine();
+                        if (line == null) {
+                            break;
+                        }
+                        if (line.isEmpty() || line.charAt(0) == '#') {
+                            continue;
+                        }
+                        if (!lineCondition.test(line)) {
+                            continue;
+                        }
+                        int i = line.indexOf('#');
+                        if (i > -1) {
+                            line = line.substring(0, i);
+                        }
+                        typeNames.add(line);
+                    }
+                }
+            } catch (IOException | UncheckedIOException e) {
+                // ignore, can't do anything here and can't log because class used in compiler
+            }
+            return typeNames;
         }
 
     }
 
     /**
      * Initializes and filters the entry.
+     *
+     * @param <S> The type
      */
     @SuppressWarnings("java:S1948")
-    private final class ServiceInstanceLoader extends RecursiveActionValuesCollector<S> {
+    private static final class ServiceInstanceLoader<S> extends RecursiveActionValuesCollector<S> {
 
         private final String className;
+        @Nullable
         private S result;
+        @Nullable
         private Throwable throwable;
+        private final Function<String, S> transformer;
 
-        public ServiceInstanceLoader(String className) {
+        public ServiceInstanceLoader(String className, Function<String, S> transformer) {
             this.className = className;
+            this.transformer = transformer;
         }
 
         @Override
@@ -239,12 +315,12 @@ final class ServiceScanner<S> {
         }
 
         @Override
-        public void collect(Collection<S> values) {
+        public void consume(Consumer<? super S> consumer) {
             if (throwable != null) {
                 throw new SoftServiceLoader.ServiceLoadingException("Failed to load a service: " + throwable.getMessage(), throwable);
             }
-            if (result != null && !values.contains(result)) {
-                values.add(result);
+            if (result != null) {
+                consumer.accept(result);
             }
         }
     }
@@ -257,11 +333,11 @@ final class ServiceScanner<S> {
     private abstract static class RecursiveActionValuesCollector<S> extends RecursiveAction {
 
         /**
-         * Collects loaded values.
+         * Consume loaded value.
          *
-         * @param values The values
+         * @param consumer The consumer
          */
-        public abstract void collect(Collection<S> values);
+        public abstract void consume(Consumer<? super S> consumer);
 
     }
 

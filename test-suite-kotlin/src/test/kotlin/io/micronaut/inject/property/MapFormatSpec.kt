@@ -16,7 +16,6 @@
 package io.micronaut.inject.property
 
 import io.micronaut.context.ApplicationContext
-import junit.framework.TestCase
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import kotlin.test.assertTrue

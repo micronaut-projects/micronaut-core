@@ -17,8 +17,7 @@ package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
@@ -36,7 +35,7 @@ import java.util.Optional;
  * @since 1.0
  */
 @Internal
-final class JavaPropertyElement extends AbstractJavaElement implements PropertyElement {
+final class JavaPropertyElement extends AbstractJavaMemberElement implements PropertyElement {
 
     private final ClassElement type;
     private final String name;
@@ -49,31 +48,47 @@ final class JavaPropertyElement extends AbstractJavaElement implements PropertyE
     private final MethodElement setter;
     @Nullable
     private final FieldElement field;
+    @Nullable
+    private final AnnotationMetadata propertyComponentAnnotationMetadata;
     private final boolean excluded;
     private final PropertyElementAnnotationMetadata annotationMetadata;
+    @Nullable
+    private final String doc;
 
+    @SuppressWarnings("checkstyle:ParameterNumber")
     JavaPropertyElement(ClassElement owningElement,
                         ClassElement type,
                         @Nullable MethodElement getter,
                         @Nullable MethodElement setter,
                         @Nullable FieldElement field,
+                        @Nullable AnnotationMetadata propertyComponentAnnotationMetadata,
                         ElementAnnotationMetadataFactory annotationMetadataFactory,
                         String name,
                         AccessKind readAccessKind,
                         AccessKind writeAccessKind,
                         boolean excluded,
-                        JavaVisitorContext visitorContext) {
+                        JavaVisitorContext visitorContext,
+                        @Nullable String doc) {
         super(selectNativeType(getter, setter, field), annotationMetadataFactory, visitorContext);
         this.type = type;
         this.getter = getter;
         this.setter = setter;
         this.field = field;
+        this.propertyComponentAnnotationMetadata = propertyComponentAnnotationMetadata;
         this.name = name;
         this.readAccessKind = readAccessKind;
         this.writeAccessKind = writeAccessKind;
         this.owningElement = owningElement;
         this.excluded = excluded;
-        this.annotationMetadata = new PropertyElementAnnotationMetadata(this, getter, setter, field, null, false);
+        this.annotationMetadata = new PropertyElementAnnotationMetadata(this, getter, setter, field, null, propertyComponentAnnotationMetadata, false);
+        this.doc = doc;
+    }
+
+    @Override
+    protected AnnotationMetadata getTypeAnnotationMetadata() {
+        // The correct check for the nullability of the property should base on the read / write accessor
+        // We might need to introduce new methods to check if reader value / write value can be null
+        return type.getTypeAnnotationMetadata();
     }
 
     @Override
@@ -88,7 +103,7 @@ final class JavaPropertyElement extends AbstractJavaElement implements PropertyE
 
     @Override
     protected AbstractJavaElement copyThis() {
-        return new JavaPropertyElement(owningElement, type, getter, setter, field, elementAnnotationMetadataFactory, name, readAccessKind, writeAccessKind, excluded, visitorContext);
+        return new JavaPropertyElement(owningElement, type, getter, setter, field, propertyComponentAnnotationMetadata, elementAnnotationMetadataFactory, name, readAccessKind, writeAccessKind, excluded, visitorContext, doc);
     }
 
     @Override
@@ -96,9 +111,9 @@ final class JavaPropertyElement extends AbstractJavaElement implements PropertyE
         return (PropertyElement) super.withAnnotationMetadata(annotationMetadata);
     }
 
-    private static JavaNativeElement selectNativeType(MethodElement getter,
-                                                      MethodElement setter,
-                                                      FieldElement field) {
+    private static JavaNativeElement selectNativeType(@Nullable MethodElement getter,
+                                                      @Nullable MethodElement setter,
+                                                      @Nullable FieldElement field) {
         if (getter != null) {
             return (JavaNativeElement) getter.getNativeType();
         }
@@ -122,12 +137,12 @@ final class JavaPropertyElement extends AbstractJavaElement implements PropertyE
     }
 
     @Override
-    public @NonNull ClassElement getType() {
+    public ClassElement getType() {
         return type;
     }
 
     @Override
-    public @NonNull ClassElement getGenericType() {
+    public ClassElement getGenericType() {
         return type; // Already generic
     }
 
@@ -162,7 +177,7 @@ final class JavaPropertyElement extends AbstractJavaElement implements PropertyE
     }
 
     @Override
-    public @NonNull String getName() {
+    public String getName() {
         return name;
     }
 
@@ -216,4 +231,11 @@ final class JavaPropertyElement extends AbstractJavaElement implements PropertyE
         return owningElement;
     }
 
+    @Override
+    public Optional<String> getDocumentation(boolean parse) {
+        if (!parse) {
+            return JavaPropertyElement.super.getDocumentation(parse);
+        }
+        return doc == null ? PropertyElement.super.getDocumentation(parse) : Optional.of(doc);
+    }
 }

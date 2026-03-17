@@ -16,8 +16,7 @@
 package io.micronaut.http.netty;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -73,14 +72,18 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
     private final HttpVersion httpVersion;
     private HttpResponseStatus httpResponseStatus;
     private final NettyHttpHeaders headers;
+    @Nullable
     private Object body;
     private Optional<Object> optionalBody;
     private final HttpHeaders nettyHeaders;
     private final HttpHeaders trailingNettyHeaders;
+    @Nullable
     private final DecoderResult decoderResult;
     private final ConversionService conversionService;
+    @Nullable
     private MutableConvertibleValues<Object> attributes;
     private final BodyConvertor bodyConvertor = newBodyConvertor();
+    @Nullable
     private MessageBodyWriter<B> messageBodyWriter;
 
     /**
@@ -117,7 +120,7 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
      * @param body The body
      * @param conversionService The conversion service
      */
-    public NettyMutableHttpResponse(HttpVersion httpVersion, HttpResponseStatus httpResponseStatus, Object body, ConversionService conversionService) {
+    public NettyMutableHttpResponse(HttpVersion httpVersion, HttpResponseStatus httpResponseStatus, @Nullable Object body, ConversionService conversionService) {
         this(httpVersion, httpResponseStatus, null, body, conversionService);
     }
 
@@ -132,7 +135,9 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
      */
     public NettyMutableHttpResponse(HttpVersion httpVersion,
                                     HttpResponseStatus httpResponseStatus,
+                                    @Nullable
                                     HttpHeaders nettyHeaders,
+                                    @Nullable
                                     Object body,
                                     ConversionService conversionService) {
         this(httpVersion, httpResponseStatus, nettyHeaders, EmptyHttpHeaders.INSTANCE, body, null, conversionService);
@@ -140,9 +145,11 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
 
     private NettyMutableHttpResponse(HttpVersion httpVersion,
                                      HttpResponseStatus httpResponseStatus,
-                                     HttpHeaders nettyHeaders,
+                                     @Nullable HttpHeaders nettyHeaders,
                                      HttpHeaders trailingNettyHeaders,
+                                     @Nullable
                                      Object body,
+                                     @Nullable
                                      DecoderResult decoderResult,
                                      ConversionService conversionService) {
         this.httpVersion = httpVersion;
@@ -151,8 +158,7 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
         this.decoderResult = decoderResult;
         this.conversionService = conversionService;
 
-        boolean hasHeaders = nettyHeaders != null;
-        if (!hasHeaders) {
+        if (nettyHeaders == null) {
             nettyHeaders = new DefaultHttpHeaders(false);
         }
         this.nettyHeaders = nettyHeaders;
@@ -164,7 +170,7 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
             this.body = body;
             this.optionalBody = Optional.of(body);
             Optional<MediaType> mediaType = MediaType.fromType(body.getClass());
-            if (mediaType.isPresent() && (!hasHeaders || !nettyHeaders.contains(HttpHeaderNames.CONTENT_TYPE))) {
+            if (mediaType.isPresent() && !nettyHeaders.contains(HttpHeaderNames.CONTENT_TYPE)) {
                 contentType(mediaType.get());
             }
         }
@@ -176,7 +182,7 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
      * @param response The mn response
      * @return The netty response
      */
-    public static @NonNull HttpResponse toNoBodyResponse(@NonNull io.micronaut.http.HttpResponse<?> response) {
+    public static HttpResponse toNoBodyResponse(io.micronaut.http.HttpResponse<?> response) {
         Objects.requireNonNull(response, "The response cannot be null");
         while (response instanceof HttpResponseWrapper<?> wrapper) {
             response = wrapper.getDelegate();
@@ -266,7 +272,7 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
     }
 
     @Override
-    public io.micronaut.http.HttpResponse<B> setAttribute(CharSequence name, Object value) {
+    public io.micronaut.http.HttpResponse<B> setAttribute(CharSequence name, @Nullable Object value) {
         // This is the copy from the super method to avoid the type pollution
         if (StringUtils.isNotEmpty(name)) {
             if (value == null) {
@@ -295,7 +301,7 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
     }
 
     @Override
-    public MutableHttpResponse<B> cookies(Set<Cookie> cookies) {
+    public MutableHttpResponse<B> cookies(@Nullable Set<Cookie> cookies) {
         if (cookies == null || cookies.isEmpty()) {
             return this;
         }
@@ -331,7 +337,7 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
     }
 
     @Override
-    public MutableHttpResponse<B> status(int status, CharSequence message) {
+    public MutableHttpResponse<B> status(int status, @Nullable CharSequence message) {
         if (message == null) {
             message = HttpStatus.getDefaultReason(status);
         }
@@ -357,7 +363,6 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
         return this;
     }
 
-    @NonNull
     @Override
     public FullHttpResponse toFullHttpResponse() {
         ByteBuf content;
@@ -379,7 +384,6 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
         return defaultFullHttpResponse;
     }
 
-    @NonNull
     @Override
     public StreamedHttpResponse toStreamHttpResponse() {
         ByteBuf content;
@@ -400,7 +404,6 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
         return streamedHttpResponse;
     }
 
-    @NonNull
     @Override
     public HttpResponse toHttpResponse() {
         return toFullHttpResponse();
@@ -411,11 +414,11 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
         return false;
     }
 
-    private void setBody(Object body) {
+    private void setBody(@Nullable Object body) {
         this.body = body;
         this.optionalBody = Optional.ofNullable(body);
         Optional<MediaType> contentType = getContentType();
-        if (!contentType.isPresent() && body != null) {
+        if (contentType.isEmpty() && body != null) {
             MediaType.fromType(body.getClass()).ifPresent(this::contentType);
         }
     }
@@ -424,7 +427,7 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
         return new BodyConvertor() {
 
             @Override
-            public Optional convert(ArgumentConversionContext conversionContext, Object value) {
+            public Optional convert(ArgumentConversionContext conversionContext, @Nullable Object value) {
                 if (value == null) {
                     return Optional.empty();
                 }
@@ -439,11 +442,12 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
 
     private abstract static class BodyConvertor<T> {
 
+        @Nullable
         private BodyConvertor<T> nextConvertor;
 
-        public abstract Optional<T> convert(ArgumentConversionContext<T> valueType, T value);
+        public abstract Optional<T> convert(ArgumentConversionContext<T> valueType, @Nullable T value);
 
-        protected synchronized Optional<T> convertFromNext(ConversionService conversionService, ArgumentConversionContext<T> conversionContext, T value) {
+        protected synchronized Optional<T> convertFromNext(ConversionService conversionService, ArgumentConversionContext<T> conversionContext, @Nullable T value) {
             if (nextConvertor == null) {
                 Optional<T> conversion;
                 if (value instanceof ByteBuffer buffer) {
@@ -454,7 +458,7 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
                 nextConvertor = new BodyConvertor<>() {
 
                     @Override
-                    public Optional<T> convert(ArgumentConversionContext<T> currentConversionContext, T value) {
+                    public Optional<T> convert(ArgumentConversionContext<T> currentConversionContext, @Nullable T value) {
                         if (currentConversionContext == conversionContext) {
                             return conversion;
                         }

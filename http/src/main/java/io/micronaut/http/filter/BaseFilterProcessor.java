@@ -16,11 +16,11 @@
 package io.micronaut.http.filter;
 
 import io.micronaut.context.BeanContext;
-import io.micronaut.context.processor.ExecutableMethodProcessor;
+import io.micronaut.context.processor.BeanDefinitionProcessor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.order.OrderUtil;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.Order;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -62,7 +62,7 @@ import java.util.function.Supplier;
  * @since 4.0.0
  */
 @Internal
-public abstract class BaseFilterProcessor<A extends Annotation> implements ExecutableMethodProcessor<A> {
+public abstract class BaseFilterProcessor<A extends Annotation> implements BeanDefinitionProcessor<A> {
     @Nullable
     private final BeanContext beanContext;
     private final Class<A> filterAnnotation;
@@ -103,13 +103,14 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements Execu
     }
 
     @Override
-    public void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
-        //noinspection unchecked,rawtypes
-        process0(beanDefinition, (ExecutableMethod) method);
+    public final void process(BeanDefinition<?> beanDefinition, BeanContext beanContext) {
+        for (ExecutableMethod<?, ?> executableMethod : beanDefinition.getExecutableMethods()) {
+            process0(beanDefinition, (ExecutableMethod) executableMethod);
+        }
     }
 
     /**
-     * Add a filter. Called during {@link #process(BeanDefinition, ExecutableMethod)}.
+     * Add a filter.
      *
      * @param factory           Factory that will create the filter instance
      * @param methodAnnotations Annotations on the filter method
@@ -133,8 +134,9 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements Execu
         }
     }
 
+    @Nullable
     private Executor getExecutor(FilterMetadata metadata) {
-        if (metadata.executeOn != null) {
+        if (beanContext != null && metadata.executeOn != null) {
             return beanContext.getBean(Executor.class, Qualifiers.byName(metadata.executeOn));
         } else {
             return null;
@@ -191,8 +193,7 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements Execu
      * @param patterns Input patterns
      * @return Output patterns with server context path prepended
      */
-    @NonNull
-    protected List<String> prependContextPath(@NonNull List<String> patterns) {
+    protected List<String> prependContextPath(List<String> patterns) {
         return patterns;
     }
 
@@ -221,7 +222,7 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements Execu
             annotationMetadata.enumValue(annotationType, "patternStyle", FilterPatternStyle.class).orElse(FilterPatternStyle.ANT),
             ArrayUtils.isNotEmpty(patterns) ? Arrays.asList(patterns) : null,
             ArrayUtils.isNotEmpty(methods) ? Arrays.asList(methods) : null,
-            order.isPresent() ? new FilterOrder.Fixed(order.getAsInt()) : null,
+            order.isPresent() ? new FilterOrder.Fixed(order.getAsInt()) : new FilterOrder.Dynamic(OrderUtil.getOrder(annotationMetadata)),
             annotationMetadata.stringValue(ExecuteOn.class).orElse(null),
             ArrayUtils.isNotEmpty(serviceId) ? Arrays.asList(serviceId) : null,
             ArrayUtils.isNotEmpty(excludeServiceId) ? Arrays.asList(excludeServiceId) : null,
@@ -234,7 +235,7 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements Execu
         FilterPatternStyle patternStyle,
         @Nullable List<String> patterns,
         @Nullable List<HttpMethod> methods,
-        @Nullable FilterOrder order,
+        FilterOrder order,
         @Nullable String executeOn,
         @Nullable List<String> serviceId,
         @Nullable List<String> excludeServiceId,

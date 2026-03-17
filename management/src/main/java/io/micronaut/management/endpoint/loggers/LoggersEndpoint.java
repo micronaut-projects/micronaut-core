@@ -15,7 +15,7 @@
  */
 package io.micronaut.management.endpoint.loggers;
 
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.core.bind.exceptions.UnsatisfiedArgumentException;
 import io.micronaut.core.type.Argument;
@@ -102,7 +102,7 @@ public class LoggersEndpoint {
     @Write
     @Sensitive(property = "write-sensitive")
     public void setLogLevel(@NotBlank @Selector String name,
-                            @Nullable io.micronaut.logging.LogLevel configuredLevel) {
+                            io.micronaut.logging.@Nullable LogLevel configuredLevel) {
         try {
             loggersManager.setLogLevel(loggingSystem, name,
                 configuredLevel != null ? configuredLevel : io.micronaut.logging.LogLevel.NOT_SPECIFIED);

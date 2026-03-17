@@ -1,8 +1,8 @@
 package io.micronaut.jackson.core.tree
 
-import com.fasterxml.jackson.core.JsonFactory
-import com.fasterxml.jackson.core.json.JsonReadFeature
-import com.fasterxml.jackson.core.json.JsonWriteFeature
+import tools.jackson.core.json.JsonFactory
+import tools.jackson.core.json.JsonReadFeature
+import tools.jackson.core.json.JsonWriteFeature
 import io.micronaut.json.JsonStreamConfig
 import spock.lang.Specification
 

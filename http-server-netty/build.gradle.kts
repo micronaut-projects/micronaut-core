@@ -2,20 +2,18 @@ plugins {
     id("io.micronaut.build.internal.convention-library")
 }
 
-import org . apache . tools . ant . taskdefs . condition . Os
-
-        micronautBuild {
-            core {
-                usesMicronautTestJunit()
-                usesMicronautTestSpock()
-            }
-        }
+micronautBuild {
+    core {
+        usesMicronautTestJunit()
+        usesMicronautTestSpock()
+    }
+}
 
 tasks {
     test {
         systemProperty("io.netty.leakDetection.level", "paranoid")
-        systemProperty("io.netty.customResourceLeakDetector", "io.micronaut.http.server.netty.fuzzing.BufferLeakDetection")
         systemProperty("io.netty.leakDetection.targetRecords", "100")
+        systemProperty("junit.jupiter.extensions.autodetection.enabled", "true")
         jvmArgs("--add-opens=java.base/java.lang=ALL-UNNAMED")
         maxHeapSize = "1G"
     }
@@ -34,6 +32,7 @@ dependencies {
     compileOnly(projects.micronautWebsocket)
     compileOnly(libs.managed.kotlin.stdlib)
     compileOnly(libs.managed.netty.transport.native.unix.common)
+    implementation(libs.managed.netty.contrib.multipart.core)
     compileOnly(projects.micronautHttpNettyHttp3)
     compileOnly(libs.brotli4j)
 
@@ -63,8 +62,8 @@ dependencies {
     testImplementation(libs.spotbugs)
     testImplementation(projects.micronautHttpNettyHttp3)
     testImplementation(libs.bcpkix)
+    testImplementation(libs.managed.netty.pkitesting)
     testImplementation(projects.micronautJacksonDatabind)
-    testImplementation(projects.micronautHttpTck)
 // Add Micronaut Jackson XML after v4 Migration
 //    testImplementation(libs.managed.micronaut.xml) {
 //        exclude module:'micronaut-inject'
@@ -80,6 +79,7 @@ dependencies {
     testImplementation(libs.httpcomponents.mime)
     testImplementation(libs.jetty.alpn.openjdk8.client)
     testImplementation(libs.jfrunit.core)
+    testImplementation(libs.awaitility)
 
     testImplementation(libs.managed.groovy.json)
     testImplementation(libs.managed.groovy.templates)
@@ -91,7 +91,7 @@ dependencies {
     }
     testImplementation(libs.managed.netty.transport.native.kqueue) {
         artifact {
-            classifier = if (Os.isArch("aarch64")) {
+            classifier = if (org.apache.tools.ant.taskdefs.condition.Os.isArch("aarch64")) {
                 "osx-aarch_64"
             } else {
                 "osx-x86_64"
@@ -100,8 +100,8 @@ dependencies {
     }
     testImplementation(libs.managed.netty.tcnative.boringssl.static) {
         artifact {
-            if (Os.isFamily("mac")) {
-                classifier = if (Os.isArch("aarch64")) {
+            if (org.apache.tools.ant.taskdefs.condition.Os.isFamily("mac")) {
+                classifier = if (org.apache.tools.ant.taskdefs.condition.Os.isArch("aarch64")) {
                     "osx-aarch_64"
                 } else {
                     "osx-x86_64"
@@ -123,12 +123,14 @@ dependencies {
         exclude(group = "io.micronaut")
     }
     testImplementation(libs.junit.jupiter.api)
+    testImplementation(libs.micronaut.test.netty.leak)
 }
 
 tasks.withType<Test>().configureEach {
     forkEvery = 100
     maxParallelForks = 4
     useJUnitPlatform()
+    systemProperty("junit.jupiter.extensions.autodetection.enabled", "true")
 }
 
 //tasks.withType(Test).configureEach {

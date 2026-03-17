@@ -16,7 +16,7 @@
 package io.micronaut.http.body.stream;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.http.body.ByteBody;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,8 +65,7 @@ abstract class ExtendedInputStream extends InputStream {
      * as allocating a new array, calling {@link #read(byte[])}, and then truncating the array, but
      * may be optimized in some implementations.
      */
-    @Nullable
-    public byte[] readSome() throws IOException {
+    public byte @Nullable [] readSome() throws IOException {
         byte[] arr = new byte[CHUNK_SIZE];
         int n = read(arr);
         if (n == -1) {

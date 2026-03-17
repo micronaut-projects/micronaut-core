@@ -21,13 +21,15 @@ import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
-import io.micronaut.inject.ast.PropertyElementQuery;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.PropertyElement;
+import io.micronaut.inject.ast.PropertyElementQuery;
+import org.jspecify.annotations.NullUnmarked;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -45,6 +47,7 @@ import java.util.function.Supplier;
  * @author Denis Stepanov
  * @since 4.0.0
  */
+@NullUnmarked
 @Internal
 public final class AstBeanPropertiesUtils {
 
@@ -73,7 +76,7 @@ public final class AstBeanPropertiesUtils {
                                                               Set<String> propertyFields,
                                                               Function<MethodElement, Optional<String>> customReaderPropertyNameResolver,
                                                               Function<MethodElement, Optional<String>> customWriterPropertyNameResolver,
-                                                              Function<BeanPropertyData, PropertyElement> propertyCreator) {
+                                                              Function<BeanPropertyData, @Nullable PropertyElement> propertyCreator) {
         BeanProperties.Visibility visibility = configuration.getVisibility();
         Set<BeanProperties.AccessKind> accessKinds = configuration.getAccessKinds();
 
@@ -293,7 +296,7 @@ public final class AstBeanPropertiesUtils {
         return setterType != null && !existingType.isAssignable(setterType) && !setterType.getName().equals(existingType.getName());
     }
 
-    private static ClassElement unwrapType(ClassElement type) {
+   private static ClassElement unwrapType(ClassElement type) {
         if (type.isOptional()) {
             return type.getOptionalValueType().orElse(type);
         }

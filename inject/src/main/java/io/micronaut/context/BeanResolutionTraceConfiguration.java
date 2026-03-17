@@ -15,7 +15,7 @@
  */
 package io.micronaut.context;
 
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.util.Set;
 
 /**

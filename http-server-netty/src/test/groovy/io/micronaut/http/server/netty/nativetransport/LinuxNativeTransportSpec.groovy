@@ -11,7 +11,7 @@ import spock.util.environment.OperatingSystem
 @Requires({ os.family == OperatingSystem.Family.LINUX })
 class LinuxNativeTransportSpec extends AbstractMicronautSpec {
 
-    void "test a basic request works with mac native transport"() {
+    void "test a basic request works with epoll"() {
         when:
         String body = httpClient.toBlocking().retrieve(HttpRequest.GET("/native-transport"))
 
@@ -25,6 +25,8 @@ class LinuxNativeTransportSpec extends AbstractMicronautSpec {
 
     @Override
     Map<String, Object> getConfiguration() {
-        super.getConfiguration() << ['micronaut.server.netty.use-native-transport': true, 'spec': 'TransportSpec']
+        super.getConfiguration() << [
+                'micronaut.server.netty.use-native-transport': true,
+                'spec': 'TransportSpec']
     }
 }

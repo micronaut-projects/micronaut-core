@@ -109,7 +109,7 @@ class UploadControllerSpec: StringSpec() {
             val embedded: Map<*, *> = response.getBody(Map::class.java).get().get("_embedded") as Map<*, *>
             val message = ((embedded.get("errors") as java.util.List<*>).get(0) as Map<*, *>).get("message")
 
-            message shouldBe "Cannot convert type [class io.micronaut.http.server.netty.MicronautHttpData\$AttributeImpl] to target type: interface io.micronaut.http.multipart.CompletedFileUpload. Considering defining a TypeConverter bean to handle this case."
+            message shouldBe "Field [file] was expected to be a file upload, but is missing a file name"
         }
 
         "test completed file upload with no filename and no bytes"() {
@@ -129,7 +129,7 @@ class UploadControllerSpec: StringSpec() {
             val embedded: Map<*, *> = response.getBody(Map::class.java).get().get("_embedded") as Map<*, *>
             val message = ((embedded.get("errors") as java.util.List<*>).get(0) as Map<*, *>).get("message")
 
-            message shouldBe "Cannot convert type [class io.micronaut.http.server.netty.MicronautHttpData\$AttributeImpl] to target type: interface io.micronaut.http.multipart.CompletedFileUpload. Considering defining a TypeConverter bean to handle this case."
+            message shouldBe "Field [file] was expected to be a file upload, but is missing a file name"
         }
 
         "test completed file upload with no part"() {

@@ -17,8 +17,6 @@ package io.micronaut.inject.inheritance
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
 import io.micronaut.inject.BeanDefinition
 import spock.lang.PendingFeature
 
@@ -52,17 +50,17 @@ abstract class Parent {
 
     @jakarta.inject.Inject
     void inject(Bean bean) {
-    
+
     }
-    
+
     @jakarta.inject.Inject
     public void injectPublic(Bean bean) {
-    
+
     }
-    
+
     @jakarta.inject.Inject
     public void injectNoOverride(Bean bean) {
-    
+
     }
 }
 
@@ -70,7 +68,7 @@ class Middle extends Parent {
 
     @jakarta.inject.Inject
     public void injectNoOverride(Bean bean) {
-    
+
     }
 }
 
@@ -79,16 +77,16 @@ class SubClass extends Middle {
 
     @Override
     void inject(Bean bean) {
-    
+
     }
-    
+
     @Override
     public void injectPublic(Bean bean) {
-    
+
     }
-    
+
     public void injectNoOverride(Bean bean) {
-    
+
     }
 }
 

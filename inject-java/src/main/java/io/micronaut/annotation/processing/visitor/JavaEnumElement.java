@@ -20,6 +20,7 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.EnumConstantElement;
 import io.micronaut.inject.ast.EnumElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
+import org.jspecify.annotations.Nullable;
 
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
@@ -28,6 +29,7 @@ import javax.lang.model.element.VariableElement;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Implements the {@link EnumElement} interface for Java.
@@ -38,18 +40,22 @@ import java.util.List;
 @Internal
 class JavaEnumElement extends JavaClassElement implements EnumElement {
 
+    @Nullable
     protected List<EnumConstantElement> enumConstants;
+    @Nullable
     protected List<String> values;
 
     /**
      * @param nativeElement The native element
      * @param annotationMetadataFactory The annotation metadata factory
      * @param visitorContext The visitor context
+     * @param doc The optional documentation
      */
     JavaEnumElement(JavaNativeElement.Class nativeElement,
                     ElementAnnotationMetadataFactory annotationMetadataFactory,
-                    JavaVisitorContext visitorContext) {
-        this(nativeElement, annotationMetadataFactory, visitorContext, 0);
+                    JavaVisitorContext visitorContext,
+                    @Nullable String doc) {
+        this(nativeElement, annotationMetadataFactory, visitorContext, 0, doc);
     }
 
     /**
@@ -57,17 +63,19 @@ class JavaEnumElement extends JavaClassElement implements EnumElement {
      * @param annotationMetadataFactory The annotation metadata factory
      * @param visitorContext The visitor context
      * @param arrayDimensions The number of array dimensions
+     * @param doc The optional documentation
      */
     JavaEnumElement(JavaNativeElement.Class nativeElement,
                     ElementAnnotationMetadataFactory annotationMetadataFactory,
                     JavaVisitorContext visitorContext,
-                    int arrayDimensions) {
-        super(nativeElement, annotationMetadataFactory, visitorContext, Collections.emptyList(), Collections.emptyMap(), arrayDimensions, false);
+                    int arrayDimensions,
+                    @Nullable String doc) {
+        super(nativeElement, annotationMetadataFactory, visitorContext, Collections.emptyList(), Collections.emptyMap(), arrayDimensions, false, doc);
     }
 
     @Override
     protected JavaClassElement copyThis() {
-        return new JavaEnumElement(getNativeType(), elementAnnotationMetadataFactory, visitorContext, arrayDimensions);
+        return new JavaEnumElement(getNativeType(), elementAnnotationMetadataFactory, visitorContext, arrayDimensions, doc);
     }
 
     @Override
@@ -76,7 +84,7 @@ class JavaEnumElement extends JavaClassElement implements EnumElement {
             return values;
         }
         initEnum();
-        return values;
+        return Objects.requireNonNull(values);
     }
 
     @Override
@@ -85,7 +93,7 @@ class JavaEnumElement extends JavaClassElement implements EnumElement {
             return enumConstants;
         }
         initEnum();
-        return enumConstants;
+        return Objects.requireNonNull(enumConstants);
     }
 
     private void initEnum() {
@@ -110,7 +118,7 @@ class JavaEnumElement extends JavaClassElement implements EnumElement {
 
     @Override
     public ClassElement withArrayDimensions(int arrayDimensions) {
-        return new JavaEnumElement(getNativeType(), elementAnnotationMetadataFactory, visitorContext, arrayDimensions);
+        return new JavaEnumElement(getNativeType(), elementAnnotationMetadataFactory, visitorContext, arrayDimensions, doc);
     }
 
 }

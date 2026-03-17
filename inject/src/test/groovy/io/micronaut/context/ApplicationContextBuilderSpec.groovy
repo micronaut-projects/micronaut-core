@@ -8,6 +8,20 @@ import spock.lang.Specification
 
 class ApplicationContextBuilderSpec extends Specification {
 
+    void "test start tracing"() {
+        when:
+        ApplicationContextBuilder builder = ApplicationContext.builder()
+        builder.bootstrapEnvironment(true)
+        builder.beanResolutionTrace(BeanResolutionTraceMode.LOG)
+        def context = builder.start()
+
+        then:
+        context != null
+
+        cleanup:
+        context.close()
+    }
+
     void "test configure() context"() {
         when:"a context is built"
         ApplicationContextBuilder builder = ApplicationContext.builder()

@@ -19,6 +19,7 @@ import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.exceptions.MessageBodyException;
+import org.jspecify.annotations.Nullable;
 
 import java.io.File;
 import java.io.IOException;
@@ -37,10 +38,12 @@ public class StreamedFile implements FileCustomizableResponseType {
     private static final char[] HEX_DIGITS = "0123456789ABCDEF".toCharArray();
 
     private final MediaType mediaType;
+    @Nullable
     private final String name;
     private final long lastModified;
     private final InputStream inputStream;
     private final long length;
+    @Nullable
     private String attachmentName;
 
     /**

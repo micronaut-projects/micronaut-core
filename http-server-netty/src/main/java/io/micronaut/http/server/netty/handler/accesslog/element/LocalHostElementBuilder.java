@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.server.netty.handler.accesslog.element;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * Builder for LocalHostElement.
  *
@@ -24,7 +26,8 @@ package io.micronaut.http.server.netty.handler.accesslog.element;
 public final class LocalHostElementBuilder implements LogElementBuilder {
 
     @Override
-    public LogElement build(String token, String param) {
+    @Nullable
+    public LogElement build(String token, @Nullable String param) {
         if (LocalHostElement.LOCAL_HOST.equals(token)) {
             return LocalHostElement.INSTANCE;
         }

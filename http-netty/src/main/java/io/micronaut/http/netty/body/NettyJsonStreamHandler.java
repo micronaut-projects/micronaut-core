@@ -33,6 +33,7 @@ import io.micronaut.json.body.CustomizableJsonHandler;
 import io.micronaut.json.body.JsonMessageHandler;
 import io.netty.buffer.ByteBuf;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
@@ -68,12 +69,12 @@ public final class NettyJsonStreamHandler<T> implements MessageBodyHandler<T>, C
     }
 
     @Override
-    public boolean isReadable(Argument<T> type, MediaType mediaType) {
-        return mediaType.matches(MediaType.APPLICATION_JSON_STREAM_TYPE);
+    public boolean isReadable(Argument<T> type, @Nullable MediaType mediaType) {
+        return mediaType != null && mediaType.matches(MediaType.APPLICATION_JSON_STREAM_TYPE);
     }
 
     @Override
-    public T read(Argument<T> type, MediaType mediaType, Headers httpHeaders, ByteBuffer<?> byteBuffer) throws CodecException {
+    public T read(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, ByteBuffer<?> byteBuffer) throws CodecException {
         if (!type.getType().isAssignableFrom(List.class)) {
             throw new IllegalArgumentException("Can only read json-stream to a Publisher or list type");
         }
@@ -82,12 +83,12 @@ public final class NettyJsonStreamHandler<T> implements MessageBodyHandler<T>, C
     }
 
     @Override
-    public T read(Argument<T> type, MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
+    public T read(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
         throw new UnsupportedOperationException("Reading from InputStream is not supported for json-stream");
     }
 
     @Override
-    public Flux<T> readChunked(Argument<T> type, MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
+    public Flux<T> readChunked(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
         JsonChunkedProcessor processor = new JsonChunkedProcessor();
         return processor.process(Flux.from(input).map(bb -> {
             if (!(bb.asNativeBuffer() instanceof ByteBuf buf)) {

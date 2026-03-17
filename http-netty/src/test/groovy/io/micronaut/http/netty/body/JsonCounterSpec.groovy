@@ -1,8 +1,8 @@
 package io.micronaut.http.netty.body
 
-import com.fasterxml.jackson.core.JsonFactory
-import com.fasterxml.jackson.core.JsonParser
-import com.fasterxml.jackson.core.JsonToken
+import tools.jackson.core.json.JsonFactory
+import tools.jackson.core.JsonParser
+import tools.jackson.core.JsonToken
 import io.micronaut.json.JsonSyntaxException
 import io.netty.buffer.ByteBufUtil
 import io.netty.buffer.Unpooled

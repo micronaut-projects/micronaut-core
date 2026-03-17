@@ -18,16 +18,15 @@ package io.micronaut.context.env.yaml
 import io.micronaut.context.ApplicationContextConfiguration
 import io.micronaut.context.env.DefaultEnvironment
 import io.micronaut.context.env.Environment
-import io.micronaut.context.env.PropertySourceLoader
-import io.micronaut.core.io.service.ServiceDefinition
-import io.micronaut.core.io.service.SoftServiceLoader
+import io.micronaut.core.io.ResourceLoader
+import io.micronaut.core.io.scan.ClassPathResourceLoader
 import spock.lang.Specification
 
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
-
+import java.util.stream.Stream
 /**
  * not limited by groovy version
  */
@@ -35,35 +34,54 @@ class YamlPropertySourceLoaderSpec2 extends Specification {
 
     void "test yaml value conversion"(String literal, Class<?> type, Object expected) {
         given:
-        def serviceDefinition = Mock(ServiceDefinition)
-        serviceDefinition.isPresent() >> true
-        serviceDefinition.load() >> new YamlPropertySourceLoader()
-
+        GroovyClassLoader gcl = new GroovyClassLoader()
+        gcl.addURL(YamlPropertySourceLoader.getResource("/META-INF/services/io.micronaut.context.env.PropertySourceLoader"))
         Environment env = new DefaultEnvironment(new ApplicationContextConfiguration() {
             @Override
             List<String> getEnvironments() {
-                return ['test']
-            }
-        }) {
-            @Override
-            protected SoftServiceLoader<PropertySourceLoader> readPropertySourceLoaders() {
-                GroovyClassLoader gcl = new GroovyClassLoader()
-                gcl.addURL(YamlPropertySourceLoader.getResource("/META-INF/services/io.micronaut.context.env.PropertySourceLoader"))
-                return new SoftServiceLoader<PropertySourceLoader>(PropertySourceLoader, gcl)
+                return ["test"]
             }
 
             @Override
-            Optional<InputStream> getResourceAsStream(String path) {
-                if (path.endsWith("application.yml")) {
-                    return Optional.of(new ByteArrayInputStream("""\
+            ClassLoader getClassLoader() {
+                return gcl
+            }
+
+            @Override
+            ClassPathResourceLoader getResourceLoader() {
+                return new ClassPathResourceLoader() {
+                    @Override
+                    ClassLoader getClassLoader() {
+                        return gcl
+                    }
+
+                    @Override
+                    Optional<InputStream> getResourceAsStream(String path) {
+                        if (path.endsWith("application.yml")) {
+                            return Optional.of(new ByteArrayInputStream("""\
 foo: $literal
 """.bytes))
+                        }
+                        return Optional.empty()
+                    }
+
+                    @Override
+                    Optional<URL> getResource(String path) {
+                        return Optional.empty()
+                    }
+
+                    @Override
+                    Stream<URL> getResources(String name) {
+                        return Stream.empty()
+                    }
+
+                    @Override
+                    ResourceLoader forBase(String basePath) {
+                        return this
+                    }
                 }
-
-                return Optional.empty()
             }
-
-        }
+        })
 
 
         when:

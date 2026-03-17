@@ -440,4 +440,51 @@ enum Test {
         config.getAnnotations("methods").size() == 2 // Two methods from Enum
 
     }
+
+    void "test dynamic proxy"() {
+        given:
+            GraalReflectionConfigurer configurer = buildReflectionConfigurer('test.Foobar', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+
+@TypeHint(value = Bar.class, accessType = TypeHint.AccessType.DYNAMIC_PROXY)
+class Foobar {
+}
+
+interface Bar {
+}
+
+''')
+
+        when:
+            AnnotationValue<ReflectionConfig> config = configurer.getAnnotationMetadata().getAnnotationValuesByType(ReflectionConfig).first()
+
+        then:
+            config
+            config.stringValue("type").get() == 'test.Bar'
+            config.enumValues("accessType", TypeHint.AccessType) == [TypeHint.AccessType.DYNAMIC_PROXY] as TypeHint.AccessType[]
+    }
+
+    void "test dynamic proxy 2"() {
+        given:
+            GraalReflectionConfigurer configurer = buildReflectionConfigurer('test.Foobar', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+
+@TypeHint(accessType = TypeHint.AccessType.DYNAMIC_PROXY)
+interface Foobar {
+}
+
+''')
+
+        when:
+            AnnotationValue<ReflectionConfig> config = configurer.getAnnotationMetadata().getAnnotationValuesByType(ReflectionConfig).first()
+
+        then:
+            config
+            config.stringValue("type").get() == 'test.Foobar'
+            config.enumValues("accessType", TypeHint.AccessType) == [TypeHint.AccessType.DYNAMIC_PROXY] as TypeHint.AccessType[]
+    }
 }

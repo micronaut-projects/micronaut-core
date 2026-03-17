@@ -26,7 +26,7 @@ class MyConfigurationPropertiesSpec : AnnotationSpec() {
 
     @AfterEach
     fun teardown() {
-        ctx.close()
+        ctx?.close()
     }
     //end::runContext[]
 
@@ -35,7 +35,7 @@ class MyConfigurationPropertiesSpec : AnnotationSpec() {
         val props = ctx.getBean(MyConfigurationProperties::class.java)
 
         val expectedDate = LocalDate.of(1982, 10, 28)
-        expectedDate shouldBe props.updatedAt
+        props.updatedAt shouldBe expectedDate
     }
 }
 //end::configSpec[]

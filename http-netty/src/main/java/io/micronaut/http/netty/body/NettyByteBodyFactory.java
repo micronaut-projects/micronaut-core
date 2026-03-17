@@ -16,25 +16,28 @@
 package io.micronaut.http.netty.body;
 
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
+import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.io.buffer.ByteBuffer;
-import io.micronaut.core.util.functional.ThrowingConsumer;
+import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.http.body.AbstractBodyAdapter;
+import io.micronaut.http.body.AvailableByteBody;
+import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableAvailableByteBody;
+import io.micronaut.http.body.CloseableByteBody;
+import io.micronaut.http.body.stream.AvailableByteArrayBody;
+import io.micronaut.http.body.stream.BodySizeLimits;
+import io.micronaut.http.body.stream.BufferConsumer;
+import io.micronaut.http.netty.NettyHttpHeaders;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
-import io.netty.buffer.ByteBufOutputStream;
-import io.netty.buffer.ByteBufUtil;
-import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
-
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.nio.CharBuffer;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
+import io.netty.channel.EventLoop;
+import io.netty.handler.codec.http.HttpHeaders;
+import org.jspecify.annotations.Nullable;
+import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 
 /**
  * {@link ByteBodyFactory} implementation with netty-optimized bodies.
@@ -44,80 +47,80 @@ import java.nio.charset.StandardCharsets;
  */
 @Internal
 public final class NettyByteBodyFactory extends ByteBodyFactory {
-    public NettyByteBodyFactory(@NonNull Channel channel) {
-        // note: atm we only use the alloc from the channel, but in the future we might also use
-        // the event loop for streaming bodies. Please design use sites to have a channel
-        // available, and don't create a constructor that just takes the alloc :)
-        super(new NettyByteBufferFactory(channel.alloc()));
+    private final EventLoop loop;
+
+    public NettyByteBodyFactory(Channel channel) {
+        this(channel.alloc(), channel.eventLoop());
     }
 
-    private ByteBufAllocator alloc() {
-        return (ByteBufAllocator) byteBufferFactory().getNativeAllocator();
+    NettyByteBodyFactory(ByteBufAllocator alloc, EventLoop loop) {
+        super(new NettyByteBufferFactory(alloc), NettyReadBufferFactory.of(alloc));
+        this.loop = loop;
     }
 
     @Override
-    public @NonNull CloseableAvailableByteBody adapt(@NonNull ByteBuffer<?> buffer) {
-        if (buffer.asNativeBuffer() instanceof ByteBuf bb) {
-            return new AvailableNettyByteBody(bb);
+    public NettyReadBufferFactory readBufferFactory() {
+        return (NettyReadBufferFactory) super.readBufferFactory();
+    }
+
+    @Override
+    public StreamingBody createStreamingBody(BodySizeLimits limits, BufferConsumer.Upstream upstream) {
+        StreamingNettyByteBody.SharedBuffer sb = createStreamingBuffer(limits, upstream);
+        return new StreamingBody(sb, new StreamingNettyByteBody(sb));
+    }
+
+    @Override
+    protected AbstractBodyAdapter createBodyAdapter(Publisher<ReadBuffer> publisher, @Nullable Runnable onDiscard) {
+        return new NettyBodyAdapter(loop, publisher, onDiscard);
+    }
+
+    public CloseableAvailableByteBody adapt(ByteBuf byteBuf) {
+        return adapt(readBufferFactory().adapt(byteBuf));
+    }
+
+    public CloseableByteBody createChecked(BodySizeLimits bodySizeLimits, ByteBuf buf) {
+        return createChecked(bodySizeLimits, readBufferFactory().adapt(buf));
+    }
+
+    public CloseableByteBody adaptNetty(Publisher<ByteBuf> publisher) {
+        return adapt(publisher, null, null);
+    }
+
+    public CloseableByteBody adapt(Publisher<ByteBuf> publisher, @Nullable HttpHeaders headersForLength, @Nullable Runnable onDiscard) {
+        return adapt(
+            Flux.from(publisher).map(readBufferFactory()::adapt),
+            BodySizeLimits.UNLIMITED, headersForLength == null ? null : new NettyHttpHeaders(headersForLength, ConversionService.SHARED),
+            onDiscard);
+    }
+
+    public static CloseableAvailableByteBody empty() {
+        return AvailableByteArrayBody.create(NettyReadBufferFactory.of(ByteBufAllocator.DEFAULT).createEmpty());
+    }
+
+    public static ByteBuf toByteBuf(AvailableByteBody body) {
+        try (ReadBuffer rb = body.toReadBuffer()) {
+            return NettyReadBufferFactory.toByteBuf(rb);
         }
-        return super.adapt(buffer);
+    }
+
+    public static Flux<ByteBuf> toByteBufs(ByteBody body) {
+        return Flux.from(body.toReadBufferPublisher())
+            .map(NettyReadBufferFactory::toByteBuf);
+    }
+
+    public StreamingNettyByteBody.SharedBuffer createStreamingBuffer(BodySizeLimits limits, BufferConsumer.Upstream rootUpstream) {
+        return new StreamingNettyByteBody.SharedBuffer(loop, this, limits, rootUpstream);
     }
 
     @Override
-    public @NonNull CloseableAvailableByteBody adapt(byte @NonNull [] array) {
-        return new AvailableNettyByteBody(Unpooled.wrappedBuffer(array));
-    }
-
-    @Override
-    public @NonNull <T extends Throwable> CloseableAvailableByteBody buffer(@NonNull ThrowingConsumer<? super OutputStream, T> writer) throws T {
-        ByteBuf buf = alloc().buffer();
-        boolean release = true;
-        try {
-            ByteBufOutputStream s = new ByteBufOutputStream(buf);
-            writer.accept(s);
-            try {
-                s.close();
-            } catch (IOException e) {
-                throw new IllegalStateException("Failed to close buffer stream", e);
-            }
-            release = false;
-            return new AvailableNettyByteBody(buf);
-        } finally {
-            if (release) {
-                buf.release();
-            }
+    public StreamingNettyByteBody toStreaming(ByteBody body) {
+        if (body instanceof StreamingNettyByteBody snbb && snbb.isCompatible(loop)) {
+            return snbb;
         }
-    }
-
-    @Override
-    public @NonNull CloseableAvailableByteBody createEmpty() {
-        return AvailableNettyByteBody.empty();
-    }
-
-    @Override
-    public @NonNull CloseableAvailableByteBody copyOf(@NonNull CharSequence cs, @NonNull Charset charset) {
-        ByteBuf byteBuf = charset == StandardCharsets.UTF_8 ?
-            ByteBufUtil.writeUtf8(alloc(), cs) :
-            ByteBufUtil.encodeString(alloc(), CharBuffer.wrap(cs), charset);
-        return new AvailableNettyByteBody(byteBuf);
-    }
-
-    @Override
-    public @NonNull CloseableAvailableByteBody copyOf(@NonNull InputStream stream) throws IOException {
-        ByteBuf buffer = alloc().buffer();
-        boolean free = true;
-        try {
-            while (true) {
-                if (buffer.writeBytes(stream, 4096) == -1) {
-                    break;
-                }
-            }
-            free = false;
-            return new AvailableNettyByteBody(buffer);
-        } finally {
-            if (free) {
-                buffer.release();
-            }
-        }
+        NettyBodyAdapter adapter = new NettyBodyAdapter(loop, body.toReadBufferPublisher(), null);
+        StreamingNettyByteBody.SharedBuffer sb = createStreamingBuffer(BodySizeLimits.UNLIMITED, adapter);
+        adapter.setSharedBuffer(sb);
+        body.expectedLength().ifPresent(sb::setExpectedLength);
+        return new StreamingNettyByteBody(sb);
     }
 }

@@ -1,34 +1,44 @@
 package io.micronaut.docs.client.upload
 
-// tag::imports[]
 import io.micronaut.context.ApplicationContext
+
+// tag::imports[]
+
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
+import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.annotation.Produces
 import io.micronaut.http.client.HttpClient
+import io.micronaut.http.client.multipart.MultipartBody
+import io.micronaut.http.multipart.CompletedFileUpload
+import io.micronaut.http.multipart.StreamingFileUpload
 import io.micronaut.runtime.server.EmbeddedServer
+
 // end::imports[]
 
 // tag::multipartBodyImports[]
-import io.micronaut.http.multipart.CompletedFileUpload
-import io.micronaut.http.multipart.StreamingFileUpload
-import io.micronaut.http.client.multipart.MultipartBody
+
+import io.micronaut.scheduling.TaskExecutors
+import io.micronaut.scheduling.annotation.ExecuteOn
 import org.reactivestreams.Publisher
+
 // end::multipartBodyImports[]
 
 // tag::controllerImports[]
-import io.micronaut.http.annotation.Controller
+
 import reactor.core.publisher.Flux
+import spock.lang.AutoCleanup
 
 // end::controllerImports[]
 
 // tag::spockImports[]
-import spock.lang.AutoCleanup
+
 import spock.lang.Shared
 import spock.lang.Specification
+
 // end::spockImports[]
 
 // tag::class[]
@@ -235,10 +245,12 @@ class MultipartFileUploadSpec extends Specification {
         }
 
         @Post(value = '/complete-file-upload', consumes = MediaType.MULTIPART_FORM_DATA)
+        @ExecuteOn(TaskExecutors.BLOCKING)
         Publisher<HttpResponse> completeFileUpload(CompletedFileUpload data, String title) {
             File newFile = new File(uploadDir, title + ".txt")
             newFile.createNewFile()
             newFile.append(data.inputStream)
+            data.close()
             return Flux.just(HttpResponse.ok("Uploaded ${newFile.length()} bytes. File size: $data.size"))
         }
 

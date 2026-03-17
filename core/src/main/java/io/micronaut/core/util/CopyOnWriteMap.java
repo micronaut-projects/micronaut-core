@@ -15,9 +15,10 @@
  */
 package io.micronaut.core.util;
 
-import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-
+import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.NextMajorVersion;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.util.AbstractMap;
 import java.util.AbstractSet;
 import java.util.BitSet;
@@ -39,7 +40,7 @@ import java.util.function.Function;
  * @param <K> The key type
  * @param <V> The value type
  */
-@Internal
+@Experimental
 public final class CopyOnWriteMap<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V> {
     /**
      * How many items to evict at a time, to make eviction a bit more efficient.
@@ -50,55 +51,92 @@ public final class CopyOnWriteMap<K, V> extends AbstractMap<K, V> implements Con
      */
     @SuppressWarnings("rawtypes")
     private static final Map EMPTY = new HashMap();
+    private static final VarHandle ACTUAL_HANDLE;
 
     private final int maxSizeWithEvictionMargin;
-    @SuppressWarnings("unchecked")
-    private volatile Map<? extends K, ? extends V> actual = EMPTY;
 
+    @SuppressWarnings("unused")
+    private Map<? extends K, ? extends V> actualField = EMPTY;
+
+    static {
+        try {
+            ACTUAL_HANDLE = MethodHandles.lookup().findVarHandle(CopyOnWriteMap.class, "actualField", Map.class);
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            throw new AssertionError("Field should be present", e);
+        }
+    }
+
+    /**
+     * @param maxSize The maximum size of this map
+     * @deprecated Use {@link #create(int)}
+     */
+    @Deprecated(forRemoval = true)
+    @NextMajorVersion("Used by validation, remove when ready")
     public CopyOnWriteMap(int maxSize) {
         int maxSizeWithEvictionMargin = maxSize + EVICTION_BATCH;
         if (maxSizeWithEvictionMargin < 0) {
             maxSizeWithEvictionMargin = Integer.MAX_VALUE;
         }
         this.maxSizeWithEvictionMargin = maxSizeWithEvictionMargin;
+        actual(EMPTY);
     }
 
-    @NonNull
+    /**
+     * Create a new COW map.
+     *
+     * @param maxSize The maximum size of the map, when arbitrary items should be evicted
+     * @return The map
+     * @param <K> The key type
+     * @param <V> The value type
+     */
+    public static <K, V> ConcurrentMap<K, V> create(int maxSize) {
+        return new CopyOnWriteMap<>(maxSize);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<? extends K, ? extends V> actual() {
+        return (Map<? extends K, ? extends V>) ACTUAL_HANDLE.getAcquire(this);
+    }
+
+    private void actual(Map<? extends K, ? extends V> map) {
+        ACTUAL_HANDLE.setRelease(this, map);
+    }
+
     @Override
     public Set<Entry<K, V>> entrySet() {
         return new EntrySet();
     }
 
     @Override
-    public V get(Object key) {
-        return actual.get(key);
+    public @org.jspecify.annotations.Nullable V get(Object key) {
+        return actual().get(key);
     }
 
     @SuppressWarnings("unchecked")
     @Override
     public V getOrDefault(Object key, V defaultValue) {
-        return ((Map<K, V>) actual).getOrDefault(key, defaultValue);
+        return ((Map<K, V>) actual()).getOrDefault(key, defaultValue);
     }
 
     @Override
     public boolean containsKey(Object key) {
-        return actual.containsKey(key);
+        return actual().containsKey(key);
     }
 
     @Override
     public boolean containsValue(Object value) {
-        return actual.containsValue(value);
+        return actual().containsValue(value);
     }
 
     @Override
     public int size() {
-        return actual.size();
+        return actual().size();
     }
 
     @SuppressWarnings("unchecked")
     @Override
     public synchronized void clear() {
-        actual = EMPTY;
+        actual(EMPTY);
     }
 
     @Override
@@ -116,33 +154,33 @@ public final class CopyOnWriteMap<K, V> extends AbstractMap<K, V> implements Con
 
     @Override
     public int hashCode() {
-        return actual.hashCode();
+        return actual().hashCode();
     }
 
     @SuppressWarnings("EqualsWhichDoesntCheckParameterClass")
     @Override
     public boolean equals(Object o) {
-        return actual.equals(o);
+        return actual().equals(o);
     }
 
     @Override
     public String toString() {
-        return actual.toString();
+        return actual().toString();
     }
 
     @Override
     public void forEach(BiConsumer<? super K, ? super V> action) {
-        actual.forEach(action);
+        actual().forEach(action);
     }
 
     private synchronized <R> R update(Function<Map<K, V>, R> updater) {
-        Map<K, V> next = new HashMap<>(actual);
+        Map<K, V> next = new HashMap<>(actual());
         R ret = updater.apply(next);
         int newSize = next.size();
         if (newSize >= maxSizeWithEvictionMargin) {
             evict(next, EVICTION_BATCH);
         }
-        actual = next;
+        actual(next);
         return ret;
     }
 
@@ -207,12 +245,12 @@ public final class CopyOnWriteMap<K, V> extends AbstractMap<K, V> implements Con
     }
 
     @Override
-    public boolean remove(@NonNull Object key, Object value) {
+    public boolean remove(Object key, Object value) {
         return update(m -> m.remove(key, value));
     }
 
     @Override
-    public boolean replace(@NonNull K key, @NonNull V oldValue, @NonNull V newValue) {
+    public boolean replace(K key, V oldValue, V newValue) {
         return update(m -> m.replace(key, oldValue, newValue));
     }
 
@@ -225,7 +263,7 @@ public final class CopyOnWriteMap<K, V> extends AbstractMap<K, V> implements Con
     }
 
     @Override
-    public V computeIfAbsent(K key, @NonNull Function<? super K, ? extends V> mappingFunction) {
+    public V computeIfAbsent(K key, Function<? super K, ? extends V> mappingFunction) {
         V present = get(key);
         if (present != null) {
             // fast path without sync
@@ -236,33 +274,33 @@ public final class CopyOnWriteMap<K, V> extends AbstractMap<K, V> implements Con
     }
 
     @Override
-    public V computeIfPresent(K key, @NonNull BiFunction<? super K, ? super V, ? extends V> remappingFunction) {
+    public V computeIfPresent(K key, BiFunction<? super K, ? super V, ? extends V> remappingFunction) {
         return update(m -> m.computeIfPresent(key, remappingFunction));
     }
 
     @Override
-    public V compute(K key, @NonNull BiFunction<? super K, ? super V, ? extends V> remappingFunction) {
+    public V compute(K key, BiFunction<? super K, ? super V, ? extends V> remappingFunction) {
         return update(m -> m.compute(key, remappingFunction));
     }
 
     @Override
-    public V merge(K key, @NonNull V value, @NonNull BiFunction<? super V, ? super V, ? extends V> remappingFunction) {
+    public V merge(K key, V value, BiFunction<? super V, ? super V, ? extends V> remappingFunction) {
         return update(m -> m.merge(key, value, remappingFunction));
     }
 
     @Override
-    public V putIfAbsent(@NonNull K key, V value) {
+    public V putIfAbsent(K key, V value) {
         return update(m -> m.putIfAbsent(key, value));
     }
 
     @Override
-    public V replace(@NonNull K key, @NonNull V value) {
+    public V replace(K key, V value) {
         return update(m -> m.replace(key, value));
     }
 
-    private class EntrySetIterator implements Iterator<Entry<K, V>> {
-        final Iterator<? extends Entry<? extends K, ? extends V>> itr = actual.entrySet().iterator();
-        K lastKey;
+    private final class EntrySetIterator implements Iterator<Entry<K, V>> {
+        final Iterator<? extends Entry<? extends K, ? extends V>> itr = actual().entrySet().iterator();
+        @org.jspecify.annotations.Nullable K lastKey;
 
         @Override
         public boolean hasNext() {
@@ -278,7 +316,9 @@ public final class CopyOnWriteMap<K, V> extends AbstractMap<K, V> implements Con
 
         @Override
         public void remove() {
-            CopyOnWriteMap.this.remove(lastKey);
+            if (lastKey != null) {
+                CopyOnWriteMap.this.remove(lastKey);
+            }
         }
     }
 
@@ -305,7 +345,7 @@ public final class CopyOnWriteMap<K, V> extends AbstractMap<K, V> implements Con
         }
     }
 
-    private class EntrySet extends AbstractSet<Entry<K, V>> {
+    private final class EntrySet extends AbstractSet<Entry<K, V>> {
         @Override
         public Iterator<Entry<K, V>> iterator() {
             return new EntrySetIterator();
@@ -313,7 +353,7 @@ public final class CopyOnWriteMap<K, V> extends AbstractMap<K, V> implements Con
 
         @Override
         public int size() {
-            return actual.size();
+            return actual().size();
         }
     }
 }

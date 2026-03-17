@@ -45,14 +45,14 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  *     filters, it is processed by the upstream response filters. Any response filter that does not
  *     declare a {@link Throwable} parameter of a matching type is skipped. If instead there is no
  *     downstream error, those response filters <i>with</i> a {@link Throwable} parameter are
- *     skipped, unless the parameter is {@link io.micronaut.core.annotation.Nullable}. <b>Note that
+ *     skipped, unless the parameter is {@link org.jspecify.annotations.Nullable}. <b>Note that
  *     for server filter execution, exceptions are transformed into non-exceptional responses with
  *     an error status code, between each filter.</b></li>
  *     <li>A {@code @}{@link Header}, {@code @}{@link QueryValue} or {@code @}{@link CookieValue}
  *     parameter</li>
  *     <li>A {@link io.micronaut.core.propagation.MutablePropagatedContext} to modify the propagated context</li>
  *     <li>A RouteMatch or RouteInfo of the route that handled this request. Note: Unless the parameter is
- *     marked as {@link io.micronaut.core.annotation.Nullable}, the filter method will <b>not</b>
+ *     marked as {@link org.jspecify.annotations.Nullable}, the filter method will <b>not</b>
  *     match for requests that do not match a route (e.g. static resources). This parameter is only
  *     supported on the server.</li>
  * </ul>

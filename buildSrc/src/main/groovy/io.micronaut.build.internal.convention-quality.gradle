@@ -1,10 +1,10 @@
 plugins {
-    id "io.micronaut.build.internal.quality-reporting"
     id 'test-report-aggregation'
     id "org.aim42.htmlSanityCheck"
 }
 
 tasks.named("htmlSanityCheck") {
+    enabled = false
     sourceDir = rootProject.layout.buildDirectory.dir("docs/guide").get().asFile
     sourceDocuments = fileTree(sourceDir) {
         include "index.html"

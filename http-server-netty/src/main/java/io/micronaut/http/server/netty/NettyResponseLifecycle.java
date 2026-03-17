@@ -15,35 +15,30 @@
  */
 package io.micronaut.http.server.netty;
 
+import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.async.subscriber.LazySendingSubscriber;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.ByteBodyHttpResponseWrapper;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.ConcatenatingSubscriber;
-import io.micronaut.http.body.stream.BodySizeLimits;
+import io.micronaut.http.body.stream.BufferConsumer;
 import io.micronaut.http.netty.EventLoopFlow;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
-import io.micronaut.http.netty.body.AvailableNettyByteBody;
-import io.micronaut.http.netty.body.ByteBufConsumer;
-import io.micronaut.http.netty.body.NettyBodyAdapter;
-import io.micronaut.http.netty.body.NettyByteBody;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.netty.body.StreamingNettyByteBody;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.micronaut.http.server.ResponseLifecycle;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
-import io.netty.channel.EventLoop;
+import io.netty.buffer.ByteBufAllocator;
 import io.netty.handler.codec.http.HttpContent;
+import io.netty.util.LeakPresenceDetector;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
-import java.nio.charset.StandardCharsets;
 import java.util.concurrent.Executor;
 
 /**
@@ -78,7 +73,7 @@ final class NettyResponseLifecycle extends ResponseLifecycle {
             io.netty.handler.codec.http.HttpResponse nettyResponse = builder.toHttpResponse();
             if (nettyResponse instanceof StreamedHttpResponse streamed) {
                 return LazySendingSubscriber.create(streamed).map(contents -> {
-                    CloseableByteBody body = NettyBodyAdapter.adapt(Flux.from(contents).map(HttpContent::content), eventLoop());
+                    CloseableByteBody body = byteBodyFactory().adapt(Flux.from(contents).map(HttpContent::content), null, null);
                     return ByteBodyHttpResponseWrapper.wrap(response, body);
                 }).onErrorResume(e -> (ExecutionFlow) handleStreamingError(request, e));
             }
@@ -87,103 +82,55 @@ final class NettyResponseLifecycle extends ResponseLifecycle {
         return super.encodeNoBody(response);
     }
 
-    private EventLoop eventLoop() {
-        return request.getChannelHandlerContext().channel().eventLoop();
+    private NettyByteBodyFactory byteBodyFactory() {
+        return new NettyByteBodyFactory(request.getChannelHandlerContext().channel());
     }
 
     @Override
-    protected @NonNull CloseableByteBody concatenate(Publisher<ByteBody> items) {
-        return NettyConcatenatingSubscriber.concatenate(eventLoop(), items);
+    protected CloseableByteBody concatenate(Publisher<ByteBody> items) {
+        return NettyConcatenatingSubscriber.concatenate(byteBodyFactory(), ConcatenatingSubscriber.Separators.NONE, items);
     }
 
     @Override
-    protected @NonNull CloseableByteBody concatenateJson(Publisher<ByteBody> items) {
-        return JsonNettyConcatenatingSubscriber.concatenateJson(eventLoop(), items);
+    protected CloseableByteBody concatenateJson(Publisher<ByteBody> items) {
+        return NettyConcatenatingSubscriber.concatenate(byteBodyFactory(), NettyConcatenatingSubscriber.JSON_NETTY, items);
     }
 
-    private static class NettyConcatenatingSubscriber extends ConcatenatingSubscriber implements ByteBufConsumer {
-        final StreamingNettyByteBody.SharedBuffer sharedBuffer;
-        private final EventLoop eventLoop;
+    private static class NettyConcatenatingSubscriber extends ConcatenatingSubscriber implements BufferConsumer {
+        static final Separators JSON_NETTY = LeakPresenceDetector.staticInitializer(() -> Separators.jsonSeparators(NettyReadBufferFactory.of(ByteBufAllocator.DEFAULT)));
+
         private final EventLoopFlow flow;
 
-        NettyConcatenatingSubscriber(EventLoop eventLoop) {
-            this.eventLoop = eventLoop;
-            this.flow = new EventLoopFlow(eventLoop);
-            sharedBuffer = new StreamingNettyByteBody.SharedBuffer(eventLoop, BodySizeLimits.UNLIMITED, this);
+        NettyConcatenatingSubscriber(NettyByteBodyFactory byteBodyFactory, Separators separators) {
+            super(byteBodyFactory, separators);
+            this.flow = new EventLoopFlow(((StreamingNettyByteBody.SharedBuffer) sharedBuffer).eventLoop());
         }
 
-        static CloseableByteBody concatenate(EventLoop eventLoop, Publisher<ByteBody> publisher) {
-            NettyConcatenatingSubscriber subscriber = new NettyConcatenatingSubscriber(eventLoop);
+        static CloseableByteBody concatenate(NettyByteBodyFactory byteBodyFactory, Separators separators, Publisher<ByteBody> publisher) {
+            NettyConcatenatingSubscriber subscriber = new NettyConcatenatingSubscriber(byteBodyFactory, separators);
             publisher.subscribe(subscriber);
-            return new StreamingNettyByteBody(subscriber.sharedBuffer);
+            return subscriber.rootBody;
         }
 
         @Override
-        protected Upstream forward(ByteBody body) {
-            NettyByteBody adapted = NettyBodyAdapter.adapt(body, eventLoop);
-            if (adapted instanceof StreamingNettyByteBody streaming) {
-                return streaming.primary(this);
-            } else {
-                add(AvailableNettyByteBody.toByteBuf((AvailableNettyByteBody) adapted));
-                complete();
-                return null;
-            }
-        }
-
-        @Override
-        public void add(@NonNull ByteBuf buffer) {
-            int n = buffer.readableBytes();
-            onForward(n);
-            add0(buffer);
-        }
-
-        void add0(@NonNull ByteBuf buffer) {
-            if (flow.executeNow(() -> sharedBuffer.add(buffer))) {
-                sharedBuffer.add(buffer);
+        public void add(ReadBuffer buffer) {
+            if (flow.executeNow(() -> super.add(buffer))) {
+                super.add(buffer);
             }
         }
 
         @Override
         protected void forwardComplete() {
-            if (flow.executeNow(sharedBuffer::complete)) {
-                sharedBuffer.complete();
+            if (flow.executeNow(super::forwardComplete)) {
+                super.forwardComplete();
             }
         }
 
         @Override
         protected void forwardError(Throwable t) {
-            if (flow.executeNow(() -> sharedBuffer.error(t))) {
-                sharedBuffer.error(t);
+            if (flow.executeNow(() -> super.forwardError(t))) {
+                super.forwardError(t);
             }
-        }
-    }
-
-    private static final class JsonNettyConcatenatingSubscriber extends NettyConcatenatingSubscriber {
-        private static final ByteBuf START_ARRAY = Unpooled.unreleasableBuffer(Unpooled.copiedBuffer("[", StandardCharsets.UTF_8)).asReadOnly();
-        private static final ByteBuf END_ARRAY = Unpooled.unreleasableBuffer(Unpooled.copiedBuffer("]", StandardCharsets.UTF_8)).asReadOnly();
-        private static final ByteBuf SEPARATOR = Unpooled.unreleasableBuffer(Unpooled.copiedBuffer(",", StandardCharsets.UTF_8)).asReadOnly();
-        private static final ByteBuf EMPTY_ARRAY = Unpooled.unreleasableBuffer(Unpooled.copiedBuffer("[]", StandardCharsets.UTF_8)).asReadOnly();
-
-        JsonNettyConcatenatingSubscriber(EventLoop eventLoop) {
-            super(eventLoop);
-        }
-
-        static CloseableByteBody concatenateJson(EventLoop eventLoop, Publisher<ByteBody> publisher) {
-            JsonNettyConcatenatingSubscriber subscriber = new JsonNettyConcatenatingSubscriber(eventLoop);
-            publisher.subscribe(subscriber);
-            return new StreamingNettyByteBody(subscriber.sharedBuffer);
-        }
-
-        @Override
-        protected long emitLeadingSeparator(boolean first) {
-            add0((first ? START_ARRAY : SEPARATOR).duplicate());
-            return 1;
-        }
-
-        @Override
-        protected long emitFinalSeparator(boolean first) {
-            add0((first ? EMPTY_ARRAY : END_ARRAY).duplicate());
-            return first ? 2 : 1;
         }
     }
 }

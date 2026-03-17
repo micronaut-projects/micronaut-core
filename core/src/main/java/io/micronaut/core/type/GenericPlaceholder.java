@@ -15,7 +15,7 @@
  */
 package io.micronaut.core.type;
 
-import io.micronaut.core.annotation.NonNull;
+import java.util.Objects;
 
 /**
  * Extends {@link Argument} to allow differentiating the
@@ -30,9 +30,8 @@ public interface GenericPlaceholder<T> extends Argument<T> {
     /**
      * @return The variable name, never {@code null}.
      */
-    @NonNull
     default String getVariableName() {
-        return getName();
+        return Objects.requireNonNull(getName(), "Argument name cannot be null");
     }
 
     @Override

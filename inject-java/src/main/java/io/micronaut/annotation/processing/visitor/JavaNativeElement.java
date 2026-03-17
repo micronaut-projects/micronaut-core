@@ -16,7 +16,7 @@
 package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
@@ -33,11 +33,12 @@ import javax.lang.model.type.TypeVariable;
  * @since 4.0.0
  */
 @Internal
-public sealed interface JavaNativeElement {
+public sealed interface JavaNativeElement extends ElementProvider {
 
     /**
      * @return The native element.
      */
+    @Override
     @Nullable
     Element element();
 

@@ -16,12 +16,14 @@
 package io.micronaut.expressions.parser.ast.operator.binary;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.sourcegen.model.ExpressionDef;
 import io.micronaut.sourcegen.model.TypeDef;
+import org.jspecify.annotations.Nullable;
+
+import java.util.Objects;
 
 import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.isNumeric;
 
@@ -42,6 +44,7 @@ public final class RelationalOperator extends ExpressionNode {
     private final ExpressionNode rightOperand;
     private final ExpressionDef.ComparisonOperation.OpType type;
 
+    @Nullable
     private ExpressionNode comparisonOperation;
 
     public RelationalOperator(ExpressionNode leftOperand,
@@ -53,7 +56,7 @@ public final class RelationalOperator extends ExpressionNode {
     }
 
     @Override
-    protected TypeDef doResolveType(@NonNull ExpressionVisitorContext ctx) {
+    protected TypeDef doResolveType(ExpressionVisitorContext ctx) {
         TypeDef leftType = leftOperand.resolveType(ctx);
         TypeDef rightType = rightOperand.resolveType(ctx);
 
@@ -70,6 +73,6 @@ public final class RelationalOperator extends ExpressionNode {
 
     @Override
     public ExpressionDef generateExpression(ExpressionCompilationContext ctx) {
-        return comparisonOperation.compile(ctx);
+        return Objects.requireNonNull(comparisonOperation).compile(ctx);
     }
 }

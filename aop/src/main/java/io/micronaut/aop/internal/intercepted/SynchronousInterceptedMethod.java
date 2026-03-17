@@ -21,6 +21,7 @@ import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The synchronous method intercept.
@@ -51,17 +52,20 @@ final class SynchronousInterceptedMethod implements InterceptedMethod {
     }
 
     @Override
+    @Nullable
     public Object interceptResult() {
         return context.proceed();
     }
 
     @Override
+    @Nullable
     public Object interceptResult(Interceptor<?, ?> from) {
         return context.proceed(from);
     }
 
     @Override
-    public Object handleResult(Object result) {
+    @Nullable
+    public Object handleResult(@Nullable Object result) {
         return result;
     }
 

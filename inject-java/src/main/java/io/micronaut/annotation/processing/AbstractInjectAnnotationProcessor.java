@@ -16,27 +16,31 @@
 package io.micronaut.annotation.processing;
 
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
-import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Generated;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.visitor.TypeElementVisitor;
+import org.jspecify.annotations.Nullable;
 
-import java.util.LinkedHashMap;
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.Filer;
 import javax.annotation.processing.Messager;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
+import javax.lang.model.element.TypeElement;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
+
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 
@@ -46,7 +50,8 @@ import java.util.Set;
  * @author Graeme Rocher
  * @since 1.0
  */
-abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
+@Internal
+public abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
 
     /**
      * Annotation processor option used to activate incremental processing.
@@ -79,6 +84,10 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
     private final Set<String> supportedAnnotationTypes = new HashSet<>(5);
     private final Map<String, Boolean> isProcessedCache = new HashMap<>(30);
     private Set<String> processedTypes;
+
+    protected final boolean processingGeneratedAnnotation(Set<? extends TypeElement> annotations) {
+        return annotations.size() == 1 && Generated.class.getName().equals(annotations.iterator().next().getQualifiedName().toString());
+    }
 
     @Override
     public SourceVersion getSupportedSourceVersion() {
@@ -149,7 +158,6 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
      *
      * @return A set of patterns
      */
-    @NonNull
     private Set<String> getProcessedAnnotationTypePatterns() {
         if (processedTypes == null) {
 
@@ -208,8 +216,7 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
      * @param processingEnv The processing env
      * @return The context
      */
-    @NonNull
-    protected JavaVisitorContext newVisitorContext(@NonNull ProcessingEnvironment processingEnv) {
+    protected JavaVisitorContext newVisitorContext(ProcessingEnvironment processingEnv) {
         return new JavaVisitorContext(
             processingEnv,
             messager,
@@ -228,7 +235,6 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
      *
      * @return The visitor kind
      */
-    @NonNull
     protected TypeElementVisitor.VisitorKind getVisitorKind() {
         return getIncrementalProcessorType().equals(GRADLE_PROCESSING_ISOLATING) ? TypeElementVisitor.VisitorKind.ISOLATING : TypeElementVisitor.VisitorKind.AGGREGATING;
     }
@@ -240,7 +246,7 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
      * @param msg The message
      * @param args The string format args
      */
-    protected final void error(Element e, String msg, Object... args) {
+    protected final void error(@Nullable Element e, String msg, Object... args) {
         if (messager == null) {
             illegalState();
             return;
@@ -326,7 +332,7 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
      * @param processingEnv The processing environment.
      * @return True if it is
      */
-    protected boolean isIncremental(@NonNull ProcessingEnvironment processingEnv) {
+    protected boolean isIncremental(ProcessingEnvironment processingEnv) {
         final Map<String, String> options = processingEnv.getOptions();
         final String v = options.get(MICRONAUT_PROCESSING_INCREMENTAL);
         if (v != null) {

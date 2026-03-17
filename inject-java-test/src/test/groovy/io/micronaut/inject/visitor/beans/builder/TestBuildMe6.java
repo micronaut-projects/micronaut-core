@@ -1,7 +1,7 @@
 package io.micronaut.inject.visitor.beans.builder;
 
 
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import tools.jackson.databind.annotation.JsonDeserialize;
 
 @JsonDeserialize(builder = TestBuildMe6.Builder.class)
 public class TestBuildMe6 {

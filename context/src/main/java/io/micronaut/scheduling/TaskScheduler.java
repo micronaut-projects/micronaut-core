@@ -14,9 +14,7 @@
  * limitations under the License.
  */
 package io.micronaut.scheduling;
-
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.time.Duration;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ScheduledFuture;
@@ -74,7 +72,7 @@ public interface TaskScheduler {
      *                                                         scheduled for execution
      * @throws NullPointerException                            if command or delay is null
      */
-    default ScheduledFuture<?> schedule(@NonNull String cron, @Nullable String timezoneId, @NonNull Runnable command) {
+    default ScheduledFuture<?> schedule(String cron, @Nullable String timezoneId, Runnable command) {
         return schedule(cron, timezoneId, () -> {
             command.run();
             return null;
@@ -96,7 +94,7 @@ public interface TaskScheduler {
      *                                    scheduled for execution
      * @throws NullPointerException       if command or delay is null
      */
-    default <V> ScheduledFuture<V> schedule(@NonNull String cron, @Nullable String timezoneId, @NonNull Callable<V> command) {
+    default <V> ScheduledFuture<V> schedule(String cron, @Nullable String timezoneId, Callable<V> command) {
         return schedule(cron, command);
     }
 

@@ -42,6 +42,9 @@ dependencies {
     testImplementation(libs.blaze.persistence.core)
     testImplementation(libs.managed.snakeyaml)
     testImplementation(libs.managed.reactor)
+    testImplementation(libs.junit4) {
+        because("TCK uses JUnit4 classes")
+    }
 
     functionalTestImplementation(testFixtures(projects.testSuite))
 }

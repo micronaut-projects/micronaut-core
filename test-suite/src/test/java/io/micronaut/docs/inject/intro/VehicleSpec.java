@@ -16,7 +16,10 @@
 package io.micronaut.docs.inject.intro;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.annotation.Property;
 import org.junit.jupiter.api.Test;
+
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -25,7 +28,7 @@ class VehicleSpec {
     @Test
     void testStartVehicle() {
         // tag::start[]
-        final ApplicationContext context = ApplicationContext.run();
+        final ApplicationContext context = ApplicationContext.run(Map.of("spec.name", "VehicleIntroSpec"));
         Vehicle vehicle = context.getBean(Vehicle.class);
         System.out.println(vehicle.start());
         // end::start[]

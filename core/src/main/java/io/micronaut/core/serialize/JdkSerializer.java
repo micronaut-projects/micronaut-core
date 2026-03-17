@@ -19,6 +19,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.serialize.exceptions.SerializationException;
 import io.micronaut.core.type.Argument;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -34,7 +35,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class JdkSerializer implements ObjectSerializer {
+public final class JdkSerializer implements ObjectSerializer {
 
     private final ConversionService conversionService;
 
@@ -53,7 +54,7 @@ public class JdkSerializer implements ObjectSerializer {
     }
 
     @Override
-    public void serialize(Object object, OutputStream outputStream) throws SerializationException {
+    public void serialize(@Nullable Object object, OutputStream outputStream) throws SerializationException {
         try {
             try (ObjectOutputStream objectOut = createObjectOutput(outputStream)) {
                 objectOut.writeObject(object);
@@ -65,7 +66,10 @@ public class JdkSerializer implements ObjectSerializer {
     }
 
     @Override
-    public <T> Optional<T> deserialize(InputStream inputStream, Class<T> requiredType) throws SerializationException {
+    public <T> Optional<T> deserialize(@Nullable InputStream inputStream, Class<T> requiredType) throws SerializationException {
+        if (inputStream == null) {
+            return Optional.empty();
+        }
         try {
             try (ObjectInputStream objectIn = createObjectInput(inputStream, requiredType)) {
                 try {
@@ -84,7 +88,10 @@ public class JdkSerializer implements ObjectSerializer {
     }
 
     @Override
-    public <T> Optional<T> deserialize(InputStream inputStream, Argument<T> requiredType) throws SerializationException {
+    public <T> Optional<T> deserialize(@Nullable InputStream inputStream, Argument<T> requiredType) throws SerializationException {
+        if (inputStream == null) {
+            return Optional.empty();
+        }
         try {
             try (ObjectInputStream objectIn = createObjectInput(inputStream, requiredType.getType())) {
                 try {
@@ -107,7 +114,7 @@ public class JdkSerializer implements ObjectSerializer {
      * @return A new {@link ObjectOutputStream}
      * @throws IOException if there is an error
      */
-    protected ObjectOutputStream createObjectOutput(OutputStream outputStream) throws IOException {
+    private ObjectOutputStream createObjectOutput(OutputStream outputStream) throws IOException {
         return new ObjectOutputStream(outputStream);
     }
 
@@ -117,7 +124,7 @@ public class JdkSerializer implements ObjectSerializer {
      * @return A {@link ObjectOutputStream}
      * @throws IOException if there is an error
      */
-    protected ObjectInputStream createObjectInput(InputStream inputStream, Class<?> requiredType) throws IOException {
+    private ObjectInputStream createObjectInput(InputStream inputStream, Class<?> requiredType) throws IOException {
         return new ObjectInputStream(inputStream) {
             @Override
             protected Class<?> resolveClass(ObjectStreamClass desc) throws IOException, ClassNotFoundException {

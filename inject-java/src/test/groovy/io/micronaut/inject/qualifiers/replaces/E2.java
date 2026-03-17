@@ -17,7 +17,9 @@ package io.micronaut.inject.qualifiers.replaces;
 
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
+import io.micronaut.context.annotation.Requires;
 
+@Requires(property = "spec.name", value = "ReplacesSpec")
 @Singleton
 @Named("E2")
 public class E2 implements E {

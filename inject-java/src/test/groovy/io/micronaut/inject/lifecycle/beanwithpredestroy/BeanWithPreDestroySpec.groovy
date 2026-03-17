@@ -16,8 +16,6 @@
 package io.micronaut.inject.lifecycle.beanwithpredestroy
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
 import spock.lang.Specification
 
 class BeanWithPreDestroySpec extends Specification{

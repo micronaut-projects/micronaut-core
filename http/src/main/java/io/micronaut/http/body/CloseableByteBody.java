@@ -16,8 +16,6 @@
 package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.NonNull;
-
 import java.io.Closeable;
 
 /**
@@ -31,9 +29,8 @@ import java.io.Closeable;
  * @since 4.5.0
  */
 @Experimental
-public interface CloseableByteBody extends ByteBody, Closeable {
+public non-sealed interface CloseableByteBody extends ByteBody, Closeable {
     @Override
-    @NonNull
     default CloseableByteBody allowDiscard() {
         return this;
     }

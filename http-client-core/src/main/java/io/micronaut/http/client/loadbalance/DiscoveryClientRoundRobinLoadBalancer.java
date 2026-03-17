@@ -18,6 +18,7 @@ package io.micronaut.http.client.loadbalance;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.discovery.DiscoveryClient;
 import io.micronaut.discovery.ServiceInstance;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 
 /**
@@ -53,7 +54,7 @@ public class DiscoveryClientRoundRobinLoadBalancer extends AbstractRoundRobinLoa
     }
 
     @Override
-    public Publisher<ServiceInstance> select(Object discriminator) {
+    public Publisher<ServiceInstance> select(@Nullable Object discriminator) {
         return Publishers.map(discoveryClient.getInstances(serviceID), this::getNextAvailable);
     }
 }

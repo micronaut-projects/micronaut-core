@@ -25,8 +25,8 @@ import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NullUnmarked;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.InjectionPoint;
@@ -35,7 +35,6 @@ import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.Element;
-import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
@@ -43,12 +42,12 @@ import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.TypedElement;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.beans.BeanConstructorElement;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
 import io.micronaut.inject.ast.beans.BeanFieldElement;
 import io.micronaut.inject.ast.beans.BeanMethodElement;
 import io.micronaut.inject.ast.beans.BeanParameterElement;
-import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.visitor.VisitorContext;
 
 import java.io.IOException;
@@ -78,6 +77,7 @@ import static io.micronaut.inject.ast.beans.BeanParameterElement.ZERO_BEAN_PARAM
  * @author graemerocher
  * @since 3.0.0
  */
+@NullUnmarked
 @Internal
 public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilder {
     private static final Map<String, AtomicInteger> BEAN_COUNTER = new HashMap<>(15);
@@ -100,7 +100,6 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
             }
         }
     };
-    protected final ConfigurationMetadataBuilder metadataBuilder;
     protected final VisitorContext visitorContext;
     protected final ElementAnnotationMetadataFactory elementAnnotationMetadataFactory;
     private final Element originatingElement;
@@ -125,14 +124,12 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
      *
      * @param originatingElement               The originating element
      * @param beanType                         The bean type
-     * @param metadataBuilder                  the metadata builder
      * @param visitorContext                   the visitor context
      * @param elementAnnotationMetadataFactory The element annotation metadata factory
      */
     protected AbstractBeanDefinitionBuilder(
         Element originatingElement,
         ClassElement beanType,
-        ConfigurationMetadataBuilder metadataBuilder,
         VisitorContext visitorContext,
         ElementAnnotationMetadataFactory elementAnnotationMetadataFactory) {
         this.originatingElement = originatingElement;
@@ -145,7 +142,6 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
             throw new IllegalArgumentException("Invalid originating element: " + originatingElement);
         }
         this.beanType = beanType;
-        this.metadataBuilder = metadataBuilder;
         this.visitorContext = visitorContext;
         this.identifier = BEAN_COUNTER.computeIfAbsent(beanType.getName(), (s) -> new AtomicInteger(0))
             .getAndIncrement();
@@ -272,13 +268,11 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         }
     }
 
-    @NonNull
     @Override
     public Element getOriginatingElement() {
         return originatingElement;
     }
 
-    @NonNull
     @Override
     public ClassElement getBeanType() {
         return beanType;
@@ -290,7 +284,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
      * @param constructorParameters The parameters to use.
      * @return The initialized parameters
      */
-    protected final BeanParameterElement[] initBeanParameters(@NonNull ParameterElement[] constructorParameters) {
+    protected final BeanParameterElement[] initBeanParameters(ParameterElement [] constructorParameters) {
         if (ArrayUtils.isNotEmpty(constructorParameters)) {
             return Arrays.stream(constructorParameters)
                 .map(InternalBeanParameter::new)
@@ -300,15 +294,13 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         }
     }
 
-    @NonNull
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
         return this.annotationMetadata;
     }
 
-    @NonNull
     @Override
-    public BeanElementBuilder createWith(@NonNull MethodElement element) {
+    public BeanElementBuilder createWith(MethodElement element) {
         // TODO: handle factories, static methods etc.
         //noinspection ConstantConditions
         if (element != null) {
@@ -321,7 +313,6 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         return this;
     }
 
-    @NonNull
     @Override
     public BeanElementBuilder typed(ClassElement... types) {
         if (ArrayUtils.isNotEmpty(types)) {
@@ -330,9 +321,8 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         return this;
     }
 
-    @NonNull
     @Override
-    public BeanElementBuilder typeArguments(@NonNull ClassElement... types) {
+    public BeanElementBuilder typeArguments(ClassElement... types) {
         final Map<String, ClassElement> typeArguments = this.beanType.getTypeArguments();
         Map<String, ClassElement> resolvedTypes = resolveTypeArguments(typeArguments, types);
         if (resolvedTypes != null) {
@@ -344,9 +334,8 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         return this;
     }
 
-    @NonNull
     @Override
-    public BeanElementBuilder typeArgumentsForType(ClassElement type, @NonNull ClassElement... types) {
+    public BeanElementBuilder typeArgumentsForType(ClassElement type, ClassElement... types) {
         if (type != null) {
             final Map<String, ClassElement> typeArguments = type.getTypeArguments();
             Map<String, ClassElement> resolvedTypes = resolveTypeArguments(typeArguments, types);
@@ -382,11 +371,10 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         return this;
     }
 
-    @NonNull
     @Override
     public BeanElementBuilder withMethods(
-        @NonNull ElementQuery<MethodElement> methods,
-        @NonNull Consumer<BeanMethodElement> beanMethods) {
+        ElementQuery<MethodElement> methods,
+        Consumer<BeanMethodElement> beanMethods) {
         //noinspection ConstantConditions
         if (methods != null && beanMethods != null) {
             final ElementQuery<MethodElement> baseQuery = methods.onlyInstance();
@@ -402,9 +390,8 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         return this;
     }
 
-    @NonNull
     @Override
-    public BeanElementBuilder withFields(@NonNull ElementQuery<FieldElement> fields, @NonNull Consumer<BeanFieldElement> beanFields) {
+    public BeanElementBuilder withFields(ElementQuery<FieldElement> fields, Consumer<BeanFieldElement> beanFields) {
         //noinspection ConstantConditions
         if (fields != null && beanFields != null) {
             this.beanType.getEnclosedElements(fields.onlyInstance().onlyAccessible(originatingType))
@@ -415,7 +402,6 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         return this;
     }
 
-    @NonNull
     @Override
     public BeanElementBuilder withParameters(Consumer<BeanParameterElement[]> parameters) {
         if (parameters != null && this.constructorElement != null) {
@@ -427,12 +413,10 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
     /**
      * @return The bean creation parameters.
      */
-    @NonNull
-    protected BeanParameterElement[] getParameters() {
+    protected BeanParameterElement [] getParameters() {
         return constructorElement.getParameters();
     }
 
-    @NonNull
     @Override
     public String getName() {
         return beanType.getName();
@@ -448,15 +432,13 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         return beanType.isPublic();
     }
 
-    @NonNull
     @Override
     public Object getNativeType() {
         return beanType;
     }
 
-    @NonNull
     @Override
-    public <T extends Annotation> BeanElementBuilder annotate(@NonNull String annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
+    public <T extends Annotation> BeanElementBuilder annotate(String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
         annotate(this.annotationMetadata, annotationType, consumer);
         return this;
     }
@@ -468,24 +450,24 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
     }
 
     @Override
-    public BeanElementBuilder removeAnnotation(@NonNull String annotationType) {
+    public BeanElementBuilder removeAnnotation(String annotationType) {
         removeAnnotation(this.annotationMetadata, annotationType);
         return this;
     }
 
     @Override
-    public <T extends Annotation> BeanElementBuilder removeAnnotationIf(@NonNull Predicate<AnnotationValue<T>> predicate) {
+    public <T extends Annotation> BeanElementBuilder removeAnnotationIf(Predicate<AnnotationValue<T>> predicate) {
         removeAnnotationIf(this.annotationMetadata, predicate);
         return this;
     }
 
     @Override
-    public BeanElementBuilder removeStereotype(@NonNull String annotationType) {
+    public BeanElementBuilder removeStereotype(String annotationType) {
         removeStereotype(this.annotationMetadata, annotationType);
         return this;
     }
 
-    private BeanElementBuilder addChildBean(@NonNull MethodElement producerMethod, Consumer<BeanElementBuilder> childBeanBuilder) {
+    private BeanElementBuilder addChildBean(MethodElement producerMethod, Consumer<BeanElementBuilder> childBeanBuilder) {
         final AbstractBeanDefinitionBuilder childBuilder = createChildBean(producerMethod);
         this.childBeans.add(childBuilder);
         if (childBeanBuilder != null) {
@@ -494,7 +476,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         return this;
     }
 
-    private BeanElementBuilder addChildBean(@NonNull FieldElement producerMethod, Consumer<BeanElementBuilder> childBeanBuilder) {
+    private BeanElementBuilder addChildBean(FieldElement producerMethod, Consumer<BeanElementBuilder> childBeanBuilder) {
         final AbstractBeanDefinitionBuilder childBuilder = createChildBean(producerMethod);
         this.childBeans.add(childBuilder);
         if (childBeanBuilder != null) {
@@ -534,7 +516,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
      * @param producerField The producer field
      * @return The child bean builder
      */
-    protected abstract @NonNull AbstractBeanDefinitionBuilder createChildBean(FieldElement producerField);
+    protected abstract AbstractBeanDefinitionBuilder createChildBean(FieldElement producerField);
 
     /**
      * Visit the intercepted methods of this type.
@@ -583,7 +565,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
      * @param producerMethod The producer method
      * @return The child bean builder
      */
-    protected abstract @NonNull AbstractBeanDefinitionBuilder createChildBean(MethodElement producerMethod);
+    protected abstract AbstractBeanDefinitionBuilder createChildBean(MethodElement producerMethod);
 
     /**
      * Build the bean definition writer.
@@ -637,7 +619,6 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
      * @param aopProxyWriter The AOP writer
      * @return The visitor
      */
-    @NonNull
     protected abstract BiConsumer<TypedElement, MethodElement> createAroundMethodVisitor(BeanDefinitionVisitor aopProxyWriter);
 
     /**
@@ -647,10 +628,8 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
      * @param annotationMetadata   The annotation metadata
      * @return The AOP writer
      */
-    @NonNull
     protected abstract BeanDefinitionVisitor createAopWriter(BeanDefinitionWriter beanDefinitionWriter, AnnotationMetadata annotationMetadata);
 
-    @NonNull
     private BeanClassWriter buildBeanClassWriter() {
         final BeanDefinitionVisitor beanDefinitionWriter = createBeanDefinitionWriter();
         return new BeanClassWriter() {
@@ -748,7 +727,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
                 executableMethod,
                 visitorContext
             );
-            if (executableMethod.getAnnotationMetadata().isTrue(Executable.class, "processOnStartup")) {
+            if (executableMethod.getAnnotationMetadata().isTrue(Executable.class, Executable.MEMBER_PROCESS_ON_STARTUP)) {
                 beanDefinitionWriter.setRequiresMethodProcessing(true);
             }
         }
@@ -853,7 +832,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
      * @param <T>                The annotation generic type
      * @since 3.3.0
      */
-    protected abstract <T extends Annotation> void annotate(@NonNull AnnotationMetadata annotationMetadata, @NonNull AnnotationValue<T> annotationValue);
+    protected abstract <T extends Annotation> void annotate(AnnotationMetadata annotationMetadata, AnnotationValue<T> annotationValue);
 
     /**
      * Remove a stereotype from the given metadata.
@@ -912,7 +891,6 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
             return Objects.hash(element);
         }
 
-        @NonNull
         @Override
         public AnnotationMetadata getAnnotationMetadata() {
             if (currentMetadata != null) {
@@ -921,7 +899,6 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
             return elementMetadata;
         }
 
-        @NonNull
         @Override
         public String getName() {
             return element.getName();
@@ -937,15 +914,13 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
             return element.isPublic();
         }
 
-        @NonNull
         @Override
         public Object getNativeType() {
             return element.getNativeType();
         }
 
-        @NonNull
         @Override
-        public <T extends Annotation> Element annotate(@NonNull String annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
+        public <T extends Annotation> Element annotate(String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
             AbstractBeanDefinitionBuilder.this.annotate(elementMetadata, annotationType, consumer);
             return this;
         }
@@ -957,19 +932,19 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         }
 
         @Override
-        public Element removeAnnotation(@NonNull String annotationType) {
+        public Element removeAnnotation(String annotationType) {
             AbstractBeanDefinitionBuilder.this.removeAnnotation(elementMetadata, annotationType);
             return this;
         }
 
         @Override
-        public <T extends Annotation> Element removeAnnotationIf(@NonNull Predicate<AnnotationValue<T>> predicate) {
+        public <T extends Annotation> Element removeAnnotationIf(Predicate<AnnotationValue<T>> predicate) {
             AbstractBeanDefinitionBuilder.this.removeAnnotationIf(elementMetadata, predicate);
             return this;
         }
 
         @Override
-        public Element removeStereotype(@NonNull String annotationType) {
+        public Element removeStereotype(String annotationType) {
             AbstractBeanDefinitionBuilder.this.removeStereotype(elementMetadata, annotationType);
             return this;
         }
@@ -1062,7 +1037,6 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
             return methodElement.isPublic();
         }
 
-        @NonNull
         @Override
         public BeanMethodElement executable() {
             if (!AbstractBeanDefinitionBuilder.this.executableMethods.contains(this)) {
@@ -1087,7 +1061,6 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
             return BeanMethodElement.super.executable(processOnStartup);
         }
 
-        @NonNull
         @Override
         public BeanMethodElement inject() {
             if (!AbstractBeanDefinitionBuilder.this.injectedMethods.contains(this)) {
@@ -1096,7 +1069,6 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
             return BeanMethodElement.super.inject();
         }
 
-        @NonNull
         @Override
         public BeanMethodElement preDestroy() {
             if (!AbstractBeanDefinitionBuilder.this.preDestroyMethods.contains(this)) {
@@ -1105,7 +1077,6 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
             return BeanMethodElement.super.preDestroy();
         }
 
-        @NonNull
         @Override
         public BeanMethodElement postConstruct() {
             if (!AbstractBeanDefinitionBuilder.this.postConstructMethods.contains(this)) {
@@ -1114,27 +1085,23 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
             return BeanMethodElement.super.postConstruct();
         }
 
-        @NonNull
         @Override
         public BeanParameterElement[] getParameters() {
             return this.beanParameters;
         }
 
-        @NonNull
         @Override
         public ClassElement getReturnType() {
             return methodElement.getReturnType();
         }
 
-        @NonNull
         @Override
         public ClassElement getGenericReturnType() {
             return methodElement.getGenericReturnType();
         }
 
-        @NonNull
         @Override
-        public MethodElement withParameters(@NonNull ParameterElement... newParameters) {
+        public MethodElement withParameters(ParameterElement... newParameters) {
             this.beanParameters = initBeanParameters(newParameters);
             return this;
         }
@@ -1224,27 +1191,23 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
             return methodElement.isPublic();
         }
 
-        @NonNull
         @Override
         public BeanParameterElement[] getParameters() {
             return this.beanParameters;
         }
 
-        @NonNull
         @Override
         public ClassElement getReturnType() {
             return methodElement.getReturnType();
         }
 
-        @NonNull
         @Override
         public ClassElement getGenericReturnType() {
             return methodElement.getGenericReturnType();
         }
 
-        @NonNull
         @Override
-        public MethodElement withParameters(@NonNull ParameterElement... newParameters) {
+        public MethodElement withParameters(ParameterElement... newParameters) {
             this.beanParameters = initBeanParameters(newParameters);
             return this;
         }
@@ -1304,7 +1267,6 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
             return AbstractBeanDefinitionBuilder.this.beanType;
         }
 
-        @NonNull
         @Override
         public ClassElement getType() {
             return fieldElement.getType();
@@ -1319,9 +1281,8 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
             }
         }
 
-        @NonNull
         @Override
-        public BeanFieldElement typeArguments(@NonNull ClassElement... types) {
+        public BeanFieldElement typeArguments(ClassElement... types) {
             final ClassElement genericType = fieldElement.getGenericField();
             final Map<String, ClassElement> typeArguments = genericType.getTypeArguments();
             final Map<String, ClassElement> resolved = resolveTypeArguments(typeArguments, types);
@@ -1345,7 +1306,6 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
             parameterElement = element;
         }
 
-        @NonNull
         @Override
         public ClassElement getGenericType() {
             if (genericType != null) {
@@ -1355,16 +1315,14 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
             }
         }
 
-        @NonNull
         @Override
         public ClassElement getType() {
             return parameterElement.getType();
         }
 
         @SuppressWarnings("rawtypes")
-        @NonNull
         @Override
-        public BeanParameterElement typeArguments(@NonNull ClassElement... types) {
+        public BeanParameterElement typeArguments(ClassElement... types) {
             final ClassElement genericType = parameterElement.getGenericType();
             final Map<String, ClassElement> typeArguments = genericType.getTypeArguments();
             final Map<String, ClassElement> resolved = resolveTypeArguments(typeArguments, types);

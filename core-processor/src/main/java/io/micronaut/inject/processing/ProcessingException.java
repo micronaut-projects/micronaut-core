@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.processing;
 
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.ast.Element;
 
 /**
@@ -26,14 +26,15 @@ import io.micronaut.inject.ast.Element;
  */
 public final class ProcessingException extends RuntimeException {
 
+    @Nullable
     private final transient Element originatingElement;
 
-    public ProcessingException(Element element, String message) {
+    public ProcessingException(@Nullable Element element, @Nullable String message) {
         super(message);
         this.originatingElement = element;
     }
 
-    public ProcessingException(Element originatingElement, String message, Throwable cause) {
+    public ProcessingException(@Nullable Element originatingElement, @Nullable String message, Throwable cause) {
         super(message, cause);
         this.originatingElement = originatingElement;
     }
@@ -44,6 +45,13 @@ public final class ProcessingException extends RuntimeException {
             return originatingElement.getNativeType();
         }
         return null;
+    }
+
+    /**
+     * @return The element that caused the issue.
+     */
+    public @Nullable Element getElement() {
+        return originatingElement;
     }
 
 }

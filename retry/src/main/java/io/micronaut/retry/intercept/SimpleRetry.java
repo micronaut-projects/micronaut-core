@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.retry.RetryState;
 import io.micronaut.retry.annotation.DefaultRetryPredicate;
 import io.micronaut.retry.annotation.RetryPredicate;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Duration;
 import java.util.Optional;
@@ -40,10 +41,12 @@ class SimpleRetry implements RetryState, MutableRetryState {
     private final int maxAttempts;
     private final double multiplier;
     private final Duration delay;
+    @Nullable
     private final Duration maxDelay;
     private final AtomicInteger attemptNumber = new AtomicInteger(0);
     private final AtomicLong overallDelay = new AtomicLong(0);
     private final RetryPredicate predicate;
+    @Nullable
     private final Class<? extends Throwable> capturedException;
     private final double jitter;
 
@@ -59,8 +62,10 @@ class SimpleRetry implements RetryState, MutableRetryState {
         int maxAttempts,
         double multiplier,
         Duration delay,
+        @Nullable
         Duration maxDelay,
         RetryPredicate predicate,
+        @Nullable
         Class<? extends Throwable> capturedException,
         double jitter) {
 
@@ -81,7 +86,7 @@ class SimpleRetry implements RetryState, MutableRetryState {
      * @param capturedException The capture exception types
      * @param jitter The jitter factor used to apply random deviation to retry delays
      */
-    SimpleRetry(int maxAttempts, double multiplier, Duration delay, Duration maxDelay, Class<? extends Throwable> capturedException, double jitter) {
+    SimpleRetry(int maxAttempts, double multiplier, Duration delay, @Nullable Duration maxDelay, @Nullable Class<? extends Throwable> capturedException, double jitter) {
         this(maxAttempts, multiplier, delay, maxDelay, new DefaultRetryPredicate(), capturedException, jitter);
     }
 
@@ -167,6 +172,7 @@ class SimpleRetry implements RetryState, MutableRetryState {
     }
 
     @Override
+    @Nullable
     public Class<? extends Throwable> getCapturedException() {
         return capturedException;
     }

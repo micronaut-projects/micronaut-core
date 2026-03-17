@@ -16,8 +16,7 @@
 package io.micronaut.http.client;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Interface for managing the construction and lifecycle of instances of {@link RawHttpClient} clients.
@@ -35,6 +34,5 @@ public interface RawHttpClientRegistry {
      * @param path        The path (Optional)
      * @return The client
      */
-    @NonNull
-    RawHttpClient getRawClient(@NonNull HttpVersionSelection httpVersion, @NonNull String clientId, @Nullable String path);
+    RawHttpClient getRawClient(HttpVersionSelection httpVersion, String clientId, @Nullable String path);
 }

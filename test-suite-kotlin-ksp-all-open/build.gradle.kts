@@ -1,5 +1,6 @@
 plugins {
     id("io.micronaut.build.internal.convention-test-library")
+    id("io.micronaut.build.internal.kotlin-base")
     alias(libs.plugins.managed.kotlin.jvm)
     alias(libs.plugins.managed.ksp)
     alias(libs.plugins.managed.kotlin.allopen)

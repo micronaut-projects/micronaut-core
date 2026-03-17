@@ -16,8 +16,7 @@
 package io.micronaut.core.io;
 
 import io.micronaut.core.annotation.Blocking;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.IOExceptionBiFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,7 +78,7 @@ public class IOUtils {
      */
     @Blocking
     @SuppressWarnings({"java:S2095", "S1141"})
-    public static void eachFile(@NonNull URL url, String path, @NonNull Consumer<Path> consumer) {
+    public static void eachFile(URL url, String path, Consumer<Path> consumer) {
         try {
             eachFile(url.toURI(), path, consumer);
         } catch (URISyntaxException e) {
@@ -97,7 +96,7 @@ public class IOUtils {
      */
     @Blocking
     @SuppressWarnings({"java:S2095", "java:S1141", "java:S3776"})
-    public static void eachFile(@NonNull URI uri, String path, @NonNull Consumer<Path> consumer) {
+    public static void eachFile(URI uri, String path, Consumer<Path> consumer) {
         List<Closeable> toClose = new ArrayList<>();
         try {
             Path myPath = resolvePath(uri, path, toClose, IOUtils::loadNestedJarUri);
@@ -152,14 +151,14 @@ public class IOUtils {
      * @since 4.7
      */
     @Nullable
-    public static Path resolvePath(@NonNull URI uri,
-                                   @NonNull String path,
-                                   @NonNull List<Closeable> toClose) throws IOException {
+    public static Path resolvePath(URI uri,
+ String path,
+ List<Closeable> toClose) throws IOException {
         return resolvePath(uri, path, toClose, IOUtils::loadNestedJarUri);
     }
 
     @Nullable
-    static Path resolvePath(@NonNull URI uri,
+    static Path resolvePath(URI uri,
                             String path,
                             List<Closeable> toClose,
                             IOExceptionBiFunction<List<Closeable>, String, Path> loadNestedJarUriFunction) throws IOException {
@@ -277,9 +276,8 @@ public class IOUtils {
             }
         }
 
-        FileSystem jrtProvider = null;
         if (uniqueURIs.isEmpty()) {
-            jrtProvider = getJrtProvider(classLoader);
+            FileSystem jrtProvider = getJrtProvider(classLoader);
             if (jrtProvider != null) {
                 Path modulesPath = jrtProvider.getPath("modules");
                 try (Stream<Path> stream = Files.list(modulesPath)) {
@@ -292,7 +290,11 @@ public class IOUtils {
                         .map(Path::toUri)
                         .forEach(uniqueURIs::add);
                 }
-
+                try {
+                    jrtProvider.close();
+                } catch (Throwable ignore) {
+                    // Ignore
+                }
                 // uri will be jrt:/modules/<module>/META-INF/micronaut/<service>, so we can walk through its files as if it was a directory
             }
         }
@@ -306,13 +308,6 @@ public class IOUtils {
             // we ignore this extra ones
             if (!("resource".equals(scheme) && uri.toString().contains("#"))) {
                 uris.add(uri);
-            }
-        }
-        if (jrtProvider != null && jrtProvider.isOpen()) {
-            try {
-                jrtProvider.close();
-            } catch (Throwable ignore) {
-                // Ignore
             }
         }
         return uris;
@@ -341,7 +336,11 @@ public class IOUtils {
         if (p.endsWith(path)) {
             Path subpath = Paths.get(path);
             for (int i = 0; i < subpath.getNameCount(); i++) {
-                p = p.getParent();
+                Path parent = p.getParent();
+                if (parent == null) {
+                    break;
+                }
+                p = parent;
             }
             uri = p.toUri();
         }

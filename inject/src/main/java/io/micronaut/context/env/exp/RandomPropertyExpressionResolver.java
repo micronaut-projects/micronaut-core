@@ -49,7 +49,7 @@ public final class RandomPropertyExpressionResolver implements PropertyExpressio
             return Optional.empty();
         }
         String value = expression.substring(RANDOM_PREFIX.length()).toLowerCase();
-        return Optional.of(conversionService.convertRequired(resolveRandomValue(value, expression), requiredType));
+        return Optional.ofNullable(conversionService.convertRequired(resolveRandomValue(value, expression), requiredType));
     }
 
     private Object resolveRandomValue(String value, String expression) {

@@ -15,8 +15,8 @@
  */
 package io.micronaut.jackson.core.tree;
 
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.core.JsonParser;
+import tools.jackson.core.JsonGenerator;
+import tools.jackson.core.JsonParser;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.json.JsonStreamConfig;
 
@@ -90,11 +90,11 @@ public final class JsonStreamTransfer {
             case END_ARRAY:
                 to.writeEndArray();
                 break;
-            case FIELD_NAME:
-                to.writeFieldName(from.currentName());
+            case PROPERTY_NAME:
+                to.writeName(from.currentName());
                 break;
             case VALUE_EMBEDDED_OBJECT:
-                to.writeObject(from.getEmbeddedObject());
+                to.writePOJO(from.getEmbeddedObject());
                 break;
             case VALUE_STRING:
                 to.writeString(from.getText());

@@ -15,6 +15,8 @@ dependencies {
         exclude(group = "io.micronaut")
     }
     testRuntimeOnly(libs.bcpkix)
+    testRuntimeOnly(libs.junit.jupiter.engine)
+    testRuntimeOnly(libs.junit.platform.launcher)
 }
 
 configurations {
@@ -37,6 +39,12 @@ graalvmNative {
     }
     binaries {
         all {
+            buildArgs.add("-H:+ReportExceptionStackTraces")
+            if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_21)) {
+                buildArgs.add("--initialize-at-build-time=org.junit.platform.suite.engine.IsSuiteClass")
+                buildArgs.add("--initialize-at-build-time=org.junit.platform.suite.engine.IsPotentialTestContainer")
+                buildArgs.add("-H:+SharedArenaSupport")
+            }
             resources.autodetect()
         }
     }

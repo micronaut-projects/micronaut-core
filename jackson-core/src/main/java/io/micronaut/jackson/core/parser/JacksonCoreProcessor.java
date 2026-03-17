@@ -15,29 +15,30 @@
  */
 package io.micronaut.jackson.core.parser;
 
-import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.core.JsonToken;
-import com.fasterxml.jackson.core.async.ByteArrayFeeder;
-import com.fasterxml.jackson.core.io.JsonEOFException;
-import com.fasterxml.jackson.core.json.async.NonBlockingJsonParser;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.async.processor.SingleThreadedBufferingProcessor;
 import io.micronaut.jackson.core.tree.JsonNodeTreeCodec;
 import io.micronaut.jackson.core.tree.JsonStreamTransfer;
 import io.micronaut.jackson.core.tree.TreeGenerator;
 import io.micronaut.json.JsonStreamConfig;
 import io.micronaut.json.tree.JsonNode;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Subscriber;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import tools.jackson.core.JsonToken;
+import tools.jackson.core.ObjectReadContext;
+import tools.jackson.core.TokenStreamFactory;
+import tools.jackson.core.async.ByteArrayFeeder;
+import tools.jackson.core.exc.UnexpectedEndOfInputException;
+import tools.jackson.core.json.async.NonBlockingByteArrayJsonParser;
 
 import java.io.IOException;
 import java.util.Optional;
 
 /**
  * A Reactive streams publisher that publishes a {@link JsonNode} once the JSON has been fully consumed.
- * Uses {@link NonBlockingJsonParser} internally allowing the parsing of
+ * Uses {@link NonBlockingByteArrayJsonParser} internally allowing the parsing of
  * JSON from an incoming stream of bytes in a non-blocking manner
  *
  * @author Graeme Rocher
@@ -48,10 +49,11 @@ public class JacksonCoreProcessor extends SingleThreadedBufferingProcessor<byte[
 
     private static final Logger LOG = LoggerFactory.getLogger(JacksonCoreProcessor.class);
 
-    private NonBlockingJsonParser currentNonBlockingJsonParser;
+    private NonBlockingByteArrayJsonParser currentNonBlockingByteArrayJsonParser;
+    @Nullable
     private TreeGenerator currentGenerator = null;
 
-    private final JsonFactory jsonFactory;
+    private final TokenStreamFactory jsonFactory;
     private final JsonStreamConfig deserializationConfig;
     private final JsonNodeTreeCodec treeCodec;
 
@@ -68,24 +70,20 @@ public class JacksonCoreProcessor extends SingleThreadedBufferingProcessor<byte[
      * @param jsonFactory Factory to use for creating the parser
      * @param deserializationConfig The deserialization configuration (in particular bignum handling)
      */
-    public JacksonCoreProcessor(boolean streamArray, JsonFactory jsonFactory, @NonNull JsonStreamConfig deserializationConfig) {
+    public JacksonCoreProcessor(boolean streamArray, TokenStreamFactory jsonFactory, JsonStreamConfig deserializationConfig) {
         this.jsonFactory = jsonFactory;
         this.streamArray = streamArray;
         this.treeCodec = JsonNodeTreeCodec.getInstance().withConfig(deserializationConfig);
         this.jsonStream = true;
         this.deserializationConfig = deserializationConfig;
-        try {
-            this.currentNonBlockingJsonParser = (NonBlockingJsonParser) jsonFactory.createNonBlockingByteArrayParser();
-        } catch (IOException e) {
-            throw new IllegalStateException("Failed to create non-blocking JSON parser: " + e.getMessage(), e);
-        }
+        this.currentNonBlockingByteArrayJsonParser = jsonFactory.createNonBlockingByteArrayParser(ObjectReadContext.empty());
     }
 
     /**
      * @return Whether more input is needed
      */
     public boolean needMoreInput() {
-        return currentNonBlockingJsonParser.getNonBlockingInputFeeder().needMoreInput();
+        return currentNonBlockingByteArrayJsonParser.nonBlockingInputFeeder().needMoreInput();
     }
 
     @Override
@@ -93,7 +91,7 @@ public class JacksonCoreProcessor extends SingleThreadedBufferingProcessor<byte[
         if (jsonStream && currentGenerator == null) {
             super.doOnComplete();
         } else if (needMoreInput()) {
-            doOnError(new JsonEOFException(currentNonBlockingJsonParser, JsonToken.NOT_AVAILABLE, "Unexpected end-of-input"));
+            doOnError(new UnexpectedEndOfInputException(currentNonBlockingByteArrayJsonParser, JsonToken.NOT_AVAILABLE, "Unexpected end-of-input"));
         } else {
             super.doOnComplete();
         }
@@ -117,7 +115,7 @@ public class JacksonCoreProcessor extends SingleThreadedBufferingProcessor<byte[
 
             JsonToken event;
 
-            while ((event = currentNonBlockingJsonParser.nextToken()) != JsonToken.NOT_AVAILABLE) {
+            while ((event = currentNonBlockingByteArrayJsonParser.nextToken()) != JsonToken.NOT_AVAILABLE) {
                 if (!started) {
                     started = true;
                     if (streamArray && event == JsonToken.START_ARRAY) {
@@ -136,7 +134,7 @@ public class JacksonCoreProcessor extends SingleThreadedBufferingProcessor<byte[
                     currentGenerator = treeCodec.createTreeGenerator();
                 }
 
-                JsonStreamTransfer.transferCurrentToken(currentNonBlockingJsonParser, currentGenerator, deserializationConfig);
+                JsonStreamTransfer.transferCurrentToken(currentNonBlockingByteArrayJsonParser, currentGenerator, deserializationConfig);
 
                 if (currentGenerator.isComplete()) {
                     publishNode(currentGenerator.getCompletedValue());
@@ -177,11 +175,11 @@ public class JacksonCoreProcessor extends SingleThreadedBufferingProcessor<byte[
     }
 
     private ByteArrayFeeder byteFeeder(byte[] message) throws IOException {
-        ByteArrayFeeder byteFeeder = currentNonBlockingJsonParser.getNonBlockingInputFeeder();
+        ByteArrayFeeder byteFeeder = currentNonBlockingByteArrayJsonParser.nonBlockingInputFeeder();
         final boolean needMoreInput = byteFeeder.needMoreInput();
         if (!needMoreInput) {
-            currentNonBlockingJsonParser = (NonBlockingJsonParser) jsonFactory.createNonBlockingByteArrayParser();
-            byteFeeder = currentNonBlockingJsonParser.getNonBlockingInputFeeder();
+            currentNonBlockingByteArrayJsonParser = (NonBlockingByteArrayJsonParser) jsonFactory.createNonBlockingByteArrayParser(ObjectReadContext.empty());
+            byteFeeder = currentNonBlockingByteArrayJsonParser.nonBlockingInputFeeder();
         }
 
         byteFeeder.feedInput(message, 0, message.length);

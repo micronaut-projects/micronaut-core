@@ -18,4 +18,7 @@
  * @author Sergio del Amo
  * @since 4.7.1
  */
+@NullMarked
 package io.micronaut.http.server.filter;
+
+import org.jspecify.annotations.NullMarked;

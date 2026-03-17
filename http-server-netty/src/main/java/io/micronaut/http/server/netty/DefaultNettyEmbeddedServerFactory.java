@@ -16,13 +16,13 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.CollectionUtils;
@@ -39,10 +39,12 @@ import io.micronaut.http.server.RouteExecutor;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.ssl.CertificateProvidedSslBuilder;
+import io.micronaut.http.server.netty.ssl.NettyServerSslFactory;
 import io.micronaut.http.server.netty.ssl.SelfSignedSslBuilder;
 import io.micronaut.http.server.netty.ssl.ServerSslBuilder;
 import io.micronaut.http.server.netty.websocket.NettyServerWebSocketUpgradeHandler;
 import io.micronaut.http.server.netty.websocket.WebSocketUpgradeHandlerFactory;
+import io.micronaut.http.ssl.CertificateProvider;
 import io.micronaut.http.ssl.ServerSslConfiguration;
 import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.web.router.resource.StaticResourceResolver;
@@ -87,8 +89,11 @@ public class DefaultNettyEmbeddedServerFactory
     private final EventLoopGroupFactory eventLoopGroupFactory;
     private final EventLoopGroupRegistry eventLoopGroupRegistry;
     private final Map<Class<?>, ApplicationEventPublisher<?>> cachedEventPublishers = new ConcurrentHashMap<>(5);
+    @Nullable
     private final WebSocketUpgradeHandlerFactory webSocketUpgradeHandlerFactory;
     private final MessageBodyHandlerRegistry messageBodyHandlerRegistry;
+    private final NettyServerSslFactory sslFactory;
+    private final BeanProvider<CertificateProvider> certificateProviders;
     private @Nullable ServerSslBuilder serverSslBuilder;
     private @Nullable ChannelOptionFactory channelOptionFactory;
     private List<ChannelOutboundHandler> outboundHandlers = Collections.emptyList();
@@ -105,6 +110,8 @@ public class DefaultNettyEmbeddedServerFactory
      * @param eventLoopGroupFactory The event loop group factory
      * @param eventLoopGroupRegistry The event loop group registry
      * @param webSocketUpgradeHandlerFactory An optional websocket integration
+     * @param sslFactory The factory for the server SSL builder
+     * @param certificateProviders The certificate provider bean for named lookup
      */
     protected DefaultNettyEmbeddedServerFactory(ApplicationContext applicationContext,
                                                 RouteExecutor routeExecutor,
@@ -115,7 +122,9 @@ public class DefaultNettyEmbeddedServerFactory
                                                 HttpCompressionStrategy httpCompressionStrategy,
                                                 EventLoopGroupFactory eventLoopGroupFactory,
                                                 EventLoopGroupRegistry eventLoopGroupRegistry,
-                                                @Nullable WebSocketUpgradeHandlerFactory webSocketUpgradeHandlerFactory) {
+                                                @Nullable WebSocketUpgradeHandlerFactory webSocketUpgradeHandlerFactory,
+                                                NettyServerSslFactory sslFactory,
+                                                BeanProvider<CertificateProvider> certificateProviders) {
         this.applicationContext = applicationContext;
         this.messageBodyHandlerRegistry = messageBodyHandlerRegistry;
         this.requestArgumentSatisfier = routeExecutor.getRequestArgumentSatisfier();
@@ -128,17 +137,17 @@ public class DefaultNettyEmbeddedServerFactory
         this.eventLoopGroupFactory = eventLoopGroupFactory;
         this.eventLoopGroupRegistry = eventLoopGroupRegistry;
         this.webSocketUpgradeHandlerFactory = webSocketUpgradeHandlerFactory;
+        this.sslFactory = sslFactory;
+        this.certificateProviders = certificateProviders;
     }
 
     @Override
-    @NonNull
-    public NettyEmbeddedServer build(@NonNull NettyHttpServerConfiguration configuration) {
+    public NettyEmbeddedServer build(NettyHttpServerConfiguration configuration) {
         return buildInternal(configuration, false, null);
     }
 
     @Override
-    @NonNull
-    public NettyEmbeddedServer build(@NonNull NettyHttpServerConfiguration configuration, @Nullable ServerSslConfiguration sslConfiguration) {
+    public NettyEmbeddedServer build(NettyHttpServerConfiguration configuration, @Nullable ServerSslConfiguration sslConfiguration) {
         return buildInternal(configuration, false, sslConfiguration);
     }
 
@@ -149,8 +158,7 @@ public class DefaultNettyEmbeddedServerFactory
      */
     @Singleton
     @Primary
-    @NonNull
-    protected NettyEmbeddedServer buildDefaultServer(@NonNull NettyHttpServerConfiguration configuration) {
+    protected NettyEmbeddedServer buildDefaultServer(NettyHttpServerConfiguration configuration) {
         return buildInternal(configuration, true, null);
     }
 
@@ -159,8 +167,7 @@ public class DefaultNettyEmbeddedServerFactory
         return messageBodyHandlerRegistry;
     }
 
-    @NonNull
-    private NettyEmbeddedServer buildInternal(@NonNull NettyHttpServerConfiguration configuration,
+    private NettyEmbeddedServer buildInternal(NettyHttpServerConfiguration configuration,
                                               boolean isDefaultServer,
                                               @Nullable ServerSslConfiguration sslConfiguration) {
         Objects.requireNonNull(configuration, "Netty HTTP server configuration cannot be null");
@@ -181,7 +188,7 @@ public class DefaultNettyEmbeddedServerFactory
         }
     }
 
-    private NettyEmbeddedServices resolveNettyEmbeddedServices(@NonNull NettyHttpServerConfiguration configuration,
+    private NettyEmbeddedServices resolveNettyEmbeddedServices(NettyHttpServerConfiguration configuration,
                                                                @Nullable ServerSslConfiguration sslConfiguration) {
         if (sslConfiguration != null && sslConfiguration.isEnabled()) {
             ServerSslBuilder resolvedSslBuilder;
@@ -250,6 +257,7 @@ public class DefaultNettyEmbeddedServerFactory
     }
 
     @Override
+    @Nullable
     public ServerSslBuilder getServerSslBuilder() {
         return serverSslBuilder;
     }
@@ -288,12 +296,12 @@ public class DefaultNettyEmbeddedServerFactory
     }
 
     @Override
-    public Channel getChannelInstance(NettyChannelType type, EventLoopGroupConfiguration workerConfig) {
+    public Channel getChannelInstance(NettyChannelType type, @Nullable EventLoopGroupConfiguration workerConfig) {
         return eventLoopGroupFactory.channelInstance(type, workerConfig);
     }
 
     @Override
-    public Channel getChannelInstance(NettyChannelType type, EventLoopGroupConfiguration workerConfig, Channel parent, int fd) {
+    public Channel getChannelInstance(NettyChannelType type, @Nullable EventLoopGroupConfiguration workerConfig, @Nullable Channel parent, int fd) {
         return eventLoopGroupFactory.channelInstance(type, workerConfig, parent, fd);
     }
 
@@ -306,8 +314,17 @@ public class DefaultNettyEmbeddedServerFactory
     }
 
     @Override
-    @NonNull
-    public EventLoopGroup createEventLoopGroup(int numThreads, @NonNull ExecutorService executorService, Integer ioRatio) {
+    public NettyServerSslFactory getSslFactory() {
+        return sslFactory;
+    }
+
+    @Override
+    public BeanProvider<CertificateProvider> getCertificateProviders() {
+        return certificateProviders;
+    }
+
+    @Override
+    public EventLoopGroup createEventLoopGroup(int numThreads, ExecutorService executorService, @Nullable Integer ioRatio) {
         return eventLoopGroupFactory.createEventLoopGroup(
                 numThreads,
                 executorService,

@@ -18,8 +18,7 @@ package io.micronaut.web.router;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
@@ -76,7 +75,6 @@ public interface RouteInfo<R> extends AnnotationMetadataProvider {
     /**
      * @return The argument representing the data type being produced.
      */
-    @NonNull
     Argument<?> getResponseBodyType();
 
     /**
@@ -289,8 +287,7 @@ public interface RouteInfo<R> extends AnnotationMetadataProvider {
      * @return The status
      * @since 2.5.2
      */
-    @NonNull
-    HttpStatus findStatus(HttpStatus defaultStatus);
+    HttpStatus findStatus(@Nullable HttpStatus defaultStatus);
 
     /**
      * Checks if route is for web socket.

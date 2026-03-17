@@ -14,9 +14,7 @@
  * limitations under the License.
  */
 package io.micronaut.http;
-
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.http.cachecontrol.CacheControl;
 import io.micronaut.http.cookie.Cookie;
 
@@ -75,7 +73,7 @@ public interface MutableHttpResponse<B> extends HttpResponse<B>, MutableHttpMess
      * @param message The message
      * @return This response object
      */
-    default MutableHttpResponse<B> status(HttpStatus status, CharSequence message) {
+    default MutableHttpResponse<B> status(HttpStatus status, @Nullable CharSequence message) {
         if (message == null) {
             message = status.getReason();
         }
@@ -103,8 +101,7 @@ public interface MutableHttpResponse<B> extends HttpResponse<B>, MutableHttpMess
      * @return This response object
      * @since 4.9.0
      */
-    @NonNull
-    default MutableHttpResponse<B> cacheControl(@NonNull CacheControl cacheControl) {
+    default MutableHttpResponse<B> cacheControl(CacheControl cacheControl) {
         return header(HttpHeaders.CACHE_CONTROL, Objects.requireNonNull(cacheControl, "Cache Control parameter cannot be null").toString());
     }
 
@@ -181,7 +178,7 @@ public interface MutableHttpResponse<B> extends HttpResponse<B>, MutableHttpMess
      * @param message The message
      * @return This response object
      */
-    MutableHttpResponse<B> status(int status, CharSequence message);
+    MutableHttpResponse<B> status(int status, @Nullable CharSequence message);
 
     /**
      * Sets the response status.

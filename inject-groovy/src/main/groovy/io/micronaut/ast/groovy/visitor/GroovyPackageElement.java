@@ -16,7 +16,7 @@
 package io.micronaut.ast.groovy.visitor;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.ast.PackageElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import org.codehaus.groovy.ast.PackageNode;
@@ -35,7 +35,7 @@ public class GroovyPackageElement extends AbstractGroovyElement implements Packa
      * Default constructor.
      *
      * @param visitorContext The visitor context
-     * @param packageNode The annotated node
+     * @param packageNode The package node
      * @param annotationMetadataFactory The annotation metadata
      */
     public GroovyPackageElement(GroovyVisitorContext visitorContext,

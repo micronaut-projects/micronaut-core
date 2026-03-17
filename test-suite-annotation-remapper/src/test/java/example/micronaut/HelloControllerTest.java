@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @MicronautTest
-public class HelloControllerTest {
+class HelloControllerTest {
 
     @Inject
     @Client("/")

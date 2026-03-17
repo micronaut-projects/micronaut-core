@@ -14,9 +14,7 @@
  * limitations under the License.
  */
 package io.micronaut.context;
-
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
@@ -32,13 +30,13 @@ import java.util.List;
  * @param <T> The bean type
  */
 public record DisabledBean<T>(
-    @NonNull Argument<T> type,
+    Argument<T> type,
     @Nullable Qualifier<T> qualifier,
-    @NonNull List<String> reasons)
+    List<String> reasons)
     implements BeanDefinition<T>, BeanDefinitionReference<T> {
 
     @Override
-    public boolean isEnabled(BeanContext context, BeanResolutionContext resolutionContext) {
+    public boolean isEnabled(BeanContext context, @Nullable BeanResolutionContext resolutionContext) {
         return true;
     }
 
@@ -53,7 +51,7 @@ public record DisabledBean<T>(
     }
 
     @Override
-    public Qualifier<T> getDeclaredQualifier() {
+    public @Nullable Qualifier<T> getDeclaredQualifier() {
         return qualifier;
     }
 

@@ -53,11 +53,11 @@ The HTTP server can be configured to use an existing file descriptor. With this 
 micronaut:
   netty:
     event-loops:
-      # use epoll
+      # use epoll transport
       parent:
-        prefer-native-transport: true
+        transport: epoll
       default:
-        prefer-native-transport: true
+        transport: epoll
     listeners:
       systemd:
         fd: 3 # systemd passes the server socket as fd 3

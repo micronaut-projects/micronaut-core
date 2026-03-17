@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.context;
-
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
@@ -28,7 +26,7 @@ import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
 
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -49,7 +47,9 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
     private final ReturnType returnType;
     private final Argument<?> genericReturnType;
     private final int hashCode;
+    @Nullable
     private Environment environment;
+    @Nullable
     private AnnotationMetadata methodAnnotationMetadata;
 
     /**
@@ -159,7 +159,8 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
     }
 
     @Override
-    public final Object invoke(Object instance, Object... arguments) {
+    @Nullable
+    public final Object invoke(Object instance, @Nullable Object... arguments) {
         if (arguments.length > 0) {
             ArgumentUtils.validateArguments(this, getArguments(), arguments);
         }
@@ -167,7 +168,8 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
     }
 
     @Override
-    public Object invokeUnsafe(Object instance, Object... arguments) {
+    @Nullable
+    public Object invokeUnsafe(Object instance, @Nullable Object... arguments) {
         return invokeInternal(instance, arguments);
     }
 
@@ -178,7 +180,8 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
      */
     @SuppressWarnings("WeakerAccess")
     @UsedByGeneratedCode
-    protected abstract Object invokeInternal(Object instance, Object[] arguments);
+    @Nullable
+    protected abstract Object invokeInternal(Object instance, @Nullable Object[] arguments);
 
     /**
      * Resolves the annotation metadata for this method. Subclasses
@@ -223,7 +226,6 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
             return AbstractExecutableMethod.this.isSuspend();
         }
 
-        @NonNull
         @Override
         public AnnotationMetadata getAnnotationMetadata() {
             return AbstractExecutableMethod.this.getAnnotationMetadata();
@@ -246,7 +248,6 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
         }
 
         @Override
-        @NonNull
         public Argument asArgument() {
             Map<String, Argument<?>> typeVariables = getTypeVariables();
             Collection<Argument<?>> values = typeVariables.values();

@@ -18,15 +18,16 @@ package io.micronaut.annotation.processing.test;
 import com.google.devtools.ksp.processing.SymbolProcessor;
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment;
 import com.google.devtools.ksp.symbol.KSClassDeclaration;
-import io.micronaut.annotation.processing.test.support.KotlinCompilation;
-import io.micronaut.annotation.processing.test.support.KspKt;
-import io.micronaut.annotation.processing.test.support.SourceFile;
+import com.tschuchort.compiletesting.JvmCompilationResult;
+import com.tschuchort.compiletesting.KotlinCompilation;
+import com.tschuchort.compiletesting.Ksp2Kt;
+import com.tschuchort.compiletesting.KspKt;
+import com.tschuchort.compiletesting.SourceFile;
 import io.micronaut.aop.internal.InterceptorRegistryBean;
 import io.micronaut.context.ApplicationContext;
-import io.micronaut.context.ApplicationContextConfiguration;
 import io.micronaut.context.BeanContext;
-import io.micronaut.context.DefaultApplicationContext;
-import io.micronaut.context.env.Environment;
+import io.micronaut.context.BeanDefinitionsProvider;
+import io.micronaut.context.DefaultBeanDefinitionsProvider;
 import io.micronaut.context.event.ApplicationEventPublisherFactory;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanIntrospector;
@@ -75,9 +76,11 @@ public class KotlinCompiler {
 
     static {
 
-        KOTLIN_COMPILATION.setJvmDefault("all");
+        KOTLIN_COMPILATION.setJvmDefault("enable");
         KOTLIN_COMPILATION.setInheritClassPath(true);
-
+        KOTLIN_COMPILATION.setLanguageVersion("2.0");
+        Ksp2Kt.useKsp2(KOTLIN_COMPILATION);
+        Ksp2Kt.useKsp2(KSP_COMPILATION);
         KSP_COMPILATION.setInheritClassPath(true);
         KSP_COMPILATION.setClasspaths(Arrays.asList(
             new File(KSP_COMPILATION.getWorkingDir(), "ksp/classes"),
@@ -86,19 +89,19 @@ public class KotlinCompiler {
     }
 
     public static URLClassLoader buildClassLoader(String name, @Language("kotlin") String clazz) {
-        Pair<Pair<KotlinCompilation, KotlinCompilation.Result>, Pair<KotlinCompilation, KotlinCompilation.Result>> resultPair = compile(name, clazz, classElement -> {
+        Pair<Pair<KotlinCompilation, JvmCompilationResult>, Pair<KotlinCompilation, JvmCompilationResult>> resultPair = compile(name, clazz, classElement -> {
         });
         return toClassLoader(resultPair);
     }
 
     @NotNull
-    private static URLClassLoader toClassLoader(Pair<Pair<KotlinCompilation, KotlinCompilation.Result>, Pair<KotlinCompilation, KotlinCompilation.Result>> resultPair) {
+    private static URLClassLoader toClassLoader(Pair<Pair<KotlinCompilation, JvmCompilationResult>, Pair<KotlinCompilation, JvmCompilationResult>> resultPair) {
         try {
-            Pair<KotlinCompilation, KotlinCompilation.Result> sourcesCompilation = resultPair.component1();
-            Pair<KotlinCompilation, KotlinCompilation.Result> kspCompilation = resultPair.component2();
+            Pair<KotlinCompilation, JvmCompilationResult> sourcesCompilation = resultPair.component1();
+            Pair<KotlinCompilation, JvmCompilationResult> kspCompilation = resultPair.component2();
 
-            KotlinCompilation.Result sourcesCompileResult = sourcesCompilation.component2();
-            KotlinCompilation.Result kspCompileResult = kspCompilation.component2();
+            JvmCompilationResult sourcesCompileResult = sourcesCompilation.component2();
+            JvmCompilationResult kspCompileResult = kspCompilation.component2();
             List<URL> classpath = new ArrayList<>();
             classpath.add(sourcesCompileResult.getOutputDirectory().toURI().toURL());
             classpath.add(kspCompileResult.getOutputDirectory().toURI().toURL());
@@ -126,14 +129,14 @@ public class KotlinCompiler {
         }
     }
 
-    public static Pair<Pair<KotlinCompilation, KotlinCompilation.Result>, Pair<KotlinCompilation, KotlinCompilation.Result>> compile(String name, @Language("kotlin") String clazz, Consumer<ClassElement> classElements) {
+    public static Pair<Pair<KotlinCompilation, JvmCompilationResult>, Pair<KotlinCompilation, JvmCompilationResult>> compile(String name, @Language("kotlin") String clazz, Consumer<ClassElement> classElements) {
         try {
             Files.deleteIfExists(KOTLIN_COMPILATION.getWorkingDir().toPath());
         } catch (IOException e) {
             // ignore
         }
         KOTLIN_COMPILATION.setSources(Collections.singletonList(SourceFile.Companion.kotlin(name + ".kt", clazz, true)));
-        KotlinCompilation.Result result = KOTLIN_COMPILATION.compile();
+        JvmCompilationResult result = KOTLIN_COMPILATION.compile();
         if (result.getExitCode() != KotlinCompilation.ExitCode.OK) {
             throw new RuntimeException(result.getMessages());
         }
@@ -141,7 +144,7 @@ public class KotlinCompiler {
         KSP_COMPILATION.setSources(KOTLIN_COMPILATION.getSources());
         ClassElementTypeElementSymbolProcessorProvider classElementTypeElementSymbolProcessorProvider = new ClassElementTypeElementSymbolProcessorProvider(classElements);
         KspKt.setSymbolProcessorProviders(KSP_COMPILATION, Arrays.asList(classElementTypeElementSymbolProcessorProvider, new BeanDefinitionProcessorProvider()));
-        KotlinCompilation.Result kspResult = KSP_COMPILATION.compile();
+        JvmCompilationResult kspResult = KSP_COMPILATION.compile();
         if (kspResult.getExitCode() != KotlinCompilation.ExitCode.OK) {
             throw new RuntimeException(kspResult.getMessages());
         }
@@ -149,14 +152,14 @@ public class KotlinCompiler {
         return new Pair<>(new Pair<>(KOTLIN_COMPILATION, result), new Pair<>(KSP_COMPILATION, kspResult));
     }
 
-    public static Pair<Pair<KotlinCompilation, KotlinCompilation.Result>, Pair<KotlinCompilation, KotlinCompilation.Result>> compileJava(String name, @Language("java") String clazz, Consumer<ClassElement> classElements) {
+    public static Pair<Pair<KotlinCompilation, JvmCompilationResult>, Pair<KotlinCompilation, JvmCompilationResult>> compileJava(String name, @Language("java") String clazz, Consumer<ClassElement> classElements) {
         try {
             Files.deleteIfExists(KOTLIN_COMPILATION.getWorkingDir().toPath());
         } catch (IOException e) {
             // ignore
         }
         KOTLIN_COMPILATION.setSources(Collections.singletonList(SourceFile.Companion.java(name + ".java", clazz, true)));
-        KotlinCompilation.Result result = KOTLIN_COMPILATION.compile();
+        JvmCompilationResult result = KOTLIN_COMPILATION.compile();
         if (result.getExitCode() != KotlinCompilation.ExitCode.OK) {
             throw new RuntimeException(result.getMessages());
         }
@@ -164,7 +167,7 @@ public class KotlinCompiler {
         KSP_COMPILATION.setSources(KOTLIN_COMPILATION.getSources());
         ClassElementTypeElementSymbolProcessorProvider classElementTypeElementSymbolProcessorProvider = new ClassElementTypeElementSymbolProcessorProvider(classElements);
         KspKt.setSymbolProcessorProviders(KSP_COMPILATION, Arrays.asList(classElementTypeElementSymbolProcessorProvider, new BeanDefinitionProcessorProvider()));
-        KotlinCompilation.Result kspResult = KSP_COMPILATION.compile();
+        JvmCompilationResult kspResult = KSP_COMPILATION.compile();
         if (kspResult.getExitCode() != KotlinCompilation.ExitCode.OK) {
             throw new RuntimeException(kspResult.getMessages());
         }
@@ -266,23 +269,16 @@ public class KotlinCompiler {
 
     @SuppressWarnings("java:S2095")
     public static ApplicationContext buildContext(@Language("kotlin") String clazz, boolean includeAllBeans, Map<String, Object> config) {
-        Pair<Pair<KotlinCompilation, KotlinCompilation.Result>, Pair<KotlinCompilation, KotlinCompilation.Result>> pair = compile("temp", clazz, classElement -> {
+        Pair<Pair<KotlinCompilation, JvmCompilationResult>, Pair<KotlinCompilation, JvmCompilationResult>> pair = compile("temp", clazz, classElement -> {
         });
         ClassLoader classLoader = toClassLoader(pair);
         var builder = ApplicationContext.builder();
         builder.classLoader(classLoader);
         builder.environments("test");
         builder.properties(config);
-        Environment environment = builder.build().getEnvironment();
-        return new DefaultApplicationContext((ApplicationContextConfiguration) builder) {
-
+        builder.beanDefinitionsProvider(new BeanDefinitionsProvider() {
             @Override
-            public Environment getEnvironment() {
-                return environment;
-            }
-
-            @Override
-            protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
+            public List<BeanDefinitionReference<?>> provide(ClassLoader classLoader) {
                 List<String> beanDefinitionNames = pair.component2().component1().
                     getClasspaths().stream().filter(f -> f.toURI().toString().contains("/ksp/sources/resources"))
                     .flatMap(dir -> {
@@ -290,10 +286,10 @@ public class KotlinCompiler {
                         if (files == null) {
                             return Stream.empty();
                         }
-                        return Stream.of(files).filter(f -> f.isFile());
-                    }).map(f -> f.getName()).toList();
+                        return Stream.of(files).filter(File::isFile);
+                    }).map(File::getName).toList();
 
-                List<BeanDefinitionReference> beanDefinitions = new ArrayList<>(beanDefinitionNames.size());
+                List<BeanDefinitionReference<?>> beanDefinitions = new ArrayList<>(beanDefinitionNames.size());
                 for (String name : beanDefinitionNames) {
                     try {
                         BeanDefinitionReference br = (BeanDefinitionReference) loadDefinition(classLoader, name);
@@ -304,7 +300,7 @@ public class KotlinCompiler {
                     }
                 }
                 if (includeAllBeans) {
-                    beanDefinitions.addAll(super.resolveBeanDefinitionReferences());
+                    beanDefinitions.addAll(new DefaultBeanDefinitionsProvider().provide(classLoader));
                 } else {
                     beanDefinitions.add(new InterceptorRegistryBean());
                     beanDefinitions.add(new BeanProviderDefinition());
@@ -312,7 +308,8 @@ public class KotlinCompiler {
                 }
                 return beanDefinitions;
             }
-        }.start();
+        });
+        return builder.build().start();
     }
 
     public static Object getBean(BeanContext beanContext, String className) throws ClassNotFoundException {
@@ -334,7 +331,7 @@ public class KotlinCompiler {
         }
     }
 
-    private static class ClassElementTypeElementSymbolProcessorProvider extends TypeElementSymbolProcessorProvider {
+    private static final class ClassElementTypeElementSymbolProcessorProvider extends TypeElementSymbolProcessorProvider {
         Consumer<ClassElement> classElements;
 
         public ClassElementTypeElementSymbolProcessorProvider(Consumer<ClassElement> classElements) {

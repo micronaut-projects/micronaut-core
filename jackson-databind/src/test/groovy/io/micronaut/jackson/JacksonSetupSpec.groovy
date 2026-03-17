@@ -15,15 +15,15 @@
  */
 package io.micronaut.jackson
 
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.databind.PropertyNamingStrategies
-import com.fasterxml.jackson.databind.SerializationFeature
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.MapPropertySource
 import io.micronaut.context.env.PropertySource
 import spock.lang.Specification
 import spock.lang.Unroll
+import tools.jackson.databind.DefaultTyping
+import tools.jackson.databind.ObjectMapper
+import tools.jackson.databind.PropertyNamingStrategies
+import tools.jackson.databind.SerializationFeature
 
 /**
  * Created by graemerocher on 31/08/2017.
@@ -33,7 +33,7 @@ class JacksonSetupSpec extends Specification {
     void "verify default jackson setup"() {
 
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test").start()
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build().start()
 
         expect:
         applicationContext.containsBean(ObjectMapper.class)
@@ -48,7 +48,7 @@ class JacksonSetupSpec extends Specification {
 
     void "verify json object mapper is primary"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test").start()
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build().start()
         ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper.class)
 
         expect:
@@ -61,10 +61,10 @@ class JacksonSetupSpec extends Specification {
     void "verify custom jackson setup"() {
 
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build()
         applicationContext.environment.addPropertySource((MapPropertySource) PropertySource.of(
                 'jackson.dateFormat': 'yyMMdd',
-                'jackson.serialization.indentOutput': true,
+                'jackson.serialization-features.indentOutput': true,
                 'jackson.json-view.enabled': true
         ))
         applicationContext.start()
@@ -75,7 +75,7 @@ class JacksonSetupSpec extends Specification {
 
         applicationContext.containsBean(JacksonConfiguration)
         applicationContext.getBean(JacksonConfiguration).dateFormat == 'yyMMdd'
-        applicationContext.getBean(JacksonConfiguration).serializationSettings.get(SerializationFeature.INDENT_OUTPUT)
+        applicationContext.getBean(JacksonConfiguration).serializationFeatures.get(SerializationFeature.INDENT_OUTPUT)
 
         cleanup:
         applicationContext?.close()
@@ -83,7 +83,7 @@ class JacksonSetupSpec extends Specification {
 
     void "verify that the defaultTyping configuration option is correctly converted and set on the object mapper"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build()
         applicationContext.environment.addPropertySource((MapPropertySource) PropertySource.of(
                 'jackson.dateFormat': 'yyMMdd',
                 'jackson.defaultTyping': 'NON_FINAL'
@@ -92,10 +92,10 @@ class JacksonSetupSpec extends Specification {
 
         expect:
         applicationContext.containsBean(ObjectMapper.class)
-        ((ObjectMapper.DefaultTypeResolverBuilder) applicationContext.getBean(ObjectMapper.class).deserializationConfig.getDefaultTyper(null))._appliesFor == ObjectMapper.DefaultTyping.NON_FINAL
+        applicationContext.getBean(ObjectMapper.class).rebuild().baseSettings().getDefaultTyper() != null
 
         applicationContext.containsBean(JacksonConfiguration)
-        applicationContext.getBean(JacksonConfiguration).defaultTyping == ObjectMapper.DefaultTyping.NON_FINAL
+        applicationContext.getBean(JacksonConfiguration).defaultTyping == DefaultTyping.NON_FINAL
 
         cleanup:
         applicationContext?.close()
@@ -113,7 +113,7 @@ class JacksonSetupSpec extends Specification {
         applicationContext.getBean(JacksonConfiguration).propertyNamingStrategy == expectedPropertyNamingStrategy
 
         applicationContext.containsBean(ObjectMapper.class)
-        applicationContext.getBean(ObjectMapper.class).getPropertyNamingStrategy() == expectedPropertyNamingStrategy
+        applicationContext.getBean(ObjectMapper.class).rebuild().baseSettings().getPropertyNamingStrategy() == expectedPropertyNamingStrategy
 
         cleanup:
         applicationContext?.close()
@@ -137,7 +137,7 @@ class JacksonSetupSpec extends Specification {
 
     void "verify trim strings with custom property enabled"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build()
         applicationContext.environment.addPropertySource((MapPropertySource) PropertySource.of(
                 'jackson.trim-strings': true
         ))
@@ -152,7 +152,7 @@ class JacksonSetupSpec extends Specification {
 
     void "verify strings are not trimmed by default"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build()
         applicationContext.start()
 
         expect:

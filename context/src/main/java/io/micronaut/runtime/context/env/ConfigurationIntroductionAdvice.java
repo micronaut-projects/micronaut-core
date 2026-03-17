@@ -20,7 +20,6 @@ import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
-import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.context.DefaultBeanResolutionContext;
 import io.micronaut.context.Qualifier;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
@@ -29,12 +28,13 @@ import io.micronaut.context.annotation.Prototype;
 import io.micronaut.context.env.ConfigurationPath;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.bind.annotation.Bindable;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.value.PropertyNotFoundException;
 import io.micronaut.inject.BeanDefinition;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.Optional;
@@ -56,8 +56,10 @@ public class ConfigurationIntroductionAdvice implements MethodInterceptor<Object
     private static final String MEMBER_BEAN = "bean";
     private static final String MEMBER_NAME = "name";
     private final Environment environment;
+    private final ConversionService conversionService;
     private final BeanContext beanContext;
     private final ConfigurationPath configurationPath;
+    @Nullable
     private final BeanDefinition<?> beanDefinition;
 
     /**
@@ -73,6 +75,7 @@ public class ConfigurationIntroductionAdvice implements MethodInterceptor<Object
         BeanContext beanContext) {
         this.beanDefinition = resolutionContext.getRootDefinition();
         this.environment = environment;
+        this.conversionService = environment.getConversionService();
         this.beanContext = beanContext;
         this.configurationPath = resolutionContext.getConfigurationPath().copy();
     }
@@ -90,6 +93,7 @@ public class ConfigurationIntroductionAdvice implements MethodInterceptor<Object
         }
     }
 
+    @Nullable
     private Object resolveProperty(MethodInvocationContext<Object, Object> context, ReturnType<Object> rt, Argument<Object> argument) {
         String property = context.stringValue(Property.class, MEMBER_NAME).orElse(null);
         if (property == null) {
@@ -108,7 +112,7 @@ public class ConfigurationIntroductionAdvice implements MethodInterceptor<Object
         if (defaultValue != null) {
             Object result = value.orElse(null);
             if (result == null) {
-                return environment.convertRequired(defaultValue, argument);
+                return conversionService.convertRequired(defaultValue, argument);
             }
             return result;
         } else if (rt.isOptional()) {
@@ -121,28 +125,29 @@ public class ConfigurationIntroductionAdvice implements MethodInterceptor<Object
         }
     }
 
+    @Nullable
     private Object resolveBean(MethodInvocationContext<Object, Object> context, Class<Object> returnType, Argument<Object> argument) {
         final Qualifier<Object> qualifier = configurationPath.beanQualifier();
         if (Iterable.class.isAssignableFrom(returnType)) {
             @SuppressWarnings("unchecked")
             Argument<Object> firstArg = (Argument<Object>) argument.getFirstTypeVariable().orElse(null);
             if (firstArg != null) {
-                return environment.convertRequired(beanContext.getBeansOfType(firstArg, qualifier), argument);
+                return conversionService.convertRequired(beanContext.getBeansOfType(firstArg, qualifier), argument);
             } else {
-                return environment.convertRequired(Collections.emptyMap(), argument);
+                return conversionService.convertRequired(Collections.emptyMap(), argument);
             }
         } else if (context.isNullable()) {
             final Object v = beanContext.findBean(argument, qualifier).orElse(null);
             if (v != null) {
-                return environment.convertRequired(v, returnType);
+                return conversionService.convertRequired(v, returnType);
             } else {
                 return v;
             }
         } else {
             try (BeanResolutionContext rc = new DefaultBeanResolutionContext(beanContext, beanDefinition)) {
                 rc.setConfigurationPath(configurationPath);
-                return environment.convertRequired(
-                    ((DefaultBeanContext) beanContext).getBean(rc, argument, qualifier),
+                return conversionService.convertRequired(
+                    rc.getBean(argument, qualifier),
                     returnType
                 );
             }

@@ -17,7 +17,6 @@ package io.micronaut.management.endpoint.loggers.impl;
 
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.logging.LogLevel;
 import io.micronaut.management.endpoint.loggers.LoggerConfiguration;
 import io.micronaut.management.endpoint.loggers.LoggersEndpoint;
@@ -28,6 +27,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.core.LoggerContext;
 import org.apache.logging.log4j.core.config.Configurator;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collection;
 
@@ -46,7 +46,6 @@ import static java.util.stream.Collectors.toList;
 public class Log4jLoggingSystem implements ManagedLoggingSystem, io.micronaut.logging.LoggingSystem {
 
     @Override
-    @NonNull
     public Collection<LoggerConfiguration> getLoggers() {
         return getLog4jLoggerContext()
             .getLoggers()
@@ -56,7 +55,6 @@ public class Log4jLoggingSystem implements ManagedLoggingSystem, io.micronaut.lo
     }
 
     @Override
-    @NonNull
     public LoggerConfiguration getLogger(String name) {
         return toLoggerConfiguration(LogManager.getLogger(name));
     }
@@ -81,6 +79,7 @@ public class Log4jLoggingSystem implements ManagedLoggingSystem, io.micronaut.lo
      * @param logLevel The micronaut {@link LogLevel} to convert
      * @return The converted log4j {@link Level}
      */
+    @Nullable
     private static Level toLog4jLevel(LogLevel logLevel) {
         if (logLevel == LogLevel.NOT_SPECIFIED) {
             return null;

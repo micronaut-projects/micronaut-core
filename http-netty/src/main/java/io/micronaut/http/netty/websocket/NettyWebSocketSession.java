@@ -16,8 +16,7 @@
 package io.micronaut.http.netty.websocket;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.value.ConvertibleMultiValues;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
@@ -222,9 +221,8 @@ public class NettyWebSocketSession implements WebSocketSession {
         }, FluxSink.OverflowStrategy.ERROR);
     }
 
-    @NonNull
     @Override
-    public CompletableFuture<?> sendPingAsync(@NonNull byte[] content) {
+    public CompletableFuture<?> sendPingAsync(byte[] content) {
         if (isOpen()) {
             ByteBuf messageBuffer = channel.alloc().buffer(content.length);
             messageBuffer.writeBytes(content);
