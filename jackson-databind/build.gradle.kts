@@ -14,6 +14,7 @@ dependencies {
         exclude(group = "io.micronaut")
     }
 
+    api(platform(libs.boms.jackson))
     api(libs.managed.jackson.databind)
     api(libs.managed.jackson.datatype.jdk8)
     api(libs.managed.jackson.datatype.jsr310)

@@ -41,13 +41,7 @@ final class JacksonDatabindFeature implements Feature {
             PropertyNamingStrategies.UpperSnakeCaseStrategy.class,
             PropertyNamingStrategies.LowerCaseStrategy.class,
             PropertyNamingStrategies.KebabCaseStrategy.class,
-            PropertyNamingStrategies.LowerDotCaseStrategy.class,
-
-            PropertyNamingStrategy.UpperCamelCaseStrategy.class,
-            PropertyNamingStrategy.SnakeCaseStrategy.class,
-            PropertyNamingStrategy.LowerCaseStrategy.class,
-            PropertyNamingStrategy.KebabCaseStrategy.class,
-            PropertyNamingStrategy.LowerDotCaseStrategy.class
+            PropertyNamingStrategies.LowerDotCaseStrategy.class
         ).forEach(RuntimeReflection::registerForReflectiveInstantiation);
     }
 }
