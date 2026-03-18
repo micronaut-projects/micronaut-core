@@ -184,8 +184,13 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                 }
             });
             responseFlow.onComplete((response, throwable) -> {
-                if (response != null) {
+                if (response == null) {
+                    return;
+                }
+                if (ctx.executor().inEventLoop()) {
                     writeResponse(ctx, msg, requestLifecycle.shouldProceedNormally, response, outboundAccess);
+                } else {
+                    ctx.executor().execute(() -> writeResponse(ctx, msg, requestLifecycle.shouldProceedNormally, response, outboundAccess));
                 }
             });
         } else {
