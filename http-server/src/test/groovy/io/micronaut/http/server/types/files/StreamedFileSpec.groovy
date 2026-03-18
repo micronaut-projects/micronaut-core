@@ -15,7 +15,7 @@ class StreamedFileSpec extends Specification {
             encoder.addParam("foo", s)
             def encoded = encoder.toString().substring("?foo=".length())
 
-            assert StreamedFile.encodeRfc6987(s) == encoded
+            assert StreamedFile.encodeRfc5987(s) == encoded
         }
     }
 
