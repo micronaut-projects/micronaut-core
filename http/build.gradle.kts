@@ -14,7 +14,6 @@ dependencies {
     compileOnly(libs.managed.kotlinx.coroutines.reactor)
     compileOnly(libs.managed.netty.pkitesting)
 
-    implementation(platform(libs.boms.jackson))
     compileOnly(libs.managed.jackson.annotations)
 
     testCompileOnly(projects.micronautInjectGroovy)

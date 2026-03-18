@@ -72,7 +72,6 @@ dependencies {
 //        exclude module:'micronaut-http'
 //        exclude module:'micronaut-bom'
 //    }
-    testImplementation(platform(libs.boms.jackson))
     testImplementation(libs.managed.jackson.databind)
 
     // http impls for tests

@@ -7,7 +7,6 @@ dependencies {
 
     api(projects.micronautJsonCore)
 
-    api(platform(libs.boms.jackson))
     api(libs.managed.jackson.core)
     api(libs.managed.jackson.annotations)
     compileOnly(libs.managed.netty.buffer)

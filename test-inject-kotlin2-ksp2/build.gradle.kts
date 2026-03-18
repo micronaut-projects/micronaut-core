@@ -38,7 +38,6 @@ dependencies {
     testImplementation(projects.micronautJacksonDatabind)
     testImplementation(libs.kotlin2.stdlib)
     testImplementation(projects.micronautHttpClient)
-    testImplementation(platform(libs.boms.jackson))
     testImplementation( libs.managed.jackson.annotations)
     testImplementation(libs.managed.reactor)
     testImplementation(libs.hibernate)

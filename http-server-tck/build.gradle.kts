@@ -16,7 +16,6 @@ dependencies {
         exclude(group = "io.micronaut")
     }
     implementation(projects.micronautRuntime)
-    implementation(platform(libs.boms.jackson))
     implementation(libs.managed.jackson.annotations)
     implementation(projects.micronautInject)
     implementation(projects.micronautManagement)
