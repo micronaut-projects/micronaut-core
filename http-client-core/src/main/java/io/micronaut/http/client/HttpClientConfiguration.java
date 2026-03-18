@@ -699,7 +699,7 @@ public abstract class HttpClientConfiguration {
      * [available in the Netty HTTP client].
      *
      * @return The maximum initial line length the client can handle
-     * @since 5.0.1
+     * @since 5.0.0
      */
     public int getMaxInitialLineLength() {
         return maxInitialLineLength;
@@ -709,7 +709,7 @@ public abstract class HttpClientConfiguration {
      * [available in the Netty HTTP client].
      *
      * @return The maximum chunk size the client can handle
-     * @since 5.0.1
+     * @since 5.0.0
      */
     public int getMaxChunkSize() {
         return maxChunkSize;
@@ -728,7 +728,7 @@ public abstract class HttpClientConfiguration {
      * Sets the maximum initial line length the client can handle. Default value ({@value io.micronaut.http.client.HttpClientConfiguration#DEFAULT_MAX_INITIAL_LINE_LENGTH}).
      *
      * @param maxInitialLineLength The maximum initial line length the client can handle
-     * @since 5.0.1
+     * @since 5.0.0
      */
     public void setMaxInitialLineLength(@ReadableBytes int maxInitialLineLength) {
         this.maxInitialLineLength = maxInitialLineLength;
@@ -738,7 +738,7 @@ public abstract class HttpClientConfiguration {
      * Sets the maximum chunk size the client can handle. Default value ({@value io.micronaut.http.client.HttpClientConfiguration#DEFAULT_MAX_CHUNK_SIZE}).
      *
      * @param maxChunkSize The maximum chunk size the client can handle
-     * @since 5.0.1
+     * @since 5.0.0
      */
     public void setMaxChunkSize(@ReadableBytes int maxChunkSize) {
         this.maxChunkSize = maxChunkSize;
