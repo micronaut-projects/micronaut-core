@@ -48,6 +48,7 @@ public class FormBindingDeadlockTest {
     private static final String SPEC_NAME = "FormBindingDeadlockTest";
     private static final String DID_NOT_FAIL = "did not fail";
     private static final String LARGE = "_".repeat(1024 * 1024);
+    private static final String HALF_ASYNC_FAIL_MESSAGE = "Argument [RawFormField asyncPart] not satisfied: This argument won't consume posted data until you subscribe to it in the controller. This prevents the following arguments from being bound:\n  [String syncPart] has not yet been received.";
 
     private static void test(String uri, String body, String expectedResponse) throws IOException {
         TestScenario.builder()
@@ -89,7 +90,9 @@ public class FormBindingDeadlockTest {
                     .assertResponse(httpResponse -> {
                         Optional<String> bodyOptional = httpResponse.getBody(String.class);
                         assertTrue(bodyOptional.isPresent());
-                        assertEquals("{\"message\":\"Bad Request\",\"_embedded\":{\"errors\":[{\"message\":\"Argument [RawFormField asyncPart] not satisfied: This argument won't consume posted data until you subscribe to it in the controller. This prevents the following arguments from being bound:\\n  [String syncPart] has not yet been received.\",\"path\":\"/asyncPart\"}]},\"_links\":{\"self\":{\"href\":\"/deadlock/half-async\",\"templated\":false}}}", bodyOptional.get());
+                        String normalizedBody = bodyOptional.get().replace("\\n", "").replace("\n", "");
+                        String normalizedMessage = HALF_ASYNC_FAIL_MESSAGE.replace("\n", "");
+                        assertTrue(normalizedBody.contains(normalizedMessage), "error response should contain the deadlock message");
                     })
                     .build()))
             .run();

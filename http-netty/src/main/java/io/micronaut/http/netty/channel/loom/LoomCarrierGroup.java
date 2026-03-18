@@ -79,6 +79,9 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
         return runner.delegate;
     }
 
+    /**
+     * Factory for creating {@link LoomCarrierGroup} instances.
+     */
     @Singleton
     @Requires(condition = LoomSupport.LoomCondition.class)
     @Requires(condition = PrivateLoomSupport.PrivateLoomCondition.class)
