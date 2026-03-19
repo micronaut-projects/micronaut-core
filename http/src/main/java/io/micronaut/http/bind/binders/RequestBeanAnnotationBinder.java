@@ -125,16 +125,17 @@ public class RequestBeanAnnotationBinder<T> implements AnnotatedRequestArgumentB
             throw new UnsatisfiedArgumentException(argument);
         }
         BindingResult<Object> result = binder.get().bind(conversionContext, source);
-        if (!result.isSatisfied() || !result.getConversionErrors().isEmpty()) {
-            List<ConversionError> errors = result.getConversionErrors();
-            if (!errors.isEmpty()) {
-                throw new ConversionErrorException(argument, errors.iterator().next());
-            }
+        List<ConversionError> errors = result.getConversionErrors();
+        if (!errors.isEmpty()) {
+            throw new ConversionErrorException(argument, errors.iterator().next());
         }
-        if (!result.isPresentAndSatisfied() && !argument.isNullable() && !argument.getType().isAssignableFrom(Optional.class)) {
-            throw new UnsatisfiedArgumentException(argument);
+        if (result.isPresentAndSatisfied()) {
+            return result.getValue();
         }
-        return result.getValue();
+        if (result.isSatisfied() && (argument.isNullable() || argument.isOptional())) {
+            return result.getValue();
+        }
+        throw new UnsatisfiedArgumentException(argument);
     }
 
 }
