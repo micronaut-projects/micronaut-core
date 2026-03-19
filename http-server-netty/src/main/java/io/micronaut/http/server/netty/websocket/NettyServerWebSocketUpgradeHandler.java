@@ -156,7 +156,8 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                 );
                 outboundAccess.attachment(errorRequest);
                 outboundAccess.closeAfterWrite();
-                try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(errorRequest)).propagate()) {
+
+                PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(errorRequest)).propagate(() -> {
                     Throwable cause = e.getCause() == null ? e : e.getCause();
                     MutableHttpResponse<?> response = routeExecutor.getErrorResponseProcessor().processResponse(
                         ErrorContext.builder(errorRequest)
@@ -169,7 +170,7 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                         response.contentType(MediaType.APPLICATION_JSON_TYPE);
                     }
                     Objects.requireNonNull(next).writeResponse(outboundAccess, errorRequest, response, null);
-                }
+                });
                 return;
             }
 
