@@ -17,8 +17,11 @@ import io.micronaut.websocket.annotation.OnMessage
 import io.micronaut.websocket.annotation.ServerWebSocket
 import io.netty.channel.embedded.EmbeddedChannel
 import io.netty.handler.codec.http.DefaultHttpHeaders
+import io.netty.handler.codec.http.FullHttpResponse
 import io.netty.handler.codec.http.HttpClientCodec
+import io.netty.handler.codec.http.HttpHeaderNames
 import io.netty.handler.codec.http.HttpObjectAggregator
+import io.netty.handler.codec.http.HttpResponseStatus
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame
 import io.netty.handler.codec.http.websocketx.WebSocketClientHandshakerFactory
 import io.netty.handler.codec.http.websocketx.WebSocketFrame
@@ -100,6 +103,58 @@ class WebSocketSpec extends Specification {
             delay = Sinks.empty()
             return Flux.concat(delay.asMono(), Flux.defer(() -> chain.proceed(request)))
         }
+    }
+
+
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/11572')
+    def 'malformed websocket URI returns 400 and closes connection'() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run([
+                'spec.name': 'WebSocketSpec11572',
+        ])
+        def embeddedServer = (NettyHttpServer) ctx.getBean(EmbeddedServer)
+
+        def serverEmbeddedChannel = embeddedServer.buildEmbeddedChannel(false)
+        def clientEmbeddedChannel = new EmbeddedChannel()
+        clientEmbeddedChannel.config().setAutoRead(true)
+
+        EmbeddedTestUtil.connect(serverEmbeddedChannel, clientEmbeddedChannel)
+
+        clientEmbeddedChannel.pipeline()
+                .addLast(new HttpClientCodec())
+                .addLast(new HttpObjectAggregator(1024))
+
+        def request = WebSocketClientHandshakerFactory.newHandshaker(
+                URI.create('http://localhost/%7Btest%7D'),
+                WebSocketVersion.V13,
+                null,
+                false,
+                new DefaultHttpHeaders()
+        ).newHandshakeRequest()
+        request.setUri('/{test}')
+        request.headers().set(HttpHeaderNames.HOST, 'localhost')
+
+        when:
+        clientEmbeddedChannel.writeOneOutbound(request)
+        clientEmbeddedChannel.flushOutbound()
+        EmbeddedTestUtil.advance(serverEmbeddedChannel, clientEmbeddedChannel)
+
+        then:
+        FullHttpResponse response = clientEmbeddedChannel.readInbound()
+        response.status() == HttpResponseStatus.BAD_REQUEST
+        response.headers().get(HttpHeaderNames.CONNECTION) == 'close'
+
+        when:
+        EmbeddedTestUtil.advance(serverEmbeddedChannel, clientEmbeddedChannel)
+
+        then:
+        !serverEmbeddedChannel.isOpen()
+
+        cleanup:
+        response?.release()
+        clientEmbeddedChannel.finishAndReleaseAll()
+        serverEmbeddedChannel.finishAndReleaseAll()
+        ctx.close()
     }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/11506')

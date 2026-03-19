@@ -8,7 +8,11 @@ import io.micronaut.test.lombok.importtest.VersionManifest;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -25,6 +29,25 @@ public class LombokIntrospectedBuilderTest {
         assertNotNull(entry);
         assertEquals("test", entry.getName());
         assertEquals(1, entry.getMajorVersion());
+    }
+
+    @Test
+    void testImportedBuilderIntrospectionUsesLongDescriptorName() {
+        BeanIntrospection<VersionManifest.VersionManifestEntry> introspection = BeanIntrospection.getIntrospection(VersionManifest.VersionManifestEntry.class);
+        assertTrue(introspection.hasBuilder());
+        VersionManifest.VersionManifestEntry entry = introspection.builder()
+            .with("name", "test")
+            .with("majorVersion", 1)
+            .with("minorVersion", 2)
+            .build();
+        assertEquals("test", entry.getName());
+
+        Path descriptorsDirectory = Path.of("build", "classes", "java", "test", "META-INF", "micronaut", "io.micronaut.core.beans.BeanIntrospectionReference");
+        String builderDescriptorName = findDescriptorName(descriptorsDirectory, "VersionManifestEntryBuilder");
+        assertTrue(
+            builderDescriptorName.contains("$io_micronaut_test_lombok_importtest_VersionManifest$VersionManifestEntry$VersionManifestEntryBuilder$Introspection"),
+            () -> "Expected imported builder descriptor to keep long naming, got: " + builderDescriptorName
+        );
     }
 
     @Test
@@ -172,5 +195,18 @@ public class LombokIntrospectedBuilderTest {
 
         assertEquals("c1", innerClassEntity.getCompartmentId());
         assertEquals(current, innerClassEntity.getTimeCreated());
+    }
+
+    private static String findDescriptorName(Path descriptorsDirectory, String contains) {
+        try (var stream = Files.list(descriptorsDirectory)) {
+            List<String> names = stream
+                .map(path -> path.getFileName().toString())
+                .filter(name -> name.contains(contains))
+                .toList();
+            assertEquals(1, names.size(), () -> "Expected exactly one descriptor containing '" + contains + "' but found: " + names);
+            return names.getFirst();
+        } catch (IOException e) {
+            throw new IllegalStateException("Unable to inspect generated introspection descriptors", e);
+        }
     }
 }

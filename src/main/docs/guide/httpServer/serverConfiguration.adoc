@@ -17,7 +17,7 @@ micronaut:
         autoRead: true
 ----
 - By default, Micronaut framework binds to all network interfaces. Use `localhost` to bind only to loopback network interface
-- `maxHeaderSize` sets the maximum size for headers
+- `maxHeaderSize` sets the maximum header size
 - `worker.threads` specifies the number of Netty worker threads
 - `autoRead` enables request body auto read
 
