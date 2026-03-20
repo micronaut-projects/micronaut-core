@@ -68,7 +68,7 @@ zacsweers-kotlin-compile-testing = "0.12.1"
 errorprone-gradle-plugin = "4.3.0"
 nullaway = "0.12.15"
 error_prone_core = "2.45.0"
-jackson2 = "2.21.1"
+jackson2 = "2.21.2"
 
 #
 # Versions which start with managed- are managed by Micronaut in the sense
