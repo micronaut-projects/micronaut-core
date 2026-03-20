@@ -9,3 +9,5 @@ The `getPropertySources` returns a rs:Publisher[] that emits zero or many api:co
 The default implementation is api:discovery.config.DefaultCompositeConfigurationClient[] which merges all registered `ConfigurationClient` beans into a single bean.
 
 You can either implement your own api:discovery.config.ConfigurationClient[] or use the implementations provided by Micronaut. The following sections cover those.
+
+NOTE: When implementing custom distributed configuration that is loaded during bootstrap, implementing api:discovery.config.ConfigurationClient[] alone is not enough. The application also needs the discovery client infrastructure, which normally comes from the `io.micronaut.discovery:micronaut-discovery-client` dependency, and any beans involved in resolving that configuration must still be bootstrap-compatible.
