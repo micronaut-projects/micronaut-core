@@ -532,6 +532,9 @@ public class DefaultMutableConversionService implements MutableConversionService
             }
         });
 
+        // CharSequence -> String
+        addInternalConverter(CharSequence.class, String.class, (object, targetType, context) -> Optional.of(object.toString()));
+
         // String -> File
         addInternalConverter(CharSequence.class, File.class, (object, targetType, context) -> {
             if (StringUtils.isEmpty(object)) {

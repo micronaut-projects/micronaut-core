@@ -119,4 +119,27 @@ class DefaultConversionServiceSpec extends Specification {
         "1"          | Optional   | [T: Argument.of(Long, 'T')]    | Optional.of(1L)
 
     }
+
+    void "test conversion service preserves empty string elements for string iterables"() {
+        given:
+        ConversionService conversionService = new DefaultMutableConversionService()
+
+        expect:
+        conversionService.convert(sourceObject, List, ConversionContext.of([E: Argument.of(String, 'E')])).get() == result
+
+        where:
+        sourceObject | result
+        ""           | [""]
+        ","          | ["", ""]
+        "a,,b"       | ["a", "", "b"]
+    }
+
+    void "test conversion service converts char sequence to string"() {
+        given:
+        ConversionService conversionService = new DefaultMutableConversionService()
+
+        expect:
+        conversionService.convert(new StringBuilder("value"), String).get() == "value"
+        conversionService.convert(new StringBuilder(""), String).get() == ""
+    }
 }
