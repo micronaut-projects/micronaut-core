@@ -12,6 +12,22 @@ import java.time.DayOfWeek
  */
 class DefaultConversionServiceSpec extends Specification {
 
+    void "test optional registrar linkage errors are ignored"() {
+        given:
+        def conversionService = new DefaultMutableConversionService()
+        def registrars = [
+            new FailingTypeConverterRegistrar(),
+            new WorkingTypeConverterRegistrar()
+        ]
+
+        when:
+        conversionService.registerInternalTypeConverters(registrars)
+
+        then:
+        conversionService.convert("123", Integer).get() == 123
+        conversionService.convert("ok", TestValue).get() == TestValue.OK
+    }
+
     void "test default conversion service converts a #sourceObject.class.name to a #targetType.name"() {
         given:
         ConversionService conversionService = new DefaultMutableConversionService()
@@ -118,5 +134,25 @@ class DefaultConversionServiceSpec extends Specification {
         "1,2"        | Iterable   | [T: Argument.of(Long, 'T')]    | [1l, 2l]
         "1"          | Optional   | [T: Argument.of(Long, 'T')]    | Optional.of(1L)
 
+    }
+
+    static final class FailingTypeConverterRegistrar implements TypeConverterRegistrar {
+        @Override
+        void register(MutableConversionService conversionService) {
+            throw new NoClassDefFoundError("org/apache/hc/core5/http/HttpHost")
+        }
+    }
+
+    static final class WorkingTypeConverterRegistrar implements TypeConverterRegistrar {
+        @Override
+        void register(MutableConversionService conversionService) {
+            conversionService.addConverter(String, TestValue) { value ->
+                value == 'ok' ? TestValue.OK : null
+            }
+        }
+    }
+
+    static enum TestValue {
+        OK
     }
 }

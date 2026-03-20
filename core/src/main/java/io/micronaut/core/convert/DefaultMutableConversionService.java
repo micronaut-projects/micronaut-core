@@ -95,6 +95,9 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import static io.micronaut.core.reflect.ReflectionUtils.EMPTY_CLASS_ARRAY;
 
 /**
@@ -104,6 +107,7 @@ import static io.micronaut.core.reflect.ReflectionUtils.EMPTY_CLASS_ARRAY;
  * @since 1.0
  */
 public class DefaultMutableConversionService implements MutableConversionService {
+    private static final Logger LOG = LoggerFactory.getLogger(DefaultMutableConversionService.class);
 
     private static final int CACHE_MAX = 256;
     private static final int CACHE_EVICTION_BATCH = 64;
@@ -1190,8 +1194,16 @@ public class DefaultMutableConversionService implements MutableConversionService
         SoftServiceLoader.load(TypeConverterRegistrar.class)
                 .disableFork()
                 .collectAll(registrars);
-        for (TypeConverterRegistrar registrar : registrars) {
+        registerInternalTypeConverters(registrars);
+    }
+
+    private void registerTypeConverterRegistrar(TypeConverterRegistrar registrar) {
+        try {
             registrar.register(internalMutableConversionService);
+        } catch (TypeNotPresentException | LinkageError e) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Skipping type converter registrar [{}] because an optional dependency is not available", registrar.getClass().getName(), e);
+            }
         }
     }
 
@@ -1204,7 +1216,7 @@ public class DefaultMutableConversionService implements MutableConversionService
     @Internal
     public void registerInternalTypeConverters(Collection<TypeConverterRegistrar> registrars) {
         for (TypeConverterRegistrar registrar : registrars) {
-            registrar.register(internalMutableConversionService);
+            registerTypeConverterRegistrar(registrar);
         }
     }
 
