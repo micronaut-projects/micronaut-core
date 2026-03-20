@@ -983,7 +983,7 @@ public class DefaultMutableConversionService implements MutableConversionService
             ConversionContext newContext = context.with(componentType);
 
             Class<?> targetComponentType = ReflectionUtils.getWrapperType(componentType.getType());
-            String[] strings = object.toString().split(",");
+            String[] strings = object.toString().split(",", -1);
             List<Object> list = new ArrayList<>();
             for (String string : strings) {
                 Optional<?> converted = convert(string, targetComponentType, newContext);
