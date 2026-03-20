@@ -390,4 +390,33 @@ interface MyConfig {
         cleanup:
             context.close()
     }
+
+    void "test interface method runtime annotation is retained on intercepted config proxy"() {
+
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyConfig$Intercepted', '''
+package test;
+
+import io.micronaut.context.annotation.*;
+import java.lang.annotation.*;
+
+@ConfigurationProperties("foo.bar")
+interface MyConfig {
+    @Exported
+    String getHost();
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.METHOD)
+@interface Exported {
+}
+
+''')
+        def interceptedClass = beanDefinition.class.classLoader.loadClass('test.MyConfig$Intercepted')
+        def interceptedMethod = interceptedClass.getDeclaredMethod('getHost')
+
+        then:
+        beanDefinition.getRequiredMethod('getHost').hasAnnotation('test.Exported')
+        interceptedMethod.getAnnotation(interceptedClass.classLoader.loadClass('test.Exported')) != null
+    }
 }
