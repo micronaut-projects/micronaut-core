@@ -555,7 +555,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                                                                     MethodElement methodElement) {
         for (AnnotationValue<Annotation> annotationValue : methodElement.getMethodAnnotationMetadata().getDeclaredAnnotationValuesByType(Annotation.class)) {
             if (annotationValue.getRetentionPolicy() == RetentionPolicy.RUNTIME) {
-                methodBuilder.addAnnotation(AnnotationDef.of(annotationValue));
+                methodBuilder.addAnnotation(AnnotationDef.of(annotationValue, visitorContext));
             }
         }
         return methodBuilder;
