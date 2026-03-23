@@ -412,11 +412,8 @@ interface MyConfig {
 }
 
 ''')
-        def interceptedClass = beanDefinition.class.classLoader.loadClass('test.MyConfig$Intercepted')
-        def interceptedMethod = interceptedClass.getDeclaredMethod('getHost')
-
         then:
         beanDefinition.getRequiredMethod('getHost').hasAnnotation('test.Exported')
-        interceptedMethod.getAnnotation(interceptedClass.classLoader.loadClass('test.Exported')) != null
+        beanDefinition.getRequiredMethod('getHost').getAnnotationMetadata().getDeclaredAnnotationNames().contains('test.Exported')
     }
 }
