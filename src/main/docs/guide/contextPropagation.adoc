@@ -1,23 +1,219 @@
-The new Propagation Context API aims to simplify reactor instrumentation, avoid thread-local usage, and integrate idiomatically with Kotlin Coroutines.
+Micronaut’s Propagated Context API provides a single, consistent way to pass request scoped data across threads, reactors, and coroutines without relying directly on `ThreadLocal`.
 
-The api:core.propagation.PropagatedContext[] object represents the context propagation. We designed the context propagation API for immutability. It consists of multiple elements of type api:core.propagation.PropagatedContextElement[].
+=== PropagatedContext building blocks
 
-Each element represents a particular state that needs to be propagated. There is a special element that can be used to update and restore the thread-local value api:core.propagation.ThreadPropagatedContextElement[]:
+The central type is api:core.propagation.PropagatedContext[]. It is an immutable container that holds any number of api:core.propagation.PropagatedContextElement[] instances. Elements are lightweight descriptors of the data you want to make available downstream—for example a trace identifier, security information, or a copy of the logging MDC. Because the context is immutable you build a new instance whenever you add or remove an element:
 
-.Example of MDC propagated element implementing `ThreadPropagatedContextElement`
+[source,java]
+----
+PropagatedContext base = PropagatedContext.getOrEmpty();
+PropagatedContext enriched = base.plus(new TraceIdContextElement(traceId));
+----
+
+If an element needs to interact with thread-local state (for example to update the MDC) it can also implement api:core.propagation.ThreadPropagatedContextElement[], which allows Micronaut to capture the previous thread-local state and restore it later. When you want to surface a JDK `ScopedValue`, implement api:core.propagation.ScopedValuePropagatedContextElement[] and Micronaut will automatically bind the provided `ScopedValue` and value while the context is propagated.
+
+.Example MDC element implementing `ThreadPropagatedContextElement`
 [source,java]
 ----
 include::{testsuitejava}/propagation/MdcPropagationContext.java[tags="class"]
 ----
-<1> The class has the MDC state passed in the contractor
-<2> The context update sets the MDC state as the current one
-<3> The previous state is captured to be restored
-<3> The previous state is restored
+<1> Accept the MDC state that should be propagated.
+<2> In `updateThreadContext` push the MDC state into the current thread.
+<3> Capture the previous MDC so it can be restored.
+<4> Restore the previous MDC state when the scope exits.
 
-In this example, the propagated context element implements the setting of the MDC context, and it restores it after.
+NOTE: api:core.propagation.ThreadPropagatedContextElement[] mirrors the behaviour of Kotlin’s `kotlinx.coroutines.ThreadContextElement`, which makes it easy to integrate with coroutines.
 
-NOTE: The api:core.propagation.ThreadPropagatedContextElement[] is inspired by Kotlin Coroutines propagation API element `kotlinx.coroutines.ThreadContextElement`
+NOTE: api:core.propagation.ScopedValuePropagatedContextElement[] lets you expose existing `ScopedValue` keys so Micronaut can apply `ScopedValue.where(key, value)` for every element before executing your code.
+
+Example of chaining multiple scoped value bindings:
+
+[source,java]
+----
+class UserContextElement implements ScopedValuePropagatedContextElement<String> {
+
+    static final ScopedValue<String> USER_ID = ScopedValue.newInstance();
+
+    private final String userId;
+
+    UserContextElement(String userId) {
+        this.userId = userId;
+    }
+
+    @Override
+    public ScopedValue<String> scopedValue() {
+        return USER_ID;
+    }
+
+    @Override
+    public String scopedValueValue() {
+        return userId;
+    }
+
+    String currentUserId() {
+        return USER_ID.isBound() ? USER_ID.get() : null;
+    }
+}
+----
+
+To bind and read the value purely with the JDK `ScopedValue` API:
+
+[source,java]
+----
+PropagatedContext context = PropagatedContext.getOrEmpty()
+    .plus(new UserContextElement("42"));
+
+String userId = context.propagate(() -> {
+    if (UserContextElement.USER_ID.isBound()) {
+        return UserContextElement.USER_ID.get();
+    }
+    return null;
+});
+----
+
+==== Hybrid example: scoped value first, thread local as a fallback
+
+Sometimes you need a single element that works in both propagation modes. Implementing both interfaces lets you bind a `ScopedValue` by default and only fall back to a `ThreadLocal` when scoped values are unavailable:
+
+[source,java]
+----
+class RequestContextElement implements ScopedValuePropagatedContextElement<String>,
+        ThreadPropagatedContextElement<String> {
+
+    private static final ScopedValue<String> REQUEST_ID = ScopedValue.newInstance();
+    private static final ThreadLocal<String> THREAD_REQUEST_ID = new ThreadLocal<>();
+
+    private final String requestId;
+
+    RequestContextElement(String requestId) {
+        this.requestId = requestId;
+    }
+
+    String currentRequestId() {
+        return REQUEST_ID.isBound() ? REQUEST_ID.get() : THREAD_REQUEST_ID.get();
+    }
+
+    @Override
+    public ScopedValue<String> scopedValue() {
+        return REQUEST_ID;
+    }
+
+    @Override
+    public String scopedValueValue() {
+        return requestId;
+    }
+
+    @Override
+    public @Nullable String updateThreadContext() {
+        if (REQUEST_ID.isBound()) {
+            return null; // scoped value already in place
+        }
+        String previous = THREAD_REQUEST_ID.get();
+        THREAD_REQUEST_ID.set(requestId);
+        return previous;
+    }
+
+    @Override
+    public void restoreThreadContext(@Nullable String previous) {
+        if (previous == null && REQUEST_ID.isBound()) {
+            return; // we skipped thread local updates
+        }
+        if (previous == null) {
+            THREAD_REQUEST_ID.remove();
+        } else {
+            THREAD_REQUEST_ID.set(previous);
+        }
+    }
+}
+----
+
+When Micronaut runs in scoped-value mode the `ScopedValue` binding happens first, so `updateThreadContext()` returns `null` and the `ThreadLocal` branch is skipped entirely. In thread-local mode the same element transparently updates the `ThreadLocal`, meaning `currentRequestId()` continues to work without additional code.
 
 snippet::io.micronaut.docs.propagation.MdcService[tags="createUser", indent=0, title="MDC propagation example"]
 
-IMPORTANT: In the previous versions of Micronaut Framework, we would capture the context to propagate, this is not the case since Micronaut Framework 4. We always require for the context to be modified manually and repropagated.
+IMPORTANT: Since Micronaut Framework 4 the runtime no longer “captures whatever happens to be in scope.” You are responsible for obtaining the current context with `PropagatedContext.getOrEmpty()`, adding elements, and propagating the resulting instance explicitly.
+
+=== Using the `propagate(…)` helpers
+
+Once you have a context you can execute work with that context in scope by using one of the helper methods. Each helper returns the result of the lambda you pass in, and inside that lambda `PropagatedContext.get()` (or `getOrEmpty()`) gives you the propagated elements:
+
+[source,java]
+----
+PropagatedContext context = PropagatedContext.getOrEmpty()
+    .plus(new TraceIdContextElement(traceId));
+
+String response = context.propagate(() -> {
+    // Inside the lambda the context is bound
+    TraceIdContextElement element = PropagatedContext.get().get(TraceIdContextElement.class);
+    return downstream.callWith(element.traceId());
+}); // Supplier<T>
+
+context.propagate(() -> {
+    TraceIdContextElement element = PropagatedContext.get().get(TraceIdContextElement.class);
+    logger.debug("executed with propagated state {}", element.traceId());
+}); // Runnable
+
+Integer status = context.propagateCall(() -> client.status()); // Callable<T>
+----
+
+For cases where you need to hand off work—for example to an executor—you can also pre-wrap a `Runnable`, `Callable`, or `Supplier` via `PropagatedContext.wrap(…)`.
+
+=== Default Scoped Values propagation on Java 25
+
+Micronaut Framework 5 targets Java 25 by default. Since Java 21 the JDK ships *Scoped Values* (`java.lang.ScopedValue`) as a structured alternative to classic thread locals. Because Scoped Values are available on Java 25, Micronaut enables them by default and stores propagated data in the `scoped-value` mode.
+
+Scoped Values participate in virtual threads, enforce well-defined lifetimes, and prevent the accidental leaks that long-running thread pools often suffer when `ThreadLocal` is used directly. Unless you override the propagation mode, every piece of state you add to a `PropagatedContext` will therefore flow through Scoped Values.
+
+=== Avoid try-with-resources unless thread-local propagation is mandatory
+
+The api:core.propagation.PropagatedContext[] interface exposes a `propagate()` method that returns an auto-closeable scope so that you can use Java’s try-with-resources syntax. The lambda helpers remain the preferred approach:
+
+[source,java]
+----
+PropagatedContext context = PropagatedContext.getOrEmpty().plus(new CustomElement());
+context.propagate(() -> {
+    // work that needs the propagated state
+});
+----
+
+The try-with-resources pattern exists primarily for legacy integrations that require `ThreadLocal` propagation. Whenever you can, call one of the lambda-based `propagate(…)` helpers shown earlier instead—they work in both propagation modes. Only fall back to the scope API when the surrounding code expects a `ThreadLocal` to be present. Because the scope relies on thread-local state, invoking `propagate()` while the mode is still `scoped-value` throws an `IllegalStateException` instructing you to enable thread-local support.
+
+Configure the mode globally (default: `scoped-value`) by setting `micronaut.propagation`:
+
+[source,yaml]
+----
+micronaut:
+  propagation: thread-local
+----
+
+Or change it programmatically during application bootstrap:
+
+[source,java]
+----
+import io.micronaut.context.annotation.Context;
+import io.micronaut.context.event.ContextStartedEvent;
+import io.micronaut.context.event.ApplicationEventListener;
+import io.micronaut.core.propagation.PropagatedContextConfiguration;
+
+@Context
+class ThreadLocalPropagationListener implements ApplicationEventListener<ContextStartedEvent> {
+
+    @Override
+    public void onApplicationEvent(ContextStartedEvent event) {
+        PropagatedContextConfiguration.set(PropagatedContextConfiguration.Mode.THREAD_LOCAL);
+    }
+}
+----
+
+Restoring Scoped Values later is as simple as calling `PropagatedContextConfiguration.set(PropagatedContextConfiguration.Mode.SCOPED_VALUE);`.
+
+NOTE: Prefer the default `scoped-value` mode whenever possible. Scoped Values integrate seamlessly with virtual threads, express the intent that the state only lives within a structured scope, and eliminate the risk of leaking `ThreadLocal` data between unrelated requests.
+
+=== When scoped values are not sufficient
+
+Some integrations still require `ThreadLocal` semantics because their APIs expose explicit “update” callbacks instead of accepting a lambda to execute with the context in scope. In those scenarios switch Micronaut’s propagation mode to `thread-local` before invoking the libraries involved. Common examples include:
+
+* **Kotlin coroutines** – when wiring custom coroutine dispatchers or using `withContext`, the runtime expects Micronaut to call `MicronautPropagatedContext.updateThreadContext`. That API assumes a `ThreadLocal`, so you must run in thread-local mode whenever coroutine propagation is active. If you see `Scope propagation requires thread-local support` while running coroutine-based code, enable the thread-local mode.
+* **Reactor instrumentation** – certain Micrometer/`ContextView` bridges expose callbacks that pull data from a `ThreadLocal` instead of accepting a lambda. If your reactive pipelines depend on that behaviour, configure thread-local propagation so the state is visible.
+
+After the critical section completes you can switch the propagation mode back to `scoped-value` to regain the benefits of structured lifetimes.
