@@ -815,6 +815,10 @@ public class ConnectionManager {
      * @param connectionCustomizer Customizer for the connection
      */
     private void initHttp2(PoolHolder pool, Channel ch, NettyClientCustomizer connectionCustomizer) {
+        initHttp2(pool, ch, connectionCustomizer, false);
+    }
+
+    private void initHttp2(PoolHolder pool, Channel ch, NettyClientCustomizer connectionCustomizer, boolean priorKnowledge) {
         Http2MultiplexHandler multiplexHandler = new Http2MultiplexHandler(new ChannelInitializer<Http2StreamChannel>() {
             @Override
             protected void initChannel(Http2StreamChannel ch) throws Exception {
@@ -830,21 +834,26 @@ public class ConnectionManager {
         });
         PoolHolder.Http2ConnectionHolder connectionHolder = pool.new Http2ConnectionHolder(ch, connectionCustomizer);
         ch.pipeline().addLast(multiplexHandler);
-        ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS, new ChannelInboundHandlerAdapter() {
-            @Override
-            public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-                if (msg instanceof Http2SettingsFrame) {
-                    ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS);
-                    ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR);
-                    connectionHolder.init();
-                    return;
-                } else {
-                    log.warn("Premature frame: {}", msg.getClass());
-                }
+        if (priorKnowledge) {
+            ch.pipeline().remove(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR);
+            connectionHolder.init();
+        } else {
+            ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS, new ChannelInboundHandlerAdapter() {
+                @Override
+                public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+                    if (msg instanceof Http2SettingsFrame) {
+                        ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS);
+                        ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR);
+                        connectionHolder.init();
+                        return;
+                    } else {
+                        log.warn("Premature frame: {}", msg.getClass());
+                    }
 
-                super.channelRead(ctx, msg);
-            }
-        });
+                    super.channelRead(ctx, msg);
+                }
+            });
+        }
         // stream frames should be handled by the multiplexer
         ch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
             @Override
@@ -1037,6 +1046,33 @@ public class ConnectionManager {
                 }
             });
             ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR, pool.initialErrorHandler);
+
+            connectionCustomizer.onInitialPipelineBuilt();
+        }
+    }
+
+
+    /**
+     * Initializer for H2C prior-knowledge connections. Will proceed with
+     * {@link #initHttp2(PoolHolder, Channel, NettyClientCustomizer)} immediately.
+     */
+    private final class Http2PriorKnowledgeInitializer extends CustomizerAwareInitializer {
+        private final PoolHolder pool;
+
+        Http2PriorKnowledgeInitializer(PoolHolder pool) {
+            this.pool = pool;
+        }
+
+        @Override
+        protected void initChannel(Channel ch) throws Exception {
+            NettyClientCustomizer connectionCustomizer = Objects.requireNonNull(bootstrappedCustomizer).specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION);
+
+            insertPcapLoggingHandlerLazy(ch, "outer");
+
+            configureProxy(ch.pipeline(), false, pool.requestKey.getHost(), pool.requestKey.getPort());
+            ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION, makeFrameCodec());
+            ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR, pool.initialErrorHandler);
+            initHttp2(pool, ch, connectionCustomizer, true);
 
             connectionCustomizer.onInitialPipelineBuilt();
         }
@@ -1323,6 +1359,7 @@ public class ConnectionManager {
                         }
                     };
                     case H2C -> new Http2UpgradeInitializer(this);
+                    case H2C_PRIOR_KNOWLEDGE -> new Http2PriorKnowledgeInitializer(this);
                 };
             }
             return doConnect(requestKey, initializer, eventLoop);

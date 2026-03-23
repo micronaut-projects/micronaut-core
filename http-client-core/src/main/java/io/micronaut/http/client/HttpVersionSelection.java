@@ -240,5 +240,9 @@ public final class HttpVersionSelection {
          * HTTP/2 cleartext upgrade from HTTP/1.1.
          */
         H2C,
+        /**
+         * HTTP/2 cleartext with prior knowledge.
+         */
+        H2C_PRIOR_KNOWLEDGE,
     }
 }
