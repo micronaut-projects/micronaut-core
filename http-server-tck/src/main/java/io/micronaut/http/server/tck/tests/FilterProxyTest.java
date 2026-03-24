@@ -64,6 +64,21 @@ public class FilterProxyTest {
         }
     }
 
+    @Test
+    void testHeadProxyPreservesContentLength() throws IOException {
+        Map<String, Object> configuration = Map.of(
+            PROP_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE
+        );
+        try (ServerUnderTest server = ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME, configuration)) {
+            HttpRequest<?> request = HttpRequest.HEAD("/filter-test/redirection");
+            AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .header("X-Test-Filter", StringUtils.TRUE)
+                .header("Content-Length", "2")
+                .build());
+        }
+    }
+
     @Controller("/ok")
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class TestController {

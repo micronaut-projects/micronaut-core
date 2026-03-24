@@ -214,15 +214,15 @@ final class DefaultHtmlErrorResponseBodyProvider implements HtmlErrorResponseBod
         return sb.toString();
     }
 
+    Map<HtmlErrorPage, String> getCache() {
+        return cache;
+    }
+
     private record HtmlErrorPage(Locale locale,
                                  int httpStatusCode,
                                  String httpStatusReason,
                                  @Nullable String error,
                                  @Nullable String errorBold,
                                  List<String> messages) {
-    }
-
-    Map<HtmlErrorPage, String> getCache() {
-        return cache;
     }
 }

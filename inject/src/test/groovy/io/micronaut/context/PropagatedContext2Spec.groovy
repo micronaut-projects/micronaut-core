@@ -3,14 +3,11 @@ package io.micronaut.context
 import io.micronaut.core.propagation.PropagatedContext
 import io.micronaut.core.propagation.ThreadPropagatedContextElement
 import io.micronaut.inject.qualifiers.Qualifiers
-import spock.lang.Requires
 import spock.lang.Specification
-import spock.util.environment.Jvm
 
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.atomic.AtomicInteger
 
-@Requires({ Jvm.current.isJava21Compatible() })
 class PropagatedContext2Spec extends Specification {
 
     void 'test PropagatedContext are correctly called for ExecutorServices io, virtual and blocking'() {
@@ -28,27 +25,27 @@ class PropagatedContext2Spec extends Specification {
         when:
         println("---------")
         println("Running IO ExecutorService:")
-        try (PropagatedContext.Scope ignored = PropagatedContext.getOrEmpty().plus(contextForIo).propagate()) {
-            io.submit {
+        PropagatedContext.getOrEmpty().plus(contextForIo).propagate(() -> {
+            return io.submit {
                 println("Executing IO Thread Service")
             }.get()
-        }
+        })
 
         println("---------")
         println("Running Virtual ExecutorService:")
-        try (PropagatedContext.Scope ignored = PropagatedContext.getOrEmpty().plus(contextForVirtual).propagate()) {
-            virtual.submit {
+        PropagatedContext.getOrEmpty().plus(contextForVirtual).propagate(() -> {
+            return virtual.submit {
                 println("Executing Virtual Thread Service")
             }.get()
-        }
+        })
 
         println("---------")
         println("Running Blocking ExecutorService:")
-        try (PropagatedContext.Scope ignored = PropagatedContext.getOrEmpty().plus(contextForBlocking).propagate()) {
-            blocking.submit {
+        PropagatedContext.getOrEmpty().plus(contextForBlocking).propagate(() -> {
+            return blocking.submit {
                 println("Executing Blocking Thread Service")
             }.get()
-        }
+        })
 
         then: "Should be called 1x on the propagate() method and 1x by the ExecutorServiceInstrumenter"
         contextForIo.state() == 1

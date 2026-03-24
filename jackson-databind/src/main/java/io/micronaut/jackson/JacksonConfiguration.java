@@ -522,30 +522,27 @@ public class JacksonConfiguration implements JsonConfiguration {
         Map<String, Argument<?>> typeVariables = type.getTypeVariables();
         JavaType[] objects = toJavaTypeArray(typeFactory, typeVariables);
         final Class<T> rawType = type.getType();
-        if (ArrayUtils.isNotEmpty(objects)) {
-            final JavaType javaType = typeFactory.constructType(
-                rawType
-            );
-            if (javaType.isCollectionLikeType()) {
-                return typeFactory.constructCollectionLikeType(
-                    rawType,
-                    objects[0]
-                );
-            } else if (javaType.isMapLikeType()) {
-                return typeFactory.constructMapLikeType(
-                    rawType,
-                    objects[0],
-                    objects[1]
-                );
-            } else if (javaType.isReferenceType()) {
-                return typeFactory.constructReferenceType(rawType, objects[0]);
-            }
-            return typeFactory.constructParametricType(rawType, objects);
-        } else {
-            return typeFactory.constructType(
-                rawType
-            );
+        final JavaType javaType = typeFactory.constructType(rawType);
+        if (ArrayUtils.isEmpty(objects)) {
+            return javaType;
         }
+        if (javaType.isCollectionLikeType()) {
+            if (objects.length < 1) {
+                return javaType;
+            }
+            return typeFactory.constructCollectionLikeType(rawType, objects[0]);
+        } else if (javaType.isMapLikeType()) {
+            if (objects.length < 2) {
+                return javaType;
+            }
+            return typeFactory.constructMapLikeType(rawType, objects[0], objects[1]);
+        } else if (javaType.isReferenceType()) {
+            if (objects.length < 1) {
+                return javaType;
+            }
+            return typeFactory.constructReferenceType(rawType, objects[0]);
+        }
+        return typeFactory.constructParametricType(rawType, objects);
     }
 
     private static JavaType[] toJavaTypeArray(TypeFactory typeFactory, Map<String, Argument<?>> typeVariables) {

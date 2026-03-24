@@ -8,7 +8,7 @@ dependencies {
 
     api(projects.micronautJacksonCore)
 
-    compileOnly(libs.graal)
+    compileOnly(libs.managed.graalvm.nativeimage)
     compileOnly(libs.jackson2.databind)
     compileOnly(platform(libs.test.boms.micronaut.validation))
     compileOnly(libs.micronaut.validation) {

@@ -430,12 +430,21 @@ public final class FormRouteCompleter {
         }
     }
 
+    /**
+     * Metadata for a form field subscription.
+     *
+     * @param mode the subscription mode
+     * @param argument the argument
+     */
     public record SubscriptionMetadata(
         SubscriptionMode mode,
         Argument<?> argument
     ) {
     }
 
+    /**
+     * Mode of subscription for form fields.
+     */
     public enum SubscriptionMode {
         /**
          * Before the route can execute, these form fields must have been fully received, including
@@ -460,6 +469,9 @@ public final class FormRouteCompleter {
         ASYNC_NO_BACKPRESSURE,
     }
 
+    /**
+     * Exception thrown when a form binding deadlock is detected.
+     */
     public static final class FormBindingDeadlockException extends UnsatisfiedArgumentException {
         public FormBindingDeadlockException(SubscriptionMetadata blockingMetadata, List<SubscriptionMetadata> blockedMetadata) {
             super(blockingMetadata.argument, makeMessage(blockedMetadata));

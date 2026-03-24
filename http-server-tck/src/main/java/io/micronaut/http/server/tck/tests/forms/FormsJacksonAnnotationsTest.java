@@ -33,6 +33,7 @@ import io.micronaut.http.tck.TestScenario;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -55,11 +56,17 @@ public class FormsJacksonAnnotationsTest {
 
         body = "title=Building+Microservices&pages=";
         assertWithBody(body, JSON_WITHOUT_PAGES);
+
+        body = "title=Building+Microservices&publishedAt=";
+        assertWithBody(body, JSON_WITHOUT_PAGES);
+
+        body = "title=Building+Microservices&category=";
+        assertWithBody(body, JSON_WITHOUT_PAGES);
     }
 
     @Test
     public void httpClientFormSubmissionsDoesNotSupportJacksonAnnotations() throws IOException {
-        Book book = new Book("Building Microservices", 100);
+        Book book = new Book("Building Microservices", 100, null, null);
         // Jackson annotations (@JsonProperty) are not supported by the HTTP Client and form-url encoded payload.
         assertWithBody(book, JSON_WITHOUT_PAGES);
     }
@@ -92,7 +99,10 @@ public class FormsJacksonAnnotationsTest {
 
     @Introspected
     @ReflectiveAccess
-    record Book(@JsonProperty("title") String title, @JsonProperty("paginas") @Nullable Integer pages) {
+    record Book(@JsonProperty("title") String title, @JsonProperty("paginas") @Nullable Integer pages, @JsonProperty("publishedAt") @Nullable LocalDateTime publishedAt, @JsonProperty("category") @Nullable Category category) {
     }
 
+    enum Category {
+        TECHNICAL
+    }
 }

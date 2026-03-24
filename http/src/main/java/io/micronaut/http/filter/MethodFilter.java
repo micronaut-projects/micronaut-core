@@ -346,26 +346,37 @@ record MethodFilter<T>(FilterOrder order,
         // this is intentionally one method instead of three nested ones to reduce stacktrace depth
         // and avoid unnecessary propagate calls
 
-        try (PropagatedContext.Scope ignore = filterContext.propagatedContext().propagate()) {
-            if (args == null) {
-                if (filterCondition != null && !filterCondition.test(methodContext)) {
-                    return ExecutionFlow.just(filterContext);
-                }
-                if (asyncArgBinders != null) {
-                    return bindArgsAsync(methodContext).flatMap(a -> filter(filterContext, methodContext, a, onExecutor));
-                } else {
-                    try {
-                        args = bindArgsSync(methodContext);
-                    } catch (Throwable e) {
-                        return ExecutionFlow.error(e);
-                    }
-                }
+        PropagatedContext propagatedContext = filterContext.propagatedContext();
+        try {
+            if (propagatedContext.isBound()) {
+                return doFilter(filterContext, methodContext, args, onExecutor);
             }
-            if (!onExecutor && executor != null) {
-                Object[] finalArgs = args;
-                return ExecutionFlow.async(executor, () -> filter(filterContext, methodContext, finalArgs, true));
-            }
+            return propagatedContext.propagate(() -> doFilter(filterContext, methodContext, args, onExecutor));
+        } catch (Throwable e) {
+            return ExecutionFlow.error(e);
+        }
+    }
 
+    private ExecutionFlow<FilterContext> doFilter(FilterContext filterContext, FilterMethodContext methodContext, Object @Nullable [] args, boolean onExecutor) {
+        if (args == null) {
+            if (filterCondition != null && !filterCondition.test(methodContext)) {
+                return ExecutionFlow.just(filterContext);
+            }
+            if (asyncArgBinders != null) {
+                return bindArgsAsync(methodContext).flatMap(a -> filter(filterContext, methodContext, a, onExecutor));
+            } else {
+                try {
+                    args = bindArgsSync(methodContext);
+                } catch (Throwable e) {
+                    return ExecutionFlow.error(e);
+                }
+            }
+        }
+        if (!onExecutor && executor != null) {
+            Object[] finalArgs = args;
+            return ExecutionFlow.async(executor, () -> filter(filterContext, methodContext, finalArgs, true));
+        }
+        try {
             Object returnValue;
             if (unsafeExecutable != null) {
                 returnValue = unsafeExecutable.invokeUnsafe(bean, args);
@@ -476,13 +487,8 @@ record MethodFilter<T>(FilterOrder order,
                         converted
                     ));
                 }
-                return ReactiveExecutionFlow.fromPublisherEager(converted, context.propagatedContext()).flatMap(v -> {
-                    try {
-                        return next.handle(context, v, continuation);
-                    } catch (Throwable e) {
-                        return ExecutionFlow.error(e);
-                    }
-                });
+                return ReactiveExecutionFlow.fromPublisherEager(converted, context.propagatedContext())
+                    .flatMap(v -> next.handle(context, v, continuation));
             };
         } else if (type.isAsync()) {
             var next = prepareReturnHandler(conversionService, type.getWrappedType(), isResponseFilter, hasContinuation, false);
@@ -604,10 +610,10 @@ record MethodFilter<T>(FilterOrder order,
         };
 
         @SuppressWarnings("java:S112")
-            // internal interface
+        // internal interface
         ExecutionFlow<FilterContext> handle(FilterContext context,
                                             @Nullable Object returnValue,
-                                            @Nullable InternalFilterContinuation<?> passedOnContinuation) throws Throwable;
+                                            @Nullable InternalFilterContinuation<?> passedOnContinuation);
     }
 
     private abstract static class DelayedFilterReturnHandler implements FilterReturnHandler {
@@ -629,29 +635,33 @@ record MethodFilter<T>(FilterOrder order,
         @Override
         public ExecutionFlow<FilterContext> handle(FilterContext context,
                                                    @Nullable Object returnValue,
-                                                   @Nullable InternalFilterContinuation<?> continuation) throws Throwable {
-            if (returnValue == null && nullable) {
-                return next.handle(context, null, continuation);
-            }
-
-            ExecutionFlow<?> delayedFlow = toFlow(context,
-                Objects.requireNonNull(returnValue, "Returned value must not be null, or mark the method as @Nullable"),
-                continuation
-            );
-            ImperativeExecutionFlow<?> doneFlow = delayedFlow.tryComplete();
-            if (doneFlow != null) {
-                if (doneFlow.getError() != null) {
-                    throw doneFlow.getError();
+                                                   @Nullable InternalFilterContinuation<?> continuation) {
+            try {
+                if (returnValue == null && nullable) {
+                    return next.handle(context, null, continuation);
                 }
-                return next.handle(context, doneFlow.getValue(), continuation);
-            } else {
-                return delayedFlow.flatMap(v -> {
-                    try {
-                        return next.handle(context, v, continuation);
-                    } catch (Throwable e) {
-                        return ExecutionFlow.error(e);
+
+                ExecutionFlow<?> delayedFlow = toFlow(context,
+                    Objects.requireNonNull(returnValue, "Returned value must not be null, or mark the method as @Nullable"),
+                    continuation
+                );
+                ImperativeExecutionFlow<?> doneFlow = delayedFlow.tryComplete();
+                if (doneFlow != null) {
+                    if (doneFlow.getError() != null) {
+                        return ExecutionFlow.error(doneFlow.getError());
                     }
-                });
+                    return next.handle(context, doneFlow.getValue(), continuation);
+                } else {
+                    return delayedFlow.flatMap(v -> {
+                        try {
+                            return next.handle(context, v, continuation);
+                        } catch (Throwable e) {
+                            return ExecutionFlow.error(e);
+                        }
+                    });
+                }
+            } catch (Throwable e) {
+                return ExecutionFlow.error(e);
             }
         }
     }

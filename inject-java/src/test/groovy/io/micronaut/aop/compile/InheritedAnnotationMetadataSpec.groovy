@@ -57,6 +57,7 @@ interface MyInterface {
         beanDefinition.injectedFields.size() == 0
         beanDefinition.executableMethods.size() == 1
         beanDefinition.executableMethods[0].hasAnnotation(Blocking)
+        beanDefinition.getRequiredMethod("someMethod").hasAnnotation(Blocking)
         !beanDefinition.executableMethods[0].hasDeclaredAnnotation(Blocking)
 
     }
@@ -99,6 +100,7 @@ interface MyInterface {
         beanDefinition.injectedFields.size() == 0
         beanDefinition.executableMethods.size() == 1
         beanDefinition.executableMethods[0].hasAnnotation(Blocking)
+        beanDefinition.getRequiredMethod("someMethod").hasAnnotation(Blocking)
 
         when:
         def context = ApplicationContext.run('foo.bar':'test')

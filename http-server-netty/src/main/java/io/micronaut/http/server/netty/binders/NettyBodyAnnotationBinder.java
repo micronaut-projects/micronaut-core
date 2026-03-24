@@ -126,14 +126,15 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
             {
                 // NettyRequestLifecycle will "subscribe" to the execution flow added to routeWaitsFor,
                 // so we can't subscribe directly ourselves. Instead, use the side effect of a map.
-                BasicHttpAttributes.addRouteWaitsFor(nhr, buffered.flatMap(imm -> {
-                    try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(nhr)).propagate()) {
-                        result = transform(nhr, context, imm);
-                        return ExecutionFlow.just(null);
-                    } catch (Throwable e) {
-                        return ExecutionFlow.error(e);
-                    }
-                }));
+                BasicHttpAttributes.addRouteWaitsFor(nhr, buffered.flatMap(imm ->
+                    PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(nhr)).propagate(() -> {
+                        try {
+                            result = transform(nhr, context, imm);
+                            return ExecutionFlow.just(null);
+                        } catch (Throwable e) {
+                            return ExecutionFlow.error(e);
+                        }
+                    })));
             }
 
             @SuppressWarnings("OptionalAssignedToNull")

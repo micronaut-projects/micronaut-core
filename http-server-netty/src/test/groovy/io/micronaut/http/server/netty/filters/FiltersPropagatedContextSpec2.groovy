@@ -124,9 +124,9 @@ class FiltersPropagatedContextSpec2 extends Specification {
 
         @Override
         Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
-            try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty().plus(new MyContext()).propagate()) {
-                return chain.proceed(request)
-            }
+            return PropagatedContext.getOrEmpty()
+                .plus(new MyContext())
+                .propagateCall(() -> chain.proceed(request))
         }
 
         @Override

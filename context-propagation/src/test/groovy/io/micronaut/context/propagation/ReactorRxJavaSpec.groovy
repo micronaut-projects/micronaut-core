@@ -13,7 +13,7 @@ import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.scheduling.annotation.ExecuteOn
-import io.reactivex.Flowable
+import io.reactivex.rxjava3.core.Flowable
 import jakarta.inject.Inject
 import org.reactivestreams.Publisher
 import org.slf4j.Logger
@@ -28,25 +28,25 @@ import spock.lang.Specification
 
 import io.micronaut.scheduling.TaskExecutors
 
-class ReactorRx2JavaSpec extends Specification {
+class ReactorRxJavaSpec extends Specification {
 
-    private static final Logger LOG = LoggerFactory.getLogger(ReactorRx2JavaSpec)
+    private static final Logger LOG = LoggerFactory.getLogger(ReactorRxJavaSpec)
 
     @Shared
     @AutoCleanup
-    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ["micronaut.propagation": "thread-local"])
 
     @Shared
     @AutoCleanup
     HttpClient rxHttpClient = HttpClient.create(embeddedServer.URL)
 
-    void "test RxJava2 integration"() {
+    void "test RxJava integration"() {
         expect:
         List<Tuple2> result = Flux.range(1, 1)
                 .flatMap {
                     String tracingId = UUID.randomUUID()
                     HttpRequest<Object> request = HttpRequest
-                            .POST("/rxjava2/enter", new SomeBody())
+                            .POST("/rxjava/enter", new SomeBody())
                             .header("X-TrackingId", tracingId)
                     return Mono.from(rxHttpClient.retrieve(request)).map(response -> {
                         Tuples.of(tracingId, response)
@@ -62,8 +62,8 @@ class ReactorRx2JavaSpec extends Specification {
     static class SomeBody {
     }
 
-    @Controller("/rxjava2")
-    static class RxJava2Controller {
+    @Controller("/rxjava")
+    static class RxJavaController {
 
         @Inject
         @Client("/")
@@ -80,30 +80,30 @@ class ReactorRx2JavaSpec extends Specification {
             LOG.info("enter")
             return Flowable.fromPublisher(
                     reactorHttpClient.retrieve(HttpRequest
-                            .GET("/rxjava2/test")
+                            .GET("/rxjava/test")
                             .header("X-TrackingId", tracingId), String)
             )
         }
 
         @ExecuteOn(TaskExecutors.IO)
         @Get("/test")
-        Mono<String> testRxJava2(@Header("X-TrackingId") String tracingId) {
+        Mono<String> testRxJava(@Header("X-TrackingId") String tracingId) {
             LOG.info("test")
             return Mono.from(
                     rxHttpClient.exchange(HttpRequest
-                            .GET("/rxjava2/test2")
+                            .GET("/rxjava/test2")
                             .header("X-TrackingId", tracingId), String)
             )
         }
 
         @ExecuteOn(TaskExecutors.IO)
         @Get("/test2")
-        String test2RxJava2(@Header("X-TrackingId") String tracingId) {
+        String test2RxJava(@Header("X-TrackingId") String tracingId) {
             LOG.info("test2")
-            return Flux.from(trackingIdRxJava2(tracingId)).blockFirst()
+            return Flux.from(trackingIdRxJava(tracingId)).blockFirst()
         }
 
-        Flowable<String> trackingIdRxJava2(String tracingId) {
+        Flowable<String> trackingIdRxJava(String tracingId) {
            return Flowable.just(tracingId, tracingId, tracingId)
         }
 

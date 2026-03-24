@@ -35,6 +35,10 @@ public final class EachBeanQualifier<T> extends FilteringQualifier<T> {
         this.beanDefinition = beanDefinition;
     }
 
+    public BeanDefinition<?> getBeanDefinition() {
+        return beanDefinition;
+    }
+
     @Override
     public boolean doesQualify(Class<T> beanType, BeanType<T> candidate) {
         return candidate.equals(beanDefinition);

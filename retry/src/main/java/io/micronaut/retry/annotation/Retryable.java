@@ -88,7 +88,9 @@ public @interface Retryable {
     Class<? extends RetryPredicate> predicate() default DefaultRetryPredicate.class;
 
     /**
-     * @return The capture exception types (defaults to RuntimeException)
+     * @return The exception type that should be intercepted for retry handling. Once an exception is captured,
+     * it is still evaluated by {@link Retryable#includes}, {@link Retryable#excludes}, or
+     * {@link Retryable#predicate()} to decide whether to retry. Defaults to {@link RuntimeException}.
      */
     Class<? extends Throwable> capturedException() default RuntimeException.class;
 

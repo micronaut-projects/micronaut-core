@@ -49,8 +49,11 @@ public final class ReactivePropagation {
             return propagate(propagatedContext, corePublisher);
         }
         return subscriber -> {
-            try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
-                actual.subscribe(propagate(propagatedContext, subscriber));
+            Subscriber<? super T> wrappedSubscriber = propagate(propagatedContext, subscriber);
+            if (propagatedContext.isBound()) {
+                actual.subscribe(wrappedSubscriber);
+            } else {
+                propagatedContext.propagate(() -> actual.subscribe(wrappedSubscriber));
             }
         };
     }
@@ -68,8 +71,12 @@ public final class ReactivePropagation {
         return new CorePublisher<>() {
             @Override
             public void subscribe(CoreSubscriber<? super T> subscriber) {
-                try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
-                    actual.subscribe(propagate(propagatedContext, subscriber));
+                @SuppressWarnings("unchecked")
+                CoreSubscriber<? super T> wrappedSubscriber = (CoreSubscriber<? super T>) propagate(propagatedContext, subscriber);
+                if (propagatedContext.isBound()) {
+                    actual.subscribe(wrappedSubscriber);
+                } else {
+                    propagatedContext.propagate(() -> actual.subscribe(wrappedSubscriber));
                 }
             }
 
@@ -79,8 +86,11 @@ public final class ReactivePropagation {
                     subscribe(coreSubscriber);
                     return;
                 }
-                try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
-                    actual.subscribe(propagate(propagatedContext, subscriber));
+                Subscriber<? super T> wrappedSubscriber = propagate(propagatedContext, subscriber);
+                if (propagatedContext.isBound()) {
+                    actual.subscribe(wrappedSubscriber);
+                } else {
+                    propagatedContext.propagate(() -> actual.subscribe(wrappedSubscriber));
                 }
             }
         };
@@ -110,29 +120,37 @@ public final class ReactivePropagation {
 
             @Override
             public void onSubscribe(Subscription s) {
-                try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
+                if (propagatedContext.isBound()) {
                     actual.onSubscribe(s);
+                } else {
+                    propagatedContext.propagate(() -> actual.onSubscribe(s));
                 }
             }
 
             @Override
             public void onNext(T t) {
-                try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
+                if (propagatedContext.isBound()) {
                     actual.onNext(t);
+                } else {
+                    propagatedContext.propagate(() -> actual.onNext(t));
                 }
             }
 
             @Override
             public void onError(Throwable t) {
-                try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
+                if (propagatedContext.isBound()) {
                     actual.onError(t);
+                } else {
+                    propagatedContext.propagate(() -> actual.onError(t));
                 }
             }
 
             @Override
             public void onComplete() {
-                try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
+                if (propagatedContext.isBound()) {
                     actual.onComplete();
+                } else {
+                    propagatedContext.propagate(actual::onComplete);
                 }
             }
         };

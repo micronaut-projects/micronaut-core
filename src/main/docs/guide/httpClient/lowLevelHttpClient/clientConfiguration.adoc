@@ -32,6 +32,22 @@ micronaut:
 
 - The `read-timeout` is applied to the `foo` client.
 
+For the Netty HTTP client, you can also plug in a custom DNS resolver by referencing a named Netty `AddressResolverGroup` bean with the `address-resolver-group-name` property. This is useful when you need custom name resolution behavior for a specific client.
+
+snippet::io.micronaut.docs.client.resolver.CustomAddressResolverGroupFactory[tags="class", indent=0, title="Define a named `AddressResolverGroup` bean"]
+
+<1> Name the resolver bean so clients can reference it.
+<2> Return the `AddressResolverGroup` instance used by the Netty client.
+
+In the test suites, the named client is configured programmatically with the same properties:
+
+snippet::io.micronaut.docs.client.resolver.AddressResolverClientConfiguration[tags="properties", indent=0, title="Programmatic client configuration example"]
+
+<1> Configure the service URL for the named client.
+<2> Reference the named resolver bean with `address-resolver-group-name`.
+
+The configured name must match an existing bean. When `address-resolver-group-name` is set, `dns-resolution-mode` is ignored.
+
 WARN: This client configuration can be used in conjunction with the `@Client` annotation, either by injecting an `HttpClient` directly or use on a client interface. In any case, all other attributes on the annotation *will be ignored* except the service id.
 
 Then, inject the named client configuration:

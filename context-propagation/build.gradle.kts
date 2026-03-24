@@ -19,13 +19,9 @@ dependencies {
     compileOnly(platform(libs.test.boms.micronaut.reactor))
     compileOnly("io.micrometer:context-propagation")
 
-    compileOnly(platform(libs.test.boms.micronaut.rxjava2))
     compileOnly(platform(libs.test.boms.micronaut.rxjava3))
     compileOnly(platform(libs.test.boms.micronaut.reactor))
 
-    compileOnly("io.micronaut.rxjava2:micronaut-rxjava2-http-client") {
-        exclude(group = "io.micronaut")
-    }
     compileOnly("io.micronaut.rxjava3:micronaut-rxjava3-http-client") {
         exclude(group = "io.micronaut")
     }
@@ -33,7 +29,6 @@ dependencies {
     testAnnotationProcessor(projects.micronautInjectJava)
     testImplementation("io.micrometer:context-propagation")
 
-    testImplementation(platform(libs.test.boms.micronaut.rxjava2))
     testImplementation(platform(libs.test.boms.micronaut.rxjava3))
     testImplementation(platform(libs.test.boms.micronaut.reactor))
 
@@ -46,9 +41,6 @@ dependencies {
     testImplementation(projects.micronautHttpServerNetty)
     testImplementation(libs.managed.snakeyaml)
 
-    testImplementation("io.micronaut.rxjava2:micronaut-rxjava2-http-client") {
-        exclude(group = "io.micronaut")
-    }
     testImplementation("io.micronaut.rxjava3:micronaut-rxjava3-http-client") {
         exclude(group = "io.micronaut")
     }

@@ -152,8 +152,10 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
                 }
             }
         };
-        try (PropagatedContext.Scope ignored = propagatedContext.propagate()) {
+        if (propagatedContext.isBound()) {
             publisher.subscribe(s);
+        } else {
+            propagatedContext.propagate(() -> publisher.subscribe(s));
         }
         ExecutionFlow<T> immediate = s.flow.getPlain();
         if (immediate != null) {
