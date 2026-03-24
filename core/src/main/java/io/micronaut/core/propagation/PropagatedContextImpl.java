@@ -59,9 +59,6 @@ final class PropagatedContextImpl implements PropagatedContext {
 
     @Override
     public boolean isBound() {
-        if (PropagatedContextConfiguration.get() == PropagatedContextConfiguration.Mode.THREAD_LOCAL) {
-            return false;
-        }
         return getOrNull() == this;
     }
 
