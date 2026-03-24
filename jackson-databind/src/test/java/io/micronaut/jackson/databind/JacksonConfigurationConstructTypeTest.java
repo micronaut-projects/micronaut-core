@@ -1,11 +1,12 @@
 package io.micronaut.jackson.databind;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.type.DefaultArgument;
 import io.micronaut.jackson.JacksonConfiguration;
-import jakarta.ws.rs.core.GenericType;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Type;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -15,9 +16,8 @@ class JacksonConfigurationConstructTypeTest {
 
     @Test
     void constructTypePreservesParameterizedMapArgumentCreatedFromType() {
-        var generic = new GenericType<Map<String, String>>() {
+        Argument<Map<String, String>> derived = new DefaultArgument<Map<String, String>>((Type) null, null, null) {
         };
-        var derived = Argument.of(generic.getType());
 
         var jacksonType = JacksonConfiguration.constructType(derived, new ObjectMapper().getTypeFactory());
 
