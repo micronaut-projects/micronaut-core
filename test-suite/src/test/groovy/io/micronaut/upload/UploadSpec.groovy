@@ -339,4 +339,24 @@ class UploadSpec extends AbstractMicronautSpec {
         response.status() == HttpStatus.OK
         response.getBody(String).get() == "OK"
     }
+
+    void "test multipart body emits zero-length file part"() {
+        given:
+        MultipartBody requestBody = MultipartBody.builder()
+                .addPart("data", "empty.txt", MediaType.TEXT_PLAIN_TYPE, new byte[0])
+                .addPart("title", "bar")
+                .build()
+
+        when:
+        HttpResponse<String> response = Flux.from(client.exchange(
+                HttpRequest.POST("/upload/receive-multipart-body", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
+                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                String
+        )).blockFirst()
+
+        then:
+        response.status() == HttpStatus.OK
+        response.getBody().get() == '|bar'
+    }
 }

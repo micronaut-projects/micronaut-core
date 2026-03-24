@@ -1,7 +1,7 @@
 :jackson-annotations: https://fasterxml.github.io/jackson-annotations/javadoc/2.9/
 :jackson-databind: https://fasterxml.github.io/jackson-databind/javadoc/2.9/
 
-If you use <<jsonBinding, `micronaut-jackson-databind`>>, the Jackson's `ObjectMapper` can be configured through configuration with the api:io.micronaut.jackson.JacksonConfiguration[] class.
+If you use <<jsonBinding, `micronaut-jackson-databind`>>, the Jackson `ObjectMapper` can be configured through configuration with the api:io.micronaut.jackson.JacksonConfiguration[] class. This section is specific to the Jackson implementation; for application code that should remain portable across Micronaut JSON implementations, prefer depending on api:json.JsonMapper[].
 
 All Jackson configuration keys start with `jackson`.
 

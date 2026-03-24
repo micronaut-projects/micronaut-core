@@ -188,9 +188,8 @@ public final class RoutingInBoundHandler implements RequestHandler {
             if (receivedPublisher != ApplicationEventPublisher.NO_OP) {
                 receivedPublisher.publishEvent(new HttpRequestReceivedEvent(errorRequest));
             }
-            try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(errorRequest)).propagate()) {
-                new NettyRequestLifecycle(this, outboundAccess).handleException(errorRequest, e.getCause() == null ? e : e.getCause());
-            }
+            PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(errorRequest))
+                .propagate(() -> new NettyRequestLifecycle(this, outboundAccess).handleException(errorRequest, e.getCause() == null ? e : e.getCause()));
             return;
         }
         if (receivedPublisher != ApplicationEventPublisher.NO_OP) {
@@ -202,9 +201,8 @@ public final class RoutingInBoundHandler implements RequestHandler {
             ctx.channel().attr(key).set(mnRequest);
         }
         outboundAccess.attachment(mnRequest);
-        try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(mnRequest)).propagate()) {
-            new NettyRequestLifecycle(this, outboundAccess).handleNormal(mnRequest);
-        }
+        PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(mnRequest))
+            .propagate(() -> new NettyRequestLifecycle(this, outboundAccess).handleNormal(mnRequest));
     }
 
     public void writeResponse(OutboundAccess outboundAccess,

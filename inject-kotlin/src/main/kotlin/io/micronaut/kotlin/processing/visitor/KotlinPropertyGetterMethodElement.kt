@@ -53,9 +53,23 @@ internal class KotlinPropertyGetterMethodElement(
         visitorContext
     )
 
-    override val internalReturnType: ClassElement = propertyElement.type
+    override val internalReturnType: ClassElement by lazy {
+        resolveReturnType(emptyMap(), propertyElement.type)
+    }
 
-    override val internalGenericReturnType: ClassElement = propertyElement.genericType
+    override val internalGenericReturnType: ClassElement by lazy {
+        resolveReturnType(declaringType.typeArguments, propertyElement.genericType)
+    }
+
+    private fun resolveReturnType(
+        parentTypeArguments: Map<String, ClassElement>,
+        fallback: ClassElement,
+    ): ClassElement {
+        val returnType = propertyGetter.returnType?.resolve() ?: return fallback
+        val overriddenReturnType = propertyElement.property.findOverridee()?.getter?.returnType?.resolve()
+        val keepBoxed = overriddenReturnType != null && returnType != overriddenReturnType
+        return newClassElement(nativeType, returnType, parentTypeArguments, !keepBoxed)
+    }
 
     override val resolvedParameters: List<ParameterElement> = presetParameters
 

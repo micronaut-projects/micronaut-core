@@ -65,10 +65,15 @@ public @interface Controller {
     String[] consumes() default MediaType.APPLICATION_JSON;
 
     /**
-     * Allows specifying an alternate port to run the controller on. Setting this member will
-     * cause.
+     * Allows specifying the local server port that the routes declared by the controller should
+     * match.
+     *
+     * <p>Setting this member does not by itself create a listener on that port. Configure the
+     * server to listen on the desired port separately, for example with
+     * {@code micronaut.server.netty.listeners.*.port}.</p>
      *
      * <p>The member is defined as a string to allow resolving the port value from configuration. For example: {@code member = "${my.port.number}"}</p>
+     *
      * @return The port to use.
      */
     String port() default "";

@@ -7,7 +7,7 @@ import jakarta.inject.Singleton
 import org.slf4j.LoggerFactory
 import java.util.concurrent.CompletionStage
 import java.util.function.Function
-import kotlin.coroutines.coroutineContext
+import java.util.function.Supplier
 
 @Singleton
 class TxManager {
@@ -15,7 +15,7 @@ class TxManager {
     private val transactionsLog: MutableList<String> = ArrayList()
 
     suspend fun findTx(): String {
-        val propagatedContext = KotlinCoroutinePropagation.findPropagatedContext(coroutineContext)!!
+        val propagatedContext = KotlinCoroutinePropagation.findPropagatedContext()!!
         check(
             propagatedContext.allElements.count() <= 1
         )
@@ -30,9 +30,9 @@ class TxManager {
         val tx = newTransaction()
         LOGGER.info("Opening transaction: {}", tx)
         transactionsLog.add("OPEN $tx")
-        PropagatedContext.getOrEmpty().plus(TxPropagatedContext(tx)).propagate().use {
+        return PropagatedContext.getOrEmpty().plus(TxPropagatedContext(tx)).propagate<CompletionStage<T>>(Supplier {
             transactionsLog.add("IN $tx")
-            return fn.apply(tx).whenComplete { value, throwable ->
+            return@Supplier fn.apply(tx).whenComplete { value, throwable ->
                 if (throwable != null) {
                     LOGGER.info("Rollback transaction: {}", tx)
                     transactionsLog.add("ROLLBACK $tx")
@@ -41,7 +41,7 @@ class TxManager {
                     transactionsLog.add("COMMIT $tx")
                 }
             }
-        }
+        })
     }
 
     private fun newTransaction(): String {

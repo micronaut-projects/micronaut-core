@@ -17,9 +17,9 @@ public class MdcService {
         try {
             UUID newUserId = UUID.randomUUID();
             MDC.put("userId", newUserId.toString());
-            try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty().plus(new MdcPropagationContext()).propagate()) {
-                return createUserInternal(newUserId, name);
-            }
+            return PropagatedContext.getOrEmpty()
+                .plus(new MdcPropagationContext())
+                .propagate(() -> createUserInternal(newUserId, name));
         } finally {
             MDC.remove("userId");
         }

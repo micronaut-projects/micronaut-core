@@ -16,7 +16,7 @@ class ThreadLocalPropagatedTraceInterceptorSpec extends Specification {
 
     @Shared
     @AutoCleanup
-    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ["micronaut.propagation": "thread-local"])
 
     void "test trace mono"() {
         when:

@@ -16,7 +16,7 @@ dependencies {
 
     implementation(libs.managed.reactor)
 
-    compileOnly(libs.graal)
+    compileOnly(libs.managed.graalvm.nativeimage)
     compileOnly(libs.jcache)
 
     compileOnly(libs.jakarta.el)

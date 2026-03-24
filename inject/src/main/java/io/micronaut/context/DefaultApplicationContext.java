@@ -617,7 +617,7 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
                         }
                         delegateTypeArguments = typeArguments;
                     }
-                    BeanDefinitionDelegate<?> delegate = BeanDefinitionDelegate.create(originBeanDefinition, (Qualifier<T>) qualifier, delegateTypeArguments);
+                    BeanDefinitionDelegate<?> delegate = BeanDefinitionDelegate.create(originBeanDefinition, (Qualifier<T>) qualifier, delegateTypeArguments, dependentCandidate);
                     if (delegate.isEnabled(this, resolutionContext) && delegate.isCandidateBean(beanType)) {
                         transformedCandidates.add((BeanDefinition<T>) delegate);
                     }
