@@ -48,7 +48,8 @@ import java.util.concurrent.atomic.AtomicLongFieldUpdater;
 @Internal
 public final class UpstreamBalancer {
     private static final AtomicLongFieldUpdater<UpstreamBalancer> DELTA = AtomicLongFieldUpdater.newUpdater(UpstreamBalancer.class, "delta");
-    private static final AtomicIntegerFieldUpdater<UpstreamBalancer> FLAGS = AtomicIntegerFieldUpdater.newUpdater(UpstreamBalancer.class, "flags");
+    private static final AtomicIntegerFieldUpdater<UpstreamBalancer> BALANCER_ATOMIC_INTEGER_FIELD_UPDATER_FLAGS
+        = AtomicIntegerFieldUpdater.newUpdater(UpstreamBalancer.class, "flags");
 
     private static final int FLAG_DISCARD_A = 1;
     private static final int FLAG_DISCARD_B = 2;
@@ -130,7 +131,7 @@ public final class UpstreamBalancer {
                 return current;
             }
             int next = current | flag;
-            if (FLAGS.compareAndSet(UpstreamBalancer.this, current, next)) {
+            if (BALANCER_ATOMIC_INTEGER_FIELD_UPDATER_FLAGS.compareAndSet(UpstreamBalancer.this, current, next)) {
                 return current;
             }
         }
