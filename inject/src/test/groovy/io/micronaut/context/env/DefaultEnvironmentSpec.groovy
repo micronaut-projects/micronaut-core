@@ -488,9 +488,10 @@ micronaut:
 
         cleanup:
         System.clearProperty("micronaut.config.files")
-        Files.walk(root)
-            .sorted(Comparator.reverseOrder())
-            .forEach(Files::deleteIfExists)
+        try (def stream = Files.walk(root)) {
+            stream.sorted(Comparator.reverseOrder())
+                .forEach(Files::deleteIfExists)
+        }
     }
 
     void "test env protocol config import"() {
@@ -554,12 +555,14 @@ micronaut:
         classLoader.close()
         System.clearProperty("micronaut.config.files")
         main.delete()
-        Files.walk(firstRoot)
-            .sorted(Comparator.reverseOrder())
-            .forEach(Files::deleteIfExists)
-        Files.walk(secondRoot)
-            .sorted(Comparator.reverseOrder())
-            .forEach(Files::deleteIfExists)
+        try (def stream = Files.walk(firstRoot)) {
+            stream.sorted(Comparator.reverseOrder())
+                .forEach(Files::deleteIfExists)
+        }
+        try (def stream = Files.walk(secondRoot)) {
+            stream.sorted(Comparator.reverseOrder())
+                .forEach(Files::deleteIfExists)
+        }
     }
 
     void "test classpath wildcard protocol loads duplicate resources in classpath order"() {
@@ -589,12 +592,14 @@ micronaut:
         classLoader.close()
         System.clearProperty("micronaut.config.files")
         main.delete()
-        Files.walk(firstRoot)
-            .sorted(Comparator.reverseOrder())
-            .forEach(Files::deleteIfExists)
-        Files.walk(secondRoot)
-            .sorted(Comparator.reverseOrder())
-            .forEach(Files::deleteIfExists)
+        try (def stream = Files.walk(firstRoot)) {
+            stream.sorted(Comparator.reverseOrder())
+                .forEach(Files::deleteIfExists)
+        }
+        try (def stream = Files.walk(secondRoot)) {
+            stream.sorted(Comparator.reverseOrder())
+                .forEach(Files::deleteIfExists)
+        }
     }
 
     void "test configtree protocol config import"() {
@@ -615,9 +620,10 @@ micronaut:
         cleanup:
         System.clearProperty("micronaut.config.files")
         main.delete()
-        Files.walk(root)
-            .sorted(Comparator.reverseOrder())
-            .forEach(Files::deleteIfExists)
+        try (def stream = Files.walk(root)) {
+            stream.sorted(Comparator.reverseOrder())
+                .forEach(Files::deleteIfExists)
+        }
     }
 
     def "constructor(String... names) should preserve order specified in micronaut.environments system property"() {
