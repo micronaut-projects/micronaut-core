@@ -56,7 +56,7 @@ public final class ConfigTreePropertySourceImporter implements PropertySourceImp
                 Path relative = root.relativize(path);
                 String key = relative.toString().replace('\\', '.').replace('/', '.');
                 try {
-                    values.put(key, Files.readString(path));
+                    values.put(key, trimSingleTrailingNewline(Files.readString(path)));
                 } catch (IOException e) {
                     LOG.warn("Skipping unreadable config tree file [{}]: {}", path, e.getMessage());
                 }
@@ -68,6 +68,16 @@ public final class ConfigTreePropertySourceImporter implements PropertySourceImp
             return Optional.empty();
         }
         return Optional.of(PropertySource.of(canonicalLocation, values, PropertySource.Origin.of(canonicalLocation)));
+    }
+
+    private static String trimSingleTrailingNewline(String value) {
+        if (value.endsWith("\r\n")) {
+            return value.substring(0, value.length() - 2);
+        }
+        if (value.endsWith("\n")) {
+            return value.substring(0, value.length() - 1);
+        }
+        return value;
     }
 
     private static boolean isHiddenPath(Path root, Path file) {

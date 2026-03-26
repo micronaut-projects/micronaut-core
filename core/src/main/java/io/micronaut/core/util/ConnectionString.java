@@ -419,21 +419,17 @@ public final class ConnectionString {
         while (normalized.contains("//")) {
             normalized = normalized.replace("//", "/");
         }
-        if (normalized.startsWith("/")) {
-            Path p = Paths.get(normalized).normalize();
-            String canonical = p.toString().replace('\\', '/');
-            validateNoParentTraversal(canonical, rawPath);
-            return canonical;
-        }
         Path p = Paths.get(normalized).normalize();
+        validateNoParentTraversal(p, rawPath);
         String canonical = p.toString().replace('\\', '/');
-        validateNoParentTraversal(canonical, rawPath);
         return canonical;
     }
 
-    private static void validateNoParentTraversal(String normalizedPath, String rawPath) {
-        if (normalizedPath.equals("..") || normalizedPath.startsWith("../") || normalizedPath.endsWith("/..") || normalizedPath.contains("/../")) {
-            throw new IllegalArgumentException("Parent path segments are not allowed in connection string path: " + rawPath);
+    private static void validateNoParentTraversal(Path normalizedPath, String rawPath) {
+        for (Path segment : normalizedPath) {
+            if ("..".equals(segment.toString())) {
+                throw new IllegalArgumentException("Parent path segments are not allowed in connection string path: " + rawPath);
+            }
         }
     }
 

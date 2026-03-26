@@ -41,7 +41,7 @@ public final class EnvPropertySourceImporter implements PropertySourceImporter {
             return Optional.empty();
         }
         String sourceName = "env:" + variableName;
-        String extension = connectionString.getExtension().orElse("properties");
+        String extension = connectionString.getOptions().getOrDefault("extension", connectionString.getExtension().orElse("properties"));
         return context.importPropertySource(value, sourceName, extension, PropertySource.Origin.of(sourceName));
     }
 }
