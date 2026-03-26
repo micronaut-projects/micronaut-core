@@ -131,7 +131,7 @@ public final class UpstreamBalancer {
                 return current;
             }
             int next = current | flag;
-            if (BALANCER_ATOMIC_INTEGER_FIELD_UPDATER_FLAGS.compareAndSet(UpstreamBalancer.this, current, next)) {
+            if (FLAGS_UPDATER.compareAndSet(UpstreamBalancer.this, current, next)) {
                 return current;
             }
         }
@@ -168,7 +168,7 @@ public final class UpstreamBalancer {
 
         assert n > 0;
 
-        long oldValue = UPSTREAM_BALANCER_ATOMIC_LONG_FIELD_UPDATER_DELTA.getAndUpdate(this, prev -> inv ? subtractSaturating(prev, n) : addSaturating(prev, n));
+        long oldValue = DELTA_UPDATER.getAndUpdate(this, prev -> inv ? subtractSaturating(prev, n) : addSaturating(prev, n));
         if (oldValue < 0 != inv) {
             long actual = Math.min(n, Math.abs(oldValue));
             if (actual > 0) {
@@ -184,7 +184,7 @@ public final class UpstreamBalancer {
 
         assert n > 0;
 
-        long newValue = UPSTREAM_BALANCER_ATOMIC_LONG_FIELD_UPDATER_DELTA.updateAndGet(this, prev -> inv ? subtractSaturating(prev, n) : addSaturating(prev, n));
+        long newValue = DELTA_UPDATER.updateAndGet(this, prev -> inv ? subtractSaturating(prev, n) : addSaturating(prev, n));
         if (newValue > 0 != inv) {
             long actual = Math.min(n, Math.abs(newValue));
             if (actual > 0) {
@@ -195,7 +195,7 @@ public final class UpstreamBalancer {
 
     private void pushSomeFromIgnored() {
         // if delta > 0, push that demand upstream.
-        long n = UPSTREAM_BALANCER_ATOMIC_LONG_FIELD_UPDATER_DELTA.getAndUpdate(this, l -> l > 0 ? 0 : l);
+        long n = DELTA_UPDATER.getAndUpdate(this, l -> l > 0 ? 0 : l);
         if (n > 0) {
             upstream.onBytesConsumed(n);
         }
@@ -283,7 +283,7 @@ public final class UpstreamBalancer {
         @Override
         public void onBytesConsumed(long bytesConsumed) {
             // don't send the demand upstream, but save it for later in case the other side calls disregardBackpressure
-            UPSTREAM_BALANCER_ATOMIC_LONG_FIELD_UPDATER_DELTA.updateAndGet(UpstreamBalancer.this, old -> addSaturating(old, bytesConsumed));
+            DELTA_UPDATER.updateAndGet(UpstreamBalancer.this, old -> addSaturating(old, bytesConsumed));
             if ((flags & FLAG_DISREGARD_A) != 0) {
                 pushSomeFromIgnored();
             }
@@ -303,7 +303,7 @@ public final class UpstreamBalancer {
         @Override
         public void onBytesConsumed(long bytesConsumed) {
             // save already-demanded bytes to delta to calculate demand for other side in case of disregardBackpressure
-            UPSTREAM_BALANCER_ATOMIC_LONG_FIELD_UPDATER_DELTA.updateAndGet(UpstreamBalancer.this, old -> subtractSaturating(old, bytesConsumed));
+            DELTA_UPDATER.updateAndGet(UpstreamBalancer.this, old -> subtractSaturating(old, bytesConsumed));
             upstream.onBytesConsumed(bytesConsumed);
         }
 
