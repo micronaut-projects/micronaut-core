@@ -411,9 +411,10 @@ micronaut:
 
         cleanup:
         System.clearProperty("micronaut.config.files")
-        Files.walk(root)
-            .sorted(Comparator.reverseOrder())
-            .forEach(Files::deleteIfExists)
+        try (def stream = Files.walk(root)) {
+            stream.sorted(Comparator.reverseOrder())
+                .forEach(Files::deleteIfExists)
+        }
     }
 
     void "test optional config import does not fail when missing"() {

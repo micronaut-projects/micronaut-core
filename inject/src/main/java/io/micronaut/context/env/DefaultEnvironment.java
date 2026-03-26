@@ -341,18 +341,22 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     private void loadProperties() {
         refreshablePropertySources.clear();
         List<PropertySource> propertySources;
+        List<PropertySource> refreshableRoots = new ArrayList<>(configLocations.size());
         if (configuration.isEnableDefaultPropertySources()) {
             propertySources = readPropertySourceList(applicationName);
+            refreshableRoots.addAll(propertySources);
             addDefaultPropertySources(propertySources);
             String propertySourcesSystemProperty = CachedEnvironment.getProperty(Environment.PROPERTY_SOURCES_KEY);
             if (propertySourcesSystemProperty != null) {
                 List<PropertySource> fromSystemProperty = readPropertySourceListFromFiles(propertySourcesSystemProperty);
                 propertySources.addAll(fromSystemProperty);
+                refreshableRoots.addAll(fromSystemProperty);
             }
             String propertySourcesEnv = CachedEnvironment.getenv(ENV_PROPERTY_SOURCES_KEY);
             if (propertySourcesEnv != null) {
                 List<PropertySource> fromEnv = readPropertySourceListFromFiles(propertySourcesEnv);
                 propertySources.addAll(fromEnv);
+                refreshableRoots.addAll(fromEnv);
             }
 
         } else {
@@ -374,17 +378,20 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
                 for (PropertySource propertySource : propertySourcesLocator.load(this)) {
                     internalAddPropertySource(propertySource);
                     propertySources.add(propertySource);
+                    if (!PropertySource.CONTEXT.equals(propertySource.getName())) {
+                        refreshableRoots.add(propertySource);
+                    }
                 }
             }
         }
 
-        List<PropertySource> resolvedRefreshable = resolvePropertySourceImports(propertySources);
+        List<PropertySource> resolvedRefreshable = resolvePropertySourceImports(refreshableRoots);
         for (PropertySource propertySource : resolvedRefreshable) {
             if (!PropertySource.CONTEXT.equals(propertySource.getName())) {
                 refreshablePropertySources.add(propertySource);
             }
         }
-        propertySources = resolvedRefreshable;
+        propertySources = resolvePropertySourceImports(propertySources);
 
         OrderUtil.sortOrdered(propertySources);
         for (PropertySource propertySource : propertySources) {

@@ -109,7 +109,8 @@ final class ConfigImportResolver {
                                                PropertyConvention fallbackConvention) {
         PropertySourceImporter importer = environment.findPropertySourceImporter(declaration.getProtocol());
         if (importer == null) {
-            throw new ConfigurationException("Unsupported micronaut.config.import protocol [" + declaration.getProtocol() + "] in " + declaration.getRawValue());
+            String parentLocation = parentOrigin != null ? parentOrigin.location() : "unknown origin";
+            throw new ConfigurationException("Unsupported micronaut.config.import protocol [" + declaration.getProtocol() + "] in " + declaration.getRawValue() + " declared from " + parentLocation);
         }
 
         PropertySourceImporter.ImportContext context = new DefaultImportContext(environment, declaration, parentOrigin);
