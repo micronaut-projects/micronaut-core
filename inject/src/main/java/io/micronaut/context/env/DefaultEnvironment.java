@@ -363,7 +363,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
             propertySources = new ArrayList<>(this.propertySources.size());
         }
         for (PropertySource propertySource : this.propertySources.values()) {
-            if (!refreshablePropertySources.contains(propertySource)) {
+            if (!propertySources.contains(propertySource)) {
                 propertySources.add(propertySource);
             }
         }
@@ -682,7 +682,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
             }
             return Optional.of(PropertySource.of(sourceName, values, origin));
         } catch (IOException e) {
-            throw new ConfigurationException("Unsupported properties content for source: " + sourceName + "." + extension, e);
+            throw new ConfigurationException("Failed to read properties content for source: " + sourceName + "." + extension, e);
         }
     }
 
@@ -704,7 +704,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
                 return Optional.of(PropertySource.of(sourceName, values, origin));
             }
         } catch (IOException e) {
-            throw new ConfigurationException("Unsupported properties file: " + resourcePath, e);
+            throw new ConfigurationException("Failed to read imported config: " + resourcePath, e);
         }
     }
 
@@ -738,7 +738,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
             try (InputStream in = resource.openStream()) {
                 values.putAll(propertySourceLoader.read(sourceName, in));
             } catch (IOException e) {
-                throw new ConfigurationException("Unsupported properties file: " + resourcePath, e);
+                throw new ConfigurationException("Failed to read imported config: " + resourcePath, e);
             }
         }
         if (values.isEmpty()) {

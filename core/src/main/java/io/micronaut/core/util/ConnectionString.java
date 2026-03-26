@@ -286,11 +286,14 @@ public final class ConnectionString {
             return true;
         }
         int colon = value.lastIndexOf(':');
-        if (colon <= 0 || colon == value.length() - 1) {
-            return false;
+        if (colon > 0 && colon < value.length() - 1) {
+            String possiblePort = value.substring(colon + 1);
+            if (StringUtils.isDigits(possiblePort)) {
+                return true;
+            }
         }
-        String possiblePort = value.substring(colon + 1);
-        return StringUtils.isDigits(possiblePort);
+        // Recognize localhost as a hostname without an explicit port
+        return "localhost".equalsIgnoreCase(value);
     }
 
     private static ParseAuthority parseAuthority(String authority, String originalValue) {

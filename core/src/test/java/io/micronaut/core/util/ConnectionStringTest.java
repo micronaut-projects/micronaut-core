@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -110,6 +111,25 @@ class ConnectionStringTest {
 
         assertEquals("classpath*", connectionString.getProtocol());
         assertEquals("config/shared.yml", connectionString.getPath());
+    }
+
+    @Test
+    void supportsLocalhostAuthorityWithoutPort() {
+        ConnectionString withPath = ConnectionString.parse("consul://localhost/config/app");
+
+        assertEquals("consul", withPath.getProtocol());
+        assertEquals(1, withPath.getHosts().size());
+        assertEquals("localhost", withPath.getHosts().get(0).host());
+        assertNull(withPath.getHosts().get(0).port());
+        assertEquals("config/app", withPath.getPath());
+
+        ConnectionString withoutPath = ConnectionString.parse("consul://localhost", ConnectionString.ParseMode.HOST);
+
+        assertEquals("consul", withoutPath.getProtocol());
+        assertEquals(1, withoutPath.getHosts().size());
+        assertEquals("localhost", withoutPath.getHosts().get(0).host());
+        assertNull(withoutPath.getHosts().get(0).port());
+        assertEquals("", withoutPath.getPath());
     }
 
     @Test
