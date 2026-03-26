@@ -24,8 +24,8 @@ import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.contrib.multipart.DecoderQuirk;
-import io.netty.contrib.multipart.FormDecoderException;
 import io.netty.contrib.multipart.TooManyFormFieldsException;
+import io.netty.contrib.multipart.UndecodedDataLimitExceededException;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.LastHttpContent;
@@ -102,7 +102,11 @@ public final class FormDataHttpContentProcessor {
     }
 
     private static InterfaceHttpPostRequestDecoder createDecoder(HttpDataFactory factory, HttpRequest request, Charset charset, NettyHttpServerConfiguration configuration) {
-        if (!contribCodecMissing) {
+        boolean isMultipart = HttpPostRequestDecoder.isMultipart(request);
+        boolean hasQuirks = !configuration.getFormDecoderQuirks().isEmpty();
+        // Use the contrib decoder for multipart (better chunk-boundary handling) or when quirks are configured.
+        // For URL-encoded without quirks, the standard Netty decoder correctly enforces maxBufferedBytes via TooLongFormFieldException.
+        if (!contribCodecMissing && (isMultipart || hasQuirks)) {
             try {
                 var builder = io.netty.contrib.multipart.vintage.HttpPostRequestDecoder.builder()
                     .dataFactory(factory)
@@ -112,19 +116,19 @@ public final class FormDataHttpContentProcessor {
                     .enableQuirks(configuration.getFormDecoderQuirks().stream()
                         .map(name -> ConversionService.SHARED.convertRequired(name, DecoderQuirk.class))
                         .toArray(DecoderQuirk[]::new));
-                if (HttpPostRequestDecoder.isMultipart(request)) {
+                if (isMultipart) {
                     return builder.buildMultipart(request);
                 } else {
                     return builder.buildStandard(request);
                 }
             } catch (LinkageError e) {
-                if (!configuration.getFormDecoderQuirks().isEmpty()) {
+                if (hasQuirks) {
                     throw new ConfigurationException("Configuration contained form-decoder-quirks, but failed to load new decoder implementation", e);
                 }
                 contribCodecMissing = true;
             }
         }
-        if (HttpPostRequestDecoder.isMultipart(request)) {
+        if (isMultipart) {
             return new HttpPostMultipartRequestDecoder(factory, request, charset, configuration.getFormMaxFields(), configuration.getFormMaxBufferedBytes());
         } else {
             return new HttpPostStandardRequestDecoder(factory, request, charset, configuration.getFormMaxFields(), configuration.getFormMaxBufferedBytes());
@@ -216,7 +220,7 @@ public final class FormDataHttpContentProcessor {
             instanceOfSafe(original, () -> TooManyFormFieldsException.class)) {
             return new ContentLengthExceededException("Number of form fields exceeds configured limit of [" + configuration.getFormMaxFields() + "]");
         } else if (original instanceof HttpPostRequestDecoder.TooLongFormFieldException ||
-            (instanceOfSafe(original, () -> FormDecoderException.class) && original.getMessage().equals("Undecoded data limit exceeded"))) {
+            instanceOfSafe(original, () -> UndecodedDataLimitExceededException.class)) {
             return new ContentLengthExceededException("Length of buffered form field exceeds configured limit of [" + configuration.getFormMaxBufferedBytes() + "]");
         } else {
             return original;
