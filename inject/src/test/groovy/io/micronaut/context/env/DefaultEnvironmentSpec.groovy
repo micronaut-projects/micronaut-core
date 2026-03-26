@@ -430,6 +430,25 @@ micronaut:
 
         cleanup:
         System.clearProperty("micronaut.config.files")
+        main.delete()
+    }
+
+    void "test required config import still fails after optional miss for same location"() {
+        given:
+        File main = File.createTempFile("config-import-optional-required", ".properties")
+        main.write("micronaut.config.import[0]=optional:file://missing.properties\nmicronaut.config.import[1]=file://missing.properties")
+
+        when:
+        System.setProperty("micronaut.config.files", main.absolutePath)
+        new DefaultEnvironment({ ["test"] }).start()
+
+        then:
+        def e = thrown(ConfigurationException)
+        e.message.contains("Required config import not found")
+
+        cleanup:
+        System.clearProperty("micronaut.config.files")
+        main.delete()
     }
 
     void "test required config import fails when missing"() {
@@ -447,6 +466,7 @@ micronaut:
 
         cleanup:
         System.clearProperty("micronaut.config.files")
+        main.delete()
     }
 
     void "test config import cycle detection"() {
@@ -487,6 +507,7 @@ micronaut:
 
         cleanup:
         System.clearProperty("micronaut.config.files")
+        main.delete()
     }
 
     void "test classpath protocol config import"() {
@@ -503,6 +524,7 @@ micronaut:
 
         cleanup:
         System.clearProperty("micronaut.config.files")
+        main.delete()
     }
 
     void "test classpath protocol fails when duplicate import resources are found"() {
@@ -530,6 +552,7 @@ micronaut:
         cleanup:
         classLoader.close()
         System.clearProperty("micronaut.config.files")
+        main.delete()
         Files.walk(firstRoot)
             .sorted(Comparator.reverseOrder())
             .forEach(Files::deleteIfExists)
@@ -564,6 +587,7 @@ micronaut:
         cleanup:
         classLoader.close()
         System.clearProperty("micronaut.config.files")
+        main.delete()
         Files.walk(firstRoot)
             .sorted(Comparator.reverseOrder())
             .forEach(Files::deleteIfExists)
@@ -589,6 +613,7 @@ micronaut:
 
         cleanup:
         System.clearProperty("micronaut.config.files")
+        main.delete()
         Files.walk(root)
             .sorted(Comparator.reverseOrder())
             .forEach(Files::deleteIfExists)

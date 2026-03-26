@@ -23,7 +23,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -50,10 +49,7 @@ public final class ConfigTreePropertySourceImporter implements PropertySourceImp
         }
         Map<String, Object> values = new LinkedHashMap<>();
         try (Stream<Path> stream = Files.walk(root)) {
-            List<Path> files = stream
-                .filter(Files::isRegularFile)
-                .toList();
-            for (Path path : files) {
+            for (Path path : (Iterable<Path>) stream.filter(Files::isRegularFile)::iterator) {
                 if (isHiddenPath(root, path)) {
                     continue;
                 }
