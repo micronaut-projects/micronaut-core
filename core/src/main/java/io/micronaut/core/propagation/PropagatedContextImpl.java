@@ -214,7 +214,10 @@ final class PropagatedContextImpl implements PropagatedContext {
     @Nullable
     public static PropagatedContext getOrNull() {
         return switch (PropagatedContextConfiguration.get()) {
-            case SCOPED_VALUE -> ScopedValues.get();
+            case SCOPED_VALUE -> {
+                PropagatedContext fromScopedValue = ScopedValues.get();
+                yield fromScopedValue != null ? fromScopedValue : ThreadContext.get();
+            }
             case THREAD_LOCAL -> ThreadContext.get();
         };
     }
@@ -238,11 +241,7 @@ final class PropagatedContextImpl implements PropagatedContext {
 
     @Override
     public Scope propagate() {
-        return switch (PropagatedContextConfiguration.get()) {
-            case THREAD_LOCAL -> ThreadContext.propagate(ThreadContext.get(), this);
-            case SCOPED_VALUE ->
-                throw new IllegalStateException("Scope propagation requires thread-local support. Set 'micronaut.propagation' to 'thread-local'.");
-        };
+        return ThreadContext.propagate(ThreadContext.get(), this);
     }
 
     @Override
