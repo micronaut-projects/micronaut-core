@@ -28,6 +28,8 @@ import spock.util.environment.RestoreSystemProperties
 
 import java.nio.file.Files
 import java.nio.file.Path
+import java.net.URLClassLoader
+import java.util.Comparator
 import java.util.function.Function
 
 /**
@@ -379,6 +381,217 @@ class DefaultEnvironmentSpec extends Specification {
         then:
         def ex = thrown(ConfigurationException)
         ex.message == "Failed to read configuration file: /does/not/exist.yaml"
+    }
+
+    void "test file config imports support nesting and extensionless probing"() {
+        given:
+        Path root = Files.createTempDirectory("config-import")
+        File main = root.resolve("main.properties").toFile()
+        main.write("micronaut.config.import=file://child\napp.main=main")
+        File child = root.resolve("child.yml").toFile()
+        child.write("""
+app:
+  child: child
+micronaut:
+  config:
+    import: file://sub/grand.properties
+""")
+        Path subDir = Files.createDirectories(root.resolve("sub"))
+        File grand = subDir.resolve("grand.properties").toFile()
+        grand.write("app.grand=grand")
+
+        when:
+        System.setProperty("micronaut.config.files", main.absolutePath)
+        Environment env = new DefaultEnvironment({ ["test"] }).start()
+
+        then:
+        env.getRequiredProperty("app.main", String) == "main"
+        env.getRequiredProperty("app.child", String) == "child"
+        env.getRequiredProperty("app.grand", String) == "grand"
+
+        cleanup:
+        System.clearProperty("micronaut.config.files")
+        Files.walk(root)
+            .sorted(Comparator.reverseOrder())
+            .forEach(Files::deleteIfExists)
+    }
+
+    void "test optional config import does not fail when missing"() {
+        given:
+        File main = File.createTempFile("config-import-optional", ".properties")
+        main.write("micronaut.config.import=optional:file://missing.properties\napp.main=main")
+
+        when:
+        System.setProperty("micronaut.config.files", main.absolutePath)
+        Environment env = new DefaultEnvironment({ ["test"] }).start()
+
+        then:
+        env.getRequiredProperty("app.main", String) == "main"
+
+        cleanup:
+        System.clearProperty("micronaut.config.files")
+    }
+
+    void "test required config import fails when missing"() {
+        given:
+        File main = File.createTempFile("config-import-required", ".properties")
+        main.write("micronaut.config.import=file://missing.properties")
+
+        when:
+        System.setProperty("micronaut.config.files", main.absolutePath)
+        new DefaultEnvironment({ ["test"] }).start()
+
+        then:
+        def e = thrown(ConfigurationException)
+        e.message.contains("Required config import not found")
+
+        cleanup:
+        System.clearProperty("micronaut.config.files")
+    }
+
+    void "test config import cycle detection"() {
+        given:
+        Path root = Files.createTempDirectory("config-import-cycle")
+        File a = root.resolve("a.properties").toFile()
+        a.write("micronaut.config.import=file://b.properties")
+        File b = root.resolve("b.properties").toFile()
+        b.write("micronaut.config.import=file://a.properties")
+
+        when:
+        System.setProperty("micronaut.config.files", a.absolutePath)
+        new DefaultEnvironment({ ["test"] }).start()
+
+        then:
+        def e = thrown(ConfigurationException)
+        e.message.contains("Cycle detected")
+
+        cleanup:
+        System.clearProperty("micronaut.config.files")
+        Files.walk(root)
+            .sorted(Comparator.reverseOrder())
+            .forEach(Files::deleteIfExists)
+    }
+
+    void "test env protocol config import"() {
+        given:
+        File main = File.createTempFile("config-import-env", ".properties")
+        main.write("micronaut.config.import=env://MY_IMPORT_CONFIG.yml")
+
+        when:
+        System.setProperty("micronaut.config.files", main.absolutePath)
+        Environment env = SystemLambda.withEnvironmentVariable("MY_IMPORT_CONFIG.yml", "app:\n  from:\n    env: true\n")
+            .execute(() -> new DefaultEnvironment({ ["test"] }).start())
+
+        then:
+        env.getRequiredProperty("app.from.env", Boolean)
+
+        cleanup:
+        System.clearProperty("micronaut.config.files")
+    }
+
+    void "test classpath protocol config import"() {
+        given:
+        File main = File.createTempFile("config-import-classpath", ".properties")
+        main.write("micronaut.config.import=classpath://config-files.yml")
+
+        when:
+        System.setProperty("micronaut.config.files", main.absolutePath)
+        Environment env = new DefaultEnvironment({ ["test"] }).start()
+
+        then:
+        env.getRequiredProperty("config.prop", String) == "config-files.yml"
+
+        cleanup:
+        System.clearProperty("micronaut.config.files")
+    }
+
+    void "test classpath protocol fails when duplicate import resources are found"() {
+        given:
+        Path firstRoot = Files.createTempDirectory("config-import-classpath-dup-first")
+        Path secondRoot = Files.createTempDirectory("config-import-classpath-dup-second")
+        Files.writeString(firstRoot.resolve("duplicate-import.yml"), "app:\n  duplicate: first\n")
+        Files.writeString(secondRoot.resolve("duplicate-import.yml"), "app:\n  duplicate: second\n")
+        URLClassLoader classLoader = new URLClassLoader([firstRoot.toUri().toURL(), secondRoot.toUri().toURL()] as URL[], this.class.classLoader)
+        File main = File.createTempFile("config-import-classpath-dup", ".properties")
+        main.write("micronaut.config.import=classpath://duplicate-import.yml")
+
+        when:
+        System.setProperty("micronaut.config.files", main.absolutePath)
+        def configuration = [
+            getEnvironments: { ["test"] },
+            getClassLoader : { classLoader }
+        ] as ApplicationContextConfiguration
+        new DefaultEnvironment(configuration).start()
+
+        then:
+        ConfigurationException e = thrown()
+        e.message.contains("Use classpath*:// to load all matches")
+
+        cleanup:
+        classLoader.close()
+        System.clearProperty("micronaut.config.files")
+        Files.walk(firstRoot)
+            .sorted(Comparator.reverseOrder())
+            .forEach(Files::deleteIfExists)
+        Files.walk(secondRoot)
+            .sorted(Comparator.reverseOrder())
+            .forEach(Files::deleteIfExists)
+    }
+
+    void "test classpath wildcard protocol loads duplicate resources in classpath order"() {
+        given:
+        Path firstRoot = Files.createTempDirectory("config-import-classpath-star-first")
+        Path secondRoot = Files.createTempDirectory("config-import-classpath-star-second")
+        Files.writeString(firstRoot.resolve("duplicate-import.yml"), "app:\n  first: true\n  value: first\n")
+        Files.writeString(secondRoot.resolve("duplicate-import.yml"), "app:\n  second: true\n  value: second\n")
+        URLClassLoader classLoader = new URLClassLoader([firstRoot.toUri().toURL(), secondRoot.toUri().toURL()] as URL[], this.class.classLoader)
+        File main = File.createTempFile("config-import-classpath-star", ".properties")
+        main.write("micronaut.config.import=classpath*://duplicate-import.yml")
+
+        when:
+        System.setProperty("micronaut.config.files", main.absolutePath)
+        def configuration = [
+            getEnvironments: { ["test"] },
+            getClassLoader : { classLoader }
+        ] as ApplicationContextConfiguration
+        Environment env = new DefaultEnvironment(configuration).start()
+
+        then:
+        env.getRequiredProperty("app.first", Boolean)
+        env.getRequiredProperty("app.second", Boolean)
+        env.getRequiredProperty("app.value", String) == "second"
+
+        cleanup:
+        classLoader.close()
+        System.clearProperty("micronaut.config.files")
+        Files.walk(firstRoot)
+            .sorted(Comparator.reverseOrder())
+            .forEach(Files::deleteIfExists)
+        Files.walk(secondRoot)
+            .sorted(Comparator.reverseOrder())
+            .forEach(Files::deleteIfExists)
+    }
+
+    void "test configtree protocol config import"() {
+        given:
+        Path root = Files.createTempDirectory("configtree-import")
+        Path nested = Files.createDirectories(root.resolve("db"))
+        Files.writeString(nested.resolve("password"), "secret")
+        File main = File.createTempFile("config-import-configtree", ".properties")
+        main.write("micronaut.config.import=configtree://${root.toString()}")
+
+        when:
+        System.setProperty("micronaut.config.files", main.absolutePath)
+        Environment env = new DefaultEnvironment({ ["test"] }).start()
+
+        then:
+        env.getRequiredProperty("db.password", String) == "secret"
+
+        cleanup:
+        System.clearProperty("micronaut.config.files")
+        Files.walk(root)
+            .sorted(Comparator.reverseOrder())
+            .forEach(Files::deleteIfExists)
     }
 
     def "constructor(String... names) should preserve order specified in micronaut.environments system property"() {
