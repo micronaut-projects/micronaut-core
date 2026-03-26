@@ -434,27 +434,28 @@ public final class RouteExecutor {
         ExecutionFlow<HttpResponse<?>> executeMethodResponseFlow;
         if (executorService != null) {
             if (routeInfo.isSuspended()) {
+                Scheduler scheduler = Schedulers.fromExecutor(executorService);
                 executeMethodResponseFlow = ReactiveExecutionFlow.fromPublisher(Mono.deferContextual(contextView -> {
                         return Mono.from(
-                            ReactiveExecutionFlow.fromFlow(executeRouteAndConvertBody(propagatedContext, routeMatch, request, true, contextView)).toPublisher()
+                            ReactiveExecutionFlow.fromFlow(executeRouteAndConvertBody(propagatedContext, routeMatch, request, true, contextView, executorService)).toPublisher()
                         );
-                    }));
+                    }).subscribeOn(scheduler));
             } else if (routeInfo.isReactive()) {
-                executeMethodResponseFlow = ReactiveExecutionFlow.async(executorService, () -> executeRouteAndConvertBody(propagatedContext, routeMatch, request, false, null));
+                executeMethodResponseFlow = ReactiveExecutionFlow.async(executorService, () -> executeRouteAndConvertBody(propagatedContext, routeMatch, request, false, null, null));
             } else {
-                executeMethodResponseFlow = ExecutionFlow.async(executorService, () -> executeRouteAndConvertBody(propagatedContext, routeMatch, request, false, null));
+                executeMethodResponseFlow = ExecutionFlow.async(executorService, () -> executeRouteAndConvertBody(propagatedContext, routeMatch, request, false, null, null));
             }
         } else {
             if (routeInfo.isSuspended()) {
                 executeMethodResponseFlow = ReactiveExecutionFlow.fromPublisher(Mono.deferContextual(contextView -> {
                         return Mono.from(
-                            ReactiveExecutionFlow.fromFlow(executeRouteAndConvertBody(propagatedContext, routeMatch, request, true, contextView)).toPublisher()
+                            ReactiveExecutionFlow.fromFlow(executeRouteAndConvertBody(propagatedContext, routeMatch, request, true, contextView, null)).toPublisher()
                         );
                     }));
             } else if (routeInfo.isReactive()) {
-                executeMethodResponseFlow = ReactiveExecutionFlow.fromFlow(executeRouteAndConvertBody(propagatedContext, routeMatch, request, false, null));
+                executeMethodResponseFlow = ReactiveExecutionFlow.fromFlow(executeRouteAndConvertBody(propagatedContext, routeMatch, request, false, null, null));
             } else {
-                executeMethodResponseFlow = executeRouteAndConvertBody(propagatedContext, routeMatch, request, false, null);
+                executeMethodResponseFlow = executeRouteAndConvertBody(propagatedContext, routeMatch, request, false, null, null);
             }
         }
         return executeMethodResponseFlow;
@@ -464,12 +465,17 @@ public final class RouteExecutor {
                                                                       RouteMatch<?> routeMatch,
                                                                       HttpRequest<?> httpRequest,
                                                                       boolean isKotlinCoroutine,
-                                                                      @Nullable ContextView contextView) {
+                                                                      @Nullable ContextView contextView,
+                                                                      @Nullable ExecutorService executorService) {
         PropagatedContext routePropagatedContext = propagatedContext.plus(new ServerHttpRequestContext(httpRequest));
         return routePropagatedContext.propagate(() -> {
             try {
                 if (isKotlinCoroutine && contextView != null) {
-                    coroutineHelper.ifPresent(helper -> helper.setupCoroutineContext(httpRequest, contextView, routePropagatedContext));
+                    if (executorService != null) {
+                        coroutineHelper.ifPresent(helper -> helper.setupCoroutineContext(httpRequest, contextView, routePropagatedContext, executorService));
+                    } else {
+                        coroutineHelper.ifPresent(helper -> helper.setupCoroutineContext(httpRequest, contextView, routePropagatedContext));
+                    }
                 }
                 requestArgumentSatisfier.fulfillArgumentRequirementsAfterFilters(routeMatch, httpRequest);
                 Object body = routeMatch.execute();
