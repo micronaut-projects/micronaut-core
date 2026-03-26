@@ -364,6 +364,7 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
                         return true;
                     }
                 }
+                return false;
             default:
                 return false;
         }
