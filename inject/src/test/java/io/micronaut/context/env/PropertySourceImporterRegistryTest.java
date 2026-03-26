@@ -10,6 +10,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PropertySourceImporterRegistryTest {
 
@@ -30,7 +31,7 @@ class PropertySourceImporterRegistryTest {
             ))
         );
 
-        assertEquals(true, e.getMessage().contains("Duplicate property source importer for protocol [file]"));
+        assertTrue(e.getMessage().contains("Duplicate property source importer for protocol [file]"));
     }
 
     private static final class TestImporter implements PropertySourceImporter {

@@ -393,7 +393,8 @@ public final class ConnectionString {
     }
 
     private static void validateProtocolAuthority(String protocol, List<HostPort> hosts, String originalValue) {
-        if (("file".equals(protocol) || "classpath".equals(protocol)) && hosts.stream().anyMatch(host -> host.port() != null)) {
+        if (("file".equals(protocol) || "classpath".equals(protocol) || "classpath*".equals(protocol))
+            && hosts.stream().anyMatch(host -> host.port() != null)) {
             throw new IllegalArgumentException("Port is not supported for " + protocol + " protocol in connection string: " + originalValue);
         }
     }
@@ -415,16 +416,19 @@ public final class ConnectionString {
             return rawPath;
         }
         String normalized = rawPath.replace('\\', '/');
-        validateNoParentTraversal(normalized, rawPath);
-        if (normalized.startsWith("/")) {
-            Path p = Paths.get(normalized).normalize();
-            return p.toString().replace('\\', '/');
-        }
         while (normalized.contains("//")) {
             normalized = normalized.replace("//", "/");
         }
+        if (normalized.startsWith("/")) {
+            Path p = Paths.get(normalized).normalize();
+            String canonical = p.toString().replace('\\', '/');
+            validateNoParentTraversal(canonical, rawPath);
+            return canonical;
+        }
         Path p = Paths.get(normalized).normalize();
-        return p.toString().replace('\\', '/');
+        String canonical = p.toString().replace('\\', '/');
+        validateNoParentTraversal(canonical, rawPath);
+        return canonical;
     }
 
     private static void validateNoParentTraversal(String normalizedPath, String rawPath) {

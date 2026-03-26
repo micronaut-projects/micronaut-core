@@ -47,7 +47,7 @@ Imports are resolved recursively and support the following protocols:
 * `configtree://` – load a directory tree where file paths map to property keys
 
 Prefix any import with `optional:` to skip it when the target is missing.
-Without `optional:`, a api:io.micronaut.context.exceptions.ConfigurationException[] is thrown if the import cannot be loaded.
+Without `optional:`, an api:io.micronaut.context.exceptions.ConfigurationException[] is thrown if the import cannot be loaded.
 
 For `file://`, `classpath://`, and `classpath*://` imports, if no extension is provided, Micronaut probes known configuration extensions (`.properties`, `.json`, `.yml`, and any additional enabled loaders).
 
