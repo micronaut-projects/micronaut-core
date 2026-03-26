@@ -111,4 +111,15 @@ class ConnectionStringTest {
         assertEquals("classpath*", connectionString.getProtocol());
         assertEquals("config/shared.yml", connectionString.getPath());
     }
+
+    @Test
+    void rejectsRelativeParentTraversalSegments() {
+        IllegalArgumentException relativeError = assertThrows(IllegalArgumentException.class,
+            () -> ConnectionString.parse("file://../secrets.yml").getCanonicalPath());
+        assertTrue(relativeError.getMessage().contains("Parent path segments are not allowed"));
+
+        IllegalArgumentException nestedError = assertThrows(IllegalArgumentException.class,
+            () -> ConnectionString.parse("classpath://config/../../secrets.yml").getCanonicalPath());
+        assertTrue(nestedError.getMessage().contains("Parent path segments are not allowed"));
+    }
 }

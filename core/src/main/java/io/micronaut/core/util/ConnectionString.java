@@ -415,6 +415,7 @@ public final class ConnectionString {
             return rawPath;
         }
         String normalized = rawPath.replace('\\', '/');
+        validateNoParentTraversal(normalized, rawPath);
         if (normalized.startsWith("/")) {
             Path p = Paths.get(normalized).normalize();
             return p.toString().replace('\\', '/');
@@ -424,6 +425,12 @@ public final class ConnectionString {
         }
         Path p = Paths.get(normalized).normalize();
         return p.toString().replace('\\', '/');
+    }
+
+    private static void validateNoParentTraversal(String normalizedPath, String rawPath) {
+        if (normalizedPath.equals("..") || normalizedPath.startsWith("../") || normalizedPath.endsWith("/..") || normalizedPath.contains("/../")) {
+            throw new IllegalArgumentException("Parent path segments are not allowed in connection string path: " + rawPath);
+        }
     }
 
     private String buildCanonicalForm() {
