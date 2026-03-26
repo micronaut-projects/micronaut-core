@@ -281,6 +281,7 @@ class AccessLogSpec extends Specification {
         responses*.content().forEach(ByteBuf::release)
         server.close()
         channel.close()
+        ctx.close()
         group.shutdownGracefully()
     }
 
