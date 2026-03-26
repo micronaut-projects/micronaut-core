@@ -15,6 +15,8 @@
  */
 package io.micronaut.context.env;
 
+import io.micronaut.core.io.file.FileSystemResourceLoader;
+
 import java.util.Optional;
 
 /**
@@ -32,7 +34,7 @@ public final class FilePropertySourceImporter implements PropertySourceImporter 
         String canonicalLocation = context.getCanonicalLocation();
         String resourcePath = context.getResourcePath();
         return context.importPropertySource(
-            context.environment(),
+            FileSystemResourceLoader.defaultLoader(),
             resourcePath,
             canonicalLocation,
             PropertySource.Origin.of(canonicalLocation)
