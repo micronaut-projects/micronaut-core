@@ -603,7 +603,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         if (!extension.isEmpty()) {
             PropertySourceLoader propertySourceLoader = loaderByFormatMap.get(extension);
             if (propertySourceLoader == null) {
-                throw new ConfigurationException("Unsupported properties file format while reading " + resourceName + "." + extension + " from " + resourcePath);
+                throw new ConfigurationException("Unsupported properties file format while reading " + resourceName + " from " + resourcePath);
             }
             return readImportedPropertySource(resourceLoader, resourcePath, sourceName, origin, propertySourceLoader);
         }
@@ -634,7 +634,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         if (!extension.isEmpty()) {
             PropertySourceLoader propertySourceLoader = loaderByFormatMap.get(extension);
             if (propertySourceLoader == null) {
-                throw new ConfigurationException("Unsupported properties file format while reading " + resourceName + "." + extension + " from " + resourcePath);
+                throw new ConfigurationException("Unsupported properties file format while reading " + resourceName + " from " + resourcePath);
             }
             return readImportedClasspathPropertySource(resourcePath, sourceName, origin, propertySourceLoader, allowMultiple);
         }
@@ -697,7 +697,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
                 return Optional.of(PropertySource.of(sourceName, values, origin));
             }
         } catch (IOException e) {
-            throw new ConfigurationException("Unsupported properties file: " + resourcePath);
+            throw new ConfigurationException("Unsupported properties file: " + resourcePath, e);
         }
     }
 

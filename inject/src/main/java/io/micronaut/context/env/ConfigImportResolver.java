@@ -80,7 +80,7 @@ final class ConfigImportResolver {
                 String previous = chain.peekLast();
                 throw new ConfigurationException("Cycle detected while resolving micronaut.config.import: " + ConfigImportIdentity.cycleDisplay(previous == null ? canonicalLocation : previous, canonicalLocation));
             }
-            if (!visited.add(identity)) {
+            if (visited.contains(identity)) {
                 continue;
             }
 
@@ -88,6 +88,7 @@ final class ConfigImportResolver {
             if (imported.isEmpty()) {
                 continue;
             }
+            visited.add(identity);
 
             chain.addLast(canonicalLocation);
             try {

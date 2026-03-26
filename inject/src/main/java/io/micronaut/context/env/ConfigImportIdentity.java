@@ -81,7 +81,7 @@ final class ConfigImportIdentity {
         verifyNoPort(connectionString, "file");
         String path = connectionString.getCanonicalPath();
         if (path.startsWith("/")) {
-            return "file:" + Paths.get(path).normalize();
+            return "file:" + normalizeFilePath(Paths.get(path).normalize());
         }
         if (!connectionString.getHosts().isEmpty()) {
             StringBuilder authority = new StringBuilder();
@@ -107,7 +107,11 @@ final class ConfigImportIdentity {
             baseDirectory = parent == null ? basePath : parent;
         }
         Path resolved = baseDirectory.resolve(path).normalize();
-        return "file:" + resolved;
+        return "file:" + normalizeFilePath(resolved);
+    }
+
+    private static String normalizeFilePath(Path path) {
+        return path.toString().replace('\\', '/');
     }
 
     private static String canonicalClasspathLocation(ConnectionString connectionString,
