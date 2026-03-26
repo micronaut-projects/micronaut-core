@@ -724,6 +724,33 @@ micronaut:
         env.close()
     }
 
+    void "test imported file property source is re-read on refresh"() {
+        given:
+        File imported = File.createTempFile("config-import-refresh-child", ".properties")
+        imported.write("app.imported=one")
+        File main = File.createTempFile("config-import-refresh-main", ".properties")
+        main.write("micronaut.config.import=file://${imported.absolutePath}\napp.main=main")
+        System.setProperty("micronaut.config.files", main.absolutePath)
+        ApplicationContext context = ApplicationContext.builder("test").build().start()
+
+        expect:
+        context.getRequiredProperty("app.imported", String) == "one"
+
+        when:
+        imported.write("app.imported=two")
+        def diff = context.getEnvironment().refreshAndDiff()
+
+        then:
+        diff.get("app.imported") == "one"
+        context.getRequiredProperty("app.imported", String) == "two"
+
+        cleanup:
+        context?.close()
+        System.clearProperty("micronaut.config.files")
+        imported?.delete()
+        main?.delete()
+    }
+
     void "test property source order"() {
         when:
         System.setProperty("micronaut.config.files", "classpath:config-files.yml,classpath:config-files2.yml")

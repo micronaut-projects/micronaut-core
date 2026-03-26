@@ -362,7 +362,11 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         } else {
             propertySources = new ArrayList<>(this.propertySources.size());
         }
-        propertySources.addAll(this.propertySources.values());
+        for (PropertySource propertySource : this.propertySources.values()) {
+            if (!refreshablePropertySources.contains(propertySource)) {
+                propertySources.add(propertySource);
+            }
+        }
 
         for (PropertySource propertySource : propertySources) {
             internalAddPropertySource(propertySource);
