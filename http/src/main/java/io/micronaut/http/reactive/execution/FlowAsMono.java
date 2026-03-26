@@ -61,8 +61,11 @@ final class FlowAsMono<T> extends Mono<T> implements Fuseable {
 
     private final class SubscriptionImpl implements QueueSubscription<T> {
         @SuppressWarnings("rawtypes")
-        private static final AtomicIntegerFieldUpdater<FlowAsMono.SubscriptionImpl> ATOMIC_INTEGER_FIELD_UPDATER_STATE
+        private static final AtomicIntegerFieldUpdater<FlowAsMono.SubscriptionImpl> STATE_UPDATER
             = AtomicIntegerFieldUpdater.newUpdater(FlowAsMono.SubscriptionImpl.class, "state");
+        @Deprecated
+        @SuppressWarnings("rawtypes")
+        private static final AtomicIntegerFieldUpdater<FlowAsMono.SubscriptionImpl> ATOMIC_INTEGER_FIELD_UPDATER_STATE = STATE_UPDATER;
         private static final int STATE_WAITING = 0;
         private static final int STATE_SUBSCRIBING = 1;
         private static final int STATE_DONE = 2;
