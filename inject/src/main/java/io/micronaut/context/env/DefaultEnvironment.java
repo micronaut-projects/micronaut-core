@@ -989,8 +989,8 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         if (withoutEntry.startsWith("jar:")) {
             withoutEntry = withoutEntry.substring(4);
         }
-        if (withoutEntry.startsWith("file:")) {
-            withoutEntry = withoutEntry.substring(5);
+        if (withoutEntry.startsWith(FILE_PREFIX)) {
+            withoutEntry = withoutEntry.substring(FILE_PREFIX.length());
         }
 
         int slashIndex = withoutEntry.lastIndexOf('/');
