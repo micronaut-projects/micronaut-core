@@ -47,20 +47,30 @@ import java.util.Optional;
  *
  * @since 5.0
  */
-public final class ConnectionString {
+public record ConnectionString(String rawValue,
+                               ParseMode parseMode,
+                               @Nullable String prefix,
+                               String protocol,
+                               @Nullable String username,
+                               @Nullable String password,
+                               List<HostPort> hosts,
+                               String path,
+                               Map<String, String> options,
+                               String canonicalForm) {
 
     private static final String OPTIONAL_PREFIX = "optional:";
 
-    private final String rawValue;
-    private final ParseMode parseMode;
-    private final @Nullable String prefix;
-    private final String protocol;
-    private final @Nullable String username;
-    private final @Nullable String password;
-    private final List<HostPort> hosts;
-    private final String path;
-    private final Map<String, String> options;
-    private final String canonicalForm;
+    public ConnectionString {
+        Objects.requireNonNull(rawValue, "rawValue");
+        Objects.requireNonNull(parseMode, "parseMode");
+        Objects.requireNonNull(protocol, "protocol");
+        Objects.requireNonNull(hosts, "hosts");
+        Objects.requireNonNull(path, "path");
+        Objects.requireNonNull(options, "options");
+        hosts = List.copyOf(hosts);
+        options = Map.copyOf(options);
+        canonicalForm = buildCanonicalForm(prefix, protocol, username, password, hosts, path, options);
+    }
 
     private ConnectionString(String rawValue,
                              ParseMode parseMode,
@@ -71,16 +81,16 @@ public final class ConnectionString {
                              List<HostPort> hosts,
                              String path,
                              Map<String, String> options) {
-        this.rawValue = rawValue;
-        this.parseMode = parseMode;
-        this.prefix = prefix;
-        this.protocol = protocol;
-        this.username = username;
-        this.password = password;
-        this.hosts = Collections.unmodifiableList(hosts);
-        this.path = path;
-        this.options = Collections.unmodifiableMap(options);
-        this.canonicalForm = buildCanonicalForm();
+        this(rawValue,
+            parseMode,
+            prefix,
+            protocol,
+            username,
+            password,
+            hosts,
+            path,
+            options,
+            buildCanonicalForm(prefix, protocol, username, password, List.copyOf(hosts), path, Map.copyOf(options)));
     }
 
     /**
@@ -353,7 +363,7 @@ public final class ConnectionString {
 
     private static Map<String, String> parseOptions(String query, String originalValue) {
         if (query.isEmpty()) {
-            return Collections.emptyMap();
+            return Map.of();
         }
         Map<String, String> options = new LinkedHashMap<>();
         for (String part : query.split("&")) {
@@ -370,7 +380,7 @@ public final class ConnectionString {
                 throw new IllegalArgumentException("Duplicate option '" + key + "' in connection string: " + originalValue);
             }
         }
-        return options;
+        return Map.copyOf(options);
     }
 
     private static void validateProtocol(String protocol, String originalValue) {
@@ -424,8 +434,7 @@ public final class ConnectionString {
         }
         Path p = Paths.get(normalized).normalize();
         validateNoParentTraversal(p, rawPath);
-        String canonical = p.toString().replace('\\', '/');
-        return canonical;
+        return p.toString().replace('\\', '/');
     }
 
     private static void validateNoParentTraversal(Path normalizedPath, String rawPath) {
@@ -436,9 +445,15 @@ public final class ConnectionString {
         }
     }
 
-    private String buildCanonicalForm() {
+    private static String buildCanonicalForm(@Nullable String prefix,
+                                             String protocol,
+                                             @Nullable String username,
+                                             @Nullable String password,
+                                             List<HostPort> hosts,
+                                             String path,
+                                             Map<String, String> options) {
         StringBuilder out = new StringBuilder();
-        if (isOptional()) {
+        if ("optional".equals(prefix)) {
             out.append(OPTIONAL_PREFIX);
         }
         out.append(protocol).append("://");

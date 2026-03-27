@@ -96,12 +96,10 @@ class ConnectionStringTest {
 
     @Test
     void rejectsPortsForFileAndClasspathProtocols() {
-        IllegalArgumentException fileError = assertThrows(IllegalArgumentException.class,
-            () -> ConnectionString.parse("file://localhost:8080/config.properties"));
+        IllegalArgumentException fileError = assertThrows(IllegalArgumentException.class, ConnectionStringTest::parseFileWithPort);
         assertTrue(fileError.getMessage().contains("Port is not supported"));
 
-        IllegalArgumentException classpathError = assertThrows(IllegalArgumentException.class,
-            () -> ConnectionString.parse("classpath://localhost:8080/config.yml"));
+        IllegalArgumentException classpathError = assertThrows(IllegalArgumentException.class, ConnectionStringTest::parseClasspathWithPort);
         assertTrue(classpathError.getMessage().contains("Port is not supported"));
     }
 
@@ -134,12 +132,28 @@ class ConnectionStringTest {
 
     @Test
     void rejectsRelativeParentTraversalSegments() {
-        IllegalArgumentException relativeError = assertThrows(IllegalArgumentException.class,
-            () -> ConnectionString.parse("file://../secrets.yml").getCanonicalPath());
+        IllegalArgumentException relativeError = assertThrows(IllegalArgumentException.class, ConnectionStringTest::canonicalizeRelativeTraversal);
         assertTrue(relativeError.getMessage().contains("Parent path segments are not allowed"));
 
-        IllegalArgumentException nestedError = assertThrows(IllegalArgumentException.class,
-            () -> ConnectionString.parse("classpath://config/../../secrets.yml").getCanonicalPath());
+        IllegalArgumentException nestedError = assertThrows(IllegalArgumentException.class, ConnectionStringTest::canonicalizeNestedTraversal);
         assertTrue(nestedError.getMessage().contains("Parent path segments are not allowed"));
+    }
+
+    private static void parseFileWithPort() {
+        ConnectionString.parse("file://localhost:8080/config.properties");
+    }
+
+    private static void parseClasspathWithPort() {
+        ConnectionString.parse("classpath://localhost:8080/config.yml");
+    }
+
+    private static void canonicalizeRelativeTraversal() {
+        ConnectionString connectionString = ConnectionString.parse("file://../secrets.yml");
+        connectionString.getCanonicalPath();
+    }
+
+    private static void canonicalizeNestedTraversal() {
+        ConnectionString connectionString = ConnectionString.parse("classpath://config/../../secrets.yml");
+        connectionString.getCanonicalPath();
     }
 }
