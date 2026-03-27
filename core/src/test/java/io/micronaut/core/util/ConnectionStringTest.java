@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -137,6 +138,24 @@ class ConnectionStringTest {
 
         IllegalArgumentException nestedError = assertThrows(IllegalArgumentException.class, ConnectionStringTest::canonicalizeNestedTraversal);
         assertTrue(nestedError.getMessage().contains("Parent path segments are not allowed"));
+    }
+
+    @Test
+    void toStringRendersOriginalUri() {
+        ConnectionString connectionString = ConnectionString.parse("optional:file://foo/bar.properties");
+
+        assertEquals("optional:file://foo/bar.properties", connectionString.toString());
+    }
+
+    @Test
+    void equalsAndHashCodeUseFullConnectionStringState() {
+        ConnectionString first = ConnectionString.parse("file://foo/bar.properties");
+        ConnectionString second = ConnectionString.parse("file://foo/bar.properties");
+        ConnectionString different = ConnectionString.parse("optional:file://foo/bar.properties");
+
+        assertEquals(first, second);
+        assertEquals(first.hashCode(), second.hashCode());
+        assertNotEquals(first, different);
     }
 
     private static void parseFileWithPort() {

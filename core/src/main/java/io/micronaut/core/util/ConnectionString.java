@@ -263,6 +263,36 @@ public record ConnectionString(String rawValue,
         return canonicalForm;
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof ConnectionString that)) {
+            return false;
+        }
+        return Objects.equals(rawValue, that.rawValue)
+            && parseMode == that.parseMode
+            && Objects.equals(prefix, that.prefix)
+            && Objects.equals(protocol, that.protocol)
+            && Objects.equals(username, that.username)
+            && Objects.equals(password, that.password)
+            && Objects.equals(hosts, that.hosts)
+            && Objects.equals(path, that.path)
+            && Objects.equals(options, that.options)
+            && Objects.equals(canonicalForm, that.canonicalForm);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(rawValue, parseMode, prefix, protocol, username, password, hosts, path, options, canonicalForm);
+    }
+
+    @Override
+    public String toString() {
+        return rawValue;
+    }
+
     private static ParseTarget splitTarget(String target, String originalValue, ParseMode parseMode) {
         if (target.isEmpty()) {
             throw new IllegalArgumentException("Connection string target cannot be empty: " + originalValue);
