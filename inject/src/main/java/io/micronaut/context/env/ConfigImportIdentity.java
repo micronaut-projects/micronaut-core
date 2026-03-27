@@ -30,6 +30,8 @@ import java.util.Objects;
  */
 final class ConfigImportIdentity {
 
+    private static final String FILE_PROTOCOL_PREFIX = "file:";
+    private static final String FILE_PROTOCOL_AUTHORITY_PREFIX = "file://";
     private static final String OPTIONAL_PREFIX = "optional:";
 
     private ConfigImportIdentity() {
@@ -81,7 +83,7 @@ final class ConfigImportIdentity {
         verifyNoPort(connectionString, "file");
         String path = connectionString.getCanonicalPath();
         if (path.startsWith("/")) {
-            return "file:" + normalizeFilePath(Paths.get(path).normalize());
+            return FILE_PROTOCOL_PREFIX + normalizeFilePath(Paths.get(path).normalize());
         }
         if (!connectionString.getHosts().isEmpty()) {
             StringBuilder authority = new StringBuilder();
@@ -95,7 +97,7 @@ final class ConfigImportIdentity {
                     authority.append(':').append(hostPort.port());
                 }
             }
-            return "file://" + authority + "/" + path;
+            return FILE_PROTOCOL_AUTHORITY_PREFIX + authority + "/" + path;
         }
         String base = requireParent(parentOrigin, "file");
         Path basePath = Paths.get(base).normalize();
@@ -107,7 +109,7 @@ final class ConfigImportIdentity {
             baseDirectory = parent == null ? basePath : parent;
         }
         Path resolved = baseDirectory.resolve(path).normalize();
-        return "file:" + normalizeFilePath(resolved);
+        return FILE_PROTOCOL_PREFIX + normalizeFilePath(resolved);
     }
 
     private static String normalizeFilePath(Path path) {
@@ -180,8 +182,7 @@ final class ConfigImportIdentity {
             normalized = normalized.replace("//", "/");
         }
         Path p = Paths.get(normalized).normalize();
-        String result = p.toString().replace('\\', '/');
-        return result;
+        return p.toString().replace('\\', '/');
     }
 
     private static String stripOptional(String value) {

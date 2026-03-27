@@ -79,25 +79,21 @@ final class ConfigImportResolver {
             if (chain.contains(canonicalLocation)) {
                 String previous = chain.peekLast();
                 throw new ConfigurationException("Cycle detected while resolving micronaut.config.import: " + ConfigImportIdentity.cycleDisplay(previous == null ? canonicalLocation : previous, canonicalLocation));
-            }
-            if (visited.contains(identity)) {
-                continue;
-            }
+            } else if (!visited.contains(identity)) {
+                Optional<PropertySource> imported = importOne(declaration, parentOrigin, tierOrder, canonicalLocation, parentConvention);
+                if (imported.isPresent()) {
+                    visited.add(identity);
 
-            Optional<PropertySource> imported = importOne(declaration, parentOrigin, tierOrder, canonicalLocation, parentConvention);
-            if (imported.isEmpty()) {
-                continue;
-            }
-            visited.add(identity);
-
-            chain.addLast(canonicalLocation);
-            try {
-                ConfigImportDeclarations.ParsedPropertySource parsedImported = ConfigImportDeclarations.normalize(imported.get());
-                PropertySource importedSource = parsedImported.propertySource();
-                resolved.add(importedSource);
-                resolveImports(parsedImported.imports(), importedSource.getOrigin(), tierOrder, importedSource.getConvention(), resolved, visited, chain);
-            } finally {
-                chain.removeLast();
+                    chain.addLast(canonicalLocation);
+                    try {
+                        ConfigImportDeclarations.ParsedPropertySource parsedImported = ConfigImportDeclarations.normalize(imported.get());
+                        PropertySource importedSource = parsedImported.propertySource();
+                        resolved.add(importedSource);
+                        resolveImports(parsedImported.imports(), importedSource.getOrigin(), tierOrder, importedSource.getConvention(), resolved, visited, chain);
+                    } finally {
+                        chain.removeLast();
+                    }
+                }
             }
         }
     }
@@ -107,11 +103,7 @@ final class ConfigImportResolver {
                                                int tierOrder,
                                                String canonicalLocation,
                                                PropertyConvention fallbackConvention) {
-        PropertySourceImporter importer = environment.findPropertySourceImporter(declaration.getProtocol());
-        if (importer == null) {
-            String parentLocation = parentOrigin != null ? parentOrigin.location() : "unknown origin";
-            throw new ConfigurationException("Unsupported micronaut.config.import protocol [" + declaration.getProtocol() + "] in " + declaration.getRawValue() + " declared from " + parentLocation);
-        }
+        PropertySourceImporter importer = findRequiredImporter(declaration, parentOrigin);
 
         PropertySourceImporter.ImportContext context = new DefaultImportContext(environment, declaration, parentOrigin);
         PropertySource imported = importer.importPropertySource(context).orElse(null);
@@ -122,8 +114,18 @@ final class ConfigImportResolver {
             throw new ConfigurationException("Required config import not found: " + declaration.getRawValue());
         }
 
-        PropertyConvention convention = imported.getConvention() != null ? imported.getConvention() : fallbackConvention;
+        PropertyConvention importedConvention = imported.getConvention();
+        PropertyConvention convention = importedConvention != null ? importedConvention : fallbackConvention;
         return Optional.of(ImportedPropertySourceFactory.wrap(imported, canonicalLocation, tierOrder, convention));
+    }
+
+    private PropertySourceImporter findRequiredImporter(ConnectionString declaration, Origin parentOrigin) {
+        PropertySourceImporter importer = environment.findPropertySourceImporter(declaration.getProtocol());
+        if (importer != null) {
+            return importer;
+        }
+        String parentLocation = parentOrigin != null ? parentOrigin.location() : "unknown origin";
+        throw new ConfigurationException("Unsupported micronaut.config.import protocol [" + declaration.getProtocol() + "] in " + declaration.getRawValue() + " declared from " + parentLocation);
     }
 
     private record DefaultImportContext(DefaultEnvironment environment,

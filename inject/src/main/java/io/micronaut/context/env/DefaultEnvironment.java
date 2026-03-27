@@ -93,6 +93,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         new PropertiesPropertySourceLoader(),
         new ConstantPropertySourceLoader()
     );
+    private static final String FILE_PREFIX = "file:";
 
     private final ClassPathResourceLoader resourceLoader;
     private final MutableConversionService mutableConversionService;
@@ -433,10 +434,10 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
                 Optional<Map<String, Object>> properties = readPropertiesFromLoader(fileName, filePath, propertySourceLoader);
                 if (properties.isPresent()) {
                     PropertySource.Origin sourceOrigin;
-                    if (filePath.startsWith("classpath:") || filePath.startsWith("file:")) {
+                    if (filePath.startsWith("classpath:") || filePath.startsWith(FILE_PREFIX)) {
                         sourceOrigin = PropertySource.Origin.of(filePath);
                     } else {
-                        sourceOrigin = PropertySource.Origin.of("file:" + filePath);
+                        sourceOrigin = PropertySource.Origin.of(FILE_PREFIX + filePath);
                     }
                     propertySources.add(PropertySource.of(filePath, properties.get(), sourceOrigin, order));
                 }
@@ -460,8 +461,8 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
                 resourceLoader = this;
             } else if (configLocation.startsWith("classpath:")) {
                 resourceLoader = this.forBase(configLocation);
-            } else  if (configLocation.startsWith("file:")) {
-                configLocation = configLocation.substring(5);
+            } else  if (configLocation.startsWith(FILE_PREFIX)) {
+                configLocation = configLocation.substring(FILE_PREFIX.length());
                 Path configLocationPath = Paths.get(configLocation);
                 if (Files.exists(configLocationPath) && Files.isDirectory(configLocationPath) && Files.isReadable(configLocationPath)) {
                     resourceLoader = new DefaultFileSystemResourceLoader(configLocationPath);
@@ -529,17 +530,17 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
      */
     @Override
     public Collection<PropertySourceLoader> getPropertySourceLoaders() {
-        Collection<PropertySourceLoader> propertySourceLoaderList = this.propertySourceLoaderList;
-        if (propertySourceLoaderList == null) {
+        Collection<PropertySourceLoader> currentPropertySourceLoaders = this.propertySourceLoaderList;
+        if (currentPropertySourceLoaders == null) {
             synchronized (this) { // double check
-                propertySourceLoaderList = this.propertySourceLoaderList;
-                if (propertySourceLoaderList == null) {
-                    propertySourceLoaderList = evaluatePropertySourceLoaders();
-                    this.propertySourceLoaderList = propertySourceLoaderList;
+                currentPropertySourceLoaders = this.propertySourceLoaderList;
+                if (currentPropertySourceLoaders == null) {
+                    currentPropertySourceLoaders = evaluatePropertySourceLoaders();
+                    this.propertySourceLoaderList = currentPropertySourceLoaders;
                 }
             }
         }
-        return propertySourceLoaderList;
+        return currentPropertySourceLoaders;
     }
 
     private Collection<PropertySourceLoader> evaluatePropertySourceLoaders() {
@@ -561,17 +562,17 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     }
 
     Collection<PropertySourceImporter> getPropertySourceImporters() {
-        Collection<PropertySourceImporter> propertySourceImporterList = this.propertySourceImporterList;
-        if (propertySourceImporterList == null) {
+        Collection<PropertySourceImporter> currentPropertySourceImporters = this.propertySourceImporterList;
+        if (currentPropertySourceImporters == null) {
             synchronized (this) {
-                propertySourceImporterList = this.propertySourceImporterList;
-                if (propertySourceImporterList == null) {
-                    propertySourceImporterList = evaluatePropertySourceImporters();
-                    this.propertySourceImporterList = propertySourceImporterList;
+                currentPropertySourceImporters = this.propertySourceImporterList;
+                if (currentPropertySourceImporters == null) {
+                    currentPropertySourceImporters = evaluatePropertySourceImporters();
+                    this.propertySourceImporterList = currentPropertySourceImporters;
                 }
             }
         }
-        return propertySourceImporterList;
+        return currentPropertySourceImporters;
     }
 
     private Collection<PropertySourceImporter> evaluatePropertySourceImporters() {
