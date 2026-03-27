@@ -53,13 +53,7 @@ public final class ConfigTreePropertySourceImporter implements PropertySourceImp
                 if (isHiddenPath(root, path)) {
                     continue;
                 }
-                Path relative = root.relativize(path);
-                String key = relative.toString().replace('\\', '.').replace('/', '.');
-                try {
-                    values.put(key, trimSingleTrailingNewline(Files.readString(path)));
-                } catch (IOException e) {
-                    LOG.warn("Skipping unreadable config tree file [{}]: {}", path, e.getMessage());
-                }
+                readConfigTreeFile(root, path, values);
             }
         } catch (IOException e) {
             return Optional.empty();
@@ -78,6 +72,16 @@ public final class ConfigTreePropertySourceImporter implements PropertySourceImp
             return value.substring(0, value.length() - 1);
         }
         return value;
+    }
+
+    private static void readConfigTreeFile(Path root, Path path, Map<String, Object> values) {
+        Path relative = root.relativize(path);
+        String key = relative.toString().replace('\\', '.').replace('/', '.');
+        try {
+            values.put(key, trimSingleTrailingNewline(Files.readString(path)));
+        } catch (IOException e) {
+            LOG.warn("Skipping unreadable config tree file [{}]: {}", path, e.getMessage());
+        }
     }
 
     private static boolean isHiddenPath(Path root, Path file) {

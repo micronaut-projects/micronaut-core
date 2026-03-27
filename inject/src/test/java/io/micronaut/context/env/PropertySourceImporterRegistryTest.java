@@ -24,14 +24,16 @@ class PropertySourceImporterRegistryTest {
 
     @Test
     void rejectsDuplicateProtocolsIgnoringCase() {
-        ConfigurationException e = assertThrows(ConfigurationException.class,
-            () -> DefaultEnvironment.toImporterByProtocol(List.of(
-                new TestImporter("file"),
-                new TestImporter("FILE")
-            ))
-        );
+        ConfigurationException e = assertThrows(ConfigurationException.class, PropertySourceImporterRegistryTest::createDuplicateImportersByProtocol);
 
         assertTrue(e.getMessage().contains("Duplicate property source importer for protocol [file]"));
+    }
+
+    private static void createDuplicateImportersByProtocol() {
+        DefaultEnvironment.toImporterByProtocol(List.of(
+            new TestImporter("file"),
+            new TestImporter("FILE")
+        ));
     }
 
     private static final class TestImporter implements PropertySourceImporter {

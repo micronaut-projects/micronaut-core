@@ -53,8 +53,7 @@ class ConfigImportIdentityTest {
     void rejectsAbsoluteClasspathImports() {
         ConnectionString target = ConnectionString.parse("classpath:///config/extra.yml");
 
-        assertThrows(ConfigurationException.class,
-            () -> ConfigImportIdentity.canonicalLocation(target, PropertySource.Origin.of("classpath:app/application.yml")));
+        assertThrows(ConfigurationException.class, () -> canonicalizeAbsoluteClasspathImport(target));
     }
 
     @Test
@@ -64,5 +63,9 @@ class ConfigImportIdentityTest {
         String canonical = ConfigImportIdentity.canonicalLocation(target, PropertySource.Origin.of("classpath:app/application.yml"));
 
         assertEquals("classpath*:app/config/extra.yml", canonical);
+    }
+
+    private static void canonicalizeAbsoluteClasspathImport(ConnectionString target) {
+        ConfigImportIdentity.canonicalLocation(target, PropertySource.Origin.of("classpath:app/application.yml"));
     }
 }
