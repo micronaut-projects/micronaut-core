@@ -148,7 +148,7 @@ class ConnectionStringTest {
     }
 
     @Test
-    void equalsAndHashCodeUseFullConnectionStringState() {
+    void equalsAndHashCodeUseSemanticComponents() {
         ConnectionString first = ConnectionString.parse("file://foo/bar.properties");
         ConnectionString second = ConnectionString.parse("file://foo/bar.properties");
         ConnectionString different = ConnectionString.parse("optional:file://foo/bar.properties");
@@ -156,6 +156,16 @@ class ConnectionStringTest {
         assertEquals(first, second);
         assertEquals(first.hashCode(), second.hashCode());
         assertNotEquals(first, different);
+    }
+
+    @Test
+    void canonicalFormSortsOptionsByKey() {
+        ConnectionString aFirst = ConnectionString.parse("consul://localhost:8500/config?a=1&b=2");
+        ConnectionString bFirst = ConnectionString.parse("consul://localhost:8500/config?b=2&a=1");
+
+        assertEquals(aFirst.getCanonicalForm(), bFirst.getCanonicalForm());
+        assertEquals(aFirst, bFirst);
+        assertEquals(aFirst.hashCode(), bFirst.hashCode());
     }
 
     private static void parseFileWithPort() {

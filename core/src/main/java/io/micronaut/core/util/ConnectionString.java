@@ -45,6 +45,16 @@ import java.util.Optional;
  *     <li>{@code env://APP_IMPORT.properties}</li>
  * </ul>
  *
+ * @param rawValue      The original unparsed connection string
+ * @param parseMode     The parse mode used when parsing
+ * @param prefix        Optional prefix (e.g. {@code optional})
+ * @param protocol      The protocol component
+ * @param username      Optional username from authority
+ * @param password      Optional password from authority
+ * @param hosts         Parsed list of host/port pairs
+ * @param path          The path component
+ * @param options       Parsed query options
+ * @param canonicalForm Normalized canonical representation
  * @since 5.0
  */
 public record ConnectionString(String rawValue,
@@ -271,21 +281,19 @@ public record ConnectionString(String rawValue,
         if (!(o instanceof ConnectionString that)) {
             return false;
         }
-        return Objects.equals(rawValue, that.rawValue)
-            && parseMode == that.parseMode
+        return parseMode == that.parseMode
             && Objects.equals(prefix, that.prefix)
             && Objects.equals(protocol, that.protocol)
             && Objects.equals(username, that.username)
             && Objects.equals(password, that.password)
             && Objects.equals(hosts, that.hosts)
             && Objects.equals(path, that.path)
-            && Objects.equals(options, that.options)
-            && Objects.equals(canonicalForm, that.canonicalForm);
+            && Objects.equals(options, that.options);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(rawValue, parseMode, prefix, protocol, username, password, hosts, path, options, canonicalForm);
+        return Objects.hash(parseMode, prefix, protocol, username, password, hosts, path, options);
     }
 
     @Override
@@ -513,7 +521,7 @@ public record ConnectionString(String rawValue,
         if (!options.isEmpty()) {
             out.append('?');
             boolean first = true;
-            for (Map.Entry<String, String> entry : options.entrySet()) {
+            for (Map.Entry<String, String> entry : options.entrySet().stream().sorted(Map.Entry.comparingByKey()).toList()) {
                 if (!first) {
                     out.append('&');
                 }

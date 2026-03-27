@@ -278,7 +278,9 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     }
 
     private void dropProperties() {
-        propertySources.values().removeAll(refreshablePropertySources);
+        for (PropertySource refreshable : refreshablePropertySources) {
+            propertySources.remove(refreshable.getName());
+        }
         propertyPlaceholderResolver.reset();
     }
 

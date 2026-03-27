@@ -76,7 +76,10 @@ final class ConfigImportResolver {
             String canonicalLocation = ConfigImportIdentity.canonicalLocation(declaration, parentOrigin);
             ConfigImportIdentity.ImportIdentity identity = new ConfigImportIdentity.ImportIdentity(canonicalLocation, tierOrder);
 
-            if (chain.contains(canonicalLocation)) {
+            String parentLocation = parentOrigin != null ? parentOrigin.location() : null;
+            if (parentLocation != null && parentLocation.equals(canonicalLocation)) {
+                throw new ConfigurationException("Cycle detected while resolving micronaut.config.import: " + ConfigImportIdentity.cycleDisplay(parentLocation, canonicalLocation));
+            } else if (chain.contains(canonicalLocation)) {
                 String previous = chain.peekLast();
                 throw new ConfigurationException("Cycle detected while resolving micronaut.config.import: " + ConfigImportIdentity.cycleDisplay(previous == null ? canonicalLocation : previous, canonicalLocation));
             } else if (!visited.contains(identity)) {

@@ -470,6 +470,24 @@ micronaut:
         main.delete()
     }
 
+    void "test config import self-import cycle detection"() {
+        given:
+        File main = File.createTempFile("config-import-self-cycle", ".properties")
+        main.write("micronaut.config.import=file://${main.absolutePath}")
+
+        when:
+        System.setProperty("micronaut.config.files", main.absolutePath)
+        new DefaultEnvironment({ ["test"] }).start()
+
+        then:
+        def e = thrown(ConfigurationException)
+        e.message.contains("Cycle detected")
+
+        cleanup:
+        System.clearProperty("micronaut.config.files")
+        main.delete()
+    }
+
     void "test config import cycle detection"() {
         given:
         Path root = Files.createTempDirectory("config-import-cycle")
