@@ -159,7 +159,7 @@ final class ConfigImportIdentity {
         }
         String location = parentOrigin.location();
         if (protocol.equals("file")) {
-            if (location.startsWith("file:")) {
+            if (location.startsWith(FILE_PROTOCOL_PREFIX)) {
                 return extractResourcePath(location);
             }
             if (Paths.get(location).isAbsolute()) {

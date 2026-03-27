@@ -69,6 +69,7 @@ public record ConnectionString(String rawValue,
                                String canonicalForm) {
 
     private static final String OPTIONAL_PREFIX = "optional:";
+    private static final String OPTIONAL_LABEL = "optional";
 
     public ConnectionString {
         Objects.requireNonNull(rawValue, "rawValue");
@@ -130,7 +131,7 @@ public record ConnectionString(String rawValue,
         String prefix = null;
         String toParse = value;
         if (toParse.startsWith(OPTIONAL_PREFIX)) {
-            prefix = "optional";
+            prefix = OPTIONAL_LABEL;
             toParse = toParse.substring(OPTIONAL_PREFIX.length());
             if (toParse.isEmpty()) {
                 throw new IllegalArgumentException("Connection string cannot be empty after optional prefix");
@@ -491,7 +492,7 @@ public record ConnectionString(String rawValue,
                                              String path,
                                              Map<String, String> options) {
         StringBuilder out = new StringBuilder();
-        if ("optional".equals(prefix)) {
+        if (OPTIONAL_LABEL.equals(prefix)) {
             out.append(OPTIONAL_PREFIX);
         }
         out.append(protocol).append("://");
