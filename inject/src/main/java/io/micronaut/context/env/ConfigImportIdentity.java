@@ -49,7 +49,8 @@ final class ConfigImportIdentity {
         return switch (protocol) {
             case "file" -> canonicalFileLocation(connectionString, parentOrigin);
             case "classpath", "classpath*" -> canonicalClasspathLocation(connectionString, parentOrigin, protocol);
-            case "env", "configtree" -> stripOptional(connectionString.getCanonicalForm());
+            case "configtree" -> protocol + "://" + connectionString.getCanonicalPath();
+            case "env" -> stripOptional(connectionString.getCanonicalForm());
             default -> stripOptional(connectionString.getCanonicalForm());
         };
     }

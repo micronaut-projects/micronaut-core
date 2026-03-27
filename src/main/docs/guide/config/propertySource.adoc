@@ -43,13 +43,15 @@ Imports are resolved recursively and support the following protocols:
 * `file://` – load from the file system
 * `classpath://` – load exactly one matching classpath resource (fails if duplicates are found)
 * `classpath*://` – load and merge all matching classpath resources in classpath discovery order
-* `env://` – load key/value properties from an environment variable value
+* `env://` – load key/value properties from an environment variable value, using the variable-name suffix (for example `.yml`) or `?extension=yml` / `?extension=json` to select non-properties formats
 * `configtree://` – load a directory tree where file paths map to property keys
 
 Prefix any import with `optional:` to skip it when the target is missing.
 Without `optional:`, an api:io.micronaut.context.exceptions.ConfigurationException[] is thrown if the import cannot be loaded.
 
 For `file://`, `classpath://`, and `classpath*://` imports, if no extension is provided, Micronaut probes known configuration extensions (`.properties`, `.json`, `.yml`, and any additional enabled loaders).
+
+For `env://` imports, Micronaut defaults to `.properties` parsing. To import YAML or JSON from an environment variable, either include the format in the variable reference such as `env://MY_APP_INLINE_CONFIG.yml`, or specify it explicitly with `env://MY_APP_INLINE_CONFIG?extension=yml`.
 
 When multiple resources with the same classpath name are present:
 
