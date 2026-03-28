@@ -28,10 +28,15 @@ import java.util.Optional;
 /**
  * Imports a {@link PropertySource} for a given protocol.
  *
+ * <p>Importer instances are created for a single configuration loading cycle. Micronaut reuses the same importer
+ * instance for all imports resolved during that cycle so implementations may share expensive resources such as
+ * HTTP clients across multiple imports. Once configuration loading completes, Micronaut invokes {@link #close()}.
+ * The same lifecycle applies during startup and each refresh operation.</p>
+ *
  * @since 5.0
  */
 @Experimental
-public interface PropertySourceImporter extends Toggleable {
+public interface PropertySourceImporter extends Toggleable, AutoCloseable {
 
     /**
      * @return The protocol this importer supports.
@@ -45,6 +50,16 @@ public interface PropertySourceImporter extends Toggleable {
      * @return The imported property source
      */
     Optional<PropertySource> importPropertySource(ImportContext context);
+
+    /**
+     * Close resources associated with this importer after a configuration loading cycle completes.
+     *
+     * <p>Micronaut invokes this method once after startup loading finishes and once after each refresh load finishes.
+     * Implementations may override it to release per-load resources. The default implementation is a no-op.</p>
+     */
+    @Override
+    default void close() {
+    }
 
     /**
      * Import context information and helper methods.
