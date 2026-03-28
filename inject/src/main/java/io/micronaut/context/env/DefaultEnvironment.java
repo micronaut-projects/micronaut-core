@@ -425,6 +425,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         if (list.isEmpty()) {
             return List.of();
         }
+        getPropertySourceLoaders();
         int order = AbstractPropertySourceLoader.DEFAULT_POSITION + 50;
         List<PropertySource> propertySources = new ArrayList<>(list.size());
         for (String filePath : list) {
@@ -611,6 +612,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         String extension = NameUtils.extension(resourcePath);
         String resourceName = NameUtils.filename(resourcePath);
         if (!extension.isEmpty()) {
+            getPropertySourceLoaders();
             PropertySourceLoader propertySourceLoader = loaderByFormatMap.get(extension);
             if (propertySourceLoader == null) {
                 throw new ConfigurationException("Unsupported properties file format while reading " + resourceName + " from " + resourcePath);
@@ -642,6 +644,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         String extension = NameUtils.extension(resourcePath);
         String resourceName = NameUtils.filename(resourcePath);
         if (!extension.isEmpty()) {
+            getPropertySourceLoaders();
             PropertySourceLoader propertySourceLoader = loaderByFormatMap.get(extension);
             if (propertySourceLoader == null) {
                 throw new ConfigurationException("Unsupported properties file format while reading " + resourceName + " from " + resourcePath);

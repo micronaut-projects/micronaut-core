@@ -94,7 +94,8 @@ public final class ConfigTreePropertySourceImporter implements PropertySourceImp
         try {
             return Files.isHidden(file);
         } catch (IOException e) {
-            return true;
+            LOG.debug("Could not determine hidden status for config tree file [{}], treating as visible: {}", file, e.getMessage());
+            return false;
         }
     }
 }
