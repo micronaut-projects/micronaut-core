@@ -82,12 +82,23 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
     @Override
     public <T> T getOrCreate(BeanCreationContext<T> creationContext) {
         final BeanIdentifier id = creationContext.id();
-        CreatedBean<?> created = refreshableBeans.computeIfAbsent(id, key -> {
-            CreatedBean<T> createdBean = creationContext.create();
-            locks.putIfAbsent(createdBean.bean(), new ReentrantReadWriteLock());
-            return createdBean;
-        });
-        return (T) created.bean();
+        CreatedBean<?> created = refreshableBeans.get(id);
+        if (created != null) {
+            return (T) created.bean();
+        }
+        // Avoid ConcurrentHashMap.computeIfAbsent() here because bean creation
+        // may trigger nested getOrCreate() calls for other @Refreshable beans,
+        // which would cause an IllegalStateException ("Recursive update") when
+        // two BeanIdentifier keys hash to the same bucket.
+        CreatedBean<T> createdBean = creationContext.create();
+        locks.putIfAbsent(createdBean.bean(), new ReentrantReadWriteLock());
+        created = refreshableBeans.putIfAbsent(id, createdBean);
+        if (created != null) {
+            // Another thread already created this bean; close our duplicate
+            createdBean.close();
+            return (T) created.bean();
+        }
+        return createdBean.bean();
     }
 
     @Override
