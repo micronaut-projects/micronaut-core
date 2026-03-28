@@ -2,17 +2,25 @@ package io.micronaut.context.env;
 
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.util.ConnectionString;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PropertySourceImporterRegistryTest {
+
+    @AfterEach
+    void resetTrackingImporter() {
+        TrackingImporter.reset();
+    }
 
     @Test
     void mapsImportersByLowercaseProtocol() {
@@ -27,6 +35,17 @@ class PropertySourceImporterRegistryTest {
         ConfigurationException e = assertThrows(ConfigurationException.class, PropertySourceImporterRegistryTest::createDuplicateImportersByProtocol);
 
         assertTrue(e.getMessage().contains("Duplicate property source importer for protocol [file]"));
+    }
+
+    @Test
+    void closesImportersAfterEachConfigurationLoadCycle() {
+        DefaultEnvironment environment = new DefaultEnvironment(() -> List.of("test"), () -> List.of(new TrackingImporter()));
+
+        environment.start();
+        environment.refreshAndDiff();
+
+        assertEquals(2, TrackingImporter.closedCount.get());
+        assertEquals(List.of(1, 2), TrackingImporter.instanceIds);
     }
 
     private static void createDuplicateImportersByProtocol() {
@@ -51,6 +70,36 @@ class PropertySourceImporterRegistryTest {
         @Override
         public Optional<PropertySource> importPropertySource(ImportContext context) {
             return Optional.of(PropertySource.of(protocol + ":test", Map.of("connection", ConnectionString.parse("file://foo/bar.properties").getCanonicalForm())));
+        }
+    }
+
+    private static final class TrackingImporter implements PropertySourceImporter {
+        private static final AtomicInteger createdCount = new AtomicInteger();
+        private static final AtomicInteger closedCount = new AtomicInteger();
+        private static final List<Integer> instanceIds = new ArrayList<>();
+
+        private final int instanceId = createdCount.incrementAndGet();
+
+        @Override
+        public String getProtocol() {
+            return "tracking";
+        }
+
+        @Override
+        public Optional<PropertySource> importPropertySource(ImportContext context) {
+            return Optional.of(PropertySource.of("tracking:" + instanceId, Map.of("tracking.value", instanceId)));
+        }
+
+        @Override
+        public void close() {
+            closedCount.incrementAndGet();
+            instanceIds.add(instanceId);
+        }
+
+        private static void reset() {
+            createdCount.set(0);
+            closedCount.set(0);
+            instanceIds.clear();
         }
     }
 }
