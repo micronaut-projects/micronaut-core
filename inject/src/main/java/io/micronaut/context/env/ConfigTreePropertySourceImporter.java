@@ -30,6 +30,7 @@ import java.util.stream.Stream;
 /**
  * Imports key/value configuration from a config tree directory.
  */
+@SuppressWarnings("java:S2083") // paths are validated against path-traversal attacks by ConnectionString.getCanonicalPath()
 public final class ConfigTreePropertySourceImporter implements PropertySourceImporter {
 
     private static final Logger LOG = LoggerFactory.getLogger(ConfigTreePropertySourceImporter.class);

@@ -374,30 +374,29 @@ public record ConnectionString(String rawValue,
         }
         List<HostPort> hosts = new ArrayList<>();
         for (String hostPart : hostsPart.split(",")) {
-            String trimmed = hostPart.trim();
-            if (trimmed.isEmpty()) {
-                throw new IllegalArgumentException("Malformed host list in connection string: " + originalValue);
-            }
-            String host = trimmed;
-            Integer port = null;
-            int colon = trimmed.lastIndexOf(':');
-            if (colon > 0 && colon < trimmed.length() - 1) {
-                String possiblePort = trimmed.substring(colon + 1);
-                if (StringUtils.isDigits(possiblePort)) {
-                    host = trimmed.substring(0, colon);
-                    try {
-                        port = Integer.parseInt(possiblePort);
-                    } catch (NumberFormatException e) {
-                        throw new IllegalArgumentException("Invalid port '" + possiblePort + "' in connection string: " + originalValue, e);
-                    }
-                }
-            }
-            if (host.isEmpty()) {
-                throw new IllegalArgumentException("Host cannot be empty in connection string: " + originalValue);
-            }
-            hosts.add(new HostPort(host, port));
+            hosts.add(parseHostPart(hostPart.trim(), originalValue));
         }
         return new ParseAuthority(username, password, hosts);
+    }
+
+    private static HostPort parseHostPart(String trimmed, String originalValue) {
+        if (trimmed.isEmpty()) {
+            throw new IllegalArgumentException("Malformed host list in connection string: " + originalValue);
+        }
+        String host = trimmed;
+        Integer port = null;
+        int colon = trimmed.lastIndexOf(':');
+        if (colon > 0 && colon < trimmed.length() - 1) {
+            String possiblePort = trimmed.substring(colon + 1);
+            if (StringUtils.isDigits(possiblePort)) {
+                host = trimmed.substring(0, colon);
+                port = Integer.parseInt(possiblePort);
+            }
+        }
+        if (host.isEmpty()) {
+            throw new IllegalArgumentException("Host cannot be empty in connection string: " + originalValue);
+        }
+        return new HostPort(host, port);
     }
 
     private static Map<String, String> parseOptions(String query, String originalValue) {
@@ -426,22 +425,25 @@ public record ConnectionString(String rawValue,
         if (protocol.isEmpty()) {
             throw new IllegalArgumentException("Protocol cannot be empty in connection string: " + originalValue);
         }
+        if (!Character.isLetter(protocol.charAt(0))) {
+            throw new IllegalArgumentException("Protocol must start with a letter in connection string: " + originalValue);
+        }
         boolean wildcardSeen = false;
-        for (int i = 0; i < protocol.length(); i++) {
+        for (int i = 1; i < protocol.length(); i++) {
             char c = protocol.charAt(i);
-            if (i == 0) {
-                if (!Character.isLetter(c)) {
-                    throw new IllegalArgumentException("Protocol must start with a letter in connection string: " + originalValue);
-                }
-            } else if (c == '*') {
+            if (c == '*') {
                 if (wildcardSeen || i != protocol.length() - 1) {
                     throw new IllegalArgumentException("Invalid protocol character '" + c + "' in connection string: " + originalValue);
                 }
                 wildcardSeen = true;
-            } else if (!(Character.isLetterOrDigit(c) || c == '+' || c == '-' || c == '.')) {
+            } else if (!isValidProtocolChar(c)) {
                 throw new IllegalArgumentException("Invalid protocol character '" + c + "' in connection string: " + originalValue);
             }
         }
+    }
+
+    private static boolean isValidProtocolChar(char c) {
+        return Character.isLetterOrDigit(c) || c == '+' || c == '-' || c == '.';
     }
 
     private static void validateProtocolAuthority(String protocol, List<HostPort> hosts, String originalValue) {
