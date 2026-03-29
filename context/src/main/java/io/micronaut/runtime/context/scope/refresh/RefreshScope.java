@@ -91,14 +91,20 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
         // which would cause an IllegalStateException ("Recursive update") when
         // two BeanIdentifier keys hash to the same bucket.
         CreatedBean<T> createdBean = creationContext.create();
+        Object bean = createdBean.bean();
+        // Install the lock before publishing the bean so that concurrent readers
+        // via RefreshInterceptor always find a lock entry in getLock().
+        ReadWriteLock newLock = new ReentrantReadWriteLock();
+        locks.putIfAbsent(bean, newLock);
         created = refreshableBeans.putIfAbsent(id, createdBean);
         if (created != null) {
             // Another thread already created this bean; close our duplicate
+            // and remove the lock we installed for the discarded instance.
+            locks.remove(bean, newLock);
             createdBean.close();
             return (T) created.bean();
         }
-        locks.putIfAbsent(createdBean.bean(), new ReentrantReadWriteLock());
-        return createdBean.bean();
+        return (T) bean;
     }
 
     @Override

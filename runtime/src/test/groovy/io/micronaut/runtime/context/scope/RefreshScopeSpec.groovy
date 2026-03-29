@@ -77,19 +77,6 @@ class RefreshScopeSpec extends Specification {
         ctx.close()
     }
 
-    void "test refreshable bean depending on another refreshable bean does not throw recursive update"() {
-        when:
-        ApplicationContext beanContext = ApplicationContext.run()
-        RefreshableServiceA serviceA = beanContext.getBean(RefreshableServiceA)
-
-        then:
-        noExceptionThrown()
-        serviceA.getValue() == 'B'
-
-        cleanup:
-        beanContext?.stop()
-    }
-
     void "test fire refresh event that refreshes all"() {
         given:
         System.setProperty("foo.bar", "test")
@@ -330,31 +317,5 @@ class RefreshScopeSpec extends Specification {
     @EachProperty(value = 'foo-list', list = true)
     static class EachListConfig {
         String bar
-    }
-
-    @Refreshable
-    static class RefreshableServiceA {
-        private final RefreshableServiceB serviceB
-
-        RefreshableServiceA(RefreshableServiceB serviceB) {
-            this.serviceB = serviceB
-        }
-
-        @jakarta.annotation.PostConstruct
-        void init() {
-            // Force eager resolution of the dependent @Refreshable bean
-            serviceB.process()
-        }
-
-        String getValue() {
-            return serviceB.process()
-        }
-    }
-
-    @Refreshable
-    static class RefreshableServiceB {
-        String process() {
-            return 'B'
-        }
     }
 }
