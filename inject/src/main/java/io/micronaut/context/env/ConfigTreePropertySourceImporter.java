@@ -57,6 +57,7 @@ public final class ConfigTreePropertySourceImporter implements PropertySourceImp
                 readConfigTreeFile(root, path, values);
             }
         } catch (IOException e) {
+            LOG.warn("Failed to walk config tree directory [{}]: {}", pathValue, e.getMessage());
             return Optional.empty();
         }
         if (values.isEmpty()) {

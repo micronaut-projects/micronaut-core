@@ -63,6 +63,7 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -358,10 +359,18 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     }
 
     Collection<PropertySourceImporter> getPropertySourceImportersForLoad() {
+        Collection<PropertySourceImporter> importers;
         if (propertySourceImporterSupplier != null) {
-            return propertySourceImporterSupplier.get();
+            importers = propertySourceImporterSupplier.get();
+            if (importers == null) {
+                importers = Collections.emptyList();
+            }
+            importerByProtocolMap.clear();
+            importerByProtocolMap.putAll(toImporterByProtocol(importers));
+        } else {
+            importers = evaluatePropertySourceImporters();
         }
-        return evaluatePropertySourceImporters();
+        return importers;
     }
 
     private void loadPropertiesInternal() {
@@ -411,16 +420,31 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
             }
         }
 
-        List<PropertySource> resolvedRefreshable = resolvePropertySourceImports(refreshableRoots);
-        for (PropertySource propertySource : resolvedRefreshable) {
-            if (!PropertySource.CONTEXT.equals(propertySource.getName())) {
+        // Snapshot names before resolution so we can later distinguish imported children
+        // (those added by the import resolver) from pre-existing sources.
+        Set<String> originalSourceNames = new LinkedHashSet<>();
+        for (PropertySource ps : propertySources) {
+            originalSourceNames.add(ps.getName());
+        }
+
+        List<PropertySource> resolvedAll = resolvePropertySourceImports(propertySources);
+        Set<String> refreshableRootNames = new LinkedHashSet<>();
+        for (PropertySource ps : refreshableRoots) {
+            refreshableRootNames.add(ps.getName());
+        }
+        for (PropertySource propertySource : resolvedAll) {
+            String name = propertySource.getName();
+            // A source is refreshable when it is a known refreshable root, or when it is an
+            // imported child (not in the original list) - imported children must be dropped and
+            // re-discovered on each refresh cycle together with their parent roots.
+            if (!PropertySource.CONTEXT.equals(name)
+                    && (refreshableRootNames.contains(name) || !originalSourceNames.contains(name))) {
                 refreshablePropertySources.add(propertySource);
             }
         }
-        propertySources = resolvePropertySourceImports(propertySources);
 
-        OrderUtil.sortOrdered(propertySources);
-        for (PropertySource propertySource : propertySources) {
+        OrderUtil.sortOrdered(resolvedAll);
+        for (PropertySource propertySource : resolvedAll) {
             internalProcessPropertySource(propertySource);
         }
     }
