@@ -15,6 +15,9 @@
  */
 package io.micronaut.retry;
 
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.async.publisher.Publishers;
+import reactor.core.publisher.Flux;
 import io.micronaut.retry.intercept.CircuitBreakerRetry;
 import io.micronaut.retry.intercept.DefaultRetryRunner;
 import io.micronaut.retry.intercept.PolicyRetryStateBuilder;
@@ -33,6 +36,7 @@ import java.util.function.Supplier;
  * Internal implementation of {@link CircuitBreakerOperations} that owns a shared circuit state for the created
  * operations instance while delegating execution to the shared retry runner.
  */
+@Internal
 final class DefaultCircuitBreakerOperations implements CircuitBreakerOperations {
 
     private final DefaultRetryRunner retryRunner;
@@ -68,8 +72,10 @@ final class DefaultCircuitBreakerOperations implements CircuitBreakerOperations 
 
     @Override
     public <T> Publisher<T> executePublisher(Supplier<? extends Publisher<T>> supplier) {
-        retryState.open();
-        return retryRunner.executePublisher(supplier, retryState, DefaultCircuitBreakerOperations.class.getSimpleName(), retryEventEmitter);
+        return Flux.defer(() -> {
+            retryState.open();
+            return Flux.from(retryRunner.executePublisher(supplier, retryState, DefaultCircuitBreakerOperations.class.getSimpleName(), retryEventEmitter));
+        });
     }
 
     @Override

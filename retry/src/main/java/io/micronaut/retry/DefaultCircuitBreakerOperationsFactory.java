@@ -15,6 +15,7 @@
  */
 package io.micronaut.retry;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.retry.intercept.DefaultRetryRunner;
 import io.micronaut.retry.intercept.RetryEventEmitter;
 import io.micronaut.scheduling.TaskExecutors;
@@ -27,6 +28,7 @@ import java.util.concurrent.ScheduledExecutorService;
 /**
  * Internal factory that creates reusable programmatic circuit breaker operations backed by Micronaut scheduler infrastructure.
  */
+@Internal
 @Singleton
 final class DefaultCircuitBreakerOperationsFactory implements CircuitBreakerOperationsFactory {
 

@@ -15,6 +15,7 @@
  */
 package io.micronaut.retry;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.retry.intercept.DefaultRetryRunner;
 import io.micronaut.retry.intercept.MutableRetryState;
 import io.micronaut.retry.intercept.PolicyRetryStateBuilder;
@@ -28,6 +29,7 @@ import java.util.function.Supplier;
  * Internal implementation of {@link RetryOperations} that creates a fresh retry state per execution while
  * reusing the shared retry runner infrastructure.
  */
+@Internal
 final class DefaultRetryOperations implements RetryOperations {
 
     private final RetryPolicy retryPolicy;

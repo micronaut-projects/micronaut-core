@@ -15,7 +15,6 @@
  */
 package io.micronaut.retry;
 
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.retry.annotation.DefaultRetryPredicate;
 import io.micronaut.retry.annotation.RetryPredicate;
 import org.jspecify.annotations.Nullable;
@@ -34,14 +33,20 @@ import java.util.Optional;
  * @since 5.0.0
  */
 public record RetryPolicy(int maxAttempts,
-                          @NonNull Duration delay,
+                          Duration delay,
                           @Nullable Duration maxDelay,
                           double multiplier,
                           double jitter,
-                          @NonNull RetryPredicate predicate,
-                          @NonNull Class<? extends Throwable> capturedException,
-                          @NonNull List<Class<? extends Throwable>> includes,
-                          @NonNull List<Class<? extends Throwable>> excludes) {
+                          RetryPredicate predicate,
+                          Class<? extends Throwable> capturedException,
+                          List<Class<? extends Throwable>> includes,
+                          List<Class<? extends Throwable>> excludes) {
+
+    public static final int DEFAULT_MAX_ATTEMPTS = 3;
+    public static final Duration DEFAULT_DELAY = Duration.ofSeconds(1);
+    public static final double DEFAULT_MULTIPLIER = 1.0d;
+    public static final double DEFAULT_JITTER = 0.0d;
+    public static final Class<? extends Throwable> DEFAULT_CAPTURED_EXCEPTION = RuntimeException.class;
 
     public RetryPolicy {
         if (maxAttempts < 1) {
@@ -71,7 +76,7 @@ public record RetryPolicy(int maxAttempts,
      *
      * @return A retry policy builder
      */
-    public static @NonNull Builder builder() {
+    public static Builder builder() {
         return new Builder();
     }
 
@@ -80,7 +85,7 @@ public record RetryPolicy(int maxAttempts,
      *
      * @return The maximum overall delay if configured
      */
-    public @NonNull Optional<Duration> getMaxDelay() {
+    public Optional<Duration> getMaxDelay() {
         return Optional.ofNullable(maxDelay);
     }
 
@@ -88,14 +93,14 @@ public record RetryPolicy(int maxAttempts,
      * Builder for {@link RetryPolicy}.
      */
     public static final class Builder {
-        private int maxAttempts = 3;
-        private Duration delay = Duration.ofSeconds(1);
+        private int maxAttempts = DEFAULT_MAX_ATTEMPTS;
+        private Duration delay = DEFAULT_DELAY;
         @Nullable
         private Duration maxDelay;
-        private double multiplier = 1.0d;
-        private double jitter;
+        private double multiplier = DEFAULT_MULTIPLIER;
+        private double jitter = DEFAULT_JITTER;
         private RetryPredicate predicate = new DefaultRetryPredicate();
-        private Class<? extends Throwable> capturedException = RuntimeException.class;
+        private Class<? extends Throwable> capturedException = DEFAULT_CAPTURED_EXCEPTION;
         private final List<Class<? extends Throwable>> includes = new ArrayList<>();
         private final List<Class<? extends Throwable>> excludes = new ArrayList<>();
         private boolean explicitPredicate;
@@ -109,7 +114,7 @@ public record RetryPolicy(int maxAttempts,
          * @param maxAttempts The maximum number of attempts
          * @return This builder
          */
-        public @NonNull Builder maxAttempts(int maxAttempts) {
+        public Builder maxAttempts(int maxAttempts) {
             this.maxAttempts = maxAttempts;
             return this;
         }
@@ -120,7 +125,7 @@ public record RetryPolicy(int maxAttempts,
          * @param delay The delay between retry attempts
          * @return This builder
          */
-        public @NonNull Builder delay(@NonNull Duration delay) {
+        public Builder delay(Duration delay) {
             this.delay = delay;
             return this;
         }
@@ -131,7 +136,7 @@ public record RetryPolicy(int maxAttempts,
          * @param maxDelay The maximum overall delay
          * @return This builder
          */
-        public @NonNull Builder maxDelay(@Nullable Duration maxDelay) {
+        public Builder maxDelay(@Nullable Duration maxDelay) {
             this.maxDelay = maxDelay;
             return this;
         }
@@ -142,7 +147,7 @@ public record RetryPolicy(int maxAttempts,
          * @param multiplier The delay multiplier
          * @return This builder
          */
-        public @NonNull Builder multiplier(double multiplier) {
+        public Builder multiplier(double multiplier) {
             this.multiplier = multiplier;
             return this;
         }
@@ -153,7 +158,7 @@ public record RetryPolicy(int maxAttempts,
          * @param jitter The jitter factor
          * @return This builder
          */
-        public @NonNull Builder jitter(double jitter) {
+        public Builder jitter(double jitter) {
             this.jitter = jitter;
             return this;
         }
@@ -164,7 +169,7 @@ public record RetryPolicy(int maxAttempts,
          * @param predicate The retry predicate
          * @return This builder
          */
-        public @NonNull Builder predicate(@NonNull RetryPredicate predicate) {
+        public Builder predicate(RetryPredicate predicate) {
             this.predicate = Objects.requireNonNull(predicate, "predicate");
             explicitPredicate = true;
             return this;
@@ -176,7 +181,7 @@ public record RetryPolicy(int maxAttempts,
          * @param capturedException The captured exception type
          * @return This builder
          */
-        public @NonNull Builder capturedException(@NonNull Class<? extends Throwable> capturedException) {
+        public Builder capturedException(Class<? extends Throwable> capturedException) {
             this.capturedException = Objects.requireNonNull(capturedException, "capturedException");
             return this;
         }
@@ -188,7 +193,7 @@ public record RetryPolicy(int maxAttempts,
          * @return This builder
          */
         @SafeVarargs
-        public final @NonNull Builder includes(@NonNull Class<? extends Throwable>... includes) {
+        public final Builder includes(Class<? extends Throwable>... includes) {
             Collections.addAll(this.includes, Objects.requireNonNull(includes, "includes"));
             return this;
         }
@@ -200,7 +205,7 @@ public record RetryPolicy(int maxAttempts,
          * @return This builder
          */
         @SafeVarargs
-        public final @NonNull Builder excludes(@NonNull Class<? extends Throwable>... excludes) {
+        public final Builder excludes(Class<? extends Throwable>... excludes) {
             Collections.addAll(this.excludes, Objects.requireNonNull(excludes, "excludes"));
             return this;
         }
@@ -210,7 +215,7 @@ public record RetryPolicy(int maxAttempts,
          *
          * @return The retry policy
          */
-        public @NonNull RetryPolicy build() {
+        public RetryPolicy build() {
             RetryPredicate resolvedPredicate = explicitPredicate
                 ? predicate
                 : new DefaultRetryPredicate(List.copyOf(includes), List.copyOf(excludes));

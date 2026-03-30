@@ -15,7 +15,6 @@
  */
 package io.micronaut.retry;
 
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.retry.annotation.RetryPredicate;
 
 import java.time.Duration;
@@ -29,9 +28,14 @@ import java.util.Optional;
  * @author graemerocher
  * @since 5.0.0
  */
-public record CircuitBreakerPolicy(@NonNull RetryPolicy retryPolicy,
-                                   @NonNull Duration resetTimeout,
+public record CircuitBreakerPolicy(RetryPolicy retryPolicy,
+                                   Duration resetTimeout,
                                    boolean throwWrappedException) {
+
+    public static final Duration DEFAULT_DELAY = Duration.ofMillis(500);
+    public static final Duration DEFAULT_MAX_DELAY = Duration.ofSeconds(5);
+    public static final double DEFAULT_MULTIPLIER = 0.0d;
+    public static final Duration DEFAULT_RESET_TIMEOUT = Duration.ofSeconds(20);
 
     public CircuitBreakerPolicy {
         Objects.requireNonNull(retryPolicy, "retryPolicy");
@@ -46,7 +50,7 @@ public record CircuitBreakerPolicy(@NonNull RetryPolicy retryPolicy,
      *
      * @return A circuit breaker policy builder
      */
-    public static @NonNull Builder builder() {
+    public static Builder builder() {
         return new Builder();
     }
 
@@ -64,7 +68,7 @@ public record CircuitBreakerPolicy(@NonNull RetryPolicy retryPolicy,
      *
      * @return The delay between retry attempts
      */
-    public @NonNull Duration getDelay() {
+    public Duration getDelay() {
         return retryPolicy.delay();
     }
 
@@ -73,7 +77,7 @@ public record CircuitBreakerPolicy(@NonNull RetryPolicy retryPolicy,
      *
      * @return The maximum overall delay if configured
      */
-    public @NonNull Optional<Duration> getMaxDelay() {
+    public Optional<Duration> getMaxDelay() {
         return retryPolicy.getMaxDelay();
     }
 
@@ -100,7 +104,7 @@ public record CircuitBreakerPolicy(@NonNull RetryPolicy retryPolicy,
      *
      * @return The retry predicate
      */
-    public @NonNull RetryPredicate getPredicate() {
+    public RetryPredicate getPredicate() {
         return retryPolicy.predicate();
     }
 
@@ -109,7 +113,7 @@ public record CircuitBreakerPolicy(@NonNull RetryPolicy retryPolicy,
      *
      * @return The captured exception type
      */
-    public @NonNull Class<? extends Throwable> getCapturedException() {
+    public Class<? extends Throwable> getCapturedException() {
         return retryPolicy.capturedException();
     }
 
@@ -118,7 +122,7 @@ public record CircuitBreakerPolicy(@NonNull RetryPolicy retryPolicy,
      *
      * @return The included exception types
      */
-    public @NonNull List<Class<? extends Throwable>> getIncludes() {
+    public List<Class<? extends Throwable>> getIncludes() {
         return retryPolicy.includes();
     }
 
@@ -127,7 +131,7 @@ public record CircuitBreakerPolicy(@NonNull RetryPolicy retryPolicy,
      *
      * @return The excluded exception types
      */
-    public @NonNull List<Class<? extends Throwable>> getExcludes() {
+    public List<Class<? extends Throwable>> getExcludes() {
         return retryPolicy.excludes();
     }
 
@@ -136,7 +140,7 @@ public record CircuitBreakerPolicy(@NonNull RetryPolicy retryPolicy,
      *
      * @return The circuit reset timeout
      */
-    public @NonNull Duration getResetTimeout() {
+    public Duration getResetTimeout() {
         return resetTimeout;
     }
 
@@ -154,7 +158,7 @@ public record CircuitBreakerPolicy(@NonNull RetryPolicy retryPolicy,
      *
      * @return The retry policy view
      */
-    public @NonNull RetryPolicy asRetryPolicy() {
+    public RetryPolicy asRetryPolicy() {
         return retryPolicy;
     }
 
@@ -163,10 +167,10 @@ public record CircuitBreakerPolicy(@NonNull RetryPolicy retryPolicy,
      */
     public static final class Builder {
         private final RetryPolicy.Builder retryPolicyBuilder = RetryPolicy.builder()
-            .delay(Duration.ofMillis(500))
-            .multiplier(0.0d)
-            .maxDelay(Duration.ofSeconds(5));
-        private Duration resetTimeout = Duration.ofSeconds(20);
+            .delay(DEFAULT_DELAY)
+            .multiplier(DEFAULT_MULTIPLIER)
+            .maxDelay(DEFAULT_MAX_DELAY);
+        private Duration resetTimeout = DEFAULT_RESET_TIMEOUT;
         private boolean throwWrappedException;
 
         private Builder() {
@@ -178,7 +182,7 @@ public record CircuitBreakerPolicy(@NonNull RetryPolicy retryPolicy,
          * @param maxAttempts The maximum number of attempts
          * @return This builder
          */
-        public @NonNull Builder maxAttempts(int maxAttempts) {
+        public Builder maxAttempts(int maxAttempts) {
             retryPolicyBuilder.maxAttempts(maxAttempts);
             return this;
         }
@@ -189,7 +193,7 @@ public record CircuitBreakerPolicy(@NonNull RetryPolicy retryPolicy,
          * @param delay The delay between retry attempts
          * @return This builder
          */
-        public @NonNull Builder delay(@NonNull Duration delay) {
+        public Builder delay(Duration delay) {
             retryPolicyBuilder.delay(delay);
             return this;
         }
@@ -200,7 +204,7 @@ public record CircuitBreakerPolicy(@NonNull RetryPolicy retryPolicy,
          * @param maxDelay The maximum overall delay
          * @return This builder
          */
-        public @NonNull Builder maxDelay(Duration maxDelay) {
+        public Builder maxDelay(Duration maxDelay) {
             retryPolicyBuilder.maxDelay(maxDelay);
             return this;
         }
@@ -211,7 +215,7 @@ public record CircuitBreakerPolicy(@NonNull RetryPolicy retryPolicy,
          * @param multiplier The delay multiplier
          * @return This builder
          */
-        public @NonNull Builder multiplier(double multiplier) {
+        public Builder multiplier(double multiplier) {
             retryPolicyBuilder.multiplier(multiplier);
             return this;
         }
@@ -222,7 +226,7 @@ public record CircuitBreakerPolicy(@NonNull RetryPolicy retryPolicy,
          * @param jitter The jitter factor
          * @return This builder
          */
-        public @NonNull Builder jitter(double jitter) {
+        public Builder jitter(double jitter) {
             retryPolicyBuilder.jitter(jitter);
             return this;
         }
@@ -233,7 +237,7 @@ public record CircuitBreakerPolicy(@NonNull RetryPolicy retryPolicy,
          * @param predicate The retry predicate
          * @return This builder
          */
-        public @NonNull Builder predicate(@NonNull RetryPredicate predicate) {
+        public Builder predicate(RetryPredicate predicate) {
             retryPolicyBuilder.predicate(predicate);
             return this;
         }
@@ -244,7 +248,7 @@ public record CircuitBreakerPolicy(@NonNull RetryPolicy retryPolicy,
          * @param capturedException The captured exception type
          * @return This builder
          */
-        public @NonNull Builder capturedException(@NonNull Class<? extends Throwable> capturedException) {
+        public Builder capturedException(Class<? extends Throwable> capturedException) {
             retryPolicyBuilder.capturedException(capturedException);
             return this;
         }
@@ -256,7 +260,7 @@ public record CircuitBreakerPolicy(@NonNull RetryPolicy retryPolicy,
          * @return This builder
          */
         @SafeVarargs
-        public final @NonNull Builder includes(@NonNull Class<? extends Throwable>... includes) {
+        public final Builder includes(Class<? extends Throwable>... includes) {
             retryPolicyBuilder.includes(includes);
             return this;
         }
@@ -268,7 +272,7 @@ public record CircuitBreakerPolicy(@NonNull RetryPolicy retryPolicy,
          * @return This builder
          */
         @SafeVarargs
-        public final @NonNull Builder excludes(@NonNull Class<? extends Throwable>... excludes) {
+        public final Builder excludes(Class<? extends Throwable>... excludes) {
             retryPolicyBuilder.excludes(excludes);
             return this;
         }
@@ -279,7 +283,7 @@ public record CircuitBreakerPolicy(@NonNull RetryPolicy retryPolicy,
          * @param resetTimeout The circuit reset timeout
          * @return This builder
          */
-        public @NonNull Builder resetTimeout(@NonNull Duration resetTimeout) {
+        public Builder resetTimeout(Duration resetTimeout) {
             this.resetTimeout = resetTimeout;
             return this;
         }
@@ -290,7 +294,7 @@ public record CircuitBreakerPolicy(@NonNull RetryPolicy retryPolicy,
          * @param throwWrappedException Whether open-circuit exceptions should be wrapped
          * @return This builder
          */
-        public @NonNull Builder throwWrappedException(boolean throwWrappedException) {
+        public Builder throwWrappedException(boolean throwWrappedException) {
             this.throwWrappedException = throwWrappedException;
             return this;
         }
@@ -300,7 +304,7 @@ public record CircuitBreakerPolicy(@NonNull RetryPolicy retryPolicy,
          *
          * @return The circuit breaker policy
          */
-        public @NonNull CircuitBreakerPolicy build() {
+        public CircuitBreakerPolicy build() {
             return new CircuitBreakerPolicy(retryPolicyBuilder.build(), resetTimeout, throwWrappedException);
         }
     }
