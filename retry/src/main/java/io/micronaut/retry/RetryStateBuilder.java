@@ -25,7 +25,9 @@ package io.micronaut.retry;
 public interface RetryStateBuilder {
 
     /**
-     * @return Builds retry state
+     * Builds retry state.
+     *
+     * @return The retry state
      */
     RetryState build();
 }

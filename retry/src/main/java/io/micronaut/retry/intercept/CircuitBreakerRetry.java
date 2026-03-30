@@ -38,7 +38,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * @author graemerocher
  * @since 1.0
  */
-class CircuitBreakerRetry implements MutableRetryState {
+public class CircuitBreakerRetry implements MutableRetryState {
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultRetryInterceptor.class);
 
@@ -55,17 +55,19 @@ class CircuitBreakerRetry implements MutableRetryState {
     private volatile MutableRetryState childState;
 
     /**
+     * Creates a circuit breaker retry state.
+     *
      * @param openTimeout The circuit open timeout in millis
      * @param childStateBuilder The retry state builder
      * @param method A compile time produced invocation of a method call
      * @param eventPublisher To publish circuit events
      * @param throwWrappedException If {@code true}, the original exception will be wrapped in {@link CircuitOpenException}
      */
-    CircuitBreakerRetry(long openTimeout,
-                        RetryStateBuilder childStateBuilder,
-                        ExecutableMethod<?, ?> method,
-                        @Nullable ApplicationEventPublisher eventPublisher,
-                        boolean throwWrappedException) {
+    public CircuitBreakerRetry(long openTimeout,
+                               RetryStateBuilder childStateBuilder,
+                               ExecutableMethod<?, ?> method,
+                               @Nullable ApplicationEventPublisher eventPublisher,
+                               boolean throwWrappedException) {
 
         this.retryStateBuilder = childStateBuilder;
         this.openTimeout = openTimeout;
@@ -171,10 +173,12 @@ class CircuitBreakerRetry implements MutableRetryState {
     }
 
     /**
+     * Returns the current circuit state.
+     *
      * @return The current state
      */
     @Nullable
-    CircuitState currentState() {
+    public CircuitState currentState() {
         if (state.get() == CircuitState.OPEN) {
             long now = System.currentTimeMillis();
             long timeout = time + openTimeout;
