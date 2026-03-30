@@ -43,6 +43,8 @@ import java.util.function.Supplier;
 public final class DefaultRetryRunner {
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultRetryRunner.class);
+    private static final String CANNOT_RETRY_MESSAGE = "Cannot retry anymore. Rethrowing original exception for {}";
+    private static final String RETRYING_MESSAGE = "Retrying execution for [{}] after delay of {}ms for exception: {}";
 
     private final ScheduledExecutorService executorService;
     private final RetrySleeper retrySleeper;
@@ -83,7 +85,7 @@ public final class DefaultRetryRunner {
                 }
                 if (!retryState.canRetry(exception)) {
                     if (LOG.isDebugEnabled()) {
-                        LOG.debug("Cannot retry anymore. Rethrowing original exception for {}", logContext);
+                        LOG.debug(CANNOT_RETRY_MESSAGE, logContext);
                     }
                     retryState.close(exception);
                     throw exception;
@@ -92,7 +94,7 @@ public final class DefaultRetryRunner {
                 retryEventEmitter.onRetry(retryState, exception);
                 try {
                     if (LOG.isDebugEnabled()) {
-                        LOG.debug("Retrying execution for [{}] after delay of {}ms for exception: {}", logContext, delayMillis, exception.getMessage());
+                        LOG.debug(RETRYING_MESSAGE, logContext, delayMillis, exception.getMessage());
                     }
                     retrySleeper.sleep(delayMillis);
                 } catch (InterruptedException interruptedException) {
@@ -121,7 +123,7 @@ public final class DefaultRetryRunner {
         try {
             CompletionStage<T> initialStage = Objects.requireNonNull(supplier.get(), "supplier returned null completion stage");
             initialStage.whenComplete(retryCompletionStage(future, supplier, retryState, logContext, retryEventEmitter));
-        } catch (Throwable exception) {
+        } catch (Exception exception) {
             if (!isCaptured(retryState, exception)) {
                 future.completeExceptionally(exception);
                 return future;
@@ -133,7 +135,7 @@ public final class DefaultRetryRunner {
             }
             long delayMillis = retryState.nextDelay();
             retryEventEmitter.onRetry(retryState, exception);
-            var unused = executorService.schedule(() ->
+            executorService.schedule(() ->
                 executeScheduledCompletionStage(future, supplier, retryState, logContext, retryEventEmitter), delayMillis, TimeUnit.MILLISECONDS);
         }
         return future;
@@ -156,7 +158,7 @@ public final class DefaultRetryRunner {
         return Flux.defer(() -> {
             try {
                 return Flux.from(Objects.requireNonNull(supplier.get(), "supplier returned null publisher"));
-            } catch (Throwable exception) {
+            } catch (Exception exception) {
                 return Flux.error(exception);
             }
         }).onErrorResume(retryPublisher(supplier, retryState, logContext, retryEventEmitter))
@@ -171,7 +173,7 @@ public final class DefaultRetryRunner {
         try {
             CompletionStage<T> nextStage = Objects.requireNonNull(supplier.get(), "supplier returned null completion stage");
             nextStage.whenComplete(retryCompletionStage(future, supplier, retryState, logContext, retryEventEmitter));
-        } catch (Throwable exception) {
+        } catch (Exception exception) {
             retryCompletionStage(future, supplier, retryState, logContext, retryEventEmitter).accept(null, exception);
         }
     }
@@ -189,7 +191,7 @@ public final class DefaultRetryRunner {
             }
             if (!retryState.canRetry(exception)) {
                 if (LOG.isDebugEnabled()) {
-                    LOG.debug("Cannot retry anymore. Rethrowing original exception for {}", logContext);
+                    LOG.debug(CANNOT_RETRY_MESSAGE, logContext);
                 }
                 retryState.close(exception);
                 future.completeExceptionally(exception);
@@ -198,9 +200,9 @@ public final class DefaultRetryRunner {
             long delayMillis = retryState.nextDelay();
             retryEventEmitter.onRetry(retryState, exception);
             if (LOG.isDebugEnabled()) {
-                LOG.debug("Retrying execution for [{}] after delay of {}ms for exception: {}", logContext, delayMillis, exception.getMessage(), exception);
+                LOG.debug(RETRYING_MESSAGE, logContext, delayMillis, exception.getMessage(), exception);
             }
-            var unused = executorService.schedule(() -> executeScheduledCompletionStage(future, supplier, retryState, logContext, retryEventEmitter), delayMillis, TimeUnit.MILLISECONDS);
+            executorService.schedule(() -> executeScheduledCompletionStage(future, supplier, retryState, logContext, retryEventEmitter), delayMillis, TimeUnit.MILLISECONDS);
         };
     }
 
@@ -211,7 +213,7 @@ public final class DefaultRetryRunner {
         return exception -> {
             if (!retryState.canRetry(exception)) {
                 if (LOG.isDebugEnabled()) {
-                    LOG.debug("Cannot retry anymore. Rethrowing original exception for {}", logContext);
+                    LOG.debug(CANNOT_RETRY_MESSAGE, logContext);
                 }
                 retryState.close(exception);
                 return Flux.error(exception);
@@ -219,7 +221,7 @@ public final class DefaultRetryRunner {
             long delayMillis = retryState.nextDelay();
             retryEventEmitter.onRetry(retryState, exception);
             if (LOG.isDebugEnabled()) {
-                LOG.debug("Retrying execution for [{}] after delay of {}ms for exception: {}", logContext, delayMillis, exception.getMessage(), exception);
+                LOG.debug(RETRYING_MESSAGE, logContext, delayMillis, exception.getMessage(), exception);
             }
             return Flux.defer(() -> executePublisher(supplier, retryState, logContext, retryEventEmitter))
                 .delaySubscription(Duration.of(delayMillis, ChronoUnit.MILLIS));
