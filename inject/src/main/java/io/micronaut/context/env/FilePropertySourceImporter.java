@@ -16,28 +16,41 @@
 package io.micronaut.context.env;
 
 import io.micronaut.core.io.file.FileSystemResourceLoader;
+import io.micronaut.core.util.ConnectionString;
 
 import java.util.Optional;
 
 /**
  * Imports property sources from file system locations.
  */
-public final class FilePropertySourceImporter implements PropertySourceImporter {
+public final class FilePropertySourceImporter implements PropertySourceImporter<FilePropertySourceImporter.FileImport> {
 
     @Override
-    public String getProtocol() {
+    public String getPropertySourceKind() {
         return "file";
     }
 
     @Override
-    public Optional<PropertySource> importPropertySource(ImportContext context) {
+    public FileImport newImportDeclaration(ConnectionString connectionString) {
+        return new FileImport(connectionString.getPath());
+    }
+
+    @Override
+    public Optional<PropertySource> importPropertySource(ImportContext<FileImport> context) {
         String canonicalLocation = context.getCanonicalLocation();
-        String resourcePath = context.getResourcePath();
         return context.importPropertySource(
             FileSystemResourceLoader.defaultLoader(),
-            resourcePath,
+            context.getResourcePath(),
             canonicalLocation,
             PropertySource.Origin.of(canonicalLocation)
         );
+    }
+
+    /**
+     * Typed file import declaration.
+     *
+     * @param resourcePath The file resource path
+     */
+    public record FileImport(String resourcePath) {
     }
 }

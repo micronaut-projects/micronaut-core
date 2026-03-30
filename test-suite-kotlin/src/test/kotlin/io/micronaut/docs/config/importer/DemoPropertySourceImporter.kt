@@ -17,13 +17,16 @@ package io.micronaut.docs.config.importer
 
 import io.micronaut.context.env.PropertySource
 import io.micronaut.context.env.PropertySourceImporter
+import io.micronaut.core.util.ConnectionString
 
 // tag::class[]
-class DemoPropertySourceImporter : PropertySourceImporter {
-    override fun getProtocol(): String = "demo"
+class DemoPropertySourceImporter : PropertySourceImporter<DemoPropertySourceImporter.DemoImport> {
+    override fun getPropertySourceKind(): String = "demo"
 
-    override fun importPropertySource(context: PropertySourceImporter.ImportContext): java.util.Optional<PropertySource> {
-        if (context.connectionString().path != "defaults") {
+    override fun newImportDeclaration(connectionString: ConnectionString): DemoImport = DemoImport(connectionString.path)
+
+    override fun importPropertySource(context: PropertySourceImporter.ImportContext<DemoImport>): java.util.Optional<PropertySource> {
+        if (context.importDeclaration().path != "defaults") {
             return java.util.Optional.empty()
         }
         return java.util.Optional.of(
@@ -33,5 +36,7 @@ class DemoPropertySourceImporter : PropertySourceImporter {
             )
         )
     }
+
+    data class DemoImport(val path: String)
 }
 // end::class[]

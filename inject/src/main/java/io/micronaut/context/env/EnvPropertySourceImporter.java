@@ -17,31 +17,47 @@ package io.micronaut.context.env;
 
 import io.micronaut.core.util.ConnectionString;
 
+import java.util.Map;
 import java.util.Optional;
 
 /**
  * Imports inline configuration stored in an environment variable.
  */
-public final class EnvPropertySourceImporter implements PropertySourceImporter {
+public final class EnvPropertySourceImporter implements PropertySourceImporter<EnvPropertySourceImporter.EnvImport> {
 
     @Override
-    public String getProtocol() {
+    public String getPropertySourceKind() {
         return "env";
     }
 
     @Override
-    public Optional<PropertySource> importPropertySource(ImportContext context) {
-        ConnectionString connectionString = context.connectionString();
+    public EnvImport newImportDeclaration(ConnectionString connectionString) {
         String variableName = connectionString.getPath();
-        if (variableName.isBlank()) {
+        String extension = connectionString.getOptions().getOrDefault("extension", connectionString.getExtension().orElse("properties"));
+        return new EnvImport(variableName, extension, Map.copyOf(connectionString.getOptions()));
+    }
+
+    @Override
+    public Optional<PropertySource> importPropertySource(ImportContext<EnvImport> context) {
+        EnvImport envImport = context.importDeclaration();
+        if (envImport.variableName().isBlank()) {
             return Optional.empty();
         }
-        String value = CachedEnvironment.getenv(variableName);
+        String value = CachedEnvironment.getenv(envImport.variableName());
         if (value == null) {
             return Optional.empty();
         }
-        String sourceName = "env:" + variableName;
-        String extension = connectionString.getOptions().getOrDefault("extension", connectionString.getExtension().orElse("properties"));
-        return context.importPropertySource(value, sourceName, extension, PropertySource.Origin.of(sourceName));
+        String sourceName = "env:" + envImport.variableName();
+        return context.importPropertySource(value, sourceName, envImport.extension(), PropertySource.Origin.of(sourceName));
+    }
+
+    /**
+     * Typed environment import declaration.
+     *
+     * @param variableName The environment variable name
+     * @param extension The property source format extension
+     * @param options Parsed connection string options
+     */
+    public record EnvImport(String variableName, String extension, Map<String, String> options) {
     }
 }

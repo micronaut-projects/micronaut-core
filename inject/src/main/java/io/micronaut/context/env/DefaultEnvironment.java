@@ -109,13 +109,13 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     @Nullable
     private Collection<PropertySourceLoader> propertySourceLoaderList;
     private final Map<String, PropertySourceLoader> loaderByFormatMap = Collections.synchronizedMap(CollectionUtils.newLinkedHashMap(10));
-    private final Map<String, PropertySourceImporter> importerByProtocolMap = Collections.synchronizedMap(CollectionUtils.newLinkedHashMap(10));
+    private final Map<String, PropertySourceImporter<?>> importerByKindMap = Collections.synchronizedMap(CollectionUtils.newLinkedHashMap(10));
     private final Map<String, Boolean> presenceCache = new ConcurrentHashMap<>();
     private final ApplicationContextConfiguration configuration;
     private final Collection<String> configLocations;
     private final PropertySourcePropertyResolver propertyPlaceholderResolver;
     private final PropertyResolver propertyResolver;
-    private final @Nullable Supplier<Collection<PropertySourceImporter>> propertySourceImporterSupplier;
+    private final @Nullable Supplier<Collection<PropertySourceImporter<?>>> propertySourceImporterSupplier;
 
     private final List<PropertySource> refreshablePropertySources = new ArrayList<>(10);
     private final Map<String, PropertySource> propertySources = Collections.synchronizedMap(CollectionUtils.newLinkedHashMap(10));
@@ -135,7 +135,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     }
 
     DefaultEnvironment(ApplicationContextConfiguration configuration,
-                       @Nullable Supplier<Collection<PropertySourceImporter>> propertySourceImporterSupplier) {
+                       @Nullable Supplier<Collection<PropertySourceImporter<?>>> propertySourceImporterSupplier) {
         MutableConversionService conversionService = configuration.getConversionService().orElseGet(MutableConversionService::create);
         this.propertyPlaceholderResolver = new PropertySourcePropertyResolver(
             conversionService,
@@ -349,24 +349,21 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     }
 
     private void loadProperties() {
-        Collection<PropertySourceImporter> importers = getPropertySourceImportersForLoad();
+        Collection<PropertySourceImporter<?>> importers = getPropertySourceImportersForLoad();
         try {
             loadPropertiesInternal();
         } finally {
-            importerByProtocolMap.clear();
+            importerByKindMap.clear();
             closeImporters(importers);
         }
     }
 
-    Collection<PropertySourceImporter> getPropertySourceImportersForLoad() {
-        Collection<PropertySourceImporter> importers;
+    Collection<PropertySourceImporter<?>> getPropertySourceImportersForLoad() {
+        Collection<PropertySourceImporter<?>> importers;
         if (propertySourceImporterSupplier != null) {
             importers = propertySourceImporterSupplier.get();
-            if (importers == null) {
-                importers = Collections.emptyList();
-            }
-            importerByProtocolMap.clear();
-            importerByProtocolMap.putAll(toImporterByProtocol(importers));
+            importerByKindMap.clear();
+            importerByKindMap.putAll(toImporterByKind(importers));
         } else {
             importers = evaluatePropertySourceImporters();
         }
@@ -375,23 +372,21 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
 
     private void loadPropertiesInternal() {
         refreshablePropertySources.clear();
-        List<PropertySource> propertySources;
-        List<PropertySource> refreshableRoots = new ArrayList<>(configLocations.size());
+        List<PropertySource> propertySources = new ArrayList<>(configLocations.size());
+        ConfigImportResolver resolver = new ConfigImportResolver(this);
+        Set<String> preExistingSourceNames = new LinkedHashSet<>(this.propertySources.keySet());
         if (configuration.isEnableDefaultPropertySources()) {
-            propertySources = readPropertySourceList(applicationName);
-            refreshableRoots.addAll(propertySources);
-            addDefaultPropertySources(propertySources);
+            addResolvedPropertySources(propertySources, readPropertySourceList(applicationName), resolver, true, preExistingSourceNames);
+            List<PropertySource> defaultPropertySources = new ArrayList<>(4);
+            addDefaultPropertySources(defaultPropertySources);
+            addResolvedPropertySources(propertySources, defaultPropertySources, resolver, true, preExistingSourceNames);
             String propertySourcesSystemProperty = CachedEnvironment.getProperty(Environment.PROPERTY_SOURCES_KEY);
             if (propertySourcesSystemProperty != null) {
-                List<PropertySource> fromSystemProperty = readPropertySourceListFromFiles(propertySourcesSystemProperty);
-                propertySources.addAll(fromSystemProperty);
-                refreshableRoots.addAll(fromSystemProperty);
+                addResolvedPropertySources(propertySources, readPropertySourceListFromFiles(propertySourcesSystemProperty), resolver, true, preExistingSourceNames);
             }
             String propertySourcesEnv = CachedEnvironment.getenv(ENV_PROPERTY_SOURCES_KEY);
             if (propertySourcesEnv != null) {
-                List<PropertySource> fromEnv = readPropertySourceListFromFiles(propertySourcesEnv);
-                propertySources.addAll(fromEnv);
-                refreshableRoots.addAll(fromEnv);
+                addResolvedPropertySources(propertySources, readPropertySourceListFromFiles(propertySourcesEnv), resolver, true, preExistingSourceNames);
             }
 
         } else {
@@ -410,48 +405,38 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         Collection<PropertySourcesLocator> propertySourcesLocators = configuration.getPropertySourcesLocators();
         if (!propertySourcesLocators.isEmpty()) {
             for (PropertySourcesLocator propertySourcesLocator : propertySourcesLocators) {
-                for (PropertySource propertySource : propertySourcesLocator.load(this)) {
-                    internalAddPropertySource(propertySource);
-                    propertySources.add(propertySource);
-                    if (!PropertySource.CONTEXT.equals(propertySource.getName())) {
-                        refreshableRoots.add(propertySource);
-                    }
-                }
+                addResolvedPropertySources(propertySources, propertySourcesLocator.load(this), resolver, true, preExistingSourceNames);
             }
         }
 
-        // Snapshot names before resolution so we can later distinguish imported children
-        // (those added by the import resolver) from pre-existing sources.
-        Set<String> originalSourceNames = new LinkedHashSet<>();
-        for (PropertySource ps : propertySources) {
-            originalSourceNames.add(ps.getName());
-        }
-
-        List<PropertySource> resolvedAll = resolvePropertySourceImports(propertySources);
-        Set<String> refreshableRootNames = new LinkedHashSet<>();
-        for (PropertySource ps : refreshableRoots) {
-            refreshableRootNames.add(ps.getName());
-        }
-        for (PropertySource propertySource : resolvedAll) {
-            String name = propertySource.getName();
-            // A source is refreshable when it is a known refreshable root, or when it is an
-            // imported child (not in the original list) - imported children must be dropped and
-            // re-discovered on each refresh cycle together with their parent roots.
-            if (!PropertySource.CONTEXT.equals(name)
-                    && (refreshableRootNames.contains(name) || !originalSourceNames.contains(name))) {
-                refreshablePropertySources.add(propertySource);
-            }
-        }
-
-        OrderUtil.sortOrdered(resolvedAll);
-        for (PropertySource propertySource : resolvedAll) {
+        OrderUtil.sortOrdered(propertySources);
+        for (PropertySource propertySource : propertySources) {
             internalProcessPropertySource(propertySource);
         }
     }
 
-    private static void closeImporters(Collection<PropertySourceImporter> importers) {
+    private void addResolvedPropertySources(List<PropertySource> propertySources,
+                                            Collection<PropertySource> roots,
+                                            ConfigImportResolver resolver,
+                                            boolean refreshable,
+                                            Set<String> preExistingSourceNames) {
+        for (PropertySource root : roots) {
+            List<PropertySource> resolved = resolver.resolve(root);
+            propertySources.addAll(resolved);
+            for (PropertySource propertySource : resolved) {
+                internalAddPropertySource(propertySource);
+                if (refreshable && !PropertySource.CONTEXT.equals(propertySource.getName())) {
+                    if (!preExistingSourceNames.contains(propertySource.getName())) {
+                        refreshablePropertySources.add(propertySource);
+                    }
+                }
+            }
+        }
+    }
+
+    private static void closeImporters(Collection<PropertySourceImporter<?>> importers) {
         RuntimeException closeException = null;
-        for (PropertySourceImporter importer : importers) {
+        for (PropertySourceImporter<?> importer : importers) {
             try {
                 importer.close();
             } catch (Exception e) {
@@ -630,30 +615,23 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         return allLoaders;
     }
 
-    private Collection<PropertySourceImporter> evaluatePropertySourceImporters() {
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private Collection<PropertySourceImporter<?>> evaluatePropertySourceImporters() {
         SoftServiceLoader<PropertySourceImporter> definitions = SoftServiceLoader.load(PropertySourceImporter.class, getClassLoader());
-        List<PropertySourceImporter> importers = definitions.collectAll();
-        Map<String, PropertySourceImporter> importersByType = CollectionUtils.newLinkedHashMap(importers.size());
-        for (PropertySourceImporter importer : importers) {
+        List<PropertySourceImporter<?>> importers = (List) definitions.collectAll();
+        Map<String, PropertySourceImporter<?>> importersByType = CollectionUtils.newLinkedHashMap(importers.size());
+        for (PropertySourceImporter<?> importer : importers) {
             importersByType.putIfAbsent(importer.getClass().getName(), importer);
         }
-        List<PropertySourceImporter> uniqueImporters = new ArrayList<>(importersByType.values());
-        importerByProtocolMap.clear();
-        importerByProtocolMap.putAll(toImporterByProtocol(uniqueImporters));
+        List<PropertySourceImporter<?>> uniqueImporters = new ArrayList<>(importersByType.values());
+        importerByKindMap.clear();
+        importerByKindMap.putAll(toImporterByKind(uniqueImporters));
         return uniqueImporters;
     }
 
     @Nullable
-    PropertySourceImporter findPropertySourceImporter(String protocol) {
-        return importerByProtocolMap.get(protocol.toLowerCase(Locale.ROOT));
-    }
-
-    List<PropertySource> resolvePropertySourceImports(List<PropertySource> sources) {
-        if (sources.isEmpty()) {
-            return List.of();
-        }
-        ConfigImportResolver resolver = new ConfigImportResolver(this);
-        return resolver.resolve(sources);
+    PropertySourceImporter<?> findPropertySourceImporter(String propertySourceKind) {
+        return importerByKindMap.get(propertySourceKind.toLowerCase(Locale.ROOT));
     }
 
     Optional<PropertySource> loadImportedPropertySource(ResourceLoader resourceLoader,
@@ -814,23 +792,23 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         return message.toString();
     }
 
-    static Map<String, PropertySourceImporter> toImporterByProtocol(Collection<PropertySourceImporter> importers) {
-        Map<String, PropertySourceImporter> importersByProtocol = CollectionUtils.newLinkedHashMap(importers.size());
-        for (PropertySourceImporter importer : importers) {
+    static Map<String, PropertySourceImporter<?>> toImporterByKind(Collection<PropertySourceImporter<?>> importers) {
+        Map<String, PropertySourceImporter<?>> importersByKind = CollectionUtils.newLinkedHashMap(importers.size());
+        for (PropertySourceImporter<?> importer : importers) {
             if (!importer.isEnabled()) {
                 continue;
             }
-            String protocol = importer.getProtocol();
-            if (protocol.isBlank()) {
-                throw new ConfigurationException("Property source importer [" + importer + "] returned an empty protocol");
+            String propertySourceKind = importer.getPropertySourceKind();
+            if (propertySourceKind.isBlank()) {
+                throw new ConfigurationException("Property source importer [" + importer + "] returned an empty property source kind");
             }
-            String protocolKey = protocol.toLowerCase(Locale.ROOT);
-            PropertySourceImporter previous = importersByProtocol.putIfAbsent(protocolKey, importer);
+            String kindKey = propertySourceKind.toLowerCase(Locale.ROOT);
+            PropertySourceImporter<?> previous = importersByKind.putIfAbsent(kindKey, importer);
             if (previous != null) {
-                throw new ConfigurationException("Duplicate property source importer for protocol [" + protocolKey + "]: " + previous + " and " + importer);
+                throw new ConfigurationException("Duplicate property source importer for kind [" + kindKey + "]: " + previous + " and " + importer);
             }
         }
-        return importersByProtocol;
+        return importersByKind;
     }
 
     private void loadPropertySourceFromLoader(String name, PropertySourceLoader propertySourceLoader, List<PropertySource> propertySources, ResourceLoader resourceLoader) {

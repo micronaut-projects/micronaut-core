@@ -15,22 +15,20 @@
  */
 package io.micronaut.context.env;
 
-import java.util.Optional;
+import io.micronaut.core.util.ConnectionString;
 
 /**
  * Imports and merges property sources from all matching classpath locations.
  */
-public final class ClasspathWildcardPropertySourceImporter implements PropertySourceImporter {
+public final class ClasspathWildcardPropertySourceImporter extends ClasspathPropertySourceImporter {
 
     @Override
-    public String getProtocol() {
+    public String getPropertySourceKind() {
         return "classpath*";
     }
 
     @Override
-    public Optional<PropertySource> importPropertySource(ImportContext context) {
-        String canonicalLocation = context.getCanonicalLocation();
-        String resourcePath = context.getResourcePath();
-        return context.importClasspathPropertySource(resourcePath, canonicalLocation, PropertySource.Origin.of(canonicalLocation), true);
+    public ClasspathImport newImportDeclaration(ConnectionString connectionString) {
+        return new ClasspathImport(connectionString.getPath(), true);
     }
 }

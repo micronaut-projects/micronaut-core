@@ -35,7 +35,8 @@ class DemoPropertySourceImporterTest {
     void importsDemoDefaults() {
         try (ApplicationContext context = ApplicationContext.run()) {
             DemoPropertySourceImporter importer = new DemoPropertySourceImporter();
-            PropertySourceImporter.ImportContext importContext = new PropertySourceImporter.ImportContext() {
+            DemoPropertySourceImporter.DemoImport declaration = importer.newImportDeclaration(ConnectionString.parse("demo://defaults"));
+            PropertySourceImporter.ImportContext<DemoPropertySourceImporter.DemoImport> importContext = new PropertySourceImporter.ImportContext<>() {
                 @Override
                 public Environment environment() {
                     return context.getEnvironment();
@@ -44,6 +45,11 @@ class DemoPropertySourceImporterTest {
                 @Override
                 public ConnectionString connectionString() {
                     return ConnectionString.parse("demo://defaults");
+                }
+
+                @Override
+                public DemoPropertySourceImporter.DemoImport importDeclaration() {
+                    return declaration;
                 }
 
                 @Override

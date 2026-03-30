@@ -17,21 +17,30 @@ package io.micronaut.docs.config.importer
 
 import io.micronaut.context.env.PropertySource
 import io.micronaut.context.env.PropertySourceImporter
+import io.micronaut.core.util.ConnectionString
 
 // tag::class[]
-class DemoPropertySourceImporter implements PropertySourceImporter {
+class DemoPropertySourceImporter implements PropertySourceImporter<DemoPropertySourceImporter.DemoImport> {
 
     @Override
-    String getProtocol() {
+    String getPropertySourceKind() {
         return "demo"
     }
 
     @Override
-    Optional<PropertySource> importPropertySource(PropertySourceImporter.ImportContext context) {
-        if (context.connectionString().path != "defaults") {
+    DemoImport newImportDeclaration(ConnectionString connectionString) {
+        new DemoImport(connectionString.path)
+    }
+
+    @Override
+    Optional<PropertySource> importPropertySource(PropertySourceImporter.ImportContext<DemoImport> context) {
+        if (context.importDeclaration().path() != "defaults") {
             return Optional.empty()
         }
         return Optional.of(PropertySource.of("demo:defaults", ["demo.message": "hello-from-demo-importer"]))
+    }
+
+    static record DemoImport(String path) {
     }
 }
 // end::class[]

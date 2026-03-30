@@ -17,27 +17,36 @@ package io.micronaut.docs.config.importer;
 
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.env.PropertySourceImporter;
+import io.micronaut.core.util.ConnectionString;
 
 import java.util.Map;
 import java.util.Optional;
 
 // tag::class[]
-public final class DemoPropertySourceImporter implements PropertySourceImporter {
+public final class DemoPropertySourceImporter implements PropertySourceImporter<DemoPropertySourceImporter.DemoImport> {
 
     @Override
-    public String getProtocol() {
+    public String getPropertySourceKind() {
         return "demo";
     }
 
     @Override
-    public Optional<PropertySource> importPropertySource(ImportContext context) {
-        if (!"defaults".equals(context.connectionString().getPath())) {
+    public DemoImport newImportDeclaration(ConnectionString connectionString) {
+        return new DemoImport(connectionString.getPath());
+    }
+
+    @Override
+    public Optional<PropertySource> importPropertySource(ImportContext<DemoImport> context) {
+        if (!"defaults".equals(context.importDeclaration().path())) {
             return Optional.empty();
         }
         return Optional.of(PropertySource.of(
             "demo:defaults",
             Map.of("demo.message", "hello-from-demo-importer")
         ));
+    }
+
+    public record DemoImport(String path) {
     }
 }
 // end::class[]

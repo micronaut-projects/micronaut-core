@@ -15,22 +15,43 @@
  */
 package io.micronaut.context.env;
 
+import io.micronaut.core.util.ConnectionString;
+
 import java.util.Optional;
 
 /**
  * Imports property sources from classpath locations.
  */
-public final class ClasspathPropertySourceImporter implements PropertySourceImporter {
+public class ClasspathPropertySourceImporter implements PropertySourceImporter<ClasspathPropertySourceImporter.ClasspathImport> {
 
     @Override
-    public String getProtocol() {
+    public String getPropertySourceKind() {
         return "classpath";
     }
 
     @Override
-    public Optional<PropertySource> importPropertySource(ImportContext context) {
+    public ClasspathImport newImportDeclaration(ConnectionString connectionString) {
+        return new ClasspathImport(connectionString.getPath(), false);
+    }
+
+    @Override
+    public Optional<PropertySource> importPropertySource(ImportContext<ClasspathImport> context) {
         String canonicalLocation = context.getCanonicalLocation();
-        String resourcePath = context.getResourcePath();
-        return context.importClasspathPropertySource(resourcePath, canonicalLocation, PropertySource.Origin.of(canonicalLocation), false);
+        ClasspathImport classpathImport = context.importDeclaration();
+        return context.importClasspathPropertySource(
+            classpathImport.resourcePath(),
+            canonicalLocation,
+            PropertySource.Origin.of(canonicalLocation),
+            classpathImport.allowMultiple()
+        );
+    }
+
+    /**
+     * Typed classpath import declaration.
+     *
+     * @param resourcePath The classpath resource path
+     * @param allowMultiple Whether multiple classpath resources may be merged
+     */
+    public record ClasspathImport(String resourcePath, boolean allowMultiple) {
     }
 }

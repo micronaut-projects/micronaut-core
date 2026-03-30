@@ -15,33 +15,45 @@
  */
 package io.micronaut.context.env;
 
+import io.micronaut.context.env.PropertySource.Origin;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.util.ConnectionString;
 import io.micronaut.core.util.Toggleable;
 import org.jspecify.annotations.Nullable;
 
-import io.micronaut.context.env.PropertySource.Origin;
-
 import java.util.Optional;
 
 /**
- * Imports a {@link PropertySource} for a given protocol.
+ * Imports a {@link PropertySource} for a given property source kind.
  *
  * <p>Importer instances are created for a single configuration loading cycle. Micronaut reuses the same importer
  * instance for all imports resolved during that cycle so implementations may share expensive resources such as
  * HTTP clients across multiple imports. Once configuration loading completes, Micronaut invokes {@link #close()}.
  * The same lifecycle applies during startup and each refresh operation.</p>
  *
+ * @param <T> The typed import declaration produced from a {@link ConnectionString}
  * @since 5.0
  */
 @Experimental
-public interface PropertySourceImporter extends Toggleable, AutoCloseable {
+public interface PropertySourceImporter<T> extends Toggleable, AutoCloseable {
 
     /**
-     * @return The protocol this importer supports.
+     * @return The property source kind this importer supports.
      */
-    String getProtocol();
+    String getPropertySourceKind();
+
+    /**
+     * Convert the raw connection string into a type-safe import declaration consumed by this importer.
+     *
+     * <p>Micronaut invokes this method once for each resolved {@code micronaut.config.import} entry before calling
+     * {@link #importPropertySource(ImportContext)}. Implementations should validate any importer-specific semantics
+     * here and return an immutable declaration value suitable for repeated reads within the same load cycle.</p>
+     *
+     * @param connectionString The parsed connection string declaration
+     * @return The typed import declaration
+     */
+    T newImportDeclaration(ConnectionString connectionString);
 
     /**
      * Resolve a property source from the provided context.
@@ -49,7 +61,7 @@ public interface PropertySourceImporter extends Toggleable, AutoCloseable {
      * @param context The import context
      * @return The imported property source
      */
-    Optional<PropertySource> importPropertySource(ImportContext context);
+    Optional<PropertySource> importPropertySource(ImportContext<T> context);
 
     /**
      * Close resources associated with this importer after a configuration loading cycle completes.
@@ -63,8 +75,10 @@ public interface PropertySourceImporter extends Toggleable, AutoCloseable {
 
     /**
      * Import context information and helper methods.
+     *
+     * @param <T> The typed import declaration
      */
-    interface ImportContext {
+    interface ImportContext<T> {
 
         /**
          * @return The environment that is resolving imports
@@ -72,9 +86,14 @@ public interface PropertySourceImporter extends Toggleable, AutoCloseable {
         Environment environment();
 
         /**
-         * @return The parsed import declaration
+         * @return The parsed connection string declaration
          */
         ConnectionString connectionString();
+
+        /**
+         * @return The type-safe import declaration derived from {@link #connectionString()}
+         */
+        T importDeclaration();
 
         /**
          * @return The canonical location.

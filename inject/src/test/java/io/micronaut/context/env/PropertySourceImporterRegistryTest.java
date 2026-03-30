@@ -24,17 +24,17 @@ class PropertySourceImporterRegistryTest {
 
     @Test
     void mapsImportersByLowercaseProtocol() {
-        Map<String, PropertySourceImporter> importers = DefaultEnvironment.toImporterByProtocol(List.of(new TestImporter("File")));
+        Map<String, PropertySourceImporter<?>> importers = DefaultEnvironment.toImporterByKind(List.of(new TestImporter("File")));
 
         assertEquals(1, importers.size());
-        assertEquals("File", importers.get("file").getProtocol());
+        assertEquals("File", importers.get("file").getPropertySourceKind());
     }
 
     @Test
     void rejectsDuplicateProtocolsIgnoringCase() {
         ConfigurationException e = assertThrows(ConfigurationException.class, PropertySourceImporterRegistryTest::createDuplicateImportersByProtocol);
 
-        assertTrue(e.getMessage().contains("Duplicate property source importer for protocol [file]"));
+        assertTrue(e.getMessage().contains("Duplicate property source importer for kind [file]"));
     }
 
     @Test
@@ -49,13 +49,13 @@ class PropertySourceImporterRegistryTest {
     }
 
     private static void createDuplicateImportersByProtocol() {
-        DefaultEnvironment.toImporterByProtocol(List.of(
+        DefaultEnvironment.toImporterByKind(List.of(
             new TestImporter("file"),
             new TestImporter("FILE")
         ));
     }
 
-    private static final class TestImporter implements PropertySourceImporter {
+    private static final class TestImporter implements PropertySourceImporter<ConnectionString> {
         private final String protocol;
 
         private TestImporter(String protocol) {
@@ -63,17 +63,22 @@ class PropertySourceImporterRegistryTest {
         }
 
         @Override
-        public String getProtocol() {
+        public String getPropertySourceKind() {
             return protocol;
         }
 
         @Override
-        public Optional<PropertySource> importPropertySource(ImportContext context) {
-            return Optional.of(PropertySource.of(protocol + ":test", Map.of("connection", ConnectionString.parse("file://foo/bar.properties").getCanonicalForm())));
+        public ConnectionString newImportDeclaration(ConnectionString connectionString) {
+            return connectionString;
+        }
+
+        @Override
+        public Optional<PropertySource> importPropertySource(ImportContext<ConnectionString> context) {
+            return Optional.of(PropertySource.of(protocol + ":test", Map.of("connection", context.importDeclaration().getCanonicalForm())));
         }
     }
 
-    private static final class TrackingImporter implements PropertySourceImporter {
+    private static final class TrackingImporter implements PropertySourceImporter<ConnectionString> {
         private static final AtomicInteger createdCount = new AtomicInteger();
         private static final AtomicInteger closedCount = new AtomicInteger();
         private static final List<Integer> instanceIds = new ArrayList<>();
@@ -81,12 +86,17 @@ class PropertySourceImporterRegistryTest {
         private final int instanceId = createdCount.incrementAndGet();
 
         @Override
-        public String getProtocol() {
+        public String getPropertySourceKind() {
             return "tracking";
         }
 
         @Override
-        public Optional<PropertySource> importPropertySource(ImportContext context) {
+        public ConnectionString newImportDeclaration(ConnectionString connectionString) {
+            return connectionString;
+        }
+
+        @Override
+        public Optional<PropertySource> importPropertySource(ImportContext<ConnectionString> context) {
             return Optional.of(PropertySource.of("tracking:" + instanceId, Map.of("tracking.value", instanceId)));
         }
 

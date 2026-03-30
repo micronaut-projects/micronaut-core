@@ -15,6 +15,7 @@
  */
 package io.micronaut.context.env;
 
+import io.micronaut.core.util.ConnectionString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,20 +32,25 @@ import java.util.stream.Stream;
  * Imports key/value configuration from a config tree directory.
  */
 @SuppressWarnings("java:S2083") // paths are validated against path-traversal attacks by ConnectionString.getCanonicalPath()
-public final class ConfigTreePropertySourceImporter implements PropertySourceImporter {
+public final class ConfigTreePropertySourceImporter implements PropertySourceImporter<ConfigTreePropertySourceImporter.ConfigTreeImport> {
 
     private static final Logger LOG = LoggerFactory.getLogger(ConfigTreePropertySourceImporter.class);
 
     @Override
-    public String getProtocol() {
+    public String getPropertySourceKind() {
         return "configtree";
     }
 
     @Override
-    public Optional<PropertySource> importPropertySource(ImportContext context) {
+    public ConfigTreeImport newImportDeclaration(ConnectionString connectionString) {
+        return new ConfigTreeImport(connectionString.getPath());
+    }
+
+    @Override
+    public Optional<PropertySource> importPropertySource(ImportContext<ConfigTreeImport> context) {
         String canonicalLocation = context.getCanonicalLocation();
-        String pathValue = context.getResourcePath();
-        Path root = Paths.get(pathValue);
+        ConfigTreeImport configTreeImport = context.importDeclaration();
+        Path root = Paths.get(configTreeImport.path());
         if (!Files.exists(root) || !Files.isDirectory(root) || !Files.isReadable(root)) {
             return Optional.empty();
         }
@@ -57,7 +63,7 @@ public final class ConfigTreePropertySourceImporter implements PropertySourceImp
                 readConfigTreeFile(root, path, values);
             }
         } catch (IOException e) {
-            LOG.warn("Failed to walk config tree directory [{}]: {}", pathValue, e.getMessage());
+            LOG.warn("Failed to walk config tree directory [{}]: {}", configTreeImport.path(), e.getMessage());
             return Optional.empty();
         }
         if (values.isEmpty()) {
@@ -99,5 +105,13 @@ public final class ConfigTreePropertySourceImporter implements PropertySourceImp
             LOG.debug("Could not determine hidden status for config tree file [{}], treating as visible: {}", file, e.getMessage());
             return false;
         }
+    }
+
+    /**
+     * Typed config tree import declaration.
+     *
+     * @param path The config tree root directory path
+     */
+    public record ConfigTreeImport(String path) {
     }
 }
