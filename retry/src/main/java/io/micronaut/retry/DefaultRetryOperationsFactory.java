@@ -42,6 +42,6 @@ final class DefaultRetryOperationsFactory implements RetryOperationsFactory {
 
     @Override
     public RetryOperations createRetryOperations(RetryPolicy retryPolicy) {
-        return new DefaultRetryOperations(retryPolicy, new DefaultRetryRunner(executorService, NO_OP_EVENT_EMITTER), NO_OP_EVENT_EMITTER);
+        return new DefaultRetryOperations(retryPolicy, new DefaultRetryRunner(executorService, Thread::sleep), NO_OP_EVENT_EMITTER);
     }
 }

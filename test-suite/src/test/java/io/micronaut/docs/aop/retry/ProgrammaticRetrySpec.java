@@ -16,11 +16,8 @@
 package io.micronaut.docs.aop.retry;
 
 import io.micronaut.context.ApplicationContext;
-import io.micronaut.retry.exception.CircuitOpenException;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
-
-import java.util.concurrent.ExecutionException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;

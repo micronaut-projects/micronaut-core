@@ -42,6 +42,6 @@ final class DefaultCircuitBreakerOperationsFactory implements CircuitBreakerOper
 
     @Override
     public CircuitBreakerOperations createCircuitBreakerOperations(CircuitBreakerPolicy circuitBreakerPolicy) {
-        return new DefaultCircuitBreakerOperations(circuitBreakerPolicy, new DefaultRetryRunner(executorService, NO_OP_EVENT_EMITTER), NO_OP_EVENT_EMITTER);
+        return new DefaultCircuitBreakerOperations(circuitBreakerPolicy, new DefaultRetryRunner(executorService, Thread::sleep), NO_OP_EVENT_EMITTER);
     }
 }

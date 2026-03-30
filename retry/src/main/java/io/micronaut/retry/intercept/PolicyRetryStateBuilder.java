@@ -15,6 +15,7 @@
  */
 package io.micronaut.retry.intercept;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.retry.RetryPolicy;
 import io.micronaut.retry.RetryState;
 import io.micronaut.retry.RetryStateBuilder;
@@ -23,8 +24,9 @@ import io.micronaut.retry.RetryStateBuilder;
  * Builds retry state from a typed retry policy.
  *
  * @author graemerocher
- * @since 4.9.0
+ * @since 5.0.0
  */
+@Internal
 public final class PolicyRetryStateBuilder implements RetryStateBuilder {
 
     private final RetryPolicy retryPolicy;

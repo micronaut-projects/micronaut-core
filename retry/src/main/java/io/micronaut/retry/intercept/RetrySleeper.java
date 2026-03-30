@@ -18,20 +18,14 @@ package io.micronaut.retry.intercept;
 import io.micronaut.core.annotation.Internal;
 
 /**
- * Emits retry attempt notifications for the shared retry runner.
+ * Internal abstraction for sleeping between retry attempts.
  *
  * @author graemerocher
  * @since 5.0.0
  */
 @Internal
 @FunctionalInterface
-public interface RetryEventEmitter {
+public interface RetrySleeper {
 
-    /**
-     * Emits a retry notification.
-     *
-     * @param retryState The retry state
-     * @param exception The exception that triggered the retry
-     */
-    void onRetry(MutableRetryState retryState, Throwable exception);
+    void sleep(long delayMillis) throws InterruptedException;
 }

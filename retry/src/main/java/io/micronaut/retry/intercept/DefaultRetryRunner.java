@@ -15,6 +15,7 @@
  */
 package io.micronaut.retry.intercept;
 
+import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
@@ -36,22 +37,25 @@ import java.util.function.Supplier;
  * Shared retry execution engine for synchronous, reactive, and asynchronous flows.
  *
  * @author graemerocher
- * @since 4.9.0
+ * @since 5.0.0
  */
+@Internal
 public final class DefaultRetryRunner {
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultRetryRunner.class);
 
     private final ScheduledExecutorService executorService;
+    private final RetrySleeper retrySleeper;
 
     /**
      * Creates a shared retry runner.
      *
      * @param executorService The scheduler used for delayed retries
-     * @param retryEventEmitter The emitter used for retry notifications
+     * @param retrySleeper The strategy used to sleep between retries
      */
-    public DefaultRetryRunner(ScheduledExecutorService executorService, RetryEventEmitter retryEventEmitter) {
+    public DefaultRetryRunner(ScheduledExecutorService executorService, RetrySleeper retrySleeper) {
         this.executorService = executorService;
+        this.retrySleeper = retrySleeper;
     }
 
     /**
@@ -90,7 +94,7 @@ public final class DefaultRetryRunner {
                     if (LOG.isDebugEnabled()) {
                         LOG.debug("Retrying execution for [{}] after delay of {}ms for exception: {}", logContext, delayMillis, exception.getMessage());
                     }
-                    sleep(delayMillis);
+                    retrySleeper.sleep(delayMillis);
                 } catch (InterruptedException interruptedException) {
                     Thread.currentThread().interrupt();
                     throw exception;
@@ -157,10 +161,6 @@ public final class DefaultRetryRunner {
             }
         }).onErrorResume(retryPublisher(supplier, retryState, logContext, retryEventEmitter))
             .doOnComplete(() -> retryState.close(null));
-    }
-
-    private void sleep(long delayMillis) throws InterruptedException {
-        Thread.sleep(delayMillis);
     }
 
     private <T> void executeScheduledCompletionStage(CompletableFuture<T> future,

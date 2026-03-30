@@ -75,7 +75,7 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
         this.conversionService = conversionService;
         this.eventPublisher = eventPublisher;
         this.executorService = (ScheduledExecutorService) executorService;
-        this.retryRunner = new DefaultRetryRunner(this.executorService, (retryState, exception) -> { });
+        this.retryRunner = new DefaultRetryRunner(this.executorService, this::sleep);
     }
 
     @Override
@@ -164,5 +164,15 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
                 LOG.error("Error occurred publishing RetryEvent: {}", eventException.getMessage(), eventException);
             }
         }
+    }
+
+    /**
+     * Performs the sleep between retries and can be overridden to customize sleep behavior.
+     *
+     * @param delayMillis The delay in milliseconds
+     * @throws InterruptedException If the thread is interrupted during sleep
+     */
+    protected void sleep(long delayMillis) throws InterruptedException {
+        Thread.sleep(delayMillis);
     }
 }

@@ -16,7 +16,6 @@
 package io.micronaut.docs.aop.retry
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.retry.exception.CircuitOpenException
 import reactor.core.publisher.Mono
 import spock.lang.Specification
 
