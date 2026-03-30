@@ -16,7 +16,6 @@
 package io.micronaut.retry;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.async.publisher.Publishers;
 import reactor.core.publisher.Flux;
 import io.micronaut.retry.intercept.CircuitBreakerRetry;
 import io.micronaut.retry.intercept.DefaultRetryRunner;

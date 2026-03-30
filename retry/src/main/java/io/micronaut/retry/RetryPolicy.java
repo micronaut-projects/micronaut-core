@@ -29,6 +29,15 @@ import java.util.Optional;
 /**
  * Typed retry policy for programmatic retry execution.
  *
+ * @param maxAttempts The maximum number of attempts
+ * @param delay The delay between retry attempts
+ * @param maxDelay The maximum overall delay
+ * @param multiplier The delay multiplier
+ * @param jitter The retry jitter factor
+ * @param predicate The retry predicate
+ * @param capturedException The captured exception type
+ * @param includes The included exception types
+ * @param excludes The excluded exception types
  * @author graemerocher
  * @since 5.0.0
  */

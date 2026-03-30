@@ -25,6 +25,9 @@ import java.util.Optional;
 /**
  * Typed circuit breaker policy for programmatic execution.
  *
+ * @param retryPolicy The retry policy used by the circuit breaker
+ * @param resetTimeout The timeout before the circuit transitions to half open
+ * @param throwWrappedException Whether open-circuit exceptions should be wrapped
  * @author graemerocher
  * @since 5.0.0
  */

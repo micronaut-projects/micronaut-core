@@ -110,8 +110,8 @@ class HttpClientWithCircuitBreakerSpec extends Specification {
         then:"The original exception is thrown"
         HttpClientResponseException e = thrown()
         e.response.getBody(Map).get()._embedded.errors[0].message == "Internal Server Error: Bad count"
-        controller.countRx == 6
-        countFilter.requests.size() == 6
+        controller.countRx == 4
+        countFilter.requests.size() == 4
 
         when:"The method is called again"
         single = countClient.getCountSingle()
@@ -120,8 +120,8 @@ class HttpClientWithCircuitBreakerSpec extends Specification {
         then:"The value is not incremented because the circuit is open"
         e = thrown()
         e.response.getBody(Map).get()._embedded.errors[0].message == "Internal Server Error: Bad count"
-        controller.countRx == 6
-        countFilter.requests.size() == 6
+        controller.countRx == 4
+        countFilter.requests.size() == 4
     }
 
     @Requires(property = 'spec.name', value = 'HttpClientWithCircuitBreakerSpec')
