@@ -801,6 +801,136 @@ micronaut:
         main?.delete()
     }
 
+    void "test imported file property source change appears in refresh diff changed set"() {
+        given:
+        File imported = File.createTempFile("config-import-refresh-diff-child", ".properties")
+        imported.write("app.imported=before")
+        File main = File.createTempFile("config-import-refresh-diff-main", ".properties")
+        main.write("micronaut.config.import=file://${imported.absolutePath}\napp.main=main")
+        System.setProperty("micronaut.config.files", main.absolutePath)
+        ApplicationContext context = ApplicationContext.builder("test").build().start()
+
+        expect:
+        context.getRequiredProperty("app.imported", String) == "before"
+
+        when:
+        imported.write("app.imported=after")
+        Map<String, Object> diff = context.getEnvironment().refreshAndDiff()
+
+        then:
+        diff.keySet() == ["app.imported"] as Set
+        diff.get("app.imported") == "before"
+        context.getRequiredProperty("app.imported", String) == "after"
+
+        cleanup:
+        context?.close()
+        System.clearProperty("micronaut.config.files")
+        imported?.delete()
+        main?.delete()
+    }
+
+    void "test map config import for file provider"() {
+        given:
+        File imported = File.createTempFile("config-import-map-child", ".properties")
+        imported.write("app.imported=map")
+        File main = File.createTempFile("config-import-map-main", ".yml")
+        main.write("""micronaut:
+  config:
+    import:
+      provider: file
+      resource-path: ${imported.absolutePath}
+""")
+
+        when:
+        System.setProperty("micronaut.config.files", main.absolutePath)
+        Environment env = new DefaultEnvironment({ ["test"] }).start()
+
+        then:
+        env.getRequiredProperty("app.imported", String) == "map"
+
+        cleanup:
+        System.clearProperty("micronaut.config.files")
+        env?.close()
+        imported?.delete()
+        main?.delete()
+    }
+
+    void "test list of map config imports for file provider"() {
+        given:
+        File first = File.createTempFile("config-import-map-list-first", ".properties")
+        first.write("app.first=true")
+        File second = File.createTempFile("config-import-map-list-second", ".properties")
+        second.write("app.second=true")
+        File main = File.createTempFile("config-import-map-list-main", ".yml")
+        main.write("""micronaut:
+  config:
+    import:
+      - provider: file
+        resource-path: ${first.absolutePath}
+      - provider: file
+        resource-path: ${second.absolutePath}
+""")
+
+        when:
+        System.setProperty("micronaut.config.files", main.absolutePath)
+        Environment env = new DefaultEnvironment({ ["test"] }).start()
+
+        then:
+        env.getRequiredProperty("app.first", Boolean)
+        env.getRequiredProperty("app.second", Boolean)
+
+        cleanup:
+        System.clearProperty("micronaut.config.files")
+        env?.close()
+        first?.delete()
+        second?.delete()
+        main?.delete()
+    }
+
+    void "test map config import fails when provider is missing"() {
+        given:
+        File main = File.createTempFile("config-import-map-missing-provider", ".yml")
+        main.write("""micronaut:
+  config:
+    import:
+      resource-path: /tmp/demo.properties
+""")
+
+        when:
+        System.setProperty("micronaut.config.files", main.absolutePath)
+        new DefaultEnvironment({ ["test"] }).start()
+
+        then:
+        ConfigurationException e = thrown()
+        e.message.contains("require non-blank ['provider']")
+
+        cleanup:
+        System.clearProperty("micronaut.config.files")
+        main?.delete()
+    }
+
+    void "test map config import fails when file resource-path is missing"() {
+        given:
+        File main = File.createTempFile("config-import-map-missing-path", ".yml")
+        main.write("""micronaut:
+  config:
+    import:
+      provider: file
+""")
+
+        when:
+        System.setProperty("micronaut.config.files", main.absolutePath)
+        new DefaultEnvironment({ ["test"] }).start()
+
+        then:
+        ConfigurationException e = thrown()
+        e.message.contains("requires ['resource-path']")
+
+        cleanup:
+        System.clearProperty("micronaut.config.files")
+        main?.delete()
+    }
+
     void "test property source order"() {
         when:
         System.setProperty("micronaut.config.files", "classpath:config-files.yml,classpath:config-files2.yml")

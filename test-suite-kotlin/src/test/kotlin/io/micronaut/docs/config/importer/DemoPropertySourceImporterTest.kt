@@ -32,10 +32,13 @@ class DemoPropertySourceImporterTest {
     fun importsDemoDefaults() {
         ApplicationContext.run().use { context ->
             val importer = DemoPropertySourceImporter()
-            val importContext = object : PropertySourceImporter.ImportContext {
+            val declaration = importer.newImportDeclaration(ConnectionString.parse("demo://defaults"))
+            val importContext = object : PropertySourceImporter.ImportContext<DemoPropertySourceImporter.DemoImport> {
                 override fun environment(): Environment = context.environment
 
                 override fun connectionString(): ConnectionString = ConnectionString.parse("demo://defaults")
+
+                override fun importDeclaration(): DemoPropertySourceImporter.DemoImport = declaration
 
                 override fun parentOrigin(): PropertySource.Origin = PropertySource.Origin.of("classpath:application.yml")
 

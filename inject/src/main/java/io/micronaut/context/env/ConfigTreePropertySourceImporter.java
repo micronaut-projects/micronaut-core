@@ -15,6 +15,8 @@
  */
 package io.micronaut.context.env;
 
+import io.micronaut.context.exceptions.ConfigurationException;
+import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.util.ConnectionString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,7 +39,7 @@ public final class ConfigTreePropertySourceImporter implements PropertySourceImp
     private static final Logger LOG = LoggerFactory.getLogger(ConfigTreePropertySourceImporter.class);
 
     @Override
-    public String getPropertySourceKind() {
+    public String getProvider() {
         return "configtree";
     }
 
@@ -47,8 +49,20 @@ public final class ConfigTreePropertySourceImporter implements PropertySourceImp
     }
 
     @Override
+    public ConfigTreeImport newImportDeclaration(ConvertibleValues<Object> values) {
+        String path = values.get(FilePropertySourceImporter.RESOURCE_PATH, String.class)
+            .orElseThrow(() -> new ConfigurationException("Config import provider [configtree] requires ['" + FilePropertySourceImporter.RESOURCE_PATH + "']"));
+        if (path.isBlank()) {
+            throw new ConfigurationException("Config import provider [configtree] requires a non-blank ['" + FilePropertySourceImporter.RESOURCE_PATH + "']");
+        }
+        return new ConfigTreeImport(path);
+    }
+
+    @Override
     public Optional<PropertySource> importPropertySource(ImportContext<ConfigTreeImport> context) {
-        String canonicalLocation = context.getCanonicalLocation();
+        String sourceName = context.connectionString() != null
+            ? context.getCanonicalLocation()
+            : getProvider() + "://" + context.importDeclaration().path();
         ConfigTreeImport configTreeImport = context.importDeclaration();
         Path root = Paths.get(configTreeImport.path());
         if (!Files.exists(root) || !Files.isDirectory(root) || !Files.isReadable(root)) {
@@ -69,7 +83,7 @@ public final class ConfigTreePropertySourceImporter implements PropertySourceImp
         if (values.isEmpty()) {
             return Optional.empty();
         }
-        return Optional.of(PropertySource.of(canonicalLocation, values, PropertySource.Origin.of(canonicalLocation)));
+        return Optional.of(PropertySource.of(sourceName, values, PropertySource.Origin.of(sourceName)));
     }
 
     private static String trimSingleTrailingNewline(String value) {

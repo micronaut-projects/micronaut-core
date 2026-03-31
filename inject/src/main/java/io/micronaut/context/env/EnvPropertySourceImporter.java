@@ -15,6 +15,8 @@
  */
 package io.micronaut.context.env;
 
+import io.micronaut.context.exceptions.ConfigurationException;
+import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.util.ConnectionString;
 
 import java.util.Map;
@@ -25,24 +27,35 @@ import java.util.Optional;
  */
 public final class EnvPropertySourceImporter implements PropertySourceImporter<EnvPropertySourceImporter.EnvImport> {
 
+    private static final String VARIABLE = "variable";
+    private static final String EXTENSION = "extension";
+
     @Override
-    public String getPropertySourceKind() {
+    public String getProvider() {
         return "env";
     }
 
     @Override
     public EnvImport newImportDeclaration(ConnectionString connectionString) {
         String variableName = connectionString.getPath();
-        String extension = connectionString.getOptions().getOrDefault("extension", connectionString.getExtension().orElse("properties"));
+        String extension = connectionString.getOptions().getOrDefault(EXTENSION, connectionString.getExtension().orElse("properties"));
         return new EnvImport(variableName, extension, Map.copyOf(connectionString.getOptions()));
+    }
+
+    @Override
+    public EnvImport newImportDeclaration(ConvertibleValues<Object> values) {
+        String variableName = values.get(VARIABLE, String.class)
+            .orElseThrow(() -> new ConfigurationException("Config import provider [env] requires ['" + VARIABLE + "']"));
+        if (variableName.isBlank()) {
+            throw new ConfigurationException("Config import provider [env] requires a non-blank ['" + VARIABLE + "']");
+        }
+        String extension = values.get(EXTENSION, String.class).orElse("properties");
+        return new EnvImport(variableName, extension, values.asMap());
     }
 
     @Override
     public Optional<PropertySource> importPropertySource(ImportContext<EnvImport> context) {
         EnvImport envImport = context.importDeclaration();
-        if (envImport.variableName().isBlank()) {
-            return Optional.empty();
-        }
         String value = CachedEnvironment.getenv(envImport.variableName());
         if (value == null) {
             return Optional.empty();
@@ -58,6 +71,6 @@ public final class EnvPropertySourceImporter implements PropertySourceImporter<E
      * @param extension The property source format extension
      * @param options Parsed connection string options
      */
-    public record EnvImport(String variableName, String extension, Map<String, String> options) {
+    public record EnvImport(String variableName, String extension, Map<String, Object> options) {
     }
 }

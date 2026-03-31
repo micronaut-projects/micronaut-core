@@ -17,13 +17,16 @@ package io.micronaut.docs.config.importer
 
 import io.micronaut.context.env.PropertySource
 import io.micronaut.context.env.PropertySourceImporter
+import io.micronaut.core.convert.value.ConvertibleValues
 import io.micronaut.core.util.ConnectionString
 
 // tag::class[]
 class DemoPropertySourceImporter : PropertySourceImporter<DemoPropertySourceImporter.DemoImport> {
-    override fun getPropertySourceKind(): String = "demo"
+    override fun getProvider(): String = "demo"
 
     override fun newImportDeclaration(connectionString: ConnectionString): DemoImport = DemoImport(connectionString.path)
+
+    override fun newImportDeclaration(values: ConvertibleValues<Any>): DemoImport = DemoImport(values.get("path", String::class.java).orElse("defaults"))
 
     override fun importPropertySource(context: PropertySourceImporter.ImportContext<DemoImport>): java.util.Optional<PropertySource> {
         if (context.importDeclaration().path != "defaults") {

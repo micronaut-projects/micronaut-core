@@ -363,7 +363,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         if (propertySourceImporterSupplier != null) {
             importers = propertySourceImporterSupplier.get();
             importerByKindMap.clear();
-            importerByKindMap.putAll(toImporterByKind(importers));
+            importerByKindMap.putAll(toImporterByProvider(importers));
         } else {
             importers = evaluatePropertySourceImporters();
         }
@@ -405,7 +405,13 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         Collection<PropertySourcesLocator> propertySourcesLocators = configuration.getPropertySourcesLocators();
         if (!propertySourcesLocators.isEmpty()) {
             for (PropertySourcesLocator propertySourcesLocator : propertySourcesLocators) {
+                List<PropertySource> propertySourcesBeforeLocator = new ArrayList<>(propertySources);
                 addResolvedPropertySources(propertySources, propertySourcesLocator.load(this), resolver, true, preExistingSourceNames);
+                for (PropertySource existingPropertySource : propertySourcesBeforeLocator) {
+                    if (!propertySources.contains(existingPropertySource)) {
+                        propertySources.add(existingPropertySource);
+                    }
+                }
             }
         }
 
@@ -625,13 +631,13 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         }
         List<PropertySourceImporter<?>> uniqueImporters = new ArrayList<>(importersByType.values());
         importerByKindMap.clear();
-        importerByKindMap.putAll(toImporterByKind(uniqueImporters));
+        importerByKindMap.putAll(toImporterByProvider(uniqueImporters));
         return uniqueImporters;
     }
 
     @Nullable
-    PropertySourceImporter<?> findPropertySourceImporter(String propertySourceKind) {
-        return importerByKindMap.get(propertySourceKind.toLowerCase(Locale.ROOT));
+    PropertySourceImporter<?> findPropertySourceImporter(String provider) {
+        return importerByKindMap.get(provider.toLowerCase(Locale.ROOT));
     }
 
     Optional<PropertySource> loadImportedPropertySource(ResourceLoader resourceLoader,
@@ -792,23 +798,23 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         return message.toString();
     }
 
-    static Map<String, PropertySourceImporter<?>> toImporterByKind(Collection<PropertySourceImporter<?>> importers) {
-        Map<String, PropertySourceImporter<?>> importersByKind = CollectionUtils.newLinkedHashMap(importers.size());
+    static Map<String, PropertySourceImporter<?>> toImporterByProvider(Collection<PropertySourceImporter<?>> importers) {
+        Map<String, PropertySourceImporter<?>> importersByProvider = CollectionUtils.newLinkedHashMap(importers.size());
         for (PropertySourceImporter<?> importer : importers) {
             if (!importer.isEnabled()) {
                 continue;
             }
-            String propertySourceKind = importer.getPropertySourceKind();
-            if (propertySourceKind.isBlank()) {
-                throw new ConfigurationException("Property source importer [" + importer + "] returned an empty property source kind");
+            String provider = importer.getProvider();
+            if (provider.isBlank()) {
+                throw new ConfigurationException("Property source importer [" + importer + "] returned an empty provider");
             }
-            String kindKey = propertySourceKind.toLowerCase(Locale.ROOT);
-            PropertySourceImporter<?> previous = importersByKind.putIfAbsent(kindKey, importer);
+            String providerKey = provider.toLowerCase(Locale.ROOT);
+            PropertySourceImporter<?> previous = importersByProvider.putIfAbsent(providerKey, importer);
             if (previous != null) {
-                throw new ConfigurationException("Duplicate property source importer for kind [" + kindKey + "]: " + previous + " and " + importer);
+                throw new ConfigurationException("Duplicate property source importer for provider [" + providerKey + "]: " + previous + " and " + importer);
             }
         }
-        return importersByKind;
+        return importersByProvider;
     }
 
     private void loadPropertySourceFromLoader(String name, PropertySourceLoader propertySourceLoader, List<PropertySource> propertySources, ResourceLoader resourceLoader) {

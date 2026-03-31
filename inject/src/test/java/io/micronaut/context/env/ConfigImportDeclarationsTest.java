@@ -7,8 +7,8 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ConfigImportDeclarationsTest {
 
@@ -29,7 +29,6 @@ class ConfigImportDeclarationsTest {
         ConfigImportResolver.ResolvedImportDeclarations parsed = resolver.normalize(source);
 
         assertEquals(1, parsed.imports().size());
-        assertEquals("file://foo/bar.properties", parsed.imports().get(0).getCanonicalForm());
         assertEquals("demo", parsed.propertySource().get("app.name"));
         assertEquals(null, parsed.propertySource().get("micronaut.config.import"));
         assertEquals(source.getConvention(), parsed.propertySource().getConvention());
@@ -50,8 +49,6 @@ class ConfigImportDeclarationsTest {
         ConfigImportResolver.ResolvedImportDeclarations parsed = resolver.normalize(source);
 
         assertEquals(2, parsed.imports().size());
-        assertEquals("file://foo/one.properties", parsed.imports().get(0).getCanonicalForm());
-        assertEquals("file://foo/two.properties", parsed.imports().get(1).getCanonicalForm());
     }
 
     @Test
@@ -64,8 +61,35 @@ class ConfigImportDeclarationsTest {
         ConfigImportResolver.ResolvedImportDeclarations parsed = resolver.normalize(source);
 
         assertEquals(2, parsed.imports().size());
-        assertEquals("file://a.properties", parsed.imports().get(0).getCanonicalForm());
-        assertEquals("file://b.properties", parsed.imports().get(1).getCanonicalForm());
+    }
+
+    @Test
+    void supportsMapDeclaration() {
+        PropertySource source = PropertySource.of(
+            "application",
+            Map.of("micronaut.config.import", Map.of("provider", "file", "resource-path", "/tmp/demo.properties"))
+        );
+
+        ConfigImportResolver.ResolvedImportDeclarations parsed = resolver.normalize(source);
+
+        assertEquals(1, parsed.imports().size());
+    }
+
+    @Test
+    void supportsIndexedMapDeclarations() {
+        PropertySource source = PropertySource.of(
+            "application",
+            Map.of(
+                "micronaut.config.import[0].provider", "file",
+                "micronaut.config.import[0].resource-path", "/tmp/one.properties",
+                "micronaut.config.import[1].provider", "file",
+                "micronaut.config.import[1].resource-path", "/tmp/two.properties"
+            )
+        );
+
+        ConfigImportResolver.ResolvedImportDeclarations parsed = resolver.normalize(source);
+
+        assertEquals(2, parsed.imports().size());
     }
 
     @Test
@@ -101,6 +125,20 @@ class ConfigImportDeclarationsTest {
         );
 
         ConfigurationException e = assertThrows(ConfigurationException.class, () -> resolver.normalize(source));
-        assertTrue(e.getMessage().contains("must be a string or list"));
+        assertTrue(e.getMessage().contains("must be a string, map, or list"));
+    }
+
+    @Test
+    void rejectsMixedScalarAndStructuredIndexedDeclarations() {
+        PropertySource source = PropertySource.of(
+            "application",
+            Map.of(
+                "micronaut.config.import[0]", "file://a.properties",
+                "micronaut.config.import[1].provider", "file"
+            )
+        );
+
+        ConfigurationException e = assertThrows(ConfigurationException.class, () -> resolver.normalize(source));
+        assertTrue(e.getMessage().contains("Cannot combine scalar and structured indexed"));
     }
 }

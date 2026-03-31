@@ -31,7 +31,7 @@ class DemoPropertySourceImporterSpec extends Specification {
         ApplicationContext context = ApplicationContext.run()
         DemoPropertySourceImporter importer = new DemoPropertySourceImporter()
         DemoPropertySourceImporter.DemoImport declaration = importer.newImportDeclaration(ConnectionString.parse("demo://defaults"))
-        PropertySourceImporter.ImportContext<DemoPropertySourceImporter.DemoImport> importContext = new PropertySourceImporter.ImportContext<>() {
+        PropertySourceImporter.ImportContext<DemoPropertySourceImporter.DemoImport> importContext = new PropertySourceImporter.ImportContext<DemoPropertySourceImporter.DemoImport>() {
             @Override
             Environment environment() {
                 context.environment

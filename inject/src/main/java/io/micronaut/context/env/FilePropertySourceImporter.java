@@ -15,6 +15,8 @@
  */
 package io.micronaut.context.env;
 
+import io.micronaut.context.exceptions.ConfigurationException;
+import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.io.file.FileSystemResourceLoader;
 import io.micronaut.core.util.ConnectionString;
 
@@ -25,8 +27,10 @@ import java.util.Optional;
  */
 public final class FilePropertySourceImporter implements PropertySourceImporter<FilePropertySourceImporter.FileImport> {
 
+    static final String RESOURCE_PATH = "resource-path";
+
     @Override
-    public String getPropertySourceKind() {
+    public String getProvider() {
         return "file";
     }
 
@@ -36,13 +40,28 @@ public final class FilePropertySourceImporter implements PropertySourceImporter<
     }
 
     @Override
+    public FileImport newImportDeclaration(ConvertibleValues<Object> values) {
+        String resourcePath = values.get(RESOURCE_PATH, String.class)
+            .orElseThrow(() -> new ConfigurationException("Config import provider [file] requires ['" + RESOURCE_PATH + "']"));
+        if (resourcePath.isBlank()) {
+            throw new ConfigurationException("Config import provider [file] requires a non-blank ['" + RESOURCE_PATH + "']");
+        }
+        return new FileImport(resourcePath);
+    }
+
+    @Override
     public Optional<PropertySource> importPropertySource(ImportContext<FileImport> context) {
-        String canonicalLocation = context.getCanonicalLocation();
+        String sourceName = context.connectionString() != null
+            ? context.getCanonicalLocation()
+            : "file://" + context.importDeclaration().resourcePath();
+        String resourcePath = context.connectionString() != null
+            ? context.getResourcePath()
+            : context.importDeclaration().resourcePath();
         return context.importPropertySource(
             FileSystemResourceLoader.defaultLoader(),
-            context.getResourcePath(),
-            canonicalLocation,
-            PropertySource.Origin.of(canonicalLocation)
+            resourcePath,
+            sourceName,
+            PropertySource.Origin.of(sourceName)
         );
     }
 

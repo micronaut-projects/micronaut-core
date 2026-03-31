@@ -17,6 +17,7 @@ package io.micronaut.context.env;
 
 import io.micronaut.context.env.PropertySource.Origin;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.util.ConnectionString;
 import io.micronaut.core.util.Toggleable;
@@ -25,28 +26,28 @@ import org.jspecify.annotations.Nullable;
 import java.util.Optional;
 
 /**
- * Imports a {@link PropertySource} for a given property source kind.
+ * Imports a {@link PropertySource} for a given provider.
  *
  * <p>Importer instances are created for a single configuration loading cycle. Micronaut reuses the same importer
  * instance for all imports resolved during that cycle so implementations may share expensive resources such as
  * HTTP clients across multiple imports. Once configuration loading completes, Micronaut invokes {@link #close()}.
  * The same lifecycle applies during startup and each refresh operation.</p>
  *
- * @param <T> The typed import declaration produced from a {@link ConnectionString}
+ * @param <T> The typed import declaration produced from a {@link ConnectionString} or structured values
  * @since 5.0
  */
 @Experimental
 public interface PropertySourceImporter<T> extends Toggleable, AutoCloseable {
 
     /**
-     * @return The property source kind this importer supports.
+     * @return The provider this importer supports.
      */
-    String getPropertySourceKind();
+    String getProvider();
 
     /**
      * Convert the raw connection string into a type-safe import declaration consumed by this importer.
      *
-     * <p>Micronaut invokes this method once for each resolved {@code micronaut.config.import} entry before calling
+     * <p>Micronaut invokes this method once for each scalar {@code micronaut.config.import} entry before calling
      * {@link #importPropertySource(ImportContext)}. Implementations should validate any importer-specific semantics
      * here and return an immutable declaration value suitable for repeated reads within the same load cycle.</p>
      *
@@ -54,6 +55,18 @@ public interface PropertySourceImporter<T> extends Toggleable, AutoCloseable {
      * @return The typed import declaration
      */
     T newImportDeclaration(ConnectionString connectionString);
+
+    /**
+     * Convert structured config import values into a type-safe import declaration consumed by this importer.
+     *
+     * <p>Micronaut invokes this method for map-based {@code micronaut.config.import} declarations after resolving the
+     * required {@code provider} field. Implementations should validate required keys and throw a configuration
+     * exception if the declaration is invalid.</p>
+     *
+     * @param values The structured config import values
+     * @return The typed import declaration
+     */
+    T newImportDeclaration(ConvertibleValues<Object> values);
 
     /**
      * Resolve a property source from the provided context.
@@ -86,12 +99,12 @@ public interface PropertySourceImporter<T> extends Toggleable, AutoCloseable {
         Environment environment();
 
         /**
-         * @return The parsed connection string declaration
+         * @return The parsed connection string declaration, if the import was declared as a scalar string
          */
-        ConnectionString connectionString();
+        @Nullable ConnectionString connectionString();
 
         /**
-         * @return The type-safe import declaration derived from {@link #connectionString()}
+         * @return The type-safe import declaration derived from the raw import input
          */
         T importDeclaration();
 
@@ -99,7 +112,11 @@ public interface PropertySourceImporter<T> extends Toggleable, AutoCloseable {
          * @return The canonical location.
          */
         default String getCanonicalLocation() {
-            return ConfigImportIdentity.canonicalLocation(connectionString(), parentOrigin());
+            ConnectionString connectionString = connectionString();
+            if (connectionString == null) {
+                throw new IllegalStateException("Canonical location is only available for scalar connection string imports");
+            }
+            return ConfigImportIdentity.canonicalLocation(connectionString, parentOrigin());
         }
 
         /**

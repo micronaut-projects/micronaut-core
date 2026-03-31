@@ -23,18 +23,18 @@ class PropertySourceImporterRegistryTest {
     }
 
     @Test
-    void mapsImportersByLowercaseProtocol() {
-        Map<String, PropertySourceImporter<?>> importers = DefaultEnvironment.toImporterByKind(List.of(new TestImporter("File")));
+    void mapsImportersByLowercaseProvider() {
+        Map<String, PropertySourceImporter<?>> importers = DefaultEnvironment.toImporterByProvider(List.of(new TestImporter("File")));
 
         assertEquals(1, importers.size());
-        assertEquals("File", importers.get("file").getPropertySourceKind());
+        assertEquals("File", importers.get("file").getProvider());
     }
 
     @Test
-    void rejectsDuplicateProtocolsIgnoringCase() {
-        ConfigurationException e = assertThrows(ConfigurationException.class, PropertySourceImporterRegistryTest::createDuplicateImportersByProtocol);
+    void rejectsDuplicateProvidersIgnoringCase() {
+        ConfigurationException e = assertThrows(ConfigurationException.class, PropertySourceImporterRegistryTest::createDuplicateImportersByProvider);
 
-        assertTrue(e.getMessage().contains("Duplicate property source importer for kind [file]"));
+        assertTrue(e.getMessage().contains("Duplicate property source importer for provider [file]"));
     }
 
     @Test
@@ -48,8 +48,8 @@ class PropertySourceImporterRegistryTest {
         assertEquals(List.of(1, 2), TrackingImporter.instanceIds);
     }
 
-    private static void createDuplicateImportersByProtocol() {
-        DefaultEnvironment.toImporterByKind(List.of(
+    private static void createDuplicateImportersByProvider() {
+        DefaultEnvironment.toImporterByProvider(List.of(
             new TestImporter("file"),
             new TestImporter("FILE")
         ));
@@ -63,13 +63,18 @@ class PropertySourceImporterRegistryTest {
         }
 
         @Override
-        public String getPropertySourceKind() {
+        public String getProvider() {
             return protocol;
         }
 
         @Override
         public ConnectionString newImportDeclaration(ConnectionString connectionString) {
             return connectionString;
+        }
+
+        @Override
+        public ConnectionString newImportDeclaration(io.micronaut.core.convert.value.ConvertibleValues<Object> values) {
+            return ConnectionString.parse(getProvider() + "://" + values.get("resource-path", String.class).orElse("missing"));
         }
 
         @Override
@@ -86,13 +91,18 @@ class PropertySourceImporterRegistryTest {
         private final int instanceId = createdCount.incrementAndGet();
 
         @Override
-        public String getPropertySourceKind() {
+        public String getProvider() {
             return "tracking";
         }
 
         @Override
         public ConnectionString newImportDeclaration(ConnectionString connectionString) {
             return connectionString;
+        }
+
+        @Override
+        public ConnectionString newImportDeclaration(io.micronaut.core.convert.value.ConvertibleValues<Object> values) {
+            return ConnectionString.parse(getProvider() + "://" + values.get("resource-path", String.class).orElse("missing"));
         }
 
         @Override

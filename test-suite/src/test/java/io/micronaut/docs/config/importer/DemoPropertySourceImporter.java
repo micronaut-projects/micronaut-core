@@ -17,6 +17,7 @@ package io.micronaut.docs.config.importer;
 
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.env.PropertySourceImporter;
+import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.util.ConnectionString;
 
 import java.util.Map;
@@ -26,13 +27,18 @@ import java.util.Optional;
 public final class DemoPropertySourceImporter implements PropertySourceImporter<DemoPropertySourceImporter.DemoImport> {
 
     @Override
-    public String getPropertySourceKind() {
+    public String getProvider() {
         return "demo";
     }
 
     @Override
     public DemoImport newImportDeclaration(ConnectionString connectionString) {
         return new DemoImport(connectionString.getPath());
+    }
+
+    @Override
+    public DemoImport newImportDeclaration(ConvertibleValues<Object> values) {
+        return new DemoImport(values.get("path", String.class).orElse("defaults"));
     }
 
     @Override

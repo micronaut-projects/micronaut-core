@@ -18,6 +18,8 @@ package io.micronaut.context.env;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.context.env.PropertySource.Origin;
 import io.micronaut.context.env.PropertySource.PropertyConvention;
+import io.micronaut.core.convert.value.ConvertibleValues;
+import io.micronaut.core.convert.value.ConvertibleValuesMap;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.util.ConnectionString;
 import org.jspecify.annotations.Nullable;
@@ -42,6 +44,9 @@ final class ConfigImportResolver {
 
     static final String CONFIG_IMPORT = "micronaut.config.import";
     private static final Pattern INDEXED_PATTERN = Pattern.compile("^micronaut\\.config\\.import\\[(\\d+)]$");
+    private static final Pattern INDEXED_PROPERTY_PATTERN = Pattern.compile("^micronaut\\.config\\.import\\[(\\d+)]\\.(.+)$");
+    private static final String STRUCTURED_ROOT_PREFIX = CONFIG_IMPORT + ".";
+    private static final String PROVIDER = "provider";
 
     private final DefaultEnvironment environment;
 
@@ -76,32 +81,32 @@ final class ConfigImportResolver {
         return resolved;
     }
 
-    private void resolveImports(List<ConnectionString> imports,
+    private void resolveImports(List<ImportDeclaration> imports,
                                 Origin parentOrigin,
                                 int tierOrder,
                                 PropertyConvention parentConvention,
                                 List<PropertySource> resolved,
                                 Set<ConfigImportIdentity.ImportIdentity> visited,
                                 Deque<String> chain) {
-        for (ConnectionString declaration : imports) {
-            String canonicalLocation = ConfigImportIdentity.canonicalLocation(declaration, parentOrigin);
-            ConfigImportIdentity.ImportIdentity identity = new ConfigImportIdentity.ImportIdentity(canonicalLocation, tierOrder);
+        for (ImportDeclaration declaration : imports) {
+            String identityLocation = declaration.identityLocation(parentOrigin);
+            ConfigImportIdentity.ImportIdentity identity = new ConfigImportIdentity.ImportIdentity(identityLocation, tierOrder);
 
             String parentLocation = parentOrigin != null ? parentOrigin.location() : null;
-            if (parentLocation != null && parentLocation.equals(canonicalLocation)) {
-                throw new ConfigurationException("Cycle detected while resolving micronaut.config.import: " + ConfigImportIdentity.cycleDisplay(parentLocation, canonicalLocation));
+            if (parentLocation != null && parentLocation.equals(identityLocation)) {
+                throw new ConfigurationException("Cycle detected while resolving micronaut.config.import: " + ConfigImportIdentity.cycleDisplay(parentLocation, identityLocation));
             }
-            boolean cycleDetected = chain.contains(canonicalLocation);
+            boolean cycleDetected = chain.contains(identityLocation);
             if (cycleDetected) {
                 String previous = chain.peekLast();
-                throw new ConfigurationException("Cycle detected while resolving micronaut.config.import: " + ConfigImportIdentity.cycleDisplay(previous, canonicalLocation));
+                throw new ConfigurationException("Cycle detected while resolving micronaut.config.import: " + ConfigImportIdentity.cycleDisplay(previous, identityLocation));
             }
             if (!visited.contains(identity)) {
-                Optional<PropertySource> imported = importOne(declaration, parentOrigin, tierOrder, canonicalLocation, parentConvention);
+                Optional<PropertySource> imported = importOne(declaration, parentOrigin, tierOrder, parentConvention);
                 if (imported.isPresent()) {
                     visited.add(identity);
 
-                    chain.addLast(canonicalLocation);
+                    chain.addLast(identityLocation);
                     try {
                         ResolvedImportDeclarations parsedImported = normalize(imported.get());
                         PropertySource importedSource = parsedImported.propertySource();
@@ -115,45 +120,48 @@ final class ConfigImportResolver {
         }
     }
 
-    private Optional<PropertySource> importOne(ConnectionString declaration,
+    private Optional<PropertySource> importOne(ImportDeclaration declaration,
                                                Origin parentOrigin,
                                                int tierOrder,
-                                               String canonicalLocation,
                                                PropertyConvention fallbackConvention) {
         PropertySourceImporter<?> importer = findRequiredImporter(declaration, parentOrigin);
 
         PropertySource imported = importPropertySource(importer, declaration, parentOrigin).orElse(null);
         if (imported == null) {
-            if (declaration.isOptional()) {
+            if (declaration.optional()) {
                 return Optional.empty();
             }
-            throw new ConfigurationException("Required config import not found: " + declaration.getRawValue());
+            throw new ConfigurationException("Required config import not found: " + declaration.displayValue());
         }
 
-        return Optional.of(ImportedPropertySourceFactory.wrap(imported, canonicalLocation, tierOrder, fallbackConvention));
+        return Optional.of(ImportedPropertySourceFactory.wrap(imported, declaration.identityLocation(parentOrigin), tierOrder, fallbackConvention));
     }
 
-    private <T> Optional<PropertySource> importPropertySource(PropertySourceImporter<T> importer,
-                                                             ConnectionString declaration,
+    @SuppressWarnings("unchecked")
+    private <T> Optional<PropertySource> importPropertySource(PropertySourceImporter<?> importer,
+                                                             ImportDeclaration declaration,
                                                              Origin parentOrigin) {
-        T importDeclaration = importer.newImportDeclaration(declaration);
-        PropertySourceImporter.ImportContext<T> context = new DefaultImportContext<>(environment, declaration, importDeclaration, parentOrigin);
-        return importer.importPropertySource(context);
+        PropertySourceImporter<T> typedImporter = (PropertySourceImporter<T>) importer;
+        T importDeclaration = declaration.createImportDeclaration(typedImporter);
+        PropertySourceImporter.ImportContext<T> context = new DefaultImportContext<>(environment, declaration.connectionString().orElse(null), importDeclaration, parentOrigin);
+        return typedImporter.importPropertySource(context);
     }
 
-    private PropertySourceImporter<?> findRequiredImporter(ConnectionString declaration, Origin parentOrigin) {
-        PropertySourceImporter<?> importer = environment.findPropertySourceImporter(declaration.getProtocol());
+    private PropertySourceImporter<?> findRequiredImporter(ImportDeclaration declaration, Origin parentOrigin) {
+        PropertySourceImporter<?> importer = environment.findPropertySourceImporter(declaration.provider());
         if (importer != null) {
             return importer;
         }
         String parentLocation = parentOrigin.location();
-        throw new ConfigurationException("Unsupported micronaut.config.import protocol [" + declaration.getProtocol() + "] in " + declaration.getRawValue() + " declared from " + parentLocation);
+        throw new ConfigurationException("Unsupported micronaut.config.import provider [" + declaration.provider() + "] in " + declaration.displayValue() + " declared from " + parentLocation);
     }
 
     ResolvedImportDeclarations normalize(PropertySource propertySource) {
         Object rootValue = null;
         boolean hasRoot = false;
         TreeMap<Integer, Object> indexedValues = new TreeMap<>();
+        TreeMap<Integer, Map<String, Object>> indexedObjectValues = new TreeMap<>();
+        Map<String, Object> structuredRootValues = new LinkedHashMap<>();
         Map<String, Object> cleanMap = new LinkedHashMap<>();
 
         for (String key : propertySource) {
@@ -163,67 +171,117 @@ final class ConfigImportResolver {
                 rootValue = value;
                 continue;
             }
-            Matcher matcher = INDEXED_PATTERN.matcher(key);
-            if (matcher.matches()) {
-                int index = Integer.parseInt(matcher.group(1));
+            if (key.startsWith(STRUCTURED_ROOT_PREFIX)) {
+                hasRoot = true;
+                structuredRootValues.put(key.substring(STRUCTURED_ROOT_PREFIX.length()), value);
+                continue;
+            }
+            Matcher indexedMatcher = INDEXED_PATTERN.matcher(key);
+            if (indexedMatcher.matches()) {
+                int index = Integer.parseInt(indexedMatcher.group(1));
                 indexedValues.put(index, value);
+                continue;
+            }
+            Matcher indexedPropertyMatcher = INDEXED_PROPERTY_PATTERN.matcher(key);
+            if (indexedPropertyMatcher.matches()) {
+                int index = Integer.parseInt(indexedPropertyMatcher.group(1));
+                indexedObjectValues.computeIfAbsent(index, ignored -> new LinkedHashMap<>())
+                    .put(indexedPropertyMatcher.group(2), value);
                 continue;
             }
             cleanMap.put(key, value);
         }
 
-        if (!hasRoot && indexedValues.isEmpty()) {
-            return new ResolvedImportDeclarations(propertySource, List.of());
-        }
-        if (hasRoot && !indexedValues.isEmpty()) {
-            throw new ConfigurationException("Cannot combine micronaut.config.import and indexed micronaut.config.import[n] declarations in " + propertySource.getName());
+        if (hasRoot && rootValue == null && !structuredRootValues.isEmpty()) {
+            rootValue = new LinkedHashMap<>(structuredRootValues);
         }
 
-        List<ConnectionString> declarations = hasRoot
+        if (!hasRoot && indexedValues.isEmpty() && indexedObjectValues.isEmpty()) {
+            return new ResolvedImportDeclarations(propertySource, List.of());
+        }
+        if (hasRoot && (!indexedValues.isEmpty() || !indexedObjectValues.isEmpty())) {
+            throw new ConfigurationException("Cannot combine micronaut.config.import and indexed micronaut.config.import[n] declarations in " + propertySource.getName());
+        }
+        if (!indexedValues.isEmpty() && !indexedObjectValues.isEmpty()) {
+            throw new ConfigurationException("Cannot combine scalar and structured indexed micronaut.config.import[n] declarations in " + propertySource.getName());
+        }
+
+        List<ImportDeclaration> declarations = hasRoot
             ? parseRootDeclaration(rootValue, propertySource)
-            : parseIndexedDeclarations(indexedValues, propertySource);
+            : parseIndexedDeclarations(indexedValues, indexedObjectValues, propertySource);
 
         return new ResolvedImportDeclarations(copyPropertySource(propertySource, cleanMap), List.copyOf(declarations));
     }
 
-    private List<ConnectionString> parseRootDeclaration(@Nullable Object value,
-                                                        PropertySource propertySource) {
+    private List<ImportDeclaration> parseRootDeclaration(@Nullable Object value,
+                                                         PropertySource propertySource) {
         if (value == null) {
             throw new ConfigurationException("micronaut.config.import cannot be null in " + propertySource.getName());
         }
-        List<ConnectionString> declarations = new ArrayList<>();
         if (value instanceof CharSequence sequence) {
-            declarations.add(ConnectionString.parse(sequence.toString()));
-            return declarations;
+            return List.of(ImportDeclaration.of(ConnectionString.parse(sequence.toString())));
+        }
+        if (value instanceof Map<?, ?> map) {
+            return List.of(ImportDeclaration.ofConvertibleValues(toConvertibleValues(map, propertySource.getName())));
         }
         if (value instanceof Iterable<?> iterable) {
+            List<ImportDeclaration> declarations = new ArrayList<>();
             for (Object item : iterable) {
-                if (!(item instanceof CharSequence sequence)) {
-                    throw new ConfigurationException("micronaut.config.import list values must be strings in " + propertySource.getName());
+                if (item instanceof CharSequence sequence) {
+                    declarations.add(ImportDeclaration.of(ConnectionString.parse(sequence.toString())));
+                } else if (item instanceof Map<?, ?> map) {
+                    declarations.add(ImportDeclaration.ofConvertibleValues(toConvertibleValues(map, propertySource.getName())));
+                } else {
+                    throw new ConfigurationException("micronaut.config.import list values must be strings or maps in " + propertySource.getName());
                 }
-                declarations.add(ConnectionString.parse(sequence.toString()));
             }
             return declarations;
         }
-        throw new ConfigurationException("micronaut.config.import must be a string or list in " + propertySource.getName());
+        throw new ConfigurationException("micronaut.config.import must be a string, map, or list in " + propertySource.getName());
     }
 
-    private List<ConnectionString> parseIndexedDeclarations(Map<Integer, Object> values,
-                                                            PropertySource propertySource) {
-        List<ConnectionString> declarations = new ArrayList<>(values.size());
+    private List<ImportDeclaration> parseIndexedDeclarations(Map<Integer, Object> scalarValues,
+                                                             Map<Integer, Map<String, Object>> structuredValues,
+                                                             PropertySource propertySource) {
+        if (!scalarValues.isEmpty()) {
+            List<ImportDeclaration> declarations = new ArrayList<>(scalarValues.size());
+            int expectedIndex = 0;
+            for (Map.Entry<Integer, Object> entry : scalarValues.entrySet()) {
+                if (entry.getKey() != expectedIndex) {
+                    throw new ConfigurationException("micronaut.config.import indexed declarations must be contiguous from 0 in " + propertySource.getName());
+                }
+                Object value = entry.getValue();
+                if (!(value instanceof CharSequence sequence)) {
+                    throw new ConfigurationException("micronaut.config.import[" + entry.getKey() + "] must be a string in " + propertySource.getName());
+                }
+                declarations.add(ImportDeclaration.of(ConnectionString.parse(sequence.toString())));
+                expectedIndex++;
+            }
+            return declarations;
+        }
+
+        List<ImportDeclaration> declarations = new ArrayList<>(structuredValues.size());
         int expectedIndex = 0;
-        for (Map.Entry<Integer, Object> entry : values.entrySet()) {
+        for (Map.Entry<Integer, Map<String, Object>> entry : structuredValues.entrySet()) {
             if (entry.getKey() != expectedIndex) {
                 throw new ConfigurationException("micronaut.config.import indexed declarations must be contiguous from 0 in " + propertySource.getName());
             }
-            Object value = entry.getValue();
-            if (!(value instanceof CharSequence sequence)) {
-                throw new ConfigurationException("micronaut.config.import[" + entry.getKey() + "] must be a string in " + propertySource.getName());
-            }
-            declarations.add(ConnectionString.parse(sequence.toString()));
+            declarations.add(ImportDeclaration.ofConvertibleValues(new ConvertibleValuesMap<>(entry.getValue())));
             expectedIndex++;
         }
         return declarations;
+    }
+
+    private ConvertibleValues<Object> toConvertibleValues(Map<?, ?> map, String propertySourceName) {
+        Map<String, Object> values = new LinkedHashMap<>(map.size());
+        for (Map.Entry<?, ?> entry : map.entrySet()) {
+            Object key = entry.getKey();
+            if (!(key instanceof CharSequence keySequence)) {
+                throw new ConfigurationException("micronaut.config.import map keys must be strings in " + propertySourceName);
+            }
+            values.put(keySequence.toString(), entry.getValue());
+        }
+        return new ConvertibleValuesMap<>(values);
     }
 
     private PropertySource copyPropertySource(PropertySource original, Map<String, Object> values) {
@@ -246,12 +304,15 @@ final class ConfigImportResolver {
     }
 
     private record DefaultImportContext<T>(DefaultEnvironment environment,
-                                            ConnectionString connectionString,
+                                            @Nullable ConnectionString connectionString,
                                             T importDeclaration,
                                             @Nullable Origin parentOrigin) implements PropertySourceImporter.ImportContext<T> {
 
         @Override
         public String getCanonicalLocation() {
+            if (connectionString == null) {
+                throw new IllegalStateException("Canonical location is only available for scalar connection string imports");
+            }
             return ConfigImportIdentity.canonicalLocation(connectionString, parentOrigin);
         }
 
@@ -290,6 +351,94 @@ final class ConfigImportResolver {
         }
     }
 
-    record ResolvedImportDeclarations(PropertySource propertySource, List<ConnectionString> imports) {
+    private sealed interface ImportDeclaration permits ScalarImportDeclaration, StructuredImportDeclaration {
+        String provider();
+
+        boolean optional();
+
+        String displayValue();
+
+        String identityLocation(@Nullable Origin parentOrigin);
+
+        <T> T createImportDeclaration(PropertySourceImporter<T> importer);
+
+        Optional<ConnectionString> connectionString();
+
+        static ImportDeclaration of(ConnectionString connectionString) {
+            return new ScalarImportDeclaration(connectionString);
+        }
+
+        static ImportDeclaration ofConvertibleValues(ConvertibleValues<Object> values) {
+            return new StructuredImportDeclaration(values);
+        }
+    }
+
+    private record ScalarImportDeclaration(ConnectionString declaration) implements ImportDeclaration {
+        @Override
+        public String provider() {
+            return declaration.getProtocol();
+        }
+
+        @Override
+        public boolean optional() {
+            return declaration.isOptional();
+        }
+
+        @Override
+        public String displayValue() {
+            return declaration.getRawValue();
+        }
+
+        @Override
+        public String identityLocation(@Nullable Origin parentOrigin) {
+            return ConfigImportIdentity.canonicalLocation(declaration, parentOrigin);
+        }
+
+        @Override
+        public <T> T createImportDeclaration(PropertySourceImporter<T> importer) {
+            return importer.newImportDeclaration(declaration);
+        }
+
+        @Override
+        public Optional<ConnectionString> connectionString() {
+            return Optional.of(declaration);
+        }
+    }
+
+    private record StructuredImportDeclaration(ConvertibleValues<Object> values) implements ImportDeclaration {
+        @Override
+        public String provider() {
+            return values.get(PROVIDER, String.class)
+                .filter(provider -> !provider.isBlank())
+                .orElseThrow(() -> new ConfigurationException("micronaut.config.import map declarations require non-blank ['" + PROVIDER + "']"));
+        }
+
+        @Override
+        public boolean optional() {
+            return values.get("optional", Boolean.class).orElse(false);
+        }
+
+        @Override
+        public String displayValue() {
+            return values.asMap().toString();
+        }
+
+        @Override
+        public String identityLocation(@Nullable Origin parentOrigin) {
+            return provider() + ":" + values.asMap();
+        }
+
+        @Override
+        public <T> T createImportDeclaration(PropertySourceImporter<T> importer) {
+            return importer.newImportDeclaration(values);
+        }
+
+        @Override
+        public Optional<ConnectionString> connectionString() {
+            return Optional.empty();
+        }
+    }
+
+    record ResolvedImportDeclarations(PropertySource propertySource, List<ImportDeclaration> imports) {
     }
 }

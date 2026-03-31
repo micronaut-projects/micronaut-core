@@ -15,6 +15,8 @@
  */
 package io.micronaut.context.env;
 
+import io.micronaut.context.exceptions.ConfigurationException;
+import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.util.ConnectionString;
 
 import java.util.Optional;
@@ -25,7 +27,7 @@ import java.util.Optional;
 public class ClasspathPropertySourceImporter implements PropertySourceImporter<ClasspathPropertySourceImporter.ClasspathImport> {
 
     @Override
-    public String getPropertySourceKind() {
+    public String getProvider() {
         return "classpath";
     }
 
@@ -35,13 +37,25 @@ public class ClasspathPropertySourceImporter implements PropertySourceImporter<C
     }
 
     @Override
+    public ClasspathImport newImportDeclaration(ConvertibleValues<Object> values) {
+        String resourcePath = values.get(FilePropertySourceImporter.RESOURCE_PATH, String.class)
+            .orElseThrow(() -> new ConfigurationException("Config import provider [classpath] requires ['" + FilePropertySourceImporter.RESOURCE_PATH + "']"));
+        if (resourcePath.isBlank()) {
+            throw new ConfigurationException("Config import provider [classpath] requires a non-blank ['" + FilePropertySourceImporter.RESOURCE_PATH + "']");
+        }
+        return new ClasspathImport(resourcePath, false);
+    }
+
+    @Override
     public Optional<PropertySource> importPropertySource(ImportContext<ClasspathImport> context) {
-        String canonicalLocation = context.getCanonicalLocation();
+        String sourceName = context.connectionString() != null
+            ? context.getCanonicalLocation()
+            : getProvider() + "://" + context.importDeclaration().resourcePath();
         ClasspathImport classpathImport = context.importDeclaration();
         return context.importClasspathPropertySource(
             classpathImport.resourcePath(),
-            canonicalLocation,
-            PropertySource.Origin.of(canonicalLocation),
+            sourceName,
+            PropertySource.Origin.of(sourceName),
             classpathImport.allowMultiple()
         );
     }

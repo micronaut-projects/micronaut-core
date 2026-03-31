@@ -15,6 +15,7 @@
  */
 package io.micronaut.context.env;
 
+import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.util.ConnectionString;
 
 /**
@@ -23,12 +24,18 @@ import io.micronaut.core.util.ConnectionString;
 public final class ClasspathWildcardPropertySourceImporter extends ClasspathPropertySourceImporter {
 
     @Override
-    public String getPropertySourceKind() {
+    public String getProvider() {
         return "classpath*";
     }
 
     @Override
     public ClasspathImport newImportDeclaration(ConnectionString connectionString) {
         return new ClasspathImport(connectionString.getPath(), true);
+    }
+
+    @Override
+    public ClasspathImport newImportDeclaration(ConvertibleValues<Object> values) {
+        ClasspathImport declaration = super.newImportDeclaration(values);
+        return new ClasspathImport(declaration.resourcePath(), true);
     }
 }
