@@ -16,6 +16,7 @@
 package io.micronaut.retry.intercept;
 
 import io.micronaut.context.event.ApplicationEventPublisher;
+import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.retry.CircuitState;
@@ -38,6 +39,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * @author graemerocher
  * @since 1.0
  */
+@Internal
 public class CircuitBreakerRetry implements MutableRetryState {
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultRetryInterceptor.class);
