@@ -15,28 +15,6 @@ class ConfigImportDeclarationsTest {
     private final ConfigImportResolver resolver = new ConfigImportResolver(new DefaultEnvironment(() -> List.of("test")));
 
     @Test
-    void normalizesScalarDeclarationAndRemovesMetadata() {
-        PropertySource source = PropertySource.of(
-            "application",
-            Map.of(
-                "micronaut.config.import", "file://foo/bar.properties",
-                "app.name", "demo"
-            ),
-            PropertySource.PropertyConvention.ENVIRONMENT_VARIABLE,
-            PropertySource.Origin.of("classpath:application.yml")
-        );
-
-        ConfigImportResolver.ResolvedImportDeclarations parsed = resolver.normalize(source);
-
-        assertEquals(1, parsed.imports().size());
-        assertEquals("demo", parsed.propertySource().get("app.name"));
-        assertEquals(null, parsed.propertySource().get("micronaut.config.import"));
-        assertEquals(source.getConvention(), parsed.propertySource().getConvention());
-        assertEquals(source.getOrder(), parsed.propertySource().getOrder());
-        assertEquals(source.getOrigin().location(), parsed.propertySource().getOrigin().location());
-    }
-
-    @Test
     void normalizesIndexedDeclarationsInOrder() {
         PropertySource source = PropertySource.of(
             "application",

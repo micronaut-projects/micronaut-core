@@ -376,17 +376,17 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         ConfigImportResolver resolver = new ConfigImportResolver(this);
         Set<String> preExistingSourceNames = new LinkedHashSet<>(this.propertySources.keySet());
         if (configuration.isEnableDefaultPropertySources()) {
-            addResolvedPropertySources(propertySources, readPropertySourceList(applicationName), resolver, preExistingSourceNames);
+            addResolvedPropertySources(propertySources, readPropertySourceList(applicationName), resolver, preExistingSourceNames, false);
             List<PropertySource> defaultPropertySources = new ArrayList<>(4);
             addDefaultPropertySources(defaultPropertySources);
-            addResolvedPropertySources(propertySources, defaultPropertySources, resolver, preExistingSourceNames);
+            addResolvedPropertySources(propertySources, defaultPropertySources, resolver, preExistingSourceNames, false);
             String propertySourcesSystemProperty = CachedEnvironment.getProperty(Environment.PROPERTY_SOURCES_KEY);
             if (propertySourcesSystemProperty != null) {
-                addResolvedPropertySources(propertySources, readPropertySourceListFromFiles(propertySourcesSystemProperty), resolver, preExistingSourceNames);
+                addResolvedPropertySources(propertySources, readPropertySourceListFromFiles(propertySourcesSystemProperty), resolver, preExistingSourceNames, false);
             }
             String propertySourcesEnv = CachedEnvironment.getenv(ENV_PROPERTY_SOURCES_KEY);
             if (propertySourcesEnv != null) {
-                addResolvedPropertySources(propertySources, readPropertySourceListFromFiles(propertySourcesEnv), resolver, preExistingSourceNames);
+                addResolvedPropertySources(propertySources, readPropertySourceListFromFiles(propertySourcesEnv), resolver, preExistingSourceNames, false);
             }
 
         } else {
@@ -406,7 +406,8 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         if (!propertySourcesLocators.isEmpty()) {
             for (PropertySourcesLocator propertySourcesLocator : propertySourcesLocators) {
                 List<PropertySource> propertySourcesBeforeLocator = new ArrayList<>(propertySources);
-                addResolvedPropertySources(propertySources, propertySourcesLocator.load(this), resolver, preExistingSourceNames);
+                boolean isBootstrapLocator = propertySourcesLocator instanceof BootstrapPropertySourceLocator;
+                addResolvedPropertySources(propertySources, propertySourcesLocator.load(this), resolver, preExistingSourceNames, isBootstrapLocator);
                 for (PropertySource existingPropertySource : propertySourcesBeforeLocator) {
                     if (!propertySources.contains(existingPropertySource)) {
                         propertySources.add(existingPropertySource);
@@ -424,12 +425,14 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     private void addResolvedPropertySources(List<PropertySource> propertySources,
                                             Collection<PropertySource> roots,
                                             ConfigImportResolver resolver,
-                                            Set<String> preExistingSourceNames) {
+                                            Set<String> preExistingSourceNames, boolean isBootstrap) {
         for (PropertySource root : roots) {
+            if (isBootstrap) {
+                internalAddPropertySource(root);
+            }
             List<PropertySource> resolved = resolver.resolve(root);
             propertySources.addAll(resolved);
             for (PropertySource propertySource : resolved) {
-                internalAddPropertySource(propertySource);
                 if (!PropertySource.CONTEXT.equals(propertySource.getName()) && !preExistingSourceNames.contains(propertySource.getName())) {
                     refreshablePropertySources.add(propertySource);
                 }

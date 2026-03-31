@@ -742,7 +742,7 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
         defaultMutableConversionService.registerInternalTypeConverters(getBeansOfType(TypeConverterRegistrar.class));
     }
 
-    private static final class BootstrapPropertySourcesLocator implements PropertySourcesLocator, Closeable {
+    private static final class BootstrapPropertySourcesLocator implements PropertySourcesLocator, Closeable, BootstrapPropertySourceLocator {
 
         private final ApplicationContextConfiguration bootstrapConfiguration;
         private final ApplicationContext parentContext;
@@ -795,6 +795,10 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
             }
         }
 
+        @Override
+        public Iterable<PropertySource> findPropertySources(Environment environment) throws ConfigurationException {
+            return List.of();
+        }
     }
 
     /**
