@@ -21,12 +21,15 @@ import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.SignalType;
 
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
@@ -123,18 +126,19 @@ public final class DefaultRetryRunner {
         try {
             CompletionStage<T> initialStage = Objects.requireNonNull(supplier.get(), "supplier returned null completion stage");
             initialStage.whenComplete(retryCompletionStage(future, supplier, retryState, logContext, retryEventEmitter));
-        } catch (Exception exception) {
-            if (!isCaptured(retryState, exception)) {
-                future.completeExceptionally(exception);
+        } catch (Throwable exception) {
+            Throwable cause = unwrapCompletionException(exception);
+            if (!isCaptured(retryState, cause)) {
+                future.completeExceptionally(cause);
                 return future;
             }
-            if (!retryState.canRetry(exception)) {
-                retryState.close(exception);
-                future.completeExceptionally(exception);
+            if (!retryState.canRetry(cause)) {
+                retryState.close(cause);
+                future.completeExceptionally(cause);
                 return future;
             }
             long delayMillis = retryState.nextDelay();
-            retryEventEmitter.onRetry(retryState, exception);
+            retryEventEmitter.onRetry(retryState, cause);
             executorService.schedule(() ->
                 executeScheduledCompletionStage(future, supplier, retryState, logContext, retryEventEmitter), delayMillis, TimeUnit.MILLISECONDS);
         }
@@ -162,7 +166,12 @@ public final class DefaultRetryRunner {
                 return Flux.error(exception);
             }
         }).onErrorResume(retryPublisher(supplier, retryState, logContext, retryEventEmitter))
-            .doOnComplete(() -> retryState.close(null));
+            .doFinally(signalType -> {
+                // ON_ERROR: retryPublisher already calls retryState.close(exception) when retries are exhausted
+                if (signalType != SignalType.ON_ERROR) {
+                    retryState.close(null);
+                }
+            });
     }
 
     private <T> void executeScheduledCompletionStage(CompletableFuture<T> future,
@@ -173,7 +182,7 @@ public final class DefaultRetryRunner {
         try {
             CompletionStage<T> nextStage = Objects.requireNonNull(supplier.get(), "supplier returned null completion stage");
             nextStage.whenComplete(retryCompletionStage(future, supplier, retryState, logContext, retryEventEmitter));
-        } catch (Exception exception) {
+        } catch (Throwable exception) {
             retryCompletionStage(future, supplier, retryState, logContext, retryEventEmitter).accept(null, exception);
         }
     }
@@ -189,22 +198,23 @@ public final class DefaultRetryRunner {
                 future.complete(value);
                 return;
             }
-            if (!isCaptured(retryState, exception)) {
-                future.completeExceptionally(exception);
+            Throwable cause = unwrapCompletionException(exception);
+            if (!isCaptured(retryState, cause)) {
+                future.completeExceptionally(cause);
                 return;
             }
-            if (!retryState.canRetry(exception)) {
+            if (!retryState.canRetry(cause)) {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug(CANNOT_RETRY_MESSAGE, logContext);
                 }
-                retryState.close(exception);
-                future.completeExceptionally(exception);
+                retryState.close(cause);
+                future.completeExceptionally(cause);
                 return;
             }
             long delayMillis = retryState.nextDelay();
-            retryEventEmitter.onRetry(retryState, exception);
+            retryEventEmitter.onRetry(retryState, cause);
             if (LOG.isDebugEnabled()) {
-                LOG.debug(RETRYING_MESSAGE, logContext, delayMillis, exception.getMessage(), exception);
+                LOG.debug(RETRYING_MESSAGE, logContext, delayMillis, cause.getMessage(), cause);
             }
             executorService.schedule(() -> executeScheduledCompletionStage(future, supplier, retryState, logContext, retryEventEmitter), delayMillis, TimeUnit.MILLISECONDS);
         };
@@ -238,5 +248,15 @@ public final class DefaultRetryRunner {
     private static boolean isCaptured(MutableRetryState retryState, Throwable exception) {
         @Nullable Class<? extends Throwable> capturedException = retryState.getCapturedException();
         return capturedException == null || capturedException.isAssignableFrom(exception.getClass());
+    }
+
+    private static Throwable unwrapCompletionException(Throwable exception) {
+        if (exception instanceof CompletionException || exception instanceof ExecutionException) {
+            Throwable cause = exception.getCause();
+            if (cause != null) {
+                return cause;
+            }
+        }
+        return exception;
     }
 }
