@@ -189,6 +189,10 @@ public final class DefaultRetryRunner {
                 future.complete(value);
                 return;
             }
+            if (!isCaptured(retryState, exception)) {
+                future.completeExceptionally(exception);
+                return;
+            }
             if (!retryState.canRetry(exception)) {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug(CANNOT_RETRY_MESSAGE, logContext);
@@ -211,6 +215,9 @@ public final class DefaultRetryRunner {
                                                                                                String logContext,
                                                                                                RetryEventEmitter retryEventEmitter) {
         return exception -> {
+            if (!isCaptured(retryState, exception)) {
+                return Flux.error(exception);
+            }
             if (!retryState.canRetry(exception)) {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug(CANNOT_RETRY_MESSAGE, logContext);
