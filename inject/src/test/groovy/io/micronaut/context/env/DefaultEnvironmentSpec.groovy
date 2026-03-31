@@ -829,6 +829,32 @@ micronaut:
         main?.delete()
     }
 
+    void "test imported file property source change appears in refresh diff changed set for run configuration"() {
+        given:
+        File imported = File.createTempFile("config-import-refresh-diff-child", ".properties")
+        imported.write("app.imported=before")
+        ApplicationContext context = ApplicationContext.run(
+                "micronaut.config.import":"file://${imported.absolutePath}",
+                "app.main": "main"
+        )
+
+        expect:
+        context.getRequiredProperty("app.imported", String) == "before"
+
+        when:
+        imported.write("app.imported=after")
+        Map<String, Object> diff = context.getEnvironment().refreshAndDiff()
+
+        then:
+        diff.keySet() == ["app.imported"] as Set
+        diff.get("app.imported") == "before"
+        context.getRequiredProperty("app.imported", String) == "after"
+
+        cleanup:
+        context?.close()
+        imported?.delete()
+    }
+
     void "test map config import for file provider"() {
         given:
         File imported = File.createTempFile("config-import-map-child", ".properties")

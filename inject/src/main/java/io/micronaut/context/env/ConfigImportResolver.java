@@ -162,10 +162,12 @@ final class ConfigImportResolver {
         TreeMap<Integer, Object> indexedValues = new TreeMap<>();
         TreeMap<Integer, Map<String, Object>> indexedObjectValues = new TreeMap<>();
         Map<String, Object> structuredRootValues = new LinkedHashMap<>();
-        Map<String, Object> cleanMap = new LinkedHashMap<>();
 
         for (String key : propertySource) {
             Object value = propertySource.get(key);
+            if (value == null) {
+                continue;
+            }
             if (CONFIG_IMPORT.equals(key)) {
                 hasRoot = true;
                 rootValue = value;
@@ -187,9 +189,7 @@ final class ConfigImportResolver {
                 int index = Integer.parseInt(indexedPropertyMatcher.group(1));
                 indexedObjectValues.computeIfAbsent(index, ignored -> new LinkedHashMap<>())
                     .put(indexedPropertyMatcher.group(2), value);
-                continue;
             }
-            cleanMap.put(key, value);
         }
 
         if (hasRoot && rootValue == null && !structuredRootValues.isEmpty()) {
@@ -210,7 +210,7 @@ final class ConfigImportResolver {
             ? parseRootDeclaration(rootValue, propertySource)
             : parseIndexedDeclarations(indexedValues, indexedObjectValues, propertySource);
 
-        return new ResolvedImportDeclarations(copyPropertySource(propertySource, cleanMap), List.copyOf(declarations));
+        return new ResolvedImportDeclarations(propertySource, List.copyOf(declarations));
     }
 
     private List<ImportDeclaration> parseRootDeclaration(@Nullable Object value,
@@ -282,25 +282,6 @@ final class ConfigImportResolver {
             values.put(keySequence.toString(), entry.getValue());
         }
         return new ConvertibleValuesMap<>(values);
-    }
-
-    private PropertySource copyPropertySource(PropertySource original, Map<String, Object> values) {
-        return new MapPropertySource(original.getName(), values) {
-            @Override
-            public int getOrder() {
-                return original.getOrder();
-            }
-
-            @Override
-            public PropertyConvention getConvention() {
-                return original.getConvention();
-            }
-
-            @Override
-            public Origin getOrigin() {
-                return original.getOrigin();
-            }
-        };
     }
 
     private record DefaultImportContext<T>(DefaultEnvironment environment,

@@ -376,17 +376,17 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         ConfigImportResolver resolver = new ConfigImportResolver(this);
         Set<String> preExistingSourceNames = new LinkedHashSet<>(this.propertySources.keySet());
         if (configuration.isEnableDefaultPropertySources()) {
-            addResolvedPropertySources(propertySources, readPropertySourceList(applicationName), resolver, true, preExistingSourceNames);
+            addResolvedPropertySources(propertySources, readPropertySourceList(applicationName), resolver, preExistingSourceNames);
             List<PropertySource> defaultPropertySources = new ArrayList<>(4);
             addDefaultPropertySources(defaultPropertySources);
-            addResolvedPropertySources(propertySources, defaultPropertySources, resolver, true, preExistingSourceNames);
+            addResolvedPropertySources(propertySources, defaultPropertySources, resolver, preExistingSourceNames);
             String propertySourcesSystemProperty = CachedEnvironment.getProperty(Environment.PROPERTY_SOURCES_KEY);
             if (propertySourcesSystemProperty != null) {
-                addResolvedPropertySources(propertySources, readPropertySourceListFromFiles(propertySourcesSystemProperty), resolver, true, preExistingSourceNames);
+                addResolvedPropertySources(propertySources, readPropertySourceListFromFiles(propertySourcesSystemProperty), resolver, preExistingSourceNames);
             }
             String propertySourcesEnv = CachedEnvironment.getenv(ENV_PROPERTY_SOURCES_KEY);
             if (propertySourcesEnv != null) {
-                addResolvedPropertySources(propertySources, readPropertySourceListFromFiles(propertySourcesEnv), resolver, true, preExistingSourceNames);
+                addResolvedPropertySources(propertySources, readPropertySourceListFromFiles(propertySourcesEnv), resolver, preExistingSourceNames);
             }
 
         } else {
@@ -406,7 +406,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         if (!propertySourcesLocators.isEmpty()) {
             for (PropertySourcesLocator propertySourcesLocator : propertySourcesLocators) {
                 List<PropertySource> propertySourcesBeforeLocator = new ArrayList<>(propertySources);
-                addResolvedPropertySources(propertySources, propertySourcesLocator.load(this), resolver, true, preExistingSourceNames);
+                addResolvedPropertySources(propertySources, propertySourcesLocator.load(this), resolver, preExistingSourceNames);
                 for (PropertySource existingPropertySource : propertySourcesBeforeLocator) {
                     if (!propertySources.contains(existingPropertySource)) {
                         propertySources.add(existingPropertySource);
@@ -424,20 +424,31 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     private void addResolvedPropertySources(List<PropertySource> propertySources,
                                             Collection<PropertySource> roots,
                                             ConfigImportResolver resolver,
-                                            boolean refreshable,
                                             Set<String> preExistingSourceNames) {
         for (PropertySource root : roots) {
             List<PropertySource> resolved = resolver.resolve(root);
             propertySources.addAll(resolved);
+            boolean contextImportRoot = PropertySource.CONTEXT.equals(root.getName()) && declaresConfigImport(root);
             for (PropertySource propertySource : resolved) {
                 internalAddPropertySource(propertySource);
-                if (refreshable && !PropertySource.CONTEXT.equals(propertySource.getName())) {
-                    if (!preExistingSourceNames.contains(propertySource.getName())) {
-                        refreshablePropertySources.add(propertySource);
-                    }
+                boolean refreshablePropertySource = !PropertySource.CONTEXT.equals(propertySource.getName());
+                if (contextImportRoot && propertySource.getName().equals(root.getName())) {
+                    refreshablePropertySource = false;
+                }
+                if (refreshablePropertySource && !preExistingSourceNames.contains(propertySource.getName())) {
+                    refreshablePropertySources.add(propertySource);
                 }
             }
         }
+    }
+
+    private static boolean declaresConfigImport(PropertySource propertySource) {
+        for (String key : propertySource) {
+            if (ConfigImportResolver.CONFIG_IMPORT.equals(key) || key.startsWith(ConfigImportResolver.CONFIG_IMPORT + ".") || key.startsWith(ConfigImportResolver.CONFIG_IMPORT + "[")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static void closeImporters(Collection<PropertySourceImporter<?>> importers) {
