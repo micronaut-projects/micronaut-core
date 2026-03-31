@@ -73,16 +73,17 @@ jfrunit = "1.0.0.Alpha2"
 #
 managed-groovy = "4.0.28"
 managed-jakarta-annotation-api = "2.1.1"
-managed-jackson = "2.19.2"
+managed-jackson = "2.21.1"
+managed-jackson-annotations = "2.21"
 #@NextMajorVersion @Deprecated Delete in Micronaut Framework 5.
-managed-jackson-databind = "2.18.2"
+managed-jackson-databind = "2.21.1"
 managed-kotlin = "1.9.25"
 managed-kotlin2 = "2.1.21"
 managed-kotlin-coroutines = "1.8.1"
 managed-methvin-directory-watcher = "0.19.1"
-managed-netty = "4.2.9.Final"
-managed-netty-tcnative = "2.0.74.Final"
-managed-netty-contrib-multipart = "1.0.0.Alpha1"
+managed-netty = "4.2.12.Final"
+managed-netty-tcnative = "2.0.75.Final"
+managed-netty-contrib-multipart = "1.0.0.Final"
 managed-reactive-streams = "1.0.4"
 # This should be kept aligned with https://github.com/micronaut-projects/micronaut-reactor/blob/master/gradle.properties from the BOM
 managed-reactor = "3.7.12"
@@ -123,7 +124,7 @@ managed-groovy-templates = { module = "org.apache.groovy:groovy-templates", vers
 
 managed-jakarta-annotation-api = { module = "jakarta.annotation:jakarta.annotation-api", version.ref = "managed-jakarta-annotation-api" }
 
-managed-jackson-annotations = { module = "com.fasterxml.jackson.core:jackson-annotations", version.ref = "managed-jackson" }
+managed-jackson-annotations = { module = "com.fasterxml.jackson.core:jackson-annotations", version.ref = "managed-jackson-annotations" }
 managed-jackson-core = { module = "com.fasterxml.jackson.core:jackson-core", version.ref = "managed-jackson" }
 managed-jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "managed-jackson" }
 managed-jackson-datatype-jdk8 = { module = "com.fasterxml.jackson.datatype:jackson-datatype-jdk8", version.ref = "managed-jackson" }

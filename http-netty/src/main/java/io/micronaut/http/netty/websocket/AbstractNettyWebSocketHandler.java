@@ -617,7 +617,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         cleanupBuffer();
         final CloseWebSocketFrame closeFrame = new CloseWebSocketFrame(code, reason);
         ctx.channel().writeAndFlush(closeFrame)
-                     .addListener(future -> handleCloseFrame(ctx, new CloseWebSocketFrame(code, reason)));
+                     .addListener(future -> handleCloseReason(ctx, new CloseReason(code, reason), false));
     }
 
     private void cleanupBuffer() {

@@ -654,6 +654,11 @@ public class DefaultMutableConversionService implements MutableConversionService
                         return Optional.empty();
                     }
                 });
+        addInternalConverter(
+                Path.class,
+                CharSequence.class,
+                (object, targetType, context) -> Optional.of(object.toString())
+        );
 
         // String -> Integer
         addInternalConverter(CharSequence.class, Integer.class, (CharSequence object, Class<Integer> targetType, ConversionContext context) -> {

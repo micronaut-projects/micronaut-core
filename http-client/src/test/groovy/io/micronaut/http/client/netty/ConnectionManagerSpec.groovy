@@ -416,6 +416,30 @@ class ConnectionManagerSpec extends Specification {
         ctx.close()
     }
 
+    def 'http1 tls works after client refresh'() {
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+                'spec.name': ConnectionManagerSpec.simpleName,
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn1 = new EmbeddedTestConnectionHttp1()
+        conn1.setupHttp1Tls()
+        def conn2 = new EmbeddedTestConnectionHttp1()
+        conn2.setupHttp1Tls()
+        patch(client, conn1, conn2)
+
+        conn1.testExchangeResponse(conn1.testExchangeRequest(client))
+        client.refresh()
+        conn2.testExchangeResponse(conn2.testExchangeRequest(client))
+
+        assertPoolConnections(client, 1)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
     def 'http1 plain text customization'() {
         given:
         def ctx = ApplicationContext.run(['spec.name': ConnectionManagerSpec.simpleName])

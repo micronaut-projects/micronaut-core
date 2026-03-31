@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.util.NativeImageUtils;
 import io.micronaut.scheduling.LoomSupport;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.IoEventLoop;
@@ -452,7 +453,7 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
 
             // JFR
             ContinuationScheduled scheduled;
-            if (ContinuationScheduled.INSTANCE.isEnabled()) {
+            if (NativeImageUtils.JFR_AVAILABLE && ContinuationScheduled.INSTANCE.isEnabled()) {
                 scheduled = new ContinuationScheduled();
                 long hash = System.identityHashCode(command);
                 scheduled.hashCode = hash;
@@ -513,7 +514,7 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
         }
 
         private void tick(int type) {
-            if (LoopTick.INSTANCE.isEnabled()) {
+            if (NativeImageUtils.JFR_AVAILABLE && LoopTick.INSTANCE.isEnabled()) {
                 LoopTick tick = new LoopTick();
                 tick.loopIndex = id;
                 tick.type = type;
