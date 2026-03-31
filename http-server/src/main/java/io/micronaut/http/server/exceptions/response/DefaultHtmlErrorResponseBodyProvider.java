@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.LocaleResolver;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -32,7 +33,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 import static io.micronaut.http.HttpStatus.*;
 
@@ -128,10 +128,14 @@ final class DefaultHtmlErrorResponseBodyProvider implements HtmlErrorResponseBod
                                   }
             """;
 
+    private static final int MAX_CACHE_SIZE = 100;
+
     private final HtmlSanitizer htmlSanitizer;
     private final MessageSource messageSource;
     private final LocaleResolver<HttpRequest<?>> localeResolver;
-    private final Map<HtmlErrorPage, String> cache = new ConcurrentHashMap<>();
+    private final Map<HtmlErrorPage, String> cache = new ConcurrentLinkedHashMap.Builder<HtmlErrorPage, String>()
+        .maximumWeightedCapacity(MAX_CACHE_SIZE)
+        .build();
 
     DefaultHtmlErrorResponseBodyProvider(HtmlSanitizer htmlSanitizer,
                                          MessageSource messageSource,
@@ -216,5 +220,9 @@ final class DefaultHtmlErrorResponseBodyProvider implements HtmlErrorResponseBod
                                  String error,
                                  String errorBold,
                                  List<String> messages) {
+    }
+
+    Map<HtmlErrorPage, String> getCache() {
+        return cache;
     }
 }

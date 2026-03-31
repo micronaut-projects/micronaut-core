@@ -40,7 +40,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -847,42 +846,47 @@ public class MediaType implements CharSequence {
         }
         name = name.trim();
         String withoutArgs;
-        Iterator<String> splitIt = StringUtils.splitOmitEmptyStringsIterator(name, SEMICOLON);
-        if (splitIt.hasNext()) {
-            withoutArgs = splitIt.next();
-            if (splitIt.hasNext()) {
-                Map<CharSequence, String> parameters = null;
-                while (splitIt.hasNext()) {
-                    String paramExpression = splitIt.next();
-                    int i = paramExpression.indexOf('=');
-                    if (i > -1) {
-                        String paramName = paramExpression.substring(0, i).trim();
-                        String paramValue = paramExpression.substring(i + 1).trim();
-                        if ("q".equals(paramName)) {
-                            qualityNumberField = new BigDecimal(paramValue);
-                        }
-                        if (parameters == null) {
-                            parameters = new LinkedHashMap<>();
-                        }
-                        parameters.put(paramName, paramValue);
-                    }
-                }
-                if (parameters == null) {
-                    parameters = Collections.emptyMap();
-                }
-                this.parameters = parameters;
-            } else if (params == null) {
-                this.parameters = Collections.emptyMap();
-            } else {
-                this.parameters = (Map) params;
-            }
-        } else {
+        if (name.indexOf(SEMICOLON) == -1) {
+            withoutArgs = name;
             if (params == null) {
                 this.parameters = Collections.emptyMap();
             } else {
                 this.parameters = (Map) params;
             }
-            withoutArgs = name;
+        } else {
+            String[] parsedType = new String[1];
+            Map<CharSequence, String> parsedParameters = new LinkedHashMap<>();
+            new ParameterParser() {
+                @Override
+                void visitType(String type) {
+                    parsedType[0] = type.trim();
+                }
+
+                @Override
+                boolean visitAttribute(String attribute) {
+                    return !attribute.trim().isEmpty();
+                }
+
+                @Override
+                void visitAttributeValue(String attribute, String value) {
+                    String normalizedAttribute = attribute.trim();
+                    String normalizedValue = value.trim();
+                    if ("q".equals(normalizedAttribute)) {
+                        qualityNumberField = new BigDecimal(unquoteParameterValue(normalizedValue));
+                    }
+                    parsedParameters.put(normalizedAttribute, normalizedValue);
+                }
+            }.run(name);
+            withoutArgs = parsedType[0];
+            if (parsedParameters.isEmpty()) {
+                if (params == null) {
+                    this.parameters = Collections.emptyMap();
+                } else {
+                    this.parameters = (Map) params;
+                }
+            } else {
+                this.parameters = parsedParameters;
+            }
         }
         this.name = withoutArgs;
         this.lowerName = withoutArgs.toLowerCase(Locale.ROOT);
@@ -1118,7 +1122,31 @@ public class MediaType implements CharSequence {
         if (charset == null) {
             return Optional.empty();
         }
-        return Optional.of(Charset.forName(charset));
+
+        return Optional.of(Charset.forName(unquoteParameterValue(charset)));
+    }
+
+    private static String unquoteParameterValue(String value) {
+        if (value.length() >= 2 && value.charAt(0) == '"' && value.charAt(value.length() - 1) == '"') {
+            StringBuilder unescaped = new StringBuilder(value.length() - 2);
+            boolean escaped = false;
+            for (int i = 1; i < value.length() - 1; i++) {
+                char c = value.charAt(i);
+                if (escaped) {
+                    unescaped.append(c);
+                    escaped = false;
+                } else if (c == '\\') {
+                    escaped = true;
+                } else {
+                    unescaped.append(c);
+                }
+            }
+            if (escaped) {
+                unescaped.append('\\');
+            }
+            return unescaped.toString();
+        }
+        return value;
     }
 
     @Override
@@ -1415,5 +1443,78 @@ public class MediaType implements CharSequence {
         }
 
         return Collections.emptyMap();
+    }
+
+    /**
+     * Adapted from Netty's {@code ParmParser}.
+     *
+     * Source: https://github.com/netty-contrib/codec-multipart/blob/1.0/multipart-core/src/main/java/io/netty/contrib/multipart/ParmParser.java
+     */
+    private abstract static class ParameterParser {
+        abstract void visitType(String type);
+
+        abstract boolean visitAttribute(String attribute);
+
+        abstract void visitAttributeValue(String attribute, String value);
+
+        final void run(String headerValue) {
+            int typeEnd = headerValue.indexOf(';');
+            if (typeEnd == -1) {
+                visitType(headerValue);
+                return;
+            }
+            visitType(headerValue.substring(0, typeEnd));
+            for (int parameterStart = typeEnd + 1; parameterStart < headerValue.length(); ) {
+                int attributeEnd = headerValue.indexOf('=', parameterStart);
+                if (attributeEnd == -1) {
+                    break;
+                }
+                while (parameterStart < headerValue.length() && Character.isWhitespace(headerValue.charAt(parameterStart))) {
+                    parameterStart++;
+                }
+                String attribute = headerValue.substring(parameterStart, attributeEnd);
+                boolean needParameterValue = visitAttribute(attribute);
+
+                String parameterValue = null;
+                int parameterValueEnd = attributeEnd + 1;
+                if (parameterValueEnd < headerValue.length() && headerValue.charAt(parameterValueEnd) == '"') {
+                    StringBuilder valueBuilder = needParameterValue ? new StringBuilder() : null;
+                    boolean quoted = false;
+                    while (parameterValueEnd < headerValue.length()) {
+                        char c = headerValue.charAt(parameterValueEnd++);
+                        if (c == '"') {
+                            quoted = !quoted;
+                        } else {
+                            if (!quoted && c == ';') {
+                                parameterValueEnd--;
+                                break;
+                            } else if (quoted && c == '\\' && parameterValueEnd < headerValue.length()) {
+                                if (needParameterValue) {
+                                    valueBuilder.append(headerValue.charAt(parameterValueEnd));
+                                }
+                                parameterValueEnd++;
+                            } else if (needParameterValue) {
+                                valueBuilder.append(c);
+                            }
+                        }
+                    }
+                    if (needParameterValue) {
+                        parameterValue = valueBuilder.toString();
+                    }
+                } else {
+                    parameterValueEnd = headerValue.indexOf(';', parameterValueEnd);
+                    if (parameterValueEnd == -1) {
+                        parameterValueEnd = headerValue.length();
+                    }
+                    if (needParameterValue) {
+                        parameterValue = headerValue.substring(attributeEnd + 1, parameterValueEnd);
+                    }
+                }
+                if (parameterValue != null) {
+                    visitAttributeValue(attribute, parameterValue);
+                }
+                parameterStart = parameterValueEnd + 1;
+            }
+        }
     }
 }

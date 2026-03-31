@@ -1,6 +1,5 @@
 package io.micronaut.http.client
 
-import groovy.test.NotYetImplemented
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Nullable
@@ -50,7 +49,6 @@ class ClientRedirectSpec extends Specification {
         response.body() == "It works!"
     }
 
-    @NotYetImplemented
     void "test - client: full uri, redirect: relative"() {
         when:
         HttpResponse<String> response = client.toBlocking().exchange('/test/redirect-relative', String)

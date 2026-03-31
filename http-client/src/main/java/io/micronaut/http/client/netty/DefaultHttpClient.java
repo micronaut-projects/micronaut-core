@@ -533,6 +533,17 @@ public class DefaultHttpClient implements
         return this;
     }
 
+    @Override
+    public HttpClient refresh() {
+        if (isRunning()) {
+            connectionManager.refresh();
+        } else {
+            start();
+            connectionManager.refresh();
+        }
+        return this;
+    }
+
     /**
      * @return The {@link MediaTypeCodecRegistry} used by this client
      * @deprecated Use body handlers instead
@@ -1274,13 +1285,8 @@ public class DefaultHttpClient implements
             if (parentRequest == null || parentRequest.getUri().getHost() == null) {
                 return resolveURI(request, false);
             } else {
-                URI parentURI = parentRequest.getUri();
-                UriBuilder uriBuilder = UriBuilder.of(requestURI)
-                        .scheme(parentURI.getScheme())
-                        .userInfo(parentURI.getUserInfo())
-                        .host(parentURI.getHost())
-                        .port(parentURI.getPort());
-                return ExecutionFlow.just(uriBuilder.build());
+                URI redirectedURI = parentRequest.getUri().resolve(requestURI).normalize();
+                return ExecutionFlow.just(redirectedURI);
             }
         }
     }
