@@ -428,27 +428,13 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         for (PropertySource root : roots) {
             List<PropertySource> resolved = resolver.resolve(root);
             propertySources.addAll(resolved);
-            boolean contextImportRoot = PropertySource.CONTEXT.equals(root.getName()) && declaresConfigImport(root);
             for (PropertySource propertySource : resolved) {
                 internalAddPropertySource(propertySource);
-                boolean refreshablePropertySource = !PropertySource.CONTEXT.equals(propertySource.getName());
-                if (contextImportRoot && propertySource.getName().equals(root.getName())) {
-                    refreshablePropertySource = false;
-                }
-                if (refreshablePropertySource && !preExistingSourceNames.contains(propertySource.getName())) {
+                if (!PropertySource.CONTEXT.equals(propertySource.getName()) && !preExistingSourceNames.contains(propertySource.getName())) {
                     refreshablePropertySources.add(propertySource);
                 }
             }
         }
-    }
-
-    private static boolean declaresConfigImport(PropertySource propertySource) {
-        for (String key : propertySource) {
-            if (ConfigImportResolver.CONFIG_IMPORT.equals(key) || key.startsWith(ConfigImportResolver.CONFIG_IMPORT + ".") || key.startsWith(ConfigImportResolver.CONFIG_IMPORT + "[")) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private static void closeImporters(Collection<PropertySourceImporter<?>> importers) {
@@ -457,7 +443,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
             try {
                 importer.close();
             } catch (Exception e) {
-                RuntimeException wrapped = new RuntimeException("Error closing property source importer: " + importer.getClass().getName(), e);
+                ConfigurationException wrapped = new ConfigurationException("Error closing property source importer: " + importer.getClass().getName(), e);
                 if (closeException == null) {
                     closeException = wrapped;
                 } else {
