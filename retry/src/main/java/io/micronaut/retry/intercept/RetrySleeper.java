@@ -16,21 +16,16 @@
 package io.micronaut.retry.intercept;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.retry.RetryState;
 
 /**
- * Mutable retry state that can calculate the next retry delay.
+ * Internal abstraction for sleeping between retry attempts.
  *
  * @author graemerocher
- * @since 1.0
+ * @since 5.0.0
  */
 @Internal
-public interface MutableRetryState extends RetryState {
+@FunctionalInterface
+public interface RetrySleeper {
 
-    /**
-     * Returns the millisecond value for the next delay.
-     *
-     * @return The next delay in milliseconds
-     */
-    long nextDelay();
+    void sleep(long delayMillis) throws InterruptedException;
 }

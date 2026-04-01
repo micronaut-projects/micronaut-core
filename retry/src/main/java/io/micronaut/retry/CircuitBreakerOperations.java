@@ -13,24 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.retry.intercept;
-
-import io.micronaut.core.annotation.Internal;
-import io.micronaut.retry.RetryState;
+package io.micronaut.retry;
 
 /**
- * Mutable retry state that can calculate the next retry delay.
+ * Programmatic circuit breaker operations.
  *
  * @author graemerocher
- * @since 1.0
+ * @since 5.0.0
  */
-@Internal
-public interface MutableRetryState extends RetryState {
+public interface CircuitBreakerOperations extends RetryOperations {
 
     /**
-     * Returns the millisecond value for the next delay.
+     * Returns the current circuit state for this operations instance.
      *
-     * @return The next delay in milliseconds
+     * @return The current circuit state
      */
-    long nextDelay();
+    CircuitState currentState();
 }

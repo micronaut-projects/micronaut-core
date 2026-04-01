@@ -16,21 +16,22 @@
 package io.micronaut.retry.intercept;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.retry.RetryState;
 
 /**
- * Mutable retry state that can calculate the next retry delay.
+ * Emits retry attempt notifications for the shared retry runner.
  *
  * @author graemerocher
- * @since 1.0
+ * @since 5.0.0
  */
 @Internal
-public interface MutableRetryState extends RetryState {
+@FunctionalInterface
+public interface RetryEventEmitter {
 
     /**
-     * Returns the millisecond value for the next delay.
+     * Emits a retry notification.
      *
-     * @return The next delay in milliseconds
+     * @param retryState The retry state
+     * @param exception The exception that triggered the retry
      */
-    long nextDelay();
+    void onRetry(MutableRetryState retryState, Throwable exception);
 }

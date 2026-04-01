@@ -71,8 +71,8 @@ class HttpClientWithCircuitBreakerSpec extends Specification {
         then:"The original exception is thrown"
         HttpClientResponseException e = thrown()
         e.response.getBody(Map).get()._embedded.errors[0].message == "Internal Server Error: Bad count"
-        controller.countValue == 6
-        countFilter.requests.size() == 6
+        controller.countValue == 4
+        countFilter.requests.size() == 4
 
         when:"the method is called again"
         countClient.getCount()
@@ -80,8 +80,8 @@ class HttpClientWithCircuitBreakerSpec extends Specification {
         then:"The value is not incremented because the circuit is open"
         e = thrown(HttpClientResponseException)
         e.response.getBody(Map).get()._embedded.errors[0].message == "Internal Server Error: Bad count"
-        controller.countValue == 6
-        countFilter.requests.size() == 6
+        controller.countValue == 4
+        countFilter.requests.size() == 4
     }
 
     void "test simply retry with reactive publisher"() {
@@ -110,8 +110,8 @@ class HttpClientWithCircuitBreakerSpec extends Specification {
         then:"The original exception is thrown"
         HttpClientResponseException e = thrown()
         e.response.getBody(Map).get()._embedded.errors[0].message == "Internal Server Error: Bad count"
-        controller.countRx == 6
-        countFilter.requests.size() == 6
+        controller.countRx == 4
+        countFilter.requests.size() == 4
 
         when:"The method is called again"
         single = countClient.getCountSingle()
@@ -120,8 +120,8 @@ class HttpClientWithCircuitBreakerSpec extends Specification {
         then:"The value is not incremented because the circuit is open"
         e = thrown()
         e.response.getBody(Map).get()._embedded.errors[0].message == "Internal Server Error: Bad count"
-        controller.countRx == 6
-        countFilter.requests.size() == 6
+        controller.countRx == 4
+        countFilter.requests.size() == 4
     }
 
     @Requires(property = 'spec.name', value = 'HttpClientWithCircuitBreakerSpec')
@@ -138,7 +138,7 @@ class HttpClientWithCircuitBreakerSpec extends Specification {
 
     @Requires(property = 'spec.name', value = 'HttpClientWithCircuitBreakerSpec')
     @Client("/circuit-breaker-test")
-    @CircuitBreaker(attempts = '5', delay = '5ms')
+    @CircuitBreaker(attempts = '3', delay = '5ms')
     static interface CountClient extends CountService {
 
     }
