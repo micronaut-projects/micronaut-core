@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ConfigImportDeclarationsTest {
 
-    private final ConfigImportResolver resolver = new ConfigImportResolver(new DefaultEnvironment(() -> List.of("test")));
+    private final ConfigImportPropertySourcesLocator locator = new ConfigImportPropertySourcesLocator(null);
 
     @Test
     void normalizesIndexedDeclarationsInOrder() {
@@ -24,7 +24,7 @@ class ConfigImportDeclarationsTest {
             )
         );
 
-        ConfigImportResolver.ResolvedImportDeclarations parsed = resolver.normalize(source);
+        ConfigImportPropertySourcesLocator.ResolvedImportDeclarations parsed = locator.normalize(source);
 
         assertEquals(2, parsed.imports().size());
     }
@@ -36,7 +36,7 @@ class ConfigImportDeclarationsTest {
             Map.of("micronaut.config.import", List.of("file://a.properties", "file://b.properties"))
         );
 
-        ConfigImportResolver.ResolvedImportDeclarations parsed = resolver.normalize(source);
+        ConfigImportPropertySourcesLocator.ResolvedImportDeclarations parsed = locator.normalize(source);
 
         assertEquals(2, parsed.imports().size());
     }
@@ -48,7 +48,7 @@ class ConfigImportDeclarationsTest {
             Map.of("micronaut.config.import", Map.of("provider", "file", "resource-path", "/tmp/demo.properties"))
         );
 
-        ConfigImportResolver.ResolvedImportDeclarations parsed = resolver.normalize(source);
+        ConfigImportPropertySourcesLocator.ResolvedImportDeclarations parsed = locator.normalize(source);
 
         assertEquals(1, parsed.imports().size());
     }
@@ -65,7 +65,7 @@ class ConfigImportDeclarationsTest {
             )
         );
 
-        ConfigImportResolver.ResolvedImportDeclarations parsed = resolver.normalize(source);
+        ConfigImportPropertySourcesLocator.ResolvedImportDeclarations parsed = locator.normalize(source);
 
         assertEquals(2, parsed.imports().size());
     }
@@ -80,7 +80,7 @@ class ConfigImportDeclarationsTest {
             )
         );
 
-        ConfigurationException e = assertThrows(ConfigurationException.class, () -> resolver.normalize(source));
+        ConfigurationException e = assertThrows(ConfigurationException.class, () -> locator.normalize(source));
         assertTrue(e.getMessage().contains("Cannot combine"));
     }
 
@@ -91,7 +91,7 @@ class ConfigImportDeclarationsTest {
             Map.of("micronaut.config.import[1]", "file://b.properties")
         );
 
-        ConfigurationException e = assertThrows(ConfigurationException.class, () -> resolver.normalize(source));
+        ConfigurationException e = assertThrows(ConfigurationException.class, () -> locator.normalize(source));
         assertTrue(e.getMessage().contains("contiguous"));
     }
 
@@ -102,7 +102,7 @@ class ConfigImportDeclarationsTest {
             Map.of("micronaut.config.import", 10)
         );
 
-        ConfigurationException e = assertThrows(ConfigurationException.class, () -> resolver.normalize(source));
+        ConfigurationException e = assertThrows(ConfigurationException.class, () -> locator.normalize(source));
         assertTrue(e.getMessage().contains("must be a string, map, or list"));
     }
 
@@ -116,7 +116,7 @@ class ConfigImportDeclarationsTest {
             )
         );
 
-        ConfigurationException e = assertThrows(ConfigurationException.class, () -> resolver.normalize(source));
+        ConfigurationException e = assertThrows(ConfigurationException.class, () -> locator.normalize(source));
         assertTrue(e.getMessage().contains("Cannot combine scalar and structured indexed"));
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2026 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,61 +15,100 @@
  */
 package io.micronaut.context.env;
 
-import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.context.env.PropertySource.Origin;
 import io.micronaut.context.env.PropertySource.PropertyConvention;
+import io.micronaut.context.exceptions.ConfigurationException;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.convert.value.ConvertibleValuesMap;
 import io.micronaut.core.io.ResourceLoader;
+import io.micronaut.core.io.service.SoftServiceLoader;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.ConnectionString;
 import org.jspecify.annotations.Nullable;
 
+import java.io.Closeable;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Resolves recursive {@code micronaut.config.import} declarations for a property source list.
+ * Resolves {@code micronaut.config.import} declarations and loads the associated property sources.
+ *
+ * @since 5.0
  */
-final class ConfigImportResolver {
+@Internal
+public final class ConfigImportPropertySourcesLocator implements PropertySourcesLocator, Closeable {
 
-    static final String CONFIG_IMPORT = "micronaut.config.import";
+    private static final String MICRONAUT_CONFIX_PREFIX = "micronaut.config.";
+    private static final String CONFIG_IMPORT = MICRONAUT_CONFIX_PREFIX + "import";
     private static final Pattern INDEXED_PATTERN = Pattern.compile("^micronaut\\.config\\.import\\[(\\d+)]$");
     private static final Pattern INDEXED_PROPERTY_PATTERN = Pattern.compile("^micronaut\\.config\\.import\\[(\\d+)]\\.(.+)$");
     private static final String STRUCTURED_ROOT_PREFIX = CONFIG_IMPORT + ".";
     private static final String PROVIDER = "provider";
 
-    private final DefaultEnvironment environment;
+    private final @Nullable Supplier<Collection<PropertySourceImporter<?>>> propertySourceImporterSupplier;
+    private final Map<String, PropertySourceImporter<?>> importerByKindMap = CollectionUtils.newLinkedHashMap(10);
 
-    /**
-     * @param environment Environment used to resolve importers
-     */
-    ConfigImportResolver(DefaultEnvironment environment) {
-        this.environment = environment;
+    ConfigImportPropertySourcesLocator(@Nullable Supplier<Collection<PropertySourceImporter<?>>> propertySourceImporterSupplier) {
+        this.propertySourceImporterSupplier = propertySourceImporterSupplier;
     }
 
-    /**
-     * Resolve imports for each root property source.
-     *
-     * @param root Root property sources
-     * @return Flattened list including roots and resolved imports
-     */
-    List<PropertySource> resolve(PropertySource root) {
+    @Override
+    public Collection<PropertySource> load(Environment environment) {
+        cleanupImporters();
+        Collection<PropertySourceImporter<?>> importers;
+        if (propertySourceImporterSupplier != null) {
+            importers = propertySourceImporterSupplier.get();
+        } else {
+            importers = evaluatePropertySourceImporters(environment);
+        }
+        importerByKindMap.putAll(toImporterByProvider(importers));
+        List<PropertySource> result = new ArrayList<>();
+        for (PropertySource propertySource : environment.getPropertySources()) {
+            result.addAll(resolveConfigImports(environment, propertySource));
+        }
+        return result;
+    }
+
+    @Override
+    public void close() {
+        cleanupImporters();
+    }
+
+    private void cleanupImporters() {
+        Collection<PropertySourceImporter<?>> importers = importerByKindMap.values();
+        if (!importers.isEmpty()) {
+            closeImporters(importers);
+        }
+        importerByKindMap.clear();
+    }
+
+    @Nullable
+    private PropertySourceImporter<?> findPropertySourceImporter(String provider) {
+        return importerByKindMap.get(provider.toLowerCase(Locale.ROOT));
+    }
+
+    private List<PropertySource> resolveConfigImports(Environment environment, PropertySource root) {
         List<PropertySource> resolved = new ArrayList<>();
         Set<ConfigImportIdentity.ImportIdentity> visited = new LinkedHashSet<>();
         Deque<String> chain = new ArrayDeque<>();
         ResolvedImportDeclarations parsed = normalize(root);
-        resolved.add(parsed.propertySource());
+        //resolved.add(parsed.propertySource());
         resolveImports(
+            environment,
             parsed.imports(),
             parsed.propertySource().getOrigin(),
             parsed.propertySource().getOrder(),
@@ -81,7 +120,8 @@ final class ConfigImportResolver {
         return resolved;
     }
 
-    private void resolveImports(List<ImportDeclaration> imports,
+    private void resolveImports(Environment environment,
+                                List<ImportDeclaration> imports,
                                 Origin parentOrigin,
                                 int tierOrder,
                                 PropertyConvention parentConvention,
@@ -92,8 +132,8 @@ final class ConfigImportResolver {
             String identityLocation = declaration.identityLocation(parentOrigin);
             ConfigImportIdentity.ImportIdentity identity = new ConfigImportIdentity.ImportIdentity(identityLocation, tierOrder);
 
-            String parentLocation = parentOrigin != null ? parentOrigin.location() : null;
-            if (parentLocation != null && parentLocation.equals(identityLocation)) {
+            String parentLocation = parentOrigin.location();
+            if (parentLocation.equals(identityLocation)) {
                 throw new ConfigurationException("Cycle detected while resolving micronaut.config.import: " + ConfigImportIdentity.cycleDisplay(parentLocation, identityLocation));
             }
             boolean cycleDetected = chain.contains(identityLocation);
@@ -102,7 +142,7 @@ final class ConfigImportResolver {
                 throw new ConfigurationException("Cycle detected while resolving micronaut.config.import: " + ConfigImportIdentity.cycleDisplay(previous, identityLocation));
             }
             if (!visited.contains(identity)) {
-                Optional<PropertySource> imported = importOne(declaration, parentOrigin, tierOrder, parentConvention);
+                Optional<PropertySource> imported = importOne(environment, declaration, parentOrigin, tierOrder, parentConvention);
                 if (imported.isPresent()) {
                     visited.add(identity);
 
@@ -111,7 +151,7 @@ final class ConfigImportResolver {
                         ResolvedImportDeclarations parsedImported = normalize(imported.get());
                         PropertySource importedSource = parsedImported.propertySource();
                         resolved.add(importedSource);
-                        resolveImports(parsedImported.imports(), importedSource.getOrigin(), tierOrder, importedSource.getConvention(), resolved, visited, chain);
+                        resolveImports(environment, parsedImported.imports(), importedSource.getOrigin(), tierOrder, importedSource.getConvention(), resolved, visited, chain);
                     } finally {
                         chain.removeLast();
                     }
@@ -120,13 +160,14 @@ final class ConfigImportResolver {
         }
     }
 
-    private Optional<PropertySource> importOne(ImportDeclaration declaration,
+    private Optional<PropertySource> importOne(Environment environment,
+                                               ImportDeclaration declaration,
                                                Origin parentOrigin,
                                                int tierOrder,
                                                PropertyConvention fallbackConvention) {
         PropertySourceImporter<?> importer = findRequiredImporter(declaration, parentOrigin);
 
-        PropertySource imported = importPropertySource(importer, declaration, parentOrigin).orElse(null);
+        PropertySource imported = importPropertySource(environment, importer, declaration, parentOrigin).orElse(null);
         if (imported == null) {
             if (declaration.optional()) {
                 return Optional.empty();
@@ -138,17 +179,18 @@ final class ConfigImportResolver {
     }
 
     @SuppressWarnings("unchecked")
-    private <T> Optional<PropertySource> importPropertySource(PropertySourceImporter<?> importer,
-                                                             ImportDeclaration declaration,
-                                                             Origin parentOrigin) {
+    private <T> Optional<PropertySource> importPropertySource(Environment environment,
+                                                              PropertySourceImporter<?> importer,
+                                                              ImportDeclaration declaration,
+                                                              Origin parentOrigin) {
         PropertySourceImporter<T> typedImporter = (PropertySourceImporter<T>) importer;
         T importDeclaration = declaration.createImportDeclaration(typedImporter);
-        PropertySourceImporter.ImportContext<T> context = new DefaultImportContext<>(environment, declaration.connectionString().orElse(null), importDeclaration, parentOrigin);
+        PropertySourceImporter.ImportContext<T> context = new DefaultImportContext<>(this, (DefaultEnvironment) environment, declaration.connectionString().orElse(null), importDeclaration, parentOrigin);
         return typedImporter.importPropertySource(context);
     }
 
     private PropertySourceImporter<?> findRequiredImporter(ImportDeclaration declaration, Origin parentOrigin) {
-        PropertySourceImporter<?> importer = environment.findPropertySourceImporter(declaration.provider());
+        PropertySourceImporter<?> importer = findPropertySourceImporter(declaration.provider());
         if (importer != null) {
             return importer;
         }
@@ -164,6 +206,9 @@ final class ConfigImportResolver {
         Map<String, Object> structuredRootValues = new LinkedHashMap<>();
 
         for (String key : propertySource) {
+            if (!key.startsWith(MICRONAUT_CONFIX_PREFIX)) {
+                continue;
+            }
             Object value = propertySource.get(key);
             if (value == null) {
                 continue;
@@ -215,29 +260,25 @@ final class ConfigImportResolver {
 
     private List<ImportDeclaration> parseRootDeclaration(@Nullable Object value,
                                                          PropertySource propertySource) {
-        if (value == null) {
-            throw new ConfigurationException("micronaut.config.import cannot be null in " + propertySource.getName());
-        }
-        if (value instanceof CharSequence sequence) {
-            return List.of(ImportDeclaration.of(ConnectionString.parse(sequence.toString())));
-        }
-        if (value instanceof Map<?, ?> map) {
-            return List.of(ImportDeclaration.ofConvertibleValues(toConvertibleValues(map, propertySource.getName())));
-        }
-        if (value instanceof Iterable<?> iterable) {
-            List<ImportDeclaration> declarations = new ArrayList<>();
-            for (Object item : iterable) {
-                if (item instanceof CharSequence sequence) {
-                    declarations.add(ImportDeclaration.of(ConnectionString.parse(sequence.toString())));
-                } else if (item instanceof Map<?, ?> map) {
-                    declarations.add(ImportDeclaration.ofConvertibleValues(toConvertibleValues(map, propertySource.getName())));
-                } else {
-                    throw new ConfigurationException("micronaut.config.import list values must be strings or maps in " + propertySource.getName());
+        return switch (value) {
+            case null -> throw new ConfigurationException("micronaut.config.import cannot be null in " + propertySource.getName());
+            case CharSequence sequence -> List.of(ImportDeclaration.of(ConnectionString.parse(sequence.toString())));
+            case Map<?, ?> map -> List.of(ImportDeclaration.ofConvertibleValues(toConvertibleValues(map, propertySource.getName())));
+            case Iterable<?> iterable -> {
+                List<ImportDeclaration> declarations = new ArrayList<>();
+                for (Object item : iterable) {
+                    if (item instanceof CharSequence sequence) {
+                        declarations.add(ImportDeclaration.of(ConnectionString.parse(sequence.toString())));
+                    } else if (item instanceof Map<?, ?> map) {
+                        declarations.add(ImportDeclaration.ofConvertibleValues(toConvertibleValues(map, propertySource.getName())));
+                    } else {
+                        throw new ConfigurationException("micronaut.config.import list values must be strings or maps in " + propertySource.getName());
+                    }
                 }
+                yield declarations;
             }
-            return declarations;
-        }
-        throw new ConfigurationException("micronaut.config.import must be a string, map, or list in " + propertySource.getName());
+            default -> throw new ConfigurationException("micronaut.config.import must be a string, map, or list in " + propertySource.getName());
+        };
     }
 
     private List<ImportDeclaration> parseIndexedDeclarations(Map<Integer, Object> scalarValues,
@@ -273,7 +314,7 @@ final class ConfigImportResolver {
     }
 
     private ConvertibleValues<Object> toConvertibleValues(Map<?, ?> map, String propertySourceName) {
-        Map<String, Object> values = new LinkedHashMap<>(map.size());
+        Map<String, Object> values = CollectionUtils.newLinkedHashMap(map.size());
         for (Map.Entry<?, ?> entry : map.entrySet()) {
             Object key = entry.getKey();
             if (!(key instanceof CharSequence keySequence)) {
@@ -284,17 +325,72 @@ final class ConfigImportResolver {
         return new ConvertibleValuesMap<>(values);
     }
 
-    private record DefaultImportContext<T>(DefaultEnvironment environment,
-                                            @Nullable ConnectionString connectionString,
-                                            T importDeclaration,
-                                            @Nullable Origin parentOrigin) implements PropertySourceImporter.ImportContext<T> {
+    private static Collection<PropertySourceImporter<?>> evaluatePropertySourceImporters(Environment environment) {
+        SoftServiceLoader<PropertySourceImporter> definitions = SoftServiceLoader.load(PropertySourceImporter.class, environment.getClassLoader());
+        List<PropertySourceImporter<?>> importers = new ArrayList<>();
+        for (PropertySourceImporter importer : definitions.collectAll()) {
+            importers.add(importer);
+        }
+        Map<String, PropertySourceImporter<?>> importersByType = CollectionUtils.newLinkedHashMap(importers.size());
+        for (PropertySourceImporter<?> importer : importers) {
+            importersByType.putIfAbsent(importer.getClass().getName(), importer);
+        }
+        return new ArrayList<>(importersByType.values());
+    }
+
+    static Map<String, PropertySourceImporter<?>> toImporterByProvider(Collection<PropertySourceImporter<?>> importers) {
+        Map<String, PropertySourceImporter<?>> importersByProvider = CollectionUtils.newLinkedHashMap(importers.size());
+        for (PropertySourceImporter<?> importer : importers) {
+            if (!importer.isEnabled()) {
+                continue;
+            }
+            String provider = importer.getProvider();
+            if (provider.isBlank()) {
+                throw new ConfigurationException("Property source importer [" + importer + "] returned an empty provider");
+            }
+            String providerKey = provider.toLowerCase(Locale.ROOT);
+            PropertySourceImporter<?> previous = importersByProvider.putIfAbsent(providerKey, importer);
+            if (previous != null) {
+                throw new ConfigurationException("Duplicate property source importer for provider [" + providerKey + "]: " + previous + " and " + importer);
+            }
+        }
+        return importersByProvider;
+    }
+
+    private static void closeImporters(Collection<PropertySourceImporter<?>> importers) {
+        RuntimeException closeException = null;
+        for (PropertySourceImporter<?> importer : importers) {
+            try {
+                importer.close();
+            } catch (Exception e) {
+                RuntimeException wrapped = new RuntimeException("Error closing property source importer: " + importer.getClass().getName(), e);
+                if (closeException == null) {
+                    closeException = wrapped;
+                } else {
+                    closeException.addSuppressed(wrapped);
+                }
+            }
+        }
+        if (closeException != null) {
+            throw closeException;
+        }
+    }
+
+    private record DefaultImportContext<T>(
+        ConfigImportPropertySourcesLocator configImportPropertySourcesLocator,
+        DefaultEnvironment defaultEnvironment,
+        @Nullable ConnectionString connectionString,
+        T importDeclaration,
+        @Nullable Origin parentOrigin) implements PropertySourceImporter.ImportContext<T> {
 
         @Override
-        public String getCanonicalLocation() {
-            if (connectionString == null) {
-                throw new IllegalStateException("Canonical location is only available for scalar connection string imports");
-            }
-            return ConfigImportIdentity.canonicalLocation(connectionString, parentOrigin);
+        public Environment environment() {
+            return defaultEnvironment;
+        }
+
+        @Override
+        public @Nullable ConnectionString connectionString() {
+            return connectionString;
         }
 
         @Override
@@ -303,11 +399,16 @@ final class ConfigImportResolver {
         }
 
         @Override
+        public @Nullable Origin parentOrigin() {
+            return parentOrigin;
+        }
+
+        @Override
         public Optional<PropertySource> importPropertySource(ResourceLoader resourceLoader,
                                                              String resourcePath,
                                                              String sourceName,
                                                              Origin origin) {
-            return environment.loadImportedPropertySource(resourceLoader, resourcePath, sourceName, origin);
+            return defaultEnvironment.loadImportedPropertySource(resourceLoader, resourcePath, sourceName, origin);
         }
 
         @Override
@@ -315,7 +416,7 @@ final class ConfigImportResolver {
                                                              String sourceName,
                                                              String extension,
                                                              Origin origin) {
-            return environment.loadImportedPropertySourceFromContent(content, sourceName, extension, origin);
+            return defaultEnvironment.loadImportedPropertySourceFromContent(content, sourceName, extension, origin);
         }
 
         @Override
@@ -323,12 +424,7 @@ final class ConfigImportResolver {
                                                                       String sourceName,
                                                                       Origin origin,
                                                                       boolean allowMultiple) {
-            return environment.loadImportedClasspathPropertySource(resourcePath, sourceName, origin, allowMultiple);
-        }
-
-        @Override
-        public String getResourcePath() {
-            return ConfigImportIdentity.extractResourcePath(getCanonicalLocation());
+            return defaultEnvironment.loadImportedClasspathPropertySource(resourcePath, sourceName, origin, allowMultiple);
         }
     }
 
@@ -354,7 +450,8 @@ final class ConfigImportResolver {
         }
     }
 
-    private record ScalarImportDeclaration(ConnectionString declaration) implements ImportDeclaration {
+    private record ScalarImportDeclaration(
+        ConnectionString declaration) implements ImportDeclaration {
         @Override
         public String provider() {
             return declaration.getProtocol();
@@ -386,7 +483,8 @@ final class ConfigImportResolver {
         }
     }
 
-    private record StructuredImportDeclaration(ConvertibleValues<Object> values) implements ImportDeclaration {
+    private record StructuredImportDeclaration(
+        ConvertibleValues<Object> values) implements ImportDeclaration {
         @Override
         public String provider() {
             return values.get(PROVIDER, String.class)
@@ -420,6 +518,7 @@ final class ConfigImportResolver {
         }
     }
 
-    record ResolvedImportDeclarations(PropertySource propertySource, List<ImportDeclaration> imports) {
+    record ResolvedImportDeclarations(PropertySource propertySource,
+                                      List<ImportDeclaration> imports) {
     }
 }
