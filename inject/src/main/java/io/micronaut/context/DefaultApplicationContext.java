@@ -760,7 +760,7 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
 
             LOG.info("Reading bootstrap environment configuration");
 
-            // We have too always recreate the bootstrap context
+            // We have to always recreate the bootstrap context
             ApplicationContext bootstrapContext = new DefaultApplicationContext(bootstrapConfiguration);
             bootstrapContexts.add(bootstrapContext);
             for (PropertySource propertySource : environment.getPropertySources()) {

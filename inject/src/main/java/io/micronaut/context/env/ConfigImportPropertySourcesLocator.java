@@ -52,8 +52,8 @@ import java.util.regex.Pattern;
 @Internal
 public final class ConfigImportPropertySourcesLocator implements PropertySourcesLocator, Closeable {
 
-    private static final String MICRONAUT_CONFIX_PREFIX = "micronaut.config.";
-    private static final String CONFIG_IMPORT = MICRONAUT_CONFIX_PREFIX + "import";
+    private static final String MICRONAUT_CONFIG_PREFIX = "micronaut.config.";
+    private static final String CONFIG_IMPORT = MICRONAUT_CONFIG_PREFIX + "import";
     private static final Pattern INDEXED_PATTERN = Pattern.compile("^micronaut\\.config\\.import\\[(\\d+)]$");
     private static final Pattern INDEXED_PROPERTY_PATTERN = Pattern.compile("^micronaut\\.config\\.import\\[(\\d+)]\\.(.+)$");
     private static final String STRUCTURED_ROOT_PREFIX = CONFIG_IMPORT + ".";
@@ -110,7 +110,6 @@ public final class ConfigImportPropertySourcesLocator implements PropertySources
         Set<ConfigImportIdentity.ImportIdentity> visited = new LinkedHashSet<>();
         Deque<String> chain = new ArrayDeque<>();
         ResolvedImportDeclarations parsed = normalize(root);
-        //resolved.add(parsed.propertySource());
         resolveImports(
             environment,
             parsed.imports(),
@@ -210,7 +209,7 @@ public final class ConfigImportPropertySourcesLocator implements PropertySources
         Map<String, Object> structuredRootValues = new LinkedHashMap<>();
 
         for (String key : propertySource) {
-            if (!key.startsWith(MICRONAUT_CONFIX_PREFIX)) {
+            if (!key.startsWith(MICRONAUT_CONFIG_PREFIX)) {
                 continue;
             }
             Object value = propertySource.get(key);
