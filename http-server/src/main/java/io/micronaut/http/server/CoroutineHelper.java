@@ -48,7 +48,6 @@ public final class CoroutineHelper {
         ContinuationArgumentBinder.setupCoroutineContext(httpRequest, contextView, propagatedContext, coroutineContextFactories);
     }
 
-
     public void setupCoroutineContext(HttpRequest<?> httpRequest, ContextView contextView, PropagatedContext propagatedContext, ExecutorService executorService) {
         ContinuationArgumentBinder.setupCoroutineContext(httpRequest, contextView, propagatedContext, coroutineContextFactories, executorService);
     }
