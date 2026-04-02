@@ -244,6 +244,9 @@ public final class ConfigImportPropertySourcesLocator implements PropertySources
         if (hasRoot && rootValue == null && !structuredRootValues.isEmpty()) {
             rootValue = new LinkedHashMap<>(structuredRootValues);
         }
+        if (hasRoot && rootValue != null && !(rootValue instanceof Map) && !structuredRootValues.isEmpty()) {
+            throw new ConfigurationException("Cannot combine micronaut.config.import and micronaut.config.import.* declarations in " + propertySource.getName());
+        }
 
         if (!hasRoot && indexedValues.isEmpty() && indexedObjectValues.isEmpty()) {
             return new ResolvedImportDeclarations(propertySource, List.of());
@@ -508,7 +511,19 @@ public final class ConfigImportPropertySourcesLocator implements PropertySources
 
         @Override
         public String identityLocation(@Nullable Origin parentOrigin) {
-            return provider() + ":" + values.asMap();
+            Map<String, Object> filteredValues = new TreeMap<>(values.asMap());
+            filteredValues.remove("optional");
+
+            Object resourcePath = filteredValues.size() == 1 ? filteredValues.get(FilePropertySourceImporter.RESOURCE_PATH) : null;
+            if (resourcePath instanceof String rp && !rp.isBlank()) {
+                try {
+                    ConnectionString connectionString = ConnectionString.parse(provider() + "://" + rp);
+                    return ConfigImportIdentity.canonicalLocation(connectionString, parentOrigin);
+                } catch (IllegalArgumentException | ConfigurationException ignored) {
+                    // Fall through to default
+                }
+            }
+            return provider() + ":" + filteredValues;
         }
 
         @Override

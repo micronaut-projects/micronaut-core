@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.EachProperty;
+import io.micronaut.context.env.BootstrapLocatorMarker;
 import io.micronaut.context.env.BootstrapPropertySourceLocator;
 import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.context.env.ConfigurationPath;
@@ -742,7 +743,7 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
         defaultMutableConversionService.registerInternalTypeConverters(getBeansOfType(TypeConverterRegistrar.class));
     }
 
-    private static final class BootstrapPropertySourcesLocator implements PropertySourcesLocator, Closeable, BootstrapPropertySourceLocator {
+    private static final class BootstrapPropertySourcesLocator implements PropertySourcesLocator, Closeable, BootstrapLocatorMarker {
 
         private final ApplicationContextConfiguration bootstrapConfiguration;
         private final ApplicationContext parentContext;
@@ -792,11 +793,6 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
                 bootstrapContext.close();
             }
             bootstrapContexts.clear();
-        }
-
-        @Override
-        public Iterable<PropertySource> findPropertySources(Environment environment) throws ConfigurationException {
-            return List.of();
         }
     }
 

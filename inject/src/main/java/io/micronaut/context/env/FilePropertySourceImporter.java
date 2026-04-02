@@ -20,6 +20,8 @@ import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.io.file.FileSystemResourceLoader;
 import io.micronaut.core.util.ConnectionString;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Optional;
 
 /**
@@ -46,7 +48,14 @@ public final class FilePropertySourceImporter implements PropertySourceImporter<
         if (resourcePath.isBlank()) {
             throw new ConfigurationException("Config import provider [file] requires a non-blank ['" + RESOURCE_PATH + "']");
         }
-        return new FileImport(resourcePath);
+        // Validate path against traversal attacks, consistent with scalar imports (ConnectionString.getCanonicalPath())
+        Path normalized = Paths.get(resourcePath).normalize();
+        for (Path segment : normalized) {
+            if ("..".equals(segment.toString())) {
+                throw new ConfigurationException("Parent path segments are not allowed in file import path: " + resourcePath);
+            }
+        }
+        return new FileImport(normalized.toString());
     }
 
     @Override

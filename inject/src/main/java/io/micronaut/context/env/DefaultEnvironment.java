@@ -373,7 +373,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
 
         if (!propertySourcesLocators.isEmpty()) {
             for (PropertySourcesLocator propertySourcesLocator : propertySourcesLocators) {
-                boolean isBootstrapLocator = propertySourcesLocator instanceof BootstrapPropertySourceLocator;
+                boolean isBootstrapLocator = propertySourcesLocator instanceof BootstrapLocatorMarker;
                 Collection<PropertySource> sources = propertySourcesLocator.load(this);
                 propertySources.addAll(sources);
                 if (isBootstrapLocator) {

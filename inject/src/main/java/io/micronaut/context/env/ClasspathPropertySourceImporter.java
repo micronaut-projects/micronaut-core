@@ -19,6 +19,8 @@ import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.util.ConnectionString;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Optional;
 
 /**
@@ -43,7 +45,17 @@ public class ClasspathPropertySourceImporter implements PropertySourceImporter<C
         if (resourcePath.isBlank()) {
             throw new ConfigurationException("Config import provider [classpath] requires a non-blank ['" + FilePropertySourceImporter.RESOURCE_PATH + "']");
         }
-        return new ClasspathImport(resourcePath, false);
+        // Validate/normalize resource path consistently with scalar imports (ConfigImportIdentity.canonicalClasspathLocation)
+        if (resourcePath.startsWith("/")) {
+            throw new ConfigurationException("Absolute classpath imports are not supported for security reasons: " + resourcePath);
+        }
+        Path normalized = Paths.get(resourcePath).normalize();
+        for (Path segment : normalized) {
+            if ("..".equals(segment.toString())) {
+                throw new ConfigurationException("Parent path segments are not allowed in classpath import path: " + resourcePath);
+            }
+        }
+        return new ClasspathImport(normalized.toString().replace('\\', '/'), false);
     }
 
     @Override

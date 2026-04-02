@@ -33,7 +33,7 @@ import java.util.stream.Stream;
 /**
  * Imports key/value configuration from a config tree directory.
  */
-@SuppressWarnings("java:S2083") // paths are validated against path-traversal attacks by ConnectionString.getCanonicalPath()
+@SuppressWarnings("java:S2083") // paths are validated against path-traversal attacks: scalar imports via ConnectionString.getCanonicalPath(), structured imports via explicit normalization in newImportDeclaration(ConvertibleValues)
 public final class ConfigTreePropertySourceImporter implements PropertySourceImporter<ConfigTreePropertySourceImporter.ConfigTreeImport> {
 
     private static final Logger LOG = LoggerFactory.getLogger(ConfigTreePropertySourceImporter.class);
@@ -55,7 +55,14 @@ public final class ConfigTreePropertySourceImporter implements PropertySourceImp
         if (path.isBlank()) {
             throw new ConfigurationException("Config import provider [configtree] requires a non-blank ['" + FilePropertySourceImporter.RESOURCE_PATH + "']");
         }
-        return new ConfigTreeImport(path);
+        // Validate path against traversal attacks, consistent with scalar imports (ConnectionString.getCanonicalPath())
+        Path normalized = Paths.get(path).normalize();
+        for (Path segment : normalized) {
+            if ("..".equals(segment.toString())) {
+                throw new ConfigurationException("Parent path segments are not allowed in configtree import path: " + path);
+            }
+        }
+        return new ConfigTreeImport(normalized.toString());
     }
 
     @Override
