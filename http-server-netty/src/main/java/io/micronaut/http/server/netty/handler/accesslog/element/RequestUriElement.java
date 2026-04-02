@@ -27,18 +27,16 @@ import java.util.Set;
  * @since 2.0
  */
 final class RequestUriElement implements LogElement {
-    /**
-     * The request uri marker.
-     */
     public static final String REQUEST_URI = "x";
+    public static final String REQUEST_PATH = "U";
 
-    /**
-     * The RequestUriElement instance.
-     */
-    static final RequestUriElement INSTANCE = new RequestUriElement();
+    static final RequestUriElement INSTANCE = new RequestUriElement(false);
+    static final RequestUriElement PATH_INSTANCE = new RequestUriElement(true);
 
-    private RequestUriElement() {
+    private final boolean pathOnly;
 
+    private RequestUriElement(boolean pathOnly) {
+        this.pathOnly = pathOnly;
     }
 
     @Override
@@ -48,7 +46,15 @@ final class RequestUriElement implements LogElement {
 
     @Override
     public String onRequestHeaders(SocketChannel channel, String method, HttpHeaders headers, String uri, String protocol) {
-        return uri;
+        return pathOnly ? requestPath(uri) : uri;
+    }
+
+    private static String requestPath(String uri) {
+        int queryStart = uri.indexOf('?');
+        if (queryStart == -1) {
+            return uri;
+        }
+        return uri.substring(0, queryStart);
     }
 
     @Override
@@ -58,6 +64,6 @@ final class RequestUriElement implements LogElement {
 
     @Override
     public String toString() {
-        return '%' + REQUEST_URI;
+        return '%' + (pathOnly ? REQUEST_PATH : REQUEST_URI);
     }
 }

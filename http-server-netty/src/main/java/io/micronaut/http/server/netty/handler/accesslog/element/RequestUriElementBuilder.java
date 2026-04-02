@@ -28,6 +28,9 @@ public final class RequestUriElementBuilder implements LogElementBuilder {
         if (RequestUriElement.REQUEST_URI.equals(token)) {
             return RequestUriElement.INSTANCE;
         }
+        if (RequestUriElement.REQUEST_PATH.equals(token)) {
+            return RequestUriElement.PATH_INSTANCE;
+        }
         return null;
     }
 

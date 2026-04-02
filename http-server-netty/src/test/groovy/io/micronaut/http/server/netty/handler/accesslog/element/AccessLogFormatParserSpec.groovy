@@ -68,6 +68,12 @@ class AccessLogFormatParserSpec extends Specification {
         then:
         parser.toString() == "%h - - [%{dd/MMM/yyyy:HH:mm:ss Z, UTC}t] \"%r\" %s %b \"%{cookie1}C\" \"%{cookie2}c\""
 
+        when:
+        parser = new AccessLogFormatParser("%x|%U")
+
+        then:
+        parser.toString() == "%x|%U"
+
     }
 
     def "test access log format parser for invalid formats"() {
@@ -103,6 +109,17 @@ class AccessLogFormatParserSpec extends Specification {
         then:
         headers.contains("User-Agent")
         headerVal == "test string  \\\" \\\\"
+    }
+
+    def 'test request uri and path markers differ by query string'() {
+        given:
+        def uriElement = new RequestUriElementBuilder().build("x", null)
+        def pathElement = new RequestUriElementBuilder().build("U", null)
+        def headers = new DefaultHttpHeaders()
+
+        expect:
+        uriElement.onRequestHeaders(ConnectionMetadata.empty(), "GET", headers, "/items/list?sort=asc", "HTTP/1.1") == "/items/list?sort=asc"
+        pathElement.onRequestHeaders(ConnectionMetadata.empty(), "GET", headers, "/items/list?sort=asc", "HTTP/1.1") == "/items/list"
     }
 
 }

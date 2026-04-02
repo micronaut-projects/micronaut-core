@@ -602,6 +602,70 @@ class AccessLogSpec extends Specification {
         group.shutdownGracefully()
     }
 
+    def 'access log distinguishes request uri path and request line'() {
+        given:
+        def ctx = ApplicationContext.run([
+                'spec.name': 'AccessLogSpec',
+                'micronaut.server.netty.access-logger.enabled': true,
+                'micronaut.server.netty.access-logger.logger-name': 'http-access-log',
+                'micronaut.server.netty.access-logger.log-format': '%x|%U|%r',
+        ])
+        def server = ctx.getBean(EmbeddedServer)
+        server.start()
+
+        def responses = new CopyOnWriteArrayList<FullHttpResponse>()
+
+        def group = new NioEventLoopGroup(1)
+        Bootstrap bootstrap = new Bootstrap()
+                .group(group)
+                .channel(NioSocketChannel)
+                .option(ChannelOption.AUTO_READ, true)
+                .handler(new ChannelInitializer<Channel>() {
+                    @Override
+                    protected void initChannel(@NonNull Channel ch) throws Exception {
+                        ch.pipeline()
+                                .addLast(new HttpClientCodec())
+                                .addLast(new HttpObjectAggregator(1024))
+                                .addLast(new ChannelInboundHandlerAdapter() {
+                                    @Override
+                                    void channelRead(@NonNull ChannelHandlerContext ctx_, @NonNull Object msg) throws Exception {
+                                        responses.add(msg)
+                                    }
+                                })
+                    }
+                })
+                .remoteAddress(server.host, server.port)
+
+        def request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, '/interleave/simple?foo=bar')
+        request.headers().add(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE)
+
+        def listAppender = new ListAppender<ILoggingEvent>()
+        listAppender.start()
+        ((Logger) LoggerFactory.getLogger('http-access-log')).addAppender(listAppender)
+
+        when:
+        def channel = bootstrap.connect().sync().channel()
+        channel.writeAndFlush(request)
+
+        then:
+        new PollingConditions(timeout: 5).eventually {
+            responses.size() == 1
+        }
+        responses[0].content().toString(StandardCharsets.UTF_8) == 'simple'
+
+        new PollingConditions(timeout: 5).eventually {
+            listAppender.list.size() == 1
+        }
+        listAppender.list[0].message == '/interleave/simple?foo=bar|/interleave/simple|GET /interleave/simple?foo=bar HTTP/1.1'
+
+        cleanup:
+        responses*.content().forEach(ByteBuf::release)
+        server.close()
+        channel.close()
+        ctx.close()
+        group.shutdownGracefully()
+    }
+
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6782')
     @spock.lang.Requires({ os.linux })
     def 'nio unix domain socket'() {
