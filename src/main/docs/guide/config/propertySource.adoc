@@ -77,6 +77,17 @@ io.micronaut.docs.config.importer.DemoPropertySourceImporter
 
 After registration, the importer is selected when `micronaut.config.import` uses your protocol, for example `demo://defaults`.
 
+If your importer loads remote configuration, api:discovery.config.RetryablePropertySourceImporter[] in `micronaut-discovery-core` provides a reusable base class that standardizes retry behavior across both connection-string and map-based imports. It parses the same retry properties from either form and applies them with Micronaut's programmatic retry support.
+
+Standard retry properties supported by api:discovery.config.RetryablePropertySourceImporter[] are:
+
+* `retry-attempts` – maximum number of attempts
+* `retry-count` – alias for `retry-attempts`
+* `retry-delay` – delay between attempts
+* `retry-max-delay` – maximum overall retry delay
+* `retry-multiplier` – delay multiplier
+* `retry-jitter` – retry jitter factor from `0.0` to `1.0`
+
 TIP: `.properties`, `.json`, `.yml` are supported out of the box. For Groovy users `.groovy` is supported as well.
 
 [[duplicateConfigurationResources]]

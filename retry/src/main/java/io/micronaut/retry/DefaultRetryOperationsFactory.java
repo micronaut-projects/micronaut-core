@@ -37,7 +37,15 @@ final class DefaultRetryOperationsFactory implements RetryOperationsFactory {
     private final ScheduledExecutorService executorService;
 
     DefaultRetryOperationsFactory(@Named(TaskExecutors.SCHEDULED) ExecutorService executorService) {
-        this.executorService = (ScheduledExecutorService) executorService;
+        this((ScheduledExecutorService) executorService);
+    }
+
+    private DefaultRetryOperationsFactory(ScheduledExecutorService executorService) {
+        this.executorService = executorService;
+    }
+
+    static RetryOperationsFactory create(ScheduledExecutorService executorService) {
+        return new DefaultRetryOperationsFactory(executorService);
     }
 
     @Override
