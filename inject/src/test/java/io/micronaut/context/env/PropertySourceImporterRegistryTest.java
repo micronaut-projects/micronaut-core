@@ -1,5 +1,7 @@
 package io.micronaut.context.env;
 
+import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.DefaultApplicationContextBuilder;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.util.ConnectionString;
 import org.junit.jupiter.api.AfterEach;
@@ -24,7 +26,7 @@ class PropertySourceImporterRegistryTest {
 
     @Test
     void mapsImportersByLowercaseProvider() {
-        Map<String, PropertySourceImporter<?>> importers = DefaultEnvironment.toImporterByProvider(List.of(new TestImporter("File")));
+        Map<String, PropertySourceImporter<?>> importers = ConfigImportPropertySourcesLocator.toImporterByProvider(List.of(new TestImporter("File")));
 
         assertEquals(1, importers.size());
         assertEquals("File", importers.get("file").getProvider());
@@ -39,17 +41,26 @@ class PropertySourceImporterRegistryTest {
 
     @Test
     void closesImportersAfterEachConfigurationLoadCycle() {
-        DefaultEnvironment environment = new DefaultEnvironment(() -> List.of("test"), () -> List.of(new TrackingImporter()));
+        DefaultApplicationContextBuilder builder = (DefaultApplicationContextBuilder) ApplicationContext.builder();
+        builder.propertySourcesLocator(new ConfigImportPropertySourcesLocator(() -> List.of(new TrackingImporter())));
+        DefaultEnvironment environment = new DefaultEnvironment(builder);
 
         environment.start();
         environment.refreshAndDiff();
 
+        assertEquals(1, TrackingImporter.closedCount.get());
+        assertEquals(List.of(1), TrackingImporter.instanceIds);
+
+        environment.close();
+
         assertEquals(2, TrackingImporter.closedCount.get());
         assertEquals(List.of(1, 2), TrackingImporter.instanceIds);
+
+        assertEquals(TrackingImporter.createdCount.get(), TrackingImporter.closedCount.get());
     }
 
     private static void createDuplicateImportersByProvider() {
-        DefaultEnvironment.toImporterByProvider(List.of(
+        ConfigImportPropertySourcesLocator.toImporterByProvider(List.of(
             new TestImporter("file"),
             new TestImporter("FILE")
         ));

@@ -45,13 +45,13 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.Closeable;
 import java.io.ByteArrayInputStream;
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.lang.annotation.Annotation;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -71,8 +71,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Supplier;
-import java.util.Locale;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
@@ -109,16 +107,15 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     @Nullable
     private Collection<PropertySourceLoader> propertySourceLoaderList;
     private final Map<String, PropertySourceLoader> loaderByFormatMap = Collections.synchronizedMap(CollectionUtils.newLinkedHashMap(10));
-    private final Map<String, PropertySourceImporter<?>> importerByKindMap = Collections.synchronizedMap(CollectionUtils.newLinkedHashMap(10));
     private final Map<String, Boolean> presenceCache = new ConcurrentHashMap<>();
     private final ApplicationContextConfiguration configuration;
     private final Collection<String> configLocations;
     private final PropertySourcePropertyResolver propertyPlaceholderResolver;
     private final PropertyResolver propertyResolver;
-    private final @Nullable Supplier<Collection<PropertySourceImporter<?>>> propertySourceImporterSupplier;
 
     private final List<PropertySource> refreshablePropertySources = new ArrayList<>(10);
     private final Map<String, PropertySource> propertySources = Collections.synchronizedMap(CollectionUtils.newLinkedHashMap(10));
+    private final Collection<PropertySourcesLocator> propertySourcesLocators;
 
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final AtomicBoolean reading = new AtomicBoolean(false);
@@ -131,11 +128,6 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
      * @param configuration The configuration
      */
     public DefaultEnvironment(ApplicationContextConfiguration configuration) {
-        this(configuration, null);
-    }
-
-    DefaultEnvironment(ApplicationContextConfiguration configuration,
-                       @Nullable Supplier<Collection<PropertySourceImporter<?>>> propertySourceImporterSupplier) {
         MutableConversionService conversionService = configuration.getConversionService().orElseGet(MutableConversionService::create);
         this.propertyPlaceholderResolver = new PropertySourcePropertyResolver(
             conversionService,
@@ -148,7 +140,6 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         this.propertyResolver = propertyPlaceholderResolver;
         this.mutableConversionService = conversionService;
         this.configuration = configuration;
-        this.propertySourceImporterSupplier = propertySourceImporterSupplier;
         this.resourceLoader = configuration.getResourceLoader();
         this.classLoader = configuration.getClassLoader();
         this.annotationScanner = new BeanIntrospectionScanner();
@@ -172,6 +163,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         // Search config locations in reverse order
         Collections.reverse(configLocations);
         this.configLocations = configLocations;
+        this.propertySourcesLocators = configuration.getPropertySourcesLocators();
     }
 
     @Override
@@ -349,44 +341,21 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     }
 
     private void loadProperties() {
-        Collection<PropertySourceImporter<?>> importers = getPropertySourceImportersForLoad();
-        try {
-            loadPropertiesInternal();
-        } finally {
-            importerByKindMap.clear();
-            closeImporters(importers);
-        }
-    }
-
-    Collection<PropertySourceImporter<?>> getPropertySourceImportersForLoad() {
-        Collection<PropertySourceImporter<?>> importers;
-        if (propertySourceImporterSupplier != null) {
-            importers = propertySourceImporterSupplier.get();
-            importerByKindMap.clear();
-            importerByKindMap.putAll(toImporterByProvider(importers));
-        } else {
-            importers = evaluatePropertySourceImporters();
-        }
-        return importers;
-    }
-
-    private void loadPropertiesInternal() {
         refreshablePropertySources.clear();
         List<PropertySource> propertySources = new ArrayList<>(configLocations.size());
-        ConfigImportResolver resolver = new ConfigImportResolver(this);
         Set<String> preExistingSourceNames = new LinkedHashSet<>(this.propertySources.keySet());
         if (configuration.isEnableDefaultPropertySources()) {
-            addResolvedPropertySources(propertySources, readPropertySourceList(applicationName), resolver, preExistingSourceNames, false);
+            propertySources.addAll(readPropertySourceList(applicationName));
             List<PropertySource> defaultPropertySources = new ArrayList<>(4);
             addDefaultPropertySources(defaultPropertySources);
-            addResolvedPropertySources(propertySources, defaultPropertySources, resolver, preExistingSourceNames, false);
+            propertySources.addAll(defaultPropertySources);
             String propertySourcesSystemProperty = CachedEnvironment.getProperty(Environment.PROPERTY_SOURCES_KEY);
             if (propertySourcesSystemProperty != null) {
-                addResolvedPropertySources(propertySources, readPropertySourceListFromFiles(propertySourcesSystemProperty), resolver, preExistingSourceNames, false);
+                propertySources.addAll(readPropertySourceListFromFiles(propertySourcesSystemProperty));
             }
             String propertySourcesEnv = CachedEnvironment.getenv(ENV_PROPERTY_SOURCES_KEY);
             if (propertySourcesEnv != null) {
-                addResolvedPropertySources(propertySources, readPropertySourceListFromFiles(propertySourcesEnv), resolver, preExistingSourceNames, false);
+                propertySources.addAll(readPropertySourceListFromFiles(propertySourcesEnv));
             }
 
         } else {
@@ -402,60 +371,28 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
             internalAddPropertySource(propertySource);
         }
 
-        Collection<PropertySourcesLocator> propertySourcesLocators = configuration.getPropertySourcesLocators();
         if (!propertySourcesLocators.isEmpty()) {
             for (PropertySourcesLocator propertySourcesLocator : propertySourcesLocators) {
-                List<PropertySource> propertySourcesBeforeLocator = new ArrayList<>(propertySources);
                 boolean isBootstrapLocator = propertySourcesLocator instanceof BootstrapPropertySourceLocator;
-                addResolvedPropertySources(propertySources, propertySourcesLocator.load(this), resolver, preExistingSourceNames, isBootstrapLocator);
-                for (PropertySource existingPropertySource : propertySourcesBeforeLocator) {
-                    if (!propertySources.contains(existingPropertySource)) {
-                        propertySources.add(existingPropertySource);
+                Collection<PropertySource> sources = propertySourcesLocator.load(this);
+                propertySources.addAll(sources);
+                if (isBootstrapLocator) {
+                    for (PropertySource source : sources) {
+                        internalAddPropertySource(source);
                     }
                 }
+            }
+        }
+
+        for (PropertySource propertySource : propertySources) {
+            if (!PropertySource.CONTEXT.equals(propertySource.getName()) && !preExistingSourceNames.contains(propertySource.getName())) {
+                refreshablePropertySources.add(propertySource);
             }
         }
 
         OrderUtil.sortOrdered(propertySources);
         for (PropertySource propertySource : propertySources) {
             internalProcessPropertySource(propertySource);
-        }
-    }
-
-    private void addResolvedPropertySources(List<PropertySource> propertySources,
-                                            Collection<PropertySource> roots,
-                                            ConfigImportResolver resolver,
-                                            Set<String> preExistingSourceNames, boolean isBootstrap) {
-        for (PropertySource root : roots) {
-            if (isBootstrap) {
-                internalAddPropertySource(root);
-            }
-            List<PropertySource> resolved = resolver.resolve(root);
-            propertySources.addAll(resolved);
-            for (PropertySource propertySource : resolved) {
-                if (!PropertySource.CONTEXT.equals(propertySource.getName()) && !preExistingSourceNames.contains(propertySource.getName())) {
-                    refreshablePropertySources.add(propertySource);
-                }
-            }
-        }
-    }
-
-    private static void closeImporters(Collection<PropertySourceImporter<?>> importers) {
-        RuntimeException closeException = null;
-        for (PropertySourceImporter<?> importer : importers) {
-            try {
-                importer.close();
-            } catch (Exception e) {
-                ConfigurationException wrapped = new ConfigurationException("Error closing property source importer: " + importer.getClass().getName(), e);
-                if (closeException == null) {
-                    closeException = wrapped;
-                } else {
-                    closeException.addSuppressed(wrapped);
-                }
-            }
-        }
-        if (closeException != null) {
-            throw closeException;
         }
     }
 
@@ -621,25 +558,6 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         return allLoaders;
     }
 
-    @SuppressWarnings({"rawtypes", "unchecked"})
-    private Collection<PropertySourceImporter<?>> evaluatePropertySourceImporters() {
-        SoftServiceLoader<PropertySourceImporter> definitions = SoftServiceLoader.load(PropertySourceImporter.class, getClassLoader());
-        List<PropertySourceImporter<?>> importers = (List) definitions.collectAll();
-        Map<String, PropertySourceImporter<?>> importersByType = CollectionUtils.newLinkedHashMap(importers.size());
-        for (PropertySourceImporter<?> importer : importers) {
-            importersByType.putIfAbsent(importer.getClass().getName(), importer);
-        }
-        List<PropertySourceImporter<?>> uniqueImporters = new ArrayList<>(importersByType.values());
-        importerByKindMap.clear();
-        importerByKindMap.putAll(toImporterByProvider(uniqueImporters));
-        return uniqueImporters;
-    }
-
-    @Nullable
-    PropertySourceImporter<?> findPropertySourceImporter(String provider) {
-        return importerByKindMap.get(provider.toLowerCase(Locale.ROOT));
-    }
-
     Optional<PropertySource> loadImportedPropertySource(ResourceLoader resourceLoader,
                                                         String resourcePath,
                                                         String sourceName,
@@ -796,25 +714,6 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
             message.append("\n - ").append(resource.toExternalForm());
         }
         return message.toString();
-    }
-
-    static Map<String, PropertySourceImporter<?>> toImporterByProvider(Collection<PropertySourceImporter<?>> importers) {
-        Map<String, PropertySourceImporter<?>> importersByProvider = CollectionUtils.newLinkedHashMap(importers.size());
-        for (PropertySourceImporter<?> importer : importers) {
-            if (!importer.isEnabled()) {
-                continue;
-            }
-            String provider = importer.getProvider();
-            if (provider.isBlank()) {
-                throw new ConfigurationException("Property source importer [" + importer + "] returned an empty provider");
-            }
-            String providerKey = provider.toLowerCase(Locale.ROOT);
-            PropertySourceImporter<?> previous = importersByProvider.putIfAbsent(providerKey, importer);
-            if (previous != null) {
-                throw new ConfigurationException("Duplicate property source importer for provider [" + providerKey + "]: " + previous + " and " + importer);
-            }
-        }
-        return importersByProvider;
     }
 
     private void loadPropertySourceFromLoader(String name, PropertySourceLoader propertySourceLoader, List<PropertySource> propertySources, ResourceLoader resourceLoader) {
@@ -1068,7 +967,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         } catch (Exception e) {
             throw new RuntimeException("Failed to close property placeholder resolver: " + e.getMessage(), e);
         }
-        for (PropertySourcesLocator propertySourcesLocator : configuration.getPropertySourcesLocators()) {
+        for (PropertySourcesLocator propertySourcesLocator : propertySourcesLocators) {
             if (propertySourcesLocator instanceof Closeable closeable) {
                 try {
                     closeable.close();
