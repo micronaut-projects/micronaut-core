@@ -62,7 +62,11 @@ public final class ConfigImportPropertySourcesLocator implements PropertySources
     private final @Nullable Supplier<Collection<PropertySourceImporter<?>>> propertySourceImporterSupplier;
     private final Map<String, PropertySourceImporter<?>> importerByKindMap = CollectionUtils.newLinkedHashMap(10);
 
-    ConfigImportPropertySourcesLocator(@Nullable Supplier<Collection<PropertySourceImporter<?>>> propertySourceImporterSupplier) {
+    public ConfigImportPropertySourcesLocator() {
+        this(null);
+    }
+
+    public ConfigImportPropertySourcesLocator(@Nullable Supplier<Collection<PropertySourceImporter<?>>> propertySourceImporterSupplier) {
         this.propertySourceImporterSupplier = propertySourceImporterSupplier;
     }
 

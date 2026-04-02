@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ConfigImportDeclarationsTest {
 
-    private final ConfigImportPropertySourcesLocator locator = new ConfigImportPropertySourcesLocator(null);
+    private final ConfigImportPropertySourcesLocator locator = new ConfigImportPropertySourcesLocator();
 
     @Test
     void normalizesIndexedDeclarationsInOrder() {

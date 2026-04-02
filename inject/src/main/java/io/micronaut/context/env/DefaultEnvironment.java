@@ -163,20 +163,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         // Search config locations in reverse order
         Collections.reverse(configLocations);
         this.configLocations = configLocations;
-
-        boolean foundConfigImporter = false;
-        Collection<PropertySourcesLocator> providedPropertySourcesLocators = configuration.getPropertySourcesLocators();
-        for (PropertySourcesLocator propertySourcesLocator : providedPropertySourcesLocators) {
-            if (propertySourcesLocator instanceof ConfigImportPropertySourcesLocator) {
-                foundConfigImporter = true;
-                break;
-            }
-        }
-        if (!foundConfigImporter) {
-            propertySourcesLocators = CollectionUtils.concat(List.copyOf(providedPropertySourcesLocators), new ConfigImportPropertySourcesLocator(null));
-        } else {
-            propertySourcesLocators = providedPropertySourcesLocators;
-        }
+        this.propertySourcesLocators = configuration.getPropertySourcesLocators();
     }
 
     @Override
