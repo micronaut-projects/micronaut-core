@@ -99,7 +99,8 @@ These are the supported markers:
 ** If the format starts with begin: (default) the time is taken at the beginning of the request processing. If it starts with end: it is the time when the log entry gets written, close to the end of the request processing.
 ** The format should follow `DateTimeFormatter` syntax.
 * *%{property}u* - Remote authenticated user. When *micronaut-session* is on the classpath, returns the session id if the argument is omitted, or the specified property otherwise prints '-'
-* *%U* - Requested URI
+* *%U* - Requested URL path (excluding query string)
+* *%x* - Requested URI (may include query string)
 * *%v* - Local server name
 * *%D* - Time taken to process the request, in milliseconds
 * *%T* - Time taken to process the request, in seconds
