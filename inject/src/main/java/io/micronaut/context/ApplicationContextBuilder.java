@@ -410,6 +410,15 @@ public interface ApplicationContextBuilder {
     ApplicationContextBuilder propertySourcesLocator(PropertySourcesLocator propertySourcesLocator);
 
     /**
+     * Enable or disable the config import 'micronaut.config.import' processing. Enabled by default.
+     *
+     * @param enabled a boolean to modify the enabled status
+     * @return This builder
+     * @since 5.0
+     */
+    ApplicationContextBuilder configImport(boolean enabled);
+
+    /**
      * Starts the {@link ApplicationContext}.
      *
      * @return The running {@link ApplicationContext}

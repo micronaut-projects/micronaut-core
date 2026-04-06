@@ -15,6 +15,8 @@
  */
 package io.micronaut.retry;
 
+import java.util.concurrent.ScheduledExecutorService;
+
 /**
  * Factory for programmatic retry operations.
  *
@@ -22,6 +24,16 @@ package io.micronaut.retry;
  * @since 5.0.0
  */
 public interface RetryOperationsFactory {
+
+    /**
+     * Creates a retry operations factory backed by the given scheduler.
+     *
+     * @param executorService The scheduler used for delayed retries
+     * @return A retry operations factory
+     */
+    static RetryOperationsFactory create(ScheduledExecutorService executorService) {
+        return DefaultRetryOperationsFactory.create(executorService);
+    }
 
     /**
      * Creates reusable retry operations for the given policy.
