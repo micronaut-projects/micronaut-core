@@ -18,9 +18,12 @@ package io.micronaut.retry.intercept;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.reflect.InstantiationUtils;
+import io.micronaut.retry.CircuitBreakerPolicy;
+import io.micronaut.retry.RetryPolicy;
 import io.micronaut.retry.RetryState;
 import io.micronaut.retry.RetryStateBuilder;
 import io.micronaut.retry.annotation.DefaultRetryPredicate;
+import io.micronaut.retry.annotation.CircuitBreaker;
 import io.micronaut.retry.annotation.RetryPredicate;
 import io.micronaut.retry.annotation.Retryable;
 
@@ -44,6 +47,8 @@ class AnnotationRetryStateBuilder implements RetryStateBuilder {
     private static final String PREDICATE = "predicate";
     private static final String CAPTURED_EXCEPTION = "capturedException";
     private static final String JITTER = "jitter";
+    private static final String RESET = "reset";
+    private static final String THROW_WRAPPED_EXCEPTION = "throwWrappedException";
     private static final int DEFAULT_RETRY_ATTEMPTS = 3;
 
     private final AnnotationMetadata annotationMetadata;
@@ -59,27 +64,46 @@ class AnnotationRetryStateBuilder implements RetryStateBuilder {
 
     @Override
     public RetryState build() {
+        return new PolicyRetryStateBuilder(retryPolicy()).build();
+    }
+
+    RetryPolicy retryPolicy() {
         AnnotationValue<Retryable> retry = annotationMetadata.findAnnotation(Retryable.class)
             .orElseThrow(() -> new IllegalStateException("Missing @Retryable annotation"));
-        int attempts = retry.intValue(ATTEMPTS).orElse(DEFAULT_RETRY_ATTEMPTS);
-        Duration delay = retry.get(DELAY, Duration.class).orElse(Duration.ofSeconds(1));
+        Duration maxDelay = retry.get(MAX_DELAY, Duration.class).orElse(null);
+        RetryPolicy.Builder builder = RetryPolicy.builder()
+            .maxAttempts(retry.intValue(ATTEMPTS).orElse(DEFAULT_RETRY_ATTEMPTS))
+            .delay(retry.get(DELAY, Duration.class).orElse(Duration.ofSeconds(1)))
+            .multiplier(retry.get(MULTIPLIER, Double.class).orElse(0d))
+            .capturedException(retry.classValue(CAPTURED_EXCEPTION, Throwable.class).orElse(RuntimeException.class))
+            .jitter(retry.get(JITTER, Double.class).orElse(0d));
+        if (maxDelay != null) {
+            builder.maxDelay(maxDelay);
+        }
+
         @SuppressWarnings("unchecked")
         Class<? extends RetryPredicate> predicateClass = (Class<? extends RetryPredicate>) retry.classValue(PREDICATE).orElse(DefaultRetryPredicate.class);
-        RetryPredicate predicate = createPredicate(predicateClass, retry);
-        @SuppressWarnings("unchecked")
-        Class<? extends RuntimeException> capturedException = (Class<? extends RuntimeException>) retry
-            .classValue(CAPTURED_EXCEPTION)
-            .orElse(RuntimeException.class);
+        builder.includes(toThrowableClasses(retry.classValues(INCLUDES)));
+        builder.excludes(toThrowableClasses(retry.classValues(EXCLUDES)));
+        builder.predicate(createPredicate(predicateClass, retry));
+        return builder.build();
+    }
 
-        return new SimpleRetry(
-            attempts,
-            retry.get(MULTIPLIER, Double.class).orElse(0d),
-            delay,
-            retry.get(MAX_DELAY, Duration.class).orElse(null),
-            predicate,
-            capturedException,
-            retry.get(JITTER, Double.class).orElse(0d)
-        );
+    CircuitBreakerPolicy circuitBreakerPolicy() {
+        AnnotationValue<CircuitBreaker> circuitBreaker = annotationMetadata.findAnnotation(CircuitBreaker.class)
+            .orElseThrow(() -> new IllegalStateException("Missing @CircuitBreaker annotation"));
+        RetryPolicy retryPolicy = retryPolicy();
+        CircuitBreakerPolicy.Builder builder = CircuitBreakerPolicy.builder()
+            .maxAttempts(retryPolicy.maxAttempts())
+            .delay(retryPolicy.delay())
+            .multiplier(retryPolicy.multiplier())
+            .jitter(retryPolicy.jitter())
+            .capturedException(retryPolicy.capturedException())
+            .predicate(retryPolicy.predicate())
+            .resetTimeout(circuitBreaker.get(RESET, Duration.class).orElse(Duration.ofSeconds(20)))
+            .throwWrappedException(circuitBreaker.booleanValue(THROW_WRAPPED_EXCEPTION).orElse(false));
+        retryPolicy.getMaxDelay().ifPresent(builder::maxDelay);
+        return builder.build();
     }
 
     private static RetryPredicate createPredicate(Class<? extends RetryPredicate> predicateClass, AnnotationValue<Retryable> retry) {
@@ -96,5 +120,14 @@ class AnnotationRetryStateBuilder implements RetryStateBuilder {
     private static List<Class<? extends Throwable>> resolveIncludes(AnnotationValue<Retryable> retry, String includes) {
         Class<?>[] values = retry.classValues(includes);
         return (List) List.of(values);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Class<? extends Throwable>[] toThrowableClasses(Class<?>[] values) {
+        Class<? extends Throwable>[] converted = new Class[values.length];
+        for (int i = 0; i < values.length; i++) {
+            converted[i] = (Class<? extends Throwable>) values[i];
+        }
+        return converted;
     }
 }

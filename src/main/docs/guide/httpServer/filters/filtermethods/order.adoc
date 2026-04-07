@@ -1,10 +1,12 @@
-Filters can be ordered in one of three ways:
+Filters can be ordered by annotating the filter method or filter class with api:order.Order[] or link:{jakartaapi}/jakarta/annotation/Priority.html[jakarta.annotation.Priority], or by implementing api:order.Ordered[] in the filter class.
 
-. An api:order.Order[] annotation on the filter method
+. An api:order.Order[] or link:{jakartaapi}/jakarta/annotation/Priority.html[@Priority] annotation on the filter method
+. An api:order.Order[] or link:{jakartaapi}/jakarta/annotation/Priority.html[@Priority] annotation on the filter class
 . Implementing api:order.Ordered[] in the filter class
-. An api:order.Order[] annotation on the filter class
 
 Request filters are executed in order from the highest precedence (the smallest integer value, as defined by `Ordered.HIGHEST_PRECEDENCE`) to the lowest precedence (the biggest integer value, as defined by `Ordered.LOWEST_PRECEDENCE`). Response filters are executed in reverse order.
+
+Micronaut applies the same numeric precedence rule to link:{jakartaapi}/jakarta/annotation/Priority.html[jakarta.annotation.Priority] because link:{jakartaapi}/jakarta/annotation/Priority.html[@Priority] is mapped to ann:core.annotation.Order[] during annotation processing.
 
 image::filter-order.svg[]
 

@@ -39,36 +39,50 @@ public interface RetryState {
     boolean canRetry(Throwable exception);
 
     /**
+     * Returns the maximum number of attempts.
+     *
      * @return The maximum number of attempts
      */
     int getMaxAttempts();
 
     /**
+     * Returns the number of the current attempt.
+     *
      * @return The number of the current attempt
      */
     int currentAttempt();
 
     /**
+     * Returns the multiplier to use between delays.
+     *
      * @return The multiplier to use between delays
      */
     OptionalDouble getMultiplier();
 
     /**
+     * Returns the delay between attempts.
+     *
      * @return The delay between attempts
      */
     Duration getDelay();
 
     /**
+     * Returns the overall delay so far.
+     *
      * @return The overall delay so far
      */
     Duration getOverallDelay();
 
     /**
+     * Returns the maximum overall delay.
+     *
      * @return The maximum overall delay
      */
     Optional<Duration> getMaxDelay();
 
     /**
+     * Returns the jitter factor used to apply random deviation to retry delays.
+     *
      * @return The jitter factor used to apply random deviation to retry delays
      */
     default OptionalDouble getJitter() {
@@ -76,14 +90,18 @@ public interface RetryState {
     }
 
     /**
-     * @return The retry predicate checking for includes/excludes throwable classes
+     * Returns the retry predicate checking for includes and excludes throwable classes.
+     *
+     * @return The retry predicate checking for includes and excludes throwable classes
      */
     default RetryPredicate getRetryPredicate() {
         throw new UnsupportedOperationException("Retry predicate not supported on this type");
     }
 
     /**
-     * @return The captured exception type (default to {@link RuntimeException}
+     * Returns the captured exception type, which defaults to {@link RuntimeException}.
+     *
+     * @return The captured exception type
      */
     @Nullable
     Class<? extends Throwable> getCapturedException();

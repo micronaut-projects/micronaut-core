@@ -49,7 +49,7 @@ class ClientRedirectSpec extends Specification {
         response.status() == HttpStatus.OK
         response.body() == "It works!"
     }
-    
+
     void "test - client: full uri, redirect: relative"() {
         when:
         HttpResponse<String> response = client.toBlocking().exchange('/test/redirect-relative', String)
