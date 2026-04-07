@@ -81,6 +81,7 @@ public final class ContextHolder {
      * @param packageName The Python package
      * @param simpleName The class name
      * @param fn Function receiving the pooled Value
+     * @param <T> Result type returned by the function
      * @return Result returned from the function
      */
     @UsedByGeneratedCode
@@ -110,6 +111,7 @@ public final class ContextHolder {
      * @param packageName The package
      * @param scriptName The script name
      * @param fn Function receiving the script Value
+     * @param <T> Result type returned by the function
      * @return Result returned from the function
      */
     @UsedByGeneratedCode
@@ -219,6 +221,28 @@ public final class ContextHolder {
     public static Value newInstance(@Nullable String packageName, String simpleName, Object... args) {
         Value pythonClass = findClass(packageName, simpleName);
         return instantiate(packageName, simpleName, args, pythonClass);
+    }
+
+    /**
+     * Create a new instance and set properties via member assignment when no constructor exists.
+     * This overload accepts a map of property values and will instantiate the Python class with
+     * no positional arguments, then populate attributes using Graal Polyglot putMember.
+     *
+     * @param packageName The package name (nullable)
+     * @param simpleName  The simple class name
+     * @param props       Map of property names to values
+     * @return The new instance with members populated.
+     */
+    @UsedByGeneratedCode
+    public static Value newInstance(@Nullable String packageName, String simpleName, java.util.Map<String, Object> props) {
+        Value pythonClass = findClass(packageName, simpleName);
+        Value instance = instantiate(packageName, simpleName, new Object[0], pythonClass);
+        if (props != null && !props.isEmpty()) {
+            for (java.util.Map.Entry<String, Object> e : props.entrySet()) {
+                instance.putMember(e.getKey(), e.getValue());
+            }
+        }
+        return instance;
     }
 
     private static Value instantiate(@Nullable String packageName, String simpleName, Object[] args, Value pythonClass) {
@@ -410,7 +434,7 @@ public final class ContextHolder {
     }
 
     /**
-     * Returns true if the context should be reused
+     * Returns true if the context should be reused.
      * @return the reuse flag
      */
     public static boolean isReuseContext() {

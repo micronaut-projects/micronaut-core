@@ -13,7 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.python.processing.annotation;
+package io.micronaut.context.python.annotation;
+
+import io.micronaut.core.annotation.Internal;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -27,25 +29,26 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  * This annotation allows inlining Python code or scanning directories for Python files
  * that will be processed during compilation.
  *
- * @since 4.8.0
+ * @since 5.0.0
  * @author Micronaut
  */
 @Documented
 @Retention(RUNTIME)
 @Target({ElementType.TYPE})
+@Internal
 public @interface PythonApplication {
 
     /**
-     * Inline Python code to be processed.
+     * Inline Python source code to process.
      *
-     * @return The Python code as a string
+     * @return Inline Python source code.
      */
     String code() default "";
 
     /**
-     * Directory paths to scan for .py files to process.
+     * Source paths containing Python files to process.
      *
-     * @return The directory path
+     * @return Source paths containing Python files.
      */
     String[] src() default "";
 }

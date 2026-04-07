@@ -39,6 +39,7 @@ from dataclasses import dataclass
 class TestDataClass:
     name: str
     age: int = 25
+
 '''
 
         when:
@@ -59,6 +60,45 @@ class TestDataClass:
         instance != null
         introspection.getRequiredProperty("name", String).get(instance) == "John"
         introspection.getRequiredProperty("age", int).get(instance) == 30
+        instance.asPolyglotValue().getMember("name").asString() == "John"
+        instance.asPolyglotValue().getMember("age").asInt() == 30
+        cleanup:
+        context?.close()
+    }
+
+    void "test @Introspected on regular Python class with attributes no constructor"() {
+        given:
+        def pythonCode = '''
+from micronaut.core.annotation import Introspected
+
+@Introspected
+class TestClass:
+    name: str
+    value: int
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def introspection = getBeanIntrospection(context, "python.TestClass")
+
+        then:
+        introspection != null
+        introspection.getBeanType().getSimpleName() == "TestClass"
+        introspection.getPropertyNames().length == 2
+        introspection.getProperty("name").isPresent()
+        introspection.getProperty("value").isPresent()
+
+        when:"instantiating with constructor arguments"
+        def instance = introspection.instantiate()
+        introspection.getRequiredProperty("name", String).set(instance, "Test")
+        introspection.getRequiredProperty("value", int).set(instance, 100)
+
+        then:"instance is created correctly"
+        instance != null
+        introspection.getRequiredProperty("name", String).get(instance) == "Test"
+        introspection.getRequiredProperty("value", int).get(instance) == 100
+        instance.asPolyglotValue().getMember("name").asString() == "Test"
+        instance.asPolyglotValue().getMember("value").asInt() == 100
 
         cleanup:
         context?.close()

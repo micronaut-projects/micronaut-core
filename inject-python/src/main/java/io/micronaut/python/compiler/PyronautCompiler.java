@@ -208,7 +208,7 @@ public final class PyronautCompiler {
         StringBuilder sb = new StringBuilder();
         sb.append("package ").append(getPackageName()).append(";\n\n");
         sb.append("import io.micronaut.runtime.Micronaut;\n");
-        sb.append("import io.micronaut.python.processing.annotation.PythonApplication;\n\n");
+        sb.append("import io.micronaut.context.python.annotation.PythonApplication;\n\n");
         sb.append("@PythonApplication(\n");
 
         if (hasSrc) {

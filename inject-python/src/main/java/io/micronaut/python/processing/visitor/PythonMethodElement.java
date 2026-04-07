@@ -35,7 +35,9 @@ import io.micronaut.inject.ast.annotation.MethodElementAnnotationsHelper;
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.python.processing.util.GraalPyUtil;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
 
 import javax.lang.model.element.Element;
 
@@ -108,6 +110,16 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
             .append(")")
             .append(genericReturnType.isVoid() ? "" : " -> " + genericReturnType.getDescription(simple));
         return description.toString();
+    }
+
+    @Override
+    public @NonNull MethodElement withNewParameters(@NotNull @NonNull ParameterElement... newParameters) {
+        return MethodElement.super.withNewParameters(newParameters);
+    }
+
+    @Override
+    public @NonNull MethodElement withNewOwningType(@NonNull ClassElement owningType) {
+        return MethodElement.super.withNewOwningType(owningType);
     }
 
     @Override

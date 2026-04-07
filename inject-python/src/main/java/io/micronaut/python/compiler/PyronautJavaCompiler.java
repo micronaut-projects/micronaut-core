@@ -20,8 +20,11 @@ import io.micronaut.annotation.processing.BeanDefinitionInjectProcessor;
 import io.micronaut.annotation.processing.MixinVisitorProcessor;
 import io.micronaut.annotation.processing.PackageElementVisitorProcessor;
 import io.micronaut.annotation.processing.TypeElementVisitorProcessor;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.processing.PythonAnnotationProcessor;
+import org.jspecify.annotations.NonNull;
 
 import javax.annotation.processing.Processor;
 import javax.tools.DiagnosticCollector;
@@ -32,11 +35,15 @@ import javax.tools.StandardJavaFileManager;
 import javax.tools.StandardLocation;
 import javax.tools.ToolProvider;
 import java.io.File;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.stream.Stream;
 
 /**
  * Utility class for compiling Java sources with Micronaut annotation processors.
@@ -89,7 +96,12 @@ final class PyronautJavaCompiler {
                              JavaFileManager fileManager,
                              DiagnosticCollector<JavaFileObject> diagnosticCollector) {
         List<String> options = buildCompilerOptions(classpath, bootclasspath, annotationProcessorPath, compilerOptions);
-        List<Processor> processors = getAnnotationProcessors();
+        ClassLoader classLoader = createAnnotationProcessorClassLoader(annotationProcessorPath);
+        System.setProperty(VisitorContext.MICRONAUT_PROCESSING_USE_CONTEXT_CLASSLOADER, StringUtils.TRUE);
+        ClassLoader previous = Thread.currentThread().getContextClassLoader();
+        Thread.currentThread().setContextClassLoader(classLoader);
+
+        List<Processor> processors = getAnnotationProcessors(annotationProcessorPath);
 
         try {
             JavaCompiler.CompilationTask task = compiler.getTask(
@@ -101,7 +113,9 @@ final class PyronautJavaCompiler {
                 Arrays.asList(sources) // Source files
             );
 
-            task.setProcessors(processors);
+            if (!processors.isEmpty()) {
+                task.setProcessors(processors);
+            }
 
             boolean success = task.call();
             if (!success) {
@@ -109,6 +123,8 @@ final class PyronautJavaCompiler {
                     "Compilation failed: " + diagnosticCollector.getDiagnostics());
             }
         } finally {
+            Thread.currentThread().setContextClassLoader(previous);
+            System.clearProperty(VisitorContext.MICRONAUT_PROCESSING_USE_CONTEXT_CLASSLOADER);
             shutdownProcessors(processors);
         }
     }
@@ -192,7 +208,16 @@ final class PyronautJavaCompiler {
      *
      * @return The processors
      */
-    private List<Processor> getAnnotationProcessors() {
+    private List<Processor> getAnnotationProcessors(List<File> annotationProcessorPath) {
+        if (annotationProcessorPath == null || annotationProcessorPath.isEmpty()) {
+            ClassLoader classLoader = createAnnotationProcessorClassLoader(annotationProcessorPath);
+            return getAnnotationProcessors(classLoader);
+        } else {
+            return List.of();
+        }
+    }
+
+    private @NonNull List<Processor> getAnnotationProcessors(ClassLoader classLoader) {
         List<Processor> processors = new ArrayList<>();
         processors.add(new MixinVisitorProcessor());
         processors.add(new PackageElementVisitorProcessor());
@@ -201,6 +226,7 @@ final class PyronautJavaCompiler {
         processors.add(new BeanDefinitionInjectProcessor());
 
         PythonAnnotationProcessor pythonProcessor = new PythonAnnotationProcessor();
+        pythonProcessor.setClassLoader(classLoader);
         if (classElementCallback != null) {
             pythonProcessor.setClassElementCallback(classElementCallback);
         }
@@ -209,5 +235,20 @@ final class PyronautJavaCompiler {
         processors.add(pythonProcessor);
 
         return processors;
+    }
+
+    private static ClassLoader createAnnotationProcessorClassLoader(List<File> annotationProcessorPath) {
+        ClassLoader classLoader = PythonAnnotationProcessor.class.getClassLoader();
+        if (annotationProcessorPath != null) {
+            List<URL> cp = annotationProcessorPath.stream().flatMap(f -> {
+                try {
+                    return Stream.of(f.toURI().toURL());
+                } catch (MalformedURLException e) {
+                    return Stream.empty();
+                }
+            }).toList();
+            classLoader = new URLClassLoader(cp.toArray(new URL[0]), classLoader);
+        }
+        return classLoader;
     }
 }

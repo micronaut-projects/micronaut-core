@@ -25,6 +25,8 @@ import io.micronaut.python.compiler.RepeatableAnnotation
 import spock.lang.PendingFeature
 import spock.lang.Unroll
 
+import java.util.function.Function
+
 /**
  * Tests for Python class elements.
  *
@@ -345,6 +347,106 @@ class MyDerived(MyBase[str]):
             assert methods[0].returnType.name == Object.name
             assert methods[0].parameters[0].genericType.name == String.name
             assert methods[0].parameters[0].type.name == Object.name
+            return element
+        }
+    }
+
+    def "test generic type arguments populated java interface in inheritance"() {
+        given:
+        def pythonCode = '''
+from typing import Generic, TypeVar
+import java
+
+Function = java.type("java.util.function.Function")
+
+class MyFunction(Function[str, str]):
+    def apply(val : str) -> str:
+        return val
+'''
+
+        expect:
+        // Test that we can build classes with generic base classes without errors
+        buildClassElement(pythonCode, "MyFunction") { ClassElement element ->
+            // Test that getSuperType() works correctly
+            def superType = element.getSuperType()
+            assert !superType.isPresent()
+            def interfaces = element.getInterfaces()
+            assert !interfaces.isEmpty()
+            assert interfaces.size() == 1
+            def javaFnc = interfaces.iterator().next()
+            assert javaFnc.name == Function.name
+            assert javaFnc.typeArguments['T'].name == String.name
+            assert javaFnc.typeArguments['R'].name == String.name
+            return element
+        }
+    }
+
+    def "test generic type arguments populated java interface using import"() {
+        given:
+        def pythonCode = '''
+from typing import Generic, TypeVar
+from java.util.function import Function
+
+class MyFunction(Function[str, str]):
+    def apply(val : str) -> str:
+        return val
+'''
+
+        expect:
+        // Test that we can build classes with generic base classes without errors
+        buildClassElement(pythonCode, "MyFunction") { ClassElement element ->
+            // Test that getSuperType() works correctly
+            def superType = element.getSuperType()
+            assert !superType.isPresent()
+            def interfaces = element.getInterfaces()
+            assert !interfaces.isEmpty()
+            assert interfaces.size() == 1
+            def javaFnc = interfaces.iterator().next()
+            assert javaFnc.name == Function.name
+            assert javaFnc.typeArguments['T'].name == String.name
+            assert javaFnc.typeArguments['R'].name == String.name
+            return element
+        }
+    }
+
+    def "test generic type arguments populated java interface as bean"() {
+        given:
+        def pythonCode = '''
+from typing import Generic, TypeVar
+from java.util.function import Function
+from jakarta.inject import Singleton
+
+print(F" TYPE {Function[str, str]}")
+
+@Singleton
+class MyFunction(Function[str, str]):
+    def apply(val : str) -> str:
+        return val
+'''
+
+        def context = buildContext(pythonCode)
+
+        expect:
+        getBean(context, "python.MyFunction") instanceof Function
+        // Test that we can build classes with generic base classes without errors
+    }
+
+    def "test override method with parameterized types"() {
+        given:
+        def pythonCode = '''
+from typing import Generic, TypeVar
+import java
+
+DataSource = java.type("javax.sql.DataSource")
+
+class MyDataSource(DataSource):
+    pass
+'''
+
+        expect:
+        // Test that we can build classes with generic base classes without errors
+        buildClassElement(pythonCode, "MyDataSource") { ClassElement element ->
+            // Test that getSuperType() works correctly
             return element
         }
     }

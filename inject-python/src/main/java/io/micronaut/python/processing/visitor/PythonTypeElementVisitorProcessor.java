@@ -33,45 +33,27 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 public class PythonTypeElementVisitorProcessor {
-    private static final Set<String> VISITOR_WARNINGS;
-    private static final Set<String> SUPPORTED_ANNOTATION_NAMES;
-
-    static {
-        final var warnings = new HashSet<String>();
-        var names = new HashSet<String>();
-        for (TypeElementVisitor<?, ?> typeElementVisitor : findCoreTypeElementVisitors(warnings)) {
-            final Set<String> supportedAnnotationNames;
-            try {
-                supportedAnnotationNames = typeElementVisitor.getSupportedAnnotationNames();
-            } catch (Throwable e) {
-                // ignore if annotations are not on the classpath
-                continue;
-            }
-            if (!supportedAnnotationNames.equals(Collections.singleton("*"))) {
-                names.addAll(supportedAnnotationNames);
-            }
-        }
-        SUPPORTED_ANNOTATION_NAMES = names;
-
-        if (warnings.isEmpty()) {
-            VISITOR_WARNINGS = Collections.emptySet();
-        } else {
-            VISITOR_WARNINGS = Collections.unmodifiableSet(warnings);
-        }
-    }
+    private final ClassLoader classLoader;
 
     private Collection<? extends TypeElementVisitor<?, ?>> typeElementVisitors;
     private List<LoadedVisitor> loadedVisitors;
 
+    public PythonTypeElementVisitorProcessor(ClassLoader classLoader) {
+        this.classLoader = classLoader;
+    }
+
     /**
      * Initialise the processor.
+     *
      * @param environment The processing environment
      */
     public synchronized void init(PythonProcessingEnvironment environment) {
@@ -107,6 +89,7 @@ public class PythonTypeElementVisitorProcessor {
 
     /**
      * Process the given elements.
+     *
      * @param environment The processing environment
      */
     public void process(PythonProcessingEnvironment environment) {
@@ -173,10 +156,11 @@ public class PythonTypeElementVisitorProcessor {
     @NonNull
     protected synchronized Collection<? extends TypeElementVisitor<?, ?>> findTypeElementVisitors() {
         if (typeElementVisitors == null) {
-            for (String visitorWarning : VISITOR_WARNINGS) {
+            HashSet<String> warnings = new HashSet<>();
+            typeElementVisitors = findCoreTypeElementVisitors(warnings);
+            for (String visitorWarning : warnings) {
                 warning(visitorWarning);
             }
-            typeElementVisitors = findCoreTypeElementVisitors(null);
         }
         return typeElementVisitors;
     }
@@ -185,9 +169,10 @@ public class PythonTypeElementVisitorProcessor {
         System.err.println("WARNING: " + visitorWarning);
     }
 
+    @SuppressWarnings("rawtypes")
     @NonNull
-    private static Collection<? extends TypeElementVisitor<?, ?>> findCoreTypeElementVisitors(@Nullable Set<String> warnings) {
-        return SoftServiceLoader.load(TypeElementVisitor.class, PythonTypeElementVisitorProcessor.class.getClassLoader())
+    private Collection<? extends TypeElementVisitor<?, ?>> findCoreTypeElementVisitors(@Nullable Set<String> warnings) {
+        List visitors = SoftServiceLoader.load(TypeElementVisitor.class, classLoader)
             .disableFork()
             .collectAll(visitor -> {
                 if (!visitor.isEnabled()) {
@@ -214,8 +199,27 @@ public class PythonTypeElementVisitorProcessor {
                 return true;
             }).stream()
             .filter(Objects::nonNull)
-            .<TypeElementVisitor<?, ?>>map(e -> e)
-            // remove duplicate classes
-            .collect(Collectors.toMap(Object::getClass, v -> v, (a, b) -> a)).values();
+            .collect(Collectors.toMap(Object::getClass, v -> v, (a, b) -> a)).values().stream().toList();
+        if (visitors.isEmpty()) {
+            visitors = new ArrayList<>();
+            Iterator<ServiceLoader.Provider<TypeElementVisitor>> it = ServiceLoader.load(TypeElementVisitor.class, classLoader).stream().iterator();
+            while (it.hasNext()) {
+                Class<? extends TypeElementVisitor> type = null;
+                try {
+                    ServiceLoader.Provider<TypeElementVisitor> provider = it.next();
+                    type = provider.type();
+                    visitors.add(provider.get());
+                } catch (Throwable e) {
+                    if (e instanceof VirtualMachineError virtualMachineError) {
+                        throw virtualMachineError;
+                    } else {
+                        if (warnings != null) {
+                            warnings.add("Error loading TypeElementVisitor " + (type != null ? type.getSimpleName() : "") + ": " + e.getMessage());
+                        }
+                    }
+                }
+            }
+        }
+        return (Collection<? extends TypeElementVisitor<?, ?>>) visitors;
     }
 }

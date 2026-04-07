@@ -20,6 +20,7 @@ dependencies {
         }
     }
     api(libs.managed.graalpy.embedding)
+    implementation(libs.bytebuddy)
     compileOnly(libs.jetbrains.annotations)
     testImplementation(projects.micronautAop)
 }

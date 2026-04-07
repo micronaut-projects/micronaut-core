@@ -12,6 +12,13 @@ micronautBuild {
 
 repositories {
     mavenCentral()
+    maven {
+        url 'https://central.sonatype.com/repository/maven-snapshots/'
+        mavenContent {
+            snapshotsOnly()
+        }
+    }
+    mavenLocal()
 }
 
 configurations.all {
@@ -113,4 +120,3 @@ spotless {
         targetExclude '**/io/micronaut/http/netty/stream/package-info.java'
     }
 }
-

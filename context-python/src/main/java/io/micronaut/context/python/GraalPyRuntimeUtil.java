@@ -78,6 +78,7 @@ public final class GraalPyRuntimeUtil {
      *
      * @param graalValue the GraalPy Value (should be a list-like object)
      * @param elementType the expected element type for conversion
+     * @param <T> the expected list element type
      * @return a Java List with converted elements
      */
     public static <T> List<T> convertList(Value graalValue, Class<T> elementType) {
@@ -121,6 +122,8 @@ public final class GraalPyRuntimeUtil {
      * @param graalValue the GraalPy Value (should be a dict-like object)
      * @param keyType the expected key type for conversion
      * @param valueType the expected value type for conversion
+     * @param <K> the expected key type
+     * @param <V> the expected value type
      * @return a Java Map with converted keys and values
      */
     public static <K, V> Map<K, V> convertMap(Value graalValue, Class<K> keyType, Class<V> valueType) {
@@ -175,6 +178,7 @@ public final class GraalPyRuntimeUtil {
      *
      * @param graalValue the GraalPy Value to convert
      * @param elementType the expected element type for conversion
+     * @param <T> the expected optional element type
      * @return a Java Optional with the converted value or empty
      */
     @SuppressWarnings("unchecked")
@@ -203,6 +207,7 @@ public final class GraalPyRuntimeUtil {
      *
      * @param graalValue the GraalPy Value (should be a set-like object)
      * @param elementType the expected element type for conversion
+     * @param <T> the expected set element type
      * @return a Java Set with converted elements
      */
     public static <T> Set<T> convertSet(Value graalValue, Class<T> elementType) {
@@ -255,6 +260,11 @@ public final class GraalPyRuntimeUtil {
 
     /**
      * Generic value conversion method that handles primitives and recursively converts collections.
+     *
+     * @param value The source polyglot value
+     * @param targetType The target Java type
+     * @param <T> The target type
+     * @return The converted value or {@code null}
      */
     @SuppressWarnings("unchecked")
     public static <T> @Nullable T convertValue(Value value, Class<T> targetType) {

@@ -21,6 +21,7 @@ import io.micronaut.core.bind.annotation.Bindable;
 /**
  * Configuration for the PythonPool.
  *
+ * @param enabled    Whether pooling is enabled.
  * @param size       The size of the pool. Defaults to the number of processors * 2.
  * @param syncInit   Whether to synchronously create the pool
  * @param warnWaitMs The amount of time to wait for a pooled context before a warning is printed.
