@@ -21,7 +21,72 @@ Micronaut framework by default contains `PropertySourceLoader` implementations t
 . Environment-specific properties from `application-{environment}.{extension}`
 . Application-specific properties from `application.{extension}`
 
-NOTE: 'micronaut.config.files' will be ignored in bootstrap.yml or application.yml. Loading additional configuration files from a configuration file is not supported
+NOTE: 'micronaut.config.files' will be ignored in bootstrap.yml or application.yml.
+
+=== Importing Additional Configuration
+
+You can import additional configuration directly from a configuration file using `micronaut.config.import`.
+The value can be a single string, a list, or indexed entries (`micronaut.config.import[0]`, `micronaut.config.import[1]`, ...).
+
+[configuration,title="Importing additional configuration"]
+----
+micronaut:
+  config:
+    import:
+      - "file:///etc/myapp/shared"
+      - "classpath://overrides.yml"
+      - "optional:env://MY_APP_INLINE_CONFIG"
+----
+
+Imports are resolved recursively and support the following protocols:
+
+* `file://` – load from the file system
+* `classpath://` – load exactly one matching classpath resource (fails if duplicates are found)
+* `classpath*://` – load and merge all matching classpath resources in classpath discovery order
+* `env://` – load key/value properties from an environment variable value, using the variable-name suffix (for example `.yml`) or `?extension=yml` / `?extension=json` to select non-properties formats
+* `configtree://` – load a directory tree where file paths map to property keys
+
+Prefix any import with `optional:` to skip it when the target is missing.
+Without `optional:`, an api:io.micronaut.context.exceptions.ConfigurationException[] is thrown if the import cannot be loaded.
+
+For `file://`, `classpath://`, and `classpath*://` imports, if no extension is provided, Micronaut probes known configuration extensions (`.properties`, `.json`, `.yml`, and any additional enabled loaders).
+
+For `env://` imports, Micronaut defaults to `.properties` parsing. To import YAML or JSON from an environment variable, either include the format in the variable reference such as `env://MY_APP_INLINE_CONFIG.yml`, or specify it explicitly with `env://MY_APP_INLINE_CONFIG?extension=yml`.
+
+When multiple resources with the same classpath name are present:
+
+* `classpath://` throws a api:io.micronaut.context.exceptions.ConfigurationException[] and reports all matching locations.
+* `classpath*://` loads all matches in classpath order and merges them in that same order.
+
+IMPORTANT: `file:///tmp/bar.properties` (with three slashes) resolves to the absolute path `/tmp/bar.properties`.
+
+=== Implementing a Custom PropertySourceImporter
+
+You can add support for a custom import protocol by implementing api:io.micronaut.context.env.PropertySourceImporter[] and registering it with Java ServiceLoader. Each importer declares its provider with `getProvider()`, converts the parsed api:io.micronaut.core.util.ConnectionString[] into a typed declaration via `newImportDeclaration(..)`, and then reads configuration from `importPropertySource(..)`.
+
+snippet::io.micronaut.docs.config.importer.DemoPropertySourceImporter[tags="class",indent=0,title="Custom importer implementation"]
+
+snippet::io.micronaut.docs.config.importer.DemoPropertySourceImporterTest[tags="test",indent=0,title="Custom importer test"]
+
+Register your implementation in `META-INF/services/io.micronaut.context.env.PropertySourceImporter`:
+
+[source]
+----
+io.micronaut.docs.config.importer.DemoPropertySourceImporter
+----
+
+After registration, the importer is selected when `micronaut.config.import` uses your protocol, for example `demo://defaults`.
+
+If your importer loads remote configuration, api:discovery.config.RetryablePropertySourceImporter[] in `micronaut-discovery-core` provides a reusable base class that standardizes retry behavior across both connection-string and map-based imports. It parses the same retry properties from either form and applies them with Micronaut's programmatic retry support.
+
+Standard retry properties supported by api:discovery.config.RetryablePropertySourceImporter[] are:
+
+* `retry-attempts` – maximum number of attempts
+* `retry-count` – alias for `retry-attempts`
+* `retry-delay` – delay between attempts
+* `retry-max-delay` – maximum overall retry delay
+* `retry-multiplier` – delay multiplier
+* `retry-jitter` – retry jitter factor from `0.0` to `1.0`
 
 TIP: `.properties`, `.json`, `.yml` are supported out of the box. For Groovy users `.groovy` is supported as well.
 
