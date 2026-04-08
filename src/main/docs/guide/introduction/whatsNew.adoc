@@ -26,7 +26,7 @@ Configuration support expanded significantly in 5.0.x. Micronaut now supports co
 
 Configuration metadata also became more useful for tooling. Micronaut 5 can generate JSON Schema documents from `@ConfigurationProperties`, making it easier to drive IDE completion, validation, and external tooling from the same configuration model used by the framework. For the underlying configuration model, see <<configurationProperties, Configuration Properties>>.
 
-The JSON and serialization stack was updated as well, with work across `JsonMapper`, Jackson 3 preparation, and additional configuration coverage so applications can adopt newer JSON infrastructure more smoothly.
+The JSON and serialization stack was updated as well, with work across `JsonMapper`, the update to Jackson 3, and additional configuration coverage so applications can adopt the newer JSON infrastructure more smoothly.
 
 == Resilience and Context Propagation
 
