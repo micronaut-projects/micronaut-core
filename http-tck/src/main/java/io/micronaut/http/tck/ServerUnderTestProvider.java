@@ -47,7 +47,6 @@ public interface ServerUnderTestProvider {
         if (specName != null) {
             props.put("spec.name", specName);
         }
-        props.putIfAbsent("micronaut.propagation", "scoped-value");
         return getServer(props);
     }
 
