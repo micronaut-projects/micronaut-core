@@ -1,6 +1,8 @@
 As you can see, the Micronaut framework features a robust system for externalizing and adapting configuration to the environment inspired by similar approaches in Grails and Spring Boot.
 
-However, what if you want multiple microservices to share configuration? the Micronaut framework includes APIs for distributed configuration.
+However, what if you want multiple microservices to share configuration? The Micronaut framework includes APIs for distributed configuration.
+
+For new applications and new integrations, the recommended approach is to use <<configImport, configuration import>> via `micronaut.config.import` instead of relying on the bootstrap context. Configuration imports let you load remote or shared configuration as part of normal property source resolution, and custom remote sources can be integrated with <<customPropertySourceImporter, PropertySourceImporter>> implementations.
 
 The api:discovery.config.ConfigurationClient[] interface has a `getPropertySources` method that can be implemented to read and resolve configuration from distributed sources.
 
@@ -8,6 +10,6 @@ The `getPropertySources` returns a rs:Publisher[] that emits zero or many api:co
 
 The default implementation is api:discovery.config.DefaultCompositeConfigurationClient[] which merges all registered `ConfigurationClient` beans into a single bean.
 
-You can either implement your own api:discovery.config.ConfigurationClient[] or use the implementations provided by Micronaut. The following sections cover those.
+You can either implement your own api:discovery.config.ConfigurationClient[] or use the implementations provided by Micronaut. For new work, prefer implementing distributed configuration through configuration import support and `PropertySourceImporter`. The following sections cover the available integrations.
 
-NOTE: When implementing custom distributed configuration that is loaded during bootstrap, implementing api:discovery.config.ConfigurationClient[] alone is not enough. The application also needs the discovery client infrastructure, which normally comes from the `io.micronaut.discovery:micronaut-discovery-client` dependency, and any beans involved in resolving that configuration must still be bootstrap-compatible.
+NOTE: The bootstrap context is still available for legacy integrations and compatibility scenarios, but it is no longer the recommended default for distributed configuration. If you still load distributed configuration during bootstrap, implementing api:discovery.config.ConfigurationClient[] alone is not enough. The application also needs the discovery client infrastructure, which normally comes from the `io.micronaut.discovery:micronaut-discovery-client` dependency, and any beans involved in resolving that configuration must still be bootstrap-compatible. See <<bootstrap, Bootstrap Configuration>> for those legacy requirements.
