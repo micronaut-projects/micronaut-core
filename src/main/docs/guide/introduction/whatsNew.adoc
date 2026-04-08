@@ -34,18 +34,6 @@ Micronaut Retry gained programmatic retry and circuit breaker APIs in addition t
 
 The 5.0.x line also expanded context propagation capabilities, including support for scope values and continued alignment with modern JDK context propagation patterns. See <<contextPropagation, Context Propagation>>.
 
-== Closed Enhancement PRs Reviewed for 5.0.x
-
-The following closed pull requests on the `5.0.x` branch were tagged `type: enhancement` and informed this summary:
-
-* https://github.com/micronaut-projects/micronaut-core/pull/12223[PR #12223] - Support for creating AOP proxies at runtime if necessary
-* https://github.com/micronaut-projects/micronaut-core/pull/12246[PR #12246] - Multipart and form API refactor
-* https://github.com/micronaut-projects/micronaut-core/pull/12377[PR #12377] - JSON Schema generation from Micronaut configuration properties
-* https://github.com/micronaut-projects/micronaut-core/pull/12435[PR #12435] - Truffle polyglot language support improvements
-* https://github.com/micronaut-projects/micronaut-core/pull/12571[PR #12571] - Config import support and importer SPI
-* https://github.com/micronaut-projects/micronaut-core/pull/12585[PR #12585] - Programmatic retry and circuit breaker APIs
-* https://github.com/micronaut-projects/micronaut-core/pull/12592[PR #12592] - `jakarta.annotation.Priority` annotation mapper
-
-== In Practice
+== Summary
 
 For teams adopting Micronaut Framework 5.0.x, the biggest benefits are stronger null-safety, more flexible AOP and retry models, better HTTP and multipart capabilities, richer configuration tooling, and continued improvements to the container's compile-time-first runtime model.
