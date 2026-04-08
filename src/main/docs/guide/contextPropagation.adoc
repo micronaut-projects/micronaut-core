@@ -71,9 +71,9 @@ String userId = context.propagate(() -> {
 });
 ----
 
-==== Hybrid example: scoped value first, thread local as a fallback
+==== Hybrid example: thread local by default, scoped value when enabled
 
-Sometimes you need a single element that works in both propagation modes. Implementing both interfaces lets you bind a `ScopedValue` by default and only fall back to a `ThreadLocal` when scoped values are unavailable:
+Sometimes you need a single element that works in both propagation modes. Implementing both interfaces lets you update a `ThreadLocal` in the default mode and automatically bind a `ScopedValue` when scoped-value mode is enabled:
 
 [source,java]
 ----
@@ -127,7 +127,7 @@ class RequestContextElement implements ScopedValuePropagatedContextElement<Strin
 }
 ----
 
-When Micronaut runs in scoped-value mode the `ScopedValue` binding happens first, so `updateThreadContext()` returns `null` and the `ThreadLocal` branch is skipped entirely. In thread-local mode the same element transparently updates the `ThreadLocal`, meaning `currentRequestId()` continues to work without additional code.
+When Micronaut runs in thread-local mode the element transparently updates the `ThreadLocal`, so `currentRequestId()` keeps working with existing integrations. If you switch to scoped-value mode, the `ScopedValue` binding happens first, `updateThreadContext()` returns `null`, and the `ThreadLocal` branch is skipped entirely.
 
 snippet::io.micronaut.docs.propagation.MdcService[tags="createUser", indent=0, title="MDC propagation example"]
 
@@ -158,11 +158,11 @@ Integer status = context.propagateCall(() -> client.status()); // Callable<T>
 
 For cases where you need to hand off work—for example to an executor—you can also pre-wrap a `Runnable`, `Callable`, or `Supplier` via `PropagatedContext.wrap(…)`.
 
-=== Default Scoped Values propagation on Java 25
+=== Default thread-local propagation with optional Scoped Values
 
-Micronaut Framework 5 targets Java 25 by default. Since Java 21 the JDK ships *Scoped Values* (`java.lang.ScopedValue`) as a structured alternative to classic thread locals. Because Scoped Values are available on Java 25, Micronaut enables them by default and stores propagated data in the `scoped-value` mode.
+Micronaut Framework 5 targets Java 25 by default. Since Java 21 the JDK ships *Scoped Values* (`java.lang.ScopedValue`) as a structured alternative to classic thread locals. Even though Scoped Values are available on Java 25, Micronaut keeps `thread-local` as the default propagation mode so existing integrations that require thread-local state continue to work without extra configuration.
 
-Scoped Values participate in virtual threads, enforce well-defined lifetimes, and prevent the accidental leaks that long-running thread pools often suffer when `ThreadLocal` is used directly. Unless you override the propagation mode, every piece of state you add to a `PropagatedContext` will therefore flow through Scoped Values.
+Scoped Values still participate in virtual threads, enforce well-defined lifetimes, and prevent the accidental leaks that long-running thread pools often suffer when `ThreadLocal` is used directly. When you want those semantics, set the propagation mode to `scoped-value` explicitly.
 
 === Avoid try-with-resources unless thread-local propagation is mandatory
 
@@ -176,14 +176,14 @@ context.propagate(() -> {
 });
 ----
 
-The try-with-resources pattern exists primarily for legacy integrations that require `ThreadLocal` propagation. Whenever you can, call one of the lambda-based `propagate(…)` helpers shown earlier instead—they work in both propagation modes. Only fall back to the scope API when the surrounding code expects a `ThreadLocal` to be present. Because the scope relies on thread-local state, invoking `propagate()` while the mode is still `scoped-value` throws an `IllegalStateException` instructing you to enable thread-local support.
+The try-with-resources pattern exists primarily for legacy integrations that require `ThreadLocal` propagation. Whenever you can, call one of the lambda-based `propagate(…)` helpers shown earlier instead—they work in both propagation modes. Only fall back to the scope API when the surrounding code expects a `ThreadLocal` to be present. Because the scope relies on thread-local state, invoking `propagate()` while the mode is `scoped-value` throws an `IllegalStateException` instructing you to switch back to thread-local support.
 
-Configure the mode globally (default: `scoped-value`) by setting `micronaut.propagation`:
+To opt into scoped-value mode globally (default: `thread-local`), set `micronaut.propagation`:
 
 [source,yaml]
 ----
 micronaut:
-  propagation: thread-local
+  propagation: scoped-value
 ----
 
 Or change it programmatically during application bootstrap:
@@ -196,18 +196,18 @@ import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.core.propagation.PropagatedContextConfiguration;
 
 @Context
-class ThreadLocalPropagationListener implements ApplicationEventListener<ContextStartedEvent> {
+class ScopedValuePropagationListener implements ApplicationEventListener<ContextStartedEvent> {
 
     @Override
     public void onApplicationEvent(ContextStartedEvent event) {
-        PropagatedContextConfiguration.set(PropagatedContextConfiguration.Mode.THREAD_LOCAL);
+        PropagatedContextConfiguration.set(PropagatedContextConfiguration.Mode.SCOPED_VALUE);
     }
 }
 ----
 
-Restoring Scoped Values later is as simple as calling `PropagatedContextConfiguration.set(PropagatedContextConfiguration.Mode.SCOPED_VALUE);`.
+Switching back to thread-local mode later is as simple as calling `PropagatedContextConfiguration.set(PropagatedContextConfiguration.Mode.THREAD_LOCAL);`.
 
-NOTE: Prefer the default `scoped-value` mode whenever possible. Scoped Values integrate seamlessly with virtual threads, express the intent that the state only lives within a structured scope, and eliminate the risk of leaking `ThreadLocal` data between unrelated requests.
+NOTE: Prefer `scoped-value` when your integrations only need lambda-based propagation. Scoped Values integrate seamlessly with virtual threads, express the intent that the state only lives within a structured scope, and eliminate the risk of leaking `ThreadLocal` data between unrelated requests.
 
 === When scoped values are not sufficient
 
