@@ -812,7 +812,13 @@ public class DefaultMutableConversionService implements MutableConversionService
         });
 
         // String -> Locale
-        addInternalConverter(CharSequence.class, Locale.class, object -> StringUtils.parseLocale(object.toString()));
+        addInternalConverter(CharSequence.class, Locale.class, object -> {
+            try {
+                return StringUtils.parseLocale(object.toString());
+            } catch (IllegalArgumentException e) {
+                return null;
+            }
+        });
 
         // String -> UUID
         addInternalConverter(CharSequence.class, UUID.class, (CharSequence object, Class<UUID> targetType, ConversionContext context) -> {
