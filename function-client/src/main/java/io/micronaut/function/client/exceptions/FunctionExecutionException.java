@@ -16,6 +16,8 @@
 package io.micronaut.function.client.exceptions;
 
 /**
+ * Exception thrown when a remote function invocation fails.
+ *
  * @author graemerocher
  * @since 1.0
  */

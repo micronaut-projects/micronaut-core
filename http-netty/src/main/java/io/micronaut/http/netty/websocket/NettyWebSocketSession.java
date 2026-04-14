@@ -24,7 +24,7 @@ import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
-import io.micronaut.http.codec.MediaTypeCodecRegistry;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.websocket.CloseReason;
 import io.micronaut.websocket.WebSocketSession;
 import io.micronaut.websocket.exceptions.WebSocketSessionException;
@@ -72,8 +72,8 @@ public class NettyWebSocketSession implements WebSocketSession {
      * @param id The ID
      * @param channel The channel
      * @param request The original request used to create the session
-     * @param codecRegistry The codec registry
      * @param handlerRegistry The handlers registry
+     * @param conversionService The conversion service
      * @param protocolVersion The protocol version
      * @param isSecure Whether the session is secure
      */
@@ -81,8 +81,8 @@ public class NettyWebSocketSession implements WebSocketSession {
             String id,
             Channel channel,
             HttpRequest<?> request,
-            MediaTypeCodecRegistry codecRegistry,
             MessageBodyHandlerRegistry handlerRegistry,
+            ConversionService conversionService,
             String protocolVersion,
             boolean isSecure) {
         this.id = id;
@@ -91,7 +91,7 @@ public class NettyWebSocketSession implements WebSocketSession {
         this.protocolVersion = protocolVersion;
         this.isSecure = isSecure;
         this.channel.attr(WEB_SOCKET_SESSION_KEY).set(this);
-        this.messageEncoder = new WebSocketMessageEncoder(codecRegistry, handlerRegistry);
+        this.messageEncoder = new WebSocketMessageEncoder(handlerRegistry, conversionService);
         this.attributes = request.getAttribute("micronaut.SESSION", MutableConvertibleValues.class).orElseGet(MutableConvertibleValuesMap::new);
     }
 

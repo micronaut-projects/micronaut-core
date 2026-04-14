@@ -21,7 +21,6 @@ import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
-import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
 import io.micronaut.http.netty.channel.EventLoopGroupRegistry;
 import io.micronaut.http.netty.channel.NettyChannelType;
@@ -81,12 +80,6 @@ public interface NettyEmbeddedServices {
      * @see io.micronaut.http.server.RouteExecutor
      */
     RouteExecutor getRouteExecutor();
-
-    /**
-     * @return The media type code registry
-     * @see io.micronaut.http.codec.MediaTypeCodecRegistry
-     */
-    MediaTypeCodecRegistry getMediaTypeCodecRegistry();
 
     /**
      * @return The static resource resolver

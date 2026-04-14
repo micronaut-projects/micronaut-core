@@ -27,6 +27,7 @@ import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.sse.Event;
 import jakarta.annotation.Nullable;
 import jakarta.inject.Inject;
+import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 
 import java.io.ByteArrayOutputStream;
@@ -44,6 +45,7 @@ import java.util.List;
  */
 @Internal
 @Singleton
+@Named(TextStreamBodyWriter.BEAN_NAME)
 @Produces(MediaType.TEXT_EVENT_STREAM)
 @Consumes(MediaType.TEXT_EVENT_STREAM)
 final class TextStreamBodyWriter<T> implements MessageBodyWriter<T> {
@@ -59,6 +61,7 @@ final class TextStreamBodyWriter<T> implements MessageBodyWriter<T> {
     @Nullable
     private final MessageBodyWriter<Object> specificBodyWriter;
     private final MessageBodyHandlerRegistry registry;
+    static final String BEAN_NAME = "text-stream";
 
     @Inject
     TextStreamBodyWriter(MessageBodyHandlerRegistry registry) {

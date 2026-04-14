@@ -28,7 +28,6 @@ import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
 import io.micronaut.http.client.jdk.cookie.CookieDecoder;
-import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.filter.HttpClientFilterResolver;
 import io.micronaut.http.filter.HttpFilterResolver;
 import org.slf4j.LoggerFactory;
@@ -55,8 +54,6 @@ public class JdkBlockingHttpClient extends AbstractJdkHttpClient implements Bloc
         @Nullable HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver,
         @Nullable List<HttpFilterResolver.FilterEntry> clientFilterEntries,
         @Nullable
-        MediaTypeCodecRegistry mediaTypeCodecRegistry,
-        @Nullable
         MessageBodyHandlerRegistry messageBodyHandlerRegistry,
         RequestBinderRegistry requestBinderRegistry,
         @Nullable
@@ -73,7 +70,6 @@ public class JdkBlockingHttpClient extends AbstractJdkHttpClient implements Bloc
             contextPath,
             filterResolver,
             clientFilterEntries,
-            mediaTypeCodecRegistry,
             messageBodyHandlerRegistry,
             requestBinderRegistry,
             clientId,

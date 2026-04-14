@@ -32,6 +32,7 @@ import io.micronaut.json.JsonMapper;
 import io.micronaut.json.body.CustomizableJsonHandler;
 import io.micronaut.json.body.JsonMessageHandler;
 import io.netty.buffer.ByteBuf;
+import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
@@ -50,9 +51,12 @@ import java.util.List;
  */
 @Internal
 @Singleton
+@Named(NettyJsonStreamHandler.BEAN_NAME)
 @Produces(MediaType.APPLICATION_JSON_STREAM)
 @Consumes(MediaType.APPLICATION_JSON_STREAM)
 public final class NettyJsonStreamHandler<T> implements MessageBodyHandler<T>, ChunkedMessageBodyReader<T>, CustomizableJsonHandler {
+    static final String BEAN_NAME = "json-stream";
+
     private final JsonMessageHandler<T> jsonMessageHandler;
 
     public NettyJsonStreamHandler(JsonMapper jsonMapper) {

@@ -34,7 +34,6 @@ import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.codec.CodecException;
-import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.simple.SimpleHttpHeaders;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
@@ -98,7 +97,6 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     protected final MethodExecutionHandle<?, ?> messageHandler;
     @Nullable
     protected final MethodExecutionHandle<?, ?> pongHandler;
-    protected final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     protected final MessageBodyHandlerRegistry messageBodyHandlerRegistry;
     protected final WebSocketVersion webSocketVersion;
     protected final String subProtocol;
@@ -124,7 +122,6 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
      */
     protected AbstractNettyWebSocketHandler(
             RequestBinderRegistry binderRegistry,
-            MediaTypeCodecRegistry mediaTypeCodecRegistry,
             MessageBodyHandlerRegistry messageBodyHandlerRegistry,
             WebSocketBean<?> webSocketBean,
             HttpRequest<?> request,
@@ -142,7 +139,6 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         this.originatingRequest = request;
         this.messageHandler = webSocketBean.messageMethod().orElse(null);
         this.pongHandler = webSocketBean.pongMethod().orElse(null);
-        this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
         this.webSocketVersion = version;
         this.conversionService = conversionService;
         this.messageBodyHandlerRegistry = messageBodyHandlerRegistry;
@@ -364,20 +360,15 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                         exceptionCaught(ctx, e);
                         return;
                     }
-                    try {
-                        data = mediaTypeCodecRegistry.findCodec(mediaType)
-                            .map(codec -> codec.decode(bodyArgument, new NettyByteBufferFactory(ctx.alloc()).wrap(msg.content())))
-                            .orElse(null);
-                    } catch (CodecException e) {
-                        messageProcessingException(ctx, e);
-                        return;
-                    }
-                    if (data == null) {
-                        MessageBodyReader<?> reader = messageBodyHandlerRegistry.findReader(bodyArgument, mediaType)
-                            .orElse(null);
-                        if (reader != null) {
-                            ByteBuffer<ByteBuf> byteBuffer = new NettyByteBufferFactory(ctx.alloc()).wrap(msg.content().retain());
+                    MessageBodyReader<?> reader = messageBodyHandlerRegistry.findReader(bodyArgument, mediaType)
+                        .orElse(null);
+                    if (reader != null) {
+                        ByteBuffer<ByteBuf> byteBuffer = new NettyByteBufferFactory(ctx.alloc()).wrap(msg.content().retain());
+                        try {
                             data = reader.read((Argument) bodyArgument, mediaType, new SimpleHttpHeaders(), byteBuffer);
+                        } catch (CodecException e) {
+                            messageProcessingException(ctx, e);
+                            return;
                         }
                     }
                 }

@@ -31,6 +31,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
+ * Provides {@link FunctionDefinition} instances for locally registered functions.
+ *
  * @author graemerocher
  * @since 1.0
  */

@@ -27,8 +27,6 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.codec.CodecException;
-import io.micronaut.http.codec.MediaTypeCodec;
-import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,19 +50,15 @@ public class HttpResponseAdapter<O> extends BaseHttpResponseAdapter<byte[], O> {
     private final Argument<O> bodyType;
 
     @Nullable
-    private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
-    @Nullable
     private final MessageBodyHandlerRegistry messageBodyHandlerRegistry;
 
     public HttpResponseAdapter(java.net.http.HttpResponse<byte[]> httpResponse,
                                @Nullable Argument<O> bodyType,
                                ConversionService conversionService,
-                               @Nullable MediaTypeCodecRegistry mediaTypeCodecRegistry,
                                @Nullable
                                MessageBodyHandlerRegistry messageBodyHandlerRegistry) {
         super(httpResponse, conversionService);
         this.bodyType = bodyType;
-        this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
         this.messageBodyHandlerRegistry = messageBodyHandlerRegistry;
     }
 
@@ -99,16 +93,6 @@ public class HttpResponseAdapter<O> extends BaseHttpResponseAdapter<byte[], O> {
             if (CharSequence.class.isAssignableFrom(type.getType())) {
                 Charset charset = contentType.getCharset().orElse(StandardCharsets.UTF_8);
                 return Optional.of((T) new String(bytes, charset));
-            }
-        }
-        if (mediaTypeCodecRegistry != null) {
-            Optional<MediaTypeCodec> foundCodec = mediaTypeCodecRegistry.findCodec(contentType);
-            if (foundCodec.isPresent()) {
-                try {
-                    return foundCodec.map(codec -> codec.decode(type, bytes));
-                } catch (CodecException e) {
-                    logCodecError(contentType, type, e);
-                }
             }
         }
         if (messageBodyHandlerRegistry != null) {

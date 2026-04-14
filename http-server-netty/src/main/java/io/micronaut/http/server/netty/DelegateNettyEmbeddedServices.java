@@ -20,7 +20,6 @@ import io.micronaut.context.BeanProvider;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
-import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
 import io.micronaut.http.netty.channel.EventLoopGroupRegistry;
 import io.micronaut.http.netty.channel.NettyChannelType;
@@ -71,11 +70,6 @@ interface DelegateNettyEmbeddedServices extends NettyEmbeddedServices {
     @Override
     default RouteExecutor getRouteExecutor() {
         return getDelegate().getRouteExecutor();
-    }
-
-    @Override
-    default MediaTypeCodecRegistry getMediaTypeCodecRegistry() {
-        return getDelegate().getMediaTypeCodecRegistry();
     }
 
     @Override

@@ -30,11 +30,11 @@ import io.micronaut.http.client.filter.ClientFilterResolutionContext;
 import io.micronaut.http.client.filter.DefaultHttpClientFilterResolver;
 import io.micronaut.http.client.netty.ssl.ClientSslBuilder;
 import io.micronaut.http.client.netty.ssl.NettyClientSslFactory;
-import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.filter.HttpClientFilter;
 import io.micronaut.http.filter.HttpClientFilterResolver;
 import io.micronaut.http.filter.HttpFilterResolver;
 import io.micronaut.http.ssl.CertificateProvider;
+import io.micronaut.json.JsonFeatures;
 import io.micronaut.websocket.context.WebSocketBeanRegistry;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFactory;
@@ -83,9 +83,9 @@ public final class DefaultHttpClientBuilder {
     @Nullable
     BeanProvider<CertificateProvider> certificateProviders;
     @Nullable
-    MediaTypeCodecRegistry codecRegistry;
-    @Nullable
     MessageBodyHandlerRegistry handlerRegistry;
+    @Nullable
+    JsonFeatures jsonFeatures;
     WebSocketBeanRegistry webSocketBeanRegistry = WebSocketBeanRegistry.EMPTY;
     @Nullable
     RequestBinderRegistry requestBinderRegistry;
@@ -190,23 +190,15 @@ public final class DefaultHttpClientBuilder {
         return this;
     }
 
-    /**
-     * Set the codec registry. This has mostly been replaced by body handlers by now.
-     *
-     * @param codecRegistry The codec registry
-     * @return This builder
-     * @deprecated Use body handlers instead
-     */
-    @Deprecated
-    DefaultHttpClientBuilder codecRegistry(MediaTypeCodecRegistry codecRegistry) {
-        ArgumentUtils.requireNonNull("codecRegistry", codecRegistry);
-        this.codecRegistry = codecRegistry;
-        return this;
-    }
-
     DefaultHttpClientBuilder handlerRegistry(MessageBodyHandlerRegistry handlerRegistry) {
         ArgumentUtils.requireNonNull("handlerRegistry", handlerRegistry);
         this.handlerRegistry = handlerRegistry;
+        return this;
+    }
+
+    DefaultHttpClientBuilder jsonFeatures(JsonFeatures jsonFeatures) {
+        ArgumentUtils.requireNonNull("jsonFeatures", jsonFeatures);
+        this.jsonFeatures = jsonFeatures;
         return this;
     }
 

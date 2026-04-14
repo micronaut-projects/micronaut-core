@@ -25,7 +25,6 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
-import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.websocket.AbstractNettyWebSocketHandler;
 import io.micronaut.http.netty.websocket.NettyWebSocketSession;
 import io.micronaut.http.uri.UriMatchInfo;
@@ -90,19 +89,17 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
      * @param webSocketBean              The WebSocket client bean.
      * @param handshaker                 The handshaker
      * @param requestBinderRegistry      The request binder registry
-     * @param mediaTypeCodecRegistry     The media type codec registry
      * @param messageBodyHandlerRegistry The handler registry
-     * @param conversionService          The conversionService
+     * @param conversionService          The conversion service
      */
     public NettyWebSocketClientHandler(
             MutableHttpRequest<?> request,
             WebSocketBean<T> webSocketBean,
             final WebSocketClientHandshaker handshaker,
             RequestBinderRegistry requestBinderRegistry,
-            MediaTypeCodecRegistry mediaTypeCodecRegistry,
             MessageBodyHandlerRegistry messageBodyHandlerRegistry,
             ConversionService conversionService) {
-        super(requestBinderRegistry, mediaTypeCodecRegistry, messageBodyHandlerRegistry, webSocketBean, request, Collections.emptyMap(), handshaker.version(), handshaker.actualSubprotocol(), null, conversionService);
+        super(requestBinderRegistry, messageBodyHandlerRegistry, webSocketBean, request, Collections.emptyMap(), handshaker.version(), handshaker.actualSubprotocol(), null, conversionService);
         this.handshaker = handshaker;
         this.genericWebSocketBean = webSocketBean;
         String clientPath = webSocketBean.getBeanDefinition().stringValue(ClientWebSocket.class).orElse("");
@@ -244,8 +241,8 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
             Objects.requireNonNull(handshakeResponse).headers().get(HttpHeaderNames.SEC_WEBSOCKET_ACCEPT),
             ctx.channel(),
             originatingRequest,
-            mediaTypeCodecRegistry,
             messageBodyHandlerRegistry,
+            conversionService,
             handshaker.version().toHttpHeaderValue(),
             ctx.pipeline().get(SslHandler.class) != null
         ) {

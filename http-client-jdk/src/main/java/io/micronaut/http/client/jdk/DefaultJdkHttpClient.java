@@ -36,13 +36,8 @@ import io.micronaut.http.client.filter.ClientFilterResolutionContext;
 import io.micronaut.http.client.jdk.cookie.CompositeCookieDecoder;
 import io.micronaut.http.client.jdk.cookie.CookieDecoder;
 import io.micronaut.http.client.jdk.cookie.DefaultCookieDecoder;
-import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.filter.HttpClientFilterResolver;
 import io.micronaut.http.filter.HttpFilterResolver;
-import io.micronaut.json.JsonMapper;
-import io.micronaut.json.codec.JsonMediaTypeCodec;
-import io.micronaut.json.codec.JsonStreamMediaTypeCodec;
-import io.micronaut.runtime.ApplicationConfiguration;
 import org.reactivestreams.Publisher;
 import org.slf4j.LoggerFactory;
 
@@ -65,8 +60,6 @@ public class DefaultJdkHttpClient extends AbstractJdkHttpClient implements JdkHt
         @Nullable String contextPath,
         @Nullable HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver,
         @Nullable List<HttpFilterResolver.FilterEntry> clientFilterEntries,
-        @Nullable
-        MediaTypeCodecRegistry mediaTypeCodecRegistry,
         MessageBodyHandlerRegistry messageBodyHandlerRegistry,
         RequestBinderRegistry requestBinderRegistry,
         @Nullable
@@ -83,7 +76,6 @@ public class DefaultJdkHttpClient extends AbstractJdkHttpClient implements JdkHt
             contextPath,
             filterResolver,
             clientFilterEntries,
-            mediaTypeCodecRegistry,
             messageBodyHandlerRegistry,
             requestBinderRegistry,
             clientId,
@@ -101,7 +93,6 @@ public class DefaultJdkHttpClient extends AbstractJdkHttpClient implements JdkHt
             null,
             null,
             null,
-            createDefaultMediaTypeRegistry(),
             JdkHttpClientFactory.createDefaultMessageBodyHandlerRegistry(),
             new DefaultRequestBinderRegistry(conversionService),
             null,
@@ -114,8 +105,6 @@ public class DefaultJdkHttpClient extends AbstractJdkHttpClient implements JdkHt
     public DefaultJdkHttpClient(
         @Nullable URI uri,
         HttpClientConfiguration configuration,
-        @Nullable
-        MediaTypeCodecRegistry mediaTypeCodecRegistry,
         MessageBodyHandlerRegistry messageBodyHandlerRegistry,
         ConversionService conversionService
     ) {
@@ -126,22 +115,12 @@ public class DefaultJdkHttpClient extends AbstractJdkHttpClient implements JdkHt
             null,
             null,
             null,
-            mediaTypeCodecRegistry,
             messageBodyHandlerRegistry,
             new DefaultRequestBinderRegistry(conversionService),
             null,
             conversionService,
             new JdkClientSslBuilder(new ResourceResolver()),
             new CompositeCookieDecoder(List.of(new DefaultCookieDecoder()))
-        );
-    }
-
-    private static MediaTypeCodecRegistry createDefaultMediaTypeRegistry() {
-        JsonMapper mapper = JsonMapper.createDefault();
-        ApplicationConfiguration configuration = new ApplicationConfiguration();
-        return MediaTypeCodecRegistry.of(
-            new JsonMediaTypeCodec(mapper, configuration, null),
-            new JsonStreamMediaTypeCodec(mapper, configuration, null)
         );
     }
 
@@ -154,7 +133,6 @@ public class DefaultJdkHttpClient extends AbstractJdkHttpClient implements JdkHt
             contextPath,
             filterResolver,
             clientFilterEntries,
-            mediaTypeCodecRegistry,
             messageBodyHandlerRegistry,
             requestBinderRegistry,
             clientId,

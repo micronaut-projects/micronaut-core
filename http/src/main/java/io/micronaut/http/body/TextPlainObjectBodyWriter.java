@@ -26,6 +26,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.codec.CodecException;
+import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 
@@ -41,8 +42,10 @@ import java.io.OutputStream;
 @Produces(MediaType.TEXT_PLAIN)
 @Consumes(MediaType.TEXT_PLAIN)
 @Singleton
+@Named(TextPlainObjectBodyWriter.BEAN_NAME)
 @Internal
 final class TextPlainObjectBodyWriter implements TypedMessageBodyWriter<Object>, ResponseBodyWriter<Object> {
+    static final String BEAN_NAME = "text";
 
     @Override
     public Argument<Object> getType() {

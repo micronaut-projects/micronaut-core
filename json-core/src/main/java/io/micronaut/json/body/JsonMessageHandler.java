@@ -37,6 +37,7 @@ import io.micronaut.http.body.ResponseBodyWriter;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.json.JsonFeatures;
 import io.micronaut.json.JsonMapper;
+import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 
@@ -62,6 +63,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Order(JsonMessageHandler.ORDER)
 @Experimental
 @Singleton
+@Named(JsonMessageHandler.BEAN_NAME)
 @JsonMessageHandler.ProducesJson
 @JsonMessageHandler.ConsumesJson
 @BootstrapContextCompatible
@@ -71,6 +73,10 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Custo
      * The JSON handler should be preferred if for any type.
      */
     public static final int ORDER = -10;
+    /**
+     * Bean name for JSON handler.
+     */
+    public static final String BEAN_NAME = "json";
 
     private final JsonMapper jsonMapper;
 

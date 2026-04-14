@@ -27,12 +27,16 @@ import java.util.Optional;
 public interface FunctionDefinition {
 
     /**
-     * @return The name of the function
+     * Returns the name of the function.
+     *
+     * @return The name of the function.
      */
     String getName();
 
     /**
-     * @return An optional URI endpoint to the function
+     * Returns an optional URI endpoint to the function.
+     *
+     * @return An optional URI endpoint to the function.
      */
     default Optional<URI> getURI() {
         return Optional.empty();

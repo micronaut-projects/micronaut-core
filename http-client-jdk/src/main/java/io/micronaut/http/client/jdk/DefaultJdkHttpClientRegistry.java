@@ -52,19 +52,15 @@ import io.micronaut.http.client.filter.ClientFilterResolutionContext;
 import io.micronaut.http.client.jdk.cookie.CompositeCookieDecoder;
 import io.micronaut.http.client.jdk.cookie.CookieDecoder;
 import io.micronaut.http.client.jdk.cookie.DefaultCookieDecoder;
-import io.micronaut.http.codec.MediaTypeCodec;
-import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.filter.HttpClientFilterResolver;
 import io.micronaut.inject.InjectionPoint;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.json.JsonFeatures;
 import io.micronaut.json.JsonMapper;
 import io.micronaut.json.body.CustomizableJsonHandler;
-import io.micronaut.json.codec.MapperMediaTypeCodec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -92,8 +88,6 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
     private final LoadBalancerResolver loadBalancerResolver;
     private final HttpClientConfiguration defaultHttpClientConfiguration;
     private final JsonMapper jsonMapper;
-    @Nullable
-    private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     private final MessageBodyHandlerRegistry messageBodyHandlerRegistry;
     private final BeanProvider<RequestBinderRegistry> requestBinderRegistryProvider;
     private final JdkClientSslBuilder jdkClientSslBuilder;
@@ -106,7 +100,6 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
         HttpClientConfiguration defaultHttpClientConfiguration,
         HttpClientFilterResolver<ClientFilterResolutionContext> httpClientFilterResolver,
         JsonMapper jsonMapper,
-        @Nullable MediaTypeCodecRegistry mediaTypeCodecRegistry,
         MessageBodyHandlerRegistry messageBodyHandlerRegistry,
         BeanProvider<RequestBinderRegistry> requestBinderRegistryProvider,
         BeanProvider<JdkClientSslBuilder> sslBuilderBeanProvider,
@@ -117,19 +110,10 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
         this.defaultHttpClientConfiguration = defaultHttpClientConfiguration;
         this.clientFilterResolver = httpClientFilterResolver;
         this.jsonMapper = jsonMapper;
-        this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
         this.messageBodyHandlerRegistry = messageBodyHandlerRegistry;
         this.requestBinderRegistryProvider = requestBinderRegistryProvider;
         this.jdkClientSslBuilder = sslBuilderBeanProvider.orElse(new JdkClientSslBuilder(new ResourceResolver()));
         this.cookieDecoder = cookieDecoderBeanProvider.orElse(new CompositeCookieDecoder(List.of(new DefaultCookieDecoder())));
-    }
-
-    private static MediaTypeCodec createNewJsonCodec(BeanContext beanContext, JsonFeatures jsonFeatures) {
-        return getJsonCodec(beanContext).cloneWithFeatures(jsonFeatures);
-    }
-
-    private static MapperMediaTypeCodec getJsonCodec(BeanContext beanContext) {
-        return beanContext.getBean(MapperMediaTypeCodec.class, Qualifiers.byName(MapperMediaTypeCodec.REGULAR_JSON_MEDIA_TYPE_CODEC_NAME));
     }
 
     /**
@@ -193,7 +177,8 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
                 null,
                 loadBalancer.getContextPath().orElse(null),
                 beanContext,
-                AnnotationMetadata.EMPTY_METADATA
+                AnnotationMetadata.EMPTY_METADATA,
+                null
             );
         } else {
             return getClient(injectionPoint != null ? injectionPoint.getAnnotationMetadata() : AnnotationMetadata.EMPTY_METADATA);
@@ -269,63 +254,16 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
                 }
             }
 
-            DefaultJdkHttpClient client = buildClient(
+            return buildClient(
                 loadBalancer,
                 clientKey.httpVersion,
                 configuration,
                 clientId,
                 contextPath,
                 beanContext,
-                annotationMetadata
+                annotationMetadata,
+                clientKey.jsonFeatures
             );
-
-            final JsonFeatures jsonFeatures = clientKey.jsonFeatures;
-            if (jsonFeatures != null) {
-                List<MediaTypeCodec> codecs = new ArrayList<>(2);
-                MediaTypeCodecRegistry codecRegistry = client.getMediaTypeCodecRegistry();
-                if (codecRegistry != null) {
-                    for (MediaTypeCodec codec : codecRegistry.getCodecs()) {
-                        if (codec instanceof MapperMediaTypeCodec mapper) {
-                            codecs.add(mapper.cloneWithFeatures(jsonFeatures));
-                        } else {
-                            codecs.add(codec);
-                        }
-                    }
-                    if (codecRegistry.findCodec(MediaType.APPLICATION_JSON_TYPE).isEmpty()) {
-                        codecs.add(createNewJsonCodec(this.beanContext, jsonFeatures));
-                    }
-                }
-                client.setMediaTypeCodecRegistry(MediaTypeCodecRegistry.of(codecs));
-                client.setMessageBodyHandlerRegistry(new MessageBodyHandlerRegistry() {
-                    @Nullable
-                    final MessageBodyHandlerRegistry delegate = client.getMessageBodyHandlerRegistry();
-
-                    @SuppressWarnings("unchecked")
-                    private <T> T customize(T handler) {
-                        if (handler instanceof CustomizableJsonHandler cnjh) {
-                            return (T) cnjh.customize(jsonFeatures);
-                        }
-                        return handler;
-                    }
-
-                    @Override
-                    public <T> Optional<MessageBodyReader<T>> findReader(Argument<T> type, @Nullable List<MediaType> mediaType) {
-                        if (delegate == null) {
-                            return Optional.empty();
-                        }
-                        return delegate.findReader(type, mediaType).map(this::customize);
-                    }
-
-                    @Override
-                    public <T> Optional<MessageBodyWriter<T>> findWriter(Argument<T> type, List<MediaType> mediaType) {
-                        if (delegate == null) {
-                            return Optional.empty();
-                        }
-                        return delegate.findWriter(type, mediaType).map(this::customize);
-                    }
-                });
-            }
-            return client;
         });
     }
 
@@ -340,9 +278,14 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
         @Nullable
         String contextPath,
         BeanContext beanContext,
-        AnnotationMetadata annotationMetadata
+        AnnotationMetadata annotationMetadata,
+        @Nullable JsonFeatures jsonFeatures
     ) {
         ConversionService conversionService = beanContext.getBean(ConversionService.class);
+        MessageBodyHandlerRegistry handlerRegistry = messageBodyHandlerRegistry;
+        if (jsonFeatures != null) {
+            handlerRegistry = customizeHandlers(handlerRegistry, jsonFeatures);
+        }
         return new DefaultJdkHttpClient(
             loadBalancer,
             httpVersion,
@@ -353,14 +296,39 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
                 clientId == null ? null : Collections.singletonList(clientId),
                 annotationMetadata
             )),
-            mediaTypeCodecRegistry,
-            messageBodyHandlerRegistry,
+            handlerRegistry,
             requestBinderRegistryProvider.orElse(new DefaultRequestBinderRegistry(conversionService)),
             clientId,
             conversionService,
             jdkClientSslBuilder,
             cookieDecoder
         );
+    }
+
+    private MessageBodyHandlerRegistry customizeHandlers(@Nullable MessageBodyHandlerRegistry delegate, JsonFeatures jsonFeatures) {
+        if (delegate == null) {
+            return MessageBodyHandlerRegistry.EMPTY;
+        }
+        MessageBodyHandlerRegistry base = delegate;
+        return new MessageBodyHandlerRegistry() {
+            @SuppressWarnings("unchecked")
+            private <T> T customize(T handler) {
+                if (handler instanceof CustomizableJsonHandler cnjh) {
+                    return (T) cnjh.customize(jsonFeatures);
+                }
+                return handler;
+            }
+
+            @Override
+            public <T> Optional<MessageBodyReader<T>> findReader(Argument<T> type, @Nullable List<MediaType> mediaType) {
+                return base.findReader(type, mediaType).map(this::customize);
+            }
+
+            @Override
+            public <T> Optional<MessageBodyWriter<T>> findWriter(Argument<T> type, List<MediaType> mediaType) {
+                return base.findWriter(type, mediaType).map(this::customize);
+            }
+        };
     }
 
     @Override

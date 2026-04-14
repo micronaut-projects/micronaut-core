@@ -19,7 +19,6 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Value;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.context.processor.BeanDefinitionProcessor;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
@@ -32,8 +31,6 @@ import io.micronaut.function.LocalFunctionRegistry;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
-import io.micronaut.http.codec.MediaTypeCodec;
-import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.web.router.DefaultRouteBuilder;
@@ -43,7 +40,6 @@ import jakarta.inject.Singleton;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -64,7 +60,7 @@ import java.util.stream.Stream;
 @Singleton
 @Replaces(DefaultLocalFunctionRegistry.class)
 public class AnnotatedFunctionRouteBuilder extends DefaultRouteBuilder
-    implements BeanDefinitionProcessor<FunctionBean>, LocalFunctionRegistry, MediaTypeCodecRegistry {
+    implements BeanDefinitionProcessor<FunctionBean>, LocalFunctionRegistry {
 
     private final LocalFunctionRegistry localFunctionRegistry;
     private final String contextPath;
@@ -76,18 +72,16 @@ public class AnnotatedFunctionRouteBuilder extends DefaultRouteBuilder
      * @param executionHandleLocator executionHandleLocator
      * @param uriNamingStrategy uriNamingStrategy
      * @param conversionService conversionService
-     * @param codecRegistry codecRegistry
      * @param contextPath contextPath
      */
     public AnnotatedFunctionRouteBuilder(
         ExecutionHandleLocator executionHandleLocator,
         UriNamingStrategy uriNamingStrategy,
         ConversionService conversionService,
-        MediaTypeCodecRegistry codecRegistry,
         @Value("${micronaut.function.context-path:/}") String contextPath) {
 
         super(executionHandleLocator, uriNamingStrategy, conversionService);
-        this.localFunctionRegistry = new DefaultLocalFunctionRegistry(codecRegistry);
+        this.localFunctionRegistry = new DefaultLocalFunctionRegistry();
         this.contextPath = contextPath.endsWith("/") ? contextPath : contextPath + '/';
     }
 
@@ -253,27 +247,4 @@ public class AnnotatedFunctionRouteBuilder extends DefaultRouteBuilder
         return localFunctionRegistry.findBiFunction(name);
     }
 
-    @Override
-    public Optional<MediaTypeCodec> findCodec(@Nullable MediaType mediaType) {
-        if (localFunctionRegistry instanceof MediaTypeCodecRegistry mediaTypeCodecRegistry) {
-            return mediaTypeCodecRegistry.findCodec(mediaType);
-        }
-        return Optional.empty();
-    }
-
-    @Override
-    public Optional<MediaTypeCodec> findCodec(@Nullable MediaType mediaType, Class<?> type) {
-        if (localFunctionRegistry instanceof MediaTypeCodecRegistry mediaTypeCodecRegistry) {
-            return mediaTypeCodecRegistry.findCodec(mediaType, type);
-        }
-        return Optional.empty();
-    }
-
-    @Override
-    public Collection<MediaTypeCodec> getCodecs() {
-        if (localFunctionRegistry instanceof MediaTypeCodecRegistry mediaTypeCodecRegistry) {
-            return mediaTypeCodecRegistry.getCodecs();
-        }
-        return Collections.emptyList();
-    }
 }

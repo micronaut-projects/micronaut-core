@@ -26,7 +26,9 @@ import java.util.Collection;
 public interface FunctionDefinitionProvider {
 
     /**
-     * @return The {@link FunctionDefinition} instances
+     * Returns the available {@link FunctionDefinition} instances.
+     *
+     * @return The available {@link FunctionDefinition} instances.
      */
     Collection<FunctionDefinition> getFunctionDefinitions();
 }

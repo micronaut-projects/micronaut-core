@@ -128,7 +128,6 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
         @Nullable CoroutineHelper coroutineHelper) {
         super(
                 nettyEmbeddedServices.getRequestArgumentSatisfier().getBinderRegistry(),
-                nettyEmbeddedServices.getMediaTypeCodecRegistry(),
                 nettyEmbeddedServices.getMessageBodyHandlerRegistry(),
                 webSocketBean,
                 request,
@@ -248,8 +247,8 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
                 Objects.requireNonNull(id),
                 channel,
                 originatingRequest,
-                mediaTypeCodecRegistry,
                 messageBodyHandlerRegistry,
+                conversionService,
                 webSocketVersion.toHttpHeaderValue(),
                 ctx.pipeline().get(SslHandler.class) != null
         ) {

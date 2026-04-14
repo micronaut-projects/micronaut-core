@@ -30,8 +30,11 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.function.LocalFunctionRegistry;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.CodecException;
-import io.micronaut.http.codec.MediaTypeCodec;
-import io.micronaut.http.codec.MediaTypeCodecRegistry;
+import io.micronaut.http.HttpHeaders;
+import io.micronaut.http.body.MessageBodyHandlerRegistry;
+import io.micronaut.http.body.MessageBodyReader;
+import io.micronaut.http.body.MessageBodyWriter;
+import io.micronaut.http.simple.SimpleHttpHeaders;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -80,6 +83,9 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
 
         final Environment env = startEnvironment(applicationContext);
         final ConversionService conversionService = env.getConversionService();
+        final MessageBodyHandlerRegistry messageBodyHandlerRegistry = applicationContext
+            .findBean(MessageBodyHandlerRegistry.class)
+            .orElse(MessageBodyHandlerRegistry.EMPTY);
         final String functionName = resolveFunctionName(env);
 
         if (functionName == null) {
@@ -109,7 +115,7 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
                     if (!typeArguments.isEmpty()) {
                         arg = Argument.of(typeArguments.get(0).getType(), arg.getName());
                     }
-                    Object value = decodeInputArgument(conversionService, localFunctionRegistry, arg, input);
+                    Object value = decodeInputArgument(conversionService, messageBodyHandlerRegistry, arg, input);
                     result = method.invoke(bean, value);
                     break;
                 case 2:
@@ -120,7 +126,7 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
                         firstArgument = Argument.of(typeArguments.get(0).getType(), firstArgument.getName());
                     }
 
-                    Object first = decodeInputArgument(conversionService, localFunctionRegistry, firstArgument, input);
+                    Object first = decodeInputArgument(conversionService, messageBodyHandlerRegistry, firstArgument, input);
                     Object second = decodeContext(conversionService, secondArgument, context);
                     result = method.invoke(bean, first, second);
                     break;
@@ -128,7 +134,7 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
                     throw new InvocationException("Function [" + functionName + "] cannot be made executable.");
             }
             if (result != null) {
-                encode(env, localFunctionRegistry, returnJavaType, result, output);
+                encode(env, messageBodyHandlerRegistry, returnJavaType, result, output);
             }
         } finally {
             close();
@@ -139,13 +145,13 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
      * Encode and write to output stream.
      *
      * @param environment environment
-     * @param registry local function registry
+     * @param handlerRegistry message body handler registry
      * @param returnType return type as Class
      * @param result result object
      * @param output output stream
      * @throws IOException input/output exception
      */
-    static void encode(Environment environment, LocalFunctionRegistry registry, Class<?> returnType, Object result, OutputStream output) throws IOException {
+    static void encode(Environment environment, MessageBodyHandlerRegistry handlerRegistry, Class<?> returnType, Object result, OutputStream output) throws IOException {
         if (ClassUtils.isJavaLangType(returnType)) {
             if (result instanceof Byte byte1) {
                 output.write(byte1);
@@ -163,11 +169,13 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
             if (result instanceof Writable writable) {
                 writable.writeTo(output, environment.getProperty(LocalFunctionRegistry.FUNCTION_CHARSET, Charset.class, StandardCharsets.UTF_8));
             } else {
-                Optional<MediaTypeCodec> codec = registry instanceof MediaTypeCodecRegistry mtcr ? mtcr.findCodec(MediaType.APPLICATION_JSON_TYPE) : Optional.empty();
-
-
-                if (codec.isPresent()) {
-                    codec.get().encode(result, output);
+                @SuppressWarnings("unchecked")
+                Argument<Object> argument = (Argument<Object>) Argument.of(returnType);
+                @SuppressWarnings({"rawtypes", "unchecked"})
+                Optional<MessageBodyWriter<Object>> writer = (Optional) handlerRegistry.findWriter((Argument) argument, MediaType.APPLICATION_JSON_TYPE);
+                if (writer.isPresent()) {
+                    MessageBodyWriter<Object> messageBodyWriter = writer.get();
+                    messageBodyWriter.writeTo(argument, MediaType.APPLICATION_JSON_TYPE, (Object) result, createJsonHeaders(), output);
                 } else {
                     byte[] bytes = environment.getConversionService()
                         .convert(result, byte[].class)
@@ -180,7 +188,7 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
 
     private Object decodeInputArgument(
         ConversionService conversionService,
-        LocalFunctionRegistry localFunctionRegistry,
+        MessageBodyHandlerRegistry messageBodyHandlerRegistry,
         Argument<?> arg,
         InputStream input) {
         Class<?> argType = arg.getType();
@@ -192,12 +200,14 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
         } else if (argType.isInstance(input)) {
             return input;
         } else {
-
-            if (localFunctionRegistry instanceof MediaTypeCodecRegistry registry) {
-                Optional<MediaTypeCodec> registeredDecoder = registry.findCodec(MediaType.APPLICATION_JSON_TYPE);
-                if (registeredDecoder.isPresent()) {
-                    MediaTypeCodec decoder = registeredDecoder.get();
-                    return decoder.decode(arg, input);
+            @SuppressWarnings({"unchecked", "rawtypes"})
+            Optional<MessageBodyReader<Object>> reader = (Optional) messageBodyHandlerRegistry.findReader((Argument) arg, MediaType.APPLICATION_JSON_TYPE);
+            if (reader.isPresent()) {
+                @SuppressWarnings("unchecked")
+                Argument<Object> targetArgument = (Argument<Object>) arg;
+                Object decoded = reader.get().read(targetArgument, MediaType.APPLICATION_JSON_TYPE, createJsonHeaders(), input);
+                if (decoded != null) {
+                    return decoded;
                 }
             }
         }
@@ -230,5 +240,11 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
             }
         }
         return null;
+    }
+
+    private static SimpleHttpHeaders createJsonHeaders() {
+        SimpleHttpHeaders headers = new SimpleHttpHeaders();
+        headers.set(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON);
+        return headers;
     }
 }

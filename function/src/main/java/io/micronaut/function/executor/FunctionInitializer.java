@@ -20,13 +20,19 @@ import io.micronaut.context.RuntimeBeanDefinition;
 import io.micronaut.context.annotation.Secondary;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.cli.CommandLine;
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.function.LocalFunctionRegistry;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.codec.MediaTypeCodecRegistry;
+import io.micronaut.http.HttpHeaders;
+import io.micronaut.http.body.MessageBodyHandlerRegistry;
+import io.micronaut.http.simple.SimpleHttpHeaders;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import org.jspecify.annotations.Nullable;
 
+import java.io.ByteArrayInputStream;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.Objects;
 import java.util.function.Function;
@@ -106,8 +112,11 @@ public class FunctionInitializer extends AbstractExecutor {
             Object result = supplier.apply(context);
             if (result != null) {
 
-                LocalFunctionRegistry bean = applicationContext.getBean(LocalFunctionRegistry.class);
-                StreamFunctionExecutor.encode(applicationContext.getEnvironment(), bean, result.getClass(), result, System.out);
+                applicationContext.getBean(LocalFunctionRegistry.class);
+                MessageBodyHandlerRegistry handlerRegistry = applicationContext
+                    .findBean(MessageBodyHandlerRegistry.class)
+                    .orElse(MessageBodyHandlerRegistry.EMPTY);
+                StreamFunctionExecutor.encode(applicationContext.getEnvironment(), handlerRegistry, result.getClass(), result, System.out);
                 functionExitHandler.exitWithSuccess();
             }
         } catch (Exception e) {
@@ -162,21 +171,30 @@ public class FunctionInitializer extends AbstractExecutor {
          * @return Type
          */
         public final <T> T get(Class<T> type) {
-            Objects.requireNonNull(applicationContext);
+            ApplicationContext context = Objects.requireNonNull(FunctionInitializer.this.applicationContext);
             if (ClassUtils.isJavaLangType(type)) {
-                return applicationContext
+                return context
                     .getConversionService()
                     .convert(data, type).orElseThrow(() -> newIllegalArgument(type, data));
             } else {
-                MediaTypeCodecRegistry codecRegistry = applicationContext.getBean(MediaTypeCodecRegistry.class);
-                return codecRegistry.findCodec(MediaType.APPLICATION_JSON_TYPE)
-                    .map(codec -> {
+                Argument<T> argument = Argument.of(type);
+                MessageBodyHandlerRegistry handlerRegistry = context
+                    .findBean(MessageBodyHandlerRegistry.class)
+                    .orElse(MessageBodyHandlerRegistry.EMPTY);
+                return handlerRegistry.findReader(argument, MediaType.APPLICATION_JSON_TYPE)
+                    .map(reader -> {
+                        SimpleHttpHeaders headers = jsonHeaders();
                         if (data != null) {
-                            return codec.decode(type, data);
-                        } else {
-                            // try System.in
-                            return codec.decode(type, System.in);
+                            Charset charset = context.getEnvironment()
+                                .getProperty(LocalFunctionRegistry.FUNCTION_CHARSET, Charset.class, StandardCharsets.UTF_8);
+                            return reader.read(
+                                argument,
+                                MediaType.APPLICATION_JSON_TYPE,
+                                headers,
+                                new ByteArrayInputStream(data.getBytes(charset))
+                            );
                         }
+                        return reader.read(argument, MediaType.APPLICATION_JSON_TYPE, headers, System.in);
                     })
                     .orElseThrow(() -> newIllegalArgument(type, data));
             }
@@ -188,6 +206,12 @@ public class FunctionInitializer extends AbstractExecutor {
             } else {
                 return new IllegalArgumentException("Input data cannot be converted to type: " + dataType);
             }
+        }
+
+        private SimpleHttpHeaders jsonHeaders() {
+            SimpleHttpHeaders headers = new SimpleHttpHeaders();
+            headers.set(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON);
+            return headers;
         }
     }
 }

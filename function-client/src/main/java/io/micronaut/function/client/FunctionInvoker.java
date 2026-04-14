@@ -19,6 +19,8 @@ import io.micronaut.core.type.Argument;
 import org.jspecify.annotations.Nullable;
 
 /**
+ * Contract for a client-side function invoker.
+ *
  * @param <I> input type
  * @param <O> output type
  * @author graemerocher

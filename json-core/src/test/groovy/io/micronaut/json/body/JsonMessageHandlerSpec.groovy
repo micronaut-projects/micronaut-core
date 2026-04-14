@@ -5,7 +5,6 @@ import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.http.annotation.Consumes
 import io.micronaut.http.annotation.Produces
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.json.codec.JsonMediaTypeCodec
 import spock.lang.Specification
 
 class JsonMessageHandlerSpec extends Specification {
@@ -13,13 +12,12 @@ class JsonMessageHandlerSpec extends Specification {
     void "JsonMessageHandler annotation #classSimpleName value matches JsonMediaTypeCode constant"(Class annotationClass, String classSimpleName) {
         given:
         ApplicationContext applicationContext = ApplicationContext.run()
-        JsonMediaTypeCodec jsonMediaTypeCodec = applicationContext.getBean(JsonMediaTypeCodec)
         when:
         BeanDefinition<JsonMessageHandler> nettyJsonHandlerBeanDefinition = applicationContext.getBeanDefinition(JsonMessageHandler.class)
         AnnotationValue annotation = nettyJsonHandlerBeanDefinition.getAnnotation(annotationClass)
 
         then:
-        assertAnnotationValueMatchesJsonMediaTypeCodec(annotation, jsonMediaTypeCodec)
+        assertAnnotationValueMatchesExpected(annotation, annotationClass)
 
         cleanup:
         applicationContext.close()
@@ -29,7 +27,15 @@ class JsonMessageHandlerSpec extends Specification {
         classSimpleName = annotationClass.simpleName
     }
 
-    private void assertAnnotationValueMatchesJsonMediaTypeCodec(AnnotationValue annotation, JsonMediaTypeCodec jsonMediaTypeCodec) {
-        assert Arrays.asList(annotation.stringValues()).sort() == jsonMediaTypeCodec.getMediaTypes().stream().map(it -> it.toString()).sorted().toList()
+    private void assertAnnotationValueMatchesExpected(AnnotationValue annotation, Class annotationClass) {
+        String[] expectedValues
+        if (annotationClass == Produces.class) {
+            expectedValues = JsonMessageHandler.ProducesJson.class.getAnnotation(Produces).value()
+        } else if (annotationClass == Consumes.class) {
+            expectedValues = JsonMessageHandler.ConsumesJson.class.getAnnotation(Consumes).value()
+        } else {
+            throw new IllegalArgumentException("Unsupported annotation " + annotationClass)
+        }
+        assert Arrays.asList(annotation.stringValues()).sort() == Arrays.asList(expectedValues).sort()
     }
 }

@@ -22,8 +22,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
-import io.micronaut.http.codec.CodecConfiguration;
-import io.micronaut.http.codec.MediaTypeCodec;
+import io.micronaut.http.body.config.MessageBodyConfiguration;
 import io.micronaut.inject.BeanType;
 import io.micronaut.inject.QualifiedBeanType;
 import io.micronaut.inject.qualifiers.FilteringQualifier;
@@ -51,7 +50,7 @@ import java.util.Objects;
 @BootstrapContextCompatible
 public final class DefaultMessageBodyHandlerRegistry extends AbstractMessageBodyHandlerRegistry {
     private final BeanContext beanLocator;
-    private final List<CodecConfiguration> codecConfigurations;
+    private final List<MessageBodyConfiguration> codecConfigurations;
 
     /**
      * Default constructor.
@@ -60,7 +59,7 @@ public final class DefaultMessageBodyHandlerRegistry extends AbstractMessageBody
      * @param codecConfigurations The codec configurations
      */
     DefaultMessageBodyHandlerRegistry(BeanContext beanLocator,
-                                      List<CodecConfiguration> codecConfigurations) {
+                                      List<MessageBodyConfiguration> codecConfigurations) {
         this.beanLocator = beanLocator;
         this.codecConfigurations = codecConfigurations;
     }
@@ -90,12 +89,15 @@ public final class DefaultMessageBodyHandlerRegistry extends AbstractMessageBody
         List<MediaType> resolvedMediaTypes = new ArrayList<>(mediaTypes.size());
         resolvedMediaTypes.addAll(mediaTypes);
         for (MediaType mediaType : mediaTypes) {
-            for (CodecConfiguration codecConfiguration : codecConfigurations) {
+            for (MessageBodyConfiguration codecConfiguration : codecConfigurations) {
                 List<MediaType> additionalTypes = codecConfiguration.getAdditionalTypes();
                 if (additionalTypes.contains(mediaType)) {
-                    beanLocator.findBean(MediaTypeCodec.class, Qualifiers.byName(codecConfiguration.getName())).ifPresent(codec ->
-                        resolvedMediaTypes.addAll(codec.getMediaTypes())
-                    );
+                    beanLocator.findBeanDefinition(MessageBodyWriter.class, Qualifiers.byName(codecConfiguration.getName())).ifPresent(definition -> {
+                        String[] produces = definition.getAnnotationMetadata().stringValues(Produces.class);
+                        for (String value : produces) {
+                            resolvedMediaTypes.add(MediaType.of(value));
+                        }
+                    });
                     break;
                 }
             }

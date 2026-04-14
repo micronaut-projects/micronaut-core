@@ -44,7 +44,7 @@ import java.net.URI;
 public class JdkHttpClientFactory extends AbstractHttpClientFactory<DefaultJdkHttpClient> implements RawHttpClientFactory {
 
     public JdkHttpClientFactory() {
-        super(null, createDefaultMessageBodyHandlerRegistry(), ConversionService.SHARED);
+        super(createDefaultMessageBodyHandlerRegistry(), ConversionService.SHARED);
     }
 
     @Override
@@ -54,7 +54,7 @@ public class JdkHttpClientFactory extends AbstractHttpClientFactory<DefaultJdkHt
 
     @Override
     protected DefaultJdkHttpClient createHttpClient(@Nullable URI uri, HttpClientConfiguration configuration) {
-        return new DefaultJdkHttpClient(uri, configuration, mediaTypeCodecRegistry, messageBodyHandlerRegistry, conversionService);
+        return new DefaultJdkHttpClient(uri, configuration, messageBodyHandlerRegistry, conversionService);
     }
 
     public static MessageBodyHandlerRegistry createDefaultMessageBodyHandlerRegistry() {

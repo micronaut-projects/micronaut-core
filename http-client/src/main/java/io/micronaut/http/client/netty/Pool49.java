@@ -130,8 +130,8 @@ final class Pool49 implements Pool {
      */
     @Override
     public void onNewConnectionFailure(EventLoop eventLoop, @Nullable Throwable error) throws Exception {
-        // todo: implement a circuit breaker here? right now, we just fail one connection in the
-        //  subclass implementation, but maybe we should do more.
+        // Note: consider adding circuit breaker logic. Currently one connection failure is reported
+        // to the subclass implementation without additional backoff.
         LocalPoolPair poolPair = localPoolsByLoop.get(eventLoop);
         assert poolPair != null;
         poolPair.onNewConnectionFailure(listener.wrapError(error));
@@ -512,7 +512,8 @@ final class Pool49 implements Pool {
          */
         void onNewConnectionFailure(Throwable error) {
             assert loop.inEventLoop();
-            globalStats.updateAndGet(s -> s.addPendingConnectionCount(-1)); // TODO: is this called for websockets?
+            // WebSocket requests should also call this so pending counts stay consistent.
+            globalStats.updateAndGet(s -> s.addPendingConnectionCount(-1));
             localPendingConnections--;
 
             PendingRequest local = localPendingRequests.poll();

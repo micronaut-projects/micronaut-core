@@ -1,6 +1,9 @@
 package io.micronaut.http.netty.websocket
 
+import io.micronaut.context.ApplicationContext
+import io.micronaut.core.convert.ConversionService
 import io.micronaut.http.MediaType
+import io.micronaut.http.body.MessageBodyHandlerRegistry
 import io.netty.buffer.ByteBufUtil
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame
 import io.netty.handler.codec.http.websocketx.WebSocketFrame
@@ -11,7 +14,10 @@ class WebSocketMessageEncoderSpec extends Specification {
 
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/2842")
     void "test a gstring is encoded correctly"() {
-        WebSocketMessageEncoder encoder = new WebSocketMessageEncoder(null)
+        ApplicationContext ctx = ApplicationContext.run()
+        MessageBodyHandlerRegistry handlerRegistry = ctx.getBean(MessageBodyHandlerRegistry)
+        ConversionService conversionService = ctx.getBean(ConversionService)
+        WebSocketMessageEncoder encoder = new WebSocketMessageEncoder(handlerRegistry, conversionService)
 
         when:
         WebSocketFrame frame = encoder.encodeMessage("${1+1}", MediaType.TEXT_PLAIN_TYPE)
@@ -19,5 +25,8 @@ class WebSocketMessageEncoderSpec extends Specification {
         then:
         frame instanceof TextWebSocketFrame
         new String(ByteBufUtil.getBytes(frame.content())) == "2"
+
+        cleanup:
+        ctx.close()
     }
 }

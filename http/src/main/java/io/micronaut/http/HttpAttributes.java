@@ -84,14 +84,6 @@ public enum HttpAttributes implements CharSequence {
     SERVICE_ID(Constants.PREFIX + ".serviceId"),
 
     /**
-     * Attribute used to store the MediaTypeCodec. Used to override the registered codec per-request.
-     *
-     * @deprecated Unused
-     */
-    @Deprecated(forRemoval = true, since = "4.8.0")
-    MEDIA_TYPE_CODEC(Constants.PREFIX + ".mediaType.codec"),
-
-    /**
      * Attribute used to store the MethodInvocationContext by declarative client.
      *
      * @deprecated Please use accessors in ClientAttributes instead

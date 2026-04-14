@@ -42,7 +42,7 @@ import java.io.OutputStream;
 /**
  * Handler for text/plain that will read and write any type, through {@link ConversionService} and
  * {@link Object#toString()} respectively. This is the behavior of
- * {@link io.micronaut.runtime.http.codec.TextPlainCodec} and can be enabled for legacy support.
+ * the legacy text/plain codec implementation and can be enabled for backwards compatibility.
  *
  * @since 4.0.0
  * @author Jonas Konrad

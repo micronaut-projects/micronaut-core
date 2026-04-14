@@ -16,15 +16,14 @@
 package io.micronaut.http.netty.websocket;
 
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
-import io.micronaut.context.annotation.Requires;
-import org.jspecify.annotations.Nullable;
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyWriter;
-import io.micronaut.http.codec.MediaTypeCodec;
-import io.micronaut.http.codec.MediaTypeCodecRegistry;
+import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.simple.SimpleHttpHeaders;
 import io.micronaut.websocket.exceptions.WebSocketSessionException;
 import io.netty.buffer.ByteBuf;
@@ -32,85 +31,101 @@ import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
-import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
 import java.nio.ByteBuffer;
-import java.util.Optional;
+import java.util.Objects;
 
 /**
- * Encapsulate functionality to encode WebSocket messages.
+ * Encapsulates functionality to encode WebSocket messages using message body handlers.
  *
  * @author sdelamo
  * @since 1.0
  */
-@Requires(classes = WebSocketSessionException.class)
 @Singleton
-public class WebSocketMessageEncoder {
+@Internal
+public final class WebSocketMessageEncoder {
 
-    private final MediaTypeCodecRegistry codecRegistry;
-    @Nullable
-    private final MessageBodyHandlerRegistry messageBodyHandlerRegistry;
+    private final MessageBodyHandlerRegistry handlerRegistry;
+    private final ConversionService conversionService;
 
-    /**
-     * @param codecRegistry The codec registry
-     * @deprecated Not used anymore
-     */
-    @Deprecated(forRemoval = true, since = "4.7")
-    public WebSocketMessageEncoder(MediaTypeCodecRegistry codecRegistry) {
-        this.codecRegistry = codecRegistry;
-        this.messageBodyHandlerRegistry = null;
-    }
-
-    /**
-     * @param codecRegistry The codec registry
-     * @param messageBodyHandlerRegistry The message body handler registry
-     */
-    @Inject
-    public WebSocketMessageEncoder(MediaTypeCodecRegistry codecRegistry,
-                                   MessageBodyHandlerRegistry messageBodyHandlerRegistry) {
-        this.codecRegistry = codecRegistry;
-        this.messageBodyHandlerRegistry = messageBodyHandlerRegistry;
+    public WebSocketMessageEncoder(MessageBodyHandlerRegistry handlerRegistry,
+                                   ConversionService conversionService) {
+        this.handlerRegistry = Objects.requireNonNull(handlerRegistry, "handlerRegistry");
+        this.conversionService = Objects.requireNonNull(conversionService, "conversionService");
     }
 
     /**
      * Encode the given message with the given media type.
-     * @param message The message
+     *
+     * @param message   The message
      * @param mediaType The media type
      * @return The encoded frame
      */
-    public WebSocketFrame encodeMessage(Object message, MediaType mediaType) {
+    WebSocketFrame encodeMessage(Object message, MediaType mediaType) {
         if (message instanceof byte[] bytes) {
             return new BinaryWebSocketFrame(Unpooled.wrappedBuffer(bytes));
-        } else if (ClassUtils.isJavaLangType(message.getClass()) || message instanceof CharSequence) {
-            String s = message.toString();
-            return new TextWebSocketFrame(s);
-        } else if (message instanceof ByteBuf buf) {
+        }
+        if (message instanceof ByteBuf buf) {
             return new BinaryWebSocketFrame(buf.slice());
-        } else if (message instanceof ByteBuffer buffer) {
+        }
+        if (message instanceof ByteBuffer buffer) {
             return new BinaryWebSocketFrame(Unpooled.wrappedBuffer(buffer));
-        } else {
-            MediaType theMediaType = mediaType != null ? mediaType : MediaType.APPLICATION_JSON_TYPE;
-            Optional<MediaTypeCodec> codec = codecRegistry.findCodec(theMediaType);
-            if (codec.isPresent()) {
-                io.micronaut.core.io.buffer.ByteBuffer<?> encoded = codec.get().encode(message, NettyByteBufferFactory.DEFAULT);
-                return new TextWebSocketFrame((ByteBuf) encoded.asNativeBuffer());
+        }
+        if (ClassUtils.isJavaLangType(message.getClass()) || message instanceof CharSequence) {
+            return new TextWebSocketFrame(message.toString());
+        }
+
+        MediaType effectiveMediaType = mediaType != null ? mediaType : MediaType.APPLICATION_JSON_TYPE;
+        Argument<Object> argument = Argument.ofInstance(message);
+        MessageBodyWriter<Object> writer = handlerRegistry.findWriter(argument, effectiveMediaType).orElse(null);
+        if (writer != null) {
+            io.micronaut.core.io.buffer.ByteBuffer<?> encoded;
+            try {
+                encoded = writer.writeTo(
+                    argument,
+                    effectiveMediaType,
+                    message,
+                    new SimpleHttpHeaders(),
+                    NettyByteBufferFactory.DEFAULT
+                );
+            } catch (CodecException e) {
+                throw new WebSocketSessionException("Unable to encode WebSocket message: " + e.getMessage(), e);
             }
-            if (messageBodyHandlerRegistry != null) {
-                Argument<Object> argument = Argument.ofInstance(message);
-                MessageBodyWriter<Object> messageBodyWriter = messageBodyHandlerRegistry.findWriter(argument, theMediaType).orElse(null);
-                if (messageBodyWriter != null) {
-                    io.micronaut.core.io.buffer.ByteBuffer<?> encoded = messageBodyWriter.writeTo(
-                        argument,
-                        theMediaType,
-                        message,
-                        new SimpleHttpHeaders(),
-                        NettyByteBufferFactory.DEFAULT
-                    );
-                    return new TextWebSocketFrame((ByteBuf) encoded.asNativeBuffer());
-                }
+            WebSocketFrame frame = createFrameFromBuffer(effectiveMediaType, encoded);
+            if (frame != null) {
+                return frame;
             }
         }
-        throw new WebSocketSessionException("Unable to encode WebSocket message: " + message);
+
+        return conversionService.convert(message, String.class)
+            .<WebSocketFrame>map(TextWebSocketFrame::new)
+            .orElseThrow(() -> new WebSocketSessionException("Unable to encode WebSocket message: " + message));
+    }
+
+    private static WebSocketFrame createFrameFromBuffer(MediaType mediaType,
+                                                        io.micronaut.core.io.buffer.ByteBuffer<?> encoded) {
+        Object nativeBuffer = encoded.asNativeBuffer();
+        if (nativeBuffer instanceof ByteBuf byteBuf) {
+            if (isTextMediaType(mediaType)) {
+                return new TextWebSocketFrame(byteBuf);
+            }
+            return new BinaryWebSocketFrame(byteBuf);
+        }
+        byte[] bytes = encoded.toByteArray();
+        if (isTextMediaType(mediaType)) {
+            return new TextWebSocketFrame(Unpooled.wrappedBuffer(bytes));
+        }
+        return new BinaryWebSocketFrame(Unpooled.wrappedBuffer(bytes));
+    }
+
+    private static boolean isTextMediaType(MediaType mediaType) {
+        if (MediaType.TEXT_PLAIN_TYPE.getType().equals(mediaType.getType())) {
+            return true;
+        }
+        if (mediaType.equals(MediaType.APPLICATION_JSON_TYPE) || mediaType.equals(MediaType.APPLICATION_JSON_STREAM_TYPE)) {
+            return true;
+        }
+        return mediaType.matchesAllOrWildcardOrExtension(MediaType.EXTENSION_JSON);
     }
 }

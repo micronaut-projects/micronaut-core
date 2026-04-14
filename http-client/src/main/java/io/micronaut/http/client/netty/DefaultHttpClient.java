@@ -18,7 +18,6 @@ package io.micronaut.http.client.netty;
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.async.propagation.ReactivePropagation;
@@ -60,6 +59,7 @@ import io.micronaut.http.body.ContextlessMessageBodyHandlerRegistry;
 import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
+import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.body.WritableBodyWriter;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.client.BlockingHttpClient;
@@ -67,7 +67,6 @@ import io.micronaut.http.client.ClientAttributes;
 import io.micronaut.http.client.DefaultHttpClientConfiguration;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientConfiguration;
-import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.ProxyHttpClient;
 import io.micronaut.http.client.ProxyRequestOptions;
@@ -87,12 +86,10 @@ import io.micronaut.http.client.multipart.MultipartDataFactory;
 import io.micronaut.http.client.netty.ssl.ClientSslBuilder;
 import io.micronaut.http.client.netty.websocket.NettyWebSocketClientHandler;
 import io.micronaut.http.client.sse.SseClient;
-import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.context.ContextPathUtils;
 import io.micronaut.http.exceptions.BufferLengthExceededException;
 import io.micronaut.http.filter.FilterRunner;
 import io.micronaut.http.filter.GenericHttpFilter;
-import io.micronaut.http.filter.HttpClientFilter;
 import io.micronaut.http.filter.HttpClientFilterResolver;
 import io.micronaut.http.filter.HttpFilterResolver;
 import io.micronaut.http.multipart.MultipartException;
@@ -112,9 +109,9 @@ import io.micronaut.http.sse.Event;
 import io.micronaut.http.uri.UriBuilder;
 import io.micronaut.http.uri.UriTemplate;
 import io.micronaut.http.util.HttpHeadersUtil;
+import io.micronaut.json.JsonFeatures;
 import io.micronaut.json.JsonMapper;
-import io.micronaut.json.codec.JsonMediaTypeCodec;
-import io.micronaut.json.codec.JsonStreamMediaTypeCodec;
+import io.micronaut.json.body.CustomizableJsonHandler;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.websocket.WebSocketClient;
 import io.micronaut.websocket.annotation.ClientWebSocket;
@@ -128,12 +125,9 @@ import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.EmptyByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
-import io.netty.channel.ChannelFactory;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
-import io.netty.channel.EventLoopGroup;
-import io.netty.channel.socket.DatagramChannel;
-import io.netty.channel.socket.SocketChannel;
+import io.netty.channel.EventLoop;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.DefaultHttpContent;
@@ -160,10 +154,10 @@ import io.netty.handler.codec.http.multipart.HttpPostRequestEncoder;
 import io.netty.handler.codec.http.multipart.InterfaceHttpData;
 import io.netty.handler.codec.http.websocketx.WebSocketClientHandshakerFactory;
 import io.netty.handler.codec.http.websocketx.WebSocketVersion;
-import io.netty.resolver.AddressResolverGroup;
 import io.netty.util.AsciiString;
 import io.netty.util.CharsetUtil;
 import io.netty.util.ReferenceCountUtil;
+import io.netty.util.concurrent.DefaultThreadFactory;
 import io.netty.util.concurrent.FastThreadLocalThread;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
@@ -193,8 +187,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
@@ -244,7 +238,6 @@ public class DefaultHttpClient implements
         .add(HttpHeaderNames.CONTENT_TYPE, "")
         .add(HttpHeaderNames.CONTENT_LENGTH, "");
 
-    protected MediaTypeCodecRegistry mediaTypeCodecRegistry;
     protected final ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory = new NettyByteBufferFactory();
 
     ConnectionManager connectionManager;
@@ -266,115 +259,7 @@ public class DefaultHttpClient implements
     private final ConversionService conversionService;
     @Nullable
     private final ExecutorService blockingExecutor;
-
-    /**
-     * Construct a client for the given arguments.
-     *
-     * @param loadBalancer                    The {@link LoadBalancer} to use for selecting servers
-     * @param configuration                   The {@link HttpClientConfiguration} object
-     * @param contextPath                     The base URI to prepend to request uris
-     * @param threadFactory                   The thread factory to use for client threads
-     * @param nettyClientSslBuilder           The SSL builder
-     * @param codecRegistry                   The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
-     * @param handlerRegistry                 The handler registry for encoding and decoding
-     * @param annotationMetadataResolver      The annotation metadata resolver
-     * @param conversionService               The conversion service
-     * @param filters                         The filters to use
-     * @deprecated Please go through the {@link #builder()} instead. If you need access to properties that are not public in the builder, make them public in core and document their usage.
-     */
-    @Deprecated
-    public DefaultHttpClient(@Nullable LoadBalancer loadBalancer,
-                             HttpClientConfiguration configuration,
-                             @Nullable String contextPath,
-                             @Nullable ThreadFactory threadFactory,
-                             ClientSslBuilder nettyClientSslBuilder,
-                             MediaTypeCodecRegistry codecRegistry,
-                             MessageBodyHandlerRegistry handlerRegistry,
-                             @Nullable AnnotationMetadataResolver annotationMetadataResolver,
-                             ConversionService conversionService,
-                             HttpClientFilter... filters) {
-        this(
-            builder()
-                .loadBalancer(loadBalancer)
-                .configuration(configuration)
-                .contextPath(contextPath)
-                .threadFactory(threadFactory)
-                .nettyClientSslBuilder(nettyClientSslBuilder)
-                .codecRegistry(codecRegistry)
-                .handlerRegistry(handlerRegistry)
-                .conversionService(conversionService)
-                .annotationMetadataResolver(annotationMetadataResolver)
-                .filters(filters)
-        );
-    }
-
-    /**
-     * Construct a client for the given arguments.
-     * @param loadBalancer                    The {@link LoadBalancer} to use for selecting servers
-     * @param explicitHttpVersion                     The HTTP version to use. Can be null and defaults to {@link io.micronaut.http.HttpVersion#HTTP_1_1}
-     * @param configuration                   The {@link HttpClientConfiguration} object
-     * @param contextPath                     The base URI to prepend to request uris
-     * @param filterResolver                  The http client filter resolver
-     * @param clientFilterEntries             The client filter entries
-     * @param threadFactory                   The thread factory to use for client threads
-     * @param nettyClientSslBuilder           The SSL builder
-     * @param codecRegistry                   The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
-     * @param handlerRegistry                 The handler registry for encoding and decoding
-     * @param webSocketBeanRegistry           The websocket bean registry
-     * @param requestBinderRegistry           The request binder registry
-     * @param eventLoopGroup                  The event loop group to use
-     * @param socketChannelFactory            The socket channel factory
-     * @param udpChannelFactory               The UDP channel factory
-     * @param clientCustomizer                The pipeline customizer
-     * @param informationalServiceId          Optional service ID that will be passed to exceptions created by this client
-     * @param conversionService               The conversion service
-     * @param resolverGroup                   Optional predefined resolver group
-     * @deprecated Please go through the {@link #builder()} instead. If you need access to properties that are not public in the builder, make them public in core and document their usage.
-     */
-    @Deprecated
-    public DefaultHttpClient(@Nullable LoadBalancer loadBalancer,
-                             @Nullable HttpVersionSelection explicitHttpVersion,
-                             HttpClientConfiguration configuration,
-                             @Nullable String contextPath,
-                             HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver,
-                             List<HttpFilterResolver.FilterEntry> clientFilterEntries,
-                             @Nullable ThreadFactory threadFactory,
-                             ClientSslBuilder nettyClientSslBuilder,
-                             MediaTypeCodecRegistry codecRegistry,
-                             MessageBodyHandlerRegistry handlerRegistry,
-                             WebSocketBeanRegistry webSocketBeanRegistry,
-                             RequestBinderRegistry requestBinderRegistry,
-                             @Nullable EventLoopGroup eventLoopGroup,
-                             ChannelFactory<? extends SocketChannel> socketChannelFactory,
-                             ChannelFactory<? extends DatagramChannel> udpChannelFactory,
-                             NettyClientCustomizer clientCustomizer,
-                             @Nullable String informationalServiceId,
-                             ConversionService conversionService,
-                             @Nullable AddressResolverGroup<?> resolverGroup
-    ) {
-        this(
-            builder()
-                .loadBalancer(loadBalancer)
-                .explicitHttpVersion(explicitHttpVersion)
-                .configuration(configuration)
-                .contextPath(contextPath)
-                .filterResolver(filterResolver)
-                .clientFilterEntries(clientFilterEntries)
-                .threadFactory(threadFactory)
-                .nettyClientSslBuilder(nettyClientSslBuilder)
-                .codecRegistry(codecRegistry)
-                .handlerRegistry(handlerRegistry)
-                .webSocketBeanRegistry(webSocketBeanRegistry)
-                .requestBinderRegistry(requestBinderRegistry)
-                .eventLoopGroup(eventLoopGroup)
-                .socketChannelFactory(socketChannelFactory)
-                .udpChannelFactory(udpChannelFactory)
-                .clientCustomizer(clientCustomizer)
-                .informationalServiceId(informationalServiceId)
-                .conversionService(conversionService)
-                .resolverGroup(resolverGroup)
-        );
-    }
+    private final ScheduledExecutorService timeoutScheduler;
 
     DefaultHttpClient(DefaultHttpClientBuilder builder) {
         this.loadBalancer = builder.loadBalancer;
@@ -389,8 +274,30 @@ public class DefaultHttpClient implements
             this.contextPath = null;
         }
 
-        this.mediaTypeCodecRegistry = builder.codecRegistry == null ? createDefaultMediaTypeRegistry() : builder.codecRegistry;
         this.handlerRegistry = builder.handlerRegistry == null ? createDefaultMessageBodyHandlerRegistry() : builder.handlerRegistry;
+        if (builder.jsonFeatures != null) {
+            JsonFeatures jsonFeatures = builder.jsonFeatures;
+            MessageBodyHandlerRegistry delegateRegistry = this.handlerRegistry;
+            this.handlerRegistry = new MessageBodyHandlerRegistry() {
+                @SuppressWarnings("unchecked")
+                private <T> T customize(T handler) {
+                    if (handler instanceof CustomizableJsonHandler cnjh) {
+                        return (T) cnjh.customize(jsonFeatures);
+                    }
+                    return handler;
+                }
+
+                @Override
+                public <T> Optional<MessageBodyReader<T>> findReader(Argument<T> type, @Nullable List<MediaType> mediaType) {
+                    return delegateRegistry.findReader(type, mediaType).map(this::customize);
+                }
+
+                @Override
+                public <T> Optional<MessageBodyWriter<T>> findWriter(Argument<T> type, List<MediaType> mediaType) {
+                    return delegateRegistry.findWriter(type, mediaType).map(this::customize);
+                }
+            };
+        }
         this.log = configuration.getLoggerName().map(LoggerFactory::getLogger).orElse(DEFAULT_LOG);
         if (builder.filterResolver == null) {
             builder.filters();
@@ -408,6 +315,7 @@ public class DefaultHttpClient implements
         this.requestBinderRegistry = builder.requestBinderRegistry == null ? new DefaultRequestBinderRegistry(conversionService) : builder.requestBinderRegistry;
         this.informationalServiceId = builder.informationalServiceId;
         this.blockingExecutor = builder.blockingExecutor;
+        this.timeoutScheduler = Executors.newSingleThreadScheduledExecutor(new DefaultThreadFactory("micronaut-http-client-timeouts", true));
 
         this.connectionManager = new ConnectionManager(log, configuration, builder);
     }
@@ -543,28 +451,6 @@ public class DefaultHttpClient implements
             connectionManager.refresh();
         }
         return this;
-    }
-
-    /**
-     * @return The {@link MediaTypeCodecRegistry} used by this client
-     * @deprecated Use body handlers instead
-     */
-    @Deprecated
-    public MediaTypeCodecRegistry getMediaTypeCodecRegistry() {
-        return mediaTypeCodecRegistry;
-    }
-
-    /**
-     * Sets the {@link MediaTypeCodecRegistry} used by this client.
-     *
-     * @param mediaTypeCodecRegistry The registry to use. Should not be null
-     * @deprecated Use builder instead
-     */
-    @Deprecated(forRemoval = true)
-    public void setMediaTypeCodecRegistry(MediaTypeCodecRegistry mediaTypeCodecRegistry) {
-        if (mediaTypeCodecRegistry != null) {
-            this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
-        }
     }
 
     /**
@@ -899,7 +785,7 @@ public class DefaultHttpClient implements
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
         // if a connection is available immediately, we can use its executor for the timeout
         // instead of a random executor for the whole group
-        AtomicReference<ScheduledExecutorService> scheduler = new AtomicReference<>(connectionManager.getGroup());
+        AtomicReference<ScheduledExecutorService> scheduler = new AtomicReference<>(timeoutScheduler);
         ExecutionFlow<HttpResponse<O>> mono = resolveRequestURI(request).flatMap(uri -> {
             MutableHttpRequest<?> mutableRequest = toMutableRequest(request).uri(uri);
             //noinspection unchecked
@@ -1040,7 +926,11 @@ public class DefaultHttpClient implements
 
     @Override
     public void close() {
-        stop();
+        try {
+            stop();
+        } finally {
+            timeoutScheduler.shutdown();
+        }
     }
 
     private <T> Publisher<T> connectWebSocket(URI uri, MutableHttpRequest<?> request, Class<T> clientEndpointType, @Nullable WebSocketBean<T> webSocketBean) {
@@ -1082,7 +972,6 @@ public class DefaultHttpClient implements
             WebSocketClientHandshakerFactory.newHandshaker(
                 webSocketURL, protocolVersion, subprotocol, true, customHeaders, maxFramePayloadLength),
             requestBinderRegistry,
-            mediaTypeCodecRegistry,
             handlerRegistry,
             conversionService);
 
@@ -1610,7 +1499,9 @@ public class DefaultHttpClient implements
         return connectionManager.connect(requestKey, blockHint, preferredScheduler)
             .flatMap(poolHandle -> {
                 poolHandle.touch();
-                preferredScheduler.set(poolHandle.channel.eventLoop());
+                if (blockHint == null) {
+                    preferredScheduler.set(poolHandle.channel.eventLoop());
+                }
 
                 // build the raw request
                 request.setAttribute(NettyClientHttpRequest.CHANNEL, poolHandle.channel);
@@ -1787,7 +1678,12 @@ public class DefaultHttpClient implements
                 if (stillExpectingContinue && byteBuf != null) {
                     byteBuf.release();
                 }
-                poolHandle.release();
+                EventLoop eventLoop = poolHandle.channel.eventLoop();
+                if (eventLoop.inEventLoop()) {
+                    eventLoop.execute(poolHandle::release);
+                } else {
+                    poolHandle.release();
+                }
             }
         }));
         poolHandle.notifyRequestPipelineBuilt();
@@ -2001,15 +1897,6 @@ public class DefaultHttpClient implements
         log.trace("----");
         log.trace(content.toString(defaultCharset));
         log.trace("----");
-    }
-
-    private static MediaTypeCodecRegistry createDefaultMediaTypeRegistry() {
-        JsonMapper mapper = JsonMapper.createDefault();
-        ApplicationConfiguration configuration = new ApplicationConfiguration();
-        return MediaTypeCodecRegistry.of(
-            new JsonMediaTypeCodec(mapper, configuration, null),
-            new JsonStreamMediaTypeCodec(mapper, configuration, null)
-        );
     }
 
     private static MessageBodyHandlerRegistry createDefaultMessageBodyHandlerRegistry() {

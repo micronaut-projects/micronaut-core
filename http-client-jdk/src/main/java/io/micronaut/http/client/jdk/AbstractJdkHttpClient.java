@@ -40,7 +40,6 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.client.exceptions.NoHostException;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
 import io.micronaut.http.client.jdk.cookie.CookieDecoder;
-import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.context.ContextPathUtils;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.filter.FilterRunner;
@@ -112,8 +111,6 @@ abstract class AbstractJdkHttpClient {
     protected final List<HttpFilterResolver.FilterEntry> clientFilterEntries;
     protected final CookieDecoder cookieDecoder;
     @Nullable
-    protected MediaTypeCodecRegistry mediaTypeCodecRegistry;
-    @Nullable
     protected MessageBodyHandlerRegistry messageBodyHandlerRegistry;
 
     protected AbstractJdkHttpClient(AbstractJdkHttpClient prototype) {
@@ -131,7 +128,6 @@ abstract class AbstractJdkHttpClient {
         this.filterResolver = prototype.filterResolver;
         this.clientFilterEntries = prototype.clientFilterEntries;
         this.cookieDecoder = prototype.cookieDecoder;
-        this.mediaTypeCodecRegistry = prototype.mediaTypeCodecRegistry;
         this.messageBodyHandlerRegistry = prototype.messageBodyHandlerRegistry;
     }
 
@@ -141,7 +137,6 @@ abstract class AbstractJdkHttpClient {
      * @param httpVersion                The {@link HttpVersionSelection} to prefer
      * @param configuration              The {@link HttpClientConfiguration} to use
      * @param contextPath                The base URI to prepend to request uris
-     * @param mediaTypeCodecRegistry     The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
      * @param messageBodyHandlerRegistry The {@link MessageBodyHandlerRegistry} to use for encoding and decoding objects
      * @param requestBinderRegistry      The request binder registry
      * @param clientId                   The client id
@@ -159,8 +154,6 @@ abstract class AbstractJdkHttpClient {
         @Nullable HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver,
         @Nullable List<HttpFilterResolver.FilterEntry> clientFilterEntries,
         @Nullable
-        MediaTypeCodecRegistry mediaTypeCodecRegistry,
-        @Nullable
         MessageBodyHandlerRegistry messageBodyHandlerRegistry,
         RequestBinderRegistry requestBinderRegistry,
         @Nullable
@@ -174,7 +167,6 @@ abstract class AbstractJdkHttpClient {
         this.loadBalancer = loadBalancer;
         this.httpVersion = httpVersion;
         this.configuration = configuration;
-        this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
         this.messageBodyHandlerRegistry = messageBodyHandlerRegistry;
         this.requestBinderRegistry = requestBinderRegistry;
         this.clientId = clientId;
@@ -309,21 +301,6 @@ abstract class AbstractJdkHttpClient {
     }
 
     /**
-     * @return The {@link MediaTypeCodecRegistry}
-     */
-    @Nullable
-    public MediaTypeCodecRegistry getMediaTypeCodecRegistry() {
-        return mediaTypeCodecRegistry;
-    }
-
-    /**
-     * @param mediaTypeCodecRegistry The {@link MediaTypeCodecRegistry}
-     */
-    public void setMediaTypeCodecRegistry(MediaTypeCodecRegistry mediaTypeCodecRegistry) {
-        this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
-    }
-
-    /**
      * @return The {@link MessageBodyHandlerRegistry}
      */
     @Nullable
@@ -354,7 +331,7 @@ abstract class AbstractJdkHttpClient {
                     cookieManager.getCookieStore().add(uri, newCookie);
                 }));
 
-                return HttpRequestFactory.builder(uri, request, configuration, bodyType, mediaTypeCodecRegistry, messageBodyHandlerRegistry).build();
+                return HttpRequestFactory.builder(uri, request, configuration, bodyType, messageBodyHandlerRegistry).build();
             });
     }
 
@@ -406,7 +383,7 @@ abstract class AbstractJdkHttpClient {
      * @return A Micronaut response
      */
     protected <O> HttpResponse<O> response(java.net.http.HttpResponse<byte[]> netResponse, @Nullable Argument<O> bodyType) {
-        return new HttpResponseAdapter<>(netResponse, bodyType, conversionService, mediaTypeCodecRegistry, messageBodyHandlerRegistry);
+        return new HttpResponseAdapter<>(netResponse, bodyType, conversionService, messageBodyHandlerRegistry);
     }
 
     protected <I, O> Flux<HttpResponse<O>> exchangeImpl(io.micronaut.http.HttpRequest<I> request, @Nullable Argument<O> bodyType) {

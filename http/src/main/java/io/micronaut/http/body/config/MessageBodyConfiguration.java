@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2024 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.codec;
+package io.micronaut.http.body.config;
 
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
@@ -24,25 +24,28 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Configuration for {@link io.micronaut.http.codec.MediaTypeCodec} instances.
+ * Configuration for message body handlers to declare additional media types.
  *
- * @author James Kleeh
- * @since 1.0
+ * @author Micronaut Framework
+ * @since 5.0
  */
-@EachProperty(CodecConfiguration.PREFIX)
-public class CodecConfiguration implements Named {
+@EachProperty(MessageBodyConfiguration.PREFIX)
+public class MessageBodyConfiguration implements Named {
 
+    /**
+     * Configuration prefix, retained for backwards compatibility.
+     */
     public static final String PREFIX = "micronaut.codec";
 
     private List<MediaType> additionalTypes = Collections.emptyList();
     private final String name;
 
-    public CodecConfiguration(@Parameter String name) {
+    public MessageBodyConfiguration(@Parameter String name) {
         this.name = name;
     }
 
     /**
-     * @return Media types in addition to the default that the codec should process
+     * @return Media types in addition to the default that the handler should process.
      */
     public List<MediaType> getAdditionalTypes() {
         return additionalTypes;
@@ -50,6 +53,7 @@ public class CodecConfiguration implements Named {
 
     /**
      * Default value (Empty list).
+     *
      * @param additionalTypes additional types
      */
     public void setAdditionalTypes(List<MediaType> additionalTypes) {

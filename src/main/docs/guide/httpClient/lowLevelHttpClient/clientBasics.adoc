@@ -124,7 +124,7 @@ Note how you can use the same Java type on both the client and the server. The i
 
 If the server you communicate with uses a custom content type that is not JSON, by default Micronaut's HTTP client will not know how to decode this type.
 
-To resolve this, register api:http.codec.MediaTypeCodec[] as a bean, and it will be automatically picked up and used to decode (or encode) messages.
+To resolve this, register an api:http.body.MessageBodyReader[] or api:http.body.MessageBodyWriter[] bean for the media type. The reader/writer will be automatically picked up and used to decode (or encode) messages.
 
 ==== Receiving the Full HTTP Response
 

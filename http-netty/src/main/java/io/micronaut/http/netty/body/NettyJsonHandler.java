@@ -42,6 +42,7 @@ import io.micronaut.json.JsonMapper;
 import io.micronaut.json.body.CustomizableJsonHandler;
 import io.micronaut.json.body.JsonMessageHandler;
 import io.netty.buffer.ByteBuf;
+import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
@@ -57,6 +58,7 @@ import java.io.OutputStream;
  */
 @Order(JsonMessageHandler.ORDER)
 @Singleton
+@Named(JsonMessageHandler.BEAN_NAME)
 @Internal
 @Replaces(JsonMessageHandler.class)
 @JsonMessageHandler.ProducesJson

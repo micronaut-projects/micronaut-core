@@ -24,16 +24,11 @@ import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.FilterMatcher;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
-import io.micronaut.http.body.MessageBodyReader;
-import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.client.DefaultHttpClientConfiguration;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientConfiguration;
@@ -55,8 +50,6 @@ import io.micronaut.http.client.netty.ssl.ClientSslBuilder;
 import io.micronaut.http.client.netty.ssl.NettyClientSslFactory;
 import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.http.client.sse.SseClientRegistry;
-import io.micronaut.http.codec.MediaTypeCodec;
-import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.filter.HttpClientFilterResolver;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
@@ -71,8 +64,6 @@ import io.micronaut.inject.InjectionPoint;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.json.JsonFeatures;
 import io.micronaut.json.JsonMapper;
-import io.micronaut.json.body.CustomizableJsonHandler;
-import io.micronaut.json.codec.MapperMediaTypeCodec;
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
 import io.micronaut.runtime.context.scope.refresh.RefreshEventListener;
 import io.micronaut.scheduling.TaskExecutors;
@@ -85,6 +76,7 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.resolver.AddressResolverGroup;
 import jakarta.annotation.PreDestroy;
 import jakarta.inject.Named;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -94,7 +86,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -129,7 +120,6 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     private final NettyClientSslFactory sslFactory;
     private final BeanProvider<CertificateProvider> certificateProviders;
     private final ThreadFactory threadFactory;
-    private final MediaTypeCodecRegistry codecRegistry;
     private final MessageBodyHandlerRegistry handlerRegistry;
     private final BeanContext beanContext;
     private final HttpClientConfiguration defaultHttpClientConfiguration;
@@ -152,7 +142,6 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
      * @param sslFactory                      The client SSL builder factory
      * @param certificateProviders            Certificate provider bean for named lookup
      * @param threadFactory                   The thread factory
-     * @param codecRegistry                   The codec registry
      * @param handlerRegistry                 The handler registry
      * @param eventLoopGroupRegistry          The event loop group registry
      * @param eventLoopGroupFactory           The event loop group factory
@@ -169,7 +158,6 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
         NettyClientSslFactory sslFactory,
         BeanProvider<CertificateProvider> certificateProviders,
         ThreadFactory threadFactory,
-        MediaTypeCodecRegistry codecRegistry,
         MessageBodyHandlerRegistry handlerRegistry,
         EventLoopGroupRegistry eventLoopGroupRegistry,
         EventLoopGroupFactory eventLoopGroupFactory,
@@ -183,7 +171,6 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
         this.sslFactory = sslFactory;
         this.certificateProviders = certificateProviders;
         this.threadFactory = threadFactory;
-        this.codecRegistry = codecRegistry;
         this.handlerRegistry = handlerRegistry;
         this.beanContext = beanContext;
         this.eventLoopGroupFactory = eventLoopGroupFactory;
@@ -402,40 +389,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                 .contextPath(contextPath);
             final JsonFeatures jsonFeatures = clientKey.jsonFeatures;
             if (jsonFeatures != null) {
-                List<MediaTypeCodec> codecs = new ArrayList<>(2);
-                MediaTypeCodecRegistry codecRegistry = Objects.requireNonNull(builder.codecRegistry);
-                for (MediaTypeCodec codec : codecRegistry.getCodecs()) {
-                    if (codec instanceof MapperMediaTypeCodec typeCodec) {
-                        codecs.add(typeCodec.cloneWithFeatures(jsonFeatures));
-                    } else {
-                        codecs.add(codec);
-                    }
-                }
-                if (codecRegistry.findCodec(MediaType.APPLICATION_JSON_TYPE).isEmpty()) {
-                    codecs.add(createNewJsonCodec(this.beanContext, jsonFeatures));
-                }
-                builder.codecRegistry(MediaTypeCodecRegistry.of(codecs));
-                builder.handlerRegistry(new MessageBodyHandlerRegistry() {
-                    final MessageBodyHandlerRegistry delegate = Objects.requireNonNull(builder.handlerRegistry);
-
-                    @SuppressWarnings("unchecked")
-                    private <T> T customize(T handler) {
-                        if (handler instanceof CustomizableJsonHandler cnjh) {
-                            return (T) cnjh.customize(jsonFeatures);
-                        }
-                        return handler;
-                    }
-
-                    @Override
-                    public <T> Optional<MessageBodyReader<T>> findReader(Argument<T> type, @Nullable List<MediaType> mediaType) {
-                        return delegate.findReader(type, mediaType).map(this::customize);
-                    }
-
-                    @Override
-                    public <T> Optional<MessageBodyWriter<T>> findWriter(Argument<T> type, List<MediaType> mediaType) {
-                        return delegate.findWriter(type, mediaType).map(this::customize);
-                    }
-                });
+                builder.jsonFeatures(jsonFeatures);
             }
             return builder.build();
         });
@@ -461,7 +415,6 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             .threadFactory(threadFactory)
             .nettyClientSslBuilder(nettyClientSslBuilder)
             .sslFactory(sslFactory, certificateProviders)
-            .codecRegistry(codecRegistry)
             .handlerRegistry(handlerRegistry)
             .webSocketBeanRegistry(WebSocketBeanRegistry.forClient(beanContext))
             .eventLoopGroup(resolveEventLoopGroup(configuration, beanContext))
@@ -537,14 +490,6 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
         JsonFeatures jsonFeatures = jsonMapper.detectFeatures(metadata).orElse(null);
 
         return new ClientKey(httpVersionSelection, clientId, filterAnnotation, path, configurationClass, jsonFeatures);
-    }
-
-    private static MediaTypeCodec createNewJsonCodec(BeanContext beanContext, JsonFeatures jsonFeatures) {
-        return getJsonCodec(beanContext).cloneWithFeatures(jsonFeatures);
-    }
-
-    private static MapperMediaTypeCodec getJsonCodec(BeanContext beanContext) {
-        return beanContext.getBean(MapperMediaTypeCodec.class, Qualifiers.byName(MapperMediaTypeCodec.REGULAR_JSON_MEDIA_TYPE_CODEC_NAME));
     }
 
     @Override

@@ -15,24 +15,18 @@
  */
 package io.micronaut.function;
 
-import org.jspecify.annotations.Nullable;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.processor.BeanDefinitionProcessor;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.codec.MediaTypeCodec;
-import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
-import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
 import java.net.URI;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.BiFunction;
@@ -48,40 +42,11 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 @Singleton
-public class DefaultLocalFunctionRegistry implements BeanDefinitionProcessor<FunctionBean>, LocalFunctionRegistry, MediaTypeCodecRegistry {
+public class DefaultLocalFunctionRegistry implements BeanDefinitionProcessor<FunctionBean>, LocalFunctionRegistry {
     private final Map<String, ExecutableMethod<?, ?>> consumers = new LinkedHashMap<>(1);
     private final Map<String, ExecutableMethod<?, ?>> functions = new LinkedHashMap<>(1);
     private final Map<String, ExecutableMethod<?, ?>> biFunctions = new LinkedHashMap<>(1);
     private final Map<String, ExecutableMethod<?, ?>> suppliers = new LinkedHashMap<>(1);
-    private final MediaTypeCodecRegistry decoderRegistry;
-
-    /**
-     * Constructor.
-     *
-     * @param decoders decoders
-     */
-    public DefaultLocalFunctionRegistry(MediaTypeCodec... decoders) {
-        this.decoderRegistry = MediaTypeCodecRegistry.of(decoders);
-    }
-
-    /**
-     * Constructor.
-     *
-     * @param decoders decoders
-     */
-    @Inject
-    public DefaultLocalFunctionRegistry(List<MediaTypeCodec> decoders) {
-        this.decoderRegistry = MediaTypeCodecRegistry.of(decoders);
-    }
-
-    /**
-     * Constructor.
-     *
-     * @param codecRegistry codecRegistry
-     */
-    public DefaultLocalFunctionRegistry(MediaTypeCodecRegistry codecRegistry) {
-        this.decoderRegistry = codecRegistry;
-    }
 
     @SuppressWarnings("unchecked")
     @Override
@@ -182,21 +147,6 @@ public class DefaultLocalFunctionRegistry implements BeanDefinitionProcessor<Fun
                 registerSupplier(executableMethod, functionId);
             }
         }
-    }
-
-    @Override
-    public Optional<MediaTypeCodec> findCodec(@Nullable MediaType mediaType) {
-        return decoderRegistry.findCodec(mediaType);
-    }
-
-    @Override
-    public Optional<MediaTypeCodec> findCodec(@Nullable MediaType mediaType, Class<?> type) {
-        return decoderRegistry.findCodec(mediaType, type);
-    }
-
-    @Override
-    public Collection<MediaTypeCodec> getCodecs() {
-        return decoderRegistry.getCodecs();
     }
 
     private void registerSupplier(ExecutableMethod<?, ?> method, String functionId) {

@@ -27,8 +27,6 @@ import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.client.HttpClientConfiguration;
-import io.micronaut.http.codec.MediaTypeCodec;
-import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import reactor.adapter.JdkFlowAdapter;
 import reactor.core.publisher.Flux;
 
@@ -61,7 +59,6 @@ public final class HttpRequestFactory {
         URI uri, io.micronaut.http.HttpRequest<I> request,
         HttpClientConfiguration configuration,
         @Nullable Argument<?> bodyType,
-        @Nullable MediaTypeCodecRegistry mediaTypeCodecRegistry,
         @Nullable MessageBodyHandlerRegistry messageBodyHandlerRegistry
     ) {
         MutableHttpRequest<I> mutableHttpRequest = request.toMutableRequest();
@@ -70,7 +67,7 @@ public final class HttpRequestFactory {
         if (mutableHttpRequest.getMethod() == HttpMethod.GET) {
             builder.GET();
         } else {
-            HttpRequest.BodyPublisher bodyPublisher = publisherForRequest(mutableHttpRequest, bodyType, mediaTypeCodecRegistry, messageBodyHandlerRegistry);
+            HttpRequest.BodyPublisher bodyPublisher = publisherForRequest(mutableHttpRequest, bodyType, messageBodyHandlerRegistry);
             builder.method(mutableHttpRequest.getMethod().toString(), bodyPublisher);
         }
         mutableHttpRequest.getHeaders().forEach((name, values) -> values.forEach(value -> builder.header(name, value)));
@@ -84,7 +81,6 @@ public final class HttpRequestFactory {
     private static <I> HttpRequest.BodyPublisher publisherForRequest(
         MutableHttpRequest<I> request,
         @Nullable Argument<?> bodyType,
-        @Nullable MediaTypeCodecRegistry mediaTypeCodecRegistry,
         @Nullable MessageBodyHandlerRegistry messageBodyHandlerRegistry
     ) {
         if (request instanceof RawHttpRequestWrapper<?> raw) {
@@ -117,19 +113,6 @@ public final class HttpRequestFactory {
             }
             if (bodyValue instanceof CharSequence) {
                 return HttpRequest.BodyPublishers.ofString(bodyValue.toString());
-            }
-            if (mediaTypeCodecRegistry != null) {
-                Optional<MediaTypeCodec> registeredCodec = mediaTypeCodecRegistry.findCodec(requestContentType);
-                var encoded = registeredCodec.map(codec -> {
-                        if (bodyType != null && bodyType.isInstance(bodyValue)) {
-                            return codec.encode((Argument<Object>) bodyType, bodyValue);
-                        }
-                        return codec.encode(bodyValue);
-                    })
-                    .orElse(null);
-                if (encoded != null) {
-                    return HttpRequest.BodyPublishers.ofByteArray(encoded);
-                }
             }
             if (messageBodyHandlerRegistry != null) {
                 Argument<Object> bodyArgument = bodyType != null && bodyType.isInstance(bodyValue) ? (Argument<Object>) bodyType : Argument.ofInstance(bodyValue);

@@ -1244,7 +1244,7 @@ public class ConnectionManager {
         ExecutionFlow<PoolHandle> acquire(@Nullable BlockHint blockHint, @Nullable AtomicReference<ScheduledExecutorService> preferredScheduler) {
             Pool.PendingRequest sink = pool.createPendingRequest(blockHint);
             sink.dispatch();
-            if (preferredScheduler != null) {
+            if (preferredScheduler != null && blockHint == null) {
                 EventExecutor destPool = sink.likelyEventLoop();
                 if (destPool != null) {
                     preferredScheduler.set(destPool);

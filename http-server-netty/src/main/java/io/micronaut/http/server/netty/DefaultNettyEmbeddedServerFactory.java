@@ -27,7 +27,6 @@ import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
-import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
 import io.micronaut.http.netty.channel.EventLoopGroupFactory;
 import io.micronaut.http.netty.channel.EventLoopGroupRegistry;
@@ -81,7 +80,6 @@ public class DefaultNettyEmbeddedServerFactory
     private final ApplicationContext applicationContext;
     private final RequestArgumentSatisfier requestArgumentSatisfier;
     private final RouteExecutor routeExecutor;
-    private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     private final StaticResourceResolver staticResourceResolver;
     private final ExecutorSelector executorSelector;
     private final ThreadFactory nettyThreadFactory;
@@ -102,7 +100,6 @@ public class DefaultNettyEmbeddedServerFactory
      * Default constructor.
      * @param applicationContext The app ctx
      * @param routeExecutor The route executor
-     * @param mediaTypeCodecRegistry The media type codec
      * @param messageBodyHandlerRegistry The message body handler registery
      * @param staticResourceResolver The static resource resolver
      * @param nettyThreadFactory The netty thread factory
@@ -115,7 +112,6 @@ public class DefaultNettyEmbeddedServerFactory
      */
     protected DefaultNettyEmbeddedServerFactory(ApplicationContext applicationContext,
                                                 RouteExecutor routeExecutor,
-                                                MediaTypeCodecRegistry mediaTypeCodecRegistry,
                                                 MessageBodyHandlerRegistry messageBodyHandlerRegistry,
                                                 StaticResourceResolver staticResourceResolver,
                                                 @Named(NettyThreadFactory.NAME) ThreadFactory nettyThreadFactory,
@@ -129,7 +125,6 @@ public class DefaultNettyEmbeddedServerFactory
         this.messageBodyHandlerRegistry = messageBodyHandlerRegistry;
         this.requestArgumentSatisfier = routeExecutor.getRequestArgumentSatisfier();
         this.routeExecutor = routeExecutor;
-        this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
         this.staticResourceResolver = staticResourceResolver;
         this.executorSelector = routeExecutor.getExecutorSelector();
         this.nettyThreadFactory = nettyThreadFactory;
@@ -239,11 +234,6 @@ public class DefaultNettyEmbeddedServerFactory
     @Override
     public RouteExecutor getRouteExecutor() {
         return routeExecutor;
-    }
-
-    @Override
-    public MediaTypeCodecRegistry getMediaTypeCodecRegistry() {
-        return mediaTypeCodecRegistry;
     }
 
     @Override
