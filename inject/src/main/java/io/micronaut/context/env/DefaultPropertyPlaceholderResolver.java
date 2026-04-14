@@ -17,6 +17,7 @@ package io.micronaut.context.env;
 
 import io.micronaut.context.env.exp.RandomPropertyExpressionResolver;
 import io.micronaut.context.exceptions.ConfigurationException;
+import org.jspecify.annotations.NullUnmarked;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.service.SoftServiceLoader;
@@ -66,6 +67,7 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
      * @param environment The property resolver for the environment
      * @param conversionService The conversion service
      */
+    @NullUnmarked
     public DefaultPropertyPlaceholderResolver(PropertyResolver environment, ConversionService conversionService) {
         this.environment = environment;
         this.conversionService = conversionService;

@@ -19,7 +19,7 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.HttpClient;
-import io.micronaut.http.uri.UriTemplate;
+import io.micronaut.http.uri.UriTemplateMatcher;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -55,7 +55,7 @@ class MovieTicketControllerSpec {
 
     @Test
     void testBindingBean() {
-        UriTemplate template = new UriTemplate("/api/movie/ticket/terminator{?minPrice,maxPrice}");
+        UriTemplateMatcher template = UriTemplateMatcher.of("/api/movie/ticket/terminator{?minPrice,maxPrice}");
         Map<String, Object> params = new HashMap<>();
         params.put("minPrice", 5.0);
         params.put("maxPrice", 20.0);

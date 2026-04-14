@@ -292,8 +292,8 @@ class DefaultUriBuilder implements UriBuilder {
         String scheme = this.scheme;
         String host = this.host;
         if (StringUtils.isNotEmpty(scheme)) {
-            if (isTemplate(scheme, values)) {
-                scheme = UriTemplate.of(scheme).expand(values);
+            if (values != null && isTemplate(scheme, values)) {
+                scheme = UriTemplateMatcher.of(scheme).expand(values);
             }
             builder.append(scheme)
                    .append(':');
@@ -339,8 +339,8 @@ class DefaultUriBuilder implements UriBuilder {
                 builder.append('/');
             }
             String pathStr = path.toString();
-            if (isTemplate(pathStr, values)) {
-                pathStr = UriTemplate.of(pathStr).expand(values);
+            if (values != null && isTemplate(pathStr, values)) {
+                pathStr = UriTemplateMatcher.of(pathStr).expand(values);
             }
 
             builder.append(pathStr);
@@ -395,8 +395,8 @@ class DefaultUriBuilder implements UriBuilder {
     }
 
     private String expandOrEncode(String value, @Nullable Map<String, ? super Object> values) {
-        if (isTemplate(value, values)) {
-            value = UriTemplate.of(value).expand(values);
+        if (values != null && isTemplate(value, values)) {
+            value = UriTemplateMatcher.of(value).expand(values);
         } else {
             value = encode(value);
         }

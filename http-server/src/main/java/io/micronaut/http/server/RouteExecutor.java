@@ -20,7 +20,6 @@ import io.micronaut.context.exceptions.BeanCreationException;
 import io.micronaut.context.propagation.instrument.execution.ContextPropagatingExecutorService;
 import io.micronaut.context.propagation.instrument.execution.ContextPropagatingScheduledExecutorService;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.async.propagation.ReactivePropagation;
 import io.micronaut.core.async.propagation.ReactorPropagation;
 import io.micronaut.core.async.publisher.Publishers;
@@ -31,7 +30,6 @@ import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
-import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
@@ -63,6 +61,7 @@ import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteMatch;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -183,7 +182,6 @@ public final class RouteExecutor {
 
     static void setRouteAttributes(HttpRequest<?> request, UriRouteMatch<Object, Object> route) {
         setRouteAttributes(request, (RouteMatch<?>) route);
-        BasicHttpAttributes.setUriTemplate(request, route.getRouteInfo().getUriMatchTemplate().toString());
     }
 
     static void setRouteAttributes(HttpRequest<?> request, RouteMatch<?> route) {

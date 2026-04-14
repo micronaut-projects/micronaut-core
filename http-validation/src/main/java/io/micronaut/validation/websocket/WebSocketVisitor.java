@@ -14,10 +14,11 @@
  * limitations under the License.
  */
 package io.micronaut.validation.websocket;
+
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.http.uri.UriMatchTemplate;
+import io.micronaut.http.uri.UriTemplateMatcher;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
@@ -55,7 +56,7 @@ public class WebSocketVisitor implements TypeElementVisitor<WebSocketComponent, 
     private static final String ON_MESSAGE = "io.micronaut.websocket.annotation.OnMessage";
     private static final String ON_ERROR = "io.micronaut.websocket.annotation.OnError";
 
-    private Map<String, UriMatchTemplate> uriCache = new HashMap<>(3);
+    private Map<String, UriTemplateMatcher> uriCache = new HashMap<>(3);
     private boolean skipValidation = false;
 
     @Override
@@ -81,8 +82,8 @@ public class WebSocketVisitor implements TypeElementVisitor<WebSocketComponent, 
             return;
         }
         String uri = element.stringValue(WEB_SOCKET_COMPONENT).orElse("/ws");
-        UriMatchTemplate template = uriCache.computeIfAbsent(uri, UriMatchTemplate::of);
-        List<String> variables = template.getVariableNames();
+        UriTemplateMatcher template = uriCache.computeIfAbsent(uri, UriTemplateMatcher::of);
+        Set<String> variables = template.getVariableNames();
         ParameterElement[] parameters = element.getParameters();
         if (ArrayUtils.isNotEmpty(parameters)) {
 
@@ -130,7 +131,7 @@ public class WebSocketVisitor implements TypeElementVisitor<WebSocketComponent, 
         skipValidation = prop != null && prop.equals("false");
     }
 
-    private boolean isInvalidParameter(List<String> variables, ParameterElement parameter, String... validTypes) {
+    private boolean isInvalidParameter(Set<String> variables, ParameterElement parameter, String... validTypes) {
         String parameterName = parameter.getName();
         ClassElement parameterType = parameter.getType();
 

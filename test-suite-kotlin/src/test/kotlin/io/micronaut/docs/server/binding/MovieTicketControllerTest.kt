@@ -5,7 +5,7 @@ import io.kotest.core.spec.style.StringSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.HttpClient
-import io.micronaut.http.uri.UriTemplate
+import io.micronaut.http.uri.UriTemplateMatcher
 import io.micronaut.runtime.server.EmbeddedServer
 
 class MovieTicketControllerTest : StringSpec() {
@@ -19,7 +19,7 @@ class MovieTicketControllerTest : StringSpec() {
 
     init {
         "test bookmark controller" {
-            var template = UriTemplate("/api/movie/ticket/terminator{?minPrice,maxPrice}")
+            var template = UriTemplateMatcher.of("/api/movie/ticket/terminator{?minPrice,maxPrice}")
             var uri = template.expand(mapOf("minPrice" to 5.0, "maxPrice" to 20.0))
 
             var response = client.toBlocking().exchange<Any>(uri)

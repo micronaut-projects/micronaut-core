@@ -17,8 +17,8 @@ package io.micronaut.validation.routes.rules;
 
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.naming.NameUtils;
-import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.http.uri.UriMatchVariable;
+import io.micronaut.http.uri.UriTemplateMatcher;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
@@ -49,7 +49,7 @@ import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
 public class NullableParameterRule implements RouteValidationRule {
 
     @Override
-    public RouteValidationResult validate(List<UriMatchTemplate> templates, ParameterElement[] parameters, MethodElement method) {
+    public RouteValidationResult validate(List<UriTemplateMatcher> templates, ParameterElement[] parameters, MethodElement method) {
         List<String> errorMessages = new ArrayList<>();
 
         boolean isClient = method.hasAnnotation("io.micronaut.http.client.annotation.Client");
@@ -58,7 +58,7 @@ public class NullableParameterRule implements RouteValidationRule {
         if (!isClient) {
             Map<String, UriMatchVariable> variables = new HashMap<>();
             Set<UriMatchVariable> required = new HashSet<>();
-            for (UriMatchTemplate template: templates) {
+            for (UriTemplateMatcher template: templates) {
                 for (UriMatchVariable variable: template.getVariables()) {
                     if (!variable.isOptional() || variable.isExploded()) {
                         required.add(variable);

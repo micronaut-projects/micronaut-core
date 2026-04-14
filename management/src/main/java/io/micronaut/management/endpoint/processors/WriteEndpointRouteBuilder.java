@@ -19,7 +19,6 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.uri.UriTemplate;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.management.endpoint.EndpointDefaultConfiguration;
 import io.micronaut.management.endpoint.annotation.Selector;
@@ -61,9 +60,9 @@ public class WriteEndpointRouteBuilder extends AbstractEndpointRouteBuilder {
     @Override
     protected void registerRoute(ExecutableMethod<?, ?> method, String id, @Nullable Integer port) {
         Class<?> declaringType = method.getDeclaringType();
-        UriTemplate template = buildUriTemplate(method, id);
+        String template = buildUriTemplate(method, id);
         String[] consumes = method.stringValues(Write.class, "consumes");
-        UriRoute uriRoute = POST(template.toString(), declaringType, method.getMethodName(), method.getArgumentTypes())
+        UriRoute uriRoute = POST(template, declaringType, method.getMethodName(), method.getArgumentTypes())
             .consumes(MediaType.of(consumes));
         if (port != null) {
             uriRoute = uriRoute.exposedPort(port);

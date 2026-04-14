@@ -29,7 +29,7 @@ import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.websocket.AbstractNettyWebSocketHandler;
 import io.micronaut.http.netty.websocket.NettyWebSocketSession;
 import io.micronaut.http.uri.UriMatchInfo;
-import io.micronaut.http.uri.UriMatchTemplate;
+import io.micronaut.http.uri.UriTemplateMatcher;
 import io.micronaut.websocket.CloseReason;
 import io.micronaut.websocket.WebSocketPongMessage;
 import io.micronaut.websocket.annotation.ClientWebSocket;
@@ -106,7 +106,7 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
         this.handshaker = handshaker;
         this.genericWebSocketBean = webSocketBean;
         String clientPath = webSocketBean.getBeanDefinition().stringValue(ClientWebSocket.class).orElse("");
-        UriMatchTemplate matchTemplate = UriMatchTemplate.of(clientPath);
+        UriTemplateMatcher matchTemplate = UriTemplateMatcher.of(clientPath);
         this.matchInfo = matchTemplate.tryMatch(request.getPath());
     }
 

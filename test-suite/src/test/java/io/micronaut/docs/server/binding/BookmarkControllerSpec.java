@@ -19,7 +19,7 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.HttpClient;
-import io.micronaut.http.uri.UriTemplate;
+import io.micronaut.http.uri.UriTemplateMatcher;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -55,7 +55,7 @@ class BookmarkControllerSpec {
 
     @Test
     void testBindingPagination() {
-        UriTemplate template = new UriTemplate("/api/bookmarks/list{?offset,max,sort,order}");
+        UriTemplateMatcher template = UriTemplateMatcher.of("/api/bookmarks/list{?offset,max,sort,order}");
         Map<String, Object> params = new HashMap<>();
         params.put("offset", 0);
         params.put("max", 10);

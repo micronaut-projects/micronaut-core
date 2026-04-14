@@ -82,6 +82,10 @@ final class UriTemplateExpander implements UriTemplateParser.PartVisitor {
             value = expandPOJO(value);
         }
 
+        append(type, variable, value);
+    }
+
+    private void append(UriTemplateParser.ExpressionType type, UriTemplateParser.Variable variable, Object value) {
         if (value instanceof Iterable<?> iterable) {
             List<String> values = asListOfString(iterable);
             if (!values.isEmpty()) {
@@ -113,7 +117,9 @@ final class UriTemplateExpander implements UriTemplateParser.PartVisitor {
     private void appendMapValues(UriTemplateParser.ExpressionType type, UriTemplateParser.Variable variable, List<Map.Entry<String, List<String>>> entries) {
         if (variable.explode()) {
             for (Map.Entry<String, List<String>> entry : entries) {
-                appendKeyValues(type, variable, entry.getKey(), entry.getValue());
+                for (String value : entry.getValue()) {
+                    appendKeyValues(type, variable, entry.getKey(), List.of(value));
+                }
             }
             return;
         }
@@ -245,7 +251,7 @@ final class UriTemplateExpander implements UriTemplateParser.PartVisitor {
             return found;
         }
         // If a simple value, just use that
-        if (found == null || ClassUtils.isJavaLangType(found.getClass())) {
+        if (ClassUtils.isJavaLangType(found.getClass())) {
             return found;
         }
         // Otherwise, expand the object into properties (after all, the user asked for an expanded parameter)

@@ -5,7 +5,7 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.HttpClient
-import io.micronaut.http.uri.UriTemplate
+import io.micronaut.http.uri.UriTemplateMatcher
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -22,7 +22,7 @@ class BookmarkControllerSpec extends Specification {
 
     void "test POJO binding"() {
         given:
-        UriTemplate template = new UriTemplate("/api/bookmarks/list{?offset,max,sort,order}")
+        UriTemplateMatcher template = UriTemplateMatcher.of("/api/bookmarks/list{?offset,max,sort,order}")
         String uri = template.expand([offset: 0, max: 10])
 
         when:

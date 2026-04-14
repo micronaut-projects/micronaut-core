@@ -17,7 +17,6 @@ package io.micronaut.management.endpoint.processors;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.http.uri.UriTemplate;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.management.endpoint.EndpointDefaultConfiguration;
 import io.micronaut.management.endpoint.annotation.Delete;
@@ -58,8 +57,8 @@ public class DeleteEndpointRouteBuilder extends AbstractEndpointRouteBuilder {
     @Override
     protected void registerRoute(ExecutableMethod<?, ?> method, String id, @Nullable Integer port) {
         Class<?> declaringType = method.getDeclaringType();
-        UriTemplate template = buildUriTemplate(method, id);
-        UriRoute uriRoute = DELETE(template.toString(), declaringType, method.getMethodName(), method.getArgumentTypes());
+        String template = buildUriTemplate(method, id);
+        UriRoute uriRoute = DELETE(template, declaringType, method.getMethodName(), method.getArgumentTypes());
         if (port != null) {
             uriRoute = uriRoute.exposedPort(port);
         }

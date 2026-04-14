@@ -41,7 +41,7 @@ import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.annotation.Put;
 import io.micronaut.http.annotation.Trace;
 import io.micronaut.http.annotation.UriMapping;
-import io.micronaut.http.uri.UriTemplate;
+import io.micronaut.http.uri.UriTemplateMatcher;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import jakarta.inject.Singleton;
@@ -388,7 +388,7 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
     }
 
     private String resolveUri(BeanDefinition bean, String value, ExecutableMethod method, UriNamingStrategy uriNamingStrategy) {
-        UriTemplate rootUri = UriTemplate.of(uriNamingStrategy.resolveUri(bean));
+        UriTemplateMatcher rootUri = UriTemplateMatcher.of(uriNamingStrategy.resolveUri(bean));
         if (StringUtils.isNotEmpty(value)) {
             return rootUri.nest(value).toString();
         } else {

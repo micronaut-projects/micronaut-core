@@ -15,11 +15,10 @@
  */
 package io.micronaut.web.router;
 
-import org.jspecify.annotations.Nullable;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.uri.UriMatchTemplate;
+import org.jspecify.annotations.Nullable;
 
 import java.net.URI;
 import java.util.function.Predicate;
@@ -48,11 +47,6 @@ public interface UriRoute extends Route, Comparable<UriRoute> {
      * @return The HTTP method for this route
      */
     HttpMethod getHttpMethod();
-
-    /**
-     * @return The {@link UriMatchTemplate} used to match URIs
-     */
-    UriMatchTemplate getUriMatchTemplate();
 
     @Override
     UriRoute consumes(MediaType... mediaType);

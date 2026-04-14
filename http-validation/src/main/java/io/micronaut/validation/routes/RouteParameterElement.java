@@ -17,6 +17,7 @@ package io.micronaut.validation.routes;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ParameterElement;
@@ -27,7 +28,8 @@ import io.micronaut.inject.ast.ParameterElement;
  * @author James Kleeh
  * @since 1.0
  */
-class RouteParameterElement implements ParameterElement, AnnotationMetadataDelegate {
+@Internal
+final class RouteParameterElement implements ParameterElement, AnnotationMetadataDelegate {
 
     private final ParameterElement delegate;
     private final String name;

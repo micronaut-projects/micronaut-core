@@ -4,7 +4,6 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.type.Argument
 import io.micronaut.core.util.StringUtils
-import io.micronaut.http.BasicHttpAttributes
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -39,12 +38,11 @@ class OptionsRequestAttributesSpec extends Specification {
 
         and: 'filter is invoked'
         MyFilter myFilter = ctx.getBean(MyFilter)
-        myFilter.containsRouteInfo != null && myFilter.containsRouteMatch != null && myFilter.containsUriTemplate != null
+        myFilter.containsRouteInfo != null && myFilter.containsRouteMatch != null
 
         and: 'but no route info/match or uri tempalte information is present'
         !myFilter.containsRouteInfo
         !myFilter.containsRouteMatch
-        !myFilter.containsUriTemplate
 
 
         cleanup:
@@ -94,13 +92,11 @@ class OptionsRequestAttributesSpec extends Specification {
     static class MyFilter implements HttpServerFilter {
         Boolean containsRouteMatch
         Boolean containsRouteInfo
-        Boolean containsUriTemplate
 
         @Override
         Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
             containsRouteMatch = RouteAttributes.getRouteMatch(request).isPresent()
             containsRouteInfo = RouteAttributes.getRouteInfo(request).isPresent()
-            containsUriTemplate = BasicHttpAttributes.getUriTemplate(request).isPresent()
             return chain.proceed(request)
         }
     }

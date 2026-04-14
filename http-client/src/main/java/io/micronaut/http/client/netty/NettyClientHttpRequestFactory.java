@@ -20,7 +20,7 @@ import io.micronaut.core.beans.BeanMap;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequestFactory;
 import io.micronaut.http.MutableHttpRequest;
-import io.micronaut.http.uri.UriTemplate;
+import io.micronaut.http.uri.UriTemplateMatcher;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Map;
@@ -84,9 +84,9 @@ public class NettyClientHttpRequestFactory implements HttpRequestFactory {
     private <T> MutableHttpRequest<T> buildRequest(String uri, @Nullable T body, HttpMethod method) {
         if (uri.indexOf('{') > -1 && body != null) {
             if (body instanceof Map) {
-                uri = UriTemplate.of(uri).expand((Map<String, Object>) body);
+                uri = UriTemplateMatcher.of(uri).expand((Map<String, Object>) body);
             } else {
-                uri = UriTemplate.of(uri).expand(BeanMap.of(body));
+                uri = UriTemplateMatcher.of(uri).expand(BeanMap.of(body));
             }
         }
         return new NettyClientHttpRequest<T>(method, uri).body(body);

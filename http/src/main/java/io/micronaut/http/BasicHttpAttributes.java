@@ -45,26 +45,6 @@ public final class BasicHttpAttributes {
     }
 
     /**
-     * Get the URI template as a String, for tracing.
-     *
-     * @param request The request
-     * @return The template, if present
-     */
-    public static Optional<String> getUriTemplate(HttpRequest<?> request) {
-        return request.getAttribute(HttpAttributes.URI_TEMPLATE, String.class);
-    }
-
-    /**
-     * Set the URI template as a String, for tracing.
-     *
-     * @param request     The request
-     * @param uriTemplate The template, if present
-     */
-    public static void setUriTemplate(HttpRequest<?> request, String uriTemplate) {
-        request.setAttribute(HttpAttributes.URI_TEMPLATE, uriTemplate);
-    }
-
-    /**
      * Get the client service ID.
      *
      * @param request The request

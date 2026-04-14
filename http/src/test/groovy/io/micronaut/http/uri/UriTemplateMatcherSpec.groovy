@@ -25,10 +25,51 @@ import spock.lang.Unroll
 class UriTemplateMatcherSpec extends Specification {
 
     @Unroll
+    void "Test nest template #template with path #nested matches #variables"() {
+        // NOTE: query variables matching not supported
+        given:
+            UriTemplateMatcher uriTemplate = UriTemplateMatcher.of(template)
+
+        expect:
+            uriTemplate.nest(nested).match(result).orElse(null)?.variableValues == variables
+
+        where:
+            template       | nested               | variables                                  | result
+            '/city'        | 'country/{name}'     | [name: 'Fred']                             | '/city/country/Fred'
+            '/city/'       | 'country/{name}'     | [name: 'Fred']                             | '/city/country/Fred'
+            '/city/'       | '/country/{name}'    | [name: 'Fred']                             | '/city/country/Fred'
+            '/city'        | '/country/{name}'    | [name: 'Fred']                             | '/city/country/Fred'
+//            '/poetry'      | '/{?max}'            | [max: '10']                                | '/poetry/?max=10'
+//            '/poetry'      | '{?max}'             | [max: '10']                                | '/poetry?max=10'
+//            '/poetry/'     | '/{?max}'            | [max: '10']                                | '/poetry/?max=10'
+//            '/poetry/'     | '{?max}'             | [max: '10']                                | '/poetry?max=10'
+            '/'            | '/hello/{name}'      | [name: 'Fred']                             | '/hello/Fred'
+            ''             | '/hello/{name}'      | [name: 'Fred']                             | '/hello/Fred'
+            '/test/'       | '/hello/{name}'      | [name: 'Fred']                             | '/test/hello/Fred'
+            '{var}'        | '{var2}'             | [var: 'foo', var2: 'bar']                  | 'foo/bar'
+            '/book{/id}'   | '/author{/authorId}' | [id: 'foo', authorId: 'bar']               | '/book/foo/author/bar'
+            '{var}/'       | '{var2}'             | [var: 'foo', var2: 'bar']                  | 'foo/bar'
+            '{var}'        | '/{var2}'            | [var: 'foo', var2: 'bar']                  | 'foo/bar'
+//            '{var}{?q}'    | '/{var2}'            | [var: 'foo', var2: 'bar', q: 'test']       | 'foo/bar?q=test'
+//            '{var}{?q}'    | '{var2}'             | [var: 'foo', var2: 'bar', q: 'test']       | 'foo/bar?q=test'
+//            '{var}{#hash}' | '{var2}'             | [var: 'foo', var2: 'bar', hash: 'test']    | 'foo/bar#test'
+//            '/'            | '{?req*}'            | [req: [var: 'foo', var2: null]]            | '/?var=foo'
+//            '/'            | '{?keys*}{?keys2*}'  | [keys: [var: 'foo', var2: null]]           | '/?var=foo'
+//            '/'            | '{?keys*}{?keys2*}'  | [keys: [var: null], keys2: [var2: null]]   | '/'
+//            '/'            | '{?keys*}{?keys2*}'  | [keys: [var: 'foo'], keys2: [var2: null]]  | '/?var=foo'
+//            '/'            | '{?keys*}{?keys2*}'  | [keys: [var: 'foo'], keys2: [var2: 'bar']] | '/?var=foo&var2=bar'
+//            '/'            | '{?keys*}{?keys2*}'  | [keys: [var: null], keys2: [var2: 'bar']]  | '/?var2=bar'
+//            '/'            | '{?keys*}{&keys2*}'  | [keys: [var: null], keys2: [var2: null]]   | '/'
+//            '/'            | '{?keys*}{&keys2*}'  | [keys: [var: 'foo'], keys2: [var2: null]]  | '/?var=foo'
+//            '/'            | '{?keys*}{&keys2*}'  | [keys: [var: 'foo'], keys2: [var2: 'bar']] | '/?var=foo&var2=bar'
+//            '/'            | '{?keys*}{&keys2*}'  | [keys: [var: null], keys2: [var2: 'bar']]  | '/&var2=bar'
+    }
+
+    @Unroll
     void "test compareTo for #left and #right"() {
         given:
-        UriTemplateMatcher leftTemplate = new UriTemplateMatcher(left)
-        UriTemplateMatcher rightTemplate = new UriTemplateMatcher(right)
+        UriTemplateMatcher leftTemplate = UriTemplateMatcher.of(left)
+        UriTemplateMatcher rightTemplate = UriTemplateMatcher.of(right)
 
         expect:
         leftTemplate.compareTo(rightTemplate) == result
@@ -48,7 +89,7 @@ class UriTemplateMatcherSpec extends Specification {
     @Unroll
     void "Test URI template #template matches #uri when nested with #nested"() {
         given:
-        UriTemplateMatcher matchTemplate = new UriTemplateMatcher(template)
+        UriTemplateMatcher matchTemplate = UriTemplateMatcher.of(template)
         Optional<UriMatchInfo> info = matchTemplate.nest(nested).match(uri)
 
         expect:
@@ -70,7 +111,7 @@ class UriTemplateMatcherSpec extends Specification {
     @Unroll
     void "Test URI template #template matches #uri"() {
         given:
-        UriTemplateMatcher matchTemplate = new UriTemplateMatcher(template)
+        UriTemplateMatcher matchTemplate = UriTemplateMatcher.of(template)
         Optional<UriMatchInfo> info = matchTemplate.match(uri)
 
         expect:
@@ -145,7 +186,7 @@ class UriTemplateMatcherSpec extends Specification {
     @Unroll
     void "Test URI template #template matches #uri with trailing slash"() {
         given:
-        UriTemplateMatcher matchTemplate = new UriTemplateMatcher(template)
+        UriTemplateMatcher matchTemplate = UriTemplateMatcher.of(template)
         Optional<UriMatchInfo> info = matchTemplate.match(uri)
 
         expect:
@@ -164,8 +205,10 @@ class UriTemplateMatcherSpec extends Specification {
         "/books{/path:.*}{.ext:?}"       | '/books/foo/bar/'     | true    | [path: 'foo/bar', ext: null]
         "/books/{id}"                    | '/books/'             | false   | null
         "/books/{id}"                    | '/books/1/'           | true    | [id: '1']
+        "/books/{id}/"                   | '/books/1/'           | true    | [id: '1']
         "/books/{id}"                    | '/books/test/'        | true    | [id: 'test']
         "/books/{id:2}"                  | '/books/1/'           | true    | [id: '1']
+        "/books/{id:2}/"                 | '/books/1/'           | true    | [id: '1']
         "/books/{id:2}"                  | '/books/100/'         | false   | null
         "/books{/id:?}"                  | '/books/'             | true    | [id: null]
         "/books{/id}{.ext}"              | '/books/1/'           | false   | null
@@ -193,7 +236,7 @@ class UriTemplateMatcherSpec extends Specification {
     @Unroll
     void "Test URI template #template matches uri with encoded characters: #uri"() {
         given:
-        UriTemplateMatcher matchTemplate = new UriTemplateMatcher(template)
+        UriTemplateMatcher matchTemplate = UriTemplateMatcher.of(template)
         Optional<UriMatchInfo> info = matchTemplate.match(uri)
 
         expect:

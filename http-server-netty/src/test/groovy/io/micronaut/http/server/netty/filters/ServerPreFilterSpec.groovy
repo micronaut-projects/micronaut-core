@@ -3,7 +3,6 @@ package io.micronaut.http.server.netty.filters
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Order
-import io.micronaut.http.BasicHttpAttributes
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MutableHttpRequest
@@ -65,9 +64,6 @@ class ServerPreFilterSpec extends Specification {
                 throw new IllegalStateException()
             }
             if (RouteAttributes.getRouteMatch(request).isPresent()) {
-                throw new IllegalStateException()
-            }
-            if (BasicHttpAttributes.getUriTemplate(request).isPresent()) {
                 throw new IllegalStateException()
             }
             events.add("prematching " + request.uri)
@@ -168,9 +164,6 @@ class ServerPreFilterSpec extends Specification {
             if (RouteAttributes.getRouteMatch(request).isPresent()) {
                 throw new IllegalStateException()
             }
-            if (BasicHttpAttributes.getUriTemplate(request).isPresent()) {
-                throw new IllegalStateException()
-            }
         }
     }
 
@@ -207,9 +200,6 @@ class ServerPreFilterSpec extends Specification {
                 throw new IllegalStateException()
             }
             if (RouteAttributes.getRouteMatch(request).isPresent()) {
-                throw new IllegalStateException()
-            }
-            if (BasicHttpAttributes.getUriTemplate(request).isPresent()) {
                 throw new IllegalStateException()
             }
             events.add("prematching " + request.uri)
@@ -342,9 +332,6 @@ class ServerPreFilterSpec extends Specification {
             if (RouteAttributes.getRouteMatch(request).isPresent()) {
                 throw new IllegalStateException()
             }
-            if (BasicHttpAttributes.getUriTemplate(request).isPresent()) {
-                throw new IllegalStateException()
-            }
             events.add("prematching " + request.uri)
             def response = continuation.proceed()
             events.add("after prematching " + request.uri)
@@ -352,9 +339,6 @@ class ServerPreFilterSpec extends Specification {
                 throw new IllegalStateException()
             }
             if (RouteAttributes.getRouteMatch(request).isEmpty()) {
-                throw new IllegalStateException()
-            }
-            if (BasicHttpAttributes.getUriTemplate(request).isEmpty()) {
                 throw new IllegalStateException()
             }
         }

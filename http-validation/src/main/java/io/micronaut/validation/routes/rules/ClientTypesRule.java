@@ -19,7 +19,7 @@ import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.server.multipart.MultipartBody;
 import io.micronaut.http.server.types.files.StreamedFile;
 import io.micronaut.http.server.types.files.SystemFile;
-import io.micronaut.http.uri.UriMatchTemplate;
+import io.micronaut.http.uri.UriTemplateMatcher;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
@@ -47,7 +47,7 @@ public class ClientTypesRule implements RouteValidationRule {
     };
 
     @Override
-    public RouteValidationResult validate(List<UriMatchTemplate> templates, ParameterElement[] parameters, MethodElement method) {
+    public RouteValidationResult validate(List<UriTemplateMatcher> templates, ParameterElement[] parameters, MethodElement method) {
         String[] errors = new String[]{};
         if (method.hasAnnotation(Client.class)) {
             final Stream.Builder<ClassElement> builder = Stream.<ClassElement>builder().add(method.getReturnType());

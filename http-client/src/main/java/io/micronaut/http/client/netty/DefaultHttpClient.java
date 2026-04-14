@@ -20,7 +20,6 @@ import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.async.propagation.ReactivePropagation;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.beans.BeanMap;
@@ -110,7 +109,7 @@ import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.sse.Event;
 import io.micronaut.http.uri.UriBuilder;
-import io.micronaut.http.uri.UriTemplate;
+import io.micronaut.http.uri.UriTemplateMatcher;
 import io.micronaut.http.util.HttpHeadersUtil;
 import io.micronaut.json.JsonMapper;
 import io.micronaut.json.codec.JsonMediaTypeCodec;
@@ -165,6 +164,7 @@ import io.netty.util.AsciiString;
 import io.netty.util.CharsetUtil;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.FastThreadLocalThread;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -1031,7 +1031,7 @@ public class DefaultHttpClient implements
     public <T extends AutoCloseable> Publisher<T> connect(Class<T> clientEndpointType, Map<String, Object> parameters) {
         WebSocketBean<T> webSocketBean = webSocketRegistry.getWebSocket(clientEndpointType);
         String uri = webSocketBean.getBeanDefinition().stringValue(ClientWebSocket.class).orElse("/ws");
-        uri = UriTemplate.of(uri).expand(parameters);
+        uri = UriTemplateMatcher.of(uri).expand(parameters);
         MutableHttpRequest<Object> request = io.micronaut.http.HttpRequest.GET(uri);
         return toMono(resolveRequestURI(request), PropagatedContext.getOrEmpty()).flux()
                 .switchMap(resolvedURI -> connectWebSocket(resolvedURI, request, clientEndpointType, webSocketBean));

@@ -58,13 +58,13 @@ public class QueryValueClientArgumentRequestBinder implements AnnotatedClientArg
      * {@link io.micronaut.core.convert.converters.MultiValuesConverterFactory} and perform conversion only when the
      * {@link io.micronaut.core.convert.format.Format} annotation has one of the supported values.
      * Otherwise, if the {@link io.micronaut.core.convert.format.Format} annotation is present, it is converted to {@link String}. If none of these
-     * are satisfied, the{@link io.micronaut.http.uri.UriTemplate} decides what to do with the given value which
+     * are satisfied, the url template decides what to do with the given value which
      * is supplied as an Object (it is added to uriContext.pathParameter).
      *
      * <br> By default value is converted to ConvertibleMultiValues when the {@link io.micronaut.core.convert.format.Format} annotation is present and has
      * one of the defined above formats. Otherwise, empty optional is returned.
      *
-     * <br> The default {@link io.micronaut.http.uri.UriTemplate} will convert the value to String and to parameters.
+     * <br> The default url template will convert the value to String and to parameters.
      * Optionally, the value can be formatted if the path template states so.
      */
     @Override

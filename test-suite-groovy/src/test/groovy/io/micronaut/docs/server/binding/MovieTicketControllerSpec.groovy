@@ -5,7 +5,7 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.HttpClient
-import io.micronaut.http.uri.UriTemplate
+import io.micronaut.http.uri.UriTemplateMatcher
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -22,7 +22,7 @@ class MovieTicketControllerSpec extends Specification {
 
     void "test Bindable values POJO binding"() {
         given:
-            UriTemplate template = new UriTemplate("/api/movie/ticket/terminator{?minPrice,maxPrice}")
+            UriTemplateMatcher template = UriTemplateMatcher.of("/api/movie/ticket/terminator{?minPrice,maxPrice}")
             String uri = template.expand([minPrice: 5.0, maxPrice: 20.0])
 
         when:

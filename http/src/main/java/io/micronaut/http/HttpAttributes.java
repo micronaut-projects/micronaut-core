@@ -60,14 +60,6 @@ public enum HttpAttributes implements CharSequence {
     ROUTE_INFO(Constants.PREFIX + ".route.info"),
 
     /**
-     * Attribute used to store the URI template defined by the route.
-     *
-     * @deprecated Use {@link BasicHttpAttributes#getUriTemplate} instead
-     */
-    @Deprecated(forRemoval = true, since = "4.8.0")
-    URI_TEMPLATE(Constants.PREFIX + ".route.template"),
-
-    /**
      * Attribute used to store the HTTP method name, if required within the response.
      *
      * @deprecated No replacement. Use your own attribute if necessary

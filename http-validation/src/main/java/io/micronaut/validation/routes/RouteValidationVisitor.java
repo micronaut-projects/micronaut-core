@@ -21,7 +21,7 @@ import io.micronaut.context.env.DefaultPropertyPlaceholderResolver.Segment;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.http.uri.UriMatchTemplate;
+import io.micronaut.http.uri.UriTemplateMatcher;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
@@ -30,7 +30,6 @@ import io.micronaut.validation.routes.rules.MissingParameterRule;
 import io.micronaut.validation.routes.rules.NullableParameterRule;
 import io.micronaut.validation.routes.rules.RequestBeanParameterRule;
 import io.micronaut.validation.routes.rules.RouteValidationRule;
-import org.jspecify.annotations.NullUnmarked;
 
 import javax.annotation.processing.SupportedOptions;
 import java.util.ArrayList;
@@ -46,7 +45,6 @@ import java.util.Set;
  * @since 1.0
  */
 @SupportedOptions(RouteValidationVisitor.VALIDATION_OPTION)
-@NullUnmarked
 public class RouteValidationVisitor implements TypeElementVisitor<Object, Object> {
 
     static final String VALIDATION_OPTION = "micronaut.route.validation";
@@ -79,7 +77,7 @@ public class RouteValidationVisitor implements TypeElementVisitor<Object, Object
             Set<String> uris = CollectionUtils.setOf(mappingAnnotation.stringValues("uris"));
             mappingAnnotation.stringValue().ifPresent(uris::add);
 
-            List<UriMatchTemplate> templates = uris.stream().map(uri -> {
+            List<UriTemplateMatcher> templates = uris.stream().map(uri -> {
                 List<Segment> segments = resolver.buildSegments(uri);
                 StringBuilder uriValue = new StringBuilder();
                 for (Segment segment : segments) {
@@ -90,7 +88,7 @@ public class RouteValidationVisitor implements TypeElementVisitor<Object, Object
                     }
                 }
 
-                return UriMatchTemplate.of(uriValue.toString());
+                return UriTemplateMatcher.of(uriValue.toString());
             }).toList();
 
             RouteParameterElement[] parameters = Arrays.stream(element.getParameters())

@@ -18,7 +18,6 @@ package io.micronaut.http.uri;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
-import org.jspecify.annotations.NullUnmarked;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -26,17 +25,19 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * Implementation of the paths matching <a href="https://tools.ietf.org/html/rfc6570">rfc6570</a>.
- *
+ * NOTE: Matcher doesn't support resolving query parameters, that is done by HTTP layer
  * @author Denis Stepanov
  * @since 4.6.0
  */
-@NullUnmarked
 @Internal
 public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTemplateMatcher> {
 
@@ -45,9 +46,14 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
     private final List<UriMatchVariable> variables;
     private final Segment[] segments;
     private final boolean isRoot;
+    private final int rawSegmentLength;
+    private final int pathVariableCount;
+    private final Set<String> variableNames;
 
     // Matches cache
+    @Nullable
     private UriMatchInfo rootMatchInfo;
+    @Nullable
     private UriMatchInfo exactMatchInfo;
 
     /**
@@ -55,7 +61,7 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
      *
      * @param templateString The template string
      */
-    public UriTemplateMatcher(String templateString) {
+    private UriTemplateMatcher(String templateString) {
         this(templateString, UriTemplateParser.parse(templateString));
     }
 
@@ -68,23 +74,64 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
         this.templateString = templateString;
         this.parts = parts;
         List<UriMatchVariable> variables = new ArrayList<>();
-        this.segments = provideMatchSegments(parts, variables);
-        this.isRoot = segments.length == 0 || segments.length == 1 && segments[0].type == SegmentType.LITERAL && isRoot(segments[0].value);
+        int[] rawSegmentLength = new int[1];
+        this.segments = provideMatchSegments(parts, variables, rawSegmentLength);
+        this.rawSegmentLength = rawSegmentLength[0];
+        this.isRoot = segments.length == 0 || segments.length == 1 && segments[0].type == SegmentType.LITERAL && isRoot(Objects.requireNonNull(segments[0].value));
         this.variables = Collections.unmodifiableList(variables);
+        int varCount = 0;
+        for (UriMatchVariable variable : variables) {
+            if (!variable.isQuery()) {
+                varCount++;
+            }
+        }
+        this.pathVariableCount = varCount;
+        this.variableNames = getVariables().stream().map(UriMatchVariable::getName).collect(Collectors.toUnmodifiableSet());
     }
 
-    private static Segment[] provideMatchSegments(List<UriTemplateParser.Part> parts, List<UriMatchVariable> variables) {
+    /**
+     * @return The variable names
+     */
+    public Set<String> getVariableNames() {
+        return variableNames;
+    }
+
+    /**
+     * @return The variable names
+     */
+    public List<UriMatchVariable> getVariables() {
+        return variables;
+    }
+
+    /**
+     * @return The number of path segments that are variable
+     */
+    public long getPathVariableSegmentCount() {
+        return pathVariableCount;
+    }
+
+    /**
+     * @return The length of the raw segments
+     * @see 5.0
+     */
+    public long getRawSegmentLength() {
+        return rawSegmentLength;
+    }
+
+
+    private static Segment[] provideMatchSegments(List<UriTemplateParser.Part> parts, List<UriMatchVariable> variables, int[] rawSegmentLength) {
         List<Segment> segments = new ArrayList<>();
         List<String> regexpVariables = new ArrayList<>();
         StringBuilder regexp = null;
         for (int i = 0; i < parts.size(); i++) {
             UriTemplateParser.Part part = parts.get(i);
-            if (part instanceof UriTemplateParser.Literal literal) {
+            if (part instanceof UriTemplateParser.Literal(String text)) {
                 if (regexp == null) {
-                    segments.add(new Segment(SegmentType.LITERAL, literal.text(), null, null));
+                    segments.add(new Segment(SegmentType.LITERAL, text, null, null));
                 } else {
-                    regexp.append(Pattern.quote(literal.text()));
+                    regexp.append(Pattern.quote(text));
                 }
+                rawSegmentLength[0] += text.length();
             } else if (part instanceof UriTemplateParser.Expression expression) {
                 if (regexp == null && allowPathSegment(expression, parts, i)) {
                     for (UriTemplateParser.Variable variable : expression.variables()) {
@@ -120,8 +167,8 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
     }
 
     private static boolean allowPathSegment(UriTemplateParser.Expression expression,
-                                     List<UriTemplateParser.Part> parts,
-                                     int index) {
+                                            List<UriTemplateParser.Part> parts,
+                                            int index) {
         if (expression.type() != UriTemplateParser.ExpressionType.NONE) {
             return false; // Only this on is supported
         }
@@ -131,10 +178,9 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
         if (parts.size() == index + 1) {
             return true; // Last path
         }
-        if (parts.get(index + 1) instanceof UriTemplateParser.Literal literal && literal.text().startsWith("/")) {
-            return true; // It can absorb everything till the next one
-        }
-        return false;
+        return parts.get(index + 1) instanceof UriTemplateParser.Literal(
+            String text
+        ) && text.startsWith("/"); // It can absorb everything till the next one
     }
 
     @SuppressWarnings("MissingSwitchDefault")
@@ -256,10 +302,7 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
      */
     @Nullable
     public UriMatchInfo tryMatch(String uri) {
-        int length = uri.length();
-        if (length > 1 && uri.charAt(length - 1) == '/') {
-            uri = uri.substring(0, length - 1);
-        }
+        uri = normalize(uri);
         if (isRoot && isRoot(uri)) {
             if (rootMatchInfo == null) {
                 rootMatchInfo = new DefaultUriMatchInfo(uri, Collections.emptyMap(), variables);
@@ -269,11 +312,7 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
         // Remove any url parameters before matching
         int parameterIndex = uri.indexOf('?');
         if (parameterIndex > -1) {
-            uri = uri.substring(0, parameterIndex);
-            length = uri.length();
-            if (length > 1 && uri.charAt(length - 1) == '/') {
-                uri = uri.substring(0, length - 1);
-            }
+            uri = normalize(uri.substring(0, parameterIndex));
         }
         if (variables.isEmpty()) {
             if (uri.equals(templateString)) {
@@ -291,33 +330,46 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
         return null;
     }
 
+    private static String normalize(String uri) {
+        int length = uri.length();
+        if (length > 1 && uri.charAt(length - 1) == '/') {
+            uri = uri.substring(0, length - 1);
+        }
+        return uri;
+    }
+
     private boolean match(String uri, Map<String, Object> variableMap) {
         for (int i = 0; i < segments.length; i++) {
             Segment segment = segments[i];
             switch (segment.type) {
                 case LITERAL -> {
-                    if (uri.startsWith(segment.value)) {
-                        uri = uri.substring(segment.value.length());
-                    } else {
-                        return false;
+                    String value = Objects.requireNonNull(segment.value);
+                    if (uri.startsWith(value)) {
+                        uri = uri.substring(value.length());
+                        continue;
                     }
+                    if (uri.equals(normalize(value))) {
+                        uri = "";
+                        continue;
+                    }
+                    return false;
                 }
                 case PATH -> {
                     boolean requiresSlash = i + 1 != segments.length;
                     int index = readText(uri, requiresSlash);
                     if (index > 0) { // Deny empty path
                         String path = uri.substring(0, index);
-                        variableMap.put(segment.value, path);
+                        variableMap.put(Objects.requireNonNull(segment.value), path);
                         uri = uri.substring(index);
                     } else {
                         return false;
                     }
                 }
                 case REGEXP -> {
-                    Matcher matcher = segment.pattern.matcher(uri);
+                    Matcher matcher = Objects.requireNonNull(segment.pattern).matcher(uri);
                     if (matcher.matches()) {
                         int groupInx = 2;
-                        for (String matchingVariable : segment.regexpVariables) {
+                        for (String matchingVariable : Objects.requireNonNull(segment.regexpVariables)) {
                             String group = matcher.group(groupInx);
                             variableMap.put(matchingVariable, group);
                             groupInx += 2;
@@ -378,7 +430,21 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
      * @return The new URI template
      */
     public UriTemplateMatcher nest(CharSequence uriTemplate) {
-        List<UriTemplateParser.Part> newParts = UriTemplateParser.parse(uriTemplate.toString());
+        return nest(uriTemplate.toString());
+    }
+
+    /**
+     * Nests another URI template with this template.
+     *
+     * @param uriTemplate The URI template. If it does not begin with forward slash it will automatically be appended with forward slash
+     * @return The new URI template
+     */
+    public UriTemplateMatcher nest(String uriTemplate) {
+        if (isRoot(uriTemplate)) {
+            return this;
+        }
+        uriTemplate = normalize(uriTemplate);
+        List<UriTemplateParser.Part> newParts = UriTemplateParser.parse(uriTemplate);
         return new UriTemplateMatcher(templateString + uriTemplate, UriTemplateParser.concat(parts, newParts));
     }
 
@@ -464,20 +530,20 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
         }
     }
 
-    private boolean isRoot(String uri) {
+    private static boolean isRoot(String uri) {
         int length = uri.length();
         return length == 0 || length == 1 && uri.charAt(0) == '/';
     }
 
     /**
      * /**
-     * Create a new {@link UriTemplate} for the given URI.
+     * Create a new {@link UriTemplateMatcher} for the given URI.
      *
      * @param uri The URI
      * @return The template
      */
     public static UriTemplateMatcher of(String uri) {
-        return new UriTemplateMatcher(uri);
+        return new UriTemplateMatcher(normalize(uri));
     }
 
     private static final class PathEvaluator implements UriTemplateParser.PartVisitor {
@@ -498,8 +564,11 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
         }
     }
 
-    private record Segment(SegmentType type, String value,
-                           @Nullable Pattern pattern, @Nullable String[] regexpVariables) {
+    private record Segment(SegmentType type,
+                           @Nullable
+                           String value,
+                           @Nullable Pattern pattern,
+                           String @Nullable [] regexpVariables) {
     }
 
     private enum SegmentType {

@@ -15,7 +15,7 @@
  */
 package io.micronaut.docs.server.uris;
 
-import io.micronaut.http.uri.UriMatchTemplate;
+import io.micronaut.http.uri.UriTemplateMatcher;
 import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
@@ -29,7 +29,7 @@ class UriTemplateTest {
     void testUriTemplate() {
 
         // tag::match[]
-        UriMatchTemplate template = UriMatchTemplate.of("/hello/{name}");
+        UriTemplateMatcher template = UriTemplateMatcher.of("/hello/{name}");
 
         assertTrue(template.match("/hello/John").isPresent()); // <1>
         assertEquals("/hello/John", template.expand( // <2>

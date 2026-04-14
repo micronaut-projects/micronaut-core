@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The result of a call to {@link UriMatchTemplate#match(java.net.URI)}.
+ * The result of a call to uri match.
  *
  * @author Graeme Rocher
  * @since 1.0

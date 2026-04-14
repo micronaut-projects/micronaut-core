@@ -24,15 +24,29 @@ import spock.lang.Unroll
 class UriTemplateExpanderSpec extends Specification {
 
     @Unroll
+    void "Test expand"() {
+        given:
+            UriTemplateMatcher uriTemplate = UriTemplateMatcher.of(template)
+
+        expect:
+            uriTemplate.expand(arguments) == result
+
+        where:
+            template                               | arguments                                                 | result
+            '/search-exploded/{flavour}{?params*}' | [flavour: 'pojo', params: [term: ["Tool", 'Agnes Obel']]] | '/search-exploded/pojo?term=Tool&term=Agnes+Obel'
+    }
+
+    @Unroll
     void "Test nest template #template with path #nested and #arguments"() {
         given:
-        UriTemplateMatcher uriTemplate = new UriTemplateMatcher(template)
+        UriTemplateMatcher uriTemplate = UriTemplateMatcher.of(template)
 
         expect:
         uriTemplate.nest(nested).expand(arguments) == result
 
         where:
         template       | nested               | arguments                               | result
+        '/city'        | 'country/{name}'     | [name: 'Fred']                          | '/city/country/Fred'
         '/city'        | 'country/{name}'     | [name: 'Fred']                          | '/city/country/Fred'
         '/city/'       | 'country/{name}'     | [name: 'Fred']                          | '/city/country/Fred'
         '/city/'       | '/country/{name}'    | [name: 'Fred']                          | '/city/country/Fred'
@@ -64,7 +78,7 @@ class UriTemplateExpanderSpec extends Specification {
     @Unroll
     void "Test nest template #template toPathString() with path #nested"() {
         given:
-        UriTemplateMatcher uriTemplate = new UriTemplateMatcher(template)
+        UriTemplateMatcher uriTemplate = UriTemplateMatcher.of(template)
 
         expect:
         uriTemplate.nest(nested).toPathString() == result
@@ -101,7 +115,7 @@ class UriTemplateExpanderSpec extends Specification {
     @Unroll
     void "Test nest template #template toString() with path #nested"() {
         given:
-        UriTemplateMatcher uriTemplate = new UriTemplateMatcher(template)
+        UriTemplateMatcher uriTemplate = UriTemplateMatcher.of(template)
 
         expect:
         uriTemplate.nest(nested).toString() == result
@@ -141,7 +155,7 @@ class UriTemplateExpanderSpec extends Specification {
     @Unroll
     void "Test expand URI template #template with arguments #arguments for path"() {
         given:
-        UriTemplateMatcher uriTemplate = new UriTemplateMatcher(template)
+        UriTemplateMatcher uriTemplate = UriTemplateMatcher.of(template)
 
         expect: 'See https://tools.ietf.org/html/rfc6570#section-2.4.1'
         uriTemplate.expand(arguments) == result
@@ -295,7 +309,7 @@ class UriTemplateExpanderSpec extends Specification {
     @Unroll
     void "Test expand URI template #template with arguments #arguments for full URL"() {
         given:
-        UriTemplateMatcher uriTemplate = new UriTemplateMatcher(template)
+        UriTemplateMatcher uriTemplate = UriTemplateMatcher.of(template)
 
         expect: 'See https://tools.ietf.org/html/rfc6570#section-2.4.1'
         uriTemplate.expand(arguments) == result
@@ -452,7 +466,7 @@ class UriTemplateExpanderSpec extends Specification {
     @Unroll
     void "Test expand URI template #template with arguments #arguments for full URL and port"() {
         given:
-        UriTemplateMatcher uriTemplate = new UriTemplateMatcher(template)
+        UriTemplateMatcher uriTemplate = UriTemplateMatcher.of(template)
 
         expect: 'See https://tools.ietf.org/html/rfc6570#section-2.4.1'
         uriTemplate.expand(arguments) == result

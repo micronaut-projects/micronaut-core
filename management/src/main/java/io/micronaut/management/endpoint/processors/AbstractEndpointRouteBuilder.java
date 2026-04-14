@@ -19,14 +19,12 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.LifeCycle;
 import io.micronaut.context.processor.BeanDefinitionProcessor;
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.uri.UriTemplate;
+import io.micronaut.http.uri.UriTemplateMatcher;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -35,6 +33,7 @@ import io.micronaut.management.endpoint.EndpointDefaultConfiguration;
 import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.annotation.Selector;
 import io.micronaut.web.router.DefaultRouteBuilder;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.util.Map;
@@ -149,16 +148,16 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
     /**
      * @param method The {@link ExecutableMethod}
      * @param id The route id
-     * @return An {@link UriTemplate}
+     * @return An url template path
      */
-    protected UriTemplate buildUriTemplate(ExecutableMethod<?, ?> method, String id) {
-        UriTemplate template = new UriTemplate(resolveUriByRouteId(id));
-        for (Argument argument : method.getArguments()) {
+    protected String buildUriTemplate(ExecutableMethod<?, ?> method, String id) {
+        UriTemplateMatcher template = UriTemplateMatcher.of(resolveUriByRouteId(id));
+        for (Argument<?> argument : method.getArguments()) {
             if (isPathParameter(argument)) {
                 template = template.nest("/{" + argument.getName() + "}");
             }
         }
-        return template;
+        return template.toString();
     }
 
     /**
@@ -180,8 +179,7 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
      * @param argument An {@link Argument}
      * @return Whether the argument is a path parameter
      */
-    protected boolean isPathParameter(Argument argument) {
-        AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
-        return annotationMetadata.hasDeclaredAnnotation(Selector.class);
+    protected boolean isPathParameter(Argument<?> argument) {
+        return argument.getAnnotationMetadata().hasDeclaredAnnotation(Selector.class);
     }
 }

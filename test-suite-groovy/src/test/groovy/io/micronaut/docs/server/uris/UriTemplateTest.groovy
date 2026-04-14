@@ -1,6 +1,7 @@
 package io.micronaut.docs.server.uris
 
-import io.micronaut.http.uri.UriMatchTemplate
+
+import io.micronaut.http.uri.UriTemplateMatcher
 import spock.lang.Specification
 
 class UriTemplateTest extends Specification {
@@ -8,7 +9,7 @@ class UriTemplateTest extends Specification {
     void "test uri template"() {
         // tag::match[]
         given:
-        UriMatchTemplate template = UriMatchTemplate.of("/hello/{name}")
+        UriTemplateMatcher template = UriTemplateMatcher.of("/hello/{name}")
 
         expect:
         template.match("/hello/John").isPresent() // <1>
@@ -18,7 +19,7 @@ class UriTemplateTest extends Specification {
 
     void "test uri with slash before params"() {
         given:
-        UriMatchTemplate template = UriMatchTemplate.of("/hello/{name}")
+        UriTemplateMatcher template = UriTemplateMatcher.of("/hello/{name}")
 
         expect:
         template.match("/hello/John/?param=value").isPresent()

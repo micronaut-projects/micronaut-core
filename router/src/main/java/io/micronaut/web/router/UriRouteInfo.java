@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 package io.micronaut.web.router;
-import org.jspecify.annotations.Nullable;
+
 import io.micronaut.http.HttpMethod;
-import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.http.uri.UriMatcher;
+import org.jspecify.annotations.Nullable;
 
 import java.net.URI;
 import java.util.Optional;
@@ -33,14 +33,28 @@ import java.util.Optional;
 public interface UriRouteInfo<T, R> extends MethodBasedRouteInfo<T, R>, RequestMatcher, UriMatcher, Comparable<UriRouteInfo<T, R>> {
 
     /**
+     * Returns the path string excluding any query variables.
+     *
+     * @return The path string
+     */
+    String toPathString();
+
+    /**
+     * @return The number of path segments that are variable
+     * @see 5.0
+     */
+    long getPathVariableSegmentCount();
+
+    /**
+     * @return The length of the raw segments
+     * @see 5.0
+     */
+    long getRawSegmentLength();
+
+    /**
      * @return The HTTP method for this route
      */
     HttpMethod getHttpMethod();
-
-    /**
-     * @return The {@link UriMatchTemplate} used to match URIs
-     */
-    UriMatchTemplate getUriMatchTemplate();
 
     /**
      * Match this route within the given URI and produce a {@link RouteMatch} if a match is found.
@@ -95,4 +109,5 @@ public interface UriRouteInfo<T, R> extends MethodBasedRouteInfo<T, R>, RequestM
     default String getHttpMethodName() {
         return getHttpMethod().name();
     }
+
 }

@@ -16,7 +16,7 @@
 package io.micronaut.http.client.bind;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.http.uri.UriMatchTemplate;
+import io.micronaut.http.uri.UriTemplateMatcher;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -33,10 +33,10 @@ public class ClientRequestUriContext {
 
     private final Map<String, Object> pathParameters;
     private final Map<String, List<String>> queryParameters;
-    private final UriMatchTemplate uriTemplate;
+    private final UriTemplateMatcher uriTemplate;
 
     @Internal
-    public ClientRequestUriContext(UriMatchTemplate uriTemplate,
+    public ClientRequestUriContext(UriTemplateMatcher uriTemplate,
                                    Map<String, Object> pathParameters,
                                    Map<String, List<String>> queryParameters) {
         this.uriTemplate = uriTemplate;
@@ -47,12 +47,11 @@ public class ClientRequestUriContext {
     /**
      * @return The URI template for the client method
      */
-    public UriMatchTemplate getUriTemplate() {
+    public UriTemplateMatcher getUriTemplate() {
         return uriTemplate;
     }
 
     /**
-     * @see UriMatchTemplate#expand(Map)
      * @return The parameters used to expand the URI template.
      */
     public Map<String, Object> getPathParameters() {

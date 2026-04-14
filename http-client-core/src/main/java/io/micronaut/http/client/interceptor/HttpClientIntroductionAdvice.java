@@ -24,7 +24,6 @@ import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.beans.BeanMap;
@@ -42,7 +41,6 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.version.annotation.Version;
-import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
@@ -68,8 +66,9 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.http.sse.Event;
 import io.micronaut.http.uri.UriBuilder;
-import io.micronaut.http.uri.UriMatchTemplate;
+import io.micronaut.http.uri.UriTemplateMatcher;
 import io.micronaut.json.codec.JsonMediaTypeCodec;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
@@ -90,6 +89,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 
@@ -367,7 +367,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                                             AnnotationMetadata annotationMetadata) {
         MutableHttpRequest<?> request = HttpRequest.create(httpMethod, "", httpMethodName);
 
-        UriMatchTemplate uriTemplate = UriMatchTemplate.of("");
+        UriTemplateMatcher uriTemplate = UriTemplateMatcher.of("");
         if (!(uri.length() == 1 && uri.charAt(0) == '/')) {
             uriTemplate = uriTemplate.nest(uri);
         }
@@ -377,7 +377,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         ClientRequestUriContext uriContext = new ClientRequestUriContext(uriTemplate, pathParams, queryParams);
         List<Argument<?>> bodyArguments = new ArrayList<>();
 
-        List<String> uriVariables = uriTemplate.getVariableNames();
+        Set<String> uriVariables = uriTemplate.getVariableNames();
         Map<String, MutableArgumentValue<?>> parameters = context.getParameters();
 
         ClientArgumentRequestBinder<Object> defaultBinder = buildDefaultBinder(pathParams, bodyArguments);
@@ -443,13 +443,11 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         }
 
         ClientAttributes.setInvocationContext(request, context);
-        // Set the URI template used to make the request for tracing purposes
-        BasicHttpAttributes.setUriTemplate(request, resolveTemplate(annotationMetadata, uriTemplate.toString()));
 
         return RequestBinderResult.withRequest(request);
     }
 
-    private void bindPathParams(List<String> uriVariables, Map<String, Object> pathParams, @Nullable Object body) {
+    private void bindPathParams(Set<String> uriVariables, Map<String, Object> pathParams, @Nullable Object body) {
         boolean variableSatisfied = uriVariables.isEmpty() || pathParams.keySet().containsAll(uriVariables);
         if (body != null && !variableSatisfied) {
             if (body instanceof Map<?, ?> map) {

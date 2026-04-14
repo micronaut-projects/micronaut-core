@@ -21,6 +21,7 @@ import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.http.uri.UriTemplateMatcher;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
@@ -35,7 +36,6 @@ import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.filter.FilterOrder;
 import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.http.filter.HttpFilter;
-import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
@@ -424,7 +424,6 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
                 httpMethodName,
                 conversionService
             );
-            currentParentRoute.nestedRoutes.add(route);
         } else {
             route = new DefaultUriRoute(httpMethod, uri, mediaTypes, executableHandle, httpMethodName, conversionService);
         }
@@ -455,7 +454,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     /**
      * Abstract class for base {@link MethodBasedRouteInfo}.
      */
-    abstract static class AbstractRoute implements Route {
+    private abstract static sealed class AbstractRoute implements Route {
         protected final List<Predicate<HttpRequest<?>>> conditions = new ArrayList<>();
         protected final MethodExecutionHandle<Object, Object> targetMethod;
         protected final ConversionService conversionService;
@@ -553,7 +552,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     /**
      * Default Error Route.
      */
-    final class DefaultErrorRoute extends AbstractRoute implements ErrorRoute {
+    private final class DefaultErrorRoute extends AbstractRoute implements ErrorRoute {
 
         private final Class<? extends Throwable> error;
         private final @Nullable Class<?> originatingClass;
@@ -667,7 +666,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     /**
      * Represents a route for an {@link io.micronaut.http.HttpStatus} code.
      */
-    final class DefaultStatusRoute extends AbstractRoute implements StatusRoute {
+    private final class DefaultStatusRoute extends AbstractRoute implements StatusRoute {
 
         private final int statusCode;
         @Nullable
@@ -770,11 +769,10 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     /**
      * The default route impl.
      */
-    final class DefaultUriRoute extends AbstractRoute implements UriRoute {
+    private final class DefaultUriRoute extends AbstractRoute implements UriRoute {
         final String httpMethodName;
         final HttpMethod httpMethod;
-        final UriMatchTemplate uriMatchTemplate;
-        final List<DefaultUriRoute> nestedRoutes = new ArrayList<>(2);
+        final UriTemplateMatcher uriMatchTemplate;
         private @Nullable Integer port;
         private final RouteExecutorSelector executorSelector = new RouteExecutorSelector();
 
@@ -786,7 +784,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
          * @param conversionService The conversion service
          */
         DefaultUriRoute(HttpMethod httpMethod,
-                        CharSequence uriTemplate,
+                        String uriTemplate,
                         MethodExecutionHandle<Object, Object> targetMethod,
                         String httpMethodName,
                         ConversionService conversionService) {
@@ -802,12 +800,12 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
          * @param conversionService The conversion service
          */
         DefaultUriRoute(HttpMethod httpMethod,
-                        CharSequence uriTemplate,
+                        String uriTemplate,
                         MediaType mediaType,
                         MethodExecutionHandle<Object, Object> targetMethod,
                         String httpMethodName,
                         ConversionService conversionService) {
-            this(httpMethod, new UriMatchTemplate(uriTemplate), Collections.singletonList(mediaType), targetMethod, httpMethodName, conversionService);
+            this(httpMethod, UriTemplateMatcher.of(uriTemplate), Collections.singletonList(mediaType), targetMethod, httpMethodName, conversionService);
         }
 
         /**
@@ -819,23 +817,23 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
          * @param conversionService The conversion service
          */
         DefaultUriRoute(HttpMethod httpMethod,
-                        CharSequence uriTemplate,
+                        String uriTemplate,
                         List<MediaType> mediaTypes,
                         MethodExecutionHandle<Object, Object> targetMethod,
                         String httpMethodName,
                         ConversionService conversionService) {
-            this(httpMethod, new UriMatchTemplate(uriTemplate), mediaTypes, targetMethod, httpMethodName, conversionService);
+            this(httpMethod, UriTemplateMatcher.of(uriTemplate), mediaTypes, targetMethod, httpMethodName, conversionService);
         }
 
         /**
          * @param httpMethod The HTTP method
-         * @param uriTemplate The URI Template as a {@link UriMatchTemplate}
+         * @param uriTemplate The URI Template
          * @param targetMethod The target method execution handle
          * @param httpMethodName The actual name of the method - may differ from {@link HttpMethod#name()} for non-standard http methods
          * @param conversionService The conversion service
          */
         DefaultUriRoute(HttpMethod httpMethod,
-                        UriMatchTemplate uriTemplate,
+                        UriTemplateMatcher uriTemplate,
                         MethodExecutionHandle<Object, Object> targetMethod,
                         String httpMethodName,
                         ConversionService conversionService) {
@@ -844,14 +842,14 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
         /**
          * @param httpMethod The HTTP method
-         * @param uriTemplate The URI Template as a {@link UriMatchTemplate}
+         * @param uriTemplate The URI Template
          * @param mediaTypes The media types
          * @param targetMethod The target method execution handle
          * @param httpMethodName The actual name of the method - may differ from {@link HttpMethod#name()} for non-standard http methods
          * @param conversionService The conversion service
          */
         DefaultUriRoute(HttpMethod httpMethod,
-                        UriMatchTemplate uriTemplate,
+                        UriTemplateMatcher uriTemplate,
                         List<MediaType> mediaTypes,
                         MethodExecutionHandle<Object, Object> targetMethod,
                         String httpMethodName,
@@ -957,13 +955,9 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public UriMatchTemplate getUriMatchTemplate() {
-            return this.uriMatchTemplate;
-        }
-
-        @Override
         public int compareTo(UriRoute o) {
-            return uriMatchTemplate.compareTo(o.getUriMatchTemplate());
+            DefaultUriRoute that = (DefaultUriRoute) o;
+            return uriMatchTemplate.compareTo(that.uriMatchTemplate);
         }
 
         private final class RouteExecutorSelector implements ExecutorSelector {
@@ -990,7 +984,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     /**
      * Define a single route.
      */
-    final class DefaultSingleRoute extends DefaultResourceRoute {
+    private final class DefaultSingleRoute extends DefaultResourceRoute {
 
         /**
          * @param resourceRoutes The resource routes
@@ -1045,7 +1039,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     /**
      * Default resource route.
      */
-    class DefaultResourceRoute implements ResourceRoute {
+    private class DefaultResourceRoute implements ResourceRoute {
 
         private final Map<HttpMethod, Route> resourceRoutes;
         private final DefaultUriRoute getRoute;
