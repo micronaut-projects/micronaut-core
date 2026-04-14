@@ -1573,15 +1573,13 @@ public class DefaultHttpClient implements
             @Override
             protected ExecutionFlow<HttpResponse<?>> provideResponse(io.micronaut.http.HttpRequest<?> request, PropagatedContext propagatedContext) {
                 try {
-                    try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
-                        return sendRequestWithRedirectsNoFilter(
-                            propagatedContext,
-                            preferredScheduler,
-                            blockHint,
-                            MutableHttpRequestWrapper.wrapIfNecessary(conversionService, request),
-                            readResponse
-                        );
-                    }
+                    return propagatedContext.propagate(() -> sendRequestWithRedirectsNoFilter(
+                        propagatedContext,
+                        preferredScheduler,
+                        blockHint,
+                        MutableHttpRequestWrapper.wrapIfNecessary(conversionService, request),
+                        readResponse
+                    ));
                 } catch (Throwable e) {
                     return ExecutionFlow.error(e);
                 }

@@ -16,6 +16,7 @@
 package io.micronaut.context;
 
 import io.micronaut.context.env.CommandLinePropertySource;
+import io.micronaut.context.env.ConfigImportPropertySourcesLocator;
 import io.micronaut.core.io.ResourceLoadStrategy;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
@@ -95,6 +96,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private Predicate<QualifiedBeanType<?>> beansPredicate;
     @Nullable
     private Predicate<BeanConfiguration> beanConfigurationsPredicate;
+    private boolean configImportEnabled = true;
 
     /**
      * Default constructor.
@@ -386,6 +388,11 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     }
 
     @Override
+    public boolean isConfigImportEnabled() {
+        return configImportEnabled;
+    }
+
+    @Override
     public @Nullable List<String> getEnvironmentVariableIncludes() {
         return envVarIncludes.isEmpty() ? null : envVarIncludes;
     }
@@ -475,6 +482,9 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     @Override
     @SuppressWarnings("MagicNumber")
     public ApplicationContext build() {
+        if (isConfigImportEnabled()) {
+            propertySourcesLocator(new ConfigImportPropertySourcesLocator());
+        }
         ApplicationContext applicationContext = newApplicationContext();
         Environment environment = applicationContext.getEnvironment();
         if (!packages.isEmpty()) {
@@ -573,6 +583,12 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
         return this;
     }
 
+    @Override
+    public ApplicationContextBuilder configImport(boolean enabled) {
+        this.configImportEnabled = enabled;
+        return this;
+    }
+
     /**
      * Returns a customizer which is the aggregation of all
      * customizers found on classpath via service loading.
@@ -587,7 +603,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
             return ApplicationContextConfigurer.NO_OP;
         }
         if (configurers.size() == 1) {
-            return configurers.get(0);
+            return configurers.getFirst();
         }
         OrderUtil.sortOrdered(configurers);
         return new ApplicationContextConfigurer() {

@@ -47,4 +47,56 @@ class BeanContextAccessExpressionsSpec extends AbstractEvaluatedExpressionsSpec 
         ctx.close()
     }
 
+    void "test bean context access for fqcn containing reserved token"() {
+        given:
+        def ctx = buildContext("""
+            package test
+
+            import io.micronaut.context.annotation.Value
+
+            @jakarta.inject.Singleton
+            class Expr {
+
+                @Value("#{ ctx[io.micronaut.context.env.Environment].activeNames.contains('test') }")
+                boolean active
+
+            }
+        """)
+
+        def type = ctx.classLoader.loadClass('test.Expr')
+        def bean = ctx.getBean(type)
+
+        expect:
+        bean.active
+
+        cleanup:
+        ctx.close()
+    }
+
+    void "test bean context access for type reference containing reserved token"() {
+        given:
+        def ctx = buildContext("""
+            package test
+
+            import io.micronaut.context.annotation.Value
+
+            @jakarta.inject.Singleton
+            class Expr {
+
+                @Value("#{ ctx[T(io.micronaut.context.env.Environment)].activeNames.contains('test') }")
+                boolean active
+
+            }
+        """)
+
+        def type = ctx.classLoader.loadClass('test.Expr')
+        def bean = ctx.getBean(type)
+
+        expect:
+        bean.active
+
+        cleanup:
+        ctx.close()
+    }
+
 }

@@ -34,7 +34,7 @@ class ReactorRxJavaSpec extends Specification {
 
     @Shared
     @AutoCleanup
-    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ["micronaut.propagation": "thread-local"])
 
     @Shared
     @AutoCleanup

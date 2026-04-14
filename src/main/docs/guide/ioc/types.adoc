@@ -67,10 +67,10 @@ The ann:core.annotation.Order[] annotation is especially useful for ordering bea
 
 snippet::io.micronaut.docs.config.env.RateLimitsFactory[tags="clazz", indent=0, title="Factory with @Order"]
 
-When a collection of `RateLimit` beans are requested from the context, they are returned in ascending order based on the value in the annotation.
+When a collection of `RateLimit` beans are requested from the context, they are returned in ascending order based on the value in the annotation. Micronaut maps link:{jakartaapi}/jakarta/annotation/Priority.html[jakarta.annotation.Priority] to ann:core.annotation.Order[] at build time, so link:{jakartaapi}/jakarta/annotation/Priority.html[@Priority] values are treated the same as ann:core.annotation.Order[] and follow the same ascending numeric precedence (lower numbers mean higher precedence).
 
 === Injecting a Bean by Order
 
-When injecting a single instance of a bean the ann:core.annotation.Order[] annotation can also be used to define which bean has the highest precedence and hence should be injected.
+When injecting a single instance of a bean the ann:core.annotation.Order[] annotation can also be used to define which bean has the highest precedence and hence should be injected. Micronaut also maps link:{jakartaapi}/jakarta/annotation/Priority.html[jakarta.annotation.Priority] to ann:core.annotation.Order[] at build time, so the same mapped link:{jakartaapi}/jakarta/annotation/Priority.html[@Priority] numeric semantics determine which bean has the highest precedence for single-bean injection.
 
 NOTE: The api:core.order.Ordered[] interface is not taken into account when selecting a single instance as this would require instantiating the bean to resolve the order.

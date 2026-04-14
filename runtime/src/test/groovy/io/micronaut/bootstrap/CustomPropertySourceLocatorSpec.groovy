@@ -81,11 +81,10 @@ some.bootstrap.config=yyy
             }
         }
 
-        ApplicationContext applicationContext = ApplicationContext.builder().resourceResolver(resourceLoader).build()
-        applicationContext.environment.addPropertySource(PropertySource.of(
-                'custom.prop.a':'BBB',
-                'some.bootstrap.value':'overridden'
-        ))
+        ApplicationContext applicationContext = ApplicationContext.builder()
+                .properties('custom.prop.a':'BBB',
+                        'some.bootstrap.value':'overridden')
+                .resourceResolver(resourceLoader).build()
         applicationContext.start()
 
 

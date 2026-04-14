@@ -18,6 +18,7 @@ package io.micronaut.core.io.service;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.io.IOUtils;
+import io.micronaut.core.util.ExceptionUtils;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -193,12 +194,8 @@ public final class MicronautMetaServiceLoaderUtils {
             // Ignore
             return null;
         } catch (Throwable e) {
-            return sneakyThrow(e);
+            return ExceptionUtils.sneakyThrow(e);
         }
-    }
-
-    private static <T extends Throwable, R> R sneakyThrow(Throwable t) throws T {
-        throw (T) t;
     }
 
     /**

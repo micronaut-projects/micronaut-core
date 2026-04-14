@@ -70,6 +70,8 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
         HttpMethod.GET  | '/parameter/set?values=10,20'                   | "Parameter Value: [10, 20]" | HttpStatus.OK
         HttpMethod.GET  | '/parameter/list?values=10,20'                  | "Parameter Value: [10, 20]" | HttpStatus.OK
         HttpMethod.GET  | '/parameter/list?values=10&values=20'           | "Parameter Value: [10, 20]" | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/string-list?values='                | "Parameter Value: ['']"     | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/string-list?values=,'               | "Parameter Value: ['', '']" | HttpStatus.OK
         HttpMethod.GET  | '/parameter/set?values=10&values=20'            | "Parameter Value: [10, 20]" | HttpStatus.OK
         HttpMethod.GET  | '/parameter/optional-list?values=10&values=20'  | "Parameter Value: [10, 20]" | HttpStatus.OK
         HttpMethod.GET  | '/parameter/optional-date?date=1941-01-05'      | "Parameter Value: 1941"     | HttpStatus.OK
@@ -251,6 +253,12 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
         @Get("/list")
         String list(List<Integer> values) {
             assert values.every() { it instanceof Integer }
+            "Parameter Value: ${values.inspect()}"
+        }
+
+        @Get("/string-list")
+        String stringList(List<String> values) {
+            assert values.every() { it instanceof String }
             "Parameter Value: ${values.inspect()}"
         }
 

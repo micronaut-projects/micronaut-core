@@ -18,6 +18,18 @@ class BeanRegistrationCollectionSpec extends Specification {
         service.beans*.identifier*.name.sort() == ['first-bean', 'second-bean']
     }
 
+    void "test beanregistration identifiers are returned regardless of prior direct bean lookup"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run(["spec.name": getClass().simpleName])
+
+        when:
+        ctx.getBean(FirstBean)
+        def service = ctx.getBean(MyService)
+
+        then:
+        service.beans*.identifier*.name.sort() == ['first-bean', 'second-bean']
+    }
+
     static interface BaseBean {
     }
 

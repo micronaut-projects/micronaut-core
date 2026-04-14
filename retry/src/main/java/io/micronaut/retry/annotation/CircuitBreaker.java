@@ -38,21 +38,30 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Retryable
 public @interface CircuitBreaker {
 
+    /**
+     * The maximum integral digits for circuit breaker attempts validation.
+     */
     int MAX_RETRY_ATTEMPTS = 4;
 
     /**
+     * Returns the exception types to include, which defaults to all.
+     *
      * @return The exception types to include (defaults to all)
      */
     @AliasFor(annotation = Retryable.class, member = "includes")
     Class<? extends Throwable>[] includes() default {};
 
     /**
+     * Returns the exception types to exclude, which defaults to none.
+     *
      * @return The exception types to exclude (defaults to none)
      */
     @AliasFor(annotation = Retryable.class, member = "excludes")
     Class<? extends Throwable>[] excludes() default {};
 
     /**
+     * Returns the maximum number of retry attempts.
+     *
      * @return The maximum number of retry attempts
      */
     @Digits(integer = MAX_RETRY_ATTEMPTS, fraction = 0)
@@ -60,12 +69,16 @@ public @interface CircuitBreaker {
     String attempts() default "3";
 
     /**
+     * Returns the delay between retry attempts.
+     *
      * @return The delay between retry attempts
      */
     @AliasFor(annotation = Retryable.class, member = "delay")
     String delay() default "500ms";
 
     /**
+     * Returns the multiplier to use to calculate the delay between retries.
+     *
      * @return The multiplier to use to calculate the delay between retries.
      */
     @Digits(integer = 2, fraction = 2)
@@ -90,6 +103,8 @@ public @interface CircuitBreaker {
     String reset() default "20s";
 
     /**
+     * Returns the retry predicate class to use instead of {@link Retryable#includes} and {@link Retryable#excludes}.
+     *
      * @return The retry predicate class to use instead of {@link Retryable#includes} and {@link Retryable#excludes}
      * (defaults to none)
      */

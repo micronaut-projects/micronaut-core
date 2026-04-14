@@ -53,7 +53,7 @@ class MDCRxJava3Spec extends Specification {
     @Shared
     @AutoCleanup
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
-            'mdc.rxjava3test.enabled': true
+            'mdc.rxjava3test.enabled': true, "micronaut.propagation": "thread-local"
     ])
 
     @Shared

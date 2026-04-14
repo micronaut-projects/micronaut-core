@@ -317,10 +317,10 @@ public class RequestLifecycle {
                 if (routeExecutor.serverConfiguration.isLogHandledExceptions()) {
                     routeExecutor.logException(cause);
                 }
-                try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
+                return propagatedContext.propagate(() -> {
                     Object result = handler.handle(request, cause);
                     return routeExecutor.createResponseForBody(propagatedContext, request, result, routeInfo, null);
-                }
+                });
             } catch (Throwable e) {
                 return createDefaultErrorResponseFlow(request, e, propagatedContext);
             }
@@ -473,10 +473,6 @@ public class RequestLifecycle {
                                                                           Throwable cause,
                                                                           PropagatedContext propagatedContext) {
         return propagatedContext.propagate(() -> ExecutionFlow.just(routeExecutor.createDefaultErrorResponse(httpRequest, cause)));
-    }
-
-    final ExecutionFlow<HttpResponse<?>> onRouteMiss(HttpRequest<?> httpRequest) {
-        return onRouteMiss(httpRequest, PropagatedContext.getOrEmpty());
     }
 
     final ExecutionFlow<HttpResponse<?>> onRouteMiss(HttpRequest<?> httpRequest, PropagatedContext propagatedContext) {

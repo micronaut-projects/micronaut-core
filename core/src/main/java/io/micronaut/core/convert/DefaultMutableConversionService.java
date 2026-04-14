@@ -532,6 +532,9 @@ public class DefaultMutableConversionService implements MutableConversionService
             }
         });
 
+        // CharSequence -> String
+        addInternalConverter(CharSequence.class, String.class, (object, targetType, context) -> Optional.of(object.toString()));
+
         // String -> File
         addInternalConverter(CharSequence.class, File.class, (object, targetType, context) -> {
             if (StringUtils.isEmpty(object)) {
@@ -980,7 +983,7 @@ public class DefaultMutableConversionService implements MutableConversionService
             ConversionContext newContext = context.with(componentType);
 
             Class<?> targetComponentType = ReflectionUtils.getWrapperType(componentType.getType());
-            String[] strings = object.toString().split(",");
+            String[] strings = object.toString().split(",", -1);
             List<Object> list = new ArrayList<>();
             for (String string : strings) {
                 Optional<?> converted = convert(string, targetComponentType, newContext);
