@@ -51,7 +51,8 @@ class MDCReactorSpec extends Specification {
     @Shared
     @AutoCleanup
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
-            'mdc.reactortestx.enabled': true
+            'mdc.reactortestx.enabled': true,
+        "micronaut.propagation": "thread-local"
     ])
 
     @Shared

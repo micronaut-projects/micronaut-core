@@ -1,3 +1,5 @@
-You may be used to work with https://fasterxml.github.io/jackson-databind/javadoc/2.7/com/fasterxml/jackson/databind/ObjectMapper.html[Jackson's `ObjectMapper`]. However, we don't recommend using Jackson's `ObjectMapper` directly; instead you should use api:json.JsonMapper[], an API almost identical to Jackson's `ObjectMapper`. Moreover, both <<jsonBinding, Micronaut Serialization and Micronaut Jackson Databind>> implement api:json.JsonMapper[].
+You may be familiar with https://fasterxml.github.io/jackson-databind/javadoc/2.7/com/fasterxml/jackson/databind/ObjectMapper.html[Jackson's `ObjectMapper`]. For implementation-agnostic application code, we recommend depending on api:json.JsonMapper[], which is Micronaut's JSON abstraction for common mapping operations. <<jsonBinding, Micronaut Serialization and Micronaut Jackson Databind>> both provide implementations of api:json.JsonMapper[], and Micronaut Serialization also defines its own `ObjectMapper` interface that extends api:json.JsonMapper[].
+
+If you are intentionally writing implementation-specific code, you can still use the corresponding implementation API such as Jackson's `ObjectMapper` or Micronaut Serialization's `ObjectMapper`.
 
 You can inject a bean of type `JsonMapper` or manually instantiate one via `JsonMapper.createDefault()`.

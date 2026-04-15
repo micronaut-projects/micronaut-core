@@ -61,6 +61,20 @@ class EncodingTest {
                 .build()));
     }
 
+    @Test
+    void quotedCharsetDecodedCorrectly() throws IOException {
+        asserts(SPEC_NAME,
+                Map.of(),
+                HttpRequest.GET("/encoding/quotedCharset"),
+                (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                        .status(HttpStatus.OK)
+                        .assertResponse(response -> {
+                            assertEquals("foo", response.getBody(String.class).get());
+                        })
+                        .build()));
+    }
+
+
     @Requires(property = "spec.name", value = SPEC_NAME)
     @Controller("/encoding")
     static class EncodingTestController {
@@ -74,6 +88,12 @@ class EncodingTest {
         @Get("/string")
         @Produces("text/plain; charset=utf-16")
         String string() {
+            return "foo";
+        }
+
+        @Get("/quotedCharset")
+        @Produces("text/plain; charset=\"utf-16\"")
+        String quotedCharset() {
             return "foo";
         }
     }

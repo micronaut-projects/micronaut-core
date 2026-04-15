@@ -18,6 +18,7 @@ package io.micronaut.docs.server.suspend
 import io.micronaut.http.*
 import io.micronaut.http.annotation.*
 import io.micronaut.http.context.ServerRequestContext
+import io.micronaut.http.multipart.CompletedFileUpload
 import io.micronaut.scheduling.TaskExecutors
 import kotlinx.coroutines.*
 import java.util.concurrent.ExecutorService
@@ -29,7 +30,8 @@ import org.slf4j.MDC
 class SuspendController(
     @Named(TaskExecutors.IO) private val executor: ExecutorService,
     private val suspendService: SuspendService,
-    private val suspendRequestScopedService: SuspendRequestScopedService
+    private val suspendRequestScopedService: SuspendRequestScopedService,
+    private val coroutineFactoryState: SuspendCoroutineFactoryState
 ) {
 
     private val coroutineDispatcher: CoroutineDispatcher
@@ -136,6 +138,14 @@ class SuspendController(
         delay(10) // suspend
         val after = "${suspendRequestScopedService.requestId},${Thread.currentThread().id}"
         return "$before,$after"
+    }
+
+    @Post(value = "/completedUpload", consumes = [MediaType.MULTIPART_FORM_DATA], produces = [MediaType.TEXT_PLAIN])
+    suspend fun completedUpload(file: CompletedFileUpload): String {
+        require(coroutineFactoryState.currentRequestPresent == true) {
+            "Request was not available in HttpCoroutineContextFactory"
+        }
+        return file.filename
     }
 
     @Get("/requestContext")

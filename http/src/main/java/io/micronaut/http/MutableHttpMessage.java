@@ -68,11 +68,14 @@ public interface MutableHttpMessage<B> extends HttpMessage<B> {
     }
 
     /**
-     * Set a response header.
+     * Adds a header value to this message.
+     * <p>
+     * To replace any existing value for the same header, use {@link #getHeaders()} and
+     * {@link MutableHttpHeaders#set(CharSequence, CharSequence)} instead.
      *
      * @param name  The name of the header
      * @param value The value of the header
-     * @return This response
+     * @return This message
      */
     default MutableHttpMessage<B> header(CharSequence name, CharSequence value) {
         getHeaders().add(name, value);

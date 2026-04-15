@@ -88,12 +88,6 @@ public class HealthMonitorTask {
 
         Flux.merge(resultPublishers)
             .collectList()
-            .doOnError(e -> {
-                if (LOG.isErrorEnabled()) {
-                    LOG.error("Health monitor check failed with exception: {}", e.getMessage(), e);
-                }
-                currentHealthStatus.update(HealthStatus.DOWN.describe("Error occurred running health check: " + e.getMessage()));
-            })
             .subscribe(healthResults -> {
                 if (LOG.isTraceEnabled() || LOG.isDebugEnabled()) {
                     healthResults.forEach(healthResult -> {
@@ -115,6 +109,13 @@ public class HealthMonitorTask {
                 } else {
                     currentHealthStatus.update(HealthStatus.UP);
                 }
-            });
+            }, this::onError);
+    }
+
+    private void onError(Throwable e) {
+        if (LOG.isErrorEnabled()) {
+            LOG.error("Health monitor check failed with exception: {}", e.getMessage(), e);
+        }
+        currentHealthStatus.update(HealthStatus.DOWN.describe("Error occurred running health check: " + e.getMessage()));
     }
 }

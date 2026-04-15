@@ -20,24 +20,24 @@
     "reason": "Added default methods"
   },
   {
-      "type": "io.micronaut.inject.ast.EnumElement",
-      "member": "Class io.micronaut.inject.ast.EnumElement",
-      "reason": "Added EnumConstantElement. Added EnumElement.elements() method to collect enum constant elements"
+    "type": "io.micronaut.inject.ast.EnumElement",
+    "member": "Class io.micronaut.inject.ast.EnumElement",
+    "reason": "Added EnumConstantElement. Added EnumElement.elements() method to collect enum constant elements"
   },
   {
-      "type": "io.micronaut.inject.ast.EnumElement",
-      "member": "Method io.micronaut.inject.ast.EnumElement.elements()",
-      "reason": "Added EnumConstantElement. Added EnumElement.elements() method to collect enum constant elements"
+    "type": "io.micronaut.inject.ast.EnumElement",
+    "member": "Method io.micronaut.inject.ast.EnumElement.elements()",
+    "reason": "Added EnumConstantElement. Added EnumElement.elements() method to collect enum constant elements"
   },
   {
-      "type": "io.micronaut.inject.visitor.TypeElementVisitor",
-      "member": "Class io.micronaut.inject.visitor.TypeElementVisitor",
-      "reason": "Added EnumConstantElement. Added EnumElement.elements() method to collect enum constant elements"
+    "type": "io.micronaut.inject.visitor.TypeElementVisitor",
+    "member": "Class io.micronaut.inject.visitor.TypeElementVisitor",
+    "reason": "Added EnumConstantElement. Added EnumElement.elements() method to collect enum constant elements"
   },
   {
-      "type": "io.micronaut.inject.visitor.TypeElementVisitor",
-      "member": "Method io.micronaut.inject.visitor.TypeElementVisitor.visitEnumConstant(io.micronaut.inject.ast.EnumConstantElement,io.micronaut.inject.visitor.VisitorContext)",
-      "reason": "Added EnumConstantElement. Added EnumElement.elements() method to collect enum constant elements"
+    "type": "io.micronaut.inject.visitor.TypeElementVisitor",
+    "member": "Method io.micronaut.inject.visitor.TypeElementVisitor.visitEnumConstant(io.micronaut.inject.ast.EnumConstantElement,io.micronaut.inject.visitor.VisitorContext)",
+    "reason": "Added EnumConstantElement. Added EnumElement.elements() method to collect enum constant elements"
   },
   {
     "type": "io.micronaut.scheduling.TaskScheduler",
@@ -223,6 +223,111 @@
     "type": "io.micronaut.core.type.TypeInformation",
     "member": "Method io.micronaut.core.type.TypeInformation.asType()",
     "reason": "Added a default method"
+  },
+  {
+    "type": "io.micronaut.core.util.ConnectionString",
+    "member": "Class io.micronaut.core.util.ConnectionString",
+    "reason": "New major-version config import connection string API"
+  },
+  {
+    "type": "io.micronaut.core.util.ConnectionString",
+    "member": "Method io.micronaut.core.util.ConnectionString.parse(java.lang.String,io.micronaut.core.util.ConnectionString$ParseMode)",
+    "reason": "New major-version config import connection string API"
+  },
+  {
+    "type": "io.micronaut.core.util.ConnectionString",
+    "member": "Method io.micronaut.core.util.ConnectionString.getParseMode()",
+    "reason": "New major-version config import connection string API"
+  },
+  {
+    "type": "io.micronaut.core.util.ConnectionString",
+    "member": "Method io.micronaut.core.util.ConnectionString.getCanonicalPath()",
+    "reason": "New major-version config import connection string API"
+  },
+  {
+    "type": "io.micronaut.core.util.ConnectionString",
+    "member": "Method io.micronaut.core.util.ConnectionString.getResourcePath()",
+    "reason": "New major-version config import connection string API"
+  },
+  {
+    "type": "io.micronaut.core.util.ConnectionString",
+    "member": "Method io.micronaut.core.util.ConnectionString.getExtension()",
+    "reason": "New major-version config import connection string API"
+  },
+  {
+    "type": "io.micronaut.core.util.ConnectionString$ParseMode",
+    "member": "Class io.micronaut.core.util.ConnectionString$ParseMode",
+    "reason": "New major-version config import connection string API"
+  },
+  {
+    "type": "io.micronaut.core.util.ConnectionString$ParseMode",
+    "member": "Method io.micronaut.core.util.ConnectionString$ParseMode.pathRequired()",
+    "reason": "New major-version config import connection string API"
+  },
+  {
+    "type": "io.micronaut.core.util.ConnectionString$ParseMode",
+    "member": "Method io.micronaut.core.util.ConnectionString$ParseMode.hostRequired()",
+    "reason": "New major-version config import connection string API"
+  },
+  {
+    "type": "io.micronaut.context.env.PropertySourceImporter",
+    "member": "Class io.micronaut.context.env.PropertySourceImporter",
+    "reason": "New major-version config import SPI"
+  },
+  {
+    "type": "io.micronaut.context.env.PropertySourceImporter",
+    "member": "Method io.micronaut.context.env.PropertySourceImporter.importPropertySource(io.micronaut.context.env.PropertySourceImporter$ImportContext)",
+    "reason": "New major-version config import SPI"
+  },
+  {
+    "type": "io.micronaut.context.env.PropertySourceImporter",
+    "member": "Method io.micronaut.context.env.PropertySourceImporter.getProtocol()",
+    "reason": "New major-version config import SPI"
+  },
+  {
+    "type": "io.micronaut.context.env.PropertySourceImporter$ImportContext",
+    "member": "Class io.micronaut.context.env.PropertySourceImporter$ImportContext",
+    "reason": "New major-version config import SPI"
+  },
+  {
+    "type": "io.micronaut.context.env.PropertySourceImporter$ImportContext",
+    "member": "Method io.micronaut.context.env.PropertySourceImporter$ImportContext.environment()",
+    "reason": "New major-version config import SPI"
+  },
+  {
+    "type": "io.micronaut.context.env.PropertySourceImporter$ImportContext",
+    "member": "Method io.micronaut.context.env.PropertySourceImporter$ImportContext.connectionString()",
+    "reason": "New major-version config import SPI"
+  },
+  {
+    "type": "io.micronaut.context.env.PropertySourceImporter$ImportContext",
+    "member": "Method io.micronaut.context.env.PropertySourceImporter$ImportContext.parentOrigin()",
+    "reason": "New major-version config import SPI"
+  },
+  {
+    "type": "io.micronaut.context.env.PropertySourceImporter$ImportContext",
+    "member": "Method io.micronaut.context.env.PropertySourceImporter$ImportContext.importPropertySource(io.micronaut.core.io.ResourceLoader,java.lang.String,java.lang.String,io.micronaut.context.env.PropertySource$Origin)",
+    "reason": "New major-version config import SPI"
+  },
+  {
+    "type": "io.micronaut.context.env.PropertySourceImporter$ImportContext",
+    "member": "Method io.micronaut.context.env.PropertySourceImporter$ImportContext.importPropertySource(java.lang.String,java.lang.String,java.lang.String,io.micronaut.context.env.PropertySource$Origin)",
+    "reason": "New major-version config import SPI"
+  },
+  {
+    "type": "io.micronaut.context.env.PropertySourceImporter$ImportContext",
+    "member": "Method io.micronaut.context.env.PropertySourceImporter$ImportContext.importClasspathPropertySource(java.lang.String,java.lang.String,io.micronaut.context.env.PropertySource$Origin,boolean)",
+    "reason": "New major-version config import SPI"
+  },
+  {
+    "type": "io.micronaut.context.env.PropertySourceImporter$ImportContext",
+    "member": "Method io.micronaut.context.env.PropertySourceImporter$ImportContext.getCanonicalLocation()",
+    "reason": "New major-version config import SPI"
+  },
+  {
+    "type": "io.micronaut.context.env.PropertySourceImporter$ImportContext",
+    "member": "Method io.micronaut.context.env.PropertySourceImporter$ImportContext.getResourcePath()",
+    "reason": "New major-version config import SPI"
   },
   {
     "type": "io.micronaut.core.annotation.AnnotationMetadata",
@@ -1126,5 +1231,125 @@
     "type": "io.micronaut.context.env.PropertySourcePropertyResolver$PropertyCatalog",
     "member": "Implemented interface java.io.Serializable",
     "reason": "Deprecated internal type"
+  },
+  {
+    "type": "io.micronaut.context.env.PropertySourceImporter",
+    "member": "Method io.micronaut.context.env.PropertySourceImporter.getProvider()",
+    "reason": "New major-version config import SPI provider/map redesign"
+  },
+  {
+    "type": "io.micronaut.context.env.PropertySourceImporter",
+    "member": "Method io.micronaut.context.env.PropertySourceImporter.newImportDeclaration(io.micronaut.core.util.ConnectionString)",
+    "reason": "New major-version config import SPI provider/map redesign"
+  },
+  {
+    "type": "io.micronaut.context.env.PropertySourceImporter",
+    "member": "Method io.micronaut.context.env.PropertySourceImporter.newImportDeclaration(io.micronaut.core.convert.value.ConvertibleValues)",
+    "reason": "New major-version config import SPI provider/map redesign"
+  },
+  {
+    "type": "io.micronaut.context.env.PropertySourceImporter$ImportContext",
+    "member": "Method io.micronaut.context.env.PropertySourceImporter$ImportContext.importDeclaration()",
+    "reason": "New major-version config import SPI provider/map redesign"
+  },
+  {
+    "type": "io.micronaut.context.env.PropertySourceImporter",
+    "member": "Method io.micronaut.context.env.PropertySourceImporter.close()",
+    "reason": "New major-version config import SPI provider/map redesign"
+  },
+  {
+    "type": "io.micronaut.context.env.ClasspathPropertySourceImporter",
+    "member": "Method io.micronaut.context.env.ClasspathPropertySourceImporter.importPropertySource(io.micronaut.context.env.PropertySourceImporter$ImportContext)",
+    "reason": "New major-version config import SPI provider/map redesign"
+  },
+  {
+    "type": "io.micronaut.context.env.ConfigTreePropertySourceImporter",
+    "member": "Method io.micronaut.context.env.ConfigTreePropertySourceImporter.importPropertySource(io.micronaut.context.env.PropertySourceImporter$ImportContext)",
+    "reason": "New major-version config import SPI provider/map redesign"
+  },
+  {
+    "type": "io.micronaut.context.env.EnvPropertySourceImporter",
+    "member": "Method io.micronaut.context.env.EnvPropertySourceImporter.importPropertySource(io.micronaut.context.env.PropertySourceImporter$ImportContext)",
+    "reason": "New major-version config import SPI provider/map redesign"
+  },
+  {
+    "type": "io.micronaut.context.env.FilePropertySourceImporter",
+    "member": "Method io.micronaut.context.env.FilePropertySourceImporter.importPropertySource(io.micronaut.context.env.PropertySourceImporter$ImportContext)",
+    "reason": "New major-version config import SPI provider/map redesign"
+  },
+  {
+    "type": "io.micronaut.context.env.FilePropertySourceImporter",
+    "member": "Method io.micronaut.context.env.FilePropertySourceImporter.getProvider()",
+    "reason": "New major-version config import SPI provider/map redesign"
+  },
+  {
+    "type": "io.micronaut.context.env.FilePropertySourceImporter",
+    "member": "Method io.micronaut.context.env.FilePropertySourceImporter.newImportDeclaration(io.micronaut.core.util.ConnectionString)",
+    "reason": "New major-version config import SPI provider/map redesign"
+  },
+  {
+    "type": "io.micronaut.context.env.FilePropertySourceImporter",
+    "member": "Method io.micronaut.context.env.FilePropertySourceImporter.newImportDeclaration(io.micronaut.core.convert.value.ConvertibleValues)",
+    "reason": "New major-version config import SPI provider/map redesign"
+  },
+  {
+    "type": "io.micronaut.context.env.ClasspathPropertySourceImporter",
+    "member": "Method io.micronaut.context.env.ClasspathPropertySourceImporter.getProvider()",
+    "reason": "New major-version config import SPI provider/map redesign"
+  },
+  {
+    "type": "io.micronaut.context.env.ClasspathPropertySourceImporter",
+    "member": "Method io.micronaut.context.env.ClasspathPropertySourceImporter.newImportDeclaration(io.micronaut.core.util.ConnectionString)",
+    "reason": "New major-version config import SPI provider/map redesign"
+  },
+  {
+    "type": "io.micronaut.context.env.ClasspathPropertySourceImporter",
+    "member": "Method io.micronaut.context.env.ClasspathPropertySourceImporter.newImportDeclaration(io.micronaut.core.convert.value.ConvertibleValues)",
+    "reason": "New major-version config import SPI provider/map redesign"
+  },
+  {
+    "type": "io.micronaut.context.env.ConfigTreePropertySourceImporter",
+    "member": "Method io.micronaut.context.env.ConfigTreePropertySourceImporter.getProvider()",
+    "reason": "New major-version config import SPI provider/map redesign"
+  },
+  {
+    "type": "io.micronaut.context.env.ConfigTreePropertySourceImporter",
+    "member": "Method io.micronaut.context.env.ConfigTreePropertySourceImporter.newImportDeclaration(io.micronaut.core.util.ConnectionString)",
+    "reason": "New major-version config import SPI provider/map redesign"
+  },
+  {
+    "type": "io.micronaut.context.env.ConfigTreePropertySourceImporter",
+    "member": "Method io.micronaut.context.env.ConfigTreePropertySourceImporter.newImportDeclaration(io.micronaut.core.convert.value.ConvertibleValues)",
+    "reason": "New major-version config import SPI provider/map redesign"
+  },
+  {
+    "type": "io.micronaut.context.env.EnvPropertySourceImporter",
+    "member": "Method io.micronaut.context.env.EnvPropertySourceImporter.getProvider()",
+    "reason": "New major-version config import SPI provider/map redesign"
+  },
+  {
+    "type": "io.micronaut.context.env.EnvPropertySourceImporter",
+    "member": "Method io.micronaut.context.env.EnvPropertySourceImporter.newImportDeclaration(io.micronaut.core.util.ConnectionString)",
+    "reason": "New major-version config import SPI provider/map redesign"
+  },
+  {
+    "type": "io.micronaut.context.env.EnvPropertySourceImporter",
+    "member": "Method io.micronaut.context.env.EnvPropertySourceImporter.newImportDeclaration(io.micronaut.core.convert.value.ConvertibleValues)",
+    "reason": "New major-version config import SPI provider/map redesign"
+  },
+  {
+    "type": "io.micronaut.context.env.ClasspathWildcardPropertySourceImporter",
+    "member": "Method io.micronaut.context.env.ClasspathWildcardPropertySourceImporter.getProvider()",
+    "reason": "New major-version config import SPI provider/map redesign"
+  },
+  {
+    "type": "io.micronaut.context.env.ClasspathWildcardPropertySourceImporter",
+    "member": "Method io.micronaut.context.env.ClasspathWildcardPropertySourceImporter.newImportDeclaration(io.micronaut.core.util.ConnectionString)",
+    "reason": "New major-version config import SPI provider/map redesign"
+  },
+  {
+    "type": "io.micronaut.context.env.ClasspathWildcardPropertySourceImporter",
+    "member": "Method io.micronaut.context.env.ClasspathWildcardPropertySourceImporter.newImportDeclaration(io.micronaut.core.convert.value.ConvertibleValues)",
+    "reason": "New major-version config import SPI provider/map redesign"
   }
 ]

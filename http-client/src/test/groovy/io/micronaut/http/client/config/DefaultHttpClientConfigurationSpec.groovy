@@ -38,6 +38,8 @@ class DefaultHttpClientConfigurationSpec extends Specification {
         'shutdown-timeout'          | 'shutdownTimeout'        | '15s'   | Optional.of(Duration.ofSeconds(15))
         'follow-redirects'          | 'followRedirects'        | 'false' | false
         'max-header-size'           | 'maxHeaderSize'          | '16384' | 16384
+        'max-initial-line-length'   | 'maxInitialLineLength'   | '8192'  | 8192
+        'max-chunk-size'            | 'maxChunkSize'           | '16384' | 16384
     }
 
     void "test pool config"() {

@@ -567,9 +567,9 @@ public class ConnectionManager {
 
                 ch.pipeline()
                     .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC, new HttpClientCodec(
-                        HttpClientConfiguration.DEFAULT_MAX_INITIAL_LINE_LENGTH,
+                        configuration.getMaxInitialLineLength(),
                         configuration.getMaxHeaderSize(),
-                        HttpClientConfiguration.DEFAULT_MAX_CHUNK_SIZE))
+                        configuration.getMaxChunkSize()))
                     .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_AGGREGATOR, new HttpObjectAggregator(configuration.getMaxContentLength()));
 
                 Optional<Duration> readIdleTime = configuration.getReadIdleTimeout();
@@ -650,9 +650,15 @@ public class ConnectionManager {
     final <V, C extends Future<V>> void withPropagation(Future<? extends V> channelFuture, GenericFutureListener<C> listener) {
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
         channelFuture.addListener(f -> {
-            try (PropagatedContext.Scope ignored = propagatedContext.propagate()) {
+            if (propagatedContext.isBound()) {
                 //noinspection unchecked
                 listener.operationComplete((C) f);
+            } else {
+                propagatedContext.propagateCall(() -> {
+                    //noinspection unchecked
+                    listener.operationComplete((C) f);
+                    return null;
+                });
             }
         });
     }
@@ -696,9 +702,9 @@ public class ConnectionManager {
 
         ChannelPipeline pipeline = ch.pipeline();
         pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC, new HttpClientCodec(
-            HttpClientConfiguration.DEFAULT_MAX_INITIAL_LINE_LENGTH,
+            configuration.getMaxInitialLineLength(),
             configuration.getMaxHeaderSize(),
-            HttpClientConfiguration.DEFAULT_MAX_CHUNK_SIZE));
+            configuration.getMaxChunkSize()));
         if (configuration.isDecompressionEnabled()) {
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECODER, new HttpContentDecompressor());
         }
@@ -1000,9 +1006,9 @@ public class ConnectionManager {
             Http2FrameCodec frameCodec = makeFrameCodec();
 
             HttpClientCodec sourceCodec = new HttpClientCodec(
-                HttpClientConfiguration.DEFAULT_MAX_INITIAL_LINE_LENGTH,
+                configuration.getMaxInitialLineLength(),
                 configuration.getMaxHeaderSize(),
-                HttpClientConfiguration.DEFAULT_MAX_CHUNK_SIZE);
+                configuration.getMaxChunkSize());
             Http2ClientUpgradeCodec upgradeCodec = new Http2ClientUpgradeCodec(frameCodec,
                 new ChannelInitializer<Channel>() {
                     @Override

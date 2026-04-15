@@ -47,4 +47,11 @@ public final class ProcessingException extends RuntimeException {
         return null;
     }
 
+    /**
+     * @return The element that caused the issue.
+     */
+    public @Nullable Element getElement() {
+        return originatingElement;
+    }
+
 }

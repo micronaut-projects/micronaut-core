@@ -20,6 +20,8 @@ import io.micronaut.core.reflect.ClassUtils;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InaccessibleObjectException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -181,8 +183,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
             try {
                 @SuppressWarnings("unchecked") final Class<S> loadedClass =
                         (Class<S>) Class.forName(className, false, classLoader);
-                // MethodHandler should more performant than the basic reflection
-                S result = (S) LOOKUP.findConstructor(loadedClass, VOID_TYPE).invoke();
+                S result = instantiate(loadedClass);
                 if (predicate != null && !predicate.test(result)) {
                     return null;
                 }
@@ -276,8 +277,42 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
         return new ServiceScanner<>(classLoader, serviceName, lineCondition, transformer).createCollector();
     }
 
+    private static <S> S instantiate(Class<S> clazz) throws Throwable {
+        try {
+            return instantiateUsingMethodHandle(clazz);
+        } catch (NoSuchMethodException | IllegalAccessException | IllegalAccessError e) {
+            return instantiateUsingReflection(clazz);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <S> S instantiateUsingMethodHandle(Class<S> clazz) throws Throwable {
+        return (S) LOOKUP.findConstructor(clazz, VOID_TYPE).invoke();
+    }
+
+    private static <S> S instantiateUsingReflection(Class<S> clazz) throws ReflectiveOperationException {
+        Constructor<S> constructor = clazz.getDeclaredConstructor();
+        if (!constructor.canAccess(null)) {
+            try {
+                constructor.setAccessible(true);
+            } catch (InaccessibleObjectException | SecurityException e) {
+                // Module system or security policy denies reflective access; treat as illegal access
+                // so dynamic service scanning can skip this class gracefully
+                IllegalAccessException iae = new IllegalAccessException("Cannot access constructor of " + clazz.getName() + ": " + e.getMessage());
+                iae.initCause(e);
+                throw iae;
+            }
+        }
+        return constructor.newInstance();
+    }
+
     /**
-     * A {@link ServiceDefinition} implementation that uses a {@link MethodHandles.Lookup} object to find a public constructor.
+     * A {@link ServiceDefinition} implementation that creates instances using the same instantiation
+     * strategy as {@link SoftServiceLoader#instantiate(Class)}: it first attempts to invoke a no-argument
+     * constructor via a {@link MethodHandles.Lookup} method handle, and if that fails due to access
+     * restrictions or similar conditions, it falls back to reflective instantiation using
+     * {@link java.lang.Class#getDeclaredConstructor()}. Depending on module and security configuration,
+     * this may allow invoking non-public no-argument constructors.
      *
      * @param <S> The service type
      */
@@ -317,7 +352,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
         @SuppressWarnings({"unchecked"})
         private static <S> S doCreate(Class<S> clazz) {
             try {
-                return (S) LOOKUP.findConstructor(clazz, VOID_TYPE).invoke();
+                return instantiate(clazz);
             } catch (Throwable e) {
                 throw new ServiceLoadingException(e);
             }

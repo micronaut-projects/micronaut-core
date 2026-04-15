@@ -160,6 +160,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
      * @param jsonMapper                      JSON Mapper
      * @param blockingExecutor                Optional executor for blocking operations
      */
+    @SuppressWarnings("checkstyle:ParameterNumber")
     public DefaultNettyHttpClientRegistry(
         HttpClientConfiguration defaultHttpClientConfiguration,
         HttpClientFilterResolver<ClientFilterResolutionContext> httpClientFilterResolver,

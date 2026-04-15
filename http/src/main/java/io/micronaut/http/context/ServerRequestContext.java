@@ -50,9 +50,7 @@ public final class ServerRequestContext {
      * @param runnable The runnable
      */
     public static void with(@Nullable HttpRequest<?> request, Runnable runnable) {
-        try (PropagatedContext.Scope ignore = propagatedContextWithRequest(request).propagate()) {
-            runnable.run();
-        }
+        propagatedContextWithRequest(request).propagate(runnable);
     }
 
     private static PropagatedContext propagatedContextWithRequest(@Nullable HttpRequest<?> request) {
@@ -75,7 +73,7 @@ public final class ServerRequestContext {
      * @param runnable The runnable
      * @return The newly instrumented runnable
      */
-    public static Runnable instrument(@Nullable HttpRequest<?> request, Runnable runnable) {
+    public static Runnable instrument(HttpRequest<?> request, Runnable runnable) {
         return () -> with(request, runnable);
     }
 
@@ -88,9 +86,7 @@ public final class ServerRequestContext {
      * @return The return value of the callable
      */
     public static <T> T with(@Nullable HttpRequest<?> request, Supplier<T> supplier) {
-        try (PropagatedContext.Scope ignore = propagatedContextWithRequest(request).propagate()) {
-            return supplier.get();
-        }
+        return propagatedContextWithRequest(request).propagate(supplier);
     }
 
     /**
@@ -103,9 +99,7 @@ public final class ServerRequestContext {
      * @throws Exception If the callable throws an exception
      */
     public static <T> T with(@Nullable HttpRequest<?> request, Callable<T> callable) throws Exception {
-        try (PropagatedContext.Scope ignore = propagatedContextWithRequest(request).propagate()) {
-            return callable.call();
-        }
+        return propagatedContextWithRequest(request).propagateCall(callable);
     }
 
     /**

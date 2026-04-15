@@ -35,15 +35,11 @@ import java.util.Optional;
  */
 @Singleton
 public class DefaultBodyAnnotationBinder<T> extends AbstractArgumentBinder<T> implements BodyArgumentBinder<T> {
-
-    protected final ConversionService conversionService;
-
     /**
      * @param conversionService The conversion service
      */
     public DefaultBodyAnnotationBinder(ConversionService conversionService) {
         super(conversionService);
-        this.conversionService = conversionService;
     }
 
     @Override

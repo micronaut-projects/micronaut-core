@@ -15,7 +15,7 @@ class SimpleTraceInterceptorSpec extends Specification {
 
     @Shared
     @AutoCleanup
-    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ["reactor.enableAutomaticContextPropagation": false])
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ["reactor.enableAutomaticContextPropagation": false, "micronaut.propagation": "thread-local"])
 
     void "test trace mono"() {
         when:

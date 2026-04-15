@@ -44,6 +44,11 @@ import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
+/**
+ * Utility class for processing visitor-related operations.
+ *
+ * @since 4.0.0
+ */
 @Internal
 public class VisitorUtils {
 

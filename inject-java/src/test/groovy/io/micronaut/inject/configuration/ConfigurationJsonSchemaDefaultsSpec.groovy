@@ -111,4 +111,33 @@ record ItfProps(
         ((Map) props.get('endpoint')).get('default') == 'http://default'
         ((Map) props.get('endpoint')).get('format') == 'uri'
     }
+
+    void "test @Bindable defaults are emitted for configuration properties interfaces"() {
+        when:
+        String schema = readSchemaFile(this, 'test.JMSConfigurationProperties', '''
+package test;
+import io.micronaut.context.annotation.*;
+import io.micronaut.core.bind.annotation.Bindable;
+import jakarta.validation.constraints.*;
+
+@ConfigurationProperties("micronaut.jms")
+interface JMSConfigurationProperties {
+  @NotNull
+  @Min(1)
+  @Bindable(defaultValue = "1")
+  Integer getInitialPoolSize();
+
+  @NotNull
+  @Min(1)
+  @Bindable(defaultValue = "50")
+  Integer getMaxPoolSize();
+}
+''')
+        then:
+        def m = parseJson(schema)
+        Map props = (Map) m.get('properties')
+        ((Map) props.get('initial-pool-size')).get('default') == 1
+        ((Map) props.get('max-pool-size')).get('default') == 50
+    }
+
 }

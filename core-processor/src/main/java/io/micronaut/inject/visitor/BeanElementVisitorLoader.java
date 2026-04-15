@@ -16,7 +16,10 @@
 package io.micronaut.inject.visitor;
 
 import java.util.Collections;
+import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
+import java.util.ServiceLoader;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.order.OrderUtil;
 
@@ -27,14 +30,20 @@ import io.micronaut.core.order.OrderUtil;
  * @since 3.0.0
  */
 final class BeanElementVisitorLoader {
+
     /**
      * @return The loaded visitors
      */
     @SuppressWarnings("unchecked")
     static List<BeanElementVisitor<?>> load() {
-        List<? extends BeanElementVisitor<?>> visitors = (List) SoftServiceLoader.load(BeanElementVisitor.class)
-            .disableFork()
-            .collectAll(BeanElementVisitor::isEnabled);
+        ClassLoader classLoader = BeanElementVisitorLoader.class.getClassLoader();
+        if (Boolean.getBoolean(VisitorContext.MICRONAUT_PROCESSING_USE_CONTEXT_CLASSLOADER)) {
+            ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
+            if (contextClassLoader != null) {
+                classLoader = contextClassLoader;
+            }
+        }
+        List<BeanElementVisitor<?>> visitors = loadServices(classLoader);
 
         if (visitors.isEmpty()) {
             return Collections.emptyList();
@@ -42,5 +51,29 @@ final class BeanElementVisitorLoader {
             OrderUtil.sort(visitors);
             return Collections.unmodifiableList(visitors);
         }
+    }
+
+    private static List<BeanElementVisitor<?>> loadServices(ClassLoader classLoader) {
+        List<BeanElementVisitor<?>> visitors = (List) SoftServiceLoader.load(BeanElementVisitor.class, classLoader)
+            .disableFork()
+            .collectAll(BeanElementVisitor::isEnabled);
+        if (!visitors.isEmpty()) {
+            return visitors;
+        }
+        visitors = new ArrayList<>();
+        Iterator<ServiceLoader.Provider<BeanElementVisitor>> iterator = ServiceLoader.load(BeanElementVisitor.class, classLoader).stream().iterator();
+        while (iterator.hasNext()) {
+            try {
+                BeanElementVisitor<?> visitor = iterator.next().get();
+                if (visitor.isEnabled()) {
+                    visitors.add(visitor);
+                }
+            } catch (Throwable e) {
+                if (e instanceof VirtualMachineError virtualMachineError) {
+                    throw virtualMachineError;
+                }
+            }
+        }
+        return visitors;
     }
 }

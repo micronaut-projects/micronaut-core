@@ -50,7 +50,6 @@ class ClientRedirectSpec extends Specification {
         response.body() == "It works!"
     }
 
-    @PendingFeature
     void "test - client: full uri, redirect: relative"() {
         when:
         HttpResponse<String> response = client.toBlocking().exchange('/test/redirect-relative', String)

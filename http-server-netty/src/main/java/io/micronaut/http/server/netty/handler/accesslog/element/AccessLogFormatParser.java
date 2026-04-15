@@ -58,7 +58,7 @@ import java.util.stream.Collectors;
  * If the format starts with begin: (default) the time is taken at the beginning of the request processing. If it starts with end: it is the time when the log entry gets written, close to the end of the request processing.
  * The format should follow the DateTimeFormatter syntax.</li>
  * <li><b>%u</b> - Remote user that was authenticated. Not implemented. Prints '-'.</li>
- * <li><b>%U</b> - Requested URI</li>
+ * <li><b>%U</b> - Requested URL path (excluding query string)</li>
  * <li><b>%v</b> - Local server name</li>
  * <li><b>%D</b> - Time taken to process the request, in millis</li>
  * <li><b>%T</b> - Time taken to process the request, in seconds</li>

@@ -9,8 +9,6 @@ classgraph = "4.8.184"
 compile-testing = "0.21.0"
 
 geb = "7.0"
-# be sure to update graal version in gradle.properties as well
-graal-svm = "23.1.10"
 h2 = "2.2.224"
 hibernate = "5.5.9.Final"
 htmlunit = "2.70.0"
@@ -35,9 +33,9 @@ jcache = "1.1.1"
 junit5 = "5.12.2"
 junit-platform="1.12.2"
 logback = "1.5.32"
-lombok = "1.18.42"
+lombok = "1.18.44"
 logbook-netty = "3.12.3"
-log4j = "2.25.3"
+log4j = "2.25.4"
 micronaut-aws = "4.11.0"
 micronaut-build-plugins="7.6.6"
 micronaut-groovy = "4.7.0"
@@ -45,7 +43,6 @@ micronaut-session = "4.6.0"
 micronaut-sql = "7.0.0"
 micronaut-test = "5.0.0-M6"
 micronaut-validation = "5.0.0-M1"
-micronaut-rxjava2 = "2.9.0"
 micronaut-rxjava3 = "4.0.0-M1"
 micronaut-reactor = "4.0.0-M1"
 micronaut-kotlin = "4.7.0"
@@ -60,31 +57,33 @@ spotbugs = "4.9.8"
 systemlambda = "1.2.1"
 testcontainers = "1.21.4"
 tomlj="1.1.1"
-vertx = "4.5.23"
+vertx = "4.5.26"
 wiremock = "2.33.2"
 mimepull = "1.10.0"
-micronaut-sourcegen = "2.0.0-M1"
+micronaut-sourcegen = "2.0.0-M2"
 icu4j = "76.1"
 jfrunit = "1.0.0.Alpha2"
 junit4 = "4.13.2"
 zacsweers-kotlin-compile-testing = "0.12.1"
-errorprone-gradle-plugin = "4.3.0"
+errorprone-gradle-plugin = "4.4.0"
 nullaway = "0.12.15"
-error_prone_core = "2.45.0"
-jackson2 = "2.21.1"
+error_prone_core = "2.48.0"
+jackson2 = "2.21.2"
 
 #
 # Versions which start with managed- are managed by Micronaut in the sense
 # that they will appear in the Micronaut BOM as <properties>
 #
+# be sure to update graal version in gradle.properties as well
+managed-graal = "25.0.2"
 managed-groovy = "5.0.4"
 managed-jakarta-annotation-api = "2.1.1"
-managed-jackson = "3.0.1"
-managed-jackson-annotations = "2.20"
-managed-kotlin = "2.3.10"
+managed-jackson = "3.1.0"
+managed-jackson-annotations = "2.21"
+managed-kotlin = "2.3.20"
 managed-kotlin-coroutines = "1.10.2"
 managed-methvin-directory-watcher = "0.19.1"
-managed-netty = "4.2.9.Final"
+managed-netty = "4.2.12.Final"
 managed-netty-tcnative = "2.0.75.Final"
 managed-netty-contrib-multipart = "1.0.0.Final"
 managed-reactive-streams = "1.0.4"
@@ -94,7 +93,7 @@ managed-snakeyaml = "2.4"
 managed-java-parser-core = "3.27.1"
 managed-ksp = "2.3.6"
 managed-jspecify = "1.0.0"
-sonatype-scan = "3.1.4"
+sonatype-scan = "3.1.5"
 micronaut-docs = "3.0.0"
 
 [libraries]
@@ -102,7 +101,6 @@ micronaut-docs = "3.0.0"
 test-boms-micronaut-aws = { module = "io.micronaut.aws:micronaut-aws-bom", version.ref = "micronaut-aws" }
 test-boms-micronaut-sql = { module = "io.micronaut.sql:micronaut-sql-bom", version.ref = "micronaut-sql" }
 test-boms-micronaut-validation = { module = "io.micronaut.validation:micronaut-validation-bom", version.ref = "micronaut-validation" }
-test-boms-micronaut-rxjava2 = { module = "io.micronaut.rxjava2:micronaut-rxjava2-bom", version.ref = "micronaut-rxjava2" }
 test-boms-micronaut-rxjava3 = { module = "io.micronaut.rxjava3:micronaut-rxjava3-bom", version.ref = "micronaut-rxjava3" }
 test-boms-micronaut-reactor = { module = "io.micronaut.reactor:micronaut-reactor-bom", version.ref = "micronaut-reactor" }
 test-boms-micronaut-kotlin = { module = "io.micronaut.kotlin:micronaut-kotlin-bom", version.ref = "micronaut-kotlin" }
@@ -118,7 +116,7 @@ boms-micronaut-sourcegen = { module = "io.micronaut.sourcegen:micronaut-sourcege
 # Libraries which start with managed- are managed by Micronaut in the sense
 # that they will appear in the Micronaut BOM
 #
-
+managed-graalvm-nativeimage = { module = "org.graalvm.sdk:nativeimage", version.ref = "managed-graal" }
 managed-groovy = { module = "org.apache.groovy:groovy", version.ref = "managed-groovy" }
 managed-groovy-json = { module = "org.apache.groovy:groovy-json", version.ref = "managed-groovy" }
 managed-groovy-sql = { module = "org.apache.groovy:groovy-sql", version.ref = "managed-groovy" }
@@ -204,7 +202,6 @@ classgraph = { module = "io.github.classgraph:classgraph", version.ref= "classgr
 compile-testing = { module = "com.google.testing.compile:compile-testing", version.ref = "compile-testing" }
 
 geb-spock = { module = "org.gebish:geb-spock", version.ref = "geb" }
-graal = { module = "org.graalvm.sdk:nativeimage", version.ref = "graal-svm" }
 groovy-test-junit5 = { module = "org.apache.groovy:groovy-test-junit5", version.ref = "managed-groovy" }
 
 h2 = { module = "com.h2database:h2", version.ref = "h2" }

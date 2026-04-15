@@ -23,9 +23,10 @@ class ReactivePropagationSpec extends Specification {
         Subscriber<Object> subscriber = new EmptySubscriber<Object>()
 
         when:
-        try (def ignore = outerContext.propagate()) {
+        outerContext.propagate(() -> {
             ReactivePropagation.propagate(innerContext, publisher).subscribe(subscriber)
-        }
+            return null
+        })
 
         then:
         publisher.capturedContext == innerContext
@@ -135,12 +136,13 @@ class ReactivePropagationSpec extends Specification {
 
         @Override
         void subscribe(Subscriber<? super T> subscriber) {
-            try (def ignore = context.propagate()) {
+            context.propagate(() -> {
                 subscriber.onSubscribe(null)
                 subscriber.onNext(null)
                 subscriber.onError(null)
                 subscriber.onComplete()
-            }
+                return null
+            })
         }
     }
 

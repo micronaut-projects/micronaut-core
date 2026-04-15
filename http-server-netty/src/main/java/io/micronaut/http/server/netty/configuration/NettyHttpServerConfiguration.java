@@ -403,9 +403,9 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     }
 
     /**
-     * The maximum size of an individual HTTP setter. Defaults to 8192.
+     * The maximum header size. Defaults to 8192.
      *
-     * @return The maximum size of an individual HTTP setter
+     * @return The maximum header size
      */
     public int getMaxHeaderSize() {
         return maxHeaderSize;
@@ -602,8 +602,8 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     }
 
     /**
-     * Sets the maximum size of any one header. Default value ({@value #DEFAULT_MAXHEADERSIZE}).
-     * @param maxHeaderSize The max header size
+     * Sets the maximum header size. Default value ({@value #DEFAULT_MAXHEADERSIZE}).
+     * @param maxHeaderSize The maximum header size
      */
     public void setMaxHeaderSize(@ReadableBytes int maxHeaderSize) {
         this.maxHeaderSize = maxHeaderSize;
@@ -1131,10 +1131,9 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     }
 
     /**
-     * Configuration for the experimental HTTP/3 server.
+     * Configuration for the HTTP/3 server.
      */
     @ConfigurationProperties("http3")
-    @Experimental
     public static final class Http3Settings {
         private int initialMaxData = DEFAULT_HTTP3_INITIAL_MAX_DATA;
         private int initialMaxStreamDataBidirectionalLocal = DEFAULT_HTTP3_INITIAL_MAX_STREAM_DATA_BIDIRECTIONAL_LOCAL;

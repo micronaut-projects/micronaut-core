@@ -31,6 +31,12 @@ public final class RequestUriElementBuilder implements LogElementBuilder {
         if (RequestUriElement.REQUEST_URI.equals(token)) {
             return RequestUriElement.INSTANCE;
         }
+        if (QueryStringElement.QUERY_STRING.equals(token)) {
+            return QueryStringElement.INSTANCE;
+        }
+        if (RequestedUrlPathElement.REQUESTED_URL_PATH.equals(token)) {
+            return RequestedUrlPathElement.INSTANCE;
+        }
         return null;
     }
 

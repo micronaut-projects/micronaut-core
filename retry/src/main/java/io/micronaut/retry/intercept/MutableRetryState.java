@@ -19,14 +19,18 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.retry.RetryState;
 
 /**
+ * Mutable retry state that can calculate the next retry delay.
+ *
  * @author graemerocher
  * @since 1.0
  */
 @Internal
-interface MutableRetryState extends RetryState {
+public interface MutableRetryState extends RetryState {
 
     /**
-     * @return Return the millisecond value for the next delay
+     * Returns the millisecond value for the next delay.
+     *
+     * @return The next delay in milliseconds
      */
     long nextDelay();
 }

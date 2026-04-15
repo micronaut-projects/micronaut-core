@@ -59,6 +59,8 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
     private final BeanContext beanContext;
 
     /**
+     * Creates a recovery interceptor.
+     *
      * @param beanContext The bean context to allow for DI of class annotated with {@link jakarta.inject.Inject}.
      */
     public RecoveryInterceptor(BeanContext beanContext) {
