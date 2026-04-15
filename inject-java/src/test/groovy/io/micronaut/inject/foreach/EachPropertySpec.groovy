@@ -16,6 +16,10 @@
 package io.micronaut.inject.foreach
 
 import io.micronaut.context.ApplicationContext
+import jakarta.inject.Singleton
+import jakarta.inject.Named
+import io.micronaut.core.annotation.Order
+import io.micronaut.context.annotation.EachBean
 import io.micronaut.context.env.MapPropertySource
 import io.micronaut.context.env.PropertySource
 import io.micronaut.context.exceptions.NoSuchBeanException
@@ -356,6 +360,26 @@ class EachPropertySpec extends Specification {
         applicationContext.close()
     }
 
+    void "test each bean preserves order from source bean"() {
+        given:
+        ApplicationContext applicationContext = ApplicationContext.run()
+
+        when:
+        def lowSourceDefinition = applicationContext.getBeanDefinition(OrderedSource, Qualifiers.byName("low"))
+        def highSourceDefinition = applicationContext.getBeanDefinition(OrderedSource, Qualifiers.byName("high"))
+        def lowDerivedDefinition = applicationContext.getBeanDefinition(MyBeanWithOrder, Qualifiers.byName("low"))
+        def highDerivedDefinition = applicationContext.getBeanDefinition(MyBeanWithOrder, Qualifiers.byName("high"))
+
+        then:
+        lowSourceDefinition.order == -100
+        highSourceDefinition.order == 100
+        lowDerivedDefinition.order == -100
+        highDerivedDefinition.order == 100
+
+        cleanup:
+        applicationContext.close()
+    }
+
     void "test configuration properties binding by non bean type with primary"() {
         given:
         ApplicationContext applicationContext = ApplicationContext.builder("test").build()
@@ -574,5 +598,29 @@ class EachPropertySpec extends Specification {
         props.innerList.size() == 2
         props.innerList.any { it.age == 20 }
         props.innerList.any { it.age == 30 }
+    }
+}
+
+interface OrderedSource {
+}
+
+@Singleton
+@Named("low")
+@Order(-100)
+class LowOrderedSource implements OrderedSource {
+}
+
+@Singleton
+@Named("high")
+@Order(100)
+class HighOrderedSource implements OrderedSource {
+}
+
+@EachBean(OrderedSource)
+class MyBeanWithOrder {
+    final OrderedSource source
+
+    MyBeanWithOrder(OrderedSource source) {
+        this.source = source
     }
 }

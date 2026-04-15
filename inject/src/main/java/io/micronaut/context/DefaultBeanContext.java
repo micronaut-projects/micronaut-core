@@ -2810,7 +2810,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 if (dependentFactoryBean != null) {
                     destroyBean(dependentFactoryBean);
                 }
-                BeanKey<T> beanKey = new BeanKey<>(beanType, qualifier);
+                Qualifier<T> registrationQualifier = qualifier;
+                if (registrationQualifier == null) {
+                    registrationQualifier = definition.getDeclaredQualifier();
+                }
+                BeanKey<T> beanKey = new BeanKey<>(beanType, registrationQualifier);
                 List<BeanRegistration<?>> dependentBeans = context.getAndResetDependentBeans();
                 BeanRegistration<T> beanRegistration = BeanRegistration.of(this, beanKey, definition, bean, dependentBeans);
                 context.pushDependentBeans(parentDependentBeans);

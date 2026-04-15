@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Experimental;
 
 import java.lang.annotation.Annotation;
 import java.lang.annotation.ElementType;
+import java.lang.annotation.Repeatable;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
@@ -37,6 +38,7 @@ import java.lang.annotation.Target;
 @Experimental
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.SOURCE)
+@Repeatable(ClassImport.Repeated.class)
 public @interface ClassImport {
 
     /**

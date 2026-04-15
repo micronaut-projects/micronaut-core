@@ -24,9 +24,8 @@ public class MdcLegacyFilter implements HttpServerFilter {
         try {
             String trackingId = request.getHeaders().get("X-TrackingId");
             MDC.put("trackingId", trackingId);
-            try (PropagatedContext.Scope ignore = PropagatedContext.get().plus(new MdcPropagationContext()).propagate()) {
-                return chain.proceed(request);
-            }
+            return PropagatedContext.get().plus(new MdcPropagationContext())
+                .propagate(() -> chain.proceed(request));
         } finally {
             MDC.remove("trackingId");
         }

@@ -466,7 +466,7 @@ public final class RouteExecutor {
                                                                       boolean isKotlinCoroutine,
                                                                       @Nullable ContextView contextView) {
         PropagatedContext routePropagatedContext = propagatedContext.plus(new ServerHttpRequestContext(httpRequest));
-        try (PropagatedContext.Scope ignore = routePropagatedContext.propagate()) {
+        return routePropagatedContext.propagate(() -> {
             try {
                 if (isKotlinCoroutine && contextView != null) {
                     coroutineHelper.ifPresent(helper -> helper.setupCoroutineContext(httpRequest, contextView, routePropagatedContext));
@@ -480,7 +480,7 @@ public final class RouteExecutor {
             } catch (Throwable e) {
                 return ExecutionFlow.error(e);
             }
-        }
+        });
     }
 
     ExecutionFlow<HttpResponse<?>> createResponseForBody(PropagatedContext propagatedContext,

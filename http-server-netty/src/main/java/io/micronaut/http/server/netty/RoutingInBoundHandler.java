@@ -239,11 +239,10 @@ public final class RoutingInBoundHandler implements RequestHandler {
     }
 
     private void handleException(ChannelHandlerContext ctx, OutboundAccess outboundAccess, NettyHttpRequest<Object> request, Throwable throwable) {
-        executeOnEventLoopIfNeeded(ctx, () -> {
-            try (PropagatedContext.Scope ignored = PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(request)).propagate()) {
-                new NettyRequestLifecycle(this, outboundAccess).handleException(request, throwable);
-            }
-        });
+        executeOnEventLoopIfNeeded(ctx, () -> PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(request)).propagate(() -> {
+            new NettyRequestLifecycle(this, outboundAccess).handleException(request, throwable);
+            return null;
+        }));
     }
 
     private void executeOnEventLoopIfNeeded(ChannelHandlerContext ctx, Runnable runnable) {

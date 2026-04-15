@@ -281,6 +281,7 @@ class AccessLogSpec extends Specification {
         responses*.content().forEach(ByteBuf::release)
         server.close()
         channel.close()
+        ctx.close()
         group.shutdownGracefully()
     }
 
@@ -398,7 +399,6 @@ class AccessLogSpec extends Specification {
         server.close()
         channel.close()
         ctx.close()
-        ReferenceCountUtil.release(ctx)
         ReferenceCountUtil.release(sslContext)
         group.shutdownGracefully()
     }

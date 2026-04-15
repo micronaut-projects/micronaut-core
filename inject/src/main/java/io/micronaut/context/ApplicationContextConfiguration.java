@@ -15,14 +15,14 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.context.env.ConfigImportPropertySourcesLocator;
 import io.micronaut.context.env.EnvironmentNamesDeducer;
 import io.micronaut.context.env.EnvironmentPackagesDeducer;
-import io.micronaut.core.io.ResourceLoadStrategy;
 import io.micronaut.context.env.PropertySourcesLocator;
-import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.MutableConversionService;
+import io.micronaut.core.io.ResourceLoadStrategy;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -36,7 +36,6 @@ import java.util.Optional;
  * @author graemerocher
  * @since 1.0
  */
-@NullMarked
 public interface ApplicationContextConfiguration extends BeanContextConfiguration {
 
     /**
@@ -205,7 +204,10 @@ public interface ApplicationContextConfiguration extends BeanContextConfiguratio
      * @since 5.0
      */
     default Collection<PropertySourcesLocator> getPropertySourcesLocators() {
-        return Collections.emptyList();
+        if (isConfigImportEnabled()) {
+            return List.of(new ConfigImportPropertySourcesLocator());
+        }
+        return List.of();
     }
 
     /**
@@ -216,6 +218,16 @@ public interface ApplicationContextConfiguration extends BeanContextConfiguratio
      */
     default ResourceLoadStrategy getConfigurationLoadingStrategy() {
         return ResourceLoadStrategy.defaultStrategy();
+    }
+
+    /**
+     * Whether is the config import 'micronaut.config.import' processing enabled. Enabled by default.
+     *
+     * @return Returns {@code true} if the config import is enabled.
+     * @since 5.0
+     */
+    default boolean isConfigImportEnabled() {
+        return true;
     }
 
 }

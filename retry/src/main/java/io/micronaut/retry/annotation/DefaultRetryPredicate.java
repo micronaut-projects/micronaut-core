@@ -35,6 +35,8 @@ public class DefaultRetryPredicate implements RetryPredicate {
     private final boolean hasExcludes;
 
     /**
+     * Creates a retry predicate with explicit include and exclude rules.
+     *
      * @param includes Classes to include for retry
      * @param excludes Classes to exclude for retry
      */

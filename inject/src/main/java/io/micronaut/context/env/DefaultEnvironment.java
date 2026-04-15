@@ -45,11 +45,13 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.ByteArrayInputStream;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.annotation.Annotation;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -61,6 +63,7 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -90,6 +93,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         new PropertiesPropertySourceLoader(),
         new ConstantPropertySourceLoader()
     );
+    private static final String FILE_PREFIX = "file:";
 
     private final ClassPathResourceLoader resourceLoader;
     private final MutableConversionService mutableConversionService;
@@ -111,6 +115,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
 
     private final List<PropertySource> refreshablePropertySources = new ArrayList<>(10);
     private final Map<String, PropertySource> propertySources = Collections.synchronizedMap(CollectionUtils.newLinkedHashMap(10));
+    private final Collection<PropertySourcesLocator> propertySourcesLocators;
 
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final AtomicBoolean reading = new AtomicBoolean(false);
@@ -158,6 +163,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         // Search config locations in reverse order
         Collections.reverse(configLocations);
         this.configLocations = configLocations;
+        this.propertySourcesLocators = configuration.getPropertySourcesLocators();
     }
 
     @Override
@@ -271,7 +277,9 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     }
 
     private void dropProperties() {
-        propertySources.values().removeAll(refreshablePropertySources);
+        for (PropertySource refreshable : refreshablePropertySources) {
+            propertySources.remove(refreshable.getName());
+        }
         propertyPlaceholderResolver.reset();
     }
 
@@ -334,39 +342,51 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
 
     private void loadProperties() {
         refreshablePropertySources.clear();
-        List<PropertySource> propertySources;
+        List<PropertySource> propertySources = new ArrayList<>(configLocations.size());
+        Set<String> preExistingSourceNames = new LinkedHashSet<>(this.propertySources.keySet());
         if (configuration.isEnableDefaultPropertySources()) {
-            propertySources = readPropertySourceList(applicationName);
-            addDefaultPropertySources(propertySources);
+            propertySources.addAll(readPropertySourceList(applicationName));
+            List<PropertySource> defaultPropertySources = new ArrayList<>(4);
+            addDefaultPropertySources(defaultPropertySources);
+            propertySources.addAll(defaultPropertySources);
             String propertySourcesSystemProperty = CachedEnvironment.getProperty(Environment.PROPERTY_SOURCES_KEY);
             if (propertySourcesSystemProperty != null) {
-                propertySources.addAll(readPropertySourceListFromFiles(propertySourcesSystemProperty, PropertySource.Origin.of(Environment.PROPERTY_SOURCES_KEY)));
+                propertySources.addAll(readPropertySourceListFromFiles(propertySourcesSystemProperty));
             }
             String propertySourcesEnv = CachedEnvironment.getenv(ENV_PROPERTY_SOURCES_KEY);
             if (propertySourcesEnv != null) {
-                propertySources.addAll(readPropertySourceListFromFiles(propertySourcesEnv, PropertySource.Origin.of(ENV_PROPERTY_SOURCES_KEY)));
+                propertySources.addAll(readPropertySourceListFromFiles(propertySourcesEnv));
             }
-            refreshablePropertySources.addAll(propertySources);
 
         } else {
             propertySources = new ArrayList<>(this.propertySources.size());
         }
-        propertySources.addAll(this.propertySources.values());
+        for (PropertySource propertySource : this.propertySources.values()) {
+            if (!propertySources.contains(propertySource)) {
+                propertySources.add(propertySource);
+            }
+        }
 
         for (PropertySource propertySource : propertySources) {
             internalAddPropertySource(propertySource);
         }
 
-        Collection<PropertySourcesLocator> propertySourcesLocators = configuration.getPropertySourcesLocators();
         if (!propertySourcesLocators.isEmpty()) {
             for (PropertySourcesLocator propertySourcesLocator : propertySourcesLocators) {
-                for (PropertySource propertySource : propertySourcesLocator.load(this)) {
-                    internalAddPropertySource(propertySource);
-                    propertySources.add(propertySource);
-                    if (!PropertySource.CONTEXT.equals(propertySource.getName())) {
-                        refreshablePropertySources.add(propertySource);
+                boolean isBootstrapLocator = propertySourcesLocator instanceof BootstrapLocatorMarker;
+                Collection<PropertySource> sources = propertySourcesLocator.load(this);
+                propertySources.addAll(sources);
+                if (isBootstrapLocator) {
+                    for (PropertySource source : sources) {
+                        internalAddPropertySource(source);
                     }
                 }
+            }
+        }
+
+        for (PropertySource propertySource : propertySources) {
+            if (!PropertySource.CONTEXT.equals(propertySource.getName()) && !preExistingSourceNames.contains(propertySource.getName())) {
+                refreshablePropertySources.add(propertySource);
             }
         }
 
@@ -389,10 +409,9 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
      * Resolve the property sources for files passed via system property and system env.
      *
      * @param files The comma separated list of files
-     * @param origin The origin of the property sources
      * @return The list of property sources for each file
      */
-    private List<PropertySource> readPropertySourceListFromFiles(@Nullable String files, PropertySource.Origin origin) {
+    private List<PropertySource> readPropertySourceListFromFiles(@Nullable String files) {
         if (files == null || files.isEmpty()) {
             return List.of();
         }
@@ -400,6 +419,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         if (list.isEmpty()) {
             return List.of();
         }
+        getPropertySourceLoaders();
         int order = AbstractPropertySourceLoader.DEFAULT_POSITION + 50;
         List<PropertySource> propertySources = new ArrayList<>(list.size());
         for (String filePath : list) {
@@ -410,7 +430,13 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
                 LOG.debug("Reading property sources from loader: {}", propertySourceLoader);
                 Optional<Map<String, Object>> properties = readPropertiesFromLoader(fileName, filePath, propertySourceLoader);
                 if (properties.isPresent()) {
-                    propertySources.add(PropertySource.of(filePath, properties.get(), order));
+                    PropertySource.Origin sourceOrigin;
+                    if (filePath.startsWith("classpath:") || filePath.startsWith(FILE_PREFIX)) {
+                        sourceOrigin = PropertySource.Origin.of(filePath);
+                    } else {
+                        sourceOrigin = PropertySource.Origin.of(FILE_PREFIX + filePath);
+                    }
+                    propertySources.add(PropertySource.of(filePath, properties.get(), sourceOrigin, order));
                 }
                 order++;
             } else {
@@ -432,8 +458,8 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
                 resourceLoader = this;
             } else if (configLocation.startsWith("classpath:")) {
                 resourceLoader = this.forBase(configLocation);
-            } else  if (configLocation.startsWith("file:")) {
-                configLocation = configLocation.substring(5);
+            } else  if (configLocation.startsWith(FILE_PREFIX)) {
+                configLocation = configLocation.substring(FILE_PREFIX.length());
                 Path configLocationPath = Paths.get(configLocation);
                 if (Files.exists(configLocationPath) && Files.isDirectory(configLocationPath) && Files.isReadable(configLocationPath)) {
                     resourceLoader = new DefaultFileSystemResourceLoader(configLocationPath);
@@ -501,17 +527,17 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
      */
     @Override
     public Collection<PropertySourceLoader> getPropertySourceLoaders() {
-        Collection<PropertySourceLoader> propertySourceLoaderList = this.propertySourceLoaderList;
-        if (propertySourceLoaderList == null) {
+        Collection<PropertySourceLoader> currentPropertySourceLoaders = this.propertySourceLoaderList;
+        if (currentPropertySourceLoaders == null) {
             synchronized (this) { // double check
-                propertySourceLoaderList = this.propertySourceLoaderList;
-                if (propertySourceLoaderList == null) {
-                    propertySourceLoaderList = evaluatePropertySourceLoaders();
-                    this.propertySourceLoaderList = propertySourceLoaderList;
+                currentPropertySourceLoaders = this.propertySourceLoaderList;
+                if (currentPropertySourceLoaders == null) {
+                    currentPropertySourceLoaders = evaluatePropertySourceLoaders();
+                    this.propertySourceLoaderList = currentPropertySourceLoaders;
                 }
             }
         }
-        return propertySourceLoaderList;
+        return currentPropertySourceLoaders;
     }
 
     private Collection<PropertySourceLoader> evaluatePropertySourceLoaders() {
@@ -530,6 +556,164 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
             }
         }
         return allLoaders;
+    }
+
+    Optional<PropertySource> loadImportedPropertySource(ResourceLoader resourceLoader,
+                                                        String resourcePath,
+                                                        String sourceName,
+                                                        PropertySource.Origin origin) {
+        String extension = NameUtils.extension(resourcePath);
+        String resourceName = NameUtils.filename(resourcePath);
+        if (!extension.isEmpty()) {
+            getPropertySourceLoaders();
+            PropertySourceLoader propertySourceLoader = loaderByFormatMap.get(extension);
+            if (propertySourceLoader == null) {
+                throw new ConfigurationException("Unsupported properties file format while reading " + resourceName + " from " + resourcePath);
+            }
+            return readImportedPropertySource(resourceLoader, resourcePath, sourceName, origin, propertySourceLoader);
+        }
+
+        Collection<PropertySourceLoader> loaders = getPropertySourceLoaders();
+        if (loaders.isEmpty()) {
+            loaders = List.of(new PropertiesPropertySourceLoader());
+        }
+        for (PropertySourceLoader propertySourceLoader : loaders) {
+            Set<String> extensions = propertySourceLoader.getExtensions();
+            for (String candidateExtension : extensions) {
+                String candidatePath = resourcePath + "." + candidateExtension;
+                Optional<PropertySource> imported = readImportedPropertySource(resourceLoader, candidatePath, sourceName, origin, propertySourceLoader);
+                if (imported.isPresent()) {
+                    return imported;
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    Optional<PropertySource> loadImportedClasspathPropertySource(String resourcePath,
+                                                                 String sourceName,
+                                                                 PropertySource.Origin origin,
+                                                                 boolean allowMultiple) {
+        String extension = NameUtils.extension(resourcePath);
+        String resourceName = NameUtils.filename(resourcePath);
+        if (!extension.isEmpty()) {
+            getPropertySourceLoaders();
+            PropertySourceLoader propertySourceLoader = loaderByFormatMap.get(extension);
+            if (propertySourceLoader == null) {
+                throw new ConfigurationException("Unsupported properties file format while reading " + resourceName + " from " + resourcePath);
+            }
+            return readImportedClasspathPropertySource(resourcePath, sourceName, origin, propertySourceLoader, allowMultiple);
+        }
+
+        Collection<PropertySourceLoader> loaders = getPropertySourceLoaders();
+        if (loaders.isEmpty()) {
+            loaders = List.of(new PropertiesPropertySourceLoader());
+        }
+        for (PropertySourceLoader propertySourceLoader : loaders) {
+            Set<String> extensions = propertySourceLoader.getExtensions();
+            for (String candidateExtension : extensions) {
+                String candidatePath = resourcePath + "." + candidateExtension;
+                Optional<PropertySource> imported = readImportedClasspathPropertySource(candidatePath, sourceName, origin, propertySourceLoader, allowMultiple);
+                if (imported.isPresent()) {
+                    return imported;
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    Optional<PropertySource> loadImportedPropertySourceFromContent(String content,
+                                                                   String sourceName,
+                                                                   String extension,
+                                                                   PropertySource.Origin origin) {
+        getPropertySourceLoaders();
+        PropertySourceLoader propertySourceLoader = loaderByFormatMap.get(extension);
+        if (propertySourceLoader == null) {
+            if (!extension.isEmpty()) {
+                throw new ConfigurationException("Unsupported properties content format while reading " + sourceName + "." + extension);
+            }
+            return Optional.empty();
+        }
+        try (InputStream in = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8))) {
+            Map<String, Object> values = propertySourceLoader.read(sourceName, in);
+            if (values.isEmpty()) {
+                return Optional.empty();
+            }
+            return Optional.of(PropertySource.of(sourceName, values, origin));
+        } catch (IOException e) {
+            throw new ConfigurationException("Failed to read properties content for source: " + sourceName + "." + extension, e);
+        }
+    }
+
+    private Optional<PropertySource> readImportedPropertySource(ResourceLoader resourceLoader,
+                                                                String resourcePath,
+                                                                String sourceName,
+                                                                PropertySource.Origin origin,
+                                                                PropertySourceLoader propertySourceLoader) {
+        try {
+            Optional<InputStream> inputStream = resourceLoader.getResourceAsStream(resourcePath);
+            if (inputStream.isEmpty()) {
+                return Optional.empty();
+            }
+            try (InputStream in = inputStream.get()) {
+                Map<String, Object> values = propertySourceLoader.read(sourceName, in);
+                if (values.isEmpty()) {
+                    return Optional.empty();
+                }
+                return Optional.of(PropertySource.of(sourceName, values, origin));
+            }
+        } catch (IOException e) {
+            throw new ConfigurationException("Failed to read imported config: " + resourcePath, e);
+        }
+    }
+
+    private Optional<PropertySource> readImportedClasspathPropertySource(String resourcePath,
+                                                                         String sourceName,
+                                                                         PropertySource.Origin origin,
+                                                                         PropertySourceLoader propertySourceLoader,
+                                                                         boolean allowMultiple) {
+        ResourceLoadStrategy strategy = ResourceLoadStrategy.builder()
+            .type(allowMultiple ? ResourceLoadStrategyType.MERGE_ALL : ResourceLoadStrategyType.FAIL_ON_DUPLICATE)
+            .build();
+        List<URL> resources;
+        try {
+            resources = ClassPathResourceLoader.resolveResources(this, resourcePath, strategy);
+        } catch (ResourceDuplicateException e) {
+            throw new ConfigurationException(buildDuplicateClasspathImportMessage(resourcePath, e.getResources()));
+        } catch (ResourceConflictException e) {
+            if (!allowMultiple) {
+                throw new ConfigurationException(buildDuplicateClasspathImportMessage(resourcePath, e.getResources()));
+            }
+            resources = e.getResources();
+        }
+        if (resources.isEmpty()) {
+            return Optional.empty();
+        }
+        if (!allowMultiple && resources.size() > 1) {
+            throw new ConfigurationException(buildDuplicateClasspathImportMessage(resourcePath, resources));
+        }
+        Map<String, Object> values = new LinkedHashMap<>();
+        for (URL resource : resources) {
+            try (InputStream in = resource.openStream()) {
+                values.putAll(propertySourceLoader.read(sourceName, in));
+            } catch (IOException e) {
+                throw new ConfigurationException("Failed to read imported config: " + resourcePath, e);
+            }
+        }
+        if (values.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(PropertySource.of(sourceName, values, origin));
+    }
+
+    private static String buildDuplicateClasspathImportMessage(String resourcePath, List<URL> resources) {
+        StringBuilder message = new StringBuilder("Multiple classpath resources found for import '")
+            .append(resourcePath)
+            .append("'. Use classpath*:// to load all matches.\nFound:");
+        for (URL resource : resources) {
+            message.append("\n - ").append(resource.toExternalForm());
+        }
+        return message.toString();
     }
 
     private void loadPropertySourceFromLoader(String name, PropertySourceLoader propertySourceLoader, List<PropertySource> propertySources, ResourceLoader resourceLoader) {
@@ -742,8 +926,8 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         if (withoutEntry.startsWith("jar:")) {
             withoutEntry = withoutEntry.substring(4);
         }
-        if (withoutEntry.startsWith("file:")) {
-            withoutEntry = withoutEntry.substring(5);
+        if (withoutEntry.startsWith(FILE_PREFIX)) {
+            withoutEntry = withoutEntry.substring(FILE_PREFIX.length());
         }
 
         int slashIndex = withoutEntry.lastIndexOf('/');
@@ -783,7 +967,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         } catch (Exception e) {
             throw new RuntimeException("Failed to close property placeholder resolver: " + e.getMessage(), e);
         }
-        for (PropertySourcesLocator propertySourcesLocator : configuration.getPropertySourcesLocators()) {
+        for (PropertySourcesLocator propertySourcesLocator : propertySourcesLocators) {
             if (propertySourcesLocator instanceof Closeable closeable) {
                 try {
                     closeable.close();

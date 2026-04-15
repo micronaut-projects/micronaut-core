@@ -247,6 +247,13 @@ class HttpHeadSpec extends Specification {
         ex.message == "Client '/head': Empty body"
     }
 
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/7332')
+    void "@QueryValue supports java.nio.file.Path"() {
+        expect:
+        myGetClient.queryPath(java.nio.file.Paths.get('a/b')) == 'a/b'
+        myGetClient.queryPath(java.nio.file.Paths.get('a', 'b')) == 'a/b'
+    }
+
     void "test body availability"() {
         when:
         Flux<HttpResponse> flowable = client.exchange(
@@ -491,6 +498,11 @@ class HttpHeadSpec extends Specification {
             return foo + '-' + bar
         }
 
+        @Get("/queryPath")
+        String queryPath(@QueryValue java.nio.file.Path path) {
+            return path.toString()
+        }
+
         @Get("/empty")
         Optional<String> empty() {
             return Optional.empty()
@@ -591,6 +603,9 @@ class HttpHeadSpec extends Specification {
 
         @Head("/multipleQueryParam")
         String queryParam(@QueryValue String foo, @QueryValue String bar)
+
+        @Get("/queryPath")
+        String queryPath(@QueryValue java.nio.file.Path path)
 
         @Head("/date/{myDate}")
         String formatDate(@Format('yyyy-MM-dd') Date myDate)

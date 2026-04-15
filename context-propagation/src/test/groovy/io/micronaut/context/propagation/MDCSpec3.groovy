@@ -34,7 +34,8 @@ class MDCSpec3 extends Specification {
     @Shared
     @AutoCleanup
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
-            'mdc.test3.enabled': true
+            'mdc.test3.enabled': true,
+            "micronaut.propagation": "thread-local"
     ])
 
     @Shared
