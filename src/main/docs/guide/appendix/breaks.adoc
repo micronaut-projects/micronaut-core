@@ -416,7 +416,9 @@ Since Micronaut 3.0 the `OncePerRequestHttpServerFilter` class was deprecated an
 
 ==== CORS support with the `@CrossOrigin` annotation
 
-Micronaut Framework 4 changes `@CrossOrigin`  behavior to match configuration-based CORS behavior. A method annotated with `@CrossOrigin` allows any origin if you don't specify any value for the `allowedOrigins` and `allowedOriginsRegex` members.
+Micronaut Framework 4 changes `@CrossOrigin` behavior to match configuration-based CORS behavior. A method annotated with `@CrossOrigin` allows any origin if you don't specify any value for the `allowedOrigins` and `allowedOriginsRegex` members.
+
+Micronaut Framework 5 changes the default value of `@CrossOrigin.allowCredentials` from `true` to `false`. If your application relies on credentialed cross-origin requests, set `allowCredentials = true` explicitly.
 
 ==== `@EachBean` requires a `@Named qualifier
 

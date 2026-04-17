@@ -17,7 +17,6 @@ package io.micronaut.http.server.tck.tests.cors;
 
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.version.annotation.Version;
@@ -36,12 +35,13 @@ import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.server.cors.CrossOrigin;
 import io.micronaut.http.server.tck.CorsUtils;
 import io.micronaut.http.server.util.HttpHostResolver;
-import io.micronaut.http.uri.UriBuilder;
-import jakarta.inject.Singleton;
-import org.junit.jupiter.api.Test;
-import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
+import io.micronaut.http.tck.ServerUnderTest;
+import io.micronaut.http.uri.UriBuilder;
+import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.net.URI;
@@ -49,8 +49,8 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.function.BiConsumer;
 
+import static io.micronaut.http.server.tck.CorsUtils.assertCorsHeaders;
 import static io.micronaut.http.tck.TestScenario.asserts;
-import static io.micronaut.http.server.tck.CorsUtils.*;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -261,15 +261,14 @@ public class CrossOriginTest {
      * @see <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Allow-Credentials">Access-Control-Allow-Credentials</a>
      */
     @Test
-    void defaultAccessControlAllowCredentialsValueIsSet() throws IOException {
+    void defaultAccessControlAllowCredentialsValueIsNotSetByDefault() throws IOException {
         asserts(SPECNAME,
             preflight(UriBuilder.of("/credentials").path("bar"), "https://foo.com", HttpMethod.GET),
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .assertResponse(response -> {
-                    assertCorsHeaders(response, "https://foo.com", HttpMethod.GET);
-                    assertTrue(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS));
-                    assertEquals("true", response.getHeaders().get(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS));
+                    assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, false);
+                    assertFalse(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS));
                 })
                 .build()));
     }
