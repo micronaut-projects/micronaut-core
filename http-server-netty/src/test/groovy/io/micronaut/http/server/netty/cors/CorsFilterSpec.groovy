@@ -19,7 +19,11 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.util.StringUtils
-import io.micronaut.http.*
+import io.micronaut.http.HttpHeaders
+import io.micronaut.http.HttpMethod
+import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
+import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.BlockingHttpClient
@@ -33,7 +37,13 @@ import jakarta.inject.Inject
 import spock.lang.Specification
 import spock.lang.Unroll
 
-import static io.micronaut.http.HttpHeaders.*
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_MAX_AGE
+import static io.micronaut.http.HttpHeaders.VARY
 
 @Property(name = "spec.name", value = SPEC_NAME)
 @Property(name = "micronaut.server.cors.enabled", value = StringUtils.TRUE)
@@ -67,17 +77,16 @@ class CorsFilterSpec extends Specification {
 
         then:
         HttpStatus.OK == response.status()
-        response.headers.names().size() == 6
+        response.headers.names().size() == 5
 
         response.headers.contains(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS)
         response.headers.contains(HttpHeaders.ACCESS_CONTROL_MAX_AGE)
         response.headers.contains(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN)
         response.headers.contains(HttpHeaders.VARY)
-        response.headers.contains(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS)
+        !response.headers.contains(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS)
         response.headers.contains(HttpHeaders.CONTENT_LENGTH)
         [origin] == response.headers.getAll(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN)
         ['Origin'] == response.headers.getAll(VARY)
-        [StringUtils.TRUE] == response.headers.getAll(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS)
 
         cleanup:
         httpClient.close()
@@ -136,16 +145,15 @@ class CorsFilterSpec extends Specification {
 
         then:
         HttpStatus.OK == response.status()
-        response.headers.names().size() == 6
+        response.headers.names().size() == 5
         response.headers.contains(HttpHeaders.DATE)
         response.headers.contains(HttpHeaders.CONTENT_TYPE)
         response.headers.contains(HttpHeaders.CONTENT_LENGTH)
         response.headers.contains(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN)
         response.headers.contains(HttpHeaders.VARY)
-        response.headers.contains(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS)
+        !response.headers.contains(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS)
         ['http://www.foo.com'] == response.headers.getAll(ACCESS_CONTROL_ALLOW_ORIGIN)
         ['Origin'] == response.headers.getAll(HttpHeaders.VARY)
-        [StringUtils.TRUE] == response.headers.getAll(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS)
     }
 
     @Property(name = "micronaut.server.cors.configurations.foo.allowed-origins", value = "http://www.foo.com")
@@ -190,19 +198,18 @@ class CorsFilterSpec extends Specification {
 
         then:
         HttpStatus.OK == response.status()
-        response.headers.names().size() == 7
+        response.headers.names().size() == 6
         response.headers.contains(HttpHeaders.CONTENT_LENGTH)
 
         response.headers.contains(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN)
         response.headers.contains(HttpHeaders.VARY)
-        response.headers.contains(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS)
+        !response.headers.contains(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS)
         response.headers.contains(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS)
         response.headers.contains(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS)
         response.headers.contains(HttpHeaders.ACCESS_CONTROL_MAX_AGE)
 
         ['http://www.foo.com'] == response.headers.getAll(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN)
         ['Origin'] == response.headers.getAll(HttpHeaders.VARY)
-        [StringUtils.TRUE] == response.headers.getAll(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS)
         ['GET']  == response.headers.getAll(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS)
         ['foo']  == response.headers.getAll(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS)
         ['1800']  == response.headers.getAll(HttpHeaders.ACCESS_CONTROL_MAX_AGE)
@@ -238,12 +245,12 @@ class CorsFilterSpec extends Specification {
 
         then:
         response.status() == HttpStatus.OK
-        7 == response.headers.names().size()
+        6 == response.headers.names().size()
         response.headers.contains(HttpHeaders.CONTENT_LENGTH)
         response.getHeaders().get(ACCESS_CONTROL_ALLOW_ORIGIN) == 'http://www.foo.com' // The origin is echo'd
         response.getHeaders().get(VARY) == 'Origin' // The vary header is set
         response.getHeaders().getAll(ACCESS_CONTROL_EXPOSE_HEADERS) == ['Foo-Header', 'Bar-Header' ]// Expose headers are set from config
-        response.getHeaders().get(ACCESS_CONTROL_ALLOW_CREDENTIALS) == 'true' // Allow credentials header is set
+        !response.getHeaders().contains(ACCESS_CONTROL_ALLOW_CREDENTIALS) // Allow credentials header is not set by default
         response.getHeaders().get(ACCESS_CONTROL_MAX_AGE) == '1800'
     }
 
@@ -262,13 +269,13 @@ class CorsFilterSpec extends Specification {
 
         then:
         HttpStatus.OK == response.status()
-        response.headers.names().size() == 8
+        response.headers.names().size() == 7
         response.getHeaders().contains(HttpHeaders.CONTENT_LENGTH)
         response.getHeaders().get(ACCESS_CONTROL_ALLOW_METHODS) == 'GET'
         response.getHeaders().get(ACCESS_CONTROL_ALLOW_ORIGIN) == 'http://www.foo.com' // The origin is echo'd
         response.getHeaders().get(VARY) == 'Origin' // The vary header is set
         response.getHeaders().getAll(ACCESS_CONTROL_EXPOSE_HEADERS) == ['Foo-Header', 'Bar-Header'] // Expose headers are set from config
-        response.getHeaders().get(ACCESS_CONTROL_ALLOW_CREDENTIALS) == 'true' // Allow credentials header is set
+        !response.getHeaders().contains(ACCESS_CONTROL_ALLOW_CREDENTIALS) // Allow credentials header is not set by default
         response.getHeaders().getAll(ACCESS_CONTROL_ALLOW_HEADERS) == ['X-Header', 'Y-Header'] // Allow headers are echo'd from the request
         response.getHeaders().get(ACCESS_CONTROL_MAX_AGE) == '1800' // Max age is set from config
     }
@@ -294,7 +301,7 @@ class CorsFilterSpec extends Specification {
         response.getHeaders().get(ACCESS_CONTROL_ALLOW_ORIGIN) == 'http://www.foo.com' // The origin is echo'd
         response.getHeaders().get(VARY) == 'Origin' // The vary header is set
         response.getHeaders().get(ACCESS_CONTROL_EXPOSE_HEADERS) == 'Foo-Header,Bar-Header' // Expose headers are set from config
-        response.getHeaders().get(ACCESS_CONTROL_ALLOW_CREDENTIALS) == 'true' // Allow credentials header is set
+        !response.getHeaders().contains(ACCESS_CONTROL_ALLOW_CREDENTIALS) // Allow credentials header is not set by default
         response.getHeaders().get(ACCESS_CONTROL_ALLOW_HEADERS) == 'X-Header,Y-Header' // Allow headers are echo'd from the request
         response.getHeaders().get(ACCESS_CONTROL_MAX_AGE) == '1800' // Max age is set from config
     }
