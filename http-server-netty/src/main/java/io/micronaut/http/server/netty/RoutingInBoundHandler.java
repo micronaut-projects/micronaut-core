@@ -138,11 +138,9 @@ public final class RoutingInBoundHandler implements RequestHandler {
             try {
                 if (!terminateEventPublisher.isEmpty()) {
                     terminatedFlow = ExecutionFlow.async(getRequestEventExecutor(), () -> {
-                        try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty()
+                        PropagatedContext.getOrEmpty()
                             .plus(new ServerHttpRequestContext(request))
-                            .propagate()) {
-                            terminateEventPublisher.publishEvent(new HttpRequestTerminatedEvent(request));
-                        }
+                            .propagate(() -> terminateEventPublisher.publishEvent(new HttpRequestTerminatedEvent(request)));
                         return ExecutionFlow.empty();
                     });
                 }
@@ -220,11 +218,9 @@ public final class RoutingInBoundHandler implements RequestHandler {
             if (throwable != null) {
                 handleException(ctx, outboundAccess, mnRequest, throwable);
             } else {
-                executeOnEventLoopIfNeeded(ctx, () -> {
-                    try (PropagatedContext.Scope propagated = PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(mnRequest)).propagate()) {
-                        new NettyRequestLifecycle(this, outboundAccess).handleNormal(mnRequest);
-                    }
-                });
+                executeOnEventLoopIfNeeded(ctx, () ->
+                    PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(mnRequest))
+                        .propagate(() -> new NettyRequestLifecycle(this, outboundAccess).handleNormal(mnRequest)));
             }
         });
     }
@@ -258,11 +254,9 @@ public final class RoutingInBoundHandler implements RequestHandler {
             return ExecutionFlow.empty();
         }
         return ExecutionFlow.async(getRequestEventExecutor(), () -> {
-            try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty()
+            PropagatedContext.getOrEmpty()
                 .plus(new ServerHttpRequestContext(request))
-                                .propagate()) {
-                receivedPublisher.publishEvent(new HttpRequestReceivedEvent(request));
-            }
+                .propagate(() -> receivedPublisher.publishEvent(new HttpRequestReceivedEvent(request)));
             return ExecutionFlow.empty();
         });
     }
