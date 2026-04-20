@@ -23,9 +23,9 @@ import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.TypeHint;
+import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.core.io.socket.SocketUtils;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.context.event.HttpRequestReceivedEvent;
 import io.micronaut.http.context.event.HttpRequestTerminatedEvent;
@@ -108,6 +108,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -189,10 +190,14 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             nettyEmbeddedServices.getExecutorSelector()
                 .select(TaskExecutors.BLOCKING).orElse(null)
         );
+        final Supplier<Executor> requestEventExecutor = SupplierUtil.memoized(() ->
+            nettyEmbeddedServices.getExecutorSelector().selectExecutor(null, serverConfiguration)
+        );
         this.routingHandler = new RoutingInBoundHandler(
             serverConfiguration,
             nettyEmbeddedServices,
             ioExecutor,
+            requestEventExecutor,
             httpRequestTerminatedEventPublisher,
             httpRequestReceivedEventPublisher,
             applicationContext.getConversionService()

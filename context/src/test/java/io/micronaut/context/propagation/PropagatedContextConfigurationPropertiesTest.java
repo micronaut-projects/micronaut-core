@@ -21,8 +21,8 @@ class PropagatedContextConfigurationPropertiesTest {
     void usesDefaultWhenNoPropertySet() {
         try (ApplicationContext context = ApplicationContext.run()) {
             PropagatedContextConfigurationProperties properties = context.getBean(PropagatedContextConfigurationProperties.class);
-            assertEquals(Mode.SCOPED_VALUE, properties.getPropagation());
-            assertEquals(Mode.SCOPED_VALUE, PropagatedContextConfiguration.get());
+            assertEquals(Mode.THREAD_LOCAL, properties.getPropagation());
+            assertEquals(Mode.THREAD_LOCAL, PropagatedContextConfiguration.get());
         }
     }
 

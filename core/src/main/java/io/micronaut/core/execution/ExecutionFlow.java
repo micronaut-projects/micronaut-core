@@ -16,6 +16,7 @@
 package io.micronaut.core.execution;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.propagation.PropagatedContext;
 import org.jspecify.annotations.Nullable;
 
 import java.time.Duration;
@@ -84,8 +85,21 @@ public interface ExecutionFlow<T> {
      * @return a new flow
      */
     static <T> ExecutionFlow<T> async(Executor executor, Supplier<? extends ExecutionFlow<T>> supplier) {
+        if (executor instanceof ConditionalExecutionExecutor conditionalExecutionExecutor && conditionalExecutionExecutor.canExecuteImmediately()) {
+            try {
+                return supplier.get();
+            } catch (Throwable e) {
+                return ExecutionFlow.error(e);
+            }
+        }
         DelayedExecutionFlow<T> completableFuture = DelayedExecutionFlow.create();
-        executor.execute(() -> supplier.get().onComplete(completableFuture::complete));
+        executor.execute(PropagatedContext.wrapCurrent(() -> {
+            try {
+                supplier.get().onComplete(completableFuture::complete);
+            } catch (Throwable e) {
+                completableFuture.completeExceptionally(e);
+            }
+        }));
         return completableFuture;
     }
 
@@ -150,7 +164,7 @@ public interface ExecutionFlow<T> {
      *
      * @param fn The function
      */
-    void onComplete(BiConsumer<? super T, Throwable> fn);
+    void onComplete(BiConsumer<? super T, @Nullable Throwable> fn);
 
     /**
      * Completes the flow to the completable future.
@@ -170,7 +184,7 @@ public interface ExecutionFlow<T> {
      *                  completes after the timeout has expired and thus the value is discarded
      * @return A new flow that will produce either the same value or a {@link java.util.concurrent.TimeoutException}
      */
-    default ExecutionFlow<T> timeout(Duration timeout, ScheduledExecutorService scheduler, @Nullable BiConsumer<T, Throwable> onDiscard) {
+    default ExecutionFlow<T> timeout(Duration timeout, ScheduledExecutorService scheduler, @Nullable BiConsumer<T, @Nullable Throwable> onDiscard) {
         DelayedExecutionFlow<T> delayed = DelayedExecutionFlow.create();
         AtomicBoolean completed = new AtomicBoolean(false);
         // schedule the timeout
@@ -278,4 +292,3 @@ public interface ExecutionFlow<T> {
         cancel();
     }
 }
-

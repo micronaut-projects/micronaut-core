@@ -17,8 +17,8 @@ package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.beans.BeanIntrospector;
+import io.micronaut.core.execution.ImmediateExecutor;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArrayUtils;
@@ -34,10 +34,13 @@ import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.sse.Event;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.scheduling.executor.ThreadSelection;
+import io.micronaut.scheduling.executor.ThreadSelectionConfiguration;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 
 /**
@@ -340,6 +343,11 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     @Override
     public @Nullable ExecutorService getExecutor(@Nullable ThreadSelection threadSelection) {
         return null;
+    }
+
+    @Override
+    public Executor getExecutor(ThreadSelectionConfiguration configuration) {
+        return ImmediateExecutor.INSTANCE;
     }
 
     @Override

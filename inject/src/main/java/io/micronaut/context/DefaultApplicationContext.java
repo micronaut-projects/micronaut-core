@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.EachProperty;
+import io.micronaut.context.env.BootstrapLocatorMarker;
 import io.micronaut.context.env.BootstrapPropertySourceLocator;
 import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.context.env.ConfigurationPath;
@@ -742,11 +743,11 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
         defaultMutableConversionService.registerInternalTypeConverters(getBeansOfType(TypeConverterRegistrar.class));
     }
 
-    private static final class BootstrapPropertySourcesLocator implements PropertySourcesLocator, Closeable {
+    private static final class BootstrapPropertySourcesLocator implements PropertySourcesLocator, Closeable, BootstrapLocatorMarker {
 
         private final ApplicationContextConfiguration bootstrapConfiguration;
         private final ApplicationContext parentContext;
-        private @Nullable ApplicationContext bootstrapContext;
+        private final List<ApplicationContext> bootstrapContexts = new ArrayList<>();
 
         private BootstrapPropertySourcesLocator(ApplicationContextConfiguration bootstrapConfiguration, ApplicationContext parentContext) {
             this.bootstrapConfiguration = bootstrapConfiguration;
@@ -755,46 +756,44 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
 
         @Override
         public Collection<PropertySource> load(Environment environment) {
-            if (bootstrapContext == null) {
-                LOG.info("Reading bootstrap environment configuration");
+            List<PropertySource> bootstrapPropertySources = new ArrayList<>();
 
-                bootstrapContext = new DefaultApplicationContext(bootstrapConfiguration);
-                for (PropertySource propertySource : environment.getPropertySources()) {
-                    if (PropertySource.CONTEXT.equals(propertySource.getName())) {
-                        bootstrapContext.getEnvironment().addPropertySource(propertySource);
-                    }
-                }
+            LOG.info("Reading bootstrap environment configuration");
 
-                bootstrapContext.registerSingleton(BootstrapContextAccess.class, () -> parentContext, null, false);
-                bootstrapContext.start();
-
-                BootstrapPropertySourceLocator bootstrapPropertySourceLocator;
-                if (bootstrapContext.containsBean(BootstrapPropertySourceLocator.class)) {
-                    bootstrapPropertySourceLocator = bootstrapContext.getBean(BootstrapPropertySourceLocator.class);
-                } else {
-                    bootstrapPropertySourceLocator = BootstrapPropertySourceLocator.EMPTY_LOCATOR;
+            // We have to always recreate the bootstrap context
+            ApplicationContext bootstrapContext = new DefaultApplicationContext(bootstrapConfiguration);
+            bootstrapContexts.add(bootstrapContext);
+            for (PropertySource propertySource : environment.getPropertySources()) {
+                if (PropertySource.CONTEXT.equals(propertySource.getName())) {
+                    bootstrapContext.getEnvironment().addPropertySource(propertySource);
                 }
-
-                List<PropertySource> bootstrapPropertySources = new ArrayList<>();
-                for (PropertySource propertySource : bootstrapPropertySourceLocator.findPropertySources(bootstrapContext.getEnvironment())) {
-                    bootstrapPropertySources.add(propertySource);
-                }
-                for (PropertySource propertySource : bootstrapContext.getEnvironment().getPropertySources()) {
-                    // Lower priority than bootstrap property sources
-                    bootstrapPropertySources.add(new BootstrapPropertySource(propertySource));
-                }
-                return bootstrapPropertySources;
             }
-            return List.of();
+
+            bootstrapContext.registerSingleton(BootstrapContextAccess.class, () -> parentContext, null, false);
+            bootstrapContext.start();
+            BootstrapPropertySourceLocator bootstrapPropertySourceLocator;
+            if (bootstrapContext.containsBean(BootstrapPropertySourceLocator.class)) {
+                bootstrapPropertySourceLocator = bootstrapContext.getBean(BootstrapPropertySourceLocator.class);
+            } else {
+                bootstrapPropertySourceLocator = BootstrapPropertySourceLocator.EMPTY_LOCATOR;
+            }
+            for (PropertySource propertySource : bootstrapPropertySourceLocator.findPropertySources(bootstrapContext.getEnvironment())) {
+                bootstrapPropertySources.add(propertySource);
+            }
+            for (PropertySource propertySource : bootstrapContext.getEnvironment().getPropertySources()) {
+                // Lower priority than bootstrap property sources
+                bootstrapPropertySources.add(new BootstrapPropertySource(propertySource));
+            }
+            return bootstrapPropertySources;
         }
 
         @Override
         public void close() {
-            if (bootstrapContext != null) {
+            for (ApplicationContext bootstrapContext : bootstrapContexts) {
                 bootstrapContext.close();
             }
+            bootstrapContexts.clear();
         }
-
     }
 
     /**

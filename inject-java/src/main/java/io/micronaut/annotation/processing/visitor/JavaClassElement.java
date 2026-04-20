@@ -505,7 +505,7 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
              try {
                  String docComment = visitorContext.getElements().getDocComment(getNativeType().element());
                  if (docComment != null) {
-                     Javadoc javadoc = StaticJavaParser.parseJavadoc(docComment);
+                     Javadoc javadoc = StaticJavaParser.parseJavadoc(docComment, false);
                      for (JavadocBlockTag t : javadoc.getBlockTags()) {
                          if (t.getType() == JavadocBlockTag.Type.PARAM && t.getName().map(n -> n.equals(value.propertyName)).orElse(false)) {
                              return t.getContent().toText();

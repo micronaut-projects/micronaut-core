@@ -21,6 +21,12 @@ import org.jspecify.annotations.Nullable;
 import java.util.concurrent.Callable;
 import java.util.function.Supplier;
 
+/**
+ * Internal utilities that bridge {@link PropagatedContext} to JDK {@link ScopedValue} bindings.
+ *
+ * @author Denis Stepanov
+ * @since 5.0.0
+ */
 @Internal
 final class ScopedValues {
 
@@ -35,15 +41,36 @@ final class ScopedValues {
     }
 
     static <T> T propagate(PropagatedContext propagatedContext, Supplier<T> supplier) {
-        return ScopedValue.where(PROPAGATED_CONTEXT, propagatedContext).call(supplier::get);
+        ScopedValue.Carrier carrier = prepareCarrier(propagatedContext);
+        return carrier.call(supplier::get);
     }
 
     static <T> T propagate(PropagatedContext propagatedContext, Callable<T> callable) throws Exception {
-        return ScopedValue.where(PROPAGATED_CONTEXT, propagatedContext).call(callable::call);
+        ScopedValue.Carrier carrier = prepareCarrier(propagatedContext);
+        return carrier.call(callable::call);
     }
 
     static void propagate(PropagatedContext propagatedContext, Runnable runnable) {
-        ScopedValue.where(PROPAGATED_CONTEXT, propagatedContext).run(runnable);
+        ScopedValue.Carrier carrier = prepareCarrier(propagatedContext);
+        carrier.run(runnable);
+    }
+
+    private static ScopedValue.Carrier prepareCarrier(PropagatedContext propagatedContext) {
+        ScopedValue.Carrier carrier = ScopedValue.where(PROPAGATED_CONTEXT, propagatedContext);
+        if (propagatedContext instanceof PropagatedContextImpl contextImpl && contextImpl.containsScopedValueElements) {
+            for (PropagatedContextElement element : contextImpl.elements) {
+                if (element instanceof ScopedValuePropagatedContextElement<?> scopedValueElement) {
+                    carrier = bindScopedValue(carrier, scopedValueElement);
+                }
+            }
+        }
+        return carrier;
+    }
+
+    private static <T> ScopedValue.Carrier bindScopedValue(ScopedValue.Carrier carrier, ScopedValuePropagatedContextElement<T> element) {
+        ScopedValue<T> scopedValue = element.scopedValue();
+        T value = element.scopedValueValue();
+        return carrier.where(scopedValue, value);
     }
 
 }

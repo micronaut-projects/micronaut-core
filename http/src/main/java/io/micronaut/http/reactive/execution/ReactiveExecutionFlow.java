@@ -73,9 +73,11 @@ public sealed interface ReactiveExecutionFlow<T> extends ExecutionFlow<T> permit
      * @return a new flow
      */
     static <K> ReactiveExecutionFlow<K> async(Executor executor, Supplier<ExecutionFlow<K>> supplier) {
-        Scheduler scheduler = Schedulers.fromExecutor(executor);
+        PropagatedContext ctx = PropagatedContext.getOrEmpty();
+        Scheduler scheduler = Schedulers.fromExecutor(r -> executor.execute(ctx.wrap(r)));
         return (ReactiveExecutionFlow<K>) new ReactorExecutionFlowImpl(
-            Mono.fromSupplier(supplier).flatMap(ReactorExecutionFlowImpl::toMono).subscribeOn(scheduler)
+            Mono.fromSupplier(supplier).flatMap(ReactorExecutionFlowImpl::toMono)
+                .subscribeOn(scheduler)
         );
     }
 

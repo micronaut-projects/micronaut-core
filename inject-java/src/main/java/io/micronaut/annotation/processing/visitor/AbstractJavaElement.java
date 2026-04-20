@@ -158,7 +158,7 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement impl
             return Optional.empty();
         }
         if (parse) {
-            Javadoc jd = StaticJavaParser.parseJavadoc(doc);
+            Javadoc jd = StaticJavaParser.parseJavadoc(doc, false);
             List<JavadocDescriptionElement> elements = jd.getDescription().getElements();
             if (!elements.isEmpty()) {
                 // String any @param or @return etc

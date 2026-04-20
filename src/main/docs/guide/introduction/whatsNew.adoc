@@ -1,0 +1,39 @@
+Micronaut Framework 5.0.x continues the work started in the first 5.0 milestones and adds a number of improvements across the core container, HTTP stack, configuration system, and developer-facing APIs.
+
+This page is a curated overview of the most important additions on the `5.0.x` line. For upgrade guidance, see <<upgrading, Upgrading your Micronaut Application>>, and for incompatible changes, review <<breaks, Breaking Changes>>.
+
+=== Core Themes in Micronaut Framework 5.0.x
+
+Micronaut Framework 5 modernizes the core platform with newer JVM and language support, including a new JDK 25 baseline, an Apache Groovy 5 baseline, a Kotlin 2.3 baseline, broader support for current JDK capabilities, and deeper investment in compile-time metadata. See also <<breaks, Breaking Changes>> for version-specific migration notes.
+
+The framework APIs now embrace <<nullabilityAnnotations, nullability annotations>> and specifically <<jspecify, JSpecify nullability annotations>>, with `@NullMarked` adoption across the codebase and stronger static analysis integration. The result is clearer API contracts, improved Kotlin interoperability, and better IDE feedback.
+
+The IoC container and compile-time infrastructure also received substantial work in the 5.0 branch. Bean resolution, qualifier handling, replacement metadata, eager initialization, and runtime annotation processing were refined to reduce runtime work and improve predictability.
+
+=== Container, AOP, and Runtime Improvements
+
+The bean context was reworked in several areas during the 5.0 development cycle, including precomputed bean indexes, compile-time `@Replaces` handling, and broader bean context optimizations. Together, these changes continue Micronaut's focus on startup performance and low runtime overhead.
+
+Micronaut 5 also added support for creating AOP proxies at runtime when build-time proxy generation is not the right fit. This enables integrations such as Byte Buddy-based proxies, JDK dynamic proxies for interfaces, and test-oriented proxy scenarios such as mocks and spies. For background on Micronaut's AOP model, see <<aop, Aspect Oriented Programming>>.
+
+Recent 5.0.x work also improved interoperability with Jakarta APIs by adding support for `jakarta.annotation.Priority`, mapping it to Micronaut ordering semantics for beans and HTTP filters. Related ordering documentation can be found in <<types, Injectable Container Types>> and <<order, Filter Order>>.
+
+=== HTTP, Configuration, and Metadata
+
+On the HTTP side, HTTP/3 support on the Netty stack was promoted to stable. See <<http3Server, HTTP/3 Support>> and <<clientHttp3, HTTP/3 in Clients>>. The 5.0 line also includes a multipart/form handling refactor that introduces a lower-level, more server-independent form API and improves resource management in higher-level binders. See <<form, Forms>>, <<formCapable, Detailed Form API>>, and <<uploads, File Uploads>>.
+
+Configuration support expanded significantly in 5.0.x. Micronaut now supports config imports and a `PropertySourceImporter` SPI, enabling configuration loading from sources such as files, classpath locations, environment variables, config trees, and custom importer implementations. See <<configImport, Importing Additional Configuration>>, <<customPropertySourceImporter, Implementing a Custom PropertySourceImporter>>, and <<propertySource, Externalized Configuration with PropertySources>>.
+
+Configuration metadata also became more useful for tooling. Micronaut 5 can generate JSON Schema documents from `@ConfigurationProperties`, making it easier to drive IDE completion, validation, and external tooling from the same configuration model used by the framework. For the underlying configuration model, see <<configurationProperties, Configuration Properties>>.
+
+The JSON and serialization stack was updated as well, with work across `JsonMapper`, the update to Jackson 3, and additional configuration coverage so applications can adopt the newer JSON infrastructure more smoothly.
+
+=== Resilience and Context Propagation
+
+Micronaut Retry gained programmatic retry and circuit breaker APIs in addition to the existing annotation-driven model documented in <<retry, Retry Advice>>. This makes it possible to define typed retry and circuit breaker policies in code and reuse them for synchronous, reactive, and asynchronous flows.
+
+The 5.0.x line also expanded context propagation capabilities, including support for scoped values and continued alignment with modern JDK context propagation patterns. See <<contextPropagation, Context Propagation>>.
+
+=== Summary
+
+For teams adopting Micronaut Framework 5.0.x, the biggest benefits are stronger null-safety, more flexible AOP and retry models, better HTTP and multipart capabilities, richer configuration tooling, and continued improvements to the container's compile-time-first runtime model.

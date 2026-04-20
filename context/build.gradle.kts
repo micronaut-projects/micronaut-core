@@ -9,6 +9,7 @@ dependencies {
     api(projects.micronautAop)
 
     compileOnly(projects.micronautCoreReactive)
+    compileOnly(libs.managed.reactor)
     compileOnly(libs.log4j)
     compileOnly(libs.logback.classic)
 

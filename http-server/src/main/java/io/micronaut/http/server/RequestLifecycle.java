@@ -18,7 +18,6 @@ package io.micronaut.http.server;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.propagation.PropagatedContext;
@@ -55,6 +54,7 @@ import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.UriRouteMatch;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,7 +67,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executor;
 import java.util.function.BiFunction;
 import java.util.function.Supplier;
 
@@ -325,13 +325,10 @@ public class RequestLifecycle {
                 return createDefaultErrorResponseFlow(request, e, propagatedContext);
             }
         };
-        ExecutionFlow<HttpResponse<?>> responseFlow;
-        final ExecutorService executor = routeExecutor.findExecutor(routeInfo);
-        if (executor != null) {
-            responseFlow = ExecutionFlow.async(executor, responseSupplier);
-        } else {
-            responseFlow = responseSupplier.get();
-        }
+        final Executor executor = routeExecutor.findExecutor(routeInfo);
+        final ExecutionFlow<HttpResponse<?>> responseFlow = executor == null
+            ? responseSupplier.get()
+            : ExecutionFlow.async(executor, responseSupplier);
         return responseFlow
             .<HttpResponse<?>>map(response -> {
                 RouteAttributes.setException(response, cause);
@@ -678,5 +675,3 @@ public class RequestLifecycle {
                 .orElse(null);
     }
 }
-
-

@@ -32,7 +32,7 @@ public final class PropagatedContextConfigurationProperties {
 
     public static final String PREFIX = "micronaut";
 
-    private PropagatedContextConfiguration.Mode propagation = PropagatedContextConfiguration.Mode.SCOPED_VALUE;
+    private PropagatedContextConfiguration.Mode propagation = PropagatedContextConfiguration.Mode.THREAD_LOCAL;
 
     public PropagatedContextConfiguration.Mode getPropagation() {
         return propagation;

@@ -16,6 +16,7 @@
 package io.micronaut.core.execution;
 
 import io.micronaut.core.annotation.Internal;
+
 import java.util.concurrent.CompletionStage;
 
 /**
