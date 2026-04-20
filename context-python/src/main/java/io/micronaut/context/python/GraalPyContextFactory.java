@@ -35,6 +35,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.Map;
 
 import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
 
@@ -96,7 +97,29 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
         }
     }
 
+    public static @NonNull Context bootstrapReusableContext(@NonNull ClassLoader classLoader) throws IOException {
+        return bootstrapReusableContext(classLoader, Map.of());
+    }
+
+    public static @NonNull Context bootstrapReusableContext(@NonNull ClassLoader classLoader,
+                                                            @NonNull Map<String, String> options) throws IOException {
+        if (ContextHolder.isInitialized() && ContextHolder.isReuseContext()) {
+            return ContextHolder.getContext();
+        }
+        var context = buildContext(HostAccess.ALL, Engine.create(), classLoader, options);
+        ContextHolder.setReuseContext(true);
+        ContextHolder.setContext(context);
+        return context;
+    }
+
     static @NonNull Context buildContext(HostAccess hostAccess, Engine engine, ClassLoader classLoader) throws IOException {
+        return buildContext(hostAccess, engine, classLoader, Map.of());
+    }
+
+    private static @NonNull Context buildContext(HostAccess hostAccess,
+                                                 Engine engine,
+                                                 ClassLoader classLoader,
+                                                 Map<String, String> options) throws IOException {
         var beacon = findBeacon(classLoader);
         System.setProperty("org.graalvm.python.vfs.allow_multiple", "true");
         System.setProperty("org.graalvm.python.vfs.multiple_vfs_checks_as_warning", "true");
@@ -116,6 +139,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
         if (pyEnv != null && venv != null && pyEnv.startsWith("graalpy")) {
             builder.option("python.Executable", Path.of(venv).resolve("bin/python").toString());
         }
+        options.forEach(builder::option);
 
         var context = builder.build();
         context.initialize(PYTHON);
