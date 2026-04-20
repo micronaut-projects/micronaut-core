@@ -92,6 +92,15 @@ class DefaultConversionServiceSpec extends Specification {
         targetType << [File, Date, Integer, BigInteger, Float, Double, Long, Short, Byte, BigDecimal, URL, URI, Locale, UUID, Currency, TimeZone, Charset, Status]
     }
 
+    void "test locale conversion with invalid characters does not throw IllegalArgumentException"() {
+        given:
+        ConversionService conversionService = new DefaultMutableConversionService()
+
+        expect: "invalid locale input returns empty instead of throwing"
+        !conversionService.convert("\u05EB", Locale).isPresent()
+        !conversionService.convert("not valid!", Locale).isPresent()
+    }
+
     void "test convert required"() {
         given:
         ConversionService conversionService = new DefaultMutableConversionService()
