@@ -16,7 +16,6 @@ dependencies {
     testImplementation(projects.micronautJacksonDatabind)
     testImplementation(projects.micronautHttpServerNetty)
     testImplementation(libs.bcpkix)
-    testImplementation(libs.bcprov)
     testImplementation(libs.testcontainers.spock)
 }
 

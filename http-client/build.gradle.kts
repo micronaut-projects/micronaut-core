@@ -47,7 +47,6 @@ dependencies {
     testImplementation(libs.wiremock)
     testImplementation(libs.logback.classic)
     testImplementation(libs.bcpkix)
-    testImplementation(libs.bcprov)
     testImplementation(libs.junit.jupiter.params)
     testImplementation(libs.awaitility)
     testImplementation(libs.managed.reactor.test)
