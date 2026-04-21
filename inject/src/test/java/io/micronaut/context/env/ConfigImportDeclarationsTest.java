@@ -145,4 +145,33 @@ class ConfigImportDeclarationsTest {
 
         assertEquals(Collections.emptyList(), parsed.imports());
     }
+
+    @Test
+    void normalizesImportCapableNonMapPropertySource() {
+        PropertySource source = new ImportCapablePropertySource() {
+            private final Map<String, Object> values = Map.of(
+                "micronaut.config.import", "file://foo/one.properties",
+                "app.name", "demo"
+            );
+
+            @Override
+            public String getName() {
+                return "test resources";
+            }
+
+            @Override
+            public Object get(String key) {
+                return values.get(key);
+            }
+
+            @Override
+            public Iterator<String> iterator() {
+                return values.keySet().iterator();
+            }
+        };
+
+        ConfigImportPropertySourcesLocator.ResolvedImportDeclarations parsed = locator.normalize(source);
+
+        assertEquals(1, parsed.imports().size());
+    }
 }

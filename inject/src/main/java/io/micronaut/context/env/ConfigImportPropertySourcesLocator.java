@@ -202,7 +202,7 @@ public final class ConfigImportPropertySourcesLocator implements PropertySources
     }
 
     ResolvedImportDeclarations normalize(PropertySource propertySource) {
-        if (!(propertySource instanceof MapPropertySource)) {
+        if (!(propertySource instanceof ImportCapablePropertySource)) {
             return new ResolvedImportDeclarations(propertySource, List.of());
         }
 
