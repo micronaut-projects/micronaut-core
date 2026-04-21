@@ -187,8 +187,6 @@ awaitility = { module = "org.awaitility:awaitility", version.ref = "awaitility" 
 aws-java-sdk-lambda = { module = "com.amazonaws:aws-java-sdk-lambda" }
 
 bcpkix = { module = "org.bouncycastle:bcpkix-jdk18on", version.ref = "bcpkix" }
-bcprov = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bcpkix" }
-bcutil = { module = "org.bouncycastle:bcutil-jdk18on", version.ref = "bcpkix" }
 
 blaze-persistence-core = { module = "com.blazebit:blaze-persistence-core-impl", version.ref = "blaze" }
 

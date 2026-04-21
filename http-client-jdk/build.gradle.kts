@@ -17,7 +17,6 @@ dependencies {
     testImplementation(projects.micronautHttpServerNetty)
     testImplementation(libs.bcpkix)
     testImplementation(libs.bcprov)
-    testImplementation(libs.bcutil)
     testImplementation(libs.testcontainers.spock)
 }
 

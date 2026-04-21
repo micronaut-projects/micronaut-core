@@ -95,7 +95,6 @@ dependencies {
     testImplementation(libs.logback.classic)
     testImplementation(libs.bcpkix)
     testImplementation(libs.bcprov)
-    testImplementation(libs.bcutil)
 
     testImplementation(libs.managed.reactor)
 
