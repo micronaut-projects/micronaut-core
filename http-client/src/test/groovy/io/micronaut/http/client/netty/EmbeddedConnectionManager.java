@@ -22,7 +22,7 @@ final class EmbeddedConnectionManager extends ConnectionManager {
     }
 
     @Override
-    ChannelFuture doConnect(DefaultHttpClient.RequestKey requestKey, CustomizerAwareInitializer channelInitializer, @NonNull EventLoopGroup eventLoop) {
+    ChannelFuture doConnect(NettyHttpClient.RequestKey requestKey, CustomizerAwareInitializer channelInitializer, @NonNull EventLoopGroup eventLoop) {
         try {
             channelInitializer.bootstrappedCustomizer = clientCustomizer;
             int index = i++;
@@ -37,7 +37,7 @@ final class EmbeddedConnectionManager extends ConnectionManager {
     }
 
     @Override
-    PoolHolder createPool(DefaultHttpClient.RequestKey requestKey, Iterable<? extends EventExecutor> group) {
+    PoolHolder createPool(NettyHttpClient.RequestKey requestKey, Iterable<? extends EventExecutor> group) {
         PoolHolder pool = super.createPool(requestKey, channels.stream().map(EmbeddedChannel::eventLoop).toList());
         AtomicInteger j = new AtomicInteger();
         ((Pool49) pool.pool).pickPreferredPoolOverride = l -> l.get((j.getAndIncrement()) % l.size());

@@ -50,6 +50,14 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
     BlockingHttpClient toBlocking();
 
     /**
+     * @return An {@link AsyncHttpClient} backed by this reactive client.
+     * @since 5.0
+     */
+    default AsyncHttpClient toAsync() {
+        return new DefaultAsyncOverReactiveHttpClient(this);
+    }
+
+    /**
      * <p>Perform an HTTP request for the given request object emitting the full HTTP response from returned
      * {@link Publisher} and converting the response body to the specified type.</p>
      *

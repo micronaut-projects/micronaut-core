@@ -555,10 +555,10 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     @Override
     public void onApplicationEvent(RefreshEvent event) {
         for (DefaultHttpClient client : unbalancedClients.values()) {
-            client.connectionManager.refresh();
+            client.connectionManager().refresh();
         }
         for (DefaultHttpClient client : balancedClients) {
-            client.connectionManager.refresh();
+            client.connectionManager().refresh();
         }
     }
 

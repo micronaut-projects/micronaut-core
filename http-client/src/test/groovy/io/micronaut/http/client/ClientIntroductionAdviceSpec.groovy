@@ -22,6 +22,11 @@ import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Specification
 
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CompletionException
+import java.util.concurrent.CompletionStage
+import java.util.function.Function
+
 import static io.micronaut.http.client.annotation.Client.DefinitionType.SERVER
 
 class ClientIntroductionAdviceSpec extends Specification {
@@ -169,6 +174,105 @@ class ClientIntroductionAdviceSpec extends Specification {
         inverseClient.post(myObject) == "success"
     }
 
+    void "async client stacktrace does not include reactive types"() {
+        given:
+        AsyncClient client = server.applicationContext.getBean(AsyncClient)
+
+        when:
+        client.fail()
+            .thenApply(Function.identity())
+            .toCompletableFuture()
+            .join()
+
+        then:
+        def e = thrown(CompletionException)
+        assert stackTraceHasNoReactiveClasses(e)
+    }
+
+    void "async client thenApply exception preserves clean stacktrace"() {
+        given:
+        AsyncClient client = server.applicationContext.getBean(AsyncClient)
+
+        when:
+        client.ok()
+            .thenApply({ throw new IllegalStateException("boom") } as Function<String, String>)
+            .toCompletableFuture()
+            .join()
+
+        then:
+        def e = thrown(CompletionException)
+        assert e.cause instanceof IllegalStateException
+        assert stackTraceHasNoReactiveClasses(e)
+    }
+
+    void "async client success response is available via thenApply"() {
+        given:
+        AsyncClient client = server.applicationContext.getBean(AsyncClient)
+
+        expect:
+        client.ok()
+            .thenApply({ it + "!" } as Function<String, String>)
+            .toCompletableFuture()
+            .join() == "async-ok!"
+    }
+
+    void "async client handles controller async success"() {
+        given:
+        AsyncClient client = server.applicationContext.getBean(AsyncClient)
+
+        expect:
+        client.okAsync()
+            .thenApply({ it + "?" } as Function<String, String>)
+            .toCompletableFuture()
+            .join() == "async-ok?"
+    }
+
+    void "async client handles controller async failure stacktrace clean"() {
+        given:
+        AsyncClient client = server.applicationContext.getBean(AsyncClient)
+
+        when:
+        client.failAsync().toCompletableFuture().join()
+
+        then:
+        def e = thrown(CompletionException)
+        assert e.cause instanceof HttpClientResponseException
+        assert stackTraceHasNoReactiveClasses(e)
+    }
+
+    void "async toAsync client retrieves successful response"() {
+        given:
+        HttpClient httpClient = server.applicationContext.createBean(HttpClient, server.getURL())
+        AsyncHttpClient async = httpClient.toAsync()
+
+        expect:
+        async.retrieve(HttpRequest.GET("/async/ok-async"), String.class)
+            .toCompletableFuture()
+            .join() == "async-ok"
+
+        cleanup:
+        httpClient.close()
+    }
+
+    void "async toAsync client failure preserves clean stacktrace"() {
+        given:
+        HttpClient httpClient = server.applicationContext.createBean(HttpClient, server.getURL())
+        AsyncHttpClient async = httpClient.toAsync()
+
+        when:
+        async.retrieve(HttpRequest.GET("/async/fail-async"), String.class)
+            .toCompletableFuture()
+            .join()
+
+        then:
+        def e = thrown(CompletionException)
+        assert e.cause instanceof HttpClientResponseException
+        assert stackTraceHasNoReactiveClasses(e)
+
+        cleanup:
+        httpClient.close()
+    }
+
     @Requires(property = 'spec.name', value = 'ClientIntroductionAdviceSpec')
     @Controller('/aop')
     static class AopController implements MyApi {
@@ -197,6 +301,58 @@ class ClientIntroductionAdviceSpec extends Specification {
             }
             return "<answer>success</answer>"
         }
+    }
+
+    @Requires(property = 'spec.name', value = 'ClientIntroductionAdviceSpec')
+    @Controller('/async')
+    static class AsyncController {
+
+        @Get("/fail")
+        HttpResponse<String> fail() {
+            return HttpResponse.badRequest("bad")
+        }
+
+        @Get("/ok-async")
+        CompletionStage<String> okAsync() {
+            return CompletableFuture.completedFuture("async-ok")
+        }
+
+        @Get("/fail-async")
+        CompletionStage<HttpResponse<String>> failAsync() {
+            return CompletableFuture.completedFuture(HttpResponse.badRequest("bad"))
+        }
+
+        @Get("/ok")
+        String ok() {
+            return "async-ok"
+        }
+    }
+
+    @Client('/async')
+    @Requires(property = 'spec.name', value = 'ClientIntroductionAdviceSpec')
+    static interface AsyncClient {
+
+        @Get("/fail")
+        CompletionStage<String> fail()
+
+        @Get("/ok")
+        CompletionStage<String> ok()
+
+        @Get("/ok-async")
+        CompletionStage<String> okAsync()
+
+        @Get("/fail-async")
+        CompletionStage<String> failAsync()
+    }
+
+    private static boolean stackTraceHasNoReactiveClasses(Throwable throwable) {
+        List<String> classNames = new ArrayList<>()
+        Throwable current = throwable
+        while (current != null) {
+            classNames.addAll(current.stackTrace*.className)
+            current = current.cause
+        }
+        classNames.every { !it.startsWith('reactor.') && !it.contains('Mono') && !it.contains('Flux') }
     }
 
     @Requires(property = 'spec.name', value = 'ClientIntroductionAdviceSpec')
