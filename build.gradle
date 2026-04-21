@@ -48,16 +48,3 @@ configurations.jacocoAggregation.dependencies.removeIf {
 configurations.javadocAggregatorBase.dependencies.removeIf {
     it instanceof ProjectDependency && it.path.startsWith(":test-")
 }
-
-configurations.configureEach {
-    resolutionStrategy.eachDependency {
-        if (requested.group == "org.apache.commons" && requested.name == "commons-lang3" && requested.version == "3.8.1") {
-            useVersion("3.18.0")
-            because("Sonatype scan flags commons-lang3:3.8.1 via CVE-2025-48924")
-        }
-        if (requested.group == "org.codehaus.plexus" && requested.name == "plexus-utils" && requested.version == "3.3.0") {
-            useVersion("4.0.2")
-            because("Sonatype scan flags plexus-utils:3.3.0 via CVE-2025-67030")
-        }
-    }
-}

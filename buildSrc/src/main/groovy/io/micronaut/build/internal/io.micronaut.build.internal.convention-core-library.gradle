@@ -10,8 +10,6 @@ if (sonatypePluginConfigured) {
     ossIndexAudit {
         username = ossIndexUsername
         password = ossIndexPassword
-        allConfigurations = true
-        outputFormat = "DEPENDENCY_GRAPH"
         excludeVulnerabilityIds = ["CVE-2025-24970"]
         // the vulnerability description says Netty 4.1.118 patches it. However, Netty 4.1.118 is still reported as vulnerable.
         // https://ossindex.sonatype.org/vulnerability/CVE-2025-24970?component-type=maven&component-name=io.netty/netty-handler
