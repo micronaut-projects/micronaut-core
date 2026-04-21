@@ -63,6 +63,8 @@ dependencies {
     testRuntimeOnly(platform(libs.test.boms.micronaut.aws))
     testRuntimeOnly(libs.aws.java.sdk.lambda)
     testImplementation(libs.bcpkix)
+    testImplementation(libs.bcprov)
+    testImplementation(libs.bcutil)
 
     testImplementation(libs.managed.reactor)
 
