@@ -202,6 +202,10 @@ public final class ConfigImportPropertySourcesLocator implements PropertySources
     }
 
     ResolvedImportDeclarations normalize(PropertySource propertySource) {
+        if (!(propertySource instanceof ImportCapablePropertySource)) {
+            return new ResolvedImportDeclarations(propertySource, List.of());
+        }
+
         Object rootValue = null;
         boolean hasRoot = false;
         TreeMap<Integer, Object> indexedValues = new TreeMap<>();
