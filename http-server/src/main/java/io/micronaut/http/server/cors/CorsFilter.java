@@ -16,7 +16,6 @@
 package io.micronaut.http.server.cors;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ImmutableArgumentConversionContext;
@@ -24,12 +23,7 @@ import io.micronaut.core.io.socket.SocketUtils;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.HttpHeaders;
-import io.micronaut.http.HttpMethod;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.*;
 import io.micronaut.http.annotation.RequestFilter;
 import io.micronaut.http.annotation.ResponseFilter;
 import io.micronaut.http.annotation.ServerFilter;
@@ -42,30 +36,17 @@ import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteMatch;
 import io.micronaut.web.router.resource.StaticResourceResolver;
 import jakarta.inject.Inject;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS;
-import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS;
-import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS;
-import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN;
-import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK;
-import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS;
-import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_MAX_AGE;
-import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS;
-import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD;
-import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_PRIVATE_NETWORK;
-import static io.micronaut.http.HttpHeaders.ORIGIN;
-import static io.micronaut.http.HttpHeaders.VARY;
+import static io.micronaut.http.HttpHeaders.*;
 import static io.micronaut.http.annotation.Filter.MATCH_ALL_PATTERN;
 
 /**
@@ -419,8 +400,7 @@ public class CorsFilter implements Ordered, ConditionalFilter {
     }
 
     private static boolean isAny(List<String> values) {
-        return values == CorsOriginConfiguration.ANY
-            || (values != null && values.size() == 1 && values.getFirst().equals(CorsOriginConfiguration.ANY.getFirst()));
+        return Objects.equals(values, CorsOriginConfiguration.ANY);
     }
 
     private static boolean isAnyMethod(List<HttpMethod> allowedMethods) {
