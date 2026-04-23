@@ -272,6 +272,6 @@ public final class DefaultHttpClientBuilder {
      * @return The client
      */
     public DefaultHttpClient build() {
-        return new DefaultHttpClient(this);
+        return DefaultHttpClient.createFromBuilder(this);
     }
 }

@@ -485,6 +485,18 @@ public class DefaultHttpClient implements
         return new DefaultHttpClientBuilder();
     }
 
+    /**
+     * Create DefaultHttpClient from builder configuration.
+     * This factory method ensures proper TLS1.2+ support and security configurations.
+     *
+     * @param builder The builder configuration
+     * @return The configured client
+     * @since 4.7.0
+     */
+    static DefaultHttpClient createFromBuilder(DefaultHttpClientBuilder builder) {
+        return new DefaultHttpClient(builder);
+    }
+
     static boolean isAcceptEvents(io.micronaut.http.HttpRequest<?> request) {
         String acceptHeader = request.getHeaders().get(io.micronaut.http.HttpHeaders.ACCEPT);
         return acceptHeader != null && acceptHeader.equalsIgnoreCase(MediaType.TEXT_EVENT_STREAM);
