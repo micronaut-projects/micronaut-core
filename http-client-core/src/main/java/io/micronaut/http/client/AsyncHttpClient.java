@@ -177,8 +177,15 @@ public interface AsyncHttpClient extends Closeable, LifeCycle<AsyncHttpClient> {
         return retrieve(HttpRequest.GET(uri));
     }
 
-    private static <O> O extractBody(HttpResponse<O> response, Argument<O> bodyType) {
-        if (bodyType != null && HttpStatus.class.isAssignableFrom(bodyType.getType())) {
+    private static <O> @Nullable O extractBody(HttpResponse<O> response, Argument<O> bodyType) {
+        if (bodyType == null) {
+            return response.getBody().orElse(null);
+        }
+        Class<?> type = bodyType.getType();
+        if (type == void.class || type == Void.class) {
+            return null;
+        }
+        if (HttpStatus.class.isAssignableFrom(type)) {
             @SuppressWarnings("unchecked")
             O status = (O) response.getStatus();
             return status;
