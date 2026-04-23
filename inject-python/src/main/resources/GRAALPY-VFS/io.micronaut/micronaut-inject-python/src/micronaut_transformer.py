@@ -224,7 +224,11 @@ def micronaut_annotation(name, repeated=None):
         elif isinstance(decorator, ast.Attribute):
             # If attribute corresponds to a generated decorator (e.g. @a.Executable),
             # return the attribute name to match generated decorator function name.
-            if hasattr(decorator, 'attr') and decorator.attr in self.generated_decorators:
+            try:
+                attr_name = decorator.attr
+            except Exception:
+                attr_name = None
+            if attr_name in self.generated_decorators:
                 return decorator.attr
             # Handle decorated decorators like @micronaut_annotation("...")
             if isinstance(decorator.value, ast.Name) and decorator.value.id in self.generated_decorators:
@@ -309,6 +313,13 @@ def micronaut_annotation(name, repeated=None):
         """
         Check if a ClassElement represents an annotation class.
         """
+        try:
+            is_annotation = class_element.isAssignable('java.lang.annotation.Annotation')
+            if is_annotation:
+                return True
+        except Exception:
+            pass
+
         # Check if it has @Retention annotation or is in java.lang.annotation package
         if class_element.getPackageName().startswith('java.lang.annotation'):
             return True
@@ -322,13 +333,8 @@ def micronaut_annotation(name, repeated=None):
         # Use native Java AST to check if it's an annotation type
         try:
             native_type = class_element.getNativeType()
-            if native_type and hasattr(native_type, 'element'):
-                java_element = native_type.element()
-                if java_element and hasattr(java_element, 'getKind'):
-                    kind = java_element.getKind()
-                    if hasattr(kind, 'name'):
-                        is_annotation = kind.name() == 'ANNOTATION_TYPE'
-                        return is_annotation
+            if native_type:
+                return native_type.element().getKind().name() == 'ANNOTATION_TYPE'
         except Exception as e:
             print(f"Error checking annotation kind for {class_element.getName()}: {e}")
 
@@ -340,12 +346,8 @@ def micronaut_annotation(name, repeated=None):
         """
         try:
             native_type = class_element.getNativeType()
-            if native_type and hasattr(native_type, 'element'):
-                java_element = native_type.element()
-                if java_element and hasattr(java_element, 'getNestingKind'):
-                    nesting_kind = java_element.getNestingKind()
-                    if hasattr(nesting_kind, 'name'):
-                        return nesting_kind.name() == 'MEMBER'
+            if native_type:
+                return native_type.element().getNestingKind().name() == 'MEMBER'
         except Exception as e:
             print(f"Error checking nesting kind for {class_element.getName()}: {e}")
 
@@ -448,12 +450,16 @@ def {decorator_name}({param_signature}):
         return func
 
     # Handle both @Annotation and @Annotation() usage patterns
-    if len(args) == 1 and len(kwargs) == 0 and callable(args[0]) and hasattr(args[0], '__name__'):
-        # Called as @Annotation (without parentheses) - args[0] is the function
-        return decorator(args[0])
-    else:
-        # Called as @Annotation() or @Annotation(param=value) - return decorator
-        return decorator
+    try:
+        if len(args) == 1 and len(kwargs) == 0:
+            args[0].__name__
+            # Called as @Annotation (without parentheses) - args[0] is the function
+            return decorator(args[0])
+    except Exception:
+        pass
+
+    # Called as @Annotation() or @Annotation(param=value) - return decorator
+    return decorator
 '''
 
         # Store the generated code in the dict for extraction (use qualified annotation name as key)
@@ -507,12 +513,16 @@ def {decorator_name}({param_signature}):
         return func
 
     # Handle both @Annotation and @Annotation() usage patterns
-    if len(args) == 1 and len(kwargs) == 0 and callable(args[0]) and hasattr(args[0], '__name__'):
-        # Called as @Annotation (without parentheses) - args[0] is the function
-        return decorator(args[0])
-    else:
-        # Called as @Annotation() or @Annotation(param=value) - return decorator
-        return decorator
+    try:
+        if len(args) == 1 and len(kwargs) == 0:
+            args[0].__name__
+            # Called as @Annotation (without parentheses) - args[0] is the function
+            return decorator(args[0])
+    except Exception:
+        pass
+
+    # Called as @Annotation() or @Annotation(param=value) - return decorator
+    return decorator
 '''
         self.generated_decorator_code[custom_annotation_name] = decorator_code
         # Handle nested annotations (annotations referenced by this annotation's parameters)
@@ -542,30 +552,32 @@ def {decorator_name}({param_signature}):
             # First try the annotation metadata approach (for consistency)
             if annotation_metadata.hasAnnotation('java.lang.annotation.Repeatable'):
                 repeatable_value = annotation_metadata.getValue('java.lang.annotation.Repeatable', 'value')
-                if repeatable_value and hasattr(repeatable_value, 'getName'):
-                    return repeatable_value.getName()
+                if repeatable_value:
+                    try:
+                        return repeatable_value.getName()
+                    except Exception:
+                        pass
 
             # If that doesn't work, try accessing the native Java element directly
             # This provides more reliable access to annotation mirrors
             native_type = class_element.getNativeType()
-            if native_type and hasattr(native_type, 'element'):
-                java_element = native_type.element()
-                if java_element and hasattr(java_element, 'getAnnotationMirrors'):
-                    annotation_mirrors = java_element.getAnnotationMirrors()
-                    # Look for @Repeatable annotation
-                    for mirror in annotation_mirrors:
-                        annotation_type = mirror.getAnnotationType()
-                        if annotation_type and hasattr(annotation_type, 'toString'):
-                            type_name = annotation_type.toString()
-                            if 'java.lang.annotation.Repeatable' in type_name:
-                                # Extract the value from the annotation
-                                element_values = mirror.getElementValues()
-                                for key, value in element_values.items():
-                                    if hasattr(key, 'getSimpleName') and key.getSimpleName().toString() == 'value':
-                                        if hasattr(value, 'getValue'):
-                                            container_value = value.getValue()
-                                            if container_value and hasattr(container_value, 'toString'):
-                                                return container_value.toString()
+            if native_type:
+                annotation_mirrors = native_type.element().getAnnotationMirrors()
+                # Look for @Repeatable annotation
+                for mirror in annotation_mirrors:
+                    annotation_type = mirror.getAnnotationType()
+                    type_name = annotation_type.toString() if annotation_type else None
+                    if type_name and 'java.lang.annotation.Repeatable' in type_name:
+                        # Extract the value from the annotation
+                        element_values = mirror.getElementValues()
+                        for key, value in element_values.items():
+                            simple_name = key.getSimpleName().toString()
+                            if simple_name == 'value':
+                                container_value = value.getValue()
+                                if container_value:
+                                    container_name = container_value.toString()
+                                    if container_name:
+                                        return container_name
         except Exception as e:
             print(f"Error checking repeatable annotation for {class_element.getName()}: {e}")
 
@@ -580,48 +592,42 @@ def {decorator_name}({param_signature}):
         try:
             # Use the Java AST to inspect annotation methods and find those that return annotation types
             native_type = class_element.getNativeType()
-            if native_type and hasattr(native_type, 'element'):
-                java_element = native_type.element()
-                if java_element and hasattr(java_element, 'getEnclosedElements'):
-                    enclosed_elements = java_element.getEnclosedElements()
-                    if enclosed_elements:
-                        for element in enclosed_elements:
-                            # Check if this is a method that returns an annotation type
-                            if hasattr(element, 'getKind') and hasattr(element.getKind(), 'name'):
-                                if element.getKind().name() == 'METHOD':
-                                     # Get the return type
-                                     return_type = None
-                                     if hasattr(element, 'getReturnType'):
-                                         return_type = element.getReturnType()
+            if native_type:
+                enclosed_elements = native_type.element().getEnclosedElements()
+                for element in enclosed_elements:
+                    # Check if this is a method that returns an annotation type
+                    kind_name = element.getKind().name()
+                    if kind_name == 'METHOD':
+                         # Get the return type
+                         return_type = element.getReturnType()
+                         return_type_name = return_type.toString() if return_type else None
+                         if return_type_name:
+                             # Check if the return type is an annotation
+                             nested_annotation_element = self.callback_get_class_element(return_type_name)
+                             if nested_annotation_element and self._is_annotation_class(nested_annotation_element):
+                                 # Skip nested annotations (annotations defined within the current annotation)
+                                 nested_name = nested_annotation_element.getName()
+                                 if nested_name.startswith(parent_name.replace('.', '$') + '$'):
+                                     continue
 
-                                     if return_type and hasattr(return_type, 'toString'):
-                                         return_type_name = return_type.toString()
-                                         # Check if the return type is an annotation
-                                         nested_annotation_element = self.callback_get_class_element(return_type_name)
-                                         if nested_annotation_element and self._is_annotation_class(nested_annotation_element):
-                                             # Skip nested annotations (annotations defined within the current annotation)
-                                             nested_name = nested_annotation_element.getName()
-                                             if nested_name.startswith(parent_name.replace('.', '$') + '$'):
-                                                 continue
+                                 # Generate decorator for the nested annotation (use the annotation's actual name)
+                                 # We don't need a special nested-named decorator, just ensure the annotation decorator exists
+                                 # Handle nested classes by extracting the simple name after the $
+                                 full_name = nested_name
+                                 if '$' in full_name:
+                                     annotation_simple_name = full_name.split('$')[-1]
+                                 else:
+                                     annotation_simple_name = nested_annotation_element.getSimpleName()
 
-                                             # Generate decorator for the nested annotation (use the annotation's actual name)
-                                             # We don't need a special nested-named decorator, just ensure the annotation decorator exists
-                                             # Handle nested classes by extracting the simple name after the $
-                                             full_name = nested_name
-                                             if '$' in full_name:
-                                                 annotation_simple_name = full_name.split('$')[-1]
-                                             else:
-                                                 annotation_simple_name = nested_annotation_element.getSimpleName()
+                                 if annotation_simple_name not in self.generated_decorators:
+                                     # Create a modified ClassElement with the dot notation name for proper annotation name
+                                     original_name = nested_annotation_element.getName()
+                                     dot_name = original_name.replace('$', '.')
+                                     modified_annotation_name = dot_name
 
-                                             if annotation_simple_name not in self.generated_decorators:
-                                                 # Create a modified ClassElement with the dot notation name for proper annotation name
-                                                 original_name = nested_annotation_element.getName()
-                                                 dot_name = original_name.replace('$', '.')
-                                                 modified_annotation_name = dot_name
-
-                                                 # Generate the decorator with the correct annotation name
-                                                 self._generate_decorator_from_class_element_with_name(
-                                                     nested_annotation_element, annotation_simple_name, modified_annotation_name)
+                                     # Generate the decorator with the correct annotation name
+                                     self._generate_decorator_from_class_element_with_name(
+                                         nested_annotation_element, annotation_simple_name, modified_annotation_name)
         except Exception as e:
             print(f"Error generating nested decorators for {class_element.getName()}: {e}")
 
@@ -662,5 +668,3 @@ def {decorator_name}({param_signature}):
         Get the list of types (classes/functions) that have Micronaut decorators.
         """
         return self.exported_types
-
-

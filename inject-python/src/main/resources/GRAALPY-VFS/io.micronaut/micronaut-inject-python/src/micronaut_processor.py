@@ -13,6 +13,22 @@ ReturnDef = java.type("io.micronaut.python.processing.visitor.ReturnDef")
 TypeRef = java.type("io.micronaut.python.processing.visitor.TypeRef")
 ScriptDef = java.type("io.micronaut.python.processing.visitor.ScriptDef")
 
+def _ast_unparse_or_dump(node):
+    try:
+        return ast.unparse(node)
+    except Exception:
+        try:
+            return ast.dump(node)
+        except Exception:
+            return str(node)
+
+
+def _ast_dump_or_str(node):
+    try:
+        return ast.dump(node)
+    except Exception:
+        return str(node)
+
 def extract_decorator_name(node):
     """
     Extract the decorator name from an AST decorator node.
@@ -654,21 +670,21 @@ class MicronautAstVisitor(ast.NodeVisitor):
                 else:
                     # Fallback to original annotation if no args
                     try:
-                        type_name = ast.unparse(annotation_node) if hasattr(ast, 'unparse') else ast.dump(annotation_node)
+                        type_name = _ast_unparse_or_dump(annotation_node)
                         type_annotation = TypeRef(type_name)
                     except:
                         type_annotation = TypeRef("object")
             else:
                 # Not Annotated, fallback to original annotation
                 try:
-                    type_name = ast.unparse(annotation_node) if hasattr(ast, 'unparse') else ast.dump(annotation_node)
+                    type_name = _ast_unparse_or_dump(annotation_node)
                     type_annotation = TypeRef(type_name)
                 except:
                     type_annotation = TypeRef("object")
         else:
             # Not a subscript, fallback to original annotation
             try:
-                type_name = ast.unparse(annotation_node) if hasattr(ast, 'unparse') else ast.dump(annotation_node)
+                type_name = _ast_unparse_or_dump(annotation_node)
                 type_annotation = TypeRef(type_name)
             except:
                 type_annotation = TypeRef("object")
@@ -795,10 +811,8 @@ class MicronautAstVisitor(ast.NodeVisitor):
         elif isinstance(type_node, ast.BinOp) and isinstance(type_node.op, ast.BitOr):
             # Handle union types like X | Y, extract non-None types
             return self._extract_union_type(type_node)
-        elif hasattr(ast, 'unparse'):
-            return ast.unparse(type_node)
         else:
-            return ast.dump(type_node)
+            return _ast_unparse_or_dump(type_node)
 
     def _extract_union_type(self, type_node):
         """
@@ -845,11 +859,11 @@ class MicronautAstVisitor(ast.NodeVisitor):
         if isinstance(type_annotation, str):
             # Legacy string handling
             return ' | None' in type_annotation or type_annotation == 'None'
-        elif hasattr(type_annotation, 'name'):
-            # TypeRef object
-            return type_annotation.name() == 'None'
         else:
-            return False
+            try:
+                return type_annotation.name() == 'None'
+            except Exception:
+                return False
 
     def _parse_metadata_call(self, call_node):
         """
@@ -879,7 +893,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
                         else:
                             members[f'arg{i}'] = value
                     else:
-                        members[f'arg{i}'] = ast.dump(arg) if hasattr(ast, 'dump') else str(arg)
+                        members[f'arg{i}'] = _ast_dump_or_str(arg)
 
             # For keyword args
             for kw in call_node.keywords:
@@ -893,7 +907,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
                             value = kw.value.id
                             members[kw.arg] = value
                         else:
-                            members[kw.arg] = ast.dump(kw.value) if hasattr(ast, 'dump') else str(kw.value)
+                            members[kw.arg] = _ast_dump_or_str(kw.value)
 
             # Create DecoratorDef with annotationName = name (assuming it's a Micronaut annotation)
             return self.to_decorator_from_reference_with_members(decorator_name, members)
@@ -964,8 +978,13 @@ class MicronautAstVisitor(ast.NodeVisitor):
         TypeVar = java.type("io.micronaut.python.processing.visitor.TypeVar")
 
         # Check if the node has type_params (Python 3.12+)
-        if hasattr(node, 'type_params') and node.type_params:
-            for type_param in node.type_params:
+        try:
+            node_type_params = node.type_params
+        except Exception:
+            node_type_params = None
+
+        if node_type_params:
+            for type_param in node_type_params:
                 if isinstance(type_param, ast.TypeVar):
                     # Extract name
                     name = type_param.name
@@ -977,8 +996,12 @@ class MicronautAstVisitor(ast.NodeVisitor):
 
                     # Extract constraints (for TypeVar with constraints)
                     constraints = []
-                    if hasattr(type_param, 'constraints') and type_param.constraints:
-                        for constraint in type_param.constraints:
+                    try:
+                        type_param_constraints = type_param.constraints
+                    except Exception:
+                        type_param_constraints = None
+                    if type_param_constraints:
+                        for constraint in type_param_constraints:
                             constraint_name = self._extract_type_name(constraint)
                             constraints.append(constraint_name)
 
@@ -1017,8 +1040,13 @@ class MicronautAstVisitor(ast.NodeVisitor):
         TypeVar = java.type("io.micronaut.python.processing.visitor.TypeVar")
 
         # Check if the function node has type_params (Python 3.12+)
-        if hasattr(func_node, 'type_params') and func_node.type_params:
-            for type_param in func_node.type_params:
+        try:
+            function_type_params = func_node.type_params
+        except Exception:
+            function_type_params = None
+
+        if function_type_params:
+            for type_param in function_type_params:
                 if isinstance(type_param, ast.TypeVar):
                     # Extract name
                     name = type_param.name
@@ -1030,8 +1058,12 @@ class MicronautAstVisitor(ast.NodeVisitor):
 
                     # Extract constraints (for TypeVar with constraints)
                     constraints = []
-                    if hasattr(type_param, 'constraints') and type_param.constraints:
-                        for constraint in type_param.constraints:
+                    try:
+                        type_param_constraints = type_param.constraints
+                    except Exception:
+                        type_param_constraints = None
+                    if type_param_constraints:
+                        for constraint in type_param_constraints:
                             constraint_name = self._extract_type_name(constraint)
                             constraints.append(constraint_name)
 
@@ -1157,7 +1189,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
         else:
             # Fallback for other expression types
             try:
-                name = ast.unparse(type_node) if hasattr(ast, 'unparse') else ast.dump(type_node)
+                name = _ast_unparse_or_dump(type_node)
                 return TypeRef(name)
             except:
                 return None
@@ -1183,18 +1215,29 @@ class MicronautAstVisitor(ast.NodeVisitor):
                     except (ValueError, TypeError):
                         # Fallback to manual extraction for edge cases
                         arg_node = node.value.args[0]
-                        if hasattr(arg_node, 'value') and isinstance(arg_node.value, str):
-                            self.java_type_assignments[var_name] = arg_node.value
-                        elif hasattr(arg_node, 's') and isinstance(arg_node.s, str):
-                            self.java_type_assignments[var_name] = arg_node.s
+                        try:
+                            if isinstance(arg_node.value, str):
+                                self.java_type_assignments[var_name] = arg_node.value
+                                return
+                        except Exception:
+                            pass
+                        try:
+                            if isinstance(arg_node.s, str):
+                                self.java_type_assignments[var_name] = arg_node.s
+                        except Exception:
+                            pass
 
     def _extract_docstring(self, node):
         """
         Extract the docstring from a class or function node.
         In Python AST, docstrings are the first statement if it's a string literal.
         """
-        if hasattr(node, 'body') and node.body:
-            first_stmt = node.body[0]
+        try:
+            node_body = node.body
+        except Exception:
+            node_body = None
+        if node_body:
+            first_stmt = node_body[0]
             if isinstance(first_stmt, ast.Expr) and isinstance(first_stmt.value, ast.Constant):
                 # Python 3.8+ uses ast.Constant for string literals
                 if isinstance(first_stmt.value.value, str):
@@ -1234,23 +1277,28 @@ class MicronautAstVisitor(ast.NodeVisitor):
             annotation = ""
             type_annotation = None
             decorators = []
-            if hasattr(arg, 'annotation') and arg.annotation is not None:
+            try:
+                arg_annotation = arg.annotation
+            except Exception:
+                arg_annotation = None
+
+            if arg_annotation is not None:
                 try:
-                    annotation = ast.unparse(arg.annotation)
+                    annotation = ast.unparse(arg_annotation)
                 except AttributeError:
-                    annotation = ast.dump(arg.annotation)
+                    annotation = ast.dump(arg_annotation)
 
                 # Check for typing.Annotated and extract decorators from metadata
-                if isinstance(arg.annotation, ast.Subscript) and isinstance(arg.annotation.value, ast.Name) and arg.annotation.value.id == 'Annotated':
-                    parsed_type, parsed_decorators = self._parse_annotated_type(arg.annotation)
+                if isinstance(arg_annotation, ast.Subscript) and isinstance(arg_annotation.value, ast.Name) and arg_annotation.value.id == 'Annotated':
+                    parsed_type, parsed_decorators = self._parse_annotated_type(arg_annotation)
                     type_annotation = parsed_type   # Use extracted type for typeAnnotation
                     decorators = parsed_decorators  # Add any decorators found
                 else:
                     # Parse type into TypeRef structure
-                    type_annotation = self._parse_type(arg.annotation)
+                    type_annotation = self._parse_type(arg_annotation)
 
                 # Check for nullable union types and add @Nullable decorator
-                if self._is_nullable_union_type(arg.annotation):
+                if self._is_nullable_union_type(arg_annotation):
                     nullable_decorator = DecoratorDef("Nullable", "jakarta.annotation.Nullable", None, {}, [])
                     decorators.append(nullable_decorator)
 
@@ -1276,14 +1324,19 @@ class MicronautAstVisitor(ast.NodeVisitor):
         """
         Parse the return type annotation of an ast.FunctionDef node and return a ReturnDef.
         """
-        if hasattr(func_node, 'returns') and func_node.returns is not None:
+        try:
+            func_returns = func_node.returns
+        except Exception:
+            func_returns = None
+
+        if func_returns is not None:
             # Check for typing.Annotated and extract decorators from metadata
-            if isinstance(func_node.returns, ast.Subscript) and isinstance(func_node.returns.value, ast.Name) and func_node.returns.value.id == 'Annotated':
-                parsed_type, parsed_decorators = self._parse_annotated_type(func_node.returns)
+            if isinstance(func_returns, ast.Subscript) and isinstance(func_returns.value, ast.Name) and func_returns.value.id == 'Annotated':
+                parsed_type, parsed_decorators = self._parse_annotated_type(func_returns)
                 return ReturnDef.of(parsed_type, parsed_decorators)
             else:
                 # Parse type into TypeRef structure
-                type_annotation = self._parse_type(func_node.returns)
+                type_annotation = self._parse_type(func_returns)
                 return ReturnDef.of(type_annotation)
 
         return ReturnDef.none()
@@ -1329,8 +1382,11 @@ def decorator_to_function(visitor, node):
             simple_name = names[-1] if names else None
             # Resolve through visitor alias mapping if available
             resolved_name = '.'.join(names)
-            if visitor is not None and hasattr(visitor, '_resolve_dotted_name'):
-                resolved_name = visitor._resolve_dotted_name(names)
+            if visitor is not None:
+                try:
+                    resolved_name = visitor._resolve_dotted_name(names)
+                except Exception:
+                    pass
             return DecoratorDef(simple_name or resolved_name, resolved_name, None, {}, [])
         # when a decorator takes argument values it is represented by ast.Call
         # here we parse out the constants to the call and set them as the named
@@ -1357,8 +1413,11 @@ def decorator_to_function(visitor, node):
                 decorator_name = names[-1] if names else ''
                 decorator_declaration = visitor.known_decorators.get(decorator_name)
                 resolved_decorator_fqn = '.'.join(names)
-                if visitor is not None and hasattr(visitor, '_resolve_dotted_name'):
-                    resolved_decorator_fqn = visitor._resolve_dotted_name(names)
+                if visitor is not None:
+                    try:
+                        resolved_decorator_fqn = visitor._resolve_dotted_name(names)
+                    except Exception:
+                        pass
             else:
                 # Unknown node.func form; fallback
                 decorator_name = getattr(getattr(node.func, 'id', None), '__str__', lambda: '')() or 'unknown'
@@ -1460,8 +1519,11 @@ def convert_ast_value(node, visitor=None):
                 return f"{visitor.package_name}.{base_name}"
 
         # Return as qualified name string, applying alias resolution when possible
-        if visitor is not None and hasattr(visitor, '_resolve_dotted_name'):
-            return visitor._resolve_dotted_name(names)
+        if visitor is not None:
+            try:
+                return visitor._resolve_dotted_name(names)
+            except Exception:
+                pass
         return '.'.join(names)
 
     # Try to evaluate the value if it's a constant or simple expression
@@ -1469,7 +1531,7 @@ def convert_ast_value(node, visitor=None):
         return ast.literal_eval(node)
     except Exception:
         # Fallback to AST dump for complex expressions
-        return ast.dump(node) if hasattr(ast, 'dump') else str(node)
+        return _ast_dump_or_str(node)
 
 def _resolve_java_constant(visitor, name_parts):
     """
@@ -1489,21 +1551,23 @@ def _resolve_java_constant(visitor, name_parts):
 
     # Try to get the class element from the visitor context
     try:
-        if hasattr(visitor, 'visitor_context') and visitor.visitor_context is not None:
+        if visitor.visitor_context is not None:
             class_element = visitor.visitor_context.getClassElement(resolved_class_name).orElse(None)
             if class_element is not None:
                 # Try to find the field using getFields() method
                 fields = class_element.getFields()
                 for field in fields:
                     if field.getName() == field_name:
-                        if hasattr(field, 'getConstantValue'):
-                            constant_value = field.getConstantValue()
-                            # Check if it's an Optional or the value directly
-                            if hasattr(constant_value, 'isPresent') and constant_value.isPresent():
+                        constant_value = field.getConstantValue()
+                        # Check if it's an Optional or the value directly
+                        try:
+                            if constant_value.isPresent():
                                 return constant_value.get()
-                            elif constant_value is not None:
-                                # Direct value
-                                return constant_value
+                        except Exception:
+                            pass
+                        if constant_value is not None:
+                            # Direct value
+                            return constant_value
                         break
     except Exception:
         # If constant resolution fails, continue with fallback
@@ -1709,8 +1773,12 @@ def extract_parameter_documentation(func_node):
 
     # Get the function docstring
     docstring = None
-    if hasattr(func_node, 'body') and func_node.body:
-        first_stmt = func_node.body[0]
+    try:
+        func_body = func_node.body
+    except Exception:
+        func_body = None
+    if func_body:
+        first_stmt = func_body[0]
         if isinstance(first_stmt, ast.Expr) and isinstance(first_stmt.value, ast.Constant):
             # Python 3.8+ uses ast.Constant for string literals
             if isinstance(first_stmt.value.value, str):
