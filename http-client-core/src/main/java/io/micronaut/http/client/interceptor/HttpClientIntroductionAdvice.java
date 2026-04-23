@@ -258,42 +258,45 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                                          Argument<?> valueType,
                                          Class<?> reactiveValueType,
                                          Class<?> declaringType) {
-
-        RequestBinderResult binderResult = bindRequest(context, httpMethod, httpMethodName, uriToBind, interceptedMethod, annotationMetadata);
-        CompletableFuture<Object> future = new CompletableFuture<>();
-        if (binderResult.isError()) {
-            future.complete(binderResult.errorResult());
-        } else {
-            MutableHttpRequest<?> request = Objects.requireNonNull(binderResult.request());
-            AsyncHttpClient asyncHttpClient = httpClient.toAsync();
-            CompletionStage<?> responseStage = httpClientResponseStage(asyncHttpClient, request, returnType, errorType, valueType);
-            responseStage.whenComplete((result, throwable) -> {
-                if (throwable != null) {
-                    Throwable cause = (throwable instanceof CompletionException completionException && completionException.getCause() != null)
-                        ? completionException.getCause()
-                        : throwable;
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("Client [{}] received HTTP error response: {}", declaringType.getName(), cause.getMessage(), cause);
-                    }
-                    if (cause instanceof HttpClientResponseException e && e.code() == HttpStatus.NOT_FOUND.getCode()) {
-                        if (reactiveValueType == Optional.class) {
-                            future.complete(Optional.empty());
-                            return;
-                        } else if (HttpResponse.class.isAssignableFrom(reactiveValueType)) {
-                            future.complete(e.getResponse());
-                            return;
-                        } else {
-                            future.complete(null);
-                            return;
+        try {
+            RequestBinderResult binderResult = bindRequest(context, httpMethod, httpMethodName, uriToBind, interceptedMethod, annotationMetadata);
+            CompletableFuture<@Nullable Object> future = new CompletableFuture<>();
+            if (binderResult.isError()) {
+                future.complete(binderResult.errorResult());
+            } else {
+                MutableHttpRequest<?> request = Objects.requireNonNull(binderResult.request());
+                AsyncHttpClient asyncHttpClient = httpClient.toAsync();
+                CompletionStage<?> responseStage = httpClientResponseStage(asyncHttpClient, request, returnType, errorType, valueType);
+                responseStage.whenComplete((result, throwable) -> {
+                    if (throwable != null) {
+                        Throwable cause = (throwable instanceof CompletionException completionException && completionException.getCause() != null)
+                            ? completionException.getCause()
+                            : throwable;
+                        if (LOG.isDebugEnabled()) {
+                            LOG.debug("Client [{}] received HTTP error response: {}", declaringType.getName(), cause.getMessage(), cause);
                         }
+                        if (cause instanceof HttpClientResponseException e && e.code() == HttpStatus.NOT_FOUND.getCode()) {
+                            if (reactiveValueType == Optional.class) {
+                                future.complete(Optional.empty());
+                                return;
+                            } else if (HttpResponse.class.isAssignableFrom(reactiveValueType)) {
+                                future.complete(e.getResponse());
+                                return;
+                            } else {
+                                future.complete(null);
+                                return;
+                            }
+                        }
+                        future.completeExceptionally(cause);
+                    } else {
+                        future.complete(result);
                     }
-                    future.completeExceptionally(cause);
-                } else {
-                    future.complete(result);
-                }
-            });
+                });
+            }
+            return interceptedMethod.handleResult(future);
+        } catch (Exception e) {
+            return interceptedMethod.handleException(e);
         }
-        return interceptedMethod.handleResult(future);
     }
 
     @Nullable
