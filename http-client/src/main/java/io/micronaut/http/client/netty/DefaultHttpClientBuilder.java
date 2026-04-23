@@ -219,12 +219,26 @@ public final class DefaultHttpClientBuilder {
      * @return The client
      */
     public DefaultHttpClient build() {
+        boolean createdDefaultConfiguration = false;
+        boolean restoreLoggerName = false;
+        String originalLoggerName = null;
         if (delegate.configuration == null) {
             delegate.configuration = new DefaultHttpClientConfiguration();
+            createdDefaultConfiguration = true;
         }
         if (delegate.configuration.getLoggerName().isEmpty()) {
+            if (!createdDefaultConfiguration) {
+                originalLoggerName = delegate.configuration.getLoggerName();
+                restoreLoggerName = true;
+            }
             delegate.configuration.setLoggerName(DefaultHttpClient.class.getName());
         }
-        return new DefaultHttpClient(delegate.build());
+        try {
+            return new DefaultHttpClient(delegate.build());
+        } finally {
+            if (restoreLoggerName) {
+                delegate.configuration.setLoggerName(originalLoggerName);
+            }
+        }
     }
 }
