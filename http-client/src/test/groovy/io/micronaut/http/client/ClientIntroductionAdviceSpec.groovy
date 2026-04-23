@@ -3,6 +3,7 @@ package io.micronaut.http.client
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Introspected
+import io.micronaut.core.type.Argument
 import io.micronaut.discovery.ServiceInstance
 import io.micronaut.discovery.ServiceInstanceList
 import io.micronaut.http.BasicAuth
@@ -227,6 +228,16 @@ class ClientIntroductionAdviceSpec extends Specification {
             .join() == "async-ok?"
     }
 
+    void "async client handles void response cleanly"() {
+        given:
+        AsyncClient client = server.applicationContext.getBean(AsyncClient)
+
+        expect:
+        client.okVoid()
+            .toCompletableFuture()
+            .join() == null
+    }
+
     void "async client handles controller async failure stacktrace clean"() {
         given:
         AsyncClient client = server.applicationContext.getBean(AsyncClient)
@@ -249,6 +260,20 @@ class ClientIntroductionAdviceSpec extends Specification {
         async.retrieve(HttpRequest.GET("/async/ok-async"), String.class)
             .toCompletableFuture()
             .join() == "async-ok"
+
+        cleanup:
+        httpClient.close()
+    }
+
+    void "async toAsync client void response does not throw"() {
+        given:
+        HttpClient httpClient = server.applicationContext.createBean(HttpClient, server.getURL())
+        AsyncHttpClient async = httpClient.toAsync()
+
+        expect:
+        async.retrieve(HttpRequest.GET("/async/ok-void"), Argument.VOID)
+            .toCompletableFuture()
+            .join() == null
 
         cleanup:
         httpClient.close()
@@ -317,6 +342,11 @@ class ClientIntroductionAdviceSpec extends Specification {
             return CompletableFuture.completedFuture("async-ok")
         }
 
+        @Get("/ok-void")
+        CompletionStage<Void> okVoid() {
+            return CompletableFuture.completedFuture(null)
+        }
+
         @Get("/fail-async")
         CompletionStage<HttpResponse<String>> failAsync() {
             return CompletableFuture.completedFuture(HttpResponse.badRequest("bad"))
@@ -340,6 +370,9 @@ class ClientIntroductionAdviceSpec extends Specification {
 
         @Get("/ok-async")
         CompletionStage<String> okAsync()
+
+        @Get("/ok-void")
+        CompletionStage<Void> okVoid()
 
         @Get("/fail-async")
         CompletionStage<String> failAsync()

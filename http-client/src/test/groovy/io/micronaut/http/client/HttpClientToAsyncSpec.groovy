@@ -135,6 +135,21 @@ class HttpClientToAsyncSpec extends Specification {
         then:
         retrievedStatus == HttpStatus.ACCEPTED
 
+        when: "retrieve void with explicit argument overload"
+        def retrievedVoid = asyncClient.retrieve(HttpRequest.GET("/async/empty"), Argument.VOID)
+                .toCompletableFuture()
+                .get(5, TimeUnit.SECONDS)
+        then:
+        retrievedVoid == null
+
+        when: "exchange void with explicit argument overload"
+        def exchangedVoid = asyncClient.exchange(HttpRequest.GET("/async/empty"), Argument.VOID)
+                .toCompletableFuture()
+                .get(5, TimeUnit.SECONDS)
+        then:
+        exchangedVoid.status == HttpStatus.NO_CONTENT
+        !exchangedVoid.body.present
+
         when: "stopping the client"
         asyncClient.stop()
         then:
@@ -163,6 +178,11 @@ class HttpClientToAsyncSpec extends Specification {
         @Get("/status")
         HttpResponse<?> status() {
             return HttpResponse.accepted()
+        }
+
+        @Get("/empty")
+        HttpResponse<?> empty() {
+            return HttpResponse.noContent()
         }
     }
 

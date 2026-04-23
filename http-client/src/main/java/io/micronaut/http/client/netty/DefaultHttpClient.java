@@ -65,9 +65,9 @@ import java.util.Objects;
 import java.util.concurrent.ThreadFactory;
 
 /**
- * Public facing HTTP client that delegates to {@link NettyHttpClient}.
+ * Default implementation of the {@link HttpClient} interface based on Netty.
  *
- * @author Micronaut Foundation
+ * @author Graeme Rocher
  * @since 1.0
  */
 @Internal
@@ -92,9 +92,9 @@ public class DefaultHttpClient implements
      * Create a {@link DefaultHttpClient} that wraps the given {@link NettyHttpClient}.
      *
      * @param nettyHttpClient The delegate client
-     * @since 4.8.0
+     * @since 5.0
      */
-    public DefaultHttpClient(NettyHttpClient nettyHttpClient) {
+    DefaultHttpClient(NettyHttpClient nettyHttpClient) {
         this.nettyHttpClient = Objects.requireNonNull(nettyHttpClient, "nettyHttpClient");
         this.asyncHttpClient = new DefaultAsyncHttpClient(nettyHttpClient);
     }
