@@ -315,7 +315,7 @@ public class DefaultHttpClient implements
      * @since 5.0
      */
     @Internal
-    public NettyHttpClient getNettyHttpClient() {
+    NettyHttpClient getNettyHttpClient() {
         return nettyHttpClient;
     }
 

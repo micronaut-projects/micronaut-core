@@ -60,7 +60,7 @@ import java.util.concurrent.ThreadFactory;
  * @since 4.7.0
  */
 @Internal
-public final class NettyHttpClientBuilder {
+final class NettyHttpClientBuilder {
     @Nullable
     LoadBalancer loadBalancer = null;
     @Nullable
@@ -297,7 +297,7 @@ public final class NettyHttpClientBuilder {
      *
      * @return The client
      */
-    public NettyHttpClient build() {
+    NettyHttpClient build() {
         return new NettyHttpClient(this);
     }
 }

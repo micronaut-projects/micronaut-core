@@ -1,4 +1,4 @@
-package io.micronaut.http.client
+package io.micronaut.http.client.netty
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
@@ -9,8 +9,9 @@ import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
-import io.micronaut.http.client.netty.DefaultAsyncHttpClient
-import io.micronaut.http.client.netty.DefaultHttpClient
+import io.micronaut.http.client.AsyncHttpClient
+import io.micronaut.http.client.DefaultAsyncOverReactiveHttpClient
+import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -30,7 +31,7 @@ class HttpClientToAsyncSpec extends Specification {
 
     void "http client toAsync adapts to CompletionStage API"() {
         given:
-        HttpClient httpClient = HttpClient.create(server.URL)
+            HttpClient httpClient = HttpClient.create(server.URL)
         def asyncClient = httpClient.toAsync()
 
         expect:
@@ -46,7 +47,7 @@ class HttpClientToAsyncSpec extends Specification {
     void "async http client default methods behave correctly (#clientVariant)"(String clientVariant) {
         given:
         def holder = createAsyncClient(clientVariant)
-        AsyncHttpClient asyncClient = holder.async
+            AsyncHttpClient asyncClient = holder.async
         asyncClient.start()
         assert asyncClient.isRunning()
 

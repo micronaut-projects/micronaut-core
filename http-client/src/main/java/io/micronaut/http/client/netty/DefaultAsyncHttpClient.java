@@ -40,7 +40,7 @@ final class DefaultAsyncHttpClient implements AsyncHttpClient {
      *
      * @param nettyHttpClient The delegate client
      */
-    public DefaultAsyncHttpClient(NettyHttpClient nettyHttpClient) {
+    DefaultAsyncHttpClient(NettyHttpClient nettyHttpClient) {
         this.nettyHttpClient = nettyHttpClient;
     }
 
