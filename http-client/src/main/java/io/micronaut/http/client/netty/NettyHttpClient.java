@@ -281,7 +281,7 @@ final class NettyHttpClient implements
             this.clientFilterEntries = builder.clientFilterEntries;
         } else {
             this.clientFilterEntries = filterResolver.resolveFilterEntries(
-                    new ClientFilterResolutionContext(null, AnnotationMetadata.EMPTY_METADATA)
+                new ClientFilterResolutionContext(null, AnnotationMetadata.EMPTY_METADATA)
             );
         }
         this.webSocketRegistry = builder.webSocketBeanRegistry;
@@ -447,7 +447,7 @@ final class NettyHttpClient implements
                     Optional<O> body = response.getBody();
                     if (body.isEmpty() && response.getBody(Argument.of(byte[].class)).isPresent()) {
                         throw decorate(new HttpClientResponseException(
-                        "Failed to decode the body for the given content type [%s]".formatted(response.getContentType().orElse(null)),
+                            "Failed to decode the body for the given content type [%s]".formatted(response.getContentType().orElse(null)),
                             response
                         ));
                     } else {
@@ -482,131 +482,131 @@ final class NettyHttpClient implements
 
     @SuppressWarnings("SubscriberImplementation")
     @Override
-    public <I> Publisher<Event<ByteBuffer<?>>> eventStream(io.micronaut.http. HttpRequest<I> request) {
+    public <I> Publisher<Event<ByteBuffer<?>>> eventStream(io.micronaut.http.HttpRequest<I> request) {
         setupConversionService(request);
         return eventStreamOrError(request, null);
     }
 
-    private <I> Publisher<Event<ByteBuffer<?>>> eventStreamOrError(io.micronaut.http. HttpRequest<I> request, @Nullable Argument<?> errorType) {
+    private <I> Publisher<Event<ByteBuffer<?>>> eventStreamOrError(io.micronaut.http.HttpRequest<I> request, @Nullable Argument<?> errorType) {
 
         if (request instanceof MutableHttpRequest<?> httpRequest) {
             httpRequest.accept(MediaType.TEXT_EVENT_STREAM_TYPE);
         }
 
         return Flux.create(emitter ->
-                dataStream(request, errorType).subscribe(new Subscriber<>() {
-                    @Nullable
-                    private Subscription dataSubscription;
-                    @Nullable
-                    private CurrentEvent currentEvent;
+            dataStream(request, errorType).subscribe(new Subscriber<>() {
+                @Nullable
+                private Subscription dataSubscription;
+                @Nullable
+                private CurrentEvent currentEvent;
 
-                    @Override
-                    public void onSubscribe(Subscription s) {
-                        this.dataSubscription = s;
-                        Disposable cancellable = s::cancel;
-                        emitter.onCancel(cancellable);
-                        if (!emitter.isCancelled() && emitter.requestedFromDownstream() > 0) {
-                            // request the first chunk
-                            dataSubscription.request(1);
-                        }
+                @Override
+                public void onSubscribe(Subscription s) {
+                    this.dataSubscription = s;
+                    Disposable cancellable = s::cancel;
+                    emitter.onCancel(cancellable);
+                    if (!emitter.isCancelled() && emitter.requestedFromDownstream() > 0) {
+                        // request the first chunk
+                        dataSubscription.request(1);
                     }
+                }
 
-                    @Override
-                    public void onNext(ByteBuffer<?> buffer) {
+                @Override
+                public void onNext(ByteBuffer<?> buffer) {
 
-                        try {
-                            int len = buffer.readableBytes();
+                    try {
+                        int len = buffer.readableBytes();
 
-                            // a length of zero indicates the start of a new event
-                            // emit the current event
-                            if (len == 0) {
-                                try {
-                                    Event event = Event.of(byteBufferFactory.wrap(Objects.requireNonNull(currentEvent).data))
-                                            .name(currentEvent.name)
-                                            .retry(currentEvent.retry)
-                                            .id(currentEvent.id);
-                                    emitter.next(
-                                            event
-                                    );
-                                } finally {
-                                    currentEvent = null;
+                        // a length of zero indicates the start of a new event
+                        // emit the current event
+                        if (len == 0) {
+                            try {
+                                Event event = Event.of(byteBufferFactory.wrap(Objects.requireNonNull(currentEvent).data))
+                                    .name(currentEvent.name)
+                                    .retry(currentEvent.retry)
+                                    .id(currentEvent.id);
+                                emitter.next(
+                                    event
+                                );
+                            } finally {
+                                currentEvent = null;
+                            }
+                        } else {
+                            if (currentEvent == null) {
+                                currentEvent = new CurrentEvent();
+                            }
+                            int colonIndex = buffer.indexOf((byte) ':');
+                            // SSE comments start with colon, so skip
+                            if (colonIndex > 0) {
+                                // obtain the type
+                                String type = buffer.slice(0, colonIndex).toString(StandardCharsets.UTF_8).trim();
+                                int fromIndex = colonIndex + 1;
+                                // skip the white space before the actual data
+                                if (buffer.getByte(fromIndex) == ((byte) ' ')) {
+                                    fromIndex++;
                                 }
-                            } else {
-                                if (currentEvent == null) {
-                                    currentEvent = new CurrentEvent();
-                                }
-                                int colonIndex = buffer.indexOf((byte) ':');
-                                // SSE comments start with colon, so skip
-                                if (colonIndex > 0) {
-                                    // obtain the type
-                                    String type = buffer.slice(0, colonIndex).toString(StandardCharsets.UTF_8).trim();
-                                    int fromIndex = colonIndex + 1;
-                                    // skip the white space before the actual data
-                                    if (buffer.getByte(fromIndex) == ((byte) ' ')) {
-                                        fromIndex++;
-                                    }
-                                    if (fromIndex < len) {
-                                        int toIndex = len - fromIndex;
-                                        switch (type) {
-                                            case "data" -> {
-                                                ByteBuffer<?> content = buffer.slice(fromIndex, toIndex);
-                                                byte[] d = currentEvent.data;
-                                                if (d.length == 0) {
-                                                    currentEvent.data = content.toByteArray();
-                                                } else {
-                                                    currentEvent.data = ArrayUtils.concat(d, content.toByteArray());
-                                                }
+                                if (fromIndex < len) {
+                                    int toIndex = len - fromIndex;
+                                    switch (type) {
+                                        case "data" -> {
+                                            ByteBuffer<?> content = buffer.slice(fromIndex, toIndex);
+                                            byte[] d = currentEvent.data;
+                                            if (d.length == 0) {
+                                                currentEvent.data = content.toByteArray();
+                                            } else {
+                                                currentEvent.data = ArrayUtils.concat(d, content.toByteArray());
                                             }
-                                            case "id" -> {
-                                                ByteBuffer<?> id = buffer.slice(fromIndex, toIndex);
-                                                currentEvent.id = id.toString(StandardCharsets.UTF_8).trim();
+                                        }
+                                        case "id" -> {
+                                            ByteBuffer<?> id = buffer.slice(fromIndex, toIndex);
+                                            currentEvent.id = id.toString(StandardCharsets.UTF_8).trim();
+                                        }
+                                        case "event" -> {
+                                            ByteBuffer<?> event = buffer.slice(fromIndex, toIndex);
+                                            currentEvent.name = event.toString(StandardCharsets.UTF_8).trim();
+                                        }
+                                        case "retry" -> {
+                                            ByteBuffer<?> retry = buffer.slice(fromIndex, toIndex);
+                                            String text = retry.toString(StandardCharsets.UTF_8);
+                                            if (!StringUtils.isEmpty(text)) {
+                                                currentEvent.retry = Duration.ofMillis(Long.parseLong(text));
                                             }
-                                            case "event" -> {
-                                                ByteBuffer<?> event = buffer.slice(fromIndex, toIndex);
-                                                currentEvent.name = event.toString(StandardCharsets.UTF_8).trim();
-                                            }
-                                            case "retry" -> {
-                                                ByteBuffer<?> retry = buffer.slice(fromIndex, toIndex);
-                                                String text = retry.toString(StandardCharsets.UTF_8);
-                                                if (!StringUtils.isEmpty(text)) {
-                                                    currentEvent.retry = Duration.ofMillis(Long.parseLong(text));
-                                                }
-                                            }
-                                            default -> {
-                                                // ignore message
-                                            }
+                                        }
+                                        default -> {
+                                            // ignore message
                                         }
                                     }
                                 }
                             }
+                        }
 
-                            if (emitter.requestedFromDownstream() > 0 && !emitter.isCancelled()) {
-                                Objects.requireNonNull(dataSubscription).request(1);
-                            }
-                        } catch (Throwable e) {
-                            onError(e);
-                        } finally {
-                            if (buffer instanceof ReferenceCounted counted) {
-                                counted.release();
-                            }
+                        if (emitter.requestedFromDownstream() > 0 && !emitter.isCancelled()) {
+                            Objects.requireNonNull(dataSubscription).request(1);
+                        }
+                    } catch (Throwable e) {
+                        onError(e);
+                    } finally {
+                        if (buffer instanceof ReferenceCounted counted) {
+                            counted.release();
                         }
                     }
+                }
 
-                    @Override
-                    public void onError(Throwable t) {
-                        Objects.requireNonNull(dataSubscription).cancel();
-                        if (t instanceof HttpClientException) {
-                            emitter.error(t);
-                        } else {
-                            emitter.error(decorate(new HttpClientException("Error consuming Server Sent Events: " + t.getMessage(), t)));
-                        }
+                @Override
+                public void onError(Throwable t) {
+                    Objects.requireNonNull(dataSubscription).cancel();
+                    if (t instanceof HttpClientException) {
+                        emitter.error(t);
+                    } else {
+                        emitter.error(decorate(new HttpClientException("Error consuming Server Sent Events: " + t.getMessage(), t)));
                     }
+                }
 
-                    @Override
-                    public void onComplete() {
-                        emitter.complete();
-                    }
-                }), FluxSink.OverflowStrategy.BUFFER);
+                @Override
+                public void onComplete() {
+                    emitter.complete();
+                }
+            }), FluxSink.OverflowStrategy.BUFFER);
     }
 
     private static <T> Mono<T> toMono(ExecutionFlow<T> flow, PropagatedContext context) {
@@ -621,7 +621,7 @@ final class NettyHttpClient implements
     }
 
     @Override
-    public <I, B> Publisher<Event<B>> eventStream(io.micronaut.http. HttpRequest<I> request, Argument<B> eventType, Argument<?> errorType) {
+    public <I, B> Publisher<Event<B>> eventStream(io.micronaut.http.HttpRequest<I> request, Argument<B> eventType, Argument<?> errorType) {
         setupConversionService(request);
         MessageBodyReader<B> reader = handlerRegistry.getReader(eventType, List.of(MediaType.APPLICATION_JSON_TYPE));
         return Flux.from(eventStreamOrError(request, errorType)).map(byteBufferEvent -> {
@@ -633,13 +633,13 @@ final class NettyHttpClient implements
     }
 
     @Override
-    public <I> Publisher<ByteBuffer<?>> dataStream(io.micronaut.http. HttpRequest<I> request) {
+    public <I> Publisher<ByteBuffer<?>> dataStream(io.micronaut.http.HttpRequest<I> request) {
         setupConversionService(request);
         return dataStream(request, DEFAULT_ERROR_TYPE);
     }
 
     @Override
-    public <I> Publisher<ByteBuffer<?>> dataStream(io.micronaut.http. HttpRequest<I> request, @Nullable Argument<?> errorType) {
+    public <I> Publisher<ByteBuffer<?>> dataStream(io.micronaut.http.HttpRequest<I> request, @Nullable Argument<?> errorType) {
         setupConversionService(request);
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
         return new MicronautFlux<>(toMono(resolveRequestURI(request), propagatedContext)
@@ -667,51 +667,51 @@ final class NettyHttpClient implements
     }
 
     @Override
-    public <I> Publisher<HttpResponse<ByteBuffer<?>>> exchangeStream(io.micronaut.http. HttpRequest<I> request) {
+    public <I> Publisher<HttpResponse<ByteBuffer<?>>> exchangeStream(io.micronaut.http.HttpRequest<I> request) {
         return exchangeStream(request, DEFAULT_ERROR_TYPE);
     }
 
     @Override
-    public <I> Publisher<HttpResponse<ByteBuffer<?>>> exchangeStream(io.micronaut.http. HttpRequest<I> request, Argument<?> errorType) {
+    public <I> Publisher<HttpResponse<ByteBuffer<?>>> exchangeStream(io.micronaut.http.HttpRequest<I> request, Argument<?> errorType) {
         setupConversionService(request);
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
         return new MicronautFlux<>(toMono(resolveRequestURI(request), propagatedContext)
-                .flatMapMany(uri -> exchangeStreamImpl(propagatedContext, toMutableRequest(request), errorType, uri)))
-                .doAfterNext(byteBufferHttpResponse -> {
-                    ByteBuffer<?> buffer = byteBufferHttpResponse.body();
-                    if (buffer instanceof ReferenceCounted counted) {
-                        counted.release();
-                    }
-                });
+            .flatMapMany(uri -> exchangeStreamImpl(propagatedContext, toMutableRequest(request), errorType, uri)))
+            .doAfterNext(byteBufferHttpResponse -> {
+                ByteBuffer<?> buffer = byteBufferHttpResponse.body();
+                if (buffer instanceof ReferenceCounted counted) {
+                    counted.release();
+                }
+            });
     }
 
     @Override
-    public <I, O> Publisher<O> jsonStream(io.micronaut.http. HttpRequest<I> request, Argument<O> type) {
+    public <I, O> Publisher<O> jsonStream(io.micronaut.http.HttpRequest<I> request, Argument<O> type) {
         return jsonStream(request, type, DEFAULT_ERROR_TYPE);
     }
 
     @Override
-    public <I, O> Publisher<O> jsonStream(io.micronaut.http. HttpRequest<I> request, Argument<O> type, Argument<?> errorType) {
+    public <I, O> Publisher<O> jsonStream(io.micronaut.http.HttpRequest<I> request, Argument<O> type, Argument<?> errorType) {
         setupConversionService(request);
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
         return Flux.from(toMono(resolveRequestURI(request), propagatedContext)
-                .flatMapMany(requestURI -> jsonStreamImpl(propagatedContext, toMutableRequest(request), type, errorType, requestURI)));
+            .flatMapMany(requestURI -> jsonStreamImpl(propagatedContext, toMutableRequest(request), type, errorType, requestURI)));
     }
 
     @SuppressWarnings("unchecked")
     @Override
-    public <I> Publisher<Map<String, Object>> jsonStream(io.micronaut.http. HttpRequest<I> request) {
+    public <I> Publisher<Map<String, Object>> jsonStream(io.micronaut.http.HttpRequest<I> request) {
         return (Publisher) jsonStream(request, Map.class);
     }
 
     @Override
-    public <I, O> Publisher<O> jsonStream(io.micronaut.http. HttpRequest<I> request, Class<O> type) {
+    public <I, O> Publisher<O> jsonStream(io.micronaut.http.HttpRequest<I> request, Class<O> type) {
         setupConversionService(request);
         return jsonStream(request, Argument.of(type));
     }
 
     @Override
-    public <I, O, E> Publisher<HttpResponse<O>> exchange(io.micronaut.http. HttpRequest<I> request, @Nullable  Argument<O> bodyType, Argument<E> errorType) {
+    public <I, O, E> Publisher<HttpResponse<O>> exchange(io.micronaut.http.HttpRequest<I> request, @Nullable Argument<O> bodyType, Argument<E> errorType) {
         return Flux.defer(() -> exchange(request, bodyType, errorType, null).flux())
             // some tests expect flux...
             ;
@@ -739,10 +739,10 @@ final class NettyHttpClient implements
         return toMono(flow, PropagatedContext.getOrEmpty());
     }
 
-    private  <I, O, E> ExecutionFlow<HttpResponse<O>> exchangeFlow(io.micronaut.http.HttpRequest<I> request,
-                                                                 @Nullable  Argument<O> bodyType,
-                                                                 Argument<E> errorType,
-                                                                 @Nullable BlockHint blockHint) {
+    private <I, O, E> ExecutionFlow<HttpResponse<O>> exchangeFlow(io.micronaut.http.HttpRequest<I> request,
+                                                                  @Nullable Argument<O> bodyType,
+                                                                  Argument<E> errorType,
+                                                                  @Nullable BlockHint blockHint) {
         setupConversionService(request);
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
         // if a connection is available immediately, we can use its executor for the timeout
@@ -855,7 +855,7 @@ final class NettyHttpClient implements
                 Optional<O> body = response.getBody();
                 if (body.isEmpty() && response.getBody(byte[].class).isPresent()) {
                     throw decorate(new HttpClientResponseException(
-                    "Failed to decode the body for the given content type [%s]".formatted(response.getContentType().orElse(null)),
+                        "Failed to decode the body for the given content type [%s]".formatted(response.getContentType().orElse(null)),
                         response
                     ));
                 } else {
@@ -872,7 +872,7 @@ final class NettyHttpClient implements
     public <T extends AutoCloseable> Publisher<T> connect(Class<T> clientEndpointType, MutableHttpRequest<?> request) {
         setupConversionService(request);
         return toMono(resolveRequestURI(request), PropagatedContext.getOrEmpty()).flux()
-                .switchMap(resolvedURI -> connectWebSocket(resolvedURI, request, clientEndpointType, null));
+            .switchMap(resolvedURI -> connectWebSocket(resolvedURI, request, clientEndpointType, null));
     }
 
     @Override
@@ -882,7 +882,7 @@ final class NettyHttpClient implements
         uri = UriTemplate.of(uri).expand(parameters);
         MutableHttpRequest<Object> request = io.micronaut.http.HttpRequest.GET(uri);
         return toMono(resolveRequestURI(request), PropagatedContext.getOrEmpty()).flux()
-                .switchMap(resolvedURI -> connectWebSocket(resolvedURI, request, clientEndpointType, webSocketBean));
+            .switchMap(resolvedURI -> connectWebSocket(resolvedURI, request, clientEndpointType, webSocketBean));
 
     }
 
@@ -948,19 +948,19 @@ final class NettyHttpClient implements
             StreamedHttpResponse streamedHttpResponse = NettyHttpResponseBuilder.toStreamResponse(response);
             Flux<HttpContent> httpContentReactiveSequence = Flux.from(streamedHttpResponse);
             return httpContentReactiveSequence
-                    .filter(message -> !(message.content() instanceof EmptyByteBuf))
-                    .map(message -> {
-                        ByteBuf byteBuf = message.content();
-                        if (log.isTraceEnabled()) {
-                            log.trace("HTTP Client Streaming Response Received Chunk (length: {}) for Request: {} {}",
-                                    byteBuf.readableBytes(), request.getMethodName(), request.getUri());
-                            traceBody("Response", byteBuf);
-                        }
-                        ByteBuffer<?> byteBuffer = byteBufferFactory.wrap(byteBuf);
-                        NettyStreamedHttpResponse<ByteBuffer<?>> thisResponse = new NettyStreamedHttpResponse<>(streamedHttpResponse, conversionService);
-                        thisResponse.setBody(byteBuffer);
-                        return (HttpResponse<ByteBuffer<?>>) new HttpResponseWrapper<>(thisResponse);
-                    });
+                .filter(message -> !(message.content() instanceof EmptyByteBuf))
+                .map(message -> {
+                    ByteBuf byteBuf = message.content();
+                    if (log.isTraceEnabled()) {
+                        log.trace("HTTP Client Streaming Response Received Chunk (length: {}) for Request: {} {}",
+                            byteBuf.readableBytes(), request.getMethodName(), request.getUri());
+                        traceBody("Response", byteBuf);
+                    }
+                    ByteBuffer<?> byteBuffer = byteBufferFactory.wrap(byteBuf);
+                    NettyStreamedHttpResponse<ByteBuffer<?>> thisResponse = new NettyStreamedHttpResponse<>(streamedHttpResponse, conversionService);
+                    thisResponse.setBody(byteBuffer);
+                    return (HttpResponse<ByteBuffer<?>>) new HttpResponseWrapper<>(thisResponse);
+                });
         });
     }
 
@@ -986,15 +986,15 @@ final class NettyHttpClient implements
             return byteBufferFactory.wrap(byteBuf);
         };
         return streamResponsePublisher.switchMap(response -> {
-                    if (!(response instanceof NettyStreamedHttpResponse)) {
-                        throw new IllegalStateException("Response has been wrapped in non streaming type. Do not wrap the response in client filters for stream requests");
-                    }
-                    NettyStreamedHttpResponse nettyStreamedHttpResponse = (NettyStreamedHttpResponse) response;
-                    Flux<HttpContent> httpContentReactiveSequence = Flux.from(nettyStreamedHttpResponse.getNettyResponse());
-                    return httpContentReactiveSequence
-                            .filter(message -> !(message.content() instanceof EmptyByteBuf))
-                            .map(contentMapper);
-                });
+            if (!(response instanceof NettyStreamedHttpResponse)) {
+                throw new IllegalStateException("Response has been wrapped in non streaming type. Do not wrap the response in client filters for stream requests");
+            }
+            NettyStreamedHttpResponse nettyStreamedHttpResponse = (NettyStreamedHttpResponse) response;
+            Flux<HttpContent> httpContentReactiveSequence = Flux.from(nettyStreamedHttpResponse.getNettyResponse());
+            return httpContentReactiveSequence
+                .filter(message -> !(message.content() instanceof EmptyByteBuf))
+                .map(contentMapper);
+        });
     }
 
     /**
@@ -1050,40 +1050,40 @@ final class NettyHttpClient implements
     }
 
     @Override
-    public Publisher<MutableHttpResponse<?>> proxy(io.micronaut.http. HttpRequest<?> request) {
+    public Publisher<MutableHttpResponse<?>> proxy(io.micronaut.http.HttpRequest<?> request) {
         return proxy(request, ProxyRequestOptions.getDefault());
     }
 
     @Override
-    public Publisher<MutableHttpResponse<?>> proxy(io.micronaut.http. HttpRequest<?> request, ProxyRequestOptions options) {
+    public Publisher<MutableHttpResponse<?>> proxy(io.micronaut.http.HttpRequest<?> request, ProxyRequestOptions options) {
         Objects.requireNonNull(options, "options");
         setupConversionService(request);
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
         return toMono(resolveRequestURI(request)
-                .flatMap(requestURI -> {
-                    MutableHttpRequest<?> httpRequest = toMutableRequest(request);
-                    if (!options.isRetainHostHeader()) {
-                        httpRequest.headers(headers -> headers.remove(HttpHeaderNames.HOST));
-                    }
+            .flatMap(requestURI -> {
+                MutableHttpRequest<?> httpRequest = toMutableRequest(request);
+                if (!options.isRetainHostHeader()) {
+                    httpRequest.headers(headers -> headers.remove(HttpHeaderNames.HOST));
+                }
 
-                    return this.sendRequestWithRedirects(
-                        propagatedContext,
-                        null,
-                        httpRequest.uri(requestURI),
-                        (req, resp) -> {
-                            Publisher<HttpContent> body;
-                            if (!hasBody(resp)) {
-                                resp.close();
-                                body = Flux.empty();
-                            } else {
-                                body = NettyByteBodyFactory.toByteBufs(resp.byteBody()).map(DefaultHttpContent::new);
-                            }
-
-                            return ExecutionFlow.<HttpResponse<?>>just(toStreamingResponse(resp, body))
-                                .flatMap(r -> handleStreamHttpError(r, false));
+                return this.sendRequestWithRedirects(
+                    propagatedContext,
+                    null,
+                    httpRequest.uri(requestURI),
+                    (req, resp) -> {
+                        Publisher<HttpContent> body;
+                        if (!hasBody(resp)) {
+                            resp.close();
+                            body = Flux.empty();
+                        } else {
+                            body = NettyByteBodyFactory.toByteBufs(resp.byteBody()).map(DefaultHttpContent::new);
                         }
-                    );
-                })
+
+                        return ExecutionFlow.<HttpResponse<?>>just(toStreamingResponse(resp, body))
+                            .flatMap(r -> handleStreamHttpError(r, false));
+                    }
+                );
+            })
             .map(HttpResponse::toMutableResponse), propagatedContext);
     }
 
@@ -1119,9 +1119,9 @@ final class NettyHttpClient implements
     }
 
     /**
-     * @param parentRequest      The parent request
-     * @param request            The redirect location request
-     * @param <I>                The input type
+     * @param parentRequest The parent request
+     * @param request       The redirect location request
+     * @param <I>           The input type
      * @return A {@link Publisher} with the resolved URI
      */
     <I> ExecutionFlow<URI> resolveRedirectURI(io.micronaut.http.HttpRequest<?> parentRequest, io.micronaut.http.HttpRequest<I> request) {
@@ -1148,10 +1148,10 @@ final class NettyHttpClient implements
     }
 
     /**
-     * @param request                The request
-     * @param requestURI             The URI of the request
-     * @param requestContentType     The request content type
-     * @param permitsBody            Whether permits body
+     * @param request            The request
+     * @param requestURI         The URI of the request
+     * @param requestContentType The request content type
+     * @param permitsBody        Whether permits body
      * @return The body
      * @throws HttpPostRequestEncoder.ErrorDataEncoderException if there is an encoder exception
      */
@@ -1266,6 +1266,7 @@ final class NettyHttpClient implements
                             final CompositeByteBuf buffer = byteBufferFactory.getNativeAllocator().compositeBuffer();
                             @Nullable
                             Subscription s;
+
                             @Override
                             public void onSubscribe(Subscription s) {
                                 this.s = s;
@@ -1327,23 +1328,23 @@ final class NettyHttpClient implements
         }
 
         return selected.map(server -> {
-                    Optional<String> authInfo = server.getMetadata().get(io.micronaut.http.HttpHeaders.AUTHORIZATION_INFO, String.class);
-                    if (request instanceof MutableHttpRequest<?> httpRequest && authInfo.isPresent()) {
-                        httpRequest.getHeaders().auth(authInfo.get());
-                    }
-
-                    try {
-                        return server.resolve(includeContextPath ? ContextPathUtils.prepend(requestURI, contextPath) : requestURI);
-                    } catch (URISyntaxException e) {
-                        throw decorate(new HttpClientException("Failed to construct the request URI", e));
-                    }
+                Optional<String> authInfo = server.getMetadata().get(io.micronaut.http.HttpHeaders.AUTHORIZATION_INFO, String.class);
+                if (request instanceof MutableHttpRequest<?> httpRequest && authInfo.isPresent()) {
+                    httpRequest.getHeaders().auth(authInfo.get());
                 }
+
+                try {
+                    return server.resolve(includeContextPath ? ContextPathUtils.prepend(requestURI, contextPath) : requestURI);
+                } catch (URISyntaxException e) {
+                    throw decorate(new HttpClientException("Failed to construct the request URI", e));
+                }
+            }
         );
     }
 
     private <R extends HttpResponse<?>> ExecutionFlow<R> handleStreamHttpError(
-            R response,
-            boolean failOnError
+        R response,
+        boolean failOnError
     ) {
         boolean errorStatus = response.code() >= 400;
         if (errorStatus && failOnError) {
@@ -1389,16 +1390,16 @@ final class NettyHttpClient implements
      * This is the high-level request method. It sits above {@link #sendRawRequest} and handles
      * things like filters, error handling, response parsing, request writing.
      *
-     * @param propagatedContext The context propagated from the original client call
+     * @param propagatedContext  The context propagated from the original client call
      * @param preferredScheduler A reference holding the preferred scheduler for timeouts. This is
      *                           replaced by the connection event loop ASAP so that callers can take
      *                           advantage of locality
-     * @param blockHint         The optional block hint
-     * @param request           The request to send. Must have resolved absolute URI (see {@link #resolveURI})
-     * @param readResponse      Function that reads the response from the raw
-     *                          {@link NettyClientByteBodyResponse} representation. This is run exactly
-     *                          once, but if there is a redirect, it potentially runs with a different
-     *                          request than the original (which is why it has a request parameter)
+     * @param blockHint          The optional block hint
+     * @param request            The request to send. Must have resolved absolute URI (see {@link #resolveURI})
+     * @param readResponse       Function that reads the response from the raw
+     *                           {@link NettyClientByteBodyResponse} representation. This is run exactly
+     *                           once, but if there is a redirect, it potentially runs with a different
+     *                           request than the original (which is why it has a request parameter)
      * @return A mono containing the response
      */
     private ExecutionFlow<HttpResponse<?>> sendRequestWithRedirects(
@@ -1519,9 +1520,9 @@ final class NettyHttpClient implements
     /**
      * This is the low-level request method, without redirect handling and with raw body bytes.
      *
-     * @param poolHandle         The pool handle to send the request on
-     * @param request            The request to send
-     * @param byteBody           The request body
+     * @param poolHandle The pool handle to send the request on
+     * @param request    The request to send
+     * @param byteBody   The request body
      * @return A mono containing the response
      */
     private ExecutionFlow<NettyClientByteBodyResponse> sendRawRequest(
@@ -1797,22 +1798,22 @@ final class NettyHttpClient implements
                 @Override
                 public InterfaceHttpData createFileUpload(String name, String filename, MediaType contentType, @Nullable String encoding, @Nullable Charset charset, long length) {
                     return factory.createFileUpload(
-                            baseRequest,
-                            name,
-                            filename,
-                            contentType.toString(),
-                            encoding,
-                            charset,
-                            length
+                        baseRequest,
+                        name,
+                        filename,
+                        contentType.toString(),
+                        encoding,
+                        charset,
+                        length
                     );
                 }
 
                 @Override
                 public InterfaceHttpData createAttribute(String name, String value) {
                     return factory.createAttribute(
-                            baseRequest,
-                            name,
-                            value
+                        baseRequest,
+                        name,
+                        value
                     );
                 }
 
@@ -2012,8 +2013,8 @@ final class NettyHttpClient implements
         private final boolean secure;
 
         /**
-         * @param ctx The HTTP client that created this request key. Only used for exception
-         *            context, not stored
+         * @param ctx        The HTTP client that created this request key. Only used for exception
+         *                   context, not stored
          * @param requestURI The request URI
          */
         public RequestKey(NettyHttpClient ctx, URI requestURI) {
@@ -2072,8 +2073,8 @@ final class NettyHttpClient implements
             }
             RequestKey that = (RequestKey) o;
             return port == that.port &&
-                    secure == that.secure &&
-                    Objects.equals(host, that.host);
+                secure == that.secure &&
+                Objects.equals(host, that.host);
         }
 
         @Override
