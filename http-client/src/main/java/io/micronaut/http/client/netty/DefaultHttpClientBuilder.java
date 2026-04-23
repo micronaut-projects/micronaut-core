@@ -228,7 +228,7 @@ public final class DefaultHttpClientBuilder {
         }
         if (delegate.configuration.getLoggerName().isEmpty()) {
             if (!createdDefaultConfiguration) {
-                originalLoggerName = delegate.configuration.getLoggerName();
+                originalLoggerName = delegate.configuration.getLoggerName().orElse(null);
                 restoreLoggerName = true;
             }
             delegate.configuration.setLoggerName(DefaultHttpClient.class.getName());
