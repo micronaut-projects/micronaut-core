@@ -85,7 +85,7 @@ public class DefaultHttpClient implements
     private final AsyncHttpClient asyncHttpClient;
 
     DefaultHttpClient(DefaultHttpClientBuilder builder) {
-        this(new NettyHttpClient(new NettyHttpClientBuilder(builder)));
+        this(builder.nettyBuilder().build());
     }
 
     /**

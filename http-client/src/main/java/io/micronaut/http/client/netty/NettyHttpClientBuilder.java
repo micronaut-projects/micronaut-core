@@ -105,32 +105,6 @@ final class NettyHttpClientBuilder {
     NettyHttpClientBuilder() {
     }
 
-    NettyHttpClientBuilder(DefaultHttpClientBuilder builder) {
-        this.loadBalancer = builder.loadBalancer;
-        this.explicitHttpVersion = builder.explicitHttpVersion;
-        this.configuration = builder.configuration;
-        this.contextPath = builder.contextPath;
-        this.annotationMetadataResolver = builder.annotationMetadataResolver;
-        this.filterResolver = builder.filterResolver;
-        this.clientFilterEntries = builder.clientFilterEntries;
-        this.threadFactory = builder.threadFactory;
-        this.nettyClientSslBuilder = builder.nettyClientSslBuilder;
-        this.sslFactory = builder.sslFactory;
-        this.certificateProviders = builder.certificateProviders;
-        this.codecRegistry = builder.codecRegistry;
-        this.handlerRegistry = builder.handlerRegistry;
-        this.webSocketBeanRegistry = builder.webSocketBeanRegistry;
-        this.requestBinderRegistry = builder.requestBinderRegistry;
-        this.eventLoopGroup = builder.eventLoopGroup;
-        this.socketChannelFactory = builder.socketChannelFactory;
-        this.udpChannelFactory = builder.udpChannelFactory;
-        this.clientCustomizer = builder.clientCustomizer;
-        this.informationalServiceId = builder.informationalServiceId;
-        this.conversionService = builder.conversionService;
-        this.resolverGroup = builder.resolverGroup;
-        this.blockingExecutor = builder.blockingExecutor;
-    }
-
     NettyHttpClientBuilder loadBalancer(@Nullable LoadBalancer loadBalancer) {
         this.loadBalancer = loadBalancer;
         return this;
