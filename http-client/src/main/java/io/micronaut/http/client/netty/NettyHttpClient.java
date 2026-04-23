@@ -2068,10 +2068,9 @@ final class NettyHttpClient implements
             if (this == o) {
                 return true;
             }
-            if (o == null || getClass() != o.getClass()) {
+            if (!(o instanceof RequestKey that)) {
                 return false;
             }
-            RequestKey that = (RequestKey) o;
             return port == that.port &&
                 secure == that.secure &&
                 Objects.equals(host, that.host);
