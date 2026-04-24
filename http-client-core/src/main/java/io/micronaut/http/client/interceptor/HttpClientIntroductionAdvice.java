@@ -106,6 +106,7 @@ import java.util.function.Supplier;
 public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, Object> {
 
     private static final Logger LOG = LoggerFactory.getLogger(HttpClientIntroductionAdvice.class);
+    private static final String HTTP_ERROR_RESPONSE_LOG_MESSAGE = "Client [{}] received HTTP error response: {}";
 
     /**
      * The default Accept-Types.
@@ -273,7 +274,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                             ? completionException.getCause()
                             : throwable;
                         if (LOG.isDebugEnabled()) {
-                            LOG.debug("Client [{}] received HTTP error response: {}", declaringType.getName(), cause.getMessage(), cause);
+                            LOG.debug(HTTP_ERROR_RESPONSE_LOG_MESSAGE, declaringType.getName(), cause.getMessage(), cause);
                         }
                         if (cause instanceof HttpClientResponseException e && e.code() == HttpStatus.NOT_FOUND.getCode()) {
                             if (reactiveValueType == Optional.class) {
@@ -328,7 +329,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
         if (LOG.isDebugEnabled()) {
             publisher = Flux.from(publisher).doOnError(t ->
-                LOG.debug("Client [{}] received HTTP error response: {}", declaringType.getName(), t.getMessage(), t)
+                LOG.debug(HTTP_ERROR_RESPONSE_LOG_MESSAGE, declaringType.getName(), t.getMessage(), t)
             );
         }
 
@@ -641,7 +642,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             }
         } catch (RuntimeException t) {
             if (LOG.isDebugEnabled()) {
-                LOG.debug("Client [{}] received HTTP error response: {}", clientName, t.getMessage(), t);
+                LOG.debug(HTTP_ERROR_RESPONSE_LOG_MESSAGE, clientName, t.getMessage(), t);
             }
 
             if (t instanceof HttpClientResponseException exception && exception.code() == HttpStatus.NOT_FOUND.getCode()) {

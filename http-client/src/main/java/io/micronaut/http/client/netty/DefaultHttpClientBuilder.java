@@ -233,12 +233,18 @@ public final class DefaultHttpClientBuilder {
             }
             delegate.configuration.setLoggerName(DefaultHttpClient.class.getName());
         }
+        DefaultHttpClient client;
         try {
-            return new DefaultHttpClient(delegate.build());
-        } finally {
+            client = new DefaultHttpClient(delegate.build());
+        } catch (RuntimeException | Error e) {
             if (restoreLoggerName) {
                 delegate.configuration.setLoggerName(originalLoggerName);
             }
+            throw e;
         }
+        if (restoreLoggerName) {
+            delegate.configuration.setLoggerName(originalLoggerName);
+        }
+        return client;
     }
 }

@@ -432,7 +432,8 @@ final class NettyHttpClient implements
                         here.""");
                 }
                 BlockHint blockHint = BlockHint.willBlockThisThread();
-                return NettyHttpClient.this.exchange(request, bodyType, errorType, blockHint).block();
+                return Objects.requireNonNull(NettyHttpClient.this.exchange(request, bodyType, errorType, blockHint).block(),
+                    "The blocking HTTP client returned a null response");
                 // We don't have to release client response buffer
             }
 
@@ -1361,7 +1362,7 @@ final class NettyHttpClient implements
             requestBody = NettyByteBodyFactory.empty();
         }
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
-        ExecutionFlow<HttpResponse<?>> mono = null;
+        ExecutionFlow<HttpResponse<?>> mono;
         try {
             mono = sendRequestWithRedirects(
                 propagatedContext,
@@ -1369,10 +1370,9 @@ final class NettyHttpClient implements
                 new RawHttpRequestWrapper<>(conversionService, request.toMutableRequest(), requestBody),
                 (req, resp) -> ExecutionFlow.just(resp)
             );
-        } finally {
-            if (mono == null) {
-                requestBody.close();
-            }
+        } catch (RuntimeException | Error e) {
+            requestBody.close();
+            throw e;
         }
         return toMono(mono, propagatedContext).doOnTerminate(requestBody::close);
     }
