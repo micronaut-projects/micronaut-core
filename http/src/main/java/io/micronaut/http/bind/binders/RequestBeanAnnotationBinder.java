@@ -30,10 +30,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.annotation.RequestBean;
 import io.micronaut.http.bind.RequestBinderRegistry;
 
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -69,6 +66,8 @@ public class RequestBeanAnnotationBinder<T> implements AnnotatedRequestArgumentB
         boolean hasAnnotation = annotationMetadata.hasAnnotation(RequestBean.class);
 
         if (hasAnnotation) {
+            boolean bindingFound = false;
+
             BeanIntrospection<T> introspection = BeanIntrospection.getIntrospection(context.getArgument().getType());
             Map<String, BeanProperty<T, Object>> beanProperties = introspection.getBeanProperties().stream()
                     .collect(Collectors.toMap(Named::getName, p -> p));
@@ -88,18 +87,37 @@ public class RequestBeanAnnotationBinder<T> implements AnnotatedRequestArgumentB
                         argumentToBind = constructorArgument;
                     }
                     Optional<Object> bindableResult = getBindableResult(source, argumentToBind);
+                    if (bindableResult.isPresent()) {
+                        bindingFound = true;
+                    }
                     argumentValues[i] = constructorArgument.isOptional() ? bindableResult : bindableResult.orElse(null);
+                }
+                if (!bindingFound) {
+                    return BindingResult.empty();
                 }
                 return () -> Optional.of(introspection.instantiate(false, argumentValues));
             } else {
                 // Handle injection with setters, we checked that all values are writable at compile time
-                T bean = introspection.instantiate();
+                Map<BeanProperty<T, Object>, Optional<Object>> bindableResults = new LinkedHashMap<>();
                 for (BeanProperty<T, Object> property : beanProperties.values()) {
                     Argument<Object> propertyArgument = property.asArgument();
                     Optional<Object> bindableResult = getBindableResult(source, propertyArgument);
-                    property.set(bean, propertyArgument.isOptional()
-                            ? bindableResult
-                            : bindableResult.orElse(null));
+                    bindableResults.put(property, bindableResult);
+                    if (bindableResult.isPresent()) {
+                        bindingFound = true;
+                    }
+                }
+                if (!bindingFound) {
+                    return BindingResult.empty();
+                }
+
+                T bean = introspection.instantiate();
+                for (BeanProperty<T, Object> property: bindableResults.keySet()) {
+                    Optional<Object> bindableResult = bindableResults.get(property);
+                    property.set(bean, property.asArgument().isOptional()
+                        ? bindableResult
+                        : bindableResult.orElse(null)
+                    );
                 }
                 return () -> Optional.of(bean);
             }

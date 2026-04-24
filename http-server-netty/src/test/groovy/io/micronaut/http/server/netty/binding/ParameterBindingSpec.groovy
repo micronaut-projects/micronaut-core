@@ -93,6 +93,9 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
         HttpMethod.GET  | '/parameter/arrayStyle?param[]=a&param[]=b&param[]=c' | "Parameter Value: [a, b, c]"    | HttpStatus.OK
 
         HttpMethod.GET  | '/parameter/query-object?age=30&title=JavaBook&author=JavaAuthor' | "Parameter Value: 30 JavaBook" | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/query-object'                       | null                        | HttpStatus.BAD_REQUEST
+        HttpMethod.GET  | '/parameter/query-object?age=30'                | "Parameter Value: 30 null"  | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/query-object-nullable'              | "null"                      | HttpStatus.OK
         HttpMethod.GET  | '/parameter/query-record?page=1&size=123' | "Parameter Value: 1 123" | HttpStatus.OK
     }
 
@@ -235,6 +238,11 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
         @Get('/query-object')
         String queryObject(@QueryValue Book book) {
             "Parameter Value: $book.age $book.title"
+        }
+
+        @Get("/query-object-nullable")
+        String queryObjectNull(@QueryValue @Nullable Book book) {
+            return book == null ? "null" : "not-null"
         }
 
         @Get('/query-record')
