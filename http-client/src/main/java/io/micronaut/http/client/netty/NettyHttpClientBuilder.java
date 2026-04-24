@@ -50,11 +50,11 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 
 /**
- * While {@link NettyHttpClient} is internal API, there are a few uses outside micronaut-core
- * that use it directly, in particular micronaut-oracle-cloud. This builder acts as API for those
- * users.
+ * Internal builder for configuring and constructing {@link NettyHttpClient} instances.
  * <p>
- * If you need to make a method of this builder public, please document the module that uses it.
+ * This type is not part of the public API. If functionality from this builder is needed outside
+ * this package, expose it through an appropriate supported public API instead of documenting this
+ * class for external use.
  *
  * @author Jonas Konrad
  * @since 4.7.0

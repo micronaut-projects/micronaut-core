@@ -726,7 +726,7 @@ final class NettyHttpClient implements
      * @param <I>       The request type
      * @param <O>       The body type
      * @param <E>       The error type
-     * @return THe execution flow
+     * @return The execution flow
      */
     public <I, O, E> ExecutionFlow<HttpResponse<O>> exchangeFlow(io.micronaut.http.HttpRequest<I> request,
                                                                  @Nullable Argument<O> bodyType,
